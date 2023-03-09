@@ -1,0 +1,14 @@
+{
+  "pins" : [
+    {
+      "identity" : "sceyt-chat-ios-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sceyt/sceyt-chat-ios-sdk.git",
+      "state" : {
+        "revision" : "55625a248ef502b589d5731e712ceb829f642a79",
+        "version" : "1.0.10"
+      }
+    }
+  ],
+  "version" : 2
+}
