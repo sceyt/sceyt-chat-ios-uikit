@@ -312,15 +312,15 @@ extension MessageCell {
             willHideProgressView()
             UIView.animate(withDuration: progressView.animationDuration + 0.1) { [weak self] in
                 guard let self else { return }
-                progressView.transform = .init(scaleX: 0.01, y: 0.01)
-                pauseButton.transform = .init(scaleX: 0.01, y: 0.01)
+                self.progressView.transform = .init(scaleX: 0.01, y: 0.01)
+                self.pauseButton.transform = .init(scaleX: 0.01, y: 0.01)
             } completion: { [weak self] _ in
                 guard let self else { return }
-                progressView.isHidden = true
-                pauseButton.isHidden = true
-                progressView.transform = .identity
-                pauseButton.transform = .identity
-                didHideProgressView()
+                self.progressView.isHidden = true
+                self.pauseButton.isHidden = true
+                self.progressView.transform = .identity
+                self.pauseButton.transform = .identity
+                self.didHideProgressView()
             }
         }
         

@@ -156,14 +156,14 @@ open class ChannelListVM: NSObject,
         searchService.search(query: query) { [weak self] chats, channels in
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                searchResults = ChannelSearchResultImp(chats: chats, channels: channels)
-                event = .reloadSearch
+                self.searchResults = ChannelSearchResultImp(chats: chats, channels: channels)
+                self.event = .reloadSearch
             }
         } globalBlock: { [weak self] channels in
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                (searchResults as? ChannelSearchResultImp)?.channels = channels
-                event = .reloadSearch
+                (self.searchResults as? ChannelSearchResultImp)?.channels = channels
+                self.event = .reloadSearch
             }
         } errorBlock: { error in
             log.error("[search] error \(error)")

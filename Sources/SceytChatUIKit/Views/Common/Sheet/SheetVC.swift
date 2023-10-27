@@ -293,16 +293,16 @@ open class SheetVC: ViewController {
         if animated {
             UIView.animate(withDuration: Layouts.animationDuration, animations: { [weak self] in
                 guard let self else { return }
-                topConstraint?.isActive = false
-                anchorConstraint?.isActive = false
-                switch style {
+                self.topConstraint?.isActive = false
+                self.anchorConstraint?.isActive = false
+                switch self.style {
                 case .center:
-                    child?.alpha = 0
+                    self.child?.alpha = 0
                 default:
-                    topConstraint = scrollView.topAnchor.pin(to: view.bottomAnchor)
+                    self.topConstraint = self.scrollView.topAnchor.pin(to: self.view.bottomAnchor)
                 }
-                view.backgroundColor = .clear
-                view.layoutIfNeeded()
+                self.view.backgroundColor = .clear
+                self.view.layoutIfNeeded()
             }, completion: { _ in
                 super.dismiss(animated: false, completion: completion)
             })

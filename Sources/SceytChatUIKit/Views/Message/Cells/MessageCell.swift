@@ -559,11 +559,11 @@ open class MessageCell: CollectionViewCell,
         func reset() {
             UIView.animate(withDuration: 0.25) { [weak self] in
                 guard let self else { return }
-                containerView.transform = .identity
-                replyIcon.transform = .identity
+                self.containerView.transform = .identity
+                self.replyIcon.transform = .identity
             } completion: { [weak self] _ in
                 guard let self else { return }
-                replyIcon.isHidden = true
+                self.replyIcon.isHidden = true
             }
         }
         guard let sender else {

@@ -106,9 +106,9 @@ open class ChannelProfileEditVC: ViewController,
             hud.isLoading = false
             guard let self else { return }
             if let error {
-                showAlert(error: error)
+                self.showAlert(error: error)
             } else {
-                router.pop()
+                self.router.pop()
             }
         }
     }
@@ -177,7 +177,7 @@ open class ChannelProfileEditVC: ViewController,
             cell.textField.text = profileViewModel.channel.uri
             cell.onTextChanged = { [weak self] in guard let self else { return }
                 let uri = $0?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                profileViewModel.uri = uri
+                self.profileViewModel.uri = uri
             }
             _cell = cell
         case .none:
@@ -221,29 +221,29 @@ open class ChannelProfileEditVC: ViewController,
             guard let self else { return }
             switch type {
             case .camera:
-                router.showCamera(mediaTypes: [.image]) { [weak self] picked in
+                self.router.showCamera(mediaTypes: [.image]) { [weak self] picked in
                     guard let self, let picked else { return }
-                    router.editImage(picked.thumbnail) { [weak self] edited in
+                    self.router.editImage(picked.thumbnail) { [weak self] edited in
                         guard let self,
                               let jpeg = Components.imageBuilder.init(image: edited).jpegData(),
                               let url = Components.storage.storeData(jpeg, filePath: picked.url.path)
                         else { return }
-                        profileViewModel.avatarUrl = url.absoluteString
+                        self.profileViewModel.avatarUrl = url.absoluteString
                     }
                 }
             case .photoLibrary:
-                router.selectPhoto(mediaTypes: [.image]) { [weak self] picked in
+                self.router.selectPhoto(mediaTypes: [.image]) { [weak self] picked in
                     guard let self, let picked else { return }
-                    router.editImage(picked.thumbnail) { [weak self] edited in
+                    self.router.editImage(picked.thumbnail) { [weak self] edited in
                         guard let self,
                               let jpeg = Components.imageBuilder.init(image: edited).jpegData(),
                               let url = Components.storage.storeData(jpeg, filePath: picked.url.path)
                         else { return }
-                        profileViewModel.avatarUrl = url.absoluteString
+                        self.profileViewModel.avatarUrl = url.absoluteString
                     }
                 }
             case .delete:
-                profileViewModel.avatarUrl = nil
+                self.profileViewModel.avatarUrl = nil
             case .none:
                 break
             }

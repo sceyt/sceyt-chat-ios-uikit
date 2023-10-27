@@ -123,10 +123,10 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 guard let self else { return }
                 switch $0 {
                 case .textChanged:
-                    updateState()
-                    updateMentions()
+                    self.updateState()
+                    self.updateMentions()
                 case let .contentSizeUpdate(old: _, new: new):
-                    update(height: max(0, new))
+                    self.update(height: max(0, new))
                 }
             }.store(in: &subscriptions)
         
@@ -137,15 +137,15 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 guard let self else { return }
                 switch $0 {
                 case .bold:
-                    toggleAttribute(component: .bold, range: inputTextView.selectedRange, textView: inputTextView)
+                    self.toggleAttribute(component: .bold, range: self.inputTextView.selectedRange, textView: self.inputTextView)
                 case .italic:
-                    toggleAttribute(component: .italic, range: inputTextView.selectedRange, textView: inputTextView)
+                    self.toggleAttribute(component: .italic, range: self.inputTextView.selectedRange, textView: self.inputTextView)
                 case .monospace:
-                    toggleAttribute(component: .monospace, range: inputTextView.selectedRange, textView: inputTextView)
+                    self.toggleAttribute(component: .monospace, range: self.inputTextView.selectedRange, textView: self.inputTextView)
                 case .strikethrough:
-                    toggleAttribute(component: .strikethrough, range: inputTextView.selectedRange, textView: inputTextView)
+                    self.toggleAttribute(component: .strikethrough, range: self.inputTextView.selectedRange, textView: self.inputTextView)
                 case .underline:
-                    toggleAttribute(component: .underline, range: inputTextView.selectedRange, textView: inputTextView)
+                    self.toggleAttribute(component: .underline, range: self.inputTextView.selectedRange, textView: self.inputTextView)
                 }
             }.store(in: &subscriptions)
 
@@ -706,12 +706,12 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         actionViewHeightLayoutConstraint.constant = 0
         onContentHeightUpdate?(view.bounds.height - Layouts.actionViewHeight, { [weak self] in
             guard let self else { return }
-            actionView.titleLabel.text = nil
-            actionView.messageLabel.text = nil
-            actionView.imageView.isHidden = true
-            actionView.isHidden = true
-            separatorViewCenter.isHidden = true
-            isRemovingActionView = false
+            self.actionView.titleLabel.text = nil
+            self.actionView.messageLabel.text = nil
+            self.actionView.imageView.isHidden = true
+            self.actionView.isHidden = true
+            self.separatorViewCenter.isHidden = true
+            self.isRemovingActionView = false
         })
         currentState = nil
         if let state = nextState {

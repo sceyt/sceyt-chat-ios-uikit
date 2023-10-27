@@ -104,7 +104,7 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
         UIView.animate(withDuration: duration, animations: { [weak self] in
             guard let self else { return }
             dummyImageView.frame = UIScreen.main.bounds
-            dummyImageView.contentMode = imageContentMode
+            dummyImageView.contentMode = self.imageContentMode
             controller.view.alpha = 1.0
         }) { [weak self] finished in
             self?.observation = transitionVC.targetView?.observe(\.image, options: [.new, .initial]) { _, _ in

@@ -151,9 +151,9 @@ open class ChannelMemberListVC: ViewController,
             memberListViewModel.createChannel(userAt: indexPath) { [weak self] channel, error in
                 guard let self else { return }
                 if let channel {
-                    router.showChannelProfileVC(channel: channel)
+                    self.router.showChannelProfileVC(channel: channel)
                 } else if let error {
-                    showAlert(error: error)
+                    self.showAlert(error: error)
                 }
             }
         }
@@ -193,7 +193,7 @@ open class ChannelMemberListVC: ViewController,
             style: .destructive,
             handler: { [weak self] in
                 guard let self else { return }
-                let alert = showAlert(
+                let alert = self.showAlert(
                     title: isBroadcast ? L10n.Channel.Profile.Action.RemoveSubscriber.title : L10n.Channel.Profile.Action.RemoveMember.title,
                     message: isBroadcast ? L10n.Channel.Profile.Action.RemoveSubscriber.message(displayName) : L10n.Channel.Profile.Action.RemoveMember.message(displayName),
                     actions: [
@@ -225,7 +225,7 @@ open class ChannelMemberListVC: ViewController,
                     title: L10n.Channel.Profile.Action.RevokeAdmin.title,
                     icon: .chatRevoke) { [weak self] in
                     guard let self else { return }
-                    let alert = showAlert(
+                        let alert = self.showAlert(
                         title: L10n.Channel.Profile.Action.RevokeAdmin.title,
                         message: isBroadcast ? L10n.Channel.Profile.Action.RevokeAdmin.message(displayName) : L10n.Channel.Profile.Action.RevokeAdmin.message(displayName),
                         actions: [

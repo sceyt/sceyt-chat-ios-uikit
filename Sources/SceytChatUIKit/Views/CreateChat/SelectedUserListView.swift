@@ -45,7 +45,7 @@ open class SelectedChannelListView: SelectedItemListView<ChatChannel> {
         cell.onDelete = { [weak self] cell in
             guard let self,
                   let indexPath = collectionView.indexPath(for: cell) else { return }
-            onDelete?(self.items[indexPath.item])
+            self.onDelete?(self.items[indexPath.item])
         }
         return cell
     }

@@ -53,7 +53,7 @@ open class FetchAllChannelsOperation: SyncOperation {
             self.onLoad?(channels)
             self.channels.append(contentsOf: channels)
             Components.channelListProvider.syncMessageForReactions(channels: channels)
-            if channels.count < query.limit || !query.hasNext {
+            if channels.count < self.query.limit || !self.query.hasNext {
                 self.finish(result: .success(self.channels))
             } else {
                 self.loadChannels()

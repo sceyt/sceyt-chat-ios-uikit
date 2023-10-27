@@ -9,8 +9,8 @@ import UIKit
 import SceytChatUIKit
 
 struct Config {
-    static let sceytHost = "https://us-ohio-api.sceyt.com"
-    static let sceytId = "8lwox2ge93"
+    static let sceytApiURL = "https://us-ohio-api.sceyt.com"
+    static let sceytAppId = "8lwox2ge93"
     static let genToken = "https://tlnig20qy7.execute-api.us-east-2.amazonaws.com/dev/user/genToken?user="
 }
 
@@ -52,7 +52,7 @@ func configureSceytChatUIKit() {
     SCTUIKitComponents.dataSession = SCTSession.default
     SCTUIKitConfig.syncChannelsAfterConnect = true
     SCTUIKitConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
-    SCTUIKitConfig.initialize(apiUrl: Config.sceytHost, appId: Config.sceytId, clientId: Config.clientId!)
+    SCTUIKitConfig.initialize(apiUrl: Config.sceytApiURL, appId: Config.sceytAppId, clientId: Config.clientId!)
     SCTUIKitConfig.setLogLevel(.verbose)
     
     SCTUIKitConfig.privateChannel = "group"

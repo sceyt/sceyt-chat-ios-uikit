@@ -204,8 +204,8 @@ open class ChannelVC: ViewController,
         
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self else { return }
-            titleView.setNeedsLayout()
-            titleView.layoutIfNeeded()
+            self.titleView.setNeedsLayout()
+            self.titleView.layoutIfNeeded()
         })
     }
     
@@ -228,11 +228,11 @@ open class ChannelVC: ViewController,
             guard let self else { return }
             switch $0 {
             case .delete:
-                router.showDeleteOptions(clear: false)
+                self.router.showDeleteOptions(clear: false)
             case .share:
-                showShareSelectedMessages()
+                self.showShareSelectedMessages()
             case .forward:
-                showForwardSelectedMessages()
+                self.showForwardSelectedMessages()
             }
         }
         
@@ -422,8 +422,8 @@ open class ChannelVC: ViewController,
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                updateNavigationItems()
-                collectionView.reloadData()
+                self.updateNavigationItems()
+                self.collectionView.reloadData()
             }.store(in: &subscriptions)
         
         channelViewModel.$isEditing
@@ -431,18 +431,18 @@ open class ChannelVC: ViewController,
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isEditing in
                 guard let self else { return }
-                updateNavigationItems()
+                self.updateNavigationItems()
                 if isEditing {
-                    shouldAnimateEditing = true
-                    collectionView.reloadData()
+                    self.shouldAnimateEditing = true
+                    self.collectionView.reloadData()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { [weak self] in
                         self?.shouldAnimateEditing = false
                     }
-                    bottomView.removeFromSuperview()
+                    self.bottomView.removeFromSuperview()
                 } else {
                     UIView.animate(withDuration: 0.3) { [weak self] in
                         guard let self else { return }
-                        collectionView.visibleCells.forEach {
+                        self.collectionView.visibleCells.forEach {
                             guard let cell = $0 as? MessageCell, cell.isEditing else { return }
                             let checkBoxSize = MessageCell.Layouts.checkBoxSize + 2 * MessageCell.Layouts.checkBoxPadding
                             cell.contentView.alpha = 1
@@ -454,7 +454,7 @@ open class ChannelVC: ViewController,
                     } completion: { [weak self] _ in
                         self?.collectionView.reloadData()
                     }
-                    showBottomViewIfNeeded()
+                    self.showBottomViewIfNeeded()
                 }
         }.store(in: &subscriptions)
         
@@ -898,14 +898,14 @@ open class ChannelVC: ViewController,
         router.showForward { [weak self] channels in
             guard let self else { return }
             hud.show()
-            channelViewModel.share(messages: messages, to: channels.map { $0.id }) { [weak self] in
+            self.channelViewModel.share(messages: messages, to: channels.map { $0.id }) { [weak self] in
                 guard let self else { return }
                 if channels.contains(self.channelViewModel.channel) {
-                    collectionView.scrollToBottom(animated: false) { _ in }
+                    self.collectionView.scrollToBottom(animated: false) { _ in }
                 } else if channels.count == 1 {
                     ChannelListRouter.showChannel(channels[0])
                 }
-                router.dismiss()
+                self.router.dismiss()
                 hud.hide()
             }
         }
@@ -1117,7 +1117,7 @@ open class ChannelVC: ViewController,
                 guard let self else { return }
                 cell.checkBoxView.transform = .identity
                 cell.containerView.transform = .identity
-                cell.contentView.alpha = channelViewModel.canSelectMessage(at: indexPath) ? 1 : 0.5
+                cell.contentView.alpha = self.channelViewModel.canSelectMessage(at: indexPath) ? 1 : 0.5
             }
         }
     }
@@ -1232,7 +1232,7 @@ open class ChannelVC: ViewController,
             case .didTapLink(let link):
                 self.showLink(link)
             case .didLongPressLink(let link):
-                router
+                self.router
                     .showLinkAlert(
                         link,
                         actions: [(L10n.Link.openIn, .default), (L10n.Link.copy, .default)])
@@ -1244,11 +1244,11 @@ open class ChannelVC: ViewController,
                     }
                 }
             case .didTapAvatar:
-                didSelectAvatar(layoutModel: model)
+                self.didSelectAvatar(layoutModel: model)
             case .didTapMentionUser(let userId):
-                didSelectMentionUser(userId: userId, layoutModel: model)
+                self.didSelectMentionUser(userId: userId, layoutModel: model)
             case .didSwipe:
-                reply(layoutModel: model, in: false)
+                self.reply(layoutModel: model, in: false)
             }
             
         }
@@ -1422,11 +1422,11 @@ open class ChannelVC: ViewController,
         if !thread {
             UIView.animate(withDuration: 0.25) { [weak self] in
                 guard let self else { return }
-                inputTextView.becomeFirstResponder()
-                view.layoutIfNeeded()
+                self.inputTextView.becomeFirstResponder()
+                self.view.layoutIfNeeded()
             } completion: { [weak self] _ in
                 guard let self else { return }
-                composerVC.addReply(layoutModel: layoutModel)
+                self.composerVC.addReply(layoutModel: layoutModel)
             }
         } else {
             showThreadForMessage(layoutModel.message)
@@ -1515,9 +1515,9 @@ open class ChannelVC: ViewController,
         channelViewModel.directChannel(userId: userId) { [weak self] channel, error in
             guard let self else { return }
             if let channel {
-                router.showChannelProfileVC(channel: channel)
+                self.router.showChannelProfileVC(channel: channel)
             } else if let error {
-                showAlert(error: error)
+                self.showAlert(error: error)
             }
         }
     }
@@ -1543,13 +1543,13 @@ open class ChannelVC: ViewController,
                 guard let self else { return }
                 UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
                     guard let self else { return }
-                    collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
+                    self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
                 } completion: { [weak self] _ in
                     guard let self else { return }
-                    if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {
-                        highlightCell(cell)
+                    if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
+                        self.highlightCell(cell)
                     }
-                    updateUnreadViewVisibility()
+                    self.updateUnreadViewVisibility()
                 }
             }
         }
@@ -1574,11 +1574,11 @@ open class ChannelVC: ViewController,
             guard let self else { return }
             UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
                 guard let self else { return }
-                collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
+                self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
             } completion: { [weak self] _ in
                 guard let self else { return }
-                if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {
-                    highlightCell(cell)
+                if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
+                    self.highlightCell(cell)
                 }
             }
         }

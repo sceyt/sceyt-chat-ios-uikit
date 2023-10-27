@@ -98,8 +98,8 @@ open class ChannelForwardVC: ViewController,
         
         selectedChannelListView.onDelete = { [weak self] in
             guard let self else { return }
-            viewModel.deselect($0)
-            tableView.reloadData()
+            self.viewModel.deselect($0)
+            self.tableView.reloadData()
         }
     }
     
@@ -109,8 +109,8 @@ open class ChannelForwardVC: ViewController,
         if selectedChannelListViewTop.constant != view.safeAreaInsets.top {
             UIView.animate(withDuration: 0.25) { [weak self] in
                 guard let self else { return }
-                selectedChannelListViewTop.constant = view.safeAreaInsets.top
-                view.layoutIfNeeded()
+                self.selectedChannelListViewTop.constant = self.view.safeAreaInsets.top
+                self.view.layoutIfNeeded()
             }
         }
     }
@@ -131,8 +131,8 @@ open class ChannelForwardVC: ViewController,
                 if selectedChannelListViewHeight.constant == 0 {
                     UIView.animate(withDuration: 0.25) { [weak self] in
                         guard let self else { return }
-                        selectedChannelListViewHeight.constant = Layouts.selectedViewHeight
-                        view.layoutIfNeeded()
+                        self.selectedChannelListViewHeight.constant = Layouts.selectedViewHeight
+                        self.view.layoutIfNeeded()
                     }
                 }
             } else {
@@ -142,8 +142,8 @@ open class ChannelForwardVC: ViewController,
                 {
                     UIView.animate(withDuration: 0.25) { [weak self] in
                         guard let self else { return }
-                        selectedChannelListViewHeight.constant = 0
-                        view.layoutIfNeeded()
+                        self.selectedChannelListViewHeight.constant = 0
+                        self.view.layoutIfNeeded()
                     }
                 }
             }

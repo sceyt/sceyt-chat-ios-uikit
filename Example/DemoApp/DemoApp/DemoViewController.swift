@@ -49,7 +49,7 @@ class DemoViewController: UITableViewController {
                 .font: Appearance.Fonts.bold.withSize(16),
                 .foregroundColor: Appearance.Colors.kitBlue
             ], for: [])
-        
+        UITabBar.appearance().tintColor = Appearance.Colors.kitBlue
         let nav = NavigationController(rootViewController: SCTUIKitComponents.channelListVC.init())
         nav.modalPresentationStyle = .fullScreen
         tab.viewControllers = [nav]

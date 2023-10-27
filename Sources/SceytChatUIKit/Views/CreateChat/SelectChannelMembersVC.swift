@@ -108,8 +108,8 @@ open class SelectChannelMembersVC: ViewController,
         if selectedUserListViewTop.constant != view.safeAreaInsets.top {
             UIView.animate(withDuration: 0.25) { [weak self] in
                 guard let self else { return }
-                selectedUserListViewTop.constant = view.safeAreaInsets.top
-                view.layoutIfNeeded()
+                self.selectedUserListViewTop.constant = self.view.safeAreaInsets.top
+                self.view.layoutIfNeeded()
             }
         }
     }
@@ -128,8 +128,8 @@ open class SelectChannelMembersVC: ViewController,
                 if selectedUserListViewHeight.constant == 0 {
                     UIView.animate(withDuration: 0.25) { [weak self] in
                         guard let self else { return }
-                        selectedUserListViewHeight.constant = Layouts.selectedViewHeight
-                        view.layoutIfNeeded()
+                        self.selectedUserListViewHeight.constant = Layouts.selectedViewHeight
+                        self.view.layoutIfNeeded()
                     }
                 }
             } else {
@@ -139,8 +139,8 @@ open class SelectChannelMembersVC: ViewController,
                 {
                     UIView.animate(withDuration: 0.25) { [weak self] in
                         guard let self else { return }
-                        selectedUserListViewHeight.constant = 0
-                        view.layoutIfNeeded()
+                        self.selectedUserListViewHeight.constant = 0
+                        self.view.layoutIfNeeded()
                     }
                 }
             }

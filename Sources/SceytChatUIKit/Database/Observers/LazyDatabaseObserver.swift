@@ -176,10 +176,10 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
         let objectID = dto.objectID
         context.perform {[weak self] in
-            guard let self, let obj = try? context.existingObject(with: objectID) as? DTO
+            guard let self, let obj = try? self.context.existingObject(with: objectID) as? DTO
             else { return }
             let item = self.itemCreator(obj)
-            writeCache {
+            self.writeCache {
                 self.mapItems[dto.objectID] = item
                 self.mapDeletedItems[dto.objectID] = nil
             }
@@ -217,10 +217,10 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
         let objectID = dto.objectID
         context.perform {[weak self] in
-            guard let self, let obj = try? context.existingObject(with: objectID) as? DTO
+            guard let self, let obj = try? self.context.existingObject(with: objectID) as? DTO
             else { return }
             let item = self.itemCreator(obj)
-            writeCache {
+            self.writeCache {
                 self.mapItems[dto.objectID] = item
                 self.mapDeletedItems[dto.objectID] = nil
             }

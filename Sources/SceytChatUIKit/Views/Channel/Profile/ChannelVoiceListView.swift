@@ -93,9 +93,9 @@ open class ChannelVoiceListView: ChannelAttachmentListView,
                 guard let self else { return }
                 switch $0 {
                 case .pause(let layout):
-                    voiceViewModel.pauseDownload(layout)
+                    self.voiceViewModel.pauseDownload(layout)
                 case .resume(let layout):
-                    voiceViewModel.resumeDownload(layout)
+                    self.voiceViewModel.resumeDownload(layout)
                 }
             }.store(in: &cell.subscriptions)
         if let attachment = cell.data {

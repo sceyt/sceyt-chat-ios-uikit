@@ -95,9 +95,9 @@ open class ChannelFileListView: ChannelAttachmentListView,
                 guard let self else { return }
                 switch $0 {
                 case .pause(let layout):
-                    fileViewModel.pauseDownload(layout)
+                    self.fileViewModel.pauseDownload(layout)
                 case .resume(let layout):
-                    fileViewModel.resumeDownload(layout)
+                    self.fileViewModel.resumeDownload(layout)
                 }
             }.store(in: &cell.subscriptions)
         if let attachmentLayout = cell.data {

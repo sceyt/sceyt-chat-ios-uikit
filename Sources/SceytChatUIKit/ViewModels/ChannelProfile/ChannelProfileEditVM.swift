@@ -78,7 +78,7 @@ open class ChannelProfileEditVM: NSObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
                 guard let self, let uri = $0 else { return }
-                check(uri: uri)
+                self.check(uri: uri)
             }.store(in: &subscriptions)
     }
     

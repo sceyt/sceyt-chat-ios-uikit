@@ -118,11 +118,11 @@ open class ImageCropperVC: ViewController {
         hud.isLoading = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
-            let image = viewModel.crop()
+            let image = self.viewModel.crop()
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
                 hud.isLoading = false
-                onComplete?(image)
+                self.onComplete?(image)
             }
         }
     }

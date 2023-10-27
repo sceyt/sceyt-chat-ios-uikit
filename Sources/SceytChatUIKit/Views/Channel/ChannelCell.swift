@@ -280,7 +280,7 @@ open class ChannelCell: TableViewCell {
             let chatUser = ChatUser(user: userPresence.user)
             if chatUser !~= peer {
                 self.data.updateMemberWithUser(chatUser)
-                self.bind(data)
+                self.bind(self.data)
             }
         }
     }

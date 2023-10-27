@@ -183,8 +183,8 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
         
         UIView.animate(withDuration: animated ? 0.3 : 0) { [weak self] in
             guard let self else { return }
-            carouselVC?.navigationController?.navigationBar.alpha = 1.0
-            playerControlContainerView.alpha = 1.0
+            self.carouselVC?.navigationController?.navigationBar.alpha = 1.0
+            self.playerControlContainerView.alpha = 1.0
         }
     }
     
@@ -399,8 +399,8 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
         let currentNavAlpha = carouselVC?.navigationController?.navigationBar.alpha ?? 0.0
         UIView.animate(withDuration: 0.3) { [weak self] in
             guard let self else { return }
-            carouselVC?.navigationController?.navigationBar.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
-            playerControlContainerView.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
+            self.carouselVC?.navigationController?.navigationBar.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
+            self.playerControlContainerView.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
         }
     }
     

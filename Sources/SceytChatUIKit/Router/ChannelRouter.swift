@@ -115,17 +115,17 @@ open class ChannelRouter: Router<ChannelVC> {
                              handler: { [weak self] in
             guard let self else { return }
             if clear {
-                rootVC.channelViewModel.deleteAllMessages(forMeOnly: false) { [weak self] error in
+                self.rootVC.channelViewModel.deleteAllMessages(forMeOnly: false) { [weak self] error in
                     guard let self else { return }
                     if let error {
-                        showAlert(error: error)
+                        self.showAlert(error: error)
                     }
                 }
             } else {
-                rootVC.channelViewModel.deleteSelectedMessages(forMeOnly: false)
+                self.rootVC.channelViewModel.deleteSelectedMessages(forMeOnly: false)
             }
             
-            rootVC.channelViewModel.isEditing = false
+            self.rootVC.channelViewModel.isEditing = false
         }))
         actions.append(.init(title: L10n.Message.Action.Subtitle.deleteMe,
                              icon: .chatDelete,
@@ -133,17 +133,17 @@ open class ChannelRouter: Router<ChannelVC> {
                              handler: { [weak self] in
             guard let self else { return }
             if clear {
-                rootVC.channelViewModel.deleteAllMessages(forMeOnly: true) { [weak self] error in
+                self.rootVC.channelViewModel.deleteAllMessages(forMeOnly: true) { [weak self] error in
                     guard let self else { return }
                     if let error {
-                        showAlert(error: error)
+                        self.showAlert(error: error)
                     }
                 }
             } else {
-                rootVC.channelViewModel.deleteSelectedMessages(forMeOnly: true)
+                self.rootVC.channelViewModel.deleteSelectedMessages(forMeOnly: true)
             }
             
-            rootVC.channelViewModel.isEditing = false
+            self.rootVC.channelViewModel.isEditing = false
         }))
         rootVC.showBottomSheet(actions: actions, withCancel: true)
     }
@@ -158,9 +158,9 @@ open class ChannelRouter: Router<ChannelVC> {
                         self?.rootVC.channelViewModel.deleteAllMessages(forMeOnly: false) { [weak self] error in
                             guard let self else { return }
                             if let error {
-                                showAlert(error: error)
+                                self.showAlert(error: error)
                             }
-                            rootVC.channelViewModel.isEditing = false
+                            self.rootVC.channelViewModel.isEditing = false
                         }
                     }
                   ],

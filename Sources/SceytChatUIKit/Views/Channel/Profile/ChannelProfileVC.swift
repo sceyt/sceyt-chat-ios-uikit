@@ -100,8 +100,8 @@ open class ChannelProfileVC: ViewController,
             .forEach {
                 $0.shouldReceiveTouch = { [weak self] in
                     guard let self else { return false }
-                    let contentOffsetY = ceil(tableView.contentOffset.y)
-                    if contentOffsetY < headerHeight - tableView.contentInset.top {
+                    let contentOffsetY = ceil(self.tableView.contentOffset.y)
+                    if contentOffsetY < self.headerHeight - self.tableView.contentInset.top {
                         return false
                     }
                     return true
@@ -110,12 +110,12 @@ open class ChannelProfileVC: ViewController,
         tableView.shouldSimultaneous = { [weak self] in
             guard let self else { return false }
             
-            (currentPage as? ChannelAttachmentListView)?.scrollingDecelerator.invalidateIfNeeded()
+            (self.currentPage as? ChannelAttachmentListView)?.scrollingDecelerator.invalidateIfNeeded()
             
             let contentOffsetY = ceil($0.contentOffset.y)
-            let shouldSimultaneous = contentOffsetY < floor(headerHeight - $0.contentInset.top) || (currentPage?.contentOffset.y ?? 0) == 0
+            let shouldSimultaneous = contentOffsetY < floor(self.headerHeight - $0.contentInset.top) || (self.currentPage?.contentOffset.y ?? 0) == 0
             
-            let velocity = tableView.panGestureRecognizer.velocity(in: tableView)
+            let velocity = self.tableView.panGestureRecognizer.velocity(in: self.tableView)
             
             return shouldSimultaneous && abs(velocity.y) > abs(velocity.x)
         }
@@ -269,7 +269,7 @@ open class ChannelProfileVC: ViewController,
             cell.data = profileViewModel.channel
             cell.avatarButton.publisher(for: .touchUpInside).sink { [weak self] _ in
                 guard let self else { return }
-                router.goAvatar()
+                self.router.goAvatar()
             }.store(in: &cell.subscriptions)
             _cell = cell
         case .actionMenu:

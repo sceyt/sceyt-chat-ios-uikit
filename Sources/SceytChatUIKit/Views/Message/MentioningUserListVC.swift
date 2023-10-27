@@ -50,10 +50,10 @@ open class MentioningUserListVC: ViewController,
         else { return }
         UIView.animate(withDuration: duration, delay: 0, options: .init(rawValue: curve)) { [weak self] in
             guard let self else { return }
-            shadowsView.top -= keyboardFrame.height - (view.window?.safeAreaInsets.bottom ?? 0)
+            self.shadowsView.top -= keyboardFrame.height - (self.view.window?.safeAreaInsets.bottom ?? 0)
         } completion: { [weak self] _ in
             guard let self else { return }
-            updateShadows()
+            self.updateShadows()
         }
     }
 
@@ -120,18 +120,18 @@ open class MentioningUserListVC: ViewController,
         
         DispatchQueue.main.async { [weak self] in
             guard let self,
-                  let last = tableView.visibleCells.last
+                  let last = self.tableView.visibleCells.last
             else { return }
-            let top = last.frameRelativeTo(view: view).minY
+            let top = last.frameRelativeTo(view: self.view).minY
             
             func perform() {
-                shadowsView.frame = .init(
-                    x: tableView.left,
+                self.shadowsView.frame = .init(
+                    x: self.tableView.left,
                     y: top,
-                    width: tableView.width,
-                    height: tableView.bottom - top
+                    width: self.tableView.width,
+                    height: self.tableView.bottom - top
                 )
-                shadowsView.layer.shadowPath = UIBezierPath(roundedRect: shadowsView.bounds,
+                self.shadowsView.layer.shadowPath = UIBezierPath(roundedRect: self.shadowsView.bounds,
                                                             cornerRadius: Layouts.cornerRadius).cgPath
             }
             if animated {
@@ -146,7 +146,7 @@ open class MentioningUserListVC: ViewController,
 
     open func onEvent(_ event: MentioningUserListVM.Event) {
         switch event {
-        case let .change(paths):
+        case .change(_):
             if tableView.numberOfSections == 0 || tableView.numberOfRows(inSection: 0) == 0 {
                 tableView.alpha = 0
                 tableView.performBatchUpdates {

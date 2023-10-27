@@ -206,12 +206,12 @@ open class ChannelProfileVoiceCell: CollectionViewCell {
                 }
                 UIView.animate(withDuration: progressView.animationDuration + 0.1) { [weak self] in
                     guard let self else { return }
-                    downloadButton.transform = .init(scaleX: 0.01, y: 0.01)
+                    self.downloadButton.transform = .init(scaleX: 0.01, y: 0.01)
                 } completion: { [weak self] completed in
                     guard let self else { return }
                     if completed {
-                        downloadButton.isHidden = true
-                        playButton.isHidden = !downloadButton.isHidden
+                        self.downloadButton.isHidden = true
+                        self.playButton.isHidden = !self.downloadButton.isHidden
                     }
                 }
             } else {
@@ -221,10 +221,10 @@ open class ChannelProfileVoiceCell: CollectionViewCell {
     }
     
     open func setProgressHandler() {
-        guard let attachment = data?.attachment,
-              let message = data?.ownerMessage
+        guard let data = self.data,
+              let message = data.ownerMessage
         else { return }
-        
+        let attachment = data.attachment
         progressView.rotateZ = true
         fileProvider
             .progress(

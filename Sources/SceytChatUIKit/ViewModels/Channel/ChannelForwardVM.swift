@@ -114,14 +114,14 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
         searchService.search(query: query) { [weak self] chats, channels in
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                searchResults = ChannelSearchResultImp(chats: chats, channels: channels)
-                event.send(.reloadSearch)
+                self.searchResults = ChannelSearchResultImp(chats: chats, channels: channels)
+                self.event.send(.reloadSearch)
             }
         } globalBlock: { [weak self] channels in
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                (searchResults as? ChannelSearchResultImp)?.channels = channels
-                event.send(.reloadSearch)
+                (self.searchResults as? ChannelSearchResultImp)?.channels = channels
+                self.event.send(.reloadSearch)
             }
         } errorBlock: { error in
             log.error("[search] error \(error)")

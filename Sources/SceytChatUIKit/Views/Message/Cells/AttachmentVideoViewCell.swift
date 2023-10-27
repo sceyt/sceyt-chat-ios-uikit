@@ -71,7 +71,7 @@ extension MessageCell {
                    let asset = PHAsset.fetchAssets(withLocalIdentifiers: [filePath.substring(fromIndex: 7)], options: .none).firstObject {
                     PHImageManager.default().requestImage(for: asset, targetSize: imageView.frame.size, contentMode: .aspectFill, options: .none) { [weak self] image, _ in
                         guard let self else { return }
-                        imageView.image = image ?? data.thumbnail
+                        self.imageView.image = image ?? self.data.thumbnail
                     }
                 } else {
                     imageView.image = data.thumbnail

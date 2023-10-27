@@ -236,7 +236,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
                 guard let self else { return }
                 try? self.channelObserver.startObserver()
-                event = .updateChannel
+                self.event = .updateChannel
             }
             let sections = messageObserver.numberOfSections
             if sections > 0 {
@@ -1175,9 +1175,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                     if let peer = self.channel.peer, peer.id == presence.userId {
                         let chatUser = ChatUser(user: presence.user)
                         if chatUser !~= peer,
-                            let channel = channelObserver.item(at: .zero),
+                           let channel = self.channelObserver.item(at: .zero),
                             channel.id == self.channel.id {
-                            channelObserver.refresh(at: .zero)
+                            self.channelObserver.refresh(at: .zero)
                         }
                     }
                     self.event = .changePresence(presence.presence)
@@ -1432,18 +1432,18 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             else { return }
             self.provider = Components.channelMessageProvider.init(
                 channelId: channel.id,
-                threadMessageId: threadMessage?.id
+                threadMessageId: self.threadMessage?.id
             )
             self.provider.queryLimit = Self.messagesFetchLimit
             self.messageSender = Components.channelMessageSender
-                .init(channelId: channel.id, threadMessageId: threadMessage?.id)
+                .init(channelId: channel.id, threadMessageId: self.threadMessage?.id)
             self.messageMarkerProvider = Components.channelMessageMarkerProvider.init(channelId: channel.id)
             self.messageFetchPredicate = NSPredicate(format: "(channelId == %lld OR (channelId == 0 AND ownerChannel.id == %lld)) AND repliedInThread == false AND replied == false AND unlisted == false", channel.id, channel.id)
             self.channelProvider = Components.channelProvider
                 .init(channelId: channel.id)
-            try? self.messageObserver.restartObserver(fetchPredicate: messageFetchPredicate)
+            try? self.messageObserver.restartObserver(fetchPredicate: self.messageFetchPredicate)
             self.channel = channel
-            for model in layoutModels.values {
+            for model in self.layoutModels.values {
                 model.replace(channel: channel)
             }
         }

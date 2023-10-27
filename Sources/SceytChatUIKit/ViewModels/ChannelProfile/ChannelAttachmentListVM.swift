@@ -167,7 +167,7 @@ open class ChannelAttachmentListVM: NSObject {
                 return
             }
             
-            getMessage(layout) { message in
+            self.getMessage(layout) { message in
                 if let message {
                     fileProvider
                         .downloadMessageAttachments(

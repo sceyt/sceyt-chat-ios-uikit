@@ -79,7 +79,7 @@ public extension Router {
             onComplete: { [weak self] edited in
                 guard let self else { return }
                 done(edited)
-                dismiss()
+                self.dismiss()
             },
             onCancel: { [weak self] in
                 self?.dismiss()

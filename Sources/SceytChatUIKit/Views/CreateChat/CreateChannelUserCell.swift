@@ -147,7 +147,7 @@ open class ChannelUserCell: TableViewCell {
         Components.presenceProvider
             .subscribe(userId: contact.id) { [weak self] user in
                 PresenceProvider.unsubscribe(userId: contact.id)
-                guard let self, user.userId == userData.id
+                guard let self, user.userId == self.userData.id
                 else { return }
                 self.statusLabel.text = Formatters.userPresenceFormatter.format(user.presence)
             }

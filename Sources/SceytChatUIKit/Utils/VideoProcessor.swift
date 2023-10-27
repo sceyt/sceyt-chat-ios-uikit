@@ -244,17 +244,17 @@ open class VideoOperation: AsyncOperation {
             PHImageManager.default().requestAVAsset(forVideo: asset, options: options) { [weak self] avAsset, _, _ in
                 guard let self else { return }
                 if let urlAsset = avAsset as? AVURLAsset {
-                    compressVideo(inputURL: urlAsset.url)
+                    self.compressVideo(inputURL: urlAsset.url)
                 } else if let avCompositionAsset = avAsset as? AVComposition {
                     SCTUIKitComponents.videoProcessor.getSlowmoVideoUrl(
                         avCompositionAsset,
                         completion: { [weak self] url in
                             guard let self else { return }
                             if let url {
-                                compressVideo(inputURL: url)
+                                self.compressVideo(inputURL: url)
                             } else {
-                                result = .failure(VideoProcessor.Errors.noSuchFile)
-                                complete()
+                                self.result = .failure(VideoProcessor.Errors.noSuchFile)
+                                self.complete()
                             }
                         }
                     )
@@ -485,8 +485,8 @@ open class VideoOperation: AsyncOperation {
             // completion
             group.notify(queue: .main) { [weak self] in
                 guard let self else { return }
-                if isCancelled {
-                    debugPrint("[VideoProcessor][\(uuid)] cancelled")
+                if self.isCancelled {
+                    debugPrint("[VideoProcessor][\(self.uuid)] cancelled")
                     return completion(.failure(Errors.cancelled))
                 }
                 switch writer.status {
@@ -495,12 +495,12 @@ open class VideoOperation: AsyncOperation {
                         guard let self else { return }
                         let endTime = Date()
                         let elapse = endTime.timeIntervalSince(startTime)
-                        debugPrint("[VideoProcessor][\(uuid)] ******** Compression finished ✅**********")
-                        debugPrint("[VideoProcessor][\(uuid)] Compressed video:")
-                        debugPrint("[VideoProcessor][\(uuid)] time: \(elapse)")
-                        debugPrint("[VideoProcessor][\(uuid)] size: \(outputURL.sizeInMB())M")
-                        debugPrint("[VideoProcessor][\(uuid)] url: \(outputURL)")
-                        debugPrint("[VideoProcessor][\(uuid)] ******************************************")
+                        debugPrint("[VideoProcessor][\(self.uuid)] ******** Compression finished ✅**********")
+                        debugPrint("[VideoProcessor][\(self.uuid)] Compressed video:")
+                        debugPrint("[VideoProcessor][\(self.uuid)] time: \(elapse)")
+                        debugPrint("[VideoProcessor][\(self.uuid)] size: \(outputURL.sizeInMB())M")
+                        debugPrint("[VideoProcessor][\(self.uuid)] url: \(outputURL)")
+                        debugPrint("[VideoProcessor][\(self.uuid)] ******************************************")
                         DispatchQueue.main.sync {
                             completion(.success(outputURL))
                         }
@@ -590,7 +590,7 @@ open class VideoOperation: AsyncOperation {
         videoInput.requestMediaDataWhenReady(on: videoCompressQueue) { [weak self] in
             guard let self else { return }
             while videoInput.isReadyForMoreMediaData {
-                if isCancelled {
+                if self.isCancelled {
                     videoInput.markAsFinished()
                     completion()
                     break
@@ -617,7 +617,7 @@ open class VideoOperation: AsyncOperation {
         audioInput.requestMediaDataWhenReady(on: audioCompressQueue) { [weak self] in
             guard let self else { return }
             while audioInput.isReadyForMoreMediaData {
-                if isCancelled {
+                if self.isCancelled {
                     audioInput.markAsFinished()
                     completion()
                     break

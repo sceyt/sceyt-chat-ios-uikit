@@ -189,45 +189,45 @@ extension ComposerVC {
                     if ComposerVC.Layouts.recorderShadowBlur > 0 {
                         lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: ComposerVC.Layouts.recorderShadowBlur)
                     }
-                    lockButton.setImage(lockImage, for: [])
-                    micButton.setImage(.audioPlayerMicGreen, for: [])
+                    self.lockButton.setImage(lockImage, for: [])
+                    self.micButton.setImage(.audioPlayerMicGreen, for: [])
                 case .lock:
                     var lockImage = UIImage.audioPlayerLock
                     if ComposerVC.Layouts.recorderShadowBlur > 0 {
                         lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: ComposerVC.Layouts.recorderShadowBlur)
                     }
-                    lockButton.setImage(lockImage, for: [])
-                    micButton.setImage(.audioPlayerMicGreen, for: [])
+                    self.lockButton.setImage(lockImage, for: [])
+                    self.micButton.setImage(.audioPlayerMicGreen, for: [])
                 case .locked:
                     var lockImage = UIImage.audioPlayerStop
                     if ComposerVC.Layouts.recorderShadowBlur > 0 {
                         lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: ComposerVC.Layouts.recorderShadowBlur)
                     }
-                    lockButton.setImage(lockImage, for: [])
-                    micButton.setImage(.audioPlayerSendLarge, for: [])
+                    self.lockButton.setImage(lockImage, for: [])
+                    self.micButton.setImage(.audioPlayerSendLarge, for: [])
                 case .cancel:
-                    lockButton.setImage(nil, for: [])
-                    micButton.setImage(.audioPlayerDelete, for: [])
+                    self.lockButton.setImage(nil, for: [])
+                    self.micButton.setImage(.audioPlayerDelete, for: [])
                 case .recorded:
                     var lockImage = UIImage.audioPlayerUnlock
                     if ComposerVC.Layouts.recorderShadowBlur > 0 {
                         lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: ComposerVC.Layouts.recorderShadowBlur)
                     }
-                    lockButton.setImage(lockImage, for: [])
-                    micButton.setImage(.audioPlayerMicGreen, for: [])
+                    self.lockButton.setImage(lockImage, for: [])
+                    self.micButton.setImage(.audioPlayerMicGreen, for: [])
                     
-                    if let recorder = recorder,
+                    if let recorder = self.recorder,
                        recorder.audioRecorder?.isRecording == true
                     {
                         recorder.stopRecording()
                         let metadata = recorder.metadata
-                        onEvent(.recorded(url: recorder.url, metadata: metadata))
+                        self.onEvent(.recorded(url: recorder.url, metadata: metadata))
                     }
-                    dismiss()
+                    self.dismiss()
                 }
-                lockButton.isHidden = self.state == .recorded
-                micButton.isHidden = self.state == .recorded
-                slidingView.isHidden = self.state == .recorded
+                self.lockButton.isHidden = self.state == .recorded
+                self.micButton.isHidden = self.state == .recorded
+                self.slidingView.isHidden = self.state == .recorded
             }
         }
         

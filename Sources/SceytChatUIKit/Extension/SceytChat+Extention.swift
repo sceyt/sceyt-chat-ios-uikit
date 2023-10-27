@@ -15,9 +15,9 @@ var chatClient: ChatClient {
 
 var me: UserId {
     if !chatClient.user.id.isEmpty {
-        chatClient.user.id
+        return chatClient.user.id
     } else {
-        SCTUIKitConfig.currentUserId ?? ""
+        return SCTUIKitConfig.currentUserId ?? ""
     }
 }
 
