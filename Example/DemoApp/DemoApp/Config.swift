@@ -1,8 +1,9 @@
 //
 //  Config.swift
-//  LiveChat
+//  DemoApp
 //
 //  Created by Hovsep Keropyan on 31.08.23.
+//  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
 import Foundation

@@ -3,6 +3,7 @@
 //  DemoApp
 //
 //  Created by Hovsep Keropyan on 27.10.23.
+//  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
 import UIKit
