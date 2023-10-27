@@ -156,7 +156,7 @@ public enum SCTUIKitComponents {
     public static var avatarBuilder: AvatarBuilder.Type = AvatarBuilder.self
     public static var audioSession: AudioSession.Type = AudioSession.self
     public static var storage: Storage.Type = Storage.self
-    public static var dataSession: SCTDataSession?
+    public static var dataSession: SCTDataSession? = SCTSession.default
     
     public static var channelEventHandler: ChannelEventHandler.Type = ChannelEventHandler.self
     public static var channelListProvider: ChannelListProvider.Type = ChannelListProvider.self

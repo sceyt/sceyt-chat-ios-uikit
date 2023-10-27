@@ -7,10 +7,9 @@
 
 import UIKit
 import SceytChatUIKit
+import SceytChat
 
-let users = ["zoe", "thomas", "ethan", "charlie", "william", "michael", "james", "john", "lily", "david", "grace", "emma", "olivia", "ben", "emily", "isabella", "sophia", "alice", "jacob", "harry"]
-
-class DemoViewController: UITableViewController {
+class DemoTabBarController: UITabBarController, ChatClientDelegate {
     
     lazy var activityIndicatorView: UIActivityIndicatorView = {
         UIActivityIndicatorView(style: .large)
@@ -18,31 +17,7 @@ class DemoViewController: UITableViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        title = "Users"
         // Do any additional setup after loading the view.
-    }
-    
-    override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        users.count
-    }
-    
-    override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "Cell", for: indexPath)
-        cell.textLabel?.text = users[indexPath.row]
-        return cell
-    }
-    
-    override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        let user = users[indexPath.row]
-        showSheet(activityIndicatorView, style: .center, backgroundDismiss: false) { [unowned self] in
-            activityIndicatorView.startAnimating()
-        }
-        connect(user: user)
-    }
-    
-    private func changeView() {
-        dismissSheet()
-        let tab = TabBarController()
         
         UIBarButtonItem.appearance()
             .setTitleTextAttributes([
@@ -50,14 +25,44 @@ class DemoViewController: UITableViewController {
                 .foregroundColor: Appearance.Colors.kitBlue
             ], for: [])
         UITabBar.appearance().tintColor = Appearance.Colors.kitBlue
-        let nav = NavigationController(rootViewController: SCTUIKitComponents.channelListVC.init())
-        nav.modalPresentationStyle = .fullScreen
-        tab.viewControllers = [nav]
-        view.window?.rootViewController = tab
-        tab.tabBar.items?.first?.image = UIImage(named: "chats_tabbar")
+        tabBar.items?.first?.image = UIImage(named: "chats_tabbar")
+        
+        if Config.currentUserId == nil {
+            Config.currentUserId = users.randomElement()
+        }
+        addAppNotifications()
+        showSheet(activityIndicatorView, style: .center, backgroundDismiss: false) { [unowned self] in
+            activityIndicatorView.startAnimating()
+        }
+        connect()
     }
     
-    private func connect(user: String) {
+    private func addAppNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didBecomeActiveNotification(_:)),
+            name: UIApplication.didBecomeActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(didEnterBackgroundNotification(_:)),
+            name: UIApplication.didEnterBackgroundNotification, object: nil)
+    }
+    
+    @objc
+    func didBecomeActiveNotification(_ notification: Notification) {
+        guard ChatClient.shared.connectionState == .disconnected
+        else { return }
+        connect()
+    }
+    
+    @objc
+    func didEnterBackgroundNotification(_ notification: Notification) {
+        
+    }
+    
+    private func connect() {
+        guard let user = Config.currentUserId
+        else { return }
         getToken(user: user) {[weak self] token, error in
             guard let token = token else {
                 if let error {
@@ -65,7 +70,8 @@ class DemoViewController: UITableViewController {
                 }
                 return
             }
-            self?.changeView()
+            self?.dismissSheet()
+            Config.chatToken = token
             SCTUIKitConfig.connect(accessToken: token)
         }
     }
@@ -94,5 +100,38 @@ class DemoViewController: UITableViewController {
            }
        }.resume()
     }
+    
+    func chatClient(_ chatClient: ChatClient, tokenWillExpire timeInterval: TimeInterval) {
+        if let user = Config.currentUserId {
+            getToken(user: user) { token, error in
+                guard let token = token else {
+                    return
+                }
+                Config.chatToken = token
+                chatClient.update(token: token) { _ in
+                    
+                }
+            }
+        }
+    }
+    
+    func chatClientTokenExpired(_ chatClient: ChatClient) {
+        if let user = Config.currentUserId {
+            getToken(user: user) { token, error in
+                guard let token = token else {
+                    return
+                }
+                Config.chatToken = token
+                chatClient.connect(token: token)
+            }
+        }
+    }
+    
+    func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
+        if state == .connected {
+            Config.currentUserId = chatClient.user.id
+            SCTUIKitConfig.currentUserId = chatClient.user.id
+            chatClient.setPresence(state: .online, status: "I'm online")
+        }
+    }
 }
-

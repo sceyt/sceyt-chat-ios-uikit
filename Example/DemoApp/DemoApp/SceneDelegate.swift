@@ -6,11 +6,12 @@
 //
 
 import UIKit
+import SceytChatUIKit
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
-
+    var backgroundTaskId = UIBackgroundTaskIdentifier.invalid
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
@@ -29,6 +30,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         // Called when the scene has moved from an inactive state to an active state.
         // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
+        if backgroundTaskId != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskId)
+            backgroundTaskId = .invalid
+        }
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
@@ -45,6 +50,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Called as the scene transitions from the foreground to the background.
         // Use this method to save data, release shared resources, and store enough scene-specific state information
         // to restore the scene back to its current state.
+        guard backgroundTaskId == .invalid else { return }
+        backgroundTaskId = UIApplication.shared
+            .beginBackgroundTask(withName: "Close Chat socket") {
+                SCTUIKitConfig.disconnect()
+                UIApplication.shared.endBackgroundTask(self.backgroundTaskId)
+                self.backgroundTaskId = .invalid
+            }
     }
 
 

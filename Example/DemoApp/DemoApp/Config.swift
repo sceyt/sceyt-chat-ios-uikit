@@ -5,8 +5,10 @@
 //  Created by Hovsep Keropyan on 31.08.23.
 //
 
-import UIKit
+import Foundation
 import SceytChatUIKit
+
+let users = ["zoe", "thomas", "ethan", "charlie", "william", "michael", "james", "john", "lily", "david", "grace", "emma", "olivia", "ben", "emily", "isabella", "sophia", "alice", "jacob", "harry"]
 
 struct Config {
     static let sceytApiURL = "https://us-ohio-api.sceyt.com"
@@ -48,7 +50,6 @@ struct UserDefaultsConfig<T> {
 
 
 func configureSceytChatUIKit() {
-    SCTUIKitConfig.database.deleteAll()
     SCTUIKitComponents.dataSession = SCTSession.default
     SCTUIKitConfig.syncChannelsAfterConnect = true
     SCTUIKitConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
