@@ -1,0 +1,291 @@
+/* 
+  Localizable.strings
+  SceytChatUIKit
+
+  Created by Hovsep on 5/27/22.
+  Copyright © 2022 Sceyt LLC. All rights reserved.
+  
+*/
+
+//MARK: SceytChatUIKit strings
+
+"common.on" = "On";
+"common.off" = "Off";
+
+"upload.preparing" = "Preparing...";
+
+"channel.empty.title" = "No Channels";
+"channel.empty.description" = "You have no channels created yet, create one and send messages";
+"channel.empty.create-new" = "Create channel";
+"channel.list.title" = "Chats";
+"channel.list.search" = "Search for channels";
+"channel.list.action.delete" = "Delete";
+"channel.list.action.leave" = "Leave";
+"channel.list.action.read" = "Read";
+"channel.list.action.unread" = "Unread";
+"channel.list.action.mute" = "Mute";
+"channel.list.action.unmute" = "Unmute";
+"channel.list.action.pin" = "Pin";
+"channel.list.action.unpin" = "Unpin";
+"channel.message.attachment" = "Attachment";
+"channel.message.lastReaction" = "Reacted %@ to:";
+"channel.join" = "Join";
+"channel.member.deleted" = "Deleted User";
+"channel.member.inactive" = "Inactive User";
+"channel.member.role.title" = "Change Role";
+"channel.member.typing" = "typing";
+
+"channel.new.title" = "Start Chat";
+"channel.new.createPublic" = "New Channel";
+"channel.new.createPrivate" = "New Group";
+"channel.new.userSectionTitle" = "Users";
+"channel.intro.title" = "New Channel";
+"channel.create.uri.error.exist" = "The URL already exists. Please provide another one.";
+"channel.create.uri.error.range" = "The name should be %d-%d characters long.";
+"channel.create.uri.error.regex" = "The name is invalid. Please provide a name from the allowed range of characters.";
+"channel.create.uri.error.success" = "Success! This URL is free to use.";
+"channel.create.uri.placeholder" = "chn12";
+"channel.create.uri.error.success" = "Success! This URL is free to use.";
+"channel.create.comment" = "Give a URL to your channel so you can share it with others inviting them to join.\n\nChoose a name from the allowed range: a-z, 0-9, and _(underscores) between %d-%d characters.";
+"channel.subject.channel.placeholder" = "Channel Name";
+"channel.subject.group.placeholder" = "Group Name";
+"channel.subject.descriptionPlaceholder" = "About";
+"channel.avatar.comment" = "Name the chat and upload a photo if you want";
+"channel.private.sectionTitle" = "Members";
+
+"channel.stopRecording.message" = "Are you sure you want to stop recording and discard your voice message?";
+
+"channel.add.admins.title" = "Add Admins";
+"channel.add.members.title" = "Add Members";
+"channel.add.subscribers.title" = "Add Subscribers";
+
+"channel.profile.title" = "Info";
+"channel.profile.notifications" = "Notifications";
+"channel.profile.about" = "About";
+
+"channel.profile.action.mute" = "mute";
+"channel.profile.action.unmute" = "unmute";
+"channel.profile.action.report" = "report";
+"channel.profile.action.join" = "join";
+"channel.profile.action.more" = "more";
+
+"channel.profile.item.title.autoDeleteMessages" = "Auto-Delete messages";
+"channel.profile.item.title.members" = "Members";
+"channel.profile.item.title.subscribers" = "Subscribers";
+"channel.profile.item.title.admins" = "Admins";
+
+"channel.profile.segment.members" = "Members";
+"channel.profile.segment.medias" = "Media";
+"channel.profile.segment.files" = "Files";
+"channel.profile.segment.links" = "Links";
+"channel.profile.segment.voice" = "Voice";
+"channel.profile.segment.medias.noItems" = "No media items yet";
+"channel.profile.segment.files.noItems" = "No file items yet";
+"channel.profile.segment.links.noItems" = "No link items yet";
+"channel.profile.segment.voice.noItems" = "No voice items yet";
+
+"channel.profile.mute.one-hour" = "For 1 hour";
+"channel.profile.mute.hours" = "For %d hours";
+"channel.profile.mute.one-day" = "For 1 day";
+"channel.profile.mute.days" = "For %d days";
+"channel.profile.mute.forever" = "Forever";
+"channel.profile.mute.title" = "Mute Chat:";
+
+"channel.profile.autoDelete.off" = "Off";
+"channel.profile.autoDelete.oneMin" = "1 min";
+"channel.profile.autoDelete.oneHour" = "1 hour";
+"channel.profile.autoDelete.oneDay" = "1 day";
+"channel.profile.autoDelete.title" = "Auto-Delete messages:";
+
+"channel.profile.subject" = "Subject";
+
+"channel.profile.action.chat.pin" = "Pin Chat";
+"channel.profile.action.chat.unpin" = "Unpin Chat";
+"channel.profile.action.group.pin" = "Pin Group";
+"channel.profile.action.group.unpin" = "Unpin Group";
+"channel.profile.action.channel.pin" = "Pin Channel";
+"channel.profile.action.channel.unpin" = "Unpin Channel";
+"channel.profile.action.group.edit" = "Edit Group";
+"channel.profile.action.channel.edit" = "Edit Channel";
+"channel.profile.action.clear-history" = "Clear History";
+"channel.profile.action.channel.leave" = "Leave Channel";
+"channel.profile.action.group.leave" = "Leave Group";
+"channel.profile.action.group.block-and-leave" = "Block and Leave Group";
+"channel.profile.action.channel.block-and-leave" = "Block and Leave Channel";
+"channel.profile.action.block" = "Block User";
+"channel.profile.action.unblock" = "Unblock User";
+"channel.profile.action.channel.delete" = "Delete Channel";
+"channel.profile.action.channel.deleteMessage" = "Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.";
+"channel.profile.action.group.delete" = "Delete Group";
+"channel.profile.action.group.deleteMessage" = "Once you delete this group it will be permanently removed along with its entire history for all the group members.";
+"channel.profile.action.chat.delete" = "Delete Chat";
+"channel.profile.action.chat.deleteMessage" = "Once you delete this chat it will be removed from the chat list with its message history.";
+
+"channel.profile.action.set-owner" = "Set Owner";
+"channel.profile.action.change-role" = "Change member’s role";
+"channel.profile.action.remove" = "Remove";
+"channel.profile.action.removeMember.title" = "Remove Member";
+"channel.profile.action.removeMember.message" = "Are you sure to remove %@ from this group?";
+"channel.profile.action.removeSubscriber.title" = "Remove Subscriber";
+"channel.profile.action.removeSubscriber.message" = "Are you sure to remove %@ from this channel?";
+"channel.profile.action.revokeAdmin.title" = "Revoke Admin";
+"channel.profile.action.revokeAdmin.message" = "Are you sure you want to revoke “Admin” rights from user: %@?";
+"channel.profile.action.revokeAdmin.action" = "Revoke";
+"channel.profile.action.block-and-kick-member" = "Block & Kick Member";
+
+"channel.profile.members.title" = "Members";
+"channel.profile.admins.title" = "Admins";
+
+"channel.members-count.one" = "1 member";
+"channel.members-count.more" = "%d members";
+"channel.subscriber-count.one" = "1 subscriber";
+"channel.subscriber-count.more" = "%d subscribers";
+
+"channel.selecting.clearChat" = "Clear Messages";
+"channel.selecting.clearChat.channel.message" = "Once you clear the messages in this channel will be permanently removed for all the subscribers.";
+"channel.selecting.clearChat.message" = "Once you clear the messages in this chat will be permanently removed for you.";
+
+"channel.selecting.clearChat.clear" = "Clear";
+"channel.selecting.selected" = "%d Selected";
+
+"channel.readOnly.message" = "Read Only.";
+"channel.deletedUser.message" = "This user has been deleted.";
+"channel.blockedUser.message" = "You blocked this user.";
+
+"channel.message.draft" = "Draft";
+
+"channel.forward.title" = "Select Chat";
+"channel.forward.chatsGroups" = "Chats & Groups";
+"channel.forward.channels" = "Channels";
+
+"message.action.title.info" = "Info";
+"message.action.title.add" = "Add";
+"message.action.title.edit" = "Edit";
+"message.action.title.remove" = "Remove";
+"message.action.title.delete" = "Delete";
+"message.action.title.copy" = "Copy";
+"message.action.title.report" = "Report";
+"message.action.title.react" = "React";
+"message.action.title.reply" = "Reply";
+"message.action.title.reply-in-thread" = "Reply in thread";
+"message.action.title.forward" = "Forward";
+"message.action.title.select" = "Select";
+"message.action.subtitle.deleteAll" = "Delete For All";
+"message.action.subtitle.deleteMe" = "Delete For Me";
+"message.alert.delete.title" = "Delete message?";
+"message.alert.delete.description" = "Are you sure you want to delete this message?";
+"message.reply.count" = "%d Replies";
+"message.input.placeholder" = "Write a message...";
+"message.list.unread" = "New Messages";
+"message.list.separator-today" = "Today";
+"message.deleted" = "Message was deleted.";
+"message.info.edited" = "edited";
+"message.attachment.image" = "Photo";
+"message.attachment.video" = "Video";
+"message.attachment.link" = "Link";
+"message.attachment.file" = "File";
+"message.attachment.voice" = "Voice";
+"message.forward.title" = "Forwarded message";
+
+"message.info.readBy" = "Read by";
+"message.info.deliveredTo" = "Delivered to";
+"message.info.sent" = "Sent:";
+"message.info.size" = "Size:";
+"message.info.title" = "Message Info";
+
+"composer.reply" = "Reply";
+"composer.edit" = "Edit message";
+
+"imagePicker.manageAccess.action" = "Manage";
+"imagePicker.manageAccess.more" = "Select More";
+"imagePicker.manageAccess.change" = "Change Settings";
+"imagePicker.title" = "Gallery";
+"imagePicker.attach.button.title" = "Attach";
+
+"user.deleted" = "Deleted user";
+"user.inactive" = "Inactive user";
+"user.current" = "You";
+
+//Presence
+"user.presence.online" = "online";
+"user.presence.offline" = "offline";
+"user.presence.away" = "away";
+"user.presence.dnd" = "DND";
+
+"user.last.seen" = "last seen %@";
+"user.last.seen.minAgo" = "last seen %@ minute ago";
+"user.last.seen.minsAgo" = "last seen %@ minutes ago";
+"user.last.seen.at" = "last seen %@ at %@";
+"user.last.seen.yesterday" = "Yesterday";
+
+"connection.state.connected" = "Connected";
+"connection.state.connecting" = "Connecting";
+"connection.state.disconnected" = "Disconnected";
+"connection.state.reconnecting" = "Connecting";
+"connection.state.failed" = "Connection Failed";
+
+"alert.error.title" = "Error";
+"alert.button.ok" = "Ok";
+"alert.button.cancel" = "Cancel";
+"alert.button.discard" = "Discard";
+"alert.button.delete" = "Delete";
+"alert.button.open-camera" = "Camera";
+"alert.button.open-gallery" = "Gallery";
+"alert.button.open-files" = "File";
+
+"alert.ask.delete" = "Are you sure you want to delete this chat?\nThis cannot be undone.";
+
+"report.title" = "Report";
+"report.additional.title" = "Please enter any additional details";
+"report.additional.details" = "Additional details";
+
+"recorder.slideToCancel" = "< Slide to cancel";
+"recorder.cancel" = "Cancel";
+
+"attachment.file" = "File";
+"attachment.image" = "Photo";
+"attachment.video" = "Video";
+"attachment.voice" = "Voice";
+
+"previewer.forward" = "Forward";
+"previewer.savePhoto" = "Save Photo";
+"previewer.sharePhoto" = "Share Photo";
+"previewer.saveVideo" = "Save Video";
+"previewer.shareVideo" = "Share Video";
+"previewer.videoSaved" = "Your video was successfully saved";
+"previewer.photoSaved" = "Your photo was successfully saved";
+
+"link.openIn" = "Open in ...";
+"link.copy" = "Copy link";
+
+"error.max20Items" = "Maximum 20 items allowed";
+"error.maxValueItems" = "Maximum %d items allowed";
+
+
+"nav.bar.add" = "Add";
+"nav.bar.cancel" = "Cancel";
+"nav.bar.create" = "Create";
+"nav.bar.done" = "Done";
+"nav.bar.confirm" = "Confirm";
+"nav.bar.edit" = "Edit";
+"nav.bar.forward" = "Forward";
+"nav.bar.next" = "Next";
+"nav.bar.update" = "Update";
+"nav.bar.close" = "Close";
+
+"capture.takePhoto" = "Camera";
+"capture.selectPhoto" = "Select Photo";
+
+"imageCropper.moveAndScale" = "Move and Scale";
+
+"emoji.recent" = "Frequently used";
+
+"searchBar.placeholder" = "Search";
+
+"search.noResults.title" = "No Results";
+"search.noResults.message" = "There were no results found.";
+
+"channel.noMessages.title" = "No Messages yet";
+"channel.noMessages.message" = "No messages yet, start the chat";
+"channel.created.title" = "You created a channel";
+"channel.created.message" = "Add subscribers so they can join\nthe channel.";

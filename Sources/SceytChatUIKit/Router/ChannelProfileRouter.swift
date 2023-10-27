@@ -1,0 +1,87 @@
+//
+//  ChannelProfileRouter.swift
+//  SceytChatUIKit
+//
+//  Created by Hovsep Keropyan on 26.10.23.
+//  Copyright © 2023 Sceyt LLC. All rights reserved.
+//
+
+import UIKit
+
+open class ChannelProfileRouter: Router<ChannelProfileVC> {
+    open func showMuteOptionsAlert(
+        selected: @escaping (SCTUIKitConfig.OptionItem) -> Void,
+        canceled: @escaping () -> Void
+    ) {
+        rootVC.showBottomSheet(
+            title: L10n.Channel.Profile.Mute.title,
+            actions: Config.muteItems.map { item in
+                    .init(title: item.title, style: .default) { selected(item) }
+            } + [.init(title: L10n.Alert.Button.cancel, style: .cancel) { canceled() }])
+    }
+    
+    open func showAutoDeleteOptionsAlert(
+        selected: @escaping (SCTUIKitConfig.OptionItem) -> Void,
+        canceled: @escaping () -> Void
+    ) {
+        rootVC.showBottomSheet(
+            title: L10n.Channel.Profile.AutoDelete.title,
+            actions: Config.autoDeleteItems.map { item in
+                    .init(title: item.title, style: .default) { selected(item) }
+            } + [.init(title: L10n.Alert.Button.cancel, style: .cancel) { canceled() }])
+    }
+    
+    open func showAttachment(_ attachment: ChatMessage.Attachment) {
+        guard attachment.status == .done else { return }
+        let preview = FilePreviewController(
+            items: AttachmentView.items(attachments: [attachment])
+                .map { .init(title: $0.name, url: $0.url) }
+        )
+        
+        preview.present(on: rootVC)
+    }
+
+    open func goChannelVC() {
+        guard let vc = channelVC else { return }
+        rootVC.navigationController?.popToViewController(vc, animated: true)
+    }
+    
+    open func goChannelListVC() {
+        guard let vc = channelListVC else { return }
+        rootVC.navigationController?.popToViewController(vc, animated: true)
+    }
+    
+    open func showMemberList() {
+        let vc = Components.channelMemberListVC.init()
+        vc.memberListViewModel = Components.channelMemberListVM.init(channel: rootVC.profileViewModel.channel)
+        rootVC.show(vc, sender: self)
+    }
+    
+    open func showAdminsList() {
+        let vc = Components.channelMemberListVC.init()
+        vc.memberListViewModel = Components.channelMemberListVM.init(channel: rootVC.profileViewModel.channel,
+                                                                     filterMembersByRole: Config.chatRoleAdmin)
+        rootVC.show(vc, sender: self)
+    }
+    
+    open func showEditChannel() {
+        let vc = Components.channelProfileEditVC.init()
+        vc.profileViewModel = Components.channelProfileEditVM.init(channel: rootVC.profileViewModel.channel)
+        rootVC.show(vc, sender: self)
+    }
+
+    private var channelListVC: ChannelListVC? {
+        rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelListVC }) as? ChannelListVC
+    }
+
+    private var channelVC: ChannelVC? {
+        rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelVC }) as? ChannelVC
+    }
+    
+    open func goAvatar() {
+        guard rootVC.profileViewModel.channel.imageUrl != nil else { return }
+        let vc = Components.channelAvatarVC.init()
+        vc.viewModel = Components.channelAvatarVM.init(channel: rootVC.profileViewModel.channel)
+        rootVC.show(vc, sender: self)
+    }
+}

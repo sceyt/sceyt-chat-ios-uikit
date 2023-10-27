@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="44px" height="44px" viewBox="0 0 44 44" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>unread-dark</title>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="unread-dark">
+            <rect id="Rectangle" fill="#232324" fill-rule="nonzero" x="0" y="0" width="44" height="44" rx="22"></rect>
+            <path d="M14.2929,18.2929 C14.6834,17.9024 15.3166,17.9024 15.7071,18.2929 L22,24.5858 L28.2929,18.2929 C28.6834,17.9024 29.3166,17.9024 29.7071,18.2929 C30.0976,18.6834 30.0976,19.3166 29.7071,19.7071 L22.7071,26.7071 C22.3166,27.0976 21.6834,27.0976 21.2929,26.7071 L14.2929,19.7071 C13.9024,19.3166 13.9024,18.6834 14.2929,18.2929 Z" id="Path" fill="#969A9F"></path>
+        </g>
+    </g>
+</svg>
