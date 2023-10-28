@@ -1,8 +1,8 @@
 //
 //  Config.swift
-//  DemoApp
+//  SceytDemoApp
 //
-//  Created by Hovsep Keropyan on 31.08.23.
+//  Created by Hovsep Keropyan on 28.10.23.
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
@@ -62,4 +62,3 @@ func configureSceytChatUIKit() {
     SCTUIKitConfig.directChannel = "direct"
     
 }
-

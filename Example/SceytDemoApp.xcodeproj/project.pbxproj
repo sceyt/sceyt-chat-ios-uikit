@@ -7,113 +7,111 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		C5BEDEBB2AEB996C0076E4CC /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BEDEBA2AEB996C0076E4CC /* AppDelegate.swift */; };
-		C5BEDEBD2AEB996C0076E4CC /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BEDEBC2AEB996C0076E4CC /* SceneDelegate.swift */; };
-		C5BEDEBF2AEB996C0076E4CC /* DemoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BEDEBE2AEB996C0076E4CC /* DemoViewController.swift */; };
-		C5BEDEC22AEB996C0076E4CC /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C5BEDEC02AEB996C0076E4CC /* Main.storyboard */; };
-		C5BEDEC42AEB996D0076E4CC /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C5BEDEC32AEB996D0076E4CC /* Assets.xcassets */; };
-		C5BEDEC72AEB996D0076E4CC /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C5BEDEC52AEB996D0076E4CC /* LaunchScreen.storyboard */; };
-		C5BEDED22AEB9A390076E4CC /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5BEDED12AEB9A390076E4CC /* Config.swift */; };
-		C5BEDED52AEB9A770076E4CC /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = C5BEDED42AEB9A770076E4CC /* SceytChatUIKit */; };
-		C5CAC5DE2AEBD3F1007EA2C2 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = C5CAC5DD2AEBD3F1007EA2C2 /* SceytChatUIKit */; };
+		C54DF6BB2AECF09100767983 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6BA2AECF09100767983 /* AppDelegate.swift */; };
+		C54DF6BD2AECF09100767983 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6BC2AECF09100767983 /* SceneDelegate.swift */; };
+		C54DF6BF2AECF09100767983 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6BE2AECF09100767983 /* ViewController.swift */; };
+		C54DF6C22AECF09100767983 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C54DF6C02AECF09100767983 /* Main.storyboard */; };
+		C54DF6C42AECF09400767983 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C54DF6C32AECF09400767983 /* Assets.xcassets */; };
+		C54DF6C72AECF09400767983 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C54DF6C52AECF09400767983 /* LaunchScreen.storyboard */; };
+		C54DF6CF2AECF19300767983 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6CE2AECF19300767983 /* Config.swift */; };
+		C54DF6D22AECF25900767983 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = C54DF6D12AECF25900767983 /* SceytChatUIKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		C5BEDEB72AEB996C0076E4CC /* DemoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C5BEDEBA2AEB996C0076E4CC /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		C5BEDEBC2AEB996C0076E4CC /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		C5BEDEBE2AEB996C0076E4CC /* DemoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoViewController.swift; sourceTree = "<group>"; };
-		C5BEDEC12AEB996C0076E4CC /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
-		C5BEDEC32AEB996D0076E4CC /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		C5BEDEC62AEB996D0076E4CC /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		C5BEDEC82AEB996D0076E4CC /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		C5BEDED12AEB9A390076E4CC /* Config.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
+		C54DF6B72AECF09100767983 /* SceytDemoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SceytDemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C54DF6BA2AECF09100767983 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		C54DF6BC2AECF09100767983 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		C54DF6BE2AECF09100767983 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		C54DF6C12AECF09100767983 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		C54DF6C32AECF09400767983 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		C54DF6C62AECF09400767983 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		C54DF6C82AECF09400767983 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C54DF6CE2AECF19300767983 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
-		C5BEDEB42AEB996C0076E4CC /* Frameworks */ = {
+		C54DF6B42AECF09100767983 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C5CAC5DE2AEBD3F1007EA2C2 /* SceytChatUIKit in Frameworks */,
-				C5BEDED52AEB9A770076E4CC /* SceytChatUIKit in Frameworks */,
+				C54DF6D22AECF25900767983 /* SceytChatUIKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		C5BEDEAE2AEB996C0076E4CC = {
+		C54DF6AE2AECF09100767983 = {
 			isa = PBXGroup;
 			children = (
-				C5BEDEB92AEB996C0076E4CC /* DemoApp */,
-				C5BEDEB82AEB996C0076E4CC /* Products */,
+				C54DF6B92AECF09100767983 /* SceytDemoApp */,
+				C54DF6B82AECF09100767983 /* Products */,
 			);
 			sourceTree = "<group>";
 		};
-		C5BEDEB82AEB996C0076E4CC /* Products */ = {
+		C54DF6B82AECF09100767983 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				C5BEDEB72AEB996C0076E4CC /* DemoApp.app */,
+				C54DF6B72AECF09100767983 /* SceytDemoApp.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		C5BEDEB92AEB996C0076E4CC /* DemoApp */ = {
+		C54DF6B92AECF09100767983 /* SceytDemoApp */ = {
 			isa = PBXGroup;
 			children = (
-				C5BEDEBA2AEB996C0076E4CC /* AppDelegate.swift */,
-				C5BEDEBC2AEB996C0076E4CC /* SceneDelegate.swift */,
-				C5BEDEBE2AEB996C0076E4CC /* DemoViewController.swift */,
-				C5BEDED12AEB9A390076E4CC /* Config.swift */,
-				C5BEDEC02AEB996C0076E4CC /* Main.storyboard */,
-				C5BEDEC32AEB996D0076E4CC /* Assets.xcassets */,
-				C5BEDEC52AEB996D0076E4CC /* LaunchScreen.storyboard */,
-				C5BEDEC82AEB996D0076E4CC /* Info.plist */,
+				C54DF6BA2AECF09100767983 /* AppDelegate.swift */,
+				C54DF6BC2AECF09100767983 /* SceneDelegate.swift */,
+				C54DF6BE2AECF09100767983 /* ViewController.swift */,
+				C54DF6CE2AECF19300767983 /* Config.swift */,
+				C54DF6C02AECF09100767983 /* Main.storyboard */,
+				C54DF6C32AECF09400767983 /* Assets.xcassets */,
+				C54DF6C52AECF09400767983 /* LaunchScreen.storyboard */,
+				C54DF6C82AECF09400767983 /* Info.plist */,
 			);
-			path = DemoApp;
+			path = SceytDemoApp;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		C5BEDEB62AEB996C0076E4CC /* DemoApp */ = {
+		C54DF6B62AECF09100767983 /* SceytDemoApp */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = C5BEDECB2AEB996D0076E4CC /* Build configuration list for PBXNativeTarget "DemoApp" */;
+			buildConfigurationList = C54DF6CB2AECF09400767983 /* Build configuration list for PBXNativeTarget "SceytDemoApp" */;
 			buildPhases = (
-				C5BEDEB32AEB996C0076E4CC /* Sources */,
-				C5BEDEB42AEB996C0076E4CC /* Frameworks */,
-				C5BEDEB52AEB996C0076E4CC /* Resources */,
+				C54DF6B32AECF09100767983 /* Sources */,
+				C54DF6B42AECF09100767983 /* Frameworks */,
+				C54DF6B52AECF09100767983 /* Resources */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 			);
-			name = DemoApp;
+			name = SceytDemoApp;
 			packageProductDependencies = (
-				C5BEDED42AEB9A770076E4CC /* SceytChatUIKit */,
-				C5CAC5DD2AEBD3F1007EA2C2 /* SceytChatUIKit */,
+				C54DF6D12AECF25900767983 /* SceytChatUIKit */,
 			);
-			productName = DemoApp;
-			productReference = C5BEDEB72AEB996C0076E4CC /* DemoApp.app */;
+			productName = SceytDemoApp;
+			productReference = C54DF6B72AECF09100767983 /* SceytDemoApp.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
-		C5BEDEAF2AEB996C0076E4CC /* Project object */ = {
+		C54DF6AF2AECF09100767983 /* Project object */ = {
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1500;
 				LastUpgradeCheck = 1500;
+				ORGANIZATIONNAME = "Sceyt LLC";
 				TargetAttributes = {
-					C5BEDEB62AEB996C0076E4CC = {
+					C54DF6B62AECF09100767983 = {
 						CreatedOnToolsVersion = 15.0.1;
 					};
 				};
 			};
-			buildConfigurationList = C5BEDEB22AEB996C0076E4CC /* Build configuration list for PBXProject "DemoApp" */;
+			buildConfigurationList = C54DF6B22AECF09100767983 /* Build configuration list for PBXProject "SceytDemoApp" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -121,59 +119,59 @@
 				en,
 				Base,
 			);
-			mainGroup = C5BEDEAE2AEB996C0076E4CC;
+			mainGroup = C54DF6AE2AECF09100767983;
 			packageReferences = (
-				C5CAC5DC2AEBD3F1007EA2C2 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */,
+				C54DF6D02AECF25900767983 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */,
 			);
-			productRefGroup = C5BEDEB82AEB996C0076E4CC /* Products */;
+			productRefGroup = C54DF6B82AECF09100767983 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				C5BEDEB62AEB996C0076E4CC /* DemoApp */,
+				C54DF6B62AECF09100767983 /* SceytDemoApp */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
-		C5BEDEB52AEB996C0076E4CC /* Resources */ = {
+		C54DF6B52AECF09100767983 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C5BEDEC72AEB996D0076E4CC /* LaunchScreen.storyboard in Resources */,
-				C5BEDEC42AEB996D0076E4CC /* Assets.xcassets in Resources */,
-				C5BEDEC22AEB996C0076E4CC /* Main.storyboard in Resources */,
+				C54DF6C72AECF09400767983 /* LaunchScreen.storyboard in Resources */,
+				C54DF6C42AECF09400767983 /* Assets.xcassets in Resources */,
+				C54DF6C22AECF09100767983 /* Main.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
-		C5BEDEB32AEB996C0076E4CC /* Sources */ = {
+		C54DF6B32AECF09100767983 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C5BEDEBF2AEB996C0076E4CC /* DemoViewController.swift in Sources */,
-				C5BEDED22AEB9A390076E4CC /* Config.swift in Sources */,
-				C5BEDEBB2AEB996C0076E4CC /* AppDelegate.swift in Sources */,
-				C5BEDEBD2AEB996C0076E4CC /* SceneDelegate.swift in Sources */,
+				C54DF6BF2AECF09100767983 /* ViewController.swift in Sources */,
+				C54DF6CF2AECF19300767983 /* Config.swift in Sources */,
+				C54DF6BB2AECF09100767983 /* AppDelegate.swift in Sources */,
+				C54DF6BD2AECF09100767983 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXVariantGroup section */
-		C5BEDEC02AEB996C0076E4CC /* Main.storyboard */ = {
+		C54DF6C02AECF09100767983 /* Main.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
-				C5BEDEC12AEB996C0076E4CC /* Base */,
+				C54DF6C12AECF09100767983 /* Base */,
 			);
 			name = Main.storyboard;
 			sourceTree = "<group>";
 		};
-		C5BEDEC52AEB996D0076E4CC /* LaunchScreen.storyboard */ = {
+		C54DF6C52AECF09400767983 /* LaunchScreen.storyboard */ = {
 			isa = PBXVariantGroup;
 			children = (
-				C5BEDEC62AEB996D0076E4CC /* Base */,
+				C54DF6C62AECF09400767983 /* Base */,
 			);
 			name = LaunchScreen.storyboard;
 			sourceTree = "<group>";
@@ -181,7 +179,7 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		C5BEDEC92AEB996D0076E4CC /* Debug */ = {
+		C54DF6C92AECF09400767983 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -244,7 +242,7 @@
 			};
 			name = Debug;
 		};
-		C5BEDECA2AEB996D0076E4CC /* Release */ = {
+		C54DF6CA2AECF09400767983 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
@@ -300,7 +298,7 @@
 			};
 			name = Release;
 		};
-		C5BEDECC2AEB996D0076E4CC /* Debug */ = {
+		C54DF6CC2AECF09400767983 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -309,7 +307,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 289SR6UP83;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = DemoApp/Info.plist;
+				INFOPLIST_FILE = SceytDemoApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -320,7 +318,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sceyt.uikit.DemoApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sceyt.uikit.SceytDemoApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -328,7 +326,7 @@
 			};
 			name = Debug;
 		};
-		C5BEDECD2AEB996D0076E4CC /* Release */ = {
+		C54DF6CD2AECF09400767983 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
@@ -337,7 +335,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 289SR6UP83;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = DemoApp/Info.plist;
+				INFOPLIST_FILE = SceytDemoApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -348,7 +346,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.sceyt.uikit.DemoApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sceyt.uikit.SceytDemoApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -359,20 +357,20 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		C5BEDEB22AEB996C0076E4CC /* Build configuration list for PBXProject "DemoApp" */ = {
+		C54DF6B22AECF09100767983 /* Build configuration list for PBXProject "SceytDemoApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C5BEDEC92AEB996D0076E4CC /* Debug */,
-				C5BEDECA2AEB996D0076E4CC /* Release */,
+				C54DF6C92AECF09400767983 /* Debug */,
+				C54DF6CA2AECF09400767983 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		C5BEDECB2AEB996D0076E4CC /* Build configuration list for PBXNativeTarget "DemoApp" */ = {
+		C54DF6CB2AECF09400767983 /* Build configuration list for PBXNativeTarget "SceytDemoApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				C5BEDECC2AEB996D0076E4CC /* Debug */,
-				C5BEDECD2AEB996D0076E4CC /* Release */,
+				C54DF6CC2AECF09400767983 /* Debug */,
+				C54DF6CD2AECF09400767983 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -380,7 +378,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		C5CAC5DC2AEBD3F1007EA2C2 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */ = {
+		C54DF6D02AECF25900767983 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sceyt/sceyt-chat-ios-uikit.git";
 			requirement = {
@@ -391,16 +389,12 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		C5BEDED42AEB9A770076E4CC /* SceytChatUIKit */ = {
+		C54DF6D12AECF25900767983 /* SceytChatUIKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = SceytChatUIKit;
-		};
-		C5CAC5DD2AEBD3F1007EA2C2 /* SceytChatUIKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = C5CAC5DC2AEBD3F1007EA2C2 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */;
+			package = C54DF6D02AECF25900767983 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */;
 			productName = SceytChatUIKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
-	rootObject = C5BEDEAF2AEB996C0076E4CC /* Project object */;
+	rootObject = C54DF6AF2AECF09100767983 /* Project object */;
 }

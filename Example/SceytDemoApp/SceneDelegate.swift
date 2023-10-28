@@ -1,8 +1,8 @@
 //
 //  SceneDelegate.swift
-//  DemoApp
+//  SceytDemoApp
 //
-//  Created by Hovsep Keropyan on 27.10.23.
+//  Created by Hovsep Keropyan on 28.10.23.
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
@@ -12,7 +12,7 @@ import SceytChatUIKit
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
-    var backgroundTaskId = UIBackgroundTaskIdentifier.invalid
+    var backgroundTaskId: UIBackgroundTaskIdentifier = .invalid
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.

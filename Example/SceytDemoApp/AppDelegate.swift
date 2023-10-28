@@ -1,8 +1,8 @@
 //
 //  AppDelegate.swift
-//  DemoApp
+//  SceytDemoApp
 //
-//  Created by Hovsep Keropyan on 27.10.23.
+//  Created by Hovsep Keropyan on 28.10.23.
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
@@ -10,8 +10,6 @@ import UIKit
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
-
-
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
