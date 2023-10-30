@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "no-messages.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

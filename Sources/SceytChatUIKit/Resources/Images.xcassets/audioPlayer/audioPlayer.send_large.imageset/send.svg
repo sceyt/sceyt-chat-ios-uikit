@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="70px" height="70px" viewBox="0 0 70 70" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Rec</title>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="Rec">
+            <circle id="Oval" fill="#5159F6" fill-rule="nonzero" cx="35" cy="35" r="35"></circle>
+            <path d="M34.3636,25.3632 C34.7151,25.0117 35.2849,25.0117 35.6364,25.3632 L42.6364,32.3632 C42.9878,32.7147 42.9878,33.2845 42.6364,33.636 C42.2849,33.9875 41.7151,33.9875 41.3636,33.636 L35.9,28.1724 L35.9,43.9996 C35.9,44.4967 35.497,44.8996 35,44.8996 C34.5029,44.8996 34.1,44.4967 34.1,43.9996 L34.1,28.1724 L28.6364,33.636 C28.2849,33.9875 27.7151,33.9875 27.3636,33.636 C27.0121,33.2845 27.0121,32.7147 27.3636,32.3632 L34.3636,25.3632 Z" id="Path" fill="#FFFFFF"></path>
+        </g>
+    </g>
+</svg>

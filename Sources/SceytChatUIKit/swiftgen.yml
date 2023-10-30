@@ -1,0 +1,19 @@
+input_dir: Resources/
+output_dir: Appearance/Generated/
+strings:
+  inputs: en.lproj
+  filter: .+\.strings$
+  outputs:
+    - templateName: structured-swift5
+      output: L10n.swift
+      params:
+        bundle: SCL10nBundleClass.resourcesBundle
+xcassets:
+  - inputs:
+    - Images.xcassets
+    outputs:
+      - templateName: swift5
+        output: Assets.swift
+        params:
+          enumName: Assets
+          bundle: SCAssetsBundleClass.resourcesBundle
