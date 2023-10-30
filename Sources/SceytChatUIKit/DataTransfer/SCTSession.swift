@@ -138,9 +138,9 @@ open class SCTUploadOperation: AsyncOperation {
         taskInfo.startChecksum { [weak self] stored in
             guard let self else { return }
             if stored {
-                complete()
+                self.complete()
             } else {
-                startPreparing()
+                self.startPreparing()
             }
         }
     }
@@ -177,7 +177,7 @@ open class SCTUploadOperation: AsyncOperation {
             switch $0 {
             case .stop:
                 SCTSession.default.pendingOperations.add(SCTUploadOperation(
-                    uuid: uuid,
+                    uuid: self.uuid,
                     attachment: self.attachment,
                     taskInfo: self.taskInfo
                 ))
@@ -240,11 +240,11 @@ open class SCTUploadOperation: AsyncOperation {
         } completion: { [weak self] url, error in
             guard let self else { return }
             if let error {
-                taskInfo.failure(error: error)
+                self.taskInfo.failure(error: error)
             } else {
-                taskInfo.success(origin: url!)
+                self.taskInfo.success(origin: url!)
             }
-            complete()
+            self.complete()
         }
     }
     
