@@ -118,13 +118,13 @@ open class SCTDataSessionTaskInfo: NSObject {
                 switch $0 {
                 case .success(let link):
                     if let link {
-                        success(origin: link)
+                        self.success(origin: link)
                         completion(true)
                     } else {
                         completion(false)
                     }
                 case .failure(let error):
-                    failure(error: error)
+                    self.failure(error: error)
                     completion(false)
                 }
             }

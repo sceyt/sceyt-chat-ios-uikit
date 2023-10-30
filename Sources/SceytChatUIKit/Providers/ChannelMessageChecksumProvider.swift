@@ -94,7 +94,7 @@ open class ChannelMessageChecksumProvider: Provider {
                 completion: { [weak self] checksum in
                     guard let self else { return }
                     if let checksum, let link = checksum.data {
-                        database.read { checksum -> ChatMessage.Attachment? in
+                        self.database.read { checksum -> ChatMessage.Attachment? in
                             var dto = MessageDTO.fetch(tid: message.tid, context: checksum)
                             if dto == nil, message.id > 0 {
                                 dto = MessageDTO.fetch(id: message.id, context: checksum)
@@ -115,7 +115,7 @@ open class ChannelMessageChecksumProvider: Provider {
                                     attachment.metadata = stored.metadata
                                     attachment.uploadedFileSize = stored.uploadedFileSize
                                     attachment.status = .done
-                                    database.write { [weak self] context in
+                                    self.database.write { [weak self] context in
                                         guard let self else { return }
                                         var attachments = message.attachments ?? []
                                         if attachments.count > 1,
@@ -142,7 +142,7 @@ open class ChannelMessageChecksumProvider: Provider {
                             }
                         }
                     } else {
-                        createChecksum(
+                        self.createChecksum(
                             message: message,
                             attachment: attachment)
                         { [weak self] error in
