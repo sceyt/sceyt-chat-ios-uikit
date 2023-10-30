@@ -55,6 +55,10 @@ public struct SCTUIKitConfig {
     }()
     
     public static var currentUserId: UserId?
+    
+    public static var currentUser: User {
+        ChatClient.shared.user
+    }
 }
 
 public extension SCTUIKitConfig {

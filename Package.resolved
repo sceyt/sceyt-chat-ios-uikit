@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/sceyt/sceyt-chat-ios-sdk.git",
       "state" : {
-        "revision" : "00e7e1e4aac76cc4c3649b4832f7b38ee651a1b3",
-        "version" : "1.5.1"
+        "revision" : "154abb9aa193ac07dd167521cb0cb6859d8edeb2",
+        "version" : "1.5.2"
       }
     }
   ],

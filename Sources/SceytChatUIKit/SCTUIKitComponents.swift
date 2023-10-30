@@ -11,22 +11,16 @@ import Foundation
 typealias Components = SCTUIKitComponents
 
 public enum SCTUIKitComponents {
-    public static var navigationController: NavigationController.Type = NavigationController.self
     
-    // Channel list VC
+    public static var navigationController: NavigationController.Type = NavigationController.self
     public static var channelListVC: ChannelListVC.Type = ChannelListVC.self
     public static var channelListVM: ChannelListVM.Type = ChannelListVM.self
     public static var channelListRouter: ChannelListRouter.Type = ChannelListRouter.self
-    
     public static var channelTableView: ChannelTableView.Type = ChannelTableView.self
-    // Channel Cell (Channel list item)
     public static var channelCell: ChannelCell.Type = ChannelCell.self
-    // The empty view (when there is no any channels)
     public static var channelListEmptyView: ChannelListEmptyView.Type = ChannelListEmptyView.self
     public static var noDataView: NoDataView.Type = NoDataView.self
     public static var channelCreatedView: ChannelCreatedView.Type = ChannelCreatedView.self
-
-    // Channel VC
     public static var channelVC: ChannelVC.Type = ChannelVC.self
     public static var channelVM: ChannelVM.Type = ChannelVM.self
     public static var channelRouter: ChannelRouter.Type = ChannelRouter.self
@@ -147,7 +141,6 @@ public enum SCTUIKitComponents {
 
     public static var textLabel: TextLabel.Type = TextLabel.self
     
-    // Models
     public static var messageLayoutModel: MessageLayoutModel.Type = MessageLayoutModel.self
     public static var channelLayoutModel: ChannelLayoutModel.Type = ChannelLayoutModel.self
     public static var initialsBuilder: InitialsBuilder.Type = InitialsBuilder.self
