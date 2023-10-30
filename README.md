@@ -151,7 +151,7 @@ class DemoChannelCell: ChannelCell {
 
     }
 
-override func deliveryStatusImage(message: ChatMessage?) -> UIImage? {
+    override func deliveryStatusImage(message: ChatMessage?) -> UIImage? {
 
         guard let message = message, !message.incoming else { return nil }
 
