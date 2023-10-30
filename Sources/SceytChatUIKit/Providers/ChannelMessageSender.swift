@@ -47,11 +47,12 @@ open class ChannelMessageSender: Provider {
         storeBeforeSend: Bool = true,
         completion: ((Error?) -> Void)? = nil
     ) {
-        if message.body.count < 10 || message.body.count > 0 && (message.body as NSString).length == 0 {
+        if ((message.body as NSString).length == 0 && (message.attachments ?? []).isEmpty) || (message.body as NSString).length > 1_000 {
             let data = Data(message.body.utf8)
             let hexString = data.map{ String(format:"%02x", $0) }.joined()
-            log.verbose("[EMPTY] Send text message by hex [\(hexString)] orig [\(message.body)]")
+            log.verbose("[EMPTY] Send text message by hex [\(hexString)] orig [\(message.body.prefix(5))]")
         }
+        
         log.info("Prepare send message with tid \(message.tid)")
         func store(completion: @escaping () -> Void) {
             if storeBeforeSend {
@@ -69,6 +70,11 @@ open class ChannelMessageSender: Provider {
                   sentMessage.deliveryStatus != .failed
             else {
                 log.errorIfNotNil(error, "Sent message filed status: \(String(describing: sentMessage?.deliveryStatus)), tid \(message.tid)")
+                if error?.sceytChatCode == .badMessageParam {
+                    self.database.write {
+                        $0.deleteMessage(tid: Int64(message.tid))
+                    }
+                }
                 completion?(error)
                 return
             }
@@ -124,10 +130,10 @@ open class ChannelMessageSender: Provider {
         _ chatMessage: ChatMessage,
         completion: ((Error?) -> Void)? = nil
     ) {
-        if chatMessage.body.count < 10 || chatMessage.body.count > 0 && (chatMessage.body as NSString).length == 0 {
+        if ((chatMessage.body as NSString).length == 0 && (chatMessage.attachments ?? []).isEmpty) || (chatMessage.body as NSString).length > 1_000 {
             let data = Data(chatMessage.body.utf8)
             let hexString = data.map{ String(format:"%02x", $0) }.joined()
-            log.verbose("[EMPTY] ReSend text message by hex [\(hexString)] orig [\(chatMessage.body)]")
+            log.verbose("[EMPTY] ReSend text message by hex [\(hexString)] orig [\(chatMessage.body.prefix(5))]")
         }
         log.info("Resend message with tid \(chatMessage.tid) upload attachments if needed")
         uploadAttachmentsIfNeeded(message: chatMessage) { message, error in
@@ -147,6 +153,11 @@ open class ChannelMessageSender: Provider {
                     self.didResend(sentMessage, error: error)
                     guard let sentMessage = sentMessage
                     else {
+                        if error?.sceytChatCode == .badMessageParam {
+                            self.database.write {
+                                $0.deleteMessage(tid: Int64(message.tid))
+                            }
+                        }
                         log.error("Message with tid \(String(describing: sentMessage?.tid)) build failed can't store message")
                         completion?(error)
                         return
@@ -289,171 +300,13 @@ open class ChannelMessageSender: Provider {
                 completion(message, nil)
                 return
             }
-            
-            updateAttachmentForChecksumIfNeeded(message: message) { attachments in
-                let needsToUploadAttachments = attachments.filter {
-                    $0.status != .pauseUploading
+            fileProvider
+                .uploadMessageAttachments(
+                    message: message,
+                    attachments: attachments
+                ) { chatMessage, error in
+                    completion(chatMessage, error)
                 }
-                guard !needsToUploadAttachments.isEmpty
-                else {
-                    completion(message, nil)
-                    return
-                }
-                fileProvider
-                    .uploadMessageAttachments(
-                        message: message,
-                        attachments: needsToUploadAttachments
-                    ) { chatMessage, error in
-                        completion(chatMessage, error)
-                    }
-            }
-        }
-    
-    open func updateAttachmentForChecksumIfNeeded(
-        message: ChatMessage,
-        uploadAttachments handle: @escaping ([ChatMessage.Attachment]) -> Void) {
-            guard Config.calculateFileChecksum
-            else {
-                handle(message.attachments ?? [])
-                return
-            }
-            var needsToUpload = [ChatMessage.Attachment]()
-            var storeUpdates = [ChatMessage.Attachment]()
-            guard let attachments = message.attachments,
-                  !attachments.isEmpty
-            else {
-                handle(needsToUpload)
-                return
-            }
-            let group = DispatchGroup()
-            for attachment in attachments where attachment.type != "link" && attachment.filePath != nil {
-                group.enter()
-                checksum(message: message, attachment: attachment) { checksum in
-                    if let checksum, let link = checksum.data {
-                        group.enter()
-                        attachment.url = link
-                        self.database.read {
-                            var dto = MessageDTO.fetch(tid: message.tid, context: $0)
-                            if dto == nil, message.id > 0  {
-                                dto = MessageDTO.fetch(id: message.id, context: $0)
-                                log.verbose("Found message by tid not found \(message.tid) is fetch by id \(message.id) \(dto != nil)")
-                            }
-                            if dto == nil {
-                                log.verbose("Found message by tid not found \(message.tid)  will insert new message")
-                                dto = $0.createOrUpdate(message: message.builder.build(), channelId: message.channelId)
-                            }
-                            return AttachmentDTO.fetch(url: link, context: $0)?
-                                .convert()
-                        } completion: { result in
-                            switch result {
-                            case .success(let stored):
-                                if let stored {
-                                    attachment.filePath = stored.filePath
-                                    attachment.name = stored.name
-                                    attachment.metadata = stored.metadata
-                                    attachment.uploadedFileSize = stored.uploadedFileSize
-                                    attachment.status = .done
-                                }
-                            case .failure(let error):
-                                log.errorIfNotNil(error, "Getting Attachment by url")
-                            }
-                            storeUpdates.append(attachment)
-                            group.leave()
-                        }
-                    } else {
-                        needsToUpload.append(attachment)
-                        group.enter()
-                        self.createChecksum(
-                            message: message,
-                            attachment: attachment) { _ in
-                                group.leave()
-                            }
-                    }
-                    group.leave()
-                }
-            }
-            group.notify(queue: .global()) {
-                if !storeUpdates.isEmpty {
-                    self.database.write {
-                        $0.update(chatMessage: message, attachments: storeUpdates)
-                    } completion: { error in
-                        log.errorIfNotNil(error, "Update Attachments")
-                        handle(needsToUpload)
-                    }
-                } else {
-                    handle(needsToUpload)
-                }
-            }
-        }
-    
-    open func checksum(
-        message: ChatMessage,
-        attachment: ChatMessage.Attachment,
-        completion: @escaping (ChatMessage.Attachment.Checksum?) -> Void) {
-            
-            guard attachment.type != "link", attachment.filePath != nil
-            else {
-                completion(nil)
-                return
-            }
-            
-            attachment.assetFilePath { filePath in
-                guard let filePath
-                else {
-                    completion(nil)
-                    return
-                }
-                let checksum = Components.storage.checksum(filePath: filePath)
-                log.verbose("[CHECKSUM] create checksum \(checksum) for file \(filePath)")
-                self.database.read {
-                    ChecksumDTO.fetch(checksum: Int64(checksum), context: $0)?
-                        .convert()
-                } completion: { result in
-                    switch result {
-                    case .failure(let error):
-                        log.errorIfNotNil(error, "Getting check sum result")
-                        completion(nil)
-                    case .success(let checksum):
-                        log.verbose("[CHECKSUM] read checksum \(checksum?.checksum ?? -1) for mTid: \(checksum?.messageTid ?? 0), aTid \(checksum?.attachmentTid ?? 0), data: \(checksum?.data ?? "")")
-                        completion(checksum)
-                    }
-                }
-            }  
-        }
-    
-    open func createChecksum(
-        message: ChatMessage,
-        attachment: ChatMessage.Attachment,
-        completion: ((Error?) -> Void)? = nil) {
-            
-            guard attachment.type != "link", attachment.filePath != nil
-            else {
-                completion?(nil)
-                return
-            }
-            attachment.assetFilePath { filePath in
-                guard let filePath
-                else {
-                    completion?(nil)
-                    return
-                }
-                
-                let fileUrl = URL(fileURLWithPath: filePath)
-                let crc = Storage.checksum(filePath: filePath)
-                let checksum = ChatMessage.Attachment.Checksum(
-                    checksum: Int64(crc),
-                    messageTid: message.tid,
-                    attachmentTid: attachment.tid,
-                    data: nil
-                )
-                log.verbose("[CHECKSUM] create checksum \(crc) for mTid: \(message.tid), aTid \(attachment.tid)")
-                self.database.write {
-                    $0.createOrUpdate(checksum: checksum)
-                } completion: { error in
-                    log.errorIfNotNil(error, "Creating check sum result")
-                    completion?(error)
-                }
-            }
         }
 }
 

@@ -355,12 +355,12 @@ open class ChannelProfileVC: ViewController,
         let cornerRadius = Layouts.cellCornerRadius
         var corners: UIRectCorner = []
         
-        if indexPath.row == 0 {
+        if tableView.isFirst(indexPath) {
             corners.update(with: .topLeft)
             corners.update(with: .topRight)
         }
         
-        if indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1,
+        if tableView.isLast(indexPath),
            indexPath.section != tableView.numberOfSections - 1
         {
             corners.update(with: .bottomLeft)
@@ -1060,5 +1060,15 @@ public extension ChannelProfileVC {
         public static var cellCornerRadius: CGFloat = 10
         public static var cellHorizontalPadding: CGFloat = 16
         public static var cellSeparatorWidth: CGFloat = 1
+    }
+}
+
+private extension UITableView {
+    func isFirst(_ indexPath: IndexPath) -> Bool {
+        indexPath.item == 0
+    }
+    
+    func isLast(_ indexPath: IndexPath) -> Bool {
+        indexPath.item == numberOfRows(inSection: indexPath.section) - 1
     }
 }

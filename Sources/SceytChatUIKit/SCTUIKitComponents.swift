@@ -168,6 +168,7 @@ public enum SCTUIKitComponents {
     public static var presenceProvider: PresenceProvider.Type = PresenceProvider.self
     public static var userProvider: UserProvider.Type = UserProvider.self
     public static var channelMessageSender: ChannelMessageSender.Type = ChannelMessageSender.self
+    public static var channelMessageChecksumProvider: ChannelMessageChecksumProvider.Type = ChannelMessageChecksumProvider.self
     public static var channelMessageMarkerProvider: ChannelMessageMarkerProvider.Type = ChannelMessageMarkerProvider.self
     public static var messageReactionProvider: MessageReactionProvider.Type = MessageReactionProvider.self
     public static var attachmentTransfer: AttachmentTransfer.Type = AttachmentTransfer.self

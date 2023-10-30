@@ -57,6 +57,12 @@ open class ChannelAvatarVC: ViewController, UIScrollViewDelegate {
         layout()
     }
     
+    open override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        layout()
+    }
+    
     open func layout() {
         scrollView.updateConstraintsForSize(scrollView.bounds.size)
         scrollView.updateMinMaxZoomScaleForSize(scrollView.bounds.size)

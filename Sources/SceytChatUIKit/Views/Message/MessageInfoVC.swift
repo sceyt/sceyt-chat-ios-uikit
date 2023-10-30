@@ -100,10 +100,8 @@ open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDele
         default:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.messageInfoMarkerCell.self)
             cell.data = section == .read ? viewModel.readMarker(at: indexPath) : viewModel.deliveredMarker(at: indexPath)
-            cell.position = (
-                isFirst: indexPath.row == 0,
-                isLast: indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1
-            )
+            cell.contentInsets.top = tableView.isFirst(indexPath) ? 8 : 0
+            cell.contentInsets.bottom = tableView.isLast(indexPath) ? 8 : 0
             return cell
         }
     }
@@ -123,5 +121,15 @@ public extension MessageInfoVC {
                 return L10n.Message.Info.deliveredTo
             }
         }
+    }
+}
+
+private extension UITableView {
+    func isFirst(_ indexPath: IndexPath) -> Bool {
+        indexPath.item == 0
+    }
+    
+    func isLast(_ indexPath: IndexPath) -> Bool {
+        indexPath.item == numberOfRows(inSection: indexPath.section) - 1
     }
 }

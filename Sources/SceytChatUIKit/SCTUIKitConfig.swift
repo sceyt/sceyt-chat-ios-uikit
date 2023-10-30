@@ -55,8 +55,6 @@ public struct SCTUIKitConfig {
     }()
     
     public static var currentUserId: UserId?
-    
-    public static var syncChannelsAfterConnect: Bool = false
 }
 
 public extension SCTUIKitConfig {
@@ -104,6 +102,7 @@ public extension SCTUIKitConfig {
     static var broadcastChannel = "broadcast"
     static var directChannel = "direct"
     
+    static var syncChannelsAfterConnect: Bool = true
 }
 
 public extension SCTUIKitConfig {

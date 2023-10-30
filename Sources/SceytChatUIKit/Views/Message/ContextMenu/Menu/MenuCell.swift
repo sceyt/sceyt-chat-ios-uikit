@@ -30,17 +30,17 @@ open class MenuCell: CollectionViewCell {
         contentView.addSubview(titleLabel)
         contentView.addSubview(separatorView)
         
-        titleLabel.leadingAnchor.pin(to: contentView.leadingAnchor, constant: Layout.insets.left)
-        titleLabel.topAnchor.pin(to: contentView.topAnchor, constant: Layout.insets.top)
-        contentView.bottomAnchor.pin(to: titleLabel.bottomAnchor, constant: Layout.insets.bottom)
+        titleLabel.leadingAnchor.pin(to: contentView.safeAreaLayoutGuide.leadingAnchor, constant: Layout.insets.left)
+        titleLabel.topAnchor.pin(to: contentView.safeAreaLayoutGuide.topAnchor, constant: Layout.insets.top)
+        contentView.safeAreaLayoutGuide.bottomAnchor.pin(to: titleLabel.bottomAnchor, constant: Layout.insets.bottom)
         iconView.heightAnchor.pin(constant: Layout.imageSize.height)
         iconView.widthAnchor.pin(constant: Layout.imageSize.width)
-        contentView.trailingAnchor.pin(to: iconView.trailingAnchor, constant: Layout.insets.right)
+        contentView.safeAreaLayoutGuide.trailingAnchor.pin(to: iconView.trailingAnchor, constant: Layout.insets.right)
         iconView.centerYAnchor.pin(to: titleLabel.centerYAnchor)
         iconView.leadingAnchor.pin(greaterThanOrEqualTo: titleLabel.trailingAnchor, constant: Layout.insets.right)
-        separatorView.leadingAnchor.pin(to: contentView.leadingAnchor)
-        contentView.trailingAnchor.pin(to: separatorView.trailingAnchor)
-        contentView.bottomAnchor.pin(to: separatorView.bottomAnchor)
+        separatorView.leadingAnchor.pin(to: contentView.safeAreaLayoutGuide.leadingAnchor)
+        contentView.safeAreaLayoutGuide.trailingAnchor.pin(to: separatorView.trailingAnchor)
+        contentView.safeAreaLayoutGuide.bottomAnchor.pin(to: separatorView.bottomAnchor)
         separatorView.heightAnchor.pin(constant: 1)
     }
     
@@ -79,6 +79,22 @@ open class MenuCell: CollectionViewCell {
                 iconView.image = nil
             }
         }
+    }
+    
+    open var contentInsets: UIEdgeInsets = .zero {
+        didSet {
+            setNeedsLayout()
+            layoutIfNeeded()
+        }
+    }
+    
+    open override var safeAreaInsets: UIEdgeInsets {
+        var safeAreaInsets = super.safeAreaInsets
+        safeAreaInsets.left += contentInsets.left
+        safeAreaInsets.right += contentInsets.right
+        safeAreaInsets.top += contentInsets.top
+        safeAreaInsets.bottom += contentInsets.bottom
+        return safeAreaInsets
     }
 }
 

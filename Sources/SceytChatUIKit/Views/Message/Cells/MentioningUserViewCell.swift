@@ -86,5 +86,6 @@ public extension MentioningUserViewCell {
         public static var avatarLeftPaddding: CGFloat = 16
         public static var avatarVerticalPadding: CGFloat = 6
         public static var cellHeight: CGFloat { avatarSize + avatarVerticalPadding * 2 }
+        public static var verticalPadding: CGFloat = 4
     }
 }

@@ -36,7 +36,7 @@ open class MenuController: ViewController,
     
     open func reloadData() {
         collectionView.reloadData()
-        collectionHeightConstraint?.constant = CGFloat(dataSource?.menuItems.count ?? 0) * Layouts.cellHeight
+        collectionHeightConstraint?.constant = CGFloat(dataSource?.menuItems.count ?? 0) * Layouts.cellHeight + Layouts.verticalPadding * 2
     }
     
     open var cellData: [MenuItem] {
@@ -57,7 +57,7 @@ open class MenuController: ViewController,
         super.setupLayout()
         view.addSubview(collectionView)
         collectionHeightConstraint = collectionView.heightAnchor.pin(constant: 0)
-        collectionView.pin(to: view, anchors: [.leading, .trailing, .top(4), .bottom(-4)])
+        collectionView.pin(to: view, anchors: [.leading, .trailing, .top, .bottom])
     }
     
     override open func setupAppearance() {
@@ -115,10 +115,12 @@ open class MenuController: ViewController,
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: MenuCell.self)
         cell.item = cellData[indexPath.item]
         cell.separatorView.isHidden = indexPath.item == cellData.indices.last
+        cell.contentInsets.top = collectionView.isFirst(indexPath) ? Layouts.verticalPadding : 0
+        cell.contentInsets.bottom = collectionView.isLast(indexPath) ? Layouts.verticalPadding : 0
         return cell
     }
     
-    //MARK: UICollectionViewDelegate
+    // MARK: UICollectionViewDelegate
     open func collectionView(
         _ collectionView: UICollectionView,
         didSelectItemAt indexPath: IndexPath) {
@@ -132,16 +134,22 @@ open class MenuController: ViewController,
         return true
     }
 
-    //MARK: UICollectionViewDelegateFlowLayout
+    // MARK: UICollectionViewDelegateFlowLayout
     open func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
         sizeForItemAt indexPath: IndexPath
     ) -> CGSize {
-        .init(width: floor(collectionView.frame.width), height: Layouts.cellHeight)
+        var height = Layouts.cellHeight
+        if collectionView.isFirst(indexPath) {
+            height += Layouts.verticalPadding
+        }
+        if collectionView.isLast(indexPath) {
+            height += Layouts.verticalPadding
+        }
+        return .init(width: floor(collectionView.frame.width), height: height)
     }
 }
-
 
 private extension MenuController {
     
@@ -161,6 +169,7 @@ private extension MenuController {
 public extension MenuController {
     enum Layouts {
         static var cellHeight: CGFloat = 40
+        static var verticalPadding: CGFloat = 4
     }
 }
 
@@ -206,5 +215,15 @@ public struct MenuItem {
         self.imageRenderingMode = imageRenderingMode
         self.dismissOnAction = dismissOnAction
         self.action = action
+    }
+}
+
+private extension UICollectionView {
+    func isFirst(_ indexPath: IndexPath) -> Bool {
+        indexPath.item == 0
+    }
+    
+    func isLast(_ indexPath: IndexPath) -> Bool {
+        indexPath.item == numberOfItems(inSection: indexPath.section) - 1
     }
 }

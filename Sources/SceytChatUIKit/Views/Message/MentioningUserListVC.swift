@@ -219,11 +219,14 @@ open class MentioningUserListVC: ViewController,
     }
     
     public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        if indexPath.row == 0 || indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1 {
-            return Components.mentioningUserViewCell.Layouts.cellHeight + 4 * 2
-        } else {
-            return Components.mentioningUserViewCell.Layouts.cellHeight
+        var height = Components.mentioningUserViewCell.Layouts.cellHeight
+        if tableView.isFirst(indexPath) {
+            height += Components.mentioningUserViewCell.Layouts.verticalPadding
         }
+        if tableView.isLast(indexPath) {
+            height += Components.mentioningUserViewCell.Layouts.verticalPadding
+        }
+        return height
     }
     
     open func tableView(
@@ -260,5 +263,16 @@ public extension MentioningUserListVC {
             .layerMinXMaxYCorner,
             .layerMaxXMaxYCorner
         ]
+    }
+}
+
+
+private extension UITableView {
+    func isFirst(_ indexPath: IndexPath) -> Bool {
+        indexPath.item == 0
+    }
+    
+    func isLast(_ indexPath: IndexPath) -> Bool {
+        indexPath.item == numberOfRows(inSection: indexPath.section) - 1
     }
 }

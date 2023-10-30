@@ -60,6 +60,7 @@ open class PreviewerScrollView: UIScrollView, Configurable, UIScrollViewDelegate
     public func setup() {
         delegate = self
         showsVerticalScrollIndicator = false
+        showsHorizontalScrollIndicator = false
         contentInsetAdjustmentBehavior = .never
         
         addGestureRecognizers()

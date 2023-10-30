@@ -52,7 +52,6 @@ struct UserDefaultsConfig<T> {
 
 func configureSceytChatUIKit() {
     SCTUIKitComponents.dataSession = SCTSession.default
-    SCTUIKitConfig.syncChannelsAfterConnect = true
     SCTUIKitConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
     SCTUIKitConfig.initialize(apiUrl: Config.sceytApiURL, appId: Config.sceytAppId, clientId: Config.clientId!)
     SCTUIKitConfig.setLogLevel(.verbose)

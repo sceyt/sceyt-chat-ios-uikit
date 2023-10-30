@@ -125,7 +125,8 @@ open class PhotosPickerVC: ViewController,
         collectionView.pin(to: view, anchors: [.leading, .trailing])
         collectionView.topAnchor.pin(to: view.safeAreaLayoutGuide.topAnchor)
         collectionView.bottomAnchor.pin(to: bottomToolbar.topAnchor)
-        bottomToolbar.pin(to: view, anchors: [.leading(), .bottom(), .trailing()])
+        bottomToolbar.pin(to: view, anchors: [.leading, .trailing])
+        bottomToolbar.bottomAnchor.pin(to: view.safeAreaLayoutGuide.bottomAnchor)
     }
     
     override open func setupDone() {

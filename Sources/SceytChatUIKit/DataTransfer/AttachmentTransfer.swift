@@ -86,10 +86,6 @@ open class AttachmentTransfer: Provider {
                 completion?(message, nil)
                 return
             }
-            attachments.forEach { attachment in
-                attachment.status = .uploading
-                self.progressCache[Self.key(message: message, attachment: attachment)] = 0.01
-            }
             
             if let dataSession = Components.dataSession {
                 var tasks = [SCTDataSessionTaskInfo]()

@@ -6,11 +6,10 @@
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
-import Foundation
 import Combine
+import Foundation
 
 public protocol SCTDataSession: NSObject {
-    
     func upload(
         attachment: ChatMessage.Attachment,
         taskInfo: SCTDataSessionTaskInfo
@@ -27,14 +26,14 @@ public protocol SCTDataSession: NSObject {
 }
 
 open class SCTDataSessionTaskInfo: NSObject {
-    
     @Published public private(set) var event: Event?
     @Published public private(set) var action: Action?
     
     public var onAction: ((Action) -> Void)?
     public var onEvent: ((Event) -> Void)?
     public var userInfo: [AnyHashable: Any]?
-    
+    private let checksumProvider = SCTUIKitComponents.channelMessageChecksumProvider.init()
+
     public enum TransferType {
         case upload
         case download
@@ -48,7 +47,8 @@ open class SCTDataSessionTaskInfo: NSObject {
     internal init(
         transferType: TransferType,
         message: ChatMessage,
-        attachment: ChatMessage.Attachment) {
+        attachment: ChatMessage.Attachment
+    ) {
         self.transferType = transferType
         self.message = message
         self.attachment = attachment
@@ -90,9 +90,7 @@ open class SCTDataSessionTaskInfo: NSObject {
         onEvent?(.successURL(url))
     }
     
-    deinit {
-        
-    }
+    deinit {}
     
     public func cancel() {
         attachment.status = .pending
@@ -111,16 +109,36 @@ open class SCTDataSessionTaskInfo: NSObject {
         action = .resume
         onAction?(.resume)
     }
+    
+    public func startChecksum(_ completion: @escaping ((Bool) -> Void)) {
+        checksumProvider.startChecksum(
+            message: message,
+            attachment: attachment) { [weak self] in
+                guard let self else { return }
+                switch $0 {
+                case .success(let link):
+                    if let link {
+                        success(origin: link)
+                        completion(true)
+                    } else {
+                        completion(false)
+                    }
+                case .failure(let error):
+                    failure(error: error)
+                    completion(false)
+                }
+            }
+    }
 }
 
-extension SCTDataSessionTaskInfo {
-    public enum Action {
+public extension SCTDataSessionTaskInfo {
+    enum Action {
         case cancel
         case stop
         case resume
     }
     
-    public enum Event {
+    enum Event {
         case updateLocalFileURL(URL, String?)
         case updateProgress(Double)
         case failure(Error?)

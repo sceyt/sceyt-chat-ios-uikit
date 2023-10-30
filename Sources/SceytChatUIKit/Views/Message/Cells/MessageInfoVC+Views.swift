@@ -137,8 +137,6 @@ extension MessageInfoVC {
             .withoutAutoresizingMask
         
         open var imageTask: Cancellable?
-        open var topPadding: NSLayoutConstraint?
-        open var bottomPadding: NSLayoutConstraint?
         
         var data: ChatMessage.Marker! {
             didSet {
@@ -160,9 +158,7 @@ extension MessageInfoVC {
             super.setupLayout()
             
             contentView.addSubview(hStack)
-            hStack.pin(to: safeAreaLayoutGuide, anchors: [.leading(16), .trailing(-16)])
-            topPadding = hStack.topAnchor.pin(to: contentView.topAnchor, constant: position.isFirst ? 12 : 4)
-            bottomPadding = hStack.bottomAnchor.pin(to: contentView.bottomAnchor, constant: -(position.isLast ? 12 : 4))
+            hStack.pin(to: contentView.safeAreaLayoutGuide, anchors: [.leading(16), .trailing(-16), .top(4), .bottom(-4)])
             avatarView.resize(anchors: [.width(40), .height(40)])
         }
         
@@ -184,15 +180,20 @@ extension MessageInfoVC {
             dateTimeLabel.text = nil
         }
         
-        public var position: (isFirst: Bool, isLast: Bool) = (false, false) {
+        open var contentInsets: UIEdgeInsets = .zero {
             didSet {
-                if let topPadding {
-                    topPadding.constant = position.isFirst ? 12 : 4
-                }
-                if let bottomPadding {
-                    bottomPadding.constant = -(position.isLast ? 12 : 4)
-                }
+                setNeedsLayout()
+                layoutIfNeeded()
             }
+        }
+        
+        open override var safeAreaInsets: UIEdgeInsets {
+            var safeAreaInsets = super.safeAreaInsets
+            safeAreaInsets.left += contentInsets.left
+            safeAreaInsets.right += contentInsets.right
+            safeAreaInsets.top += contentInsets.top
+            safeAreaInsets.bottom += contentInsets.bottom
+            return safeAreaInsets
         }
     }
 }
