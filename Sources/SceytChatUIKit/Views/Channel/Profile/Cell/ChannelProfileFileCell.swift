@@ -170,7 +170,7 @@ open class ChannelProfileFileCell: CollectionViewCell {
             ) { [weak self] progress in
                 guard let self, self.data == data
                 else {
-                    log.verbose("[Attachment] progress self is nil thumbnail load from filePath \(attachment.description)")
+                    logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(attachment.description)")
                     return
                 }
                 
@@ -178,7 +178,7 @@ open class ChannelProfileFileCell: CollectionViewCell {
                     self?.progressView.progress = progress.progress
                 }
             } completion: { result in
-                debugPrint("[AWSSTASK] completion", result.attachment.status)
+                logger.debug("[Attachment] completion \(result.attachment.status)")
                 fileProvider.removeProgressObserver(message: result.message, attachment: result.attachment)
             }
     }

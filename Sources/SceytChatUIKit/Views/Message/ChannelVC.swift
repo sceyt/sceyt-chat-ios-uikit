@@ -340,32 +340,26 @@ open class ChannelVC: ViewController,
                 self?.channelViewModel.isTyping = isTyping
             }.store(in: &subscriptions)
         
-        composerVC.onContentHeightUpdate = { [unowned self] height, completion in
-            if height != messageComposerViewHeightConstraint.constant {
-                let bottom = collectionView.contentInset.bottom
-                var contentOffsetY = collectionView.contentOffset.y
-                let diff = messageComposerViewHeightConstraint.constant - height
-                messageComposerViewHeightConstraint.constant = height
-                updateCollectionViewInsets()
-                let newBottom = collectionView.contentInset.bottom
-                if newBottom != bottom {
-                    if collectionView.contentSize.height >= collectionView.bounds.height {
-                        contentOffsetY += newBottom - bottom
-                    } else {
-                        let diff2 = collectionView.contentSize.height - (collectionView.bounds.height - newBottom)
-                        if diff2 > 0 {
-                            contentOffsetY += diff2
-                        } else {
-                            contentOffsetY -= diff
-                        }
-                    }
-                }
-                contentOffsetY = min(contentOffsetY, collectionView.contentSize.height)
-                let needsToScroll = collectionView.contentSize.height > collectionView.frame.height
+        composerVC.onContentHeightUpdate = { [weak self] height, completion in
+            guard let self else { return }
+            if height != self.messageComposerViewHeightConstraint.constant {
                 UIView.animate(withDuration: 0.25) { [weak self] in
-                    self?.coverView.layoutIfNeeded()
+                    guard let self else { return }
+                    let bottom = self.collectionView.contentInset.bottom
+                    var contentOffsetY = self.collectionView.contentOffset.y
+                    let diff = self.messageComposerViewHeightConstraint.constant - height
+                    self.messageComposerViewHeightConstraint.constant = height
+                    self.updateCollectionViewInsets()
+                    let newBottom = self.collectionView.contentInset.bottom
+                    if newBottom != bottom {
+                        contentOffsetY += newBottom - bottom
+                    }
+                    contentOffsetY = min(contentOffsetY, collectionView.contentSize.height)
+                    let needsToScroll = (self.collectionView.lastVisibleAttributes?.frame.maxY ?? 0) > self.composerVC.view.frameRelativeTo(view: self.collectionView).minY + diff
+                    self.coverView.layoutIfNeeded()
                     guard needsToScroll else { return }
-                    self?.collectionView.setContentOffset(
+                    self.collectionView.layoutIfNeeded()
+                    self.collectionView.setContentOffset(
                         .init(
                             x: 0,
                             y: contentOffsetY
@@ -986,12 +980,10 @@ open class ChannelVC: ViewController,
         }
     }
     
-    @objc
     open func loadPrevMessages(beforeMessageAt indexPath: IndexPath) {
         channelViewModel.loadPrevMessages(beforeMessageAt: indexPath)
     }
     
-    @objc
     open func loadNextMessages(afterMessageAt indexPath: IndexPath) {
         channelViewModel.loadNextMessages(afterMessageAt: indexPath)
     }
@@ -1511,7 +1503,7 @@ open class ChannelVC: ViewController,
     }
     
     open func showProfile(userId: UserId) {
-        log.debug("showProfile for \(userId)")
+        logger.debug("showProfile for \(userId)")
         channelViewModel.directChannel(userId: userId) { [weak self] channel, error in
             guard let self else { return }
             if let channel {
@@ -1618,7 +1610,7 @@ open class ChannelVC: ViewController,
             let sectionDeletes = paths.sectionDeletes
             let continuesOptions = paths.continuesOptions
             var needsToScrollBottom = false
-            if noDataView.isHidden {
+            if !noDataView.isHidden {
                 showEmptyViewIfNeeded()
             }
             if let unreadMessageIndexPath, checkOnlyFirstTimeReceivedMessagesFromArchive {

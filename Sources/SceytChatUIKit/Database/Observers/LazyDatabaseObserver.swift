@@ -184,7 +184,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 self.mapDeletedItems[dto.objectID] = nil
             }
             
-            log.error("object did not find with id \(objectID.uriRepresentation()), found from context \(obj) ")
+            logger.error("object did not find with id \(objectID.uriRepresentation()), found from context \(obj) ")
         }
         return nil
     }
@@ -224,7 +224,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 self.mapItems[dto.objectID] = item
                 self.mapDeletedItems[dto.objectID] = nil
             }
-            log.error("object did not find from prev cache with id \(objectID.uriRepresentation()), found from context \(obj) ")
+            logger.error("object did not find from prev cache with id \(objectID.uriRepresentation()), found from context \(obj) ")
         }
         return nil
     }
@@ -578,7 +578,7 @@ private extension LazyDatabaseObserver {
         let dtos = DTO.fetch(request: request, context: context)
         insert(dtos: dtos, in: &cache, changeItems: &changeItems, changeSections: &changeSections)
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
-        log.verbose("[PERFORMANCE] fetch data time elapsed \(timeElapsed) s.")
+        logger.verbose("[PERFORMANCE] fetch data time elapsed \(timeElapsed) s.")
         return dtos
     }
     
@@ -668,70 +668,92 @@ private extension LazyDatabaseObserver {
         changeItems: inout [ChangeItem],
         changeSections: inout [ChangeSection]
     ) -> [DTO] {
-        
         var shouldInsert = [DTO]()
-        var _deleteSectionsMap = [Int: Int]()
-        var _insertSectionsMap = [Int: Int]()
         for dto in dtos {
-            var _deleteItems = [ChangeItem]()
-            var _insertItems = [ChangeItem]()
-            var _deleteSections = [ChangeSection]()
-            var _insertSections = [ChangeSection]()
-            delete(dtos: [dto], in: &cache, changeItems: &_deleteItems, changeSections: &_deleteSections)
-            insert(dtos: [dto], in: &cache, changeItems: &_insertItems, changeSections: &_insertSections)
-            if let last = _insertItems.last, let item = last.item {
-                if _deleteItems.isEmpty {
-                    changeItems.append(.insert(last.indexPath, item))
-                } else if last.indexPath == _deleteItems.last?.indexPath {
-                    changeItems.append(.update(last.indexPath, item))
-                } else if let delLast = _deleteItems.last {
-                    changeItems.append(.move(delLast.indexPath, last.indexPath, item))
-                } else if _insertItems.isEmpty, let last = _deleteItems.last {
-                    changeItems.append(.delete(last.indexPath))
-                }
-                
-            } else {
+            if !reload(dto: dto, in: &cache, changeItems: &changeItems, changeSections: &changeSections) {
                 shouldInsert.append(dto)
             }
-            
-            if _deleteSections.isEmpty, !_insertSections.isEmpty {
-                _insertSectionsMap[_insertSections.last!.section] = 1
-            } else if !_deleteSections.isEmpty, _insertSections.isEmpty {
-                _deleteSectionsMap[_deleteSections.last!.section] = 1
-            } else if !_insertSections.isEmpty, !_deleteSections.isEmpty,
-                        _insertSections.last?.section != _deleteSections.last?.section {
-                _insertSectionsMap[_insertSections.last!.section] = 1
-                _deleteSectionsMap[_deleteSections.last!.section] = 1
+        }
+        return shouldInsert
+    }
+    
+    func reload(
+        dto: DTO,
+        in cache: inout Cache,
+        changeItems: inout [ChangeItem],
+        changeSections: inout [ChangeSection]
+    ) -> Bool {
+        
+        var foundIndexPath: IndexPath?
+        
+        for (section, objects) in cache.enumerated() {
+            if foundIndexPath != nil {
+                break
+            }
+            for (row, item) in objects.enumerated() {
+                if item.objectID == dto.objectID {
+                    foundIndexPath = IndexPath(row: row, section: section)
+                    break
+                }
             }
         }
-        _deleteSectionsMap = _deleteSectionsMap.filter({ item in
-            if _insertSectionsMap[item.key] == 1 {
-                _insertSectionsMap[item.key] = nil
-                return false
+        var isRemovedSection = false
+        
+        if let foundIndexPath {
+            let beforeCount = cache.count
+            cache[foundIndexPath.section].remove(at: foundIndexPath.row)
+            if cache[foundIndexPath.section].isEmpty {
+                cache.remove(at: foundIndexPath.section)
+                isRemovedSection = true
             }
-            return true
-        })
-        changeSections.append(contentsOf: _deleteSectionsMap.keys.map { .delete($0)})
-        changeSections.append(contentsOf: _insertSectionsMap.keys.map { .insert($0)})
-//        var shouldInsert = [DTO]()
-//        for dto in dtos {
-//            var isReloaded = false
-//            for (section, objects) in cache.enumerated().reversed() {
-//                if let row = objects.firstIndex(where: { $0.objectID == dto.objectID }) {
-//                    cache[section].remove(at: row)
-//                    cache[section].insert(dto, at: row)
-//                    let item = itemCreator(dto)
-//                    mapItems[dto.objectID] = item
-//                    changeItems.append(.update(.init(row: row, section: section), item))
-//                    isReloaded = true
-//                    break
-//                }
-//            }
-//            if !isReloaded {
-//                shouldInsert.append(dto)
-//            }
-//        }
-        return shouldInsert
+            writeCache {
+                self.mapDeletedItems[dto.objectID] = self.mapItems[dto.objectID]
+                self.mapItems[dto.objectID] = nil
+                
+            }
+            var _changeItems = [ChangeItem]()
+            var _changeSections = [ChangeSection]()
+            
+            insert(dtos: [dto], in: &cache, changeItems: &_changeItems, changeSections: &_changeSections)
+            
+            let item = _changeItems.last!
+            if cache.count == beforeCount {
+                if isRemovedSection {
+                    if item.indexPath.section == foundIndexPath.section {
+                        if item.indexPath.row == foundIndexPath.row {
+                            changeItems.append(.update(item.indexPath, item.item!))
+                        } else {
+                            changeItems.append(.move(foundIndexPath, item.indexPath, item.item!))
+                        }
+                    } else {
+                        changeSections.append(.delete(foundIndexPath.section))
+                        changeSections.append(.insert(item.indexPath.section))
+                        changeItems.append(.move(foundIndexPath, item.indexPath, item.item!))
+                    }
+                } else {
+                    if item.indexPath.section == foundIndexPath.section {
+                        if item.indexPath.row == foundIndexPath.row {
+                            changeItems.append(.update(item.indexPath, item.item!))
+                        } else {
+                            changeItems.append(.move(foundIndexPath, item.indexPath, item.item!))
+                        }
+                    } else {
+                        changeItems.append(.move(foundIndexPath, item.indexPath, item.item!))
+                    }
+                }
+            } else if cache.count > beforeCount {
+                if cache[item.indexPath.section].count == 1 {
+                    changeItems.append(.move(foundIndexPath, item.indexPath, item.item!))
+                    changeSections.append(.insert(item.indexPath.section))
+                } else {
+                    logger.error("something wrong on reload item from index \(foundIndexPath) to index \(item.indexPath) isRemovedSection \(isRemovedSection) ")
+                }
+            } else { //if cache.count < beforeCount
+                changeSections.append(.delete(foundIndexPath.section))
+                changeItems.append(.move(foundIndexPath, item.indexPath, item.item!))
+            }
+        }
+        return foundIndexPath != nil
     }
     
     func delete(
@@ -913,6 +935,10 @@ public extension LazyDatabaseObserver {
             sectionDeletes.isEmpty
         }
         
+        public var numberOfChangedItems: Int {
+            changeItems.count + changeSections.count
+        }
+        
         public init(changeItems: [ChangeItem],
                     changeSections: [ChangeSection] = []) {
             self.changeItems = changeItems
@@ -939,7 +965,7 @@ public extension LazyDatabaseObserver {
             })
             
             if updatesCount != updates.count {
-                log.debug("[LazyDatabaseObserver] update/delete items: something is wrong deletes has collision with updates")
+                logger.debug("[LazyDatabaseObserver] update/delete items: something is wrong deletes has collision with updates")
             }
             
             changeSections.forEach { section in
@@ -966,5 +992,12 @@ public extension LazyDatabaseObserver {
 private extension NSArray {
     func ns_filtered(using predicate: NSPredicate) -> NSArray {
         filtered(using: predicate) as NSArray
+    }
+}
+
+internal extension LazyDatabaseObserver.ChangeItemPaths {
+    
+    var description: String {
+        "[CHANGE]: INSERTS: \(inserts), UPDATES: \(updates), DELETES: \(deletes), MOVES: \(moves), SEC_INS \(sectionInserts), SEC_DEL \(sectionDeletes)"
     }
 }

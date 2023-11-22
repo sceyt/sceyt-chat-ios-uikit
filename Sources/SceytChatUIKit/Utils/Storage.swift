@@ -93,7 +93,7 @@ open class Storage: NSObject {
             }
             return fileUrl
         } catch {
-            debugPrint(#function, error)
+            logger.errorIfNotNil(error, "")
         }
         return nil
     }
@@ -113,7 +113,7 @@ open class Storage: NSObject {
             try data.write(to: fileUrl)
             return fileUrl
         } catch {
-            debugPrint(#function, error)
+            logger.errorIfNotNil(error, "")
         }
         return nil
     }
@@ -129,7 +129,7 @@ open class Storage: NSObject {
             try data.write(to: fileUrl)
             return fileUrl
         } catch {
-            debugPrint(#function, error)
+            logger.errorIfNotNil(error, "")
         }
         return nil
     }
@@ -141,7 +141,7 @@ open class Storage: NSObject {
             try FileManager.default.removeItem(at: fileUrl)
             return fileUrl
         } catch {
-            debugPrint(#function, error)
+            logger.errorIfNotNil(error, "")
         }
         return nil
     }
@@ -153,7 +153,7 @@ open class Storage: NSObject {
             try FileManager.default.removeItem(at: fileUrl)
             return fileUrl
         } catch {
-            debugPrint(#function, error)
+            logger.errorIfNotNil(error, "")
         }
         return nil
     }
@@ -182,7 +182,7 @@ open class Storage: NSObject {
             try FileManager.default.copyItem(at: url, to: fileUrl)
             return fileUrl
         } catch {
-            debugPrint(#function, error)
+            logger.errorIfNotNil(error, "")
         }
         return nil
     }
@@ -237,7 +237,7 @@ open class Storage: NSObject {
             let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: count)
             guard let stream = InputStream(url: url)
             else {
-                log.error("ERROR OPENING FILE")
+                logger.error("ERROR OPENING FILE")
                 return nil
             }
             
@@ -245,7 +245,7 @@ open class Storage: NSObject {
             
             let bytesRead = stream.read(buffer, maxLength: count)
             if bytesRead == -1 {
-                log.error("ERROR READING FILE")
+                logger.error("ERROR READING FILE")
                 return nil
             }
             data = Data(bytes: buffer, count: count)
@@ -360,7 +360,7 @@ open class SceytChatStoringKey: StoringKey {
         do {
             try FileManager.default.removeItem(atPath: storageFolderPath)
         } catch {
-            debugPrint(#function, error)
+            logger.errorIfNotNil(error, "")
         }
     }
 }

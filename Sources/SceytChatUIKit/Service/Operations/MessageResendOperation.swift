@@ -29,11 +29,11 @@ import SceytChat
 //    
 //    private func send(_ completion: @escaping () -> Void) {
 //        let tid = message.tid
-//        log.verbose("SyncService: Resending Message with tid \(tid)")
+//        logger.verbose("SyncService: Resending Message with tid \(tid)")
 //        sender.resendMessage(message) { error in
-//            log.errorIfNotNil(error, "SyncService: Response Resending Message with tid \(tid)")
+//            logger.errorIfNotNil(error, "SyncService: Response Resending Message with tid \(tid)")
 //            if error?.isChannelNotExists == true {
-//                log.errorIfNotNil(error, "SyncService: Response Channel not exist delete Message with tid \(tid)")
+//                logger.errorIfNotNil(error, "SyncService: Response Channel not exist delete Message with tid \(tid)")
 //                self.provider.deletePending(message: tid)
 //            }
 //            completion()

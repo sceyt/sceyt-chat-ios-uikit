@@ -55,7 +55,6 @@ public class MessageDTO: NSManagedObject {
     
     @NSManaged public var changedBy: UserDTO?
     @NSManaged public var lastMessageChannel: ChannelDTO?
-    @NSManaged public var ownerChannel: ChannelDTO?
     @NSManaged public var parent: MessageDTO?
     
     @NSManaged public var forwardMessageId: Int64

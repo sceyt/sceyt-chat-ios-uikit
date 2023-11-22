@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="21754" systemVersion="22G91" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22225" systemVersion="23A344" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
     <entity name="AttachmentDTO" representedClassName="AttachmentDTO" syncable="YES">
         <attribute name="channelId" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -57,8 +57,6 @@
         <relationship name="createdBy" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserDTO" inverseName="creator" inverseEntity="UserDTO"/>
         <relationship name="lastMessage" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="MessageDTO" inverseName="lastMessageChannel" inverseEntity="MessageDTO"/>
         <relationship name="lastReaction" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ReactionDTO" inverseName="channelLasts" inverseEntity="ReactionDTO"/>
-        <relationship name="members" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MemberDTO" inverseName="channels" inverseEntity="MemberDTO"/>
-        <relationship name="messages" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="MessageDTO" inverseName="ownerChannel" inverseEntity="MessageDTO"/>
         <relationship name="owner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="MemberDTO" inverseName="channelOwner" inverseEntity="MemberDTO"/>
         <relationship name="userRole" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RoleDTO" inverseName="channelRole" inverseEntity="RoleDTO"/>
         <uniquenessConstraints>
@@ -100,7 +98,6 @@
     <entity name="MemberDTO" representedClassName="MemberDTO" syncable="YES">
         <attribute name="channelId" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="channelOwner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="owner" inverseEntity="ChannelDTO"/>
-        <relationship name="channels" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="members" inverseEntity="ChannelDTO"/>
         <relationship name="role" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RoleDTO" inverseName="members" inverseEntity="RoleDTO"/>
         <relationship name="user" optional="YES" maxCount="1" deletionRule="No Action" destinationEntity="UserDTO" inverseName="member" inverseEntity="UserDTO"/>
     </entity>
@@ -140,7 +137,6 @@
         <relationship name="lastMessageChannel" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="lastMessage" inverseEntity="ChannelDTO"/>
         <relationship name="linkMetadatas" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="LinkMetadataDTO" inverseName="messages" inverseEntity="LinkMetadataDTO"/>
         <relationship name="mentionedUsers" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="UserDTO" inverseName="mention" inverseEntity="UserDTO"/>
-        <relationship name="ownerChannel" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="messages" inverseEntity="ChannelDTO"/>
         <relationship name="parent" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="children" inverseEntity="MessageDTO"/>
         <relationship name="pendingReactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ReactionDTO" inverseName="pendingMessages" inverseEntity="ReactionDTO"/>
         <relationship name="reactions" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="ReactionDTO" inverseName="message" inverseEntity="ReactionDTO"/>

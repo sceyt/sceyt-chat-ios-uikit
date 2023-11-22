@@ -56,7 +56,6 @@ open class ChannelListProvider: Provider {
         query: ChannelListQuery? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
-        log.debug("[MARKER CHECK] loadChannels BEGIN")
         guard let query = (query ?? defaultQuery)
         else {
             completion?(nil)
@@ -64,13 +63,11 @@ open class ChannelListProvider: Provider {
         }
         if query.hasNext, !query.loading {
             query.loadNext { _, channels, error in
-                log.debug("[MARKER CHECK] loadChannels END")
                 guard let channels = channels
                 else {
                     completion?(error)
                     return
                 }
-                log.debug("[MARKER CHECK] loaded channels for query: \(query):\n\(channels.map { $0.subject })")
                 self.store(
                     channels: channels,
                     completion: completion
@@ -88,7 +85,7 @@ open class ChannelListProvider: Provider {
         database.write {
             $0.createOrUpdate(channels: channels)
         } completion: { error in
-            log.errorIfNotNil(error, "Unable Store channels")
+            logger.errorIfNotNil(error, "Unable Store channels")
             completion?(error)
         }
         
@@ -96,7 +93,7 @@ open class ChannelListProvider: Provider {
             channels.forEach { channel in
                 guard let message = channel.lastMessage
                 else { return }
-                if channel.userRole == nil || message.markerTotals?.contains(where: {$0.name == DefaultMarker.received}) == true {
+                if !message.incoming || channel.userRole == nil || message.markerTotals?.contains(where: {$0.name == DefaultMarker.received}) == true {
                     return
                 }
                 Components.channelMessageProvider.init(channelId: channel.id)
@@ -114,7 +111,7 @@ public extension ChannelListProvider {
         } completion: { result in
             switch result {
             case let .failure(error):
-                debugPrint(error)
+                logger.errorIfNotNil(error, "")
             case let .success(sum):
                 completion(sum)
             }
@@ -140,7 +137,7 @@ extension ChannelListProvider {
                 case .success(let result):
                     completion(result)
                 case .failure(let error):
-                    debugPrint(error)
+                    logger.errorIfNotNil(error, "")
                     completion([])
                 }
             }
@@ -148,21 +145,24 @@ extension ChannelListProvider {
     
     public class func fetchChannels(query: String, completion: @escaping ([ChatChannel]) -> Void) {
         database.read { context in
-            let request = ChannelDTO.fetchRequest()
-            request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
+            let memberRequest = MemberDTO.fetchRequest()
+            memberRequest.sortDescriptor = NSSortDescriptor(keyPath: \MemberDTO.channelId, ascending: false)
             let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-            let contactQuery = "(ANY members.user.firstName CONTAINS[cd] %@) OR (ANY members.user.lastName CONTAINS[cd] %@)"
+            let memberQuery = "(ANY user.firstName CONTAINS[cd] %@) OR (ANY user.lastName CONTAINS[cd] %@)"
+            
             let queries = query.components(separatedBy: " ").compactMap { $0.isEmpty ? nil : $0 }
-            request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: queries.map { NSPredicate(format: contactQuery, $0, $0) } + [
-                NSPredicate(format: "type == %@ AND unsynched == NO", "direct")
-            ])
-            return ChannelDTO.fetch(request: request, context: context).map { $0.convert() }
+            memberRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: queries.map { NSPredicate(format: memberQuery, $0, $0) })
+            let channelIds = MemberDTO.fetch(request: memberRequest, context: context).map { $0.channelId }
+            
+            let channelRequest = ChannelDTO.fetchRequest()
+            channelRequest.predicate = NSPredicate(format: "type == %@ AND unsynched == NO AND id IN %@", "direct", Set(channelIds))
+            return ChannelDTO.fetch(request: channelRequest, context: context).map { $0.convert() }
         } completion: { result in
             switch result {
             case .success(let result):
                 completion(result)
             case .failure(let error):
-                debugPrint(error)
+                logger.errorIfNotNil(error, "")
                 completion([])
             }
         }
@@ -207,7 +207,7 @@ extension ChannelListProvider {
                                 }
                             } completion: { error in
                                 if let error {
-                                    debugPrint(error)
+                                    logger.errorIfNotNil(error, "")
                                 }
                             }
                         }

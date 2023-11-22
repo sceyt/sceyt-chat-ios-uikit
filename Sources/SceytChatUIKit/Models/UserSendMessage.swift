@@ -301,7 +301,7 @@ public struct AttachmentView {
                 false
             }
             options.progressHandler = { pct, _ in
-                print("asset progress", pct, asset.localIdentifier)
+                logger.debug("asset progress \(pct) \(asset.localIdentifier)")
             }
             asset
                 .requestContentEditingInput(
@@ -336,13 +336,13 @@ public struct AttachmentView {
                     }
                 )
         } else if asset.mediaType == .video {
-            log.verbose("[ATTACHMENT] Creating Attachment view")
+            logger.verbose("[ATTACHMENT] Creating Attachment view")
             let maxDimen = 848.0
             let targetSize = VideoProcessor.calculateSizeWith(
                 maxDimen: maxDimen,
                 originalSize: CGSize(width: asset.pixelWidth, height: asset.pixelHeight)
             )
-            log.verbose("[ATTACHMENT] Creating Attachment view targetSize\(targetSize)")
+            logger.verbose("[ATTACHMENT] Creating Attachment view targetSize\(targetSize)")
             let imageOptions = PHImageRequestOptions()
             imageOptions.deliveryMode = .highQualityFormat
             imageOptions.resizeMode = .fast
@@ -355,20 +355,20 @@ public struct AttachmentView {
                 contentMode: .aspectFill,
                 options: imageOptions
             ) { image, info in
-                log.verbose("[ATTACHMENT] requestImage received with size \(String(describing: image?.size)), info: \(String(describing: info))")
+                logger.verbose("[ATTACHMENT] requestImage received with size \(String(describing: image?.size)), info: \(String(describing: info))")
                 if let image {
-                    log.verbose("[ATTACHMENT] requestImage receives requestAVAsset")
+                    logger.verbose("[ATTACHMENT] requestImage receives requestAVAsset")
                     let viedeoOptions: PHVideoRequestOptions = .init()
                     viedeoOptions.isNetworkAccessAllowed = true
                     viedeoOptions.version = .current
                     viedeoOptions.deliveryMode = .highQualityFormat
                     manager.requestAVAsset(forVideo: asset, options: viedeoOptions) { avAsset, _, _ in
-                        log.verbose("[ATTACHMENT] requestAVAsset receives \(avAsset != nil)")
+                        logger.verbose("[ATTACHMENT] requestAVAsset receives \(avAsset != nil)")
                         guard let avAsset else { return completion(nil) }
                         
                         var duration = Int(asset.duration)
                         if avAsset.isSlowMotionVideo, let slowMoDuration = (avAsset as? AVComposition)?.slowMoDuration {
-                            log.verbose("[ATTACHMENT] requestAVAsset receives is slowMoDuration \(slowMoDuration)")
+                            logger.verbose("[ATTACHMENT] requestAVAsset receives is slowMoDuration \(slowMoDuration)")
                             duration = Int(slowMoDuration)
                         }
                         
@@ -381,12 +381,12 @@ public struct AttachmentView {
                         v.photoAsset = asset
                         v.avAssetUrl = (avAsset as? AVURLAsset)?.url
                         DispatchQueue.main.async {
-                            log.verbose("[ATTACHMENT] Created Attachment with \(v.name)")
+                            logger.verbose("[ATTACHMENT] Created Attachment with \(v.name)")
                             completion(v)
                         }
                     }
                 } else {
-                    log.verbose("[ATTACHMENT] image size != target size targetSize = \(targetSize), imageSize = \(image?.size)")
+                    logger.verbose("[ATTACHMENT] image size != target size targetSize = \(targetSize), imageSize = \(image?.size)")
                     completion(nil)
                 }
             }

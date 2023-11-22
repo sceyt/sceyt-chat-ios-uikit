@@ -37,7 +37,7 @@ final public class ActionAnimator: NSObject, UIViewControllerAnimatedTransitioni
         if let superview = view.superview {
             return superview.convert(view.frame, to: nil)
         }
-        print("[ANIMATION WARNING] Seems like this view is not in views hierarchy\n\(view)\nOriginal frame returned")
+        logger.debug("[ANIMATION WARNING] Seems like this view is not in views hierarchy\n\(view)\nOriginal frame returned")
         return view.frame
     }
 

@@ -45,7 +45,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         database.write {
             $0.deleteChannel(id: id)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -56,11 +56,10 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         }
         database.write {
             if let dto = ChannelDTO.fetch(id: ChannelId(channelId), context: $0) {
+                let oldId = dto.id
                 dto.id = Int64(channel.id)
                 dto.unsynched = false
-                dto.messages?.forEach({
-                    $0.channelId = Int64(channel.id)
-                })
+                try? $0.batchUpdate(object: MessageDTO.self, predicate: .init(format: "channelId == %lld", dto.id), propertiesToUpdate: [#keyPath(MessageDTO.channelId): oldId])
                 let chatChannel = $0.createOrUpdate(channel: channel).convert()
                 NotificationCenter.default
                     .post(name: .didUpdateLocalCreateChannelOnEventChannelCreate,
@@ -71,7 +70,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             }
             
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
 
@@ -80,7 +79,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             $0.createOrUpdate(channel: channel)
             $0.add(members: members, channelId: channel.id)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -89,7 +88,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             $0.createOrUpdate(channel: channel)
             $0.add(members: [member], channelId: channel.id)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -103,7 +102,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                 $0.delete(members: members, channelId: channel.id)
             }
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -117,7 +116,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                 $0.delete(members: [member], channelId: channel.id)
             }
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -125,12 +124,12 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         database.write {
             $0.createOrUpdate(channel: channel)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
     open func channel(channelId: ChannelId, didReceive marker: MessageListMarker) {
-        log.debug("[MARKER CHECK] didReceive in cid \(channelId) mark: \(marker.name) for \(marker.messageIds) in channelId:\(marker.channelId)")
+        logger.debug("[MARKER CHECK] didReceive in cid \(channelId) mark: \(marker.name) for \(marker.messageIds) in channelId:\(marker.channelId)")
         database.write {
             $0.update(messageMarkers: marker)
         }
@@ -141,7 +140,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             $0.createOrUpdate(channel: channel)
             $0.createOrUpdate(message: message, channelId: channel.id)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
         markReceivedMessageAsReceivedIfNeeded(message: message, channel: channel)
     }
@@ -162,7 +161,11 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
     
     open func channel(_ channel: Channel, user: User, message: Message, didAdd reaction: Reaction) {
         database.write {
-            $0.add(reaction: reaction)
+            if $0.add(reaction: reaction) == nil {
+                $0.createOrUpdate(message: message, channelId: channel.id)
+                    .unlisted = true
+                $0.add(reaction: reaction)
+            }
         }
     }
     
@@ -208,10 +211,10 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     before: channel.messagesClearedAt
                 )
             } catch {
-                debugPrint(error)
+                logger.errorIfNotNil(error, "")
             }
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -223,10 +226,10 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     before: channel.messagesClearedAt
                 )
             } catch {
-                debugPrint(error)
+                logger.errorIfNotNil(error, "")
             }
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -234,11 +237,11 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         _ channel: Channel,
         totalUnreadChannelCount: UInt,
         totalUnreadMessageCount: UInt) {
-            log.debug("[MARKER CHECK] received channelDidUpdateUnreadCount: \(channel.id) for \(channel.newMessageCount)")
+            logger.debug("[MARKER CHECK] received channelDidUpdateUnreadCount: \(channel.id) for \(channel.newMessageCount)")
             database.write {
                 $0.createOrUpdate(channel: channel)
             } completion: { error in
-                log.errorIfNotNil(error, "Unable update channel from ```channelDidUpdateUnreadCount```")
+                logger.errorIfNotNil(error, "Unable update channel from ```channelDidUpdateUnreadCount```")
             }
         }
     
@@ -246,7 +249,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         database.write {
             $0.createOrUpdate(channel: channel)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -254,7 +257,23 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         database.write {
             $0.createOrUpdate(channel: channel)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
+        }
+    }
+    
+    open func channelDidPin(_ channel: Channel) {
+        database.write {
+            $0.createOrUpdate(channel: channel)
+        } completion: { error in
+            logger.debug(error?.localizedDescription ?? "")
+        }
+    }
+    
+    open func channelDidUnpin(_ channel: Channel) {
+        database.write {
+            $0.createOrUpdate(channel: channel)
+        } completion: { error in
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -263,7 +282,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             $0.createOrUpdate(channel: channel)
             $0.markAsRead(channelId: channel.id)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -271,7 +290,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         database.write {
             $0.createOrUpdate(channel: channel)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     

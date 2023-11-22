@@ -166,19 +166,26 @@ open class ChannelListVC: ViewController,
             tableView.reloadData()
         } else {
             tableView.performBatchUpdates {
+                if !paths.sectionInserts.isEmpty {
+                    tableView.insertSections(paths.sectionInserts, with: .none)
+                }
+                if !paths.sectionDeletes.isEmpty {
+                    tableView.deleteSections(paths.sectionDeletes, with: .none)
+                }
                 tableView.insertRows(at: paths.inserts, with: .none)
                 tableView.reloadRows(at: paths.updates, with: .none)
                 tableView.deleteRows(at: paths.deletes, with: .none)
                 paths.moves.forEach { move in
                     tableView.moveRow(at: move.from, to: move.to)
                 }
-                
+            } completion: { [weak self] _ in
+                self?.tableView.reloadRows(at: paths.moves.map { $0.to }, with: .none)
             }
         }
     }
     
     open func showEmptyViewIfNeeded() {
-        emptyView.isHidden = channelListViewModel.numberOfChannels > 0
+        emptyView.isHidden = channelListViewModel.numberOfSections > 0
     }
     
     open func updateUnreadMessages(count: Int) {
@@ -205,31 +212,38 @@ open class ChannelListVC: ViewController,
     open func onSwipeAction(
         actions: ChannelSwipeActionsConfiguration.Actions,
         indexPath: IndexPath) {
-            switch actions {
-            case .delete:
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                channelListRouter.showAskForDelete { [weak self] in
-                    if $0 {
-                        self?.channelListViewModel.delete(at: indexPath)
-                    }
-                }
-            case .leave:
-                channelListViewModel.leave(at: indexPath)
-            case .read:
-                channelListViewModel.markAs(read: true, at: indexPath)
-            case .unread:
-                channelListViewModel.markAs(read: false, at: indexPath)
-            case .mute:
-                channelListRouter.showMuteOptionsAlert { [weak self] item in
-                    self?.channelListViewModel.mute(item.timeInterval, at: indexPath)
-                } canceled: {}
-            case .unmute:
-                channelListViewModel.unmute(at: indexPath)
-            case .pin:
-                channelListViewModel.pin(true, at: indexPath)
-            case .unpin:
-                channelListViewModel.pin(false, at: indexPath)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+                switchAction()
             }
+            
+            func switchAction() {
+                switch actions {
+                case .delete:
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    channelListRouter.showAskForDelete { [weak self] in
+                        if $0 {
+                            self?.channelListViewModel.delete(at: indexPath)
+                        }
+                    }
+                case .leave:
+                    channelListViewModel.leave(at: indexPath)
+                case .read:
+                    channelListViewModel.markAs(read: true, at: indexPath)
+                case .unread:
+                    channelListViewModel.markAs(read: false, at: indexPath)
+                case .mute:
+                    channelListRouter.showMuteOptionsAlert { [weak self] item in
+                        self?.channelListViewModel.mute(item.timeInterval, at: indexPath)
+                    } canceled: {}
+                case .unmute:
+                    channelListViewModel.unmute(at: indexPath)
+                case .pin:
+                    channelListViewModel.pin(at: indexPath)
+                case .unpin:
+                    channelListViewModel.unpin(at: indexPath)
+                }
+            }
+            
         }
     
     // MARK: UITableViewDelegate
@@ -265,16 +279,20 @@ open class ChannelListVC: ViewController,
             channelListViewModel.selectChannel(at: indexPath)
         }
     
+    open func numberOfSections(in tableView: UITableView) -> Int {
+        channelListViewModel.numberOfSections
+    }
+    
     open func tableView(
         _ tableView: UITableView,
         numberOfRowsInSection section: Int) -> Int {
-            channelListViewModel.numberOfChannels
+            channelListViewModel.numberOfChannel(at: section)
         }
     
     open  func tableView(
         _ tableView: UITableView,
         cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-            if indexPath.row > channelListViewModel.numberOfChannels - 3 {
+            if indexPath.row > channelListViewModel.numberOfChannel(at: indexPath.section) - 3 {
                 channelListViewModel.loadChannels()
             }
             let cell = tableView.dequeueReusableCell(for: indexPath,

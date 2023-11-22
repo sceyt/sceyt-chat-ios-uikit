@@ -27,14 +27,14 @@ open class ReactionResendOperation: AsyncOperation {
     private func addReaction(_ completion: @escaping () -> Void) {
         let mid = reaction.messageId
         let key = reaction.key
-        log.verbose("SyncService: Resending Reaction with messageId \(mid), key: \(key)")
+        logger.verbose("SyncService: Resending Reaction with messageId \(mid), key: \(key)")
         provider.addReactionToMessage(
             id: reaction.messageId,
             key: reaction.key,
             score: UInt16(reaction.score),
             reason: reaction.reason,
             storeForResend: false) { error in
-                log.errorIfNotNil(error, "SyncService: Resending Reaction with messageId \(mid), key: \(key)")
+                logger.errorIfNotNil(error, "SyncService: Resending Reaction with messageId \(mid), key: \(key)")
                 completion()
             }
     }

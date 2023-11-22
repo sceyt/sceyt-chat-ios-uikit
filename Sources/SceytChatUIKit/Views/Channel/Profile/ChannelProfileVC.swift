@@ -678,18 +678,16 @@ open class ChannelProfileVC: ViewController,
     }
     
     open func pinChat() {
-        // TODO: Pin Chat
-        log.debug("Pin Chat")
+        profileViewModel.channelProvider.pin()
     }
     
     open func unpinChat() {
-        // TODO: Unpin Chat
-        log.debug("Unpin Chat")
+        profileViewModel.channelProvider.unpin()
     }
     
     open func reportAction(_ sender: HoldButton) {
         // TODO: Report User
-        log.debug("Report User")
+        logger.debug("Report User")
     }
     
     open func joinAction(_ sender: HoldButton) {
@@ -908,7 +906,7 @@ open class ChannelProfileVC: ViewController,
     }
     
     open func messageAction(_ sender: HoldButton) {
-        log.debug("message")
+        logger.debug("message")
         ChannelListRouter.findAndShowChannel(id: profileViewModel.channel.id)
     }
     

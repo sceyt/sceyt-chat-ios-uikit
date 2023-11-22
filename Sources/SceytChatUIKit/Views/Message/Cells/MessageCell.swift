@@ -241,7 +241,7 @@ open class MessageCell: CollectionViewCell,
         guard let data = data else { return }
         let message = data.message
         showSenderInfo = data.showUserInfo
-        unreadView.isHidden = !data.isFirstUnreadMessage
+        unreadView.isHidden = !data.isLastDisplayedMessage
         textLabel.attributedText = data.attributedView.content
         infoView.data = data
         nameLabel.text = Formatters.userDisplayName.format(message.user)
@@ -315,7 +315,7 @@ open class MessageCell: CollectionViewCell,
         deliveryStatus = .pending
         NSLayoutConstraint.deactivate(contentView.constraints + containerView.constraints + (contentConstraints ?? []))
         imageTask?.cancel()
-        contextMenu?.disconnect(from: bubbleView)
+        contextMenu?.disconnect(from: bubbleView, identifier: .init(value: data))
         constraintsAffectingLayout(for: .horizontal)
         replyIcon.isHidden = true
     }

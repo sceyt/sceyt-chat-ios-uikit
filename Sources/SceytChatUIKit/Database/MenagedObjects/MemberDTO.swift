@@ -16,7 +16,6 @@ public class MemberDTO: NSManagedObject {
     @NSManaged public var role: RoleDTO?
     @NSManaged public var user: UserDTO?
     @NSManaged public var channelId: Int64
-    @NSManaged public var channels: Set<ChannelDTO>?
 
     @nonobjc
     public static func fetchRequest() -> NSFetchRequest<MemberDTO> {
@@ -28,6 +27,13 @@ public class MemberDTO: NSManagedObject {
         request.sortDescriptor = NSSortDescriptor(keyPath: \MemberDTO.user?.id, ascending: false)
         request.predicate = .init(format: "user.id == %@ AND channelId == %lld", id, channelId)
         return fetch(request: request, context: context).first
+    }
+    
+    public static func fetch(channelId: ChannelId, context: NSManagedObjectContext) -> [MemberDTO] {
+        let request = fetchRequest()
+        request.sortDescriptor = NSSortDescriptor(keyPath: \MemberDTO.user?.id, ascending: false)
+        request.predicate = .init(format: "channelId == %lld", channelId)
+        return fetch(request: request, context: context)
     }
 
     public static func fetchOrCreate(id: UserId, channelId: ChannelId, context: NSManagedObjectContext) -> MemberDTO {

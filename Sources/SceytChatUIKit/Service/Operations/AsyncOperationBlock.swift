@@ -16,7 +16,7 @@ open class AsyncOperationBlock: AsyncOperation {
         block: @escaping ((AsyncOperationBlock) -> Void))
     {
         operationBlock = block
-        log.debug("[ASYNC OP] create operation with id \(uuid)")
+        logger.debug("[ASYNC OP] create operation with id \(uuid)")
         super.init(uuid)
     }
     
@@ -36,7 +36,7 @@ open class AsyncOperationQueue: OperationQueue {
     open func addOperation(_ op: AsyncOperation) {
         super.addOperation(op)
         ops.append(op)
-        log.debug("[ASYNC OP] add operation with id \(op.uuid)")
+        logger.debug("[ASYNC OP] add operation with id \(op.uuid)")
     }
     
     func stopOperation(uuid: String) {
@@ -44,7 +44,7 @@ open class AsyncOperationQueue: OperationQueue {
             if let cp = ops[index].copy() as? AsyncOperation {
                 copyOps.append(cp)
             }
-            log.debug("[ASYNC OP] stopOperation operation with id \(ops[index].uuid)")
+            logger.debug("[ASYNC OP] stopOperation operation with id \(ops[index].uuid)")
             ops[index].complete()
             ops.remove(at: index)
         }
@@ -54,7 +54,7 @@ open class AsyncOperationQueue: OperationQueue {
         if let index = copyOps.firstIndex(where: { $0.uuid == uuid }) {
             addOperation(copyOps[index])
             copyOps.remove(at: index)
-            log.debug("[ASYNC OP] resumeOperation operation with id \(ops[index].uuid)")
+            logger.debug("[ASYNC OP] resumeOperation operation with id \(ops[index].uuid)")
         }
     }
 }

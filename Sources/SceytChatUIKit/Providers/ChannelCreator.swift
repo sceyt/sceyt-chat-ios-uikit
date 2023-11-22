@@ -36,7 +36,7 @@ open class ChannelCreator: Provider {
             ) { channel, error in
                 guard let channel = channel
                 else {
-                    log.errorIfNotNil(error, "Create channel")
+                    logger.errorIfNotNil(error, "Create channel")
                     completion?(nil, error)
                     return
                 }
@@ -45,7 +45,7 @@ open class ChannelCreator: Provider {
                     chatChannel = $0.createOrUpdate(channel: channel)
                         .convert()
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store created channel in db")
+                    logger.errorIfNotNil(error, "Store created channel in db")
                     completion?(chatChannel, nil)
                 }
         }
@@ -65,26 +65,23 @@ open class ChannelCreator: Provider {
             ) { sceytChannel, error in
                 guard let sceytChannel
                 else {
-                    log.errorIfNotNil(error, "Create channel")
+                    logger.errorIfNotNil(error, "Create channel")
                     completion?(nil, error)
                     return
                 }
                 var chatChannel: ChatChannel?
                 self.database.write {
                     if var dto = ChannelDTO.fetch(id: channel.id, context: $0) {
+                        let oldId = dto.id
                         dto = dto.map(sceytChannel)
                         dto.id = Int64(sceytChannel.id)
-                        dto.messages?.forEach({
-                            $0.channelId = Int64(sceytChannel.id)
-                        })
-                        dto.members?.forEach({
-                            $0.channelId = Int64(sceytChannel.id)
-                        })
+                        try $0.batchUpdate(object: MessageDTO.self, predicate: .init(format: "channelId == %lld", oldId), propertiesToUpdate: [#keyPath(MessageDTO.channelId): oldId])
+                        try $0.batchUpdate(object: MemberDTO.self, predicate: .init(format: "channelId == %lld", oldId), propertiesToUpdate: [#keyPath(MemberDTO.channelId): oldId])
                     }
                     chatChannel = $0.createOrUpdate(channel: sceytChannel)
                         .convert()
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store created channel in db")
+                    logger.errorIfNotNil(error, "Store created channel in db")
                     completion?(chatChannel, nil)
                 }
         }
@@ -144,21 +141,21 @@ open class ChannelCreator: Provider {
             ChannelDTO.fetchChannelByMembers(channel: channel, context: $0)
         } completion: { result in
             if let chatChannel = try? result.get() {
-                log.info("Found channel with id: \(channelId) for members \(String(describing: chatMembers?.map { $0.id}))")
+                logger.info("Found channel with id: \(channelId) for members \(String(describing: chatMembers?.map { $0.id}))")
                 completion?(chatChannel, nil)
             } else {
                 self.database.write { 
                     $0.createOrUpdate(channel: channel)
                         .unsynched = true
                 } completion: { error in
-                    log.errorIfNotNil(error, "Store created channel in db")
+                    logger.errorIfNotNil(error, "Store created channel in db")
                     self.database.read {
                         ChannelDTO.fetch(id: ChannelId(channelId), context: $0)?
                             .convert()
                     } completion: { result in
                         switch result {
                         case .success(let chatChannel):
-                            log.info("Get channel after store with id: \(channelId)")
+                            logger.info("Get channel after store with id: \(channelId)")
                             completion?(chatChannel, nil)
                         case .failure(let error):
                             completion?(channel, error)
@@ -177,7 +174,7 @@ open class ChannelCreator: Provider {
         } completion: { result in
             switch result {
             case .failure(let error):
-                log.errorIfNotNil(error, "Get channel for db \(channelId)")
+                logger.errorIfNotNil(error, "Get channel for db \(channelId)")
                 completion?(nil, nil)
             case .success(let channel):
                 if let channel, channel.unSynched == true {
@@ -199,10 +196,10 @@ open class ChannelCreator: Provider {
             } completion: { result in
                 switch result {
                 case .failure(let error):
-                    log.errorIfNotNil(error, "Get channel for db \(channelId)")
+                    logger.errorIfNotNil(error, "Get channel for db \(channelId)")
                     continuation.resume(throwing: error)
                 case .success(let channel):
-                    if let channel, channel.unSynched == true {
+                    if let channel, channel.unSynched {
                         self.create(channel: channel)
                         { channel, error in
                             if let error {
@@ -223,21 +220,21 @@ open class ChannelCreator: Provider {
 extension ChannelDTO {
  
     class func fetchChannelByMembers(channel: ChatChannel, context: NSManagedObjectContext) -> ChatChannel? {
-        let request = ChannelDTO.fetchRequest()
-        request.predicate = NSPredicate(format: "type == %@", channel.type)
-        let channelDtos = ChannelDTO.fetch(request: request, context: context)
-        for dto in channelDtos {
-            if let channelMembers = dto.members, channelMembers.count == channel.members?.count ?? 0 {
-                let join: String = channelMembers.compactMap { $0.user?.id }.sorted().joined(separator: "$")
-                var hash: Int64 = Crypto.hash(value: join)
-                if hash < 0 {
-                    hash *= -1
-                }
-                if hash == channel.id {
-                    return dto.convert()
-                }
-            }
-        }
+//        let request = ChannelDTO.fetchRequest()
+//        request.predicate = NSPredicate(format: "type == %@", channel.type)
+//        let channelDtos = ChannelDTO.fetch(request: request, context: context)
+//        for dto in channelDtos {
+//            if let channelMembers = dto.members, channelMembers.count == channel.members?.count ?? 0 {
+//                let join: String = channelMembers.compactMap { $0.user?.id }.sorted().joined(separator: "$")
+//                var hash: Int64 = Crypto.hash(value: join)
+//                if hash < 0 {
+//                    hash *= -1
+//                }
+//                if hash == channel.id {
+//                    return dto.convert()
+//                }
+//            }
+//        }
         return nil
     }
 }

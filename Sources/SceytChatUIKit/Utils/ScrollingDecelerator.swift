@@ -52,8 +52,8 @@ public final class ScrollingDecelerator {
                 && decelerationRate > 0
                 && initialVelocity.length != 0 else { return 0 }
 
-            let dCoeff = 1000 * CoreGraphics.log(decelerationRate)
-            return TimeInterval(CoreGraphics.log(-dCoeff * threshold / initialVelocity.length) / dCoeff)
+            let dCoeff = 1000 * log(decelerationRate)
+            return TimeInterval(log(-dCoeff * threshold / initialVelocity.length) / dCoeff)
         }
 
         public func point(at time: TimeInterval) -> CGPoint {
@@ -61,7 +61,7 @@ public final class ScrollingDecelerator {
                 && decelerationRate > 0
                 && initialVelocity != .zero else { return .zero }
 
-            let dCoeff = 1000 * CoreGraphics.log(decelerationRate)
+            let dCoeff = 1000 * log(decelerationRate)
             return initialContentOffset + (pow(decelerationRate, CGFloat(1000 * time)) - 1) / dCoeff * initialVelocity
         }
     }

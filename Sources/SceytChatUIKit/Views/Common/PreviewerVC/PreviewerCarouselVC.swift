@@ -41,7 +41,7 @@ open class PreviewerCarouselVC: UIPageViewController,
     open lazy var titleView = UIStackView(column: titleLabel, subtitleLabel, alignment: .center)
     
     deinit {
-        debugPrint("[PreviewerCarouselVC] deinit")
+        logger.debug("[PreviewerCarouselVC] deinit")
         
         initialSourceView?.alpha = 1.0
     }

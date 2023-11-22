@@ -19,7 +19,7 @@ public func formatLogMessage(_ logString: String,
     return "[SceytChatUIKit: \(filename):\(line) \(function)]: \(logString)"
 }
 
-var log: SCTUIKitLog.Type {
+var logger: SCTUIKitLog.Type {
     Components.logger.self
 }
 
@@ -73,7 +73,7 @@ open class SCTUIKitLog {
                                        function: String = #function,
                                        line: Int = #line) {
         if let error {
-            log.error(logString() + " error: \(error)", file: file, function: function, line: line)
+            logger.error(logString() + " error: \(error)", file: file, function: function, line: line)
         }
     }
 }

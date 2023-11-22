@@ -105,10 +105,10 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         setPersistentStoreDescription(type: storeType)
         loadPersistentStores {[weak self] _, error in
             if let error = error {
-                debugPrint(error)
+                logger.errorIfNotNil(error, "")
                 self?.tryRecreatePersistentStore(completion: { error in
                     if let error = error {
-                        debugPrint(error)
+                        logger.errorIfNotNil(error, "")
                     }
                 })
             }
@@ -158,7 +158,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                 description.type = NSInMemoryStoreType
             }
         }
-        debugPrint("Database file url", description.url as Any)
+        logger.debug("Database file url \(description.url)")
         persistentStoreDescriptions = [description]
     }
     
@@ -173,6 +173,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         let context = newBackgroundContext()
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         context.automaticallyMergesChangesFromParent = true
+        context.retainsRegisteredObjects = true
         return context
     }()
     
@@ -186,7 +187,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                 try perform(self.backgroundPerformContext)
                 for object in self.backgroundPerformContext.updatedObjects {
                     if object.changedValues().isEmpty {
-                        self.backgroundPerformContext.refresh(object, mergeChanges: true)
+                        self.backgroundPerformContext.refresh(object, mergeChanges: false)
                     }
                 }
                 guard self.backgroundPerformContext.hasChanges else { return }

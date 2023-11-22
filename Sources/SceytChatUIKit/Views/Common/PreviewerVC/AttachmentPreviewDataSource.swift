@@ -41,11 +41,11 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
     open lazy var attachmentObserver: DatabaseObserver<AttachmentDTO, ChatMessage.Attachment> = {
         let predicate: NSPredicate
         if attachmentTypes.isEmpty {
-            predicate = .init(format: "message.ownerChannel.id == %lld OR channelId == %lld", channel.id, channel.id)
+            predicate = .init(format: "channelId == %lld", channel.id)
         } else {
             predicate =
                 NSCompoundPredicate(andPredicateWithSubpredicates: [
-                    NSPredicate(format: "message.ownerChannel.id == %lld OR channelId == %lld", channel.id, channel.id),
+                    NSPredicate(format: "channelId == %lld", channel.id),
                     NSCompoundPredicate(orPredicateWithSubpredicates:
                         attachmentTypes.map { NSPredicate(format: "type = %@", $0) }
                     )
@@ -82,7 +82,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
         do {
             try attachmentObserver.startObserver(fetchedAllObjects: false)
         } catch {
-            debugPrint("observer.startObserver", error)
+            logger.errorIfNotNil(error, "observer.startObserver")
         }
 
         attachmentObserver.onDidChange = { [weak self] in

@@ -84,7 +84,7 @@ open class ChannelAttachmentListVM: NSObject {
                 .AttachmentLayout(
                     attachment: attachment,
                     ownerMessage: $0.message?.convert(),
-                    ownerChannel: $0.message?.ownerChannel?.convert(),
+                    ownerChannel: self?.channel,
                     thumbnailSize: self?.thumbnailSize,
                     onLoadThumbnail: { [weak self] in
                         self?.cacheThumbnail($0, for: attachment)
@@ -102,7 +102,7 @@ open class ChannelAttachmentListVM: NSObject {
         do {
             try attachmentObserver.startObserver(fetchLimit: Int(provider.queryLimit))
         } catch {
-            debugPrint("observer.startObserver", error)
+            logger.errorIfNotNil(error, "observer.startObserver")
         }
     }
 
@@ -111,7 +111,7 @@ open class ChannelAttachmentListVM: NSObject {
     }
 
     open func attachmentLayout(at indexPath: IndexPath,
-                               onLoadThumbnail: ((UIImage?) -> Void)? = nil,
+                               onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)? = nil,
                                onLoadLinkMetadata: ((LinkMetadata?) -> Void)? = nil) -> MessageLayoutModel.AttachmentLayout?
     {
         let attachmentLayout = attachmentObserver.item(at: indexPath)
@@ -120,7 +120,7 @@ open class ChannelAttachmentListVM: NSObject {
             if let onLoadThumbnail {
                 attachmentLayout.onLoadThumbnail = { [weak self] in
                     self?.cacheThumbnail($0, for: attachment)
-                    onLoadThumbnail($0)
+                    onLoadThumbnail(attachmentLayout)
                 }
             }
 
@@ -177,7 +177,7 @@ open class ChannelAttachmentListVM: NSObject {
                             if let attachment = message?.attachments?.first(where: { $0.id == attachment.id }) {
                                 layout.update(attachment: attachment)
                             } else if let error {
-                                log.errorIfNotNil(error, "Download Channel profile attachment")
+                                logger.errorIfNotNil(error, "Download Channel profile attachment")
                             }
                             DispatchQueue.main.async {
                                 completion?(layout)
@@ -219,9 +219,7 @@ open class ChannelAttachmentListVM: NSObject {
                             let attachmentDTO = AttachmentDTO.fetch(id: attachment.id, context: $0)
                             attachmentDTO?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue
                         } completion: { error in
-                            if let error {
-                                log.error(error.localizedDescription)
-                            }
+                            logger.errorIfNotNil(error, "")
                         }
                     }
                 }

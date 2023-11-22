@@ -15,7 +15,7 @@ public struct ChecksumAlg {
         let startTime = CFAbsoluteTimeGetCurrent()
         defer {
             let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
-            log.verbose("[CHECKSUM] CALC \(timeElapsed) s. for bytes: \(data.count)")
+            logger.verbose("[CHECKSUM] CALC \(timeElapsed) s. for bytes: \(data.count)")
         }
         let checksum = data.withUnsafeBytes {
             zlib.crc32(0, $0.bindMemory(to: Bytef.self).baseAddress, uInt(data.count))

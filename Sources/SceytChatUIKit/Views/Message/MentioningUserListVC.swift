@@ -151,8 +151,10 @@ open class MentioningUserListVC: ViewController,
                 tableView.alpha = 0
                 tableView.performBatchUpdates {
                 } completion: { [weak self] _ in
-                    self?.tableView.alpha = 1
-                    self?.tableView.scrollToBottom()
+                    guard let self else { return }
+                    self.tableView.alpha = 1
+                    self.tableView.scrollToBottom()
+                    self.updateShadows()
                 }
             } else {
 //                tableView.performBatchUpdates {
@@ -175,8 +177,10 @@ open class MentioningUserListVC: ViewController,
             tableView.reloadData()
             tableView.performBatchUpdates {
             } completion: { [weak self] _ in
-                self?.tableView.alpha = 1
-                self?.tableView.scrollToBottom()
+                guard let self else { return }
+                self.tableView.alpha = 1
+                self.tableView.scrollToBottom()
+                self.updateShadows()
             }
         }
         view.alpha = viewModel.numberOfMembers == 0 ? 0 : 1
