@@ -31,7 +31,7 @@ public struct RelationshipKeyPath: Hashable {
         self.destinationEntityName = destinationEntityName
         self.inverseRelationshipKeyPath = inverseRelationshipName
         if [sourcePropertyName, self.destinationEntityName, destinationPropertyName].contains("") {
-            log.error("RelationshipKeyPath: Key path is empty")
+            logger.error("RelationshipKeyPath: Key path is empty")
             return nil
         }
     }

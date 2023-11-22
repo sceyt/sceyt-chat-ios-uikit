@@ -6,12 +6,11 @@
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
-import Foundation
 import CoreData
+import Foundation
 import SceytChat
 
 public protocol MessageDatabaseSession {
-
     @discardableResult
     func createOrUpdate(message: Message, channelId: ChannelId, changedBy: User?) -> MessageDTO
     
@@ -70,6 +69,12 @@ public protocol MessageDatabaseSession {
     func update(messageSelfMarkers: MessageListMarker) -> [MessageDTO]
     
     @discardableResult
+    func createOrUpdate(marker: Marker, messageId: MessageId) -> MarkerDTO
+    
+    @discardableResult
+    func createOrUpdate(markers: [Marker], messageId: MessageId) -> [MarkerDTO]
+    
+    @discardableResult
     func addPendingReaction(messageId: MessageId, key: String, score: UInt16, reason: String?, enforceUnique: Bool) -> (MessageDTO, ReactionDTO)?
     
     @discardableResult
@@ -84,11 +89,10 @@ public protocol MessageDatabaseSession {
     func deleteAttachmentsFor(message: Message)
     func deleteAttachment(id: AttachmentId)
     
-    
     func updateAttachment(with filePath: String, chatMessage: ChatMessage, attachment: ChatMessage.Attachment)
     
     @discardableResult
-    func createOrUpdate(notificationContent userInfo: [AnyHashable : Any]) throws -> MessageDTO?
+    func createOrUpdate(notificationContent userInfo: [AnyHashable: Any]) throws -> MessageDTO?
     
     @discardableResult
     func createOrUpdate(checksum: ChatMessage.Attachment.Checksum) -> ChecksumDTO
@@ -98,7 +102,6 @@ public protocol MessageDatabaseSession {
 }
 
 public extension MessageDatabaseSession {
-
     @discardableResult
     func createOrUpdate(message: Message, channelId: ChannelId) -> MessageDTO {
         createOrUpdate(message: message, channelId: channelId, changedBy: nil)
@@ -106,14 +109,11 @@ public extension MessageDatabaseSession {
 }
 
 extension NSManagedObjectContext: MessageDatabaseSession {
-    
     @discardableResult
     public func createOrUpdate(message: Message, channelId: ChannelId, changedBy: User?) -> MessageDTO {
         let dto = MessageDTO.fetchOrCreate(id: message.id, tid: message.incoming ? 0 : Int64(message.tid), context: self).map(message)
         dto.channelId = Int64(channelId)
-        if dto.ownerChannel?.id != Int64(channelId) {
-            dto.ownerChannel = ChannelDTO.fetchOrCreate(id: channelId, context: self)
-        }
+        let ownerChannel = ChannelDTO.fetch(id: channelId, context: self)
         dto.user = createOrUpdate(user: message.user)
         if let changedBy = changedBy {
             dto.changedBy = createOrUpdate(user: changedBy)
@@ -143,9 +143,9 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             dto.markerTotal![marker.name] = Int(marker.count)
         }
         
-        if let channel = dto.ownerChannel {
+        if let channel = ownerChannel {
             if let lastMessage = channel.lastMessage {
-                if (lastMessage.id != 0 && dto.id != 0) {
+                if lastMessage.id != 0 && dto.id != 0 {
                     if lastMessage.id <= dto.id {
                         channel.lastMessage = dto
                     }
@@ -178,9 +178,11 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         } else if message.state == .deleted {
             dto.parent = nil
         }
+        ReactionDTO.unownedReactions(messageId: message.id, context: self)
+            .forEach { $0.message = dto }
         return dto
     }
-
+    
     @discardableResult
     public func createOrUpdate(messages: [Message], channelId: ChannelId) -> [MessageDTO] {
         messages.map { createOrUpdate(message: $0, channelId: channelId) }
@@ -215,20 +217,20 @@ extension NSManagedObjectContext: MessageDatabaseSession {
               !dto.isDeleted
         else { return nil }
         
-        //Attachment
-        attachments?.forEach({
+        // Attachment
+        attachments?.forEach {
             var attachmentDTO: AttachmentDTO?
             if $0.id != 0 {
                 attachmentDTO = AttachmentDTO.fetch(id: $0.id, context: self)
-                log.verbose("[AttachmentDTO] update MESSAGE found by id \($0.id) \(attachmentDTO != nil) \($0.description)")
+                logger.verbose("[AttachmentDTO] update MESSAGE found by id \($0.id) \(attachmentDTO != nil) \($0.description)")
             } else if $0.tid != 0 {
                 attachmentDTO = AttachmentDTO.fetch(tid: $0.tid, message: dto, context: self)
-                log.verbose("[AttachmentDTO] update MESSAGE found by tid \($0.tid) \(attachmentDTO != nil) \($0.description)")
+                logger.verbose("[AttachmentDTO] update MESSAGE found by tid \($0.tid) \(attachmentDTO != nil) \($0.description)")
             } else if let filePath = $0.filePath {
                 attachmentDTO = AttachmentDTO.fetchOrCreate(filePath: filePath, message: dto, context: self)
-                log.verbose("[AttachmentDTO] update MESSAGE found by filePath \(filePath) \(attachmentDTO != nil) \($0.description)")
+                logger.verbose("[AttachmentDTO] update MESSAGE found by filePath \(filePath) \(attachmentDTO != nil) \($0.description)")
             } else if let url = $0.url {
-                log.verbose("[AttachmentDTO] update MESSAGE found by url \(url) \(attachmentDTO != nil) \($0.description)")
+                logger.verbose("[AttachmentDTO] update MESSAGE found by url \(url) \(attachmentDTO != nil) \($0.description)")
                 attachmentDTO = AttachmentDTO.fetchOrCreate(url: url, message: dto, context: self)
             }
             guard let attachmentDTO else { return }
@@ -245,11 +247,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             attachmentDTO.metadata = $0.metadata
             attachmentDTO.channelId = Int64(chatMessage.channelId)
             attachmentDTO.uploadedFileSize = Int64($0.uploadedFileSize)
-        })
+        }
         return dto
     }
     
-
     @discardableResult
     public func createOrUpdate(attachments: [Attachment], dto: MessageDTO) -> MessageDTO {
         dto.attachments = .init(
@@ -280,21 +281,20 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(attachment: Attachment, channelId: ChannelId) -> AttachmentDTO {
-        log.verbose("[AttachmentDTO] createOrUpdate by channelId \(channelId) create \(attachment.description)")
+        logger.verbose("[AttachmentDTO] createOrUpdate by channelId \(channelId) create \(attachment.description)")
         let dto = AttachmentDTO.fetchOrCreate(id: attachment.id, context: self).map(attachment)
         dto.channelId = Int64(channelId)
         if dto.message == nil {
             dto.message = MessageDTO.fetch(id: attachment.messageId, context: self)
         }
         return dto
-        
     }
     
     @discardableResult
     public func createOrUpdate(attachments: [Attachment], channelId: ChannelId) -> [AttachmentDTO] {
-        attachments.map { createOrUpdate(attachment: $0, channelId: channelId)}
+        attachments.map { createOrUpdate(attachment: $0, channelId: channelId) }
     }
-
+    
     @discardableResult
     public func createOrUpdate(userReactions: [Reaction], dto: MessageDTO) -> MessageDTO {
         if dto.userReactions == nil {
@@ -302,10 +302,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         
         var items = dto.userReactions?.compactMap { !$0.pending ? $0 : nil } ?? []
-        items.removeAll(where: { r in userReactions.contains(where: {  $0.key == r.key})})
+        items.removeAll(where: { r in userReactions.contains(where: { $0.key == r.key }) })
         dto.userReactions?.subtract(items)
         let newItems = createOrUpdate(reactions: userReactions)
-            .map{
+            .map {
                 $0.messageSelf = dto
                 return $0
             }
@@ -321,7 +321,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             if let message = MessageDTO.fetch(id: $0.messageId, context: self) {
                 rdto.message = message
                 if !message.incoming,
-                   let channel = message.ownerChannel {
+                   let channel = ChannelDTO.fetch(id: ChannelId(message.channelId), context: self) {
                     if channel.lastReaction == nil {
                         channel.lastReaction = rdto
                     } else if channel.lastReaction!.id < rdto.id {
@@ -354,7 +354,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         
         rdto.message = message
         if !message.incoming,
-           let channel = message.ownerChannel {
+           let channel = ChannelDTO.fetch(id: ChannelId(message.channelId), context: self)
+        {
             if channel.lastReaction == nil {
                 channel.lastReaction = rdto
             } else if channel.lastReaction!.id < rdto.id {
@@ -367,9 +368,9 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     @discardableResult
     public func delete(reaction: Reaction) -> ReactionDTO? {
         var channelDto: ChannelDTO?
-        if let dto = ReactionDTO.fetch(userId: reaction.user.id, key: reaction.key, messageId: reaction.messageId, context: self)  {
+        if let dto = ReactionDTO.fetch(userId: reaction.user.id, key: reaction.key, messageId: reaction.messageId, context: self) {
             if let messageDto = MessageDTO.fetch(id: reaction.messageId, context: self) {
-                channelDto = messageDto.ownerChannel
+                channelDto = ChannelDTO.fetch(id: ChannelId(messageDto.channelId), context: self)
                 messageDto.userReactions?.remove(dto)
                 messageDto.pendingReactions?.remove(dto)
                 if let total = messageDto.reactionTotal?.first(where: { $0.key == reaction.key }) {
@@ -383,7 +384,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             delete(dto)
             if let channelDto,
                channelDto.lastReaction?.id ?? 0 == reaction.id {
-                let predicate = NSPredicate(format: "id != %lld AND message.incoming = false AND message.ownerChannel == %@", reaction.id, channelDto)
+                let predicate = NSPredicate(format: "id != %lld AND message.incoming = false AND message.channelId == %lld", reaction.id, channelDto.id)
                 channelDto.lastReaction = ReactionDTO.lastReaction(predicate: predicate, context: self)
             }
             return dto
@@ -408,7 +409,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         return dto
     }
-
+    
     @discardableResult
     public func createOrUpdate(requestedMentionUserIds: [UserId], dto: MessageDTO) -> MessageDTO {
         dto.orderedMentionedUserIds = requestedMentionUserIds
@@ -418,7 +419,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             })
         return dto
     }
-
+    
     @discardableResult
     public func createOrUpdate(mentionedUsers: [User], dto: MessageDTO) -> MessageDTO {
         dto.orderedMentionedUserIds = mentionedUsers.map { $0.id }
@@ -428,7 +429,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             })
         return dto
     }
-
+    
     @discardableResult
     public func createOrUpdate(userMarkers: [Marker], dto: MessageDTO) -> MessageDTO {
         guard !userMarkers.isEmpty else { return dto }
@@ -440,6 +441,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId(dto.id), name: marker.name, context: self).map(marker)
             markerDTO.user = UserDTO.fetchOrCreate(id: marker.user.id, context: self).map(marker.user)
             dto.userMarkers?.insert(markerDTO)
+            dto.pendingMarkerNames?.remove(marker.name)
+        }
+        if dto.pendingMarkerNames != nil, dto.pendingMarkerNames!.isEmpty {
+            dto.pendingMarkerNames = nil
         }
         return dto
     }
@@ -500,7 +505,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         return dto
     }
-
+    
     @discardableResult
     public func add(linkMetadatas: [LinkMetadata], toMessage id: MessageId) -> MessageDTO {
         let dto = MessageDTO.fetchOrCreate(id: id, context: self)
@@ -518,13 +523,45 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         return dto
     }
+    
+    @discardableResult
+    public func createOrUpdate(marker: Marker, messageId: MessageId) -> MarkerDTO {
+        MarkerDTO.fetchOrCreate(messageId: messageId, name: marker.name, context: self).map(marker)
+    }
+    
+    @discardableResult
+    public func createOrUpdate(markers: [Marker], messageId: MessageId) -> [MarkerDTO] {
+        markers.map {
+            MarkerDTO.fetchOrCreate(messageId: messageId, name: $0.name, context: self).map($0)
+        }
+    }
+    
+    @discardableResult
+    public func createOrUpdate(messageMarkers: MessageListMarker) -> [MarkerDTO] {
+        let predicate = NSPredicate(format: "id IN %@",
+                                    messageMarkers.messageIds.map { MessageId($0.uint64Value) })
+        let messages = MessageDTO.fetch(
+            predicate: predicate,
+            context: self
+        )
+        return messages.map {
+            let markerDTO = MarkerDTO.fetchOrCreate(
+                messageId: MessageId($0.id),
+                name: messageMarkers.name,
+                context: self
+            )
+            markerDTO.createdAt = messageMarkers.createdAt.bridgeDate
+            markerDTO.user = UserDTO.fetchOrCreate(id: messageMarkers.user.id, context: self).map(messageMarkers.user)
+            return markerDTO
+        }
+    }
 
     @discardableResult
     public func update(messageMarkers: MessageListMarker) -> [MessageDTO] {
         guard let status = ChatMessage.DeliveryStatus(rawValue: messageMarkers.name),
               !messageMarkers.messageIds.isEmpty
         else { return [] }
-        let maxId = messageMarkers.messageIds.max(by: { $0.int64Value < $1.int64Value}) ?? messageMarkers.messageIds.last!
+        let maxId = messageMarkers.messageIds.max(by: { $0.int64Value < $1.int64Value }) ?? messageMarkers.messageIds.last!
         guard let channelId = MessageDTO.fetch(id: MessageId(maxId.int64Value), context: self)?.channelId
         else { return [] }
         let predicate = NSPredicate(
@@ -533,7 +570,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             maxId,
             ChatMessage.DeliveryStatus.pending.intValue,
             ChatMessage.DeliveryStatus.failed.intValue,
-            status.intValue)
+            status.intValue
+        )
         
         let messages = MessageDTO.fetch(
             predicate: predicate,
@@ -545,6 +583,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         if messageMarkers.user.id == me {
             update(messageSelfMarkers: messageMarkers)
+        } else {
+            createOrUpdate(messageMarkers: messageMarkers)
         }
         return messages
     }
@@ -552,7 +592,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     @discardableResult
     public func update(messageSelfMarkers: MessageListMarker) -> [MessageDTO] {
         let predicate = NSPredicate(format: "id IN %@",
-                                    messageSelfMarkers.messageIds.map { MessageId($0.uint64Value)})
+                                    messageSelfMarkers.messageIds.map { MessageId($0.uint64Value) })
         let messages = MessageDTO.fetch(
             predicate: predicate,
             context: self
@@ -581,7 +621,6 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         return messages
     }
-    
     
     @discardableResult
     public func update(messagePendingMarkers messageIds: [MessageId], markerName: String) -> [MessageDTO] {
@@ -652,7 +691,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         dto.pendingReactions?.insert(rDto)
         
         if !dto.incoming,
-           let channel = dto.ownerChannel {
+           let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self) {
             channel.lastReaction = rDto
         }
         return (dto, rDto)
@@ -674,15 +713,17 @@ extension NSManagedObjectContext: MessageDatabaseSession {
 
     public func deleteMessage(id: MessageId) {
         if let dto = MessageDTO.fetch(id: id, context: self) {
-            if let channel = dto.ownerChannel, channel.lastMessage == dto {
+            if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self), channel.lastMessage == dto {
                 let predicate = NSPredicate(format: "channelId == %lld AND id != %lld", channel.id, id)
                 channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
                 
                 if let lastMessage = channel.lastMessage,
-                   lastMessage.id != 0 {
+                   lastMessage.id != 0
+                {
                     let reactionPredicate = NSPredicate(format: "channelId == %lld AND message.incoming = false", channel.id)
                     if let lastReaction = ReactionDTO.lastReaction(predicate: reactionPredicate, context: self),
-                       lastMessage.id < lastReaction.id {
+                       lastMessage.id < lastReaction.id
+                    {
                         channel.lastReaction = lastReaction
                     }
                 }
@@ -693,15 +734,17 @@ extension NSManagedObjectContext: MessageDatabaseSession {
 
     public func deleteMessage(tid: Int64) {
         if let dto = MessageDTO.fetch(tid: tid, context: self) {
-            if let channel = dto.ownerChannel, channel.lastMessage == dto {
+            if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self), channel.lastMessage == dto {
                 let predicate = NSPredicate(format: "channelId == %lld AND tid != %lld", channel.id, tid)
                 channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
                 
                 if let lastMessage = channel.lastMessage,
-                   lastMessage.id != 0 {
+                   lastMessage.id != 0
+                {
                     let reactionPredicate = NSPredicate(format: "channelId == %lld AND message.incoming = false", channel.id)
                     if let lastReaction = ReactionDTO.lastReaction(predicate: reactionPredicate, context: self),
-                       lastMessage.id < lastReaction.id {
+                       lastMessage.id < lastReaction.id
+                    {
                         channel.lastReaction = lastReaction
                     }
                 }
@@ -716,9 +759,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             messageDto?.userReactions?.remove(dto)
             messageDto?.pendingReactions?.remove(dto)
             delete(dto)
-            if let channelDto = messageDto?.ownerChannel,
-               channelDto.lastReaction?.id ?? 0 == id {
-                let predicate = NSPredicate(format: "id != %lld AND message.incoming = false AND message.ownerChannel == %@", id, channelDto)
+            if let messageDto, let channelDto = ChannelDTO.fetch(id: ChannelId(messageDto.channelId), context: self),
+               channelDto.lastReaction?.id ?? 0 == id
+            {
+                let predicate = NSPredicate(format: "id != %lld AND message.incoming = false AND message.channelId == %@", id, channelDto.id)
                 channelDto.lastReaction = ReactionDTO.lastReaction(predicate: predicate, context: self)
             }
         }
@@ -740,7 +784,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     }
     
     public func deleteAttachmentsFor(messageTid: Int64) {
-        if let attachments =  MessageDTO.fetch(tid: messageTid, context: self)?.attachments {
+        if let attachments = MessageDTO.fetch(tid: messageTid, context: self)?.attachments {
             for attachment in attachments {
                 delete(attachment)
             }
@@ -748,8 +792,9 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     }
     
     public func deleteAttachmentsFor(message: Message) {
-        if message.deliveryStatus == .pending || 
-            message.deliveryStatus == .failed {
+        if message.deliveryStatus == .pending ||
+            message.deliveryStatus == .failed
+        {
             deleteAttachmentsFor(messageTid: Int64(message.tid))
         } else {
             deleteAttachmentsFor(messageId: message.id)
@@ -757,7 +802,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     }
     
     public func deleteAttachment(id: AttachmentId) {
-        if let attachment =  AttachmentDTO.fetch(id: id, context: self) {
+        if let attachment = AttachmentDTO.fetch(id: id, context: self) {
             delete(attachment)
         }
     }
@@ -773,10 +818,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             predicates.append(.init(format: "tid == %lld", chatMessage.tid))
         }
         guard !predicates.isEmpty
-        else { return  }
+        else { return }
         request.predicate = NSCompoundPredicate(orPredicateWithSubpredicates: predicates)
         guard let dto = MessageDTO.fetch(request: request, context: self).first,
-                !dto.isDeleted
+              !dto.isDeleted
         else { return }
         
         guard let attachmentDTO = AttachmentDTO.fetch(filePath: filePath, message: dto, context: self).first
@@ -796,7 +841,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     ) throws {
         let request = NSFetchRequest<NSFetchRequestResult>(entityName: MessageDTO.entityName)
         request.sortDescriptor = NSSortDescriptor(keyPath: \MessageDTO.id, ascending: false)
-        var predicate = NSPredicate(format: "ownerChannel.id == %lld", channelId)
+        var predicate = NSPredicate(format: "channelId == %lld", channelId)
         if let date {
             predicate = NSCompoundPredicate(type: .and, subpredicates: [
                 predicate,
@@ -807,11 +852,12 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         try batchDelete(fetchRequest: request)
         try? deleteAllAttachments(channelId: channelId, before: date)
         if let date,
-           let channel = ChannelDTO.fetch(id: channelId, context: self) {
+           let channel = ChannelDTO.fetch(id: channelId, context: self)
+        {
             if let lastMessage = channel.lastMessage {
                 if date >= lastMessage.createdAt.bridgeDate {
                     channel.lastMessage = nil
-                    channel.messages = nil
+//                    channel.messages = nil
                     channel.lastReceivedMessageId = 0
                     channel.lastDisplayedMessageId = 0
                 }
@@ -840,36 +886,37 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     }
     
     @discardableResult
-    public func createOrUpdate(notificationContent userInfo: [AnyHashable : Any]) throws -> MessageDTO? {
+    public func createOrUpdate(notificationContent userInfo: [AnyHashable: Any]) throws -> MessageDTO? {
         let pushData = try NotificationPayload(from: userInfo)
         
         if let reaction = pushData.reaction,
-            reaction.key != "" {
+           reaction.key != ""
+        {
             return createOrUpdateReaction(pushData: pushData)?.message
         }
         
         if let message = pushData.message,
            let channel = pushData.channel,
-            let messageId = MessageId(message.id),
-            let channelId = ChannelId(channel.id) {
+           let messageId = MessageId(message.id),
+           let channelId = ChannelId(channel.id)
+        {
             let dto = MessageDTO.fetchOrCreate(id: messageId, context: self).map(message)
             dto.tid = Int64(messageId)
             dto.channelId = Int64(channelId)
-            if dto.ownerChannel?.id != Int64(channelId) {
-                dto.ownerChannel = ChannelDTO.fetchOrCreate(id: channelId, context: self).map(channel)
-            }
             
             if let user = pushData.user {
                 dto.user = createOrUpdate(user: user)
             }
             
             if let mentionedUsers = message.mentionedUsers,
-               !mentionedUsers.isEmpty {
+               !mentionedUsers.isEmpty
+            {
                 createOrUpdate(mentionedUsers: mentionedUsers, dto: dto)
             }
             
             if let attachments = message.attachments,
-               !attachments.isEmpty {
+               !attachments.isEmpty
+            {
                 createOrUpdate(attachments: attachments, dto: dto)
             }
             
@@ -881,10 +928,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 dto.markerTotal = .init()
             }
             
-            if let channel = dto.ownerChannel {
+            if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self) {
                 channel.newMessageCount += 1
                 if let lastMessage = channel.lastMessage {
-                    if (lastMessage.id != 0 && dto.id != 0) {
+                    if lastMessage.id != 0 && dto.id != 0 {
                         if lastMessage.id <= dto.id {
                             channel.lastMessage = dto
                         }
@@ -896,7 +943,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 }
                 if let lm = channel.lastMessage?.createdAt.bridgeDate,
                    let lr = channel.lastReaction?.createdAt?.bridgeDate,
-                   lm > lr {
+                   lm > lr
+                {
                     channel.lastReaction = nil
                 }
             }
@@ -904,7 +952,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             if let parentId = message.parentId,
                let id = Int64(parentId),
                id > 0,
-               let message = MessageDTO.fetch(id: MessageId(id), context: self) {
+               let message = MessageDTO.fetch(id: MessageId(id), context: self)
+            {
                 dto.parent = message
             }
             
@@ -975,7 +1024,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         rdto.message = messageDTO
         if let message = rdto.message,
            !message.incoming,
-           let channel = message.ownerChannel {
+           let channel = ChannelDTO.fetch(id: ChannelId(message.channelId), context: self)
+        {
             if channel.lastReaction == nil {
                 channel.lastReaction = rdto
             } else if channel.lastReaction!.id < rdto.id {
@@ -985,7 +1035,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         return rdto
     }
     
-    //MARK: Checksum
+    // MARK: Checksum
     
     @discardableResult
     public func createOrUpdate(checksum: ChatMessage.Attachment.Checksum) -> ChecksumDTO {
@@ -1002,4 +1052,3 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         return dto
     }
 }
-

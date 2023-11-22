@@ -50,10 +50,10 @@ open class ChannelMessageSender: Provider {
         if ((message.body as NSString).length == 0 && (message.attachments ?? []).isEmpty) || (message.body as NSString).length > 1_000 {
             let data = Data(message.body.utf8)
             let hexString = data.map{ String(format:"%02x", $0) }.joined()
-            log.verbose("[EMPTY] Send text message by hex [\(hexString)] orig [\(message.body.prefix(5))]")
+            logger.verbose("[EMPTY] Send text message by hex [\(hexString)] orig [\(message.body.prefix(5))]")
         }
         
-        log.info("Prepare send message with tid \(message.tid)")
+        logger.info("Prepare send message with tid \(message.tid)")
         func store(completion: @escaping () -> Void) {
             if storeBeforeSend {
                 messageProvider.storePending(message: message) { _ in
@@ -69,7 +69,7 @@ open class ChannelMessageSender: Provider {
             guard let sentMessage = sentMessage,
                   sentMessage.deliveryStatus != .failed
             else {
-                log.errorIfNotNil(error, "Sent message filed status: \(String(describing: sentMessage?.deliveryStatus)), tid \(message.tid)")
+                logger.errorIfNotNil(error, "Sent message filed status: \(String(describing: sentMessage?.deliveryStatus)), tid \(message.tid)")
                 if error?.sceytChatCode == .badMessageParam {
                     self.database.write {
                         $0.deleteMessage(tid: Int64(message.tid))
@@ -78,11 +78,11 @@ open class ChannelMessageSender: Provider {
                 completion?(error)
                 return
             }
-            log.info("message with tid \(sentMessage.tid) id: \(sentMessage.id) sent successfully")
+             logger.info("message with tid \(sentMessage.tid) id: \(sentMessage.id) sent successfully")
             self.database.write ({
-                $0.update(message: sentMessage, channelId: self.channelId)?
-                    .ownerChannel?
-                    .lastDisplayedMessageId = Int64(sentMessage.id)
+                $0.update(message: sentMessage, channelId: self.channelId)
+                ChannelDTO.fetch(id: self.channelId, context: $0)?
+                    .lastReceivedMessageId = Int64(sentMessage.id)
             }) { dbError in
                 completion?(error ?? dbError)
             }
@@ -100,20 +100,20 @@ open class ChannelMessageSender: Provider {
                     handleAck(sentMessage: sentMessage, error: error)
                 }
             } else {
-                log.info("The message has attachments. will send message with tid \(message.tid) after upload")
+                 logger.info("The message has attachments. will send message with tid \(message.tid) after upload")
                 let chatMessage = ChatMessage(message: message, channelId: self.channelId)
                 self.uploadAttachmentsIfNeeded(message: chatMessage)
                 { message, error in
                     if error == nil, let message {
-                        log.info("Message attachments uploaded successfully. will send message with tid \(message.tid)")
+                         logger.info("Message attachments uploaded successfully. will send message with tid \(message.tid)")
                         let sendableMessage = message.builder.build()
                         guard let sendableMessage = self.willSend(sendableMessage)
                         else {
-                            log.info("Message with tid \(message.tid) build failed can't send message")
+                             logger.info("Message with tid \(message.tid) build failed can't send message")
                             completion?(nil)
                             return
                         }
-                        log.info("Send message with tid \(message.tid)")
+                         logger.info("Send message with tid \(message.tid)")
                         self.channelOperator.sendMessage(sendableMessage)
                         { sentMessage, error in
                             handleAck(sentMessage: sentMessage, error: error)
@@ -133,22 +133,22 @@ open class ChannelMessageSender: Provider {
         if ((chatMessage.body as NSString).length == 0 && (chatMessage.attachments ?? []).isEmpty) || (chatMessage.body as NSString).length > 1_000 {
             let data = Data(chatMessage.body.utf8)
             let hexString = data.map{ String(format:"%02x", $0) }.joined()
-            log.verbose("[EMPTY] ReSend text message by hex [\(hexString)] orig [\(chatMessage.body.prefix(5))]")
+            logger.verbose("[EMPTY] ReSend text message by hex [\(hexString)] orig [\(chatMessage.body.prefix(5))]")
         }
-        log.info("Resend message with tid \(chatMessage.tid) upload attachments if needed")
+         logger.info("Resend message with tid \(chatMessage.tid) upload attachments if needed")
         uploadAttachmentsIfNeeded(message: chatMessage) { message, error in
             if error == nil, let message {
                 let sendableMessage = message.builder.build()
                 guard let sendableMessage = self.willResend(sendableMessage)
                 else {
-                    log.info("Message with tid \(message.tid) build failed can't resend message")
+                     logger.info("Message with tid \(message.tid) build failed can't resend message")
                     completion?(nil)
                     return
                 }
                 
                 func callback(sentMessage: Message?, error: Error?) {
                     if error != nil || sentMessage?.deliveryStatus == .failed {
-                        log.errorIfNotNil(error, "Resending message with tid \(String(describing: sentMessage?.tid)) failed")
+                         logger.errorIfNotNil(error, "Resending message with tid \(String(describing: sentMessage?.tid)) failed")
                     }
                     self.didResend(sentMessage, error: error)
                     guard let sentMessage = sentMessage
@@ -158,18 +158,17 @@ open class ChannelMessageSender: Provider {
                                 $0.deleteMessage(tid: Int64(message.tid))
                             }
                         }
-                        log.error("Message with tid \(String(describing: sentMessage?.tid)) build failed can't store message")
+                        logger.error("Message with tid \(String(describing: sentMessage?.tid)) build failed can't store message")
                         completion?(error)
                         return
                     }
-                    log.info("Message with tid \(sentMessage.tid), id \(sentMessage.id) will store in db")
+                     logger.info("Message with tid \(sentMessage.tid), id \(sentMessage.id) will store in db")
                     self.database.write ({
-                        let ownerChannel =
                         $0.createOrUpdate(
                             message: sentMessage,
                             channelId: self.channelId
-                        ).ownerChannel
-                        if let ownerChannel,
+                        )
+                        if let ownerChannel = ChannelDTO.fetch(id: self.channelId, context: $0),
                            ownerChannel.lastDisplayedMessageId < Int64(sentMessage.id) {
                             ownerChannel.lastDisplayedMessageId = Int64(sentMessage.id)
                         }
@@ -177,13 +176,13 @@ open class ChannelMessageSender: Provider {
                 }
                 switch message.state {
                 case .none:
-                    log.info("Resending message with tid \(chatMessage.tid)")
+                     logger.info("Resending message with tid \(chatMessage.tid)")
                     self.channelOperator.resendMessage(sendableMessage, completion: callback(sentMessage:error:))
                 case .edited:
-                    log.info("Reediting message with tid \(chatMessage.tid)")
+                     logger.info("Reediting message with tid \(chatMessage.tid)")
                     self.channelOperator.editMessage(sendableMessage, completion: callback(sentMessage:error:))
                 case .deleted:
-                    log.info("Redeleting message with tid \(chatMessage.tid)")
+                     logger.info("Redeleting message with tid \(chatMessage.tid)")
                     self.channelOperator.deleteMessage(sendableMessage, forMe: true, completion: callback(sentMessage:error:))
                 }
             }

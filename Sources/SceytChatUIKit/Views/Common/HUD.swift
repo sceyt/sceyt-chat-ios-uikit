@@ -32,16 +32,20 @@ open class KitHUD: View, HUD {
     static var hud: KitHUD? { window.subviews.first(where: { $0 is KitHUD }) as? KitHUD }
     
     public static func show() {
-        var hud = hud
-        if hud == nil {
-            hud = KitHUD().withoutAutoresizingMask
+        DispatchQueue.main.async {
+            var hud = hud
+            if hud == nil {
+                hud = KitHUD().withoutAutoresizingMask
+            }
+            window.addSubview(hud!)
+            hud?.pin(to: window)
         }
-        window.addSubview(hud!)
-        hud?.pin(to: window)
     }
     
     public static func hide() {
-        hud?.removeFromSuperview()
+        DispatchQueue.main.async {
+            hud?.removeFromSuperview()
+        }
     }
     
     open lazy var activityIndicator = UIActivityIndicatorView(style: .large)

@@ -85,7 +85,7 @@ open class MessageLayoutModel {
                 height: _measureSize.height + contentInsets.top + contentInsets.bottom)
         }
     }
-    public var isFirstUnreadMessage: Bool {
+    public var isLastDisplayedMessage: Bool {
         lastDisplayedMessageId != 0 && lastDisplayedMessageId == message.id
     }
     
@@ -498,7 +498,7 @@ open class MessageLayoutModel {
     
     open class func attachmentLayout(message: ChatMessage, channel: ChatChannel) -> [AttachmentLayout] {
         (message.attachments?.compactMap {
-            log.verbose("[Attachment] attachmentLayout attachment \($0.description)")
+            logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
             let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel)
             return layout.type == .link ? nil : layout
         } ?? [])
@@ -512,7 +512,7 @@ open class MessageLayoutModel {
     open func updateAttachmentLayouts(message: ChatMessage) {
         attachments =
         (message.attachments?.compactMap { attachment in
-            log.verbose("[Attachment] attachmentLayout update attachment \(attachment.description)")
+            logger.verbose("[Attachment] attachmentLayout update attachment \(attachment.description)")
             if let index = attachments.firstIndex(where: { $0.attachment == attachment }) {
                 attachments[index].update(attachment: attachment)
                 return attachments[index]
@@ -581,7 +581,7 @@ open class MessageLayoutModel {
                         let mention = NSAttributedString(string: Config.mentionSymbol + user.displayName,
                                                          attributes: attributes)
                         guard text.length >= pos.loc + pos.len else {
-                            log.error("Something wrong❗️❗️, body: \(text.string) mention: \(mention.string) pos: \(pos.loc), \(pos.len) user: \(pos.id)")
+                            logger.error("Something wrong❗️❗️, body: \(text.string) mention: \(mention.string) pos: \(pos.loc), \(pos.len) user: \(pos.id)")
                             continue
                         }
                         text.safeReplaceCharacters(in: .init(location: pos.loc, length: pos.len), with: mention)
@@ -910,18 +910,18 @@ extension MessageLayoutModel {
                 voiceWaveform = attachment.voiceDecodedMetadata?.thumbnail.map { Float($0) }
             case .image, .video:
                 if let path = fileProvider.thumbnailFile(for: attachment, preferred: thumbnailSize) {
-                    log.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
+                    logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
                         thumbnail = UIImage(data: data)
                         isThumbnailLoadedFromFile = true
                     } catch {
-                        log.errorIfNotNil(error, "load image from path \(path)")
+                        logger.errorIfNotNil(error, "load image from path \(path)")
                     }
                 }
                 if thumbnail == nil {
                     let metadata = attachment.imageDecodedMetadata
-                    log.verbose("[Attachment] thumbnail is nil make from metadata \(attachment.description)")
+                    logger.verbose("[Attachment] thumbnail is nil make from metadata \(attachment.description)")
                     if let data = metadata?.thumbnailImage {
                         thumbnail = data
                     } else if let base64 = metadata?.thumbnail,
@@ -933,13 +933,13 @@ extension MessageLayoutModel {
                 }
             case .file:
                 if let path = fileProvider.thumbnailFile(for: attachment, preferred: thumbnailSize) {
-                    log.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
+                    logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
                         thumbnail = UIImage(data: data)
                         isThumbnailLoadedFromFile = true
                     } catch {
-                        log.errorIfNotNil(error, "load image from path \(path)")
+                        logger.errorIfNotNil(error, "load image from path \(path)")
                     }
                 }
                 if thumbnail == nil {
@@ -981,7 +981,10 @@ extension MessageLayoutModel {
                     data.width > 0,
                     data.height > 0 {
                     let thumbnailSize = CGSize(width: data.width, height: data.height)
-                    size = preferredImageSize(maxSize: defaults.imageAttachmentSize.width, imageSize: thumbnailSize)
+                    size = preferredImageSize(
+                        maxSize: defaults.imageAttachmentSize.width,
+                        imageSize: thumbnailSize,
+                        minSize: type == .video ? 120 : nil)
                 } else {
                     size = defaults.imageAttachmentSize
                 }
@@ -993,7 +996,7 @@ extension MessageLayoutModel {
                 config.font = MessageCell.appearance.attachmentFileNameFont
                 let nameWidth = TextSizeMeasure.calculateSize(
                     of: name,
-                    config: config).textSize.width + 10
+                    config: config).textSize.width
                 config.font = MessageCell.appearance.attachmentFileSizeFont
                 var sizeWidth = TextSizeMeasure.calculateSize(
                     of: "\(fileSize) • \(fileSize)",
@@ -1001,7 +1004,7 @@ extension MessageLayoutModel {
                 if let ownerChannel, let ownerMessage {
                     sizeWidth += MessageCell.InfoView.measure(channel: ownerChannel, message: ownerMessage, appearance: MessageCell.appearance).width
                 }
-                size.width = min(size.width, max(nameWidth, sizeWidth) + MessageCell.Layouts.attachmentIconSize + MessageCell.Layouts.horizontalPadding * 2)
+                size.width = min(size.width, max(nameWidth, sizeWidth) + MessageCell.Layouts.attachmentIconSize + MessageCell.Layouts.horizontalPadding * 3)
             case .voice:
                 size.height = defaults.audioAttachmentSize.height
             case .link:
@@ -1010,16 +1013,19 @@ extension MessageLayoutModel {
             return size
         }
         
-        private func preferredImageSize(maxSize: CGFloat, imageSize: CGSize) -> CGSize {
+        private func preferredImageSize(maxSize: CGFloat, imageSize: CGSize, minSize: CGFloat? = nil) -> CGSize {
             let coefficient = imageSize.width / imageSize.height
             var scaleWidth = maxSize
             var scaleHeight = maxSize
             
             if !coefficient.isNaN, coefficient != 1 {
-                let minSize = maxSize / 3.0
+                var _minSize = maxSize / 3.0
+                if let minSize {
+                    _minSize = max(_minSize, minSize)
+                }
                 if (imageSize.width > imageSize.height) {
                     let height = maxSize / coefficient
-                    scaleHeight = height >= minSize ? height : minSize
+                    scaleHeight = height >= _minSize ? height : _minSize
                 } else {
                     let futureW = maxSize * coefficient
                     let coefficientWidth = futureW / maxSize
@@ -1030,7 +1036,7 @@ extension MessageLayoutModel {
                     }
                     
                     let width = preferredMaxSize * coefficient
-                    scaleWidth = width >= minSize ? width : minSize
+                    scaleWidth = width >= _minSize ? width : _minSize
                     scaleHeight = preferredMaxSize
                 }
             }
@@ -1166,11 +1172,10 @@ extension MessageLayoutModel {
 extension MessageLayoutModel: Hashable, Equatable {
     
     public static func == (lhs: MessageLayoutModel, rhs: MessageLayoutModel) -> Bool {
-        lhs.channel == rhs.channel && lhs.message == rhs.message
+        lhs.message == rhs.message
     }
     
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(channel)
         hasher.combine(message)
     }
     

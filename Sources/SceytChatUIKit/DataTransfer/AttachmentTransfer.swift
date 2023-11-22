@@ -181,7 +181,7 @@ open class AttachmentTransfer: Provider {
                 completion?(message, nil)
                 return
             }
-            log.verbose("[Attachment] downloadMessageAttachments \(attachments.map { $0.description })")
+            logger.verbose("[Attachment] downloadMessageAttachments \(attachments.map { $0.description })")
             if let dataSession = Components.dataSession {
                 var tasks = [SCTDataSessionTaskInfo]()
                 let existTasks = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid]
@@ -192,7 +192,7 @@ open class AttachmentTransfer: Provider {
                     if existTasks?.contains(where: { $0.attachment.url == attachment.url }) == true || fileProvider.filePath(attachment: attachment) != nil {
                         let key = Self.key(message: message, attachment: attachment)
                         self.downloadCallbackCache[key] = [.init(callback: completion)]
-                        log.verbose("[Attachment] downloadMessageAttachments: Task already exist \(attachments.map { $0.description })")
+                        logger.verbose("[Attachment] downloadMessageAttachments: Task already exist \(attachments.map { $0.description })")
                         continue
                     }
                     attachment.status = .downloading
@@ -217,8 +217,8 @@ open class AttachmentTransfer: Provider {
                     $0.update(chatMessage: message, attachments: attachments)
                 }
                 if let infos = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] {
-                    log.verbose("[AWSS3] Download error \(infos.map { $0.attachment.url}) \(message.id)")
-                    log.verbose("[AWSS3] Download error new \(tasks.map { $0.attachment.url}) \(tasks.map { $0.message.id})")
+                    logger.verbose("[AWSS3] Download error \(infos.map { $0.attachment.url}) \(message.id)")
+                    logger.verbose("[AWSS3] Download error new \(tasks.map { $0.attachment.url}) \(tasks.map { $0.message.id})")
                 }
                 self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] = tasks
                 self.handle(tasks: tasks, message: message, attachments: attachments, completion: completion)
@@ -327,7 +327,7 @@ open class AttachmentTransfer: Provider {
                 attachment: taskInfo.attachment,
                 progress: progress
             )
-            log.verbose("[AWSSTASK] onProgress KEY \(key)")
+            logger.verbose("[AWSSTASK] onProgress KEY \(key)")
             if let blocks = self.cache[key] {
                 blocks.forEach {
                     $0.progress?(attachmentProgress)
@@ -342,7 +342,7 @@ open class AttachmentTransfer: Provider {
             error: Error? = nil
         ) {
             let key = Self.key(message: taskInfo.message, attachment: taskInfo.attachment)
-            log.verbose("[AWSSTASK] onCompletion KEY \(key)")
+            logger.verbose("[AWSSTASK] onCompletion KEY \(key)")
             if let blocks = self.cache[key] {
                 let attachmentCompletion = AttachmentCompletion(
                     message: message,
@@ -362,10 +362,10 @@ open class AttachmentTransfer: Provider {
                     case .updateProgress(let progress):
                         onProgress(progress, taskInfo: taskInfo)
                     case .updateLocalFileURL(let url, let filePath):
-                        log.verbose("[AWSS3] Handle updateLocalFileURL \(url)")
+                        logger.verbose("[AWSS3] Handle updateLocalFileURL \(url)")
                         if attachments.indices.contains(index) {
                             let atch = attachments[index]
-                            log.verbose("[AWSS3] Handle updateLocalFileURL found \(String(describing: atch.url))")
+                            logger.verbose("[AWSS3] Handle updateLocalFileURL found \(String(describing: atch.url))")
                             if let builder = Components.imageBuilder.init(imageUrl: url) {
                                 if let decodedMetadata = atch.imageDecodedMetadata {
                                     atch.metadata =
@@ -394,44 +394,44 @@ open class AttachmentTransfer: Provider {
                             taskInfo.attachment = atch
                             self.database.write {
                                 if let filePath {
-                                    log.verbose("[AWSS3] Handle updateLocalFileURL file by filePath \(String(describing: atch.url))")
+                                    logger.verbose("[AWSS3] Handle updateLocalFileURL file by filePath \(String(describing: atch.url))")
                                     $0.updateAttachment(with: filePath, chatMessage: message, attachment: atch)
                                 } else {
-                                    log.verbose("[AWSS3] Handle updateLocalFileURL file by [] \(String(describing: atch.url))")
+                                    logger.verbose("[AWSS3] Handle updateLocalFileURL file by [] \(String(describing: atch.url))")
                                     $0.update(chatMessage: message, attachments: [atch])
                                 }
                             }
                         }
                     case .successURL(let url):
-                        log.verbose("[AWSS3] Handle successURL  \(url)")
+                        logger.verbose("[AWSS3] Handle successURL  \(url)")
                         let uri = url.absoluteString
                         if attachments.indices.contains(index) {
                             let atch = attachments[index]
-                            log.verbose("[AWSS3] Handle successURL  found \(String(describing: atch.url))")
+                            logger.verbose("[AWSS3] Handle successURL  found \(String(describing: atch.url))")
                             atch.url = uri
                             atch.transferProgress = 1
                             atch.status = .done
                             onCompletion(taskInfo: taskInfo, attachment: atch)
                         }
-                        log.verbose("receive successURL \(uri)")
+                        logger.verbose("receive successURL \(uri)")
                         didEndTask(taskInfo: taskInfo, error: nil)
                     case .successURI(let uri):
-                        log.verbose("[AWSS3] Handle successURI  \(uri)")
+                        logger.verbose("[AWSS3] Handle successURI  \(uri)")
                         if attachments.indices.contains(index) {
                             let atch = attachments[index]
-                            log.verbose("[AWSS3] Handle successURI  found \(String(describing: atch.url))")
+                            logger.verbose("[AWSS3] Handle successURI  found \(String(describing: atch.url))")
                             atch.url = uri
                             atch.transferProgress = 1
                             atch.status = .done
                             onCompletion(taskInfo: taskInfo, attachment: atch)
                         }
-                        log.verbose("receive successURI \(uri)")
+                        logger.verbose("receive successURI \(uri)")
                         didEndTask(taskInfo: taskInfo, error: nil)
                     case .failure(let error):
-                        log.errorIfNotNil(error, "Attachment transfer")
+                        logger.errorIfNotNil(error, "Attachment transfer")
                         if attachments.indices.contains(index) {
                             let atch = attachments[index]
-                            log.verbose("[AWSS3] Handle failure  found \(String(describing: atch.url))")
+                            logger.verbose("[AWSS3] Handle failure  found \(String(describing: atch.url))")
                             switch taskInfo.transferType {
                             case .download:
                                 if atch.status != .pauseDownloading {
@@ -444,7 +444,7 @@ open class AttachmentTransfer: Provider {
                             }
                             onCompletion(taskInfo: taskInfo, attachment: atch, error: error)
                         }
-                        log.errorIfNotNil(error, "receive failure")
+                        logger.errorIfNotNil(error, "receive failure")
                         didEndTask(taskInfo: taskInfo, error: error)
                     }
                 }
@@ -464,7 +464,7 @@ open class AttachmentTransfer: Provider {
                 case .upload:
                     if let callbacks = self.uploadCallbackCache[key] {
                         for callback in callbacks {
-                            log.verbose("[AttachmentTransfer] Handle didEndTask  uploadCallbackCache \(callback)")
+                            logger.verbose("[AttachmentTransfer] Handle didEndTask  uploadCallbackCache \(callback)")
                             callback.callback?(storedMessage ?? message, error)
                         }
                         self.uploadCallbackCache[key] = nil
@@ -473,7 +473,7 @@ open class AttachmentTransfer: Provider {
                     if let callbacks = self.downloadCallbackCache[key] {
                         for callback in callbacks {
 
-                            log.verbose("[AttachmentTransfer] Handle didEndTask  downloadCallbackCache \(callback)")
+                            logger.verbose("[AttachmentTransfer] Handle didEndTask  downloadCallbackCache \(callback)")
                             callback.callback?(storedMessage ?? message, error)
                         }
                         self.downloadCallbackCache[key] = nil
@@ -481,7 +481,7 @@ open class AttachmentTransfer: Provider {
                 }
             }
             if let taskInfos = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] {
-                log.verbose("[AWSS3] Handle didEndTask  taskInfos \(taskInfos.map { $0.attachment.url})")
+                logger.verbose("[AWSS3] Handle didEndTask  taskInfos \(taskInfos.map { $0.attachment.url})")
                 self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] = nil
             }
             

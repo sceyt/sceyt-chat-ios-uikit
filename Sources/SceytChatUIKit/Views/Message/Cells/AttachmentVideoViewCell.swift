@@ -77,7 +77,7 @@ extension MessageCell {
                     imageView.image = data.thumbnail
                     data.onLoadThumbnail = { [weak self] thumbnail in
                         guard let self else {
-                            log.verbose("[Attachment] onLoadThumbnail self is nil")
+                            logger.verbose("[Attachment] onLoadThumbnail self is nil")
                             return
                         }
                         self.imageView.image = thumbnail

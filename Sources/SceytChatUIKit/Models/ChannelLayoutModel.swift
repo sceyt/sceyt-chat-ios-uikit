@@ -53,9 +53,9 @@ open class ChannelLayoutModel {
     
     required public init(channel: ChatChannel) {
         self.channel = channel
-        formatedSubject = createFormatedSubject()
-        formatedDate = createFormatedDate()
-        formatedUnreadCount = createFormatedUnreadCount()
+        formatedSubject = createFormattedSubject()
+        formatedDate = createFormattedDate()
+        formatedUnreadCount = createFormattedUnreadCount()
         if let message = createDraftMessageIfNeeded() {
             attributedView = message
         } else {
@@ -73,6 +73,7 @@ open class ChannelLayoutModel {
         channel.lastMessage?.state != selfChannel.lastMessage?.state ||
         channel.lastMessage?.updatedAt != selfChannel.lastMessage?.updatedAt ||
         channel.lastReaction?.id != selfChannel.lastReaction?.id ||
+        channel.lastReaction?.message?.id != selfChannel.lastReaction?.message?.id ||
         channel.lastMessage?.deliveryStatus != selfChannel.lastMessage?.deliveryStatus
         
         self.channel = channel
@@ -80,9 +81,9 @@ open class ChannelLayoutModel {
         if channel.imageUrl != selfChannel.imageUrl {
             loadAvatar()
         }
-        formatedSubject = createFormatedSubject()
-        formatedDate = createFormatedDate()
-        formatedUnreadCount = createFormatedUnreadCount()
+        formatedSubject = createFormattedSubject()
+        formatedDate = createFormattedDate()
+        formatedUnreadCount = createFormattedUnreadCount()
         
         if update {
             if let message = createDraftMessageIfNeeded() {
@@ -98,6 +99,7 @@ open class ChannelLayoutModel {
         if let members = channel.members,
             let index = members.firstIndex(where: {$0.id == user.id}) {
             let currentUser = members[index]
+            let shouldUpdateAvatar = currentUser.avatarUrl != user.avatarUrl
             currentUser.firstName = user.firstName
             currentUser.lastName = user.lastName
             currentUser.avatarUrl = user.avatarUrl
@@ -105,6 +107,9 @@ open class ChannelLayoutModel {
             currentUser.presence = user.presence
             currentUser.state = user.state
             formatedSubject = Formatters.channelDisplayName.format(channel)
+            if shouldUpdateAvatar {
+                loadAvatar()
+            }
         }
     }
     
@@ -163,7 +168,7 @@ open class ChannelLayoutModel {
                         let mention = NSAttributedString(string: Config.mentionSymbol + user.1,
                                                          attributes: attributes)
                         guard text.length >= pos.loc + pos.len else {
-                            debugPrint("Something wrong❗️❗️❗️", "body:", text.string, "mention:", mention.string, "pos:", pos.loc, pos.len, "user:", pos.id)
+                            logger.debug("Something wrong❗️❗️❗️body: \(text.string) mention: \(mention.string) pos: \(pos.loc) \(pos.len) user: \(pos.id)")
                             continue
                         }
                         text.safeReplaceCharacters(in: .init(location: pos.loc, length: pos.len), with: mention)
@@ -329,11 +334,11 @@ open class ChannelLayoutModel {
         return text
     }
     
-    open func createFormatedSubject() -> String {
+    open func createFormattedSubject() -> String {
         Formatters.channelDisplayName.format(channel)
     }
     
-    open func createFormatedDate() -> String {
+    open func createFormattedDate() -> String {
         if hasReaction,
            let message = channel.lastReaction?.message {
             return Formatters.channelTimestamp.format(message.updatedAt ?? message.createdAt )
@@ -344,7 +349,7 @@ open class ChannelLayoutModel {
         return Formatters.channelTimestamp.format(channel.updatedAt ?? channel.createdAt )
     }
     
-    open func createFormatedUnreadCount() -> String {
+    open func createFormattedUnreadCount() -> String {
         Formatters
             .channelUnreadMessageCount
             .format(channel.newMessageCount)

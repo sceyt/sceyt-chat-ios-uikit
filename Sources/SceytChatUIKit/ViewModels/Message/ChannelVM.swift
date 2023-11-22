@@ -36,7 +36,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     public let presenceProvider = PresenceProvider.default
-    public lazy var messageFetchPredicate = NSPredicate(format: "(channelId == %lld OR (channelId == 0 AND ownerChannel.id == %lld)) AND repliedInThread == false AND replied == false AND unlisted == false", channel.id, channel.id)
+    public lazy var messageFetchPredicate = NSPredicate(format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false", channel.id)
     
     //MARK: Message observer
     open lazy var messageObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> = {
@@ -71,12 +71,12 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 .fetch(predicate: .init(format: "id == %lld", channel.id))
                 .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)])
                 .relationshipKeyPathsFor(refreshing: [
-                    #keyPath(ChannelDTO.members.user),
-                    #keyPath(ChannelDTO.members.user.blocked),
-                    #keyPath(ChannelDTO.members.user.state),
-                    #keyPath(ChannelDTO.members.user.firstName),
-                    #keyPath(ChannelDTO.members.user.lastName),
-                    #keyPath(ChannelDTO.members.user.avatarUrl)
+//                    #keyPath(ChannelDTO.members.user),
+//                    #keyPath(ChannelDTO.members.user.blocked),
+//                    #keyPath(ChannelDTO.members.user.state),
+//                    #keyPath(ChannelDTO.members.user.firstName),
+//                    #keyPath(ChannelDTO.members.user.lastName),
+//                    #keyPath(ChannelDTO.members.user.avatarUrl)
                 ]),
             context: Config.database.viewContext
         ) { $0.convert() }
@@ -135,6 +135,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     @Atomic private var lasMarkDisplayedMessageId: MessageId = 0
     @Atomic private var lastPendingMarkDisplayedMessageId: MessageId = 0
     @Atomic private var isAppActive: Bool = true
+    @Atomic private var isRestartingMessageObserver: Bool = false
     
     //MARK: required init
     public required init(
@@ -200,7 +201,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     //MARK: deinit
     deinit {
-        log.verbose("ChannelVM deinit for channel \(channel.id)")
+        logger.verbose("ChannelVM deinit for channel \(channel.id)")
         channelObserver.stopObserver()
         messageObserver.stopObserver()
 //        unsubscribeToPeerPresence()
@@ -256,8 +257,50 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             }
             
         } catch {
-            debugPrint("observer.startObserver", error)
+            logger.errorIfNotNil(error, "observer.startObserver")
         }
+    }
+    
+    open func updateUserInfo(
+        indexPath: IndexPath,
+        message: ChatMessage,
+        prevIndexPath: IndexPath?,
+        prevMessage: ChatMessage?,
+        nextIndexPath: IndexPath?,
+        nextMessage: ChatMessage?) {
+            guard channel.isGroup
+            else { return }
+            if indexPath.item == 0 {
+                if message.incoming {
+                    layoutModel(for: message)?.showUserInfo(true)
+                    if let nextMessage, let nextModel = layoutModel(for: nextMessage) {
+                        if nextMessage.user.id == message.user.id {
+                            nextModel.showUserInfo(false)
+                        }
+                    }
+                }
+                return
+            }
+            
+            if let prevMessage, let _ = layoutModel(for: prevMessage) {
+                if prevMessage.user.id != message.user.id {
+                    layoutModel(for: message)?.showUserInfo(true)
+                } else {
+//                    layoutModel(for: message)?.showUserInfo(false)
+                }
+            }
+            
+            if let nextMessage, let nextModel = layoutModel(for: nextMessage) {
+                if nextMessage.user.id == message.user.id {
+                    nextModel.showUserInfo(false)
+                }
+            }
+            
+            if let model = layoutModel(for: message), model.isLastDisplayedMessage {
+                if let nextMessage, let nextModel = layoutModel(for: nextMessage) {
+                    nextModel.showUserInfo(true)
+                }
+            }
     }
     
     open func onWillChangeEvent(
@@ -273,68 +316,44 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         
         func updateUserInfo(indexPath: IndexPath, message: ChatMessage) {
-            guard channel.isGroup
-            else { return }
-            if !message.incoming {
-                var next = indexPath
-                next.item += 1
-                if let nextMessage = cachedMessage(next) {
-                    if let nextModel = layoutModel(for: nextMessage),
-                       nextMessage.user.id != message.user.id || layoutModel(for: message)?.isFirstUnreadMessage == true {
-                        nextModel.showUserInfo(true)
-                    }
-                }
-                return
-            }
-            if indexPath.item == 0 {
-                let currentModel = layoutModel(for: message)
-                currentModel?.showUserInfo(true)
-                var next = indexPath
-                next.item += 1
-                if let nextMessage = cachedMessage(next) {
-                    if currentModel?.isFirstUnreadMessage == true {
-                        layoutModel(for: nextMessage)?.showUserInfo(true)
-                    } else if nextMessage.user.id == message.user.id {
-                        layoutModel(for: nextMessage)?.showUserInfo(false)
-                    }
-                }
-            } else {
-                var prev = indexPath
-                prev.item -= 1
-                if let prevMessage = cachedMessage(prev) {
-                    if prevMessage.user.id != message.user.id || layoutModel(for: prevMessage)?.isFirstUnreadMessage == true {
-                        layoutModel(for: message)?.showUserInfo(true)
-                    }
-                }
-                var next = indexPath
-                next.item += 1
-                if let nextMessage = cachedMessage(next) {
-                    if nextMessage.user.id == message.user.id && layoutModel(for: message)?.isFirstUnreadMessage == false {
-                        layoutModel(for: nextMessage)?.showUserInfo(false)
-                    } else {
-                        log.debug("[AVATAR] next \(nextMessage.user.id), cur: \(message.user.id) is vis: \(layoutModel(for: nextMessage)?.showUserInfo as Any)")
-                        layoutModel(for: nextMessage)?.showUserInfo(true)
-                    }
-                }
-            }
+            let nextIndexPath = IndexPath(item: indexPath.item + 1, section: indexPath.section)
+            let prevIndexPath = IndexPath(item: indexPath.item - 1, section: indexPath.section)
+            
+            let prevMessage = cachedMessage(prevIndexPath)
+            let nextMessage = cachedMessage(nextIndexPath)
+            self.updateUserInfo(
+                indexPath: indexPath,
+                message: message,
+                prevIndexPath: prevMessage == nil ? nil : prevIndexPath,
+                prevMessage: prevMessage,
+                nextIndexPath: nextMessage == nil ? nil : nextIndexPath,
+                nextMessage: nextMessage
+            )
         }
         
         for item in changeItems.reversed() {
             switch item {
             case let .insert(indexPath, message):
-                updateUserInfo(indexPath: indexPath, message: message)
+                updateUserInfo(indexPath: indexPath, message: cachedMessage(indexPath) ?? message)
             case let .move(fromIndexPath, toIndexPath, _):
                 if let message = cachedMessage(fromIndexPath) {
-                    updateUserInfo(indexPath: fromIndexPath, message: message)
+                    updateUserInfo(indexPath: fromIndexPath, message: cachedMessage(fromIndexPath) ?? message)
                 }
                 if let message = cachedMessage(toIndexPath) {
-                    updateUserInfo(indexPath: toIndexPath, message: message)
+                    updateUserInfo(indexPath: toIndexPath, message: cachedMessage(toIndexPath) ?? message)
                 }
             case .delete:
                 break
-            case .update:
-//                updateUserInfo(indexPath: indexPath, message: message)
+            case let .update(indexPath, message):
+                updateUserInfo(indexPath: indexPath, message: message)
                 break
+            }
+        }
+        
+        if var max = changeItems.last?.indexPath, max.item > 0 {
+            max.item += 1
+            if let message = cachedMessage(max) {
+                updateUserInfo(indexPath: max, message: message)
             }
         }
         return makeEvents(cache: cache, items: items)
@@ -474,6 +493,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         events: [Event]) {
             if numberOfSections == 0 {
                 event = .showNoMessage
+            }
+            if isRestartingMessageObserver {
+                event = .reloadData
+                return
             }
             if isAppActive {
                 events.forEach {
@@ -682,15 +705,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             loadPrevMessages(before: MessageId(Int64.max))
         } else {
             if isThread || channel.lastMessage?.incoming == false || lastDisplayedMessageId == 0 {
-                log.info("ChannelVM loadLastMessages (prev) channel id: \(channel.id), lastMessage id \(channel.lastMessage?.id as Any)")
-                provider.loadPrevMessages(before: channel.lastMessage?.id ?? MessageId(Int64.max)) {[weak self] error in
-                    if error == nil, let self {
-                        //MARK: Force sync last messages to fix context observing for unlisted
-                        self.messageObserver.load(from: self.messageObserver.fetchOffset, limit: 30)
-                    }
-                }
+                logger.info("ChannelVM loadLastMessages (prev) channel id: \(channel.id), lastMessage id \(channel.lastMessage?.id as Any)")
+                provider.loadPrevMessages(before: channel.lastMessage?.id ?? MessageId(Int64.max))
             } else {
-                log.info("ChannelVM loadLastMessages (near) channel id: \(channel.id), lastDisplayedMessageId \(lastDisplayedMessageId)")
+                logger.info("ChannelVM loadLastMessages (near) channel id: \(channel.id), lastDisplayedMessageId \(lastDisplayedMessageId)")
                 provider.loadNearMessages(near: lastDisplayedMessageId)
             }
         }
@@ -709,7 +727,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     ) {
         guard let message = message(at: indexPath)
         else { return }
-        log.info("ChannelVM loadLastMessages (next) channel id: \(channel.id), \(indexPath) lastDisplayedMessageId \(message.id) \(message.body)")
+        logger.info("ChannelVM loadLastMessages (next) channel id: \(channel.id), \(indexPath) lastDisplayedMessageId \(message.id) \(message.body)")
         if message.id == 0 {
             loadPrevMessages(before: MessageId(Int64.max))
         } else {
@@ -797,7 +815,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             
             guard let message, self.lasMarkDisplayedMessageId != message.id
             else { return }
-            log.verbose("[MARKER CHECK], ChannelVM markMessageAsDisplayed from message id: \(message.id), \(message.body), last: \(self.lasMarkDisplayedMessageId)")
+            logger.verbose("[MARKER CHECK], ChannelVM markMessageAsDisplayed from message id: \(message.id), \(message.body), last: \(self.lasMarkDisplayedMessageId)")
             let prevLasMarkDisplayedMessageId = self.lasMarkDisplayedMessageId
             self.lasMarkDisplayedMessageId = message.id
             let semafore = DispatchSemaphore(value: 1)
@@ -836,7 +854,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if userMessage.text.count < 10 || userMessage.text.count > 0 && (userMessage.text as NSString).length == 0 {
             let data = Data(userMessage.text.utf8)
             let hexString = data.map{ String(format:"%02x", $0) }.joined()
-            log.verbose("[EMPTY] Prepare Send text message by hex [\(hexString)] orig [\(userMessage.text)]")
+            logger.verbose("[EMPTY] Prepare Send text message by hex [\(hexString)] orig [\(userMessage.text)]")
         }
         if case let .edit(message) = userMessage.action,
            message.body == userMessage.text {
@@ -1065,7 +1083,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     open func report(layoutModel: MessageLayoutModel) {
         // TODO: Report Message
-        log.debug("Report Message")
+        logger.debug("Report Message")
     }
     
     open func updateDraftMessage(_ message: NSAttributedString?) {
@@ -1438,10 +1456,14 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.messageSender = Components.channelMessageSender
                 .init(channelId: channel.id, threadMessageId: self.threadMessage?.id)
             self.messageMarkerProvider = Components.channelMessageMarkerProvider.init(channelId: channel.id)
-            self.messageFetchPredicate = NSPredicate(format: "(channelId == %lld OR (channelId == 0 AND ownerChannel.id == %lld)) AND repliedInThread == false AND replied == false AND unlisted == false", channel.id, channel.id)
+            self.messageFetchPredicate = NSPredicate(format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false", channel.id, channel.id)
             self.channelProvider = Components.channelProvider
                 .init(channelId: channel.id)
-            try? self.messageObserver.restartObserver(fetchPredicate: self.messageFetchPredicate)
+            isRestartingMessageObserver = true
+            try? self.messageObserver.restartObserver(fetchPredicate: self.messageFetchPredicate) {[weak self] in
+                self?.isRestartingMessageObserver = false
+                
+            }
             self.channel = channel
             for model in self.layoutModels.values {
                 model.replace(channel: channel)

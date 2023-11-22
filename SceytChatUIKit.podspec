@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name         = "SceytChatUIKit"
-  s.version      = "1.5.0"
+  s.version      = "1.5.2"
   s.summary      = "Fully customizable UI Kit on top of SceytChat SDK"
   s.description  = "Messaging and Chat API for Mobile Apps and Websites"
   s.homepage     = "https://sceyt.com"

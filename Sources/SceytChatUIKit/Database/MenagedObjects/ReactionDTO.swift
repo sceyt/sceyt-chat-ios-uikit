@@ -40,6 +40,16 @@ public class ReactionDTO: NSManagedObject {
     }
     
     public static func fetch(
+        messageId: MessageId,
+        context: NSManagedObjectContext
+    ) -> [ReactionDTO] {
+        let request = fetchRequest()
+        request.sortDescriptor = NSSortDescriptor(keyPath: \ReactionDTO.key, ascending: false)
+        request.predicate = .init(format: "messageId == %lld", messageId)
+        return fetch(request: request, context: context)
+    }
+    
+    public static func fetch(
         userId: UserId,
         key: String,
         messageId: MessageId,
@@ -106,6 +116,14 @@ public extension ReactionDTO {
             return results.compactMap { $0.values.first.map { ReactionId($0) }}
         }
         return []
+        
+    }
+    
+    static func unownedReactions(messageId: MessageId, context: NSManagedObjectContext) -> [ReactionDTO] {
+        let request = ReactionDTO.fetchRequest()
+        request.sortDescriptor = NSSortDescriptor(keyPath: \ReactionDTO.key, ascending: false)
+        request.predicate = .init(format: "messageId == %lld AND message == NULL", messageId)
+        return fetch(request: request, context: context)
         
     }
 }

@@ -31,17 +31,17 @@ open class ChannelMessageChecksumProvider: Provider {
                 return
             }
             let checksum = Components.storage.checksum(filePath: filePath)
-            log.verbose("[CHECKSUM] create checksum \(checksum) for file \(filePath)")
+            logger.verbose("[CHECKSUM] create checksum \(checksum) for file \(filePath)")
             self.database.read {
                 ChecksumDTO.fetch(checksum: Int64(checksum), context: $0)?
                     .convert()
             } completion: { result in
                 switch result {
                 case .failure(let error):
-                    log.errorIfNotNil(error, "Getting check sum result")
+                    logger.errorIfNotNil(error, "Getting check sum result")
                     completion(nil)
                 case .success(let checksum):
-                    log.verbose("[CHECKSUM] read checksum \(checksum?.checksum ?? -1) for mTid: \(checksum?.messageTid ?? 0), aTid \(checksum?.attachmentTid ?? 0), data: \(checksum?.data ?? "")")
+                    logger.verbose("[CHECKSUM] read checksum \(checksum?.checksum ?? -1) for mTid: \(checksum?.messageTid ?? 0), aTid \(checksum?.attachmentTid ?? 0), data: \(checksum?.data ?? "")")
                     completion(checksum)
                 }
             }
@@ -71,11 +71,11 @@ open class ChannelMessageChecksumProvider: Provider {
                 messageTid: message.tid,
                 attachmentTid: attachment.tid,
                 data: nil)
-            log.verbose("[CHECKSUM] create checksum \(crc) for mTid: \(message.tid), aTid \(attachment.tid)")
+            logger.verbose("[CHECKSUM] create checksum \(crc) for mTid: \(message.tid), aTid \(attachment.tid)")
             self.database.write {
                 $0.createOrUpdate(checksum: checksum)
             } completion: { error in
-                log.errorIfNotNil(error, "Creating check sum result")
+                logger.errorIfNotNil(error, "Creating check sum result")
                 completion?(error)
             }
         }
@@ -98,10 +98,10 @@ open class ChannelMessageChecksumProvider: Provider {
                             var dto = MessageDTO.fetch(tid: message.tid, context: checksum)
                             if dto == nil, message.id > 0 {
                                 dto = MessageDTO.fetch(id: message.id, context: checksum)
-                                log.debug("Found message by tid not found \(message.tid) is fetch by id \(message.id) \(dto != nil)")
+                                logger.debug("Found message by tid not found \(message.tid) is fetch by id \(message.id) \(dto != nil)")
                             }
                             if dto == nil {
-                                log.debug("Found message by tid not found \(message.tid)  will insert new message")
+                                logger.debug("Found message by tid not found \(message.tid)  will insert new message")
                                 dto = checksum.createOrUpdate(message: message.builder.build(), channelId: message.channelId)
                             }
                             return AttachmentDTO.fetch(url: link, context: checksum)?.convert()
@@ -125,9 +125,8 @@ open class ChannelMessageChecksumProvider: Provider {
                                         }
                                         context.update(chatMessage: message, attachments: attachments)
                                     } completion: { [weak self] error in
-                                        guard let self else { return }
                                         if let error {
-                                            log.debug("Update Attachments error: \(error.localizedDescription)")
+                                            logger.errorIfNotNil(error, "Update Attachments")
                                             completion(.failure(error))
                                         } else {
                                             completion(.success(link))
@@ -137,7 +136,7 @@ open class ChannelMessageChecksumProvider: Provider {
                                     completion(.success(nil))
                                 }
                             case .failure(let error):
-                                log.debug("Getting Attachment by url error: \(error.localizedDescription)")
+                                logger.errorIfNotNil(error, "Getting Attachment by url")
                                 completion(.failure(error))
                             }
                         }
@@ -146,7 +145,6 @@ open class ChannelMessageChecksumProvider: Provider {
                             message: message,
                             attachment: attachment)
                         { [weak self] error in
-                            guard let self else { return }
                             if let error {
                                 completion(.failure(error))
                             } else {

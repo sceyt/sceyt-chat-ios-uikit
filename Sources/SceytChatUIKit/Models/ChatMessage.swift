@@ -138,7 +138,7 @@ public class ChatMessage {
         if let user = dto.user {
             self.user = user.convert()
         } else {
-            log.verbose("Could not get user from db for message id: \(dto.id)")
+            logger.verbose("Could not get user from db for message id: \(dto.id)")
             user = ChatUser(id: "")
         }
         if let changedBy = dto.changedBy {

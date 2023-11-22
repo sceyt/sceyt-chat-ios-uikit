@@ -24,6 +24,8 @@ public struct Formatters {
     public static var messageListSeparator: MessagesListSeparator = DefaultMessagesListSeparator()
     
     public static var messageTimestamp: TimestampFormatter = DefaultMessageTimestampFormatter()
+    
+    public static var messageInfoTimestamp: TimestampFormatter = DetaultMessageInfoTimestampFormatter()
 
     public static var number: NumberFormatter = DefaultNumberFormatter()
     

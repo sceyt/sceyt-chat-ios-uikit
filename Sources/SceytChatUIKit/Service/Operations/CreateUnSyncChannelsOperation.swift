@@ -63,20 +63,20 @@ open class CreateUnSyncChannelsOperation: SyncOperation {
         if !isCancelled {
             fetching = true
             var createdChannel = [ChatChannel]()
-            log.verbose("SyncService: createPendingChannels if Needed")
+            logger.verbose("SyncService: createPendingChannels if Needed")
             let group = DispatchGroup()
             let channelCreator = Components.channelCreator.init()
             group.enter()
             Components.channelListProvider
                 .fetchPendingChannel { channels in
                     for channel in channels {
-                        log.verbose("SyncService: createPendingChannels found channel with members: \(String(describing: channel.members?.map { $0.id }))")
+                        logger.verbose("SyncService: createPendingChannels found channel with members: \(String(describing: channel.members?.map { $0.id }))")
                         group.enter()
                         let localChannelId = channel.id
                         channelCreator
                             .createChannelOnServerIfNeeded(channelId: channel.id) { sceytChannel, error in
-                                log.verbose("SyncService: createPendingChannels did create found channel with members: \(String(describing: sceytChannel?.members?.map { $0.id }))")
-                                log.errorIfNotNil(error, "SyncService: Creating Pending channel")
+                                logger.verbose("SyncService: createPendingChannels did create found channel with members: \(String(describing: sceytChannel?.members?.map { $0.id }))")
+                                logger.errorIfNotNil(error, "SyncService: Creating Pending channel")
                                 if let sceytChannel {
                                     createdChannel.append(sceytChannel)
                                     NotificationCenter.default

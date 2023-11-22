@@ -159,7 +159,7 @@ fileprivate extension EmojiListVM {
             }
             return emojis
         } catch {
-            debugPrint(error)
+            logger.errorIfNotNil(error, "")
         }
         return []
     }

@@ -438,43 +438,43 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     }
     
     open func openPhotoPicker() {
-        log.verbose("[ATTACHMENT] openPhotoPicker")
+        logger.verbose("[ATTACHMENT] openPhotoPicker")
         router.showPhotos(selectedPhotoAssetIdentifiers: selectedPhotoAssetIdentifiers)
         { [unowned self] assets, picker in
-            log.verbose("[ATTACHMENT] did select assets \(assets.count)")
+            logger.verbose("[ATTACHMENT] did select assets \(assets.count)")
             guard !assets.isEmpty else { return true }
             
             let semaphore = DispatchSemaphore(value: 1)
             DispatchQueue.global().async {
-                log.verbose("[ATTACHMENT] Start BG task to create attachments from assets")
+                logger.verbose("[ATTACHMENT] Start BG task to create attachments from assets")
                 assets.forEach { asset in
                     semaphore.wait()
                     AttachmentView.view(from: asset, completion: { [weak self] view in
-                        log.verbose("[ATTACHMENT] created attachment \(view?.name)")
+                        logger.verbose("[ATTACHMENT] created attachment \(view?.name)")
                         guard let self else {
                             semaphore.signal()
                             return
                         }
                         if let view {
                             selectedPhotoAssetIdentifiers.insert(asset.localIdentifier)
-                            log.verbose("[ATTACHMENT] insert attachment in mediaView")
+                            logger.verbose("[ATTACHMENT] insert attachment in mediaView")
                             mediaView.insert(view: view)
                         }
                         semaphore.signal()
                     })
                 }
                 semaphore.wait()
-                log.verbose("[ATTACHMENT] did finish create attachments from assets")
-                log.verbose("[ATTACHMENT] dismiss PhotoVC ")
+                logger.verbose("[ATTACHMENT] did finish create attachments from assets")
+                logger.verbose("[ATTACHMENT] dismiss PhotoVC ")
                 DispatchQueue.main.async { [weak self, weak picker] in
                     guard let self, let picker else {
-                        log.verbose("[ATTACHMENT] dismiss PhotoVC failed")
+                        logger.verbose("[ATTACHMENT] dismiss PhotoVC failed")
                         semaphore.signal()
                         return
                     }
                     inputTextView.becomeFirstResponder()
                     picker.dismiss(animated: true) {
-                        log.verbose("[ATTACHMENT] did dismiss PhotoVC")
+                        logger.verbose("[ATTACHMENT] did dismiss PhotoVC")
                         semaphore.signal()
                     }
                 }

@@ -121,7 +121,11 @@ open class ChannelProfileVoiceCell: CollectionViewCell {
             else { return }
                     
             if let user = attachment.user {
-                titleLabel.text = Formatters.userDisplayName.format(user)
+                if user.id == me {
+                    titleLabel.text = L10n.User.current
+                } else {
+                    titleLabel.text = Formatters.userDisplayName.format(user)
+                }
             } else {
                 titleLabel.text = attachment.userId
             }
@@ -233,7 +237,7 @@ open class ChannelProfileVoiceCell: CollectionViewCell {
             ) { [weak self] progress in
                 guard let self, self.data == data
                 else {
-                    log.verbose("[Attachment] progress self is nil thumbnail load from filePath \(attachment.description)")
+                    logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(attachment.description)")
                     return
                 }
                 
@@ -241,7 +245,7 @@ open class ChannelProfileVoiceCell: CollectionViewCell {
                     self?.progressView.progress = progress.progress
                 }
             } completion: { result in
-                debugPrint("[AWSSTASK] completion", result.attachment.status)
+                logger.debug("[AWSSTASK] completion \(result.attachment.status)")
                 fileProvider.removeProgressObserver(message: result.message, attachment: result.attachment)
             }
     }

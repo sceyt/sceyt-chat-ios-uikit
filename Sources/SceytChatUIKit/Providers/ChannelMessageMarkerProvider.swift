@@ -16,7 +16,7 @@ open class ChannelMessageMarkerProvider: Provider {
     
     public static var canMarkMessage: Bool = true {
         didSet {
-            log.debug("[MARKER CHECK] canMarkMessage: \(canMarkMessage)")
+            logger.debug("[MARKER CHECK] canMarkMessage: \(canMarkMessage)")
             if canMarkMessage {
                 SyncService.sendPendingMarkers()
             }
@@ -45,7 +45,7 @@ open class ChannelMessageMarkerProvider: Provider {
         } completion: { result in
             switch result {
             case .failure(let error):
-                debugPrint(error)
+                logger.errorIfNotNil(error, "")
                 completion?(error)
             case .success(let ids):
                 guard !ids.isEmpty
@@ -70,10 +70,10 @@ open class ChannelMessageMarkerProvider: Provider {
                 var resultError: Error?
                 for chunk in chunked {
                     group.enter()
-                    log.debug("[MARKER CHECK] will mark: \(markerName) to \(chunk) in channelId \(self.channelId)")
+                    logger.debug("[MARKER CHECK] will mark: \(markerName) to \(chunk) in channelId \(self.channelId)")
                     self.mark(ids: Array(chunk), markerName: markerName) { error in
                         resultError = error
-                        log.debug("[MARKER CHECK] did mark: \(markerName) to \(chunk) \(error as Any)")
+                        logger.debug("[MARKER CHECK] did mark: \(markerName) to \(chunk) \(error as Any)")
                         group.leave()
                     }
                 }
@@ -99,8 +99,8 @@ open class ChannelMessageMarkerProvider: Provider {
                 }
                 completion?(error)
             } else if let markerList {
-                print("[MARKER CK] receive ", markerList.messageIds.count)
-                log.debug("[MARKER CHECK] received mark: \(markerList.name) for \(markerList.messageIds) in channelId:\(markerList.channelId)")
+                logger.debug("[MARKER CK] receive \(markerList.messageIds.count)")
+                logger.debug("[MARKER CHECK] received mark: \(markerList.name) for \(markerList.messageIds) in channelId:\(markerList.channelId)")
                 self.database.write ({
                     $0.update(messageSelfMarkers: markerList)
                 }, completion: completion)
@@ -112,7 +112,7 @@ open class ChannelMessageMarkerProvider: Provider {
             completion?(nil)
             return
         }
-        print("[MARKER CK] send ", ids.count)
+        logger.debug("[MARKER CK] send \(ids.count)")
         switch markerName {
         case DefaultMarker.received:
             channelOperator.markMessagesAsReceived(ids: ids.map { NSNumber(value: $0)}, completion: completed(_:error:))

@@ -56,7 +56,7 @@ open class ChannelMemberListProvider: Provider {
             $0.createOrUpdate(
                 members: members, channelId: self.channelId)
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
         }
     }
     
@@ -65,17 +65,17 @@ open class ChannelMemberListProvider: Provider {
             let ids = members.map { $0.id }
             if members.count < queryLimit {
                 if let lastLoadedMemberId {
-                    return NSPredicate(format: "user.id > %@ AND (ANY channels.id == %lld) AND (NOT (user.id IN %@))", lastLoadedMemberId, channelId, ids)
+                    return NSPredicate(format: "user.id > %@ AND (channelId == %lld) AND (NOT (user.id IN %@))", lastLoadedMemberId, channelId, ids)
                 } else {
-                    return NSPredicate(format: "(ANY channels.id == %lld) AND (NOT (user.id IN %@))", channelId, ids)
+                    return NSPredicate(format: "(channelId == %lld) AND (NOT (user.id IN %@))", channelId, ids)
                 }
                 
             }
             if let lastLoadedMemberId {
-                return NSPredicate(format: "(user.id > %@ AND user.id <= %@) AND (ANY channels.id == %lld) AND (NOT (user.id IN %@))", lastLoadedMemberId, ids.last!, channelId, ids)
+                return NSPredicate(format: "(user.id > %@ AND user.id <= %@) AND (channelId == %lld) AND (NOT (user.id IN %@))", lastLoadedMemberId, ids.last!, channelId, ids)
             } else {
                 let max = ids.max() ?? ids.last!
-                return NSPredicate(format: "(user.id <= %@) AND (ANY channels.id == %lld) AND (NOT (user.id IN %@))", max, channelId, ids)
+                return NSPredicate(format: "(user.id <= %@) AND (channelId == %lld) AND (NOT (user.id IN %@))", max, channelId, ids)
             }
             
         }

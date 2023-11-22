@@ -37,7 +37,7 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
                 .relationshipKeyPathsFor(refreshing: [#keyPath(ChannelDTO.lastMessage.deliveryStatus),
                                                       #keyPath(ChannelDTO.lastMessage.updatedAt),
                                                       #keyPath(ChannelDTO.lastMessage.state),
-                                                      #keyPath(ChannelDTO.members.user),
+//                                                      #keyPath(ChannelDTO.members.user),
                                                       #keyPath(ChannelDTO.lastReaction.messageId),
                                                       #keyPath(ChannelDTO.lastReaction.key)]),
             context: Config.database.viewContext
@@ -55,7 +55,7 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
         do {
             try channelObserver.startObserver()
         } catch {
-            debugPrint("observer.startObserver", error)
+            logger.errorIfNotNil(error, "observer.startObserver")
         }
     }
     
@@ -124,7 +124,7 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
                 self.event.send(.reloadSearch)
             }
         } errorBlock: { error in
-            log.error("[search] error \(error)")
+            logger.error("[search] error \(error)")
         }
     }
 }

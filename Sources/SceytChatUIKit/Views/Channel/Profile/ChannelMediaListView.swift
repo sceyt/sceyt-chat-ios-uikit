@@ -113,9 +113,10 @@ open class ChannelMediaListView: ChannelAttachmentListView,
             cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileImageAttachmentCell.self)
         }
         
-        cell.data = mediaViewModel.attachmentLayout(at: indexPath) { [weak cell] in
-            cell?.imageView.image = $0
-        }
+        cell.data = mediaViewModel.attachmentLayout(at: indexPath, onLoadThumbnail: { [weak cell] layout in
+            guard layout == cell?.data else { return }
+            cell?.imageView.image = layout.thumbnail
+        })
         cell.previewer = { [unowned self] in
             previewer?()
         }

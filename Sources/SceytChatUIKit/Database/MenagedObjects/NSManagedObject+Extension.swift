@@ -21,7 +21,7 @@ public extension NSManagedObject {
         do {
             return try context.fetch(request)
         } catch {
-            debugPrint("fetch failed for request \(request) error: \(error)")
+            logger.debug("fetch failed for request \(request) error: \(error)")
         }
         return []
     }

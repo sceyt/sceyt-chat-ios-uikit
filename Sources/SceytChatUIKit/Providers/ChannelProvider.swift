@@ -46,11 +46,11 @@ open class ChannelProvider: Provider {
                     self.database.write {
                         $0.createOrUpdate(channel: channel)
                     } completion: { error in
-                        log.errorIfNotNil(error, "Update channel \(self.channelId) in db")
+                        logger.errorIfNotNil(error, "Update channel \(self.channelId) in db")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Update channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Update channel \(self.channelId)")
                     completion?(error)
                 }
             }
@@ -75,14 +75,14 @@ open class ChannelProvider: Provider {
             { channel, error in
                 guard let channel = channel
                 else {
-                    log.errorIfNotNil(error, "Get channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Get channel \(self.channelId)")
                     completion?(error)
                     return
                 }
                 self.database.write {
                     $0.createOrUpdate(channel: channel)
                 } completion: { error in
-                    log.errorIfNotNil(error, "Update channel \(self.channelId) in db")
+                    logger.errorIfNotNil(error, "Update channel \(self.channelId) in db")
                     completion?(error)
                 }
             }
@@ -95,11 +95,11 @@ open class ChannelProvider: Provider {
                     self.database.write {
                         $0.deleteChannel(id: self.channelId)
                     } completion: { error in
-                        log.errorIfNotNil(error, "Delete channel \(self.channelId) in db")
+                        logger.errorIfNotNil(error, "Delete channel \(self.channelId) in db")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Delete channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Delete channel \(self.channelId)")
                     completion?(error)
                 }
             }
@@ -112,11 +112,11 @@ open class ChannelProvider: Provider {
                     self.database.write {
                         $0.deleteChannel(id: self.channelId)
                     } completion: { error in
-                        log.errorIfNotNil(error, "Delete channel \(self.channelId) in db")
+                        logger.errorIfNotNil(error, "Delete channel \(self.channelId) in db")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Leave channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Leave channel \(self.channelId)")
                     completion?(error)
                 }
             }
@@ -129,11 +129,11 @@ open class ChannelProvider: Provider {
                     self.database.write {
                         $0.deleteChannel(id: self.channelId)
                     } completion: { error in
-                        log.errorIfNotNil(error, "Delete channel \(self.channelId) in db")
+                        logger.errorIfNotNil(error, "Delete channel \(self.channelId) in db")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Block channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Block channel \(self.channelId)")
                     completion?(error)
                 }
             }
@@ -142,7 +142,7 @@ open class ChannelProvider: Provider {
     open func unblock(completion: ((Error?) -> Void)? = nil) {
         channelOperator
             .unblock { error in
-                log.errorIfNotNil(error, "Unblock channel \(self.channelId)")
+                logger.errorIfNotNil(error, "Unblock channel \(self.channelId)")
                 completion?(error)
             }
     }
@@ -157,11 +157,11 @@ open class ChannelProvider: Provider {
                     self.database.write {
                         $0.createOrUpdate(channel: channel)
                     } completion: { error in
-                        log.errorIfNotNil(error, "Store muted channel \(self.channelId) in db with timeInterval \(timeInterval)")
+                        logger.errorIfNotNil(error, "Store muted channel \(self.channelId) in db with timeInterval \(timeInterval)")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Mute channel \(self.channelId) with timeInterval \(timeInterval)")
+                    logger.errorIfNotNil(error, "Mute channel \(self.channelId) with timeInterval \(timeInterval)")
                     completion?(error)
                 }
             })
@@ -176,11 +176,49 @@ open class ChannelProvider: Provider {
                     self.database.write {
                         $0.createOrUpdate(channel: channel)
                     } completion: { error in
-                        log.errorIfNotNil(error, "Store unmuted channel in db \(self.channelId)")
+                        logger.errorIfNotNil(error, "Store unmuted channel in db \(self.channelId)")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Unmute channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Unmute channel \(self.channelId)")
+                    completion?(error)
+                }
+            }
+    }
+    
+    open func pin(
+        completion: ((Error?) -> Void)? = nil
+    ) {
+        channelOperator
+            .pin { channel, error in
+                if let channel = channel {
+                    self.database.write {
+                        $0.createOrUpdate(channel: channel)
+                    } completion: { error in
+                        logger.errorIfNotNil(error, "Store pinned channel in db \(self.channelId)")
+                        completion?(error)
+                    }
+                } else {
+                    logger.errorIfNotNil(error, "Pin channel \(self.channelId)")
+                    completion?(error)
+                }
+            }
+    }
+    
+    open func unpin(
+        completion: ((Error?) -> Void)? = nil
+    ) {
+        channelOperator
+            .unpin { channel, error in
+                if let channel = channel {
+                    self.database.write {
+                        $0.createOrUpdate(channel: channel)
+                    } completion: { error in
+                        logger.errorIfNotNil(error, "Store unpinned channel in db \(self.channelId)")
+                        completion?(error)
+                    }
+                } else {
+                    logger.errorIfNotNil(error, "Unpin channel \(self.channelId)")
                     completion?(error)
                 }
             }
@@ -194,7 +232,7 @@ open class ChannelProvider: Provider {
             database.write {
                 $0.createOrUpdate(channel: channel)
             } completion: { error in
-                log.errorIfNotNil(error, "Store markAs \(read ? "read" : "unread") channel \(self.channelId)")
+                logger.errorIfNotNil(error, "Store markAs \(read ? "read" : "unread") channel \(self.channelId)")
                 completion?(error)
             }
         }
@@ -204,7 +242,7 @@ open class ChannelProvider: Provider {
                 if let channel = channel {
                     _update(channel: channel)
                 } else {
-                    log.errorIfNotNil(error, "Mark as read channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Mark as read channel \(self.channelId)")
                     completion?(error)
                 }
             }
@@ -213,7 +251,7 @@ open class ChannelProvider: Provider {
                 if let channel = channel {
                     _update(channel: channel)
                 } else {
-                    log.errorIfNotNil(error, "Mark as unread channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Mark as unread channel \(self.channelId)")
                     completion?(error)
                 }
             }
@@ -235,14 +273,14 @@ open class ChannelProvider: Provider {
                                 before: currentDate
                             )
                         } catch {
-                            log.errorIfNotNil(error, "Delete all messages from db in channel \(self.channelId) forEveryone: \(forEveryone)")
+                            logger.errorIfNotNil(error, "Delete all messages from db in channel \(self.channelId) forEveryone: \(forEveryone)")
                         }
                     } completion: { error in
-                        log.errorIfNotNil(error, "Delete all messages from db in channel \(self.channelId) forEveryone: \(forEveryone)")
+                        logger.errorIfNotNil(error, "Delete all messages from db in channel \(self.channelId) forEveryone: \(forEveryone)")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Delete all messages from channel \(self.channelId) for forEveryone: \(forEveryone)")
+                    logger.errorIfNotNil(error, "Delete all messages from channel \(self.channelId) for forEveryone: \(forEveryone)")
                     completion?(error)
                 }
             }
@@ -256,10 +294,10 @@ open class ChannelProvider: Provider {
                     self.database.write {
                         $0.createOrUpdate(channel: channel)
                     }  completion: { error in
-                        log.errorIfNotNil(error, "Store channel \(self.channelId) in db")
+                        logger.errorIfNotNil(error, "Store channel \(self.channelId) in db")
                     }
                 } else {
-                    log.errorIfNotNil(error, "Join channel \(self.channelId)")
+                    logger.errorIfNotNil(error, "Join channel \(self.channelId)")
                     completion?(error)
                 }
             }
@@ -280,11 +318,11 @@ open class ChannelProvider: Provider {
                         channelId: self.channelId
                     )
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store channel [members] \(self.channelId) in db")
+                    logger.errorIfNotNil(error, "Store channel [members] \(self.channelId) in db")
                     completion?(error)
                 }
             } else {
-                log.errorIfNotNil(error, "Change owner \(self.channelId)")
+                logger.errorIfNotNil(error, "Change owner \(self.channelId)")
                 completion?(error)
             }
         }
@@ -310,11 +348,11 @@ open class ChannelProvider: Provider {
                         channelId: channel.id
                     )
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store channel [members] \(self.channelId) in db")
+                    logger.errorIfNotNil(error, "Store channel [members] \(self.channelId) in db")
                     completion?(error)
                 }
             } else {
-                log.errorIfNotNil(error, "Set Role \(self.channelId)")
+                logger.errorIfNotNil(error, "Set Role \(self.channelId)")
                 completion?(error)
             }
         }
@@ -342,11 +380,11 @@ open class ChannelProvider: Provider {
                         channelId: channel.id
                     )
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store channel [members] \(self.channelId) in db")
+                    logger.errorIfNotNil(error, "Store channel [members] \(self.channelId) in db")
                     completion?(error)
                 }
             } else {
-                log.errorIfNotNil(error, "Set Role \(self.channelId)")
+                logger.errorIfNotNil(error, "Set Role \(self.channelId)")
                 completion?(error)
             }
         }
@@ -366,11 +404,11 @@ open class ChannelProvider: Provider {
                     )
                     $0.add(members: members, channelId: channel.id)
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store channel [members] \(self.channelId) in db")
+                    logger.errorIfNotNil(error, "Store channel [members] \(self.channelId) in db")
                     completion?(error)
                 }
             } else {
-                log.errorIfNotNil(error, "Add members Role \(self.channelId)")
+                logger.errorIfNotNil(error, "Add members Role \(self.channelId)")
                 completion?(error)
             }
         }
@@ -392,11 +430,11 @@ open class ChannelProvider: Provider {
                         $0.deleteMember(id: member.id, from: channel.id)
                     }
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store/delete channel [members] \(self.channelId) in db")
+                    logger.errorIfNotNil(error, "Store/delete channel [members] \(self.channelId) in db")
                     completion?(error)
                 }
             } else {
-                log.errorIfNotNil(error, "Kick members Role \(self.channelId)")
+                logger.errorIfNotNil(error, "Kick members Role \(self.channelId)")
                 completion?(error)
             }
         }
@@ -416,11 +454,11 @@ open class ChannelProvider: Provider {
                         $0.deleteMember(id: member.id, from: self.channelId)
                     }
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store/delete channel [members] \(self.channelId) in db")
+                    logger.errorIfNotNil(error, "Store/delete channel [members] \(self.channelId) in db")
                     completion?(error)
                 }
             } else {
-                log.errorIfNotNil(error, "Block members Role \(self.channelId)")
+                logger.errorIfNotNil(error, "Block members Role \(self.channelId)")
                 completion?(error)
             }
         }
@@ -440,11 +478,11 @@ open class ChannelProvider: Provider {
                         $0.deleteMember(id: member.id, from: self.channelId)
                     }
                 }  completion: { error in
-                    log.errorIfNotNil(error, "Store/delete channel [members] \(self.channelId) in db")
+                    logger.errorIfNotNil(error, "Store/delete channel [members] \(self.channelId) in db")
                     completion?(error)
                 }
             } else {
-                log.errorIfNotNil(error, "Unblock members Role \(self.channelId)")
+                logger.errorIfNotNil(error, "Unblock members Role \(self.channelId)")
                 completion?(error)
             }
         }
@@ -457,8 +495,8 @@ open class ChannelProvider: Provider {
             self.database.write {
                 $0.deleteChannel(id: self.channelId)
             }  completion: { dbError in
-                log.errorIfNotNil(dbError, "Delete channel \(self.channelId) in db")
-                log.errorIfNotNil(error, "Hide channel \(self.channelId)")
+                logger.errorIfNotNil(dbError, "Delete channel \(self.channelId) in db")
+                logger.errorIfNotNil(error, "Hide channel \(self.channelId)")
                 completion?(error ?? dbError)
             }
         }
@@ -468,20 +506,23 @@ open class ChannelProvider: Provider {
         self.database.write {
             $0.update(draft: message, date: date, channelId: self.channelId)
         }  completion: { error in
-            log.errorIfNotNil(error, "save draft message channel \(self.channelId) in db")
+            logger.errorIfNotNil(error, "save draft message channel \(self.channelId) in db")
         }
     }
     
     open func getLocalChannel(type: String, userId: UserId, completion: @escaping (ChatChannel?) -> Void) {
         database.read {
-            let request = ChannelDTO.fetchRequest()
-            request.predicate = NSPredicate(format: "type == %@ AND ANY members.user.id == %@", type, userId)
-            let channel = ChannelDTO.fetch(request: request, context: $0).first?.convert()
+            let memberRequest = MemberDTO.fetchRequest()
+            memberRequest.predicate = NSPredicate(format: "user.id == %@", userId)
+            let channelIds = MemberDTO.fetch(request: memberRequest, context: $0).map { $0.channelId }
+            let channelRequest = ChannelDTO.fetchRequest()
+            channelRequest.predicate = NSPredicate(format: "type == %@ AND id IN %@", type, channelIds)
+            let channel = ChannelDTO.fetch(request: channelRequest, context: $0).first?.convert()
             return channel
         } completion: { result in
             switch result {
             case .failure(let error):
-                log.errorIfNotNil(error, "Getting channel with \(userId)")
+                logger.errorIfNotNil(error, "Getting channel with \(userId)")
             case .success(let channel):
                 completion(channel)
             }

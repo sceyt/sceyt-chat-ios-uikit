@@ -17,6 +17,12 @@ public protocol UserDatabaseSession {
 
     @discardableResult
     func createOrUpdate(users: [User]) -> [UserDTO]
+    
+    @discardableResult
+    func createOrUpdate(user: ChatUser) -> UserDTO
+    
+    @discardableResult
+    func createOrUpdate(users: [ChatUser]) -> [UserDTO]
 }
 
 extension NSManagedObjectContext: UserDatabaseSession {
@@ -28,6 +34,16 @@ extension NSManagedObjectContext: UserDatabaseSession {
 
     @discardableResult
     public func createOrUpdate(users: [User]) -> [UserDTO] {
+        users.map { createOrUpdate(user: $0) }
+    }
+    
+    @discardableResult
+    public func createOrUpdate(user: ChatUser) -> UserDTO {
+        UserDTO.fetchOrCreate(id: user.id, context: self).map(user)
+    }
+
+    @discardableResult
+    public func createOrUpdate(users: [ChatUser]) -> [UserDTO] {
         users.map { createOrUpdate(user: $0) }
     }
 }

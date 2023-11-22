@@ -63,7 +63,7 @@ open class AsyncOperation: Operation {
     }
     
     override public func start() {
-        debugPrint("[AsyncOperation] Started \(uuid)")
+        logger.debug("[AsyncOperation] Started \(uuid)")
         guard !isCancelled else {
             complete()
             return
@@ -91,14 +91,14 @@ open class AsyncOperation: Operation {
     }
     
     open func complete() {
-        debugPrint("[AsyncOperation] Completed \(uuid)")
+        logger.debug("[AsyncOperation] Completed \(uuid)")
         scheduler?.stop()
         isExecuting = false
         isFinished = true
     }
     
     override open func cancel() {
-        debugPrint("[AsyncOperation] Cancelled \(uuid)")
+        logger.debug("[AsyncOperation] Cancelled \(uuid)")
         scheduler?.stop()
         _isCancelled = true
         super.cancel()

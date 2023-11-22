@@ -69,7 +69,7 @@ open class PlayerView: View {
                     let duration = try await playerItem.asset.load(.duration)
                     self.timeLabel.text = Formatters.videoAssetDuration.format(duration.seconds)
                 } catch {
-                    debugPrint(error)
+                    logger.errorIfNotNil(error, "")
                 }
 
             } else {

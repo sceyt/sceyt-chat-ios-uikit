@@ -31,11 +31,18 @@ open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDele
         tableView.register(Components.messageInfoHeaderView.self)
         tableView.register(Components.messageInfoMessageCell.self)
         tableView.register(Components.messageInfoMarkerCell.self)
-        tableView.estimatedRowHeight = 48
+        tableView.estimatedRowHeight = Layouts.cellHeight
         tableView.rowHeight = UITableView.automaticDimension
         tableView.delegate = self
         tableView.dataSource = self
         tableView.separatorStyle = .none
+
+        viewModel
+            .$event
+            .compactMap { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.onEvent($0) }
+            .store(in: &subscriptions)
     }
 
     override open func setupLayout() {
@@ -52,74 +59,75 @@ open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDele
         tableView.backgroundColor = .clear
     }
 
+    // MARK: - Actions
+
+    open func onEvent(_ event: MessageInfoVM.Event) {
+        switch event {
+        case .reload:
+            tableView.reloadData()
+        }
+    }
+
     open func onCancelTapped() {
         router.dismiss()
     }
 
     // MARK: - UITableViewDataSource, UITableViewDelegate
 
-    public func numberOfSections(in tableView: UITableView) -> Int {
-        Section.allCases.count
+    open func numberOfSections(in tableView: UITableView) -> Int {
+        viewModel.numberOfSections
     }
 
-    public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        switch Section(rawValue: section)! {
-        case .message:
-            return 16
-        case .read:
-            return viewModel.numberOfReads > 0 ? 32 : 0
-        case .delivered:
-            return viewModel.numberOfDelivered > 0 ? 32 : 0
-        }
+    open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        guard let _ = viewModel.header(section: section)
+        else { return 16 }
+        return 32
     }
 
-    public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+    open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        guard let header = viewModel.header(section: section)
+        else { return nil }
         let headerView = tableView.dequeueReusableHeaderFooterView(HeaderView.self)
-        headerView.label.text = Section(rawValue: section)?.title
+        headerView.label.text = header
         return headerView
     }
 
-    public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        switch Section(rawValue: section)! {
-        case .message:
-            return 1
-        case .read:
-            return viewModel.numberOfReads
-        case .delivered:
-            return viewModel.numberOfDelivered
-        }
+    open func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        viewModel.numberOfRows(section: section)
     }
 
-    public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let section = Section(rawValue: indexPath.section)!
+    open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let section = indexPath.section
         switch section {
-        case .message:
+        case 0:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.messageInfoMessageCell.self)
             cell.data = viewModel.data
             return cell
         default:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.messageInfoMarkerCell.self)
-            cell.data = section == .read ? viewModel.readMarker(at: indexPath) : viewModel.deliveredMarker(at: indexPath)
+            cell.data = viewModel.marker(at: indexPath)
             cell.contentInsets.top = tableView.isFirst(indexPath) ? 8 : 0
             cell.contentInsets.bottom = tableView.isLast(indexPath) ? 8 : 0
             return cell
         }
     }
-}
 
-public extension MessageInfoVC {
-    enum Section: Int, CaseIterable {
-        case message, read, delivered
+    open func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+        switch indexPath.section {
+        case 0: return UITableView.automaticDimension
+        default:
+            var cellHeight = Layouts.cellHeight
+            cellHeight += tableView.isFirst(indexPath) ? 8 : 0
+            cellHeight += tableView.isLast(indexPath) ? 8 : 0
+            return cellHeight
+        }
+    }
 
-        public var title: String? {
-            switch self {
-            case .message:
-                return nil
-            case .read:
-                return L10n.Message.Info.readBy
-            case .delivered:
-                return L10n.Message.Info.deliveredTo
-            }
+    open func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        if indexPath.section > 0,
+           tableView.isLast(indexPath)
+        {
+            viewModel.loadNext(indexPath.section)
         }
     }
 }
@@ -128,8 +136,14 @@ private extension UITableView {
     func isFirst(_ indexPath: IndexPath) -> Bool {
         indexPath.item == 0
     }
-    
+
     func isLast(_ indexPath: IndexPath) -> Bool {
         indexPath.item == numberOfRows(inSection: indexPath.section) - 1
+    }
+}
+
+public extension MessageInfoVC {
+    enum Layouts {
+        public static var cellHeight: CGFloat = 48
     }
 }

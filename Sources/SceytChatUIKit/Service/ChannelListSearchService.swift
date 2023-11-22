@@ -52,7 +52,7 @@ public struct ChannelListSearchService {
                 provider.loadChannels(query: channelListQuery) { error in
                     guard error == nil
                     else {
-                        log.debug("[search] loadChannels \(error!)")
+                        logger.debug("[search] loadChannels \(error!)")
                         return
                     }
                     Task(priority: .userInitiated) {

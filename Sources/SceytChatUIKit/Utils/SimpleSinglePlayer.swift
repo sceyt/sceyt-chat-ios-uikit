@@ -58,7 +58,7 @@ internal class SimpleSinglePlayer: NSObject {
             isPlaying = true
             player.play()
         } catch {
-            debugPrint(error)
+            logger.errorIfNotNil(error, "")
         }
     }
     

@@ -42,7 +42,7 @@ open class ChannelMemberListVM: NSObject {
     public var isSearching = false
     
     public lazy var defaultPredicate: NSPredicate = {
-        var predicate = NSPredicate(format: "ANY channels.id == %lld", channel.id)
+        var predicate = NSPredicate(format: "channelId == %lld", channel.id)
         if let filterMembersByRole {
             predicate = predicate.and(predicate: .init(format: "role.name == %@", filterMembersByRole))
         }
@@ -92,7 +92,7 @@ open class ChannelMemberListVM: NSObject {
         do {
             try memberObserver.startObserver()
         } catch {
-            debugPrint("observer.startObserver", error)
+            logger.errorIfNotNil(error, "observer.startObserver")
         }
     }
 
@@ -202,7 +202,7 @@ open class ChannelMemberListVM: NSObject {
     @objc
     open func search(query: String) {
         isSearching = true
-        var predicate = NSPredicate(format: "ANY channels.id == %lld", channel.id)
+        var predicate = NSPredicate(format: "channelId == %lld", channel.id)
         if let filterMembersByRole {
             predicate = predicate.and(predicate: .init(format: "role.name == %@", filterMembersByRole))
         }
@@ -211,7 +211,7 @@ open class ChannelMemberListVM: NSObject {
             try memberObserver.update(predicate: predicate)
             provider.loadMembers()
         } catch {
-            debugPrint(error)
+            logger.errorIfNotNil(error, "")
         }
     }
     
@@ -221,7 +221,7 @@ open class ChannelMemberListVM: NSObject {
             try memberObserver.update(predicate: defaultPredicate)
             provider.loadMembers()
         } catch {
-            debugPrint(error)
+            logger.errorIfNotNil(error, "")
         }
         isSearching = false
     }

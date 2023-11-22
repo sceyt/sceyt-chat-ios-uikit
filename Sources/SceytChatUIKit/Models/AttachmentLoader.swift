@@ -86,7 +86,7 @@ open class AttachmentLoader: NSObject {
                         item.progress = 1
                     case .failure(let error):
                         item.progress = 1
-                        debugPrint("Download error", error)
+                        logger.debug("Download error \(error)")
                     }
                 }
         }

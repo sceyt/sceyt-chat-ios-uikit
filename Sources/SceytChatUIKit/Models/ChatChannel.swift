@@ -34,13 +34,15 @@ public class ChatChannel {
     public let avatarUrl: String?
     public let lastMessage: ChatMessage?
     public let lastReaction: ChatMessage.Reaction?
-    public let members: [ChatChannelMember]?
     public let userRole: String?
     public var unSynched: Bool = false
     
     public var draftMessage: NSAttributedString?
     
     public var decodedMetadata: Metadata?
+    
+    /// available only if channel type is direct
+    public private(set) var members: [ChatChannelMember]?
     
     public init(
         id: ChannelId,
@@ -94,12 +96,14 @@ public class ChatChannel {
         self.uri = uri
         self.lastMessage = lastMessage
         self.lastReaction = lastReaction
-        self.members = members
         self.userRole = userRole
         self.draftMessage = draftMessage
         self.unSynched = unSynched
         if let metadata {
             decodedMetadata = try? Metadata.decode(metadata)
+        }
+        if let members {
+            self.members = members
         }
     }
     
@@ -128,11 +132,19 @@ public class ChatChannel {
             uri: dto.uri ?? "",
             lastMessage: dto.lastMessage == nil ? nil : .init(dto: dto.lastMessage!),
             lastReaction: dto.lastReaction == nil ? nil : .init(dto: dto.lastReaction!, convertMessage: true),
-            members: dto.members?.map { .init(dto: $0) },
             userRole: dto.userRole?.name,
             draftMessage: dto.draft,
             unSynched: dto.unsynched
         )
+        if self.channelType == .direct {
+            if let context = dto.managedObjectContext {
+                members = MemberDTO.fetch(channelId: ChannelId(dto.id), context: context).map { $0.convert() }
+            } else {
+                #if DEBUG
+                fatalError("ChannelDTO managedObjectContext is nil")
+                #endif
+            }
+        }
     }
     
     public convenience init(channel: Channel) {
@@ -160,8 +172,10 @@ public class ChatChannel {
             uri: channel.uri,
             lastMessage: channel.lastMessage.map { ChatMessage(message: $0, channelId: channel.id)},
             lastReaction: channel.lastReactions?.max(by: { $0.id > $1.id }).map { ChatMessage.Reaction(reaction: $0)},
-            members: channel.members?.map { .init(member: $0)},
             userRole: channel.userRole)
+        if self.channelType == .direct {
+            members = channel.members?.map { .init(member: $0)}
+        }
     }
 }
 
