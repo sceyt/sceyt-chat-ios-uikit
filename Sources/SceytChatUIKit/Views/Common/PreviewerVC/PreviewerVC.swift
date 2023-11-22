@@ -89,7 +89,7 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
     private var timeObserver: Any?
 
     deinit {
-        debugPrint("[PreviewerVC] deinit")
+        logger.debug("[PreviewerVC] deinit")
     
         removeObservers()
         player?.pause()
@@ -254,7 +254,7 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
         do {
             try Components.audioSession.configure(category: .playback)
         } catch {
-            log.errorIfNotNil(error, "Setting category to .playback failed.")
+            logger.errorIfNotNil(error, "Setting category to .playback failed.")
         }
     }
     

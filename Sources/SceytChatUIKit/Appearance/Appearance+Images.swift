@@ -49,8 +49,8 @@ public extension Appearance {
         public static var messageActionInfo: UIImage = { Assets.actionInfo.image }()
         public static var messageActionAdd: UIImage = { Assets.actionAdd.image }()
         public static var messageActionEdit: UIImage = { Assets.actionEdit.image }()
-        public static var messageActionReply: UIImage = { Assets.reply.image }()
-        public static var messageActionReplyInThread: UIImage = { Assets.replyInThread.image }()
+        public static var messageActionReply: UIImage = { Assets.actionReply.image }()
+        public static var messageActionReplyInThread: UIImage = { Assets.actionReplyThread.image }()
         public static var messageActionForward: UIImage = { Assets.actionForward.image }()
         public static var messageActionShare: UIImage = { Assets.actionShare.image }()
         public static var messageActionCopy: UIImage = { Assets.actionCopy.image }()
@@ -91,6 +91,7 @@ public extension Appearance {
         public static var channelProfileEditAvatar: UIImage = { Assets.channelProfileEditAvatar.image }()
         public static var channelReply: UIImage = { Assets.channelReply.image }()
         public static var channelCreated: UIImage = { Assets.channelCreated.image }()
+        public static var channelPin: UIImage = { Assets.channelPin.image }()
 
         public static var audioPlayerCancel: UIImage = { Assets.audioPlayerCancel.image }()
         public static var audioPlayerDelete: UIImage = { Assets.audioPlayerDelete.image }()

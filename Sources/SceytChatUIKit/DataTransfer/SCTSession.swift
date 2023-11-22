@@ -10,13 +10,49 @@ import SceytChat
 import UIKit
 
 open class SCTSession: NSObject, SCTDataSession {
-    fileprivate lazy var queue = {
+    private lazy var queue = {
         $0.name = "com.sceyt.SCTUploadingQueue"
         $0.maxConcurrentOperationCount = 1
         return $0
     }(OperationQueue())
     
-    fileprivate lazy var pendingOperations = NSMutableSet()
+    private lazy var pendingOperations = NSMutableSet()
+    
+    open func add(_ operation: SCTUploadOperation) {
+        if pendingOperations.contains(operation) {
+            pendingOperations.remove(operation)
+        }
+        queue.addOperation(operation)
+    }
+    
+    open func stop(_ operation: SCTUploadOperation) {
+        operation.complete()
+        pendingOperations.add(SCTUploadOperation(
+            uuid: operation.uuid,
+            attachment: operation.attachment,
+            taskInfo: operation.taskInfo
+        ))
+    }
+    
+    open func resume(_ operation: SCTUploadOperation) {
+        if let operation = pending(uuid: operation.uuid) {
+            add(operation)
+        } else {
+            add(SCTUploadOperation(
+                uuid: operation.uuid,
+                attachment: operation.attachment,
+                taskInfo: operation.taskInfo
+            ))
+        }
+    }
+    
+    open func queuedOperation(uuid: String) -> SCTUploadOperation? {
+        Self.default.queue.operations.first(where: { ($0 as? SCTUploadOperation)?.uuid == uuid }) as? SCTUploadOperation
+    }
+    
+    open func pending(uuid: String) -> SCTUploadOperation? {
+        Self.default.pendingOperations.first(where: { ($0 as? SCTUploadOperation)?.uuid == uuid }) as? SCTUploadOperation
+    }
     
     public static let `default` = SCTSession()
     
@@ -27,11 +63,28 @@ open class SCTSession: NSObject, SCTDataSession {
             attachment: attachment,
             taskInfo: taskInfo
         )
-        operation.completionBlock = { [weak self] in
+        add(operation)
+        
+        taskInfo.onAction = { [weak self] in
             guard let self else { return }
-            self.pendingOperations.remove(operation)
+            
+            switch $0 {
+            case .stop:
+                if let operation = queuedOperation(uuid: operation.uuid) {
+                    stop(operation)
+                }
+            case .cancel:
+                if let operation = queuedOperation(uuid: operation.uuid) {
+                    operation.cancel()
+                }
+            case .resume:
+                resume(operation)
+            @unknown default:
+                break
+            }
+            
+            operation.complete()
         }
-        queue.addOperation(operation)
     }
     
     open func download(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo) {
@@ -97,7 +150,7 @@ open class SCTSession: NSObject, SCTDataSession {
                let ib = try? SCTUIKitComponents.imageBuilder.init(image: image).resize(max: newSize.maxSide),
                let data = ib.jpegData()
             {
-                print("[thumbnail] 3 stored", thumbnailPath)
+                logger.debug("[thumbnail] 3 stored \(thumbnailPath)")
                 return Storage.storeData(data, filePath: thumbnailPath)?.path
             }
             return nil
@@ -106,7 +159,7 @@ open class SCTSession: NSObject, SCTDataSession {
         if let path = getFilePath(attachment: attachment) {
             let thumbnailPath = fileStorage.thumbnailPath(filePath: path, imageSize: newSize)
             if fileStorage.isFilePath(thumbnailPath) {
-                print("[thumbnail] found file", attachment.type)
+                logger.debug("[thumbnail] found file \(attachment.type)")
                 return thumbnailPath
             }
             return makeThumbnail(file: path, thumbnailPath: thumbnailPath)
@@ -119,9 +172,9 @@ open class SCTSession: NSObject, SCTDataSession {
 }
 
 open class SCTUploadOperation: AsyncOperation {
-    private let attachment: ChatMessage.Attachment
-    private let taskInfo: SCTDataSessionTaskInfo
-    private var videoProcessInfo: SCVideoProcessInfo?
+    let attachment: ChatMessage.Attachment
+    let taskInfo: SCTDataSessionTaskInfo
+    private(set) var videoProcessInfo: SCVideoProcessInfo?
     public let fileStorage: FileStorage = .init()
 
     init(
@@ -146,59 +199,14 @@ open class SCTUploadOperation: AsyncOperation {
     }
     
     open func startPreparing() {
-        var isStoped: Bool {
-            switch taskInfo.action {
-            case .stop:
-                return true
-            case .cancel:
-                return true
-            case .resume:
-                return false
-            default:
-                return false
-            }
-        }
-        
-        var isRestarted = false
-        var canContinue: Bool { !isStoped && !isRestarted }
-        
-        taskInfo.onAction = { [weak self] in
-            if case .resume = $0 {
-                if let operation = SCTSession.default.pendingOperations.first(where: { ($0 as? SCTUploadOperation)?.uuid == self?.uuid }) as? SCTUploadOperation {
-                    operation.completionBlock = {
-                        SCTSession.default.pendingOperations.remove(operation)
-                    }
-                    SCTSession.default.pendingOperations.remove(operation)
-                    SCTSession.default.queue.addOperation(operation)
-                }
-            }
-            guard let self else { return }
-            log.debug("[SCTSTASK] onAction \($0)")
-            switch $0 {
-            case .stop:
-                SCTSession.default.pendingOperations.add(SCTUploadOperation(
-                    uuid: self.uuid,
-                    attachment: self.attachment,
-                    taskInfo: self.taskInfo
-                ))
-                self.videoProcessInfo?.cancel()
-                self.complete()
-            case .cancel:
-                self.videoProcessInfo?.cancel()
-                self.complete()
-            case .resume:
-                self.videoProcessInfo?.cancel()
-                self.complete()
-                isRestarted = true
-            }
-        }
-        
         Task {
-            let videoProcessInfo = SCVideoProcessInfo()
+            var canContinue: Bool { !isFinished && !isCancelled }
+            
             guard var filePath = attachment.filePath else { return }
-            print("check", FileManager.default.fileExists(atPath: filePath))
+            logger.debug("check \(FileManager.default.fileExists(atPath: filePath))")
             let transferId = UUID().uuidString
             if attachment.type == "video" {
+                let videoProcessInfo = SCVideoProcessInfo()
                 let result = await SCTUIKitComponents.videoProcessor.export(from: filePath, processInfo: videoProcessInfo)
                 switch result {
                 case .success(let success):
@@ -206,7 +214,7 @@ open class SCTUploadOperation: AsyncOperation {
                     taskInfo.updateLocalFileLocation(newLocation: URL(fileURLWithPath: path))
                     filePath = path
                 case .failure(let error):
-                    log.debug(error.localizedDescription)
+                    logger.errorIfNotNil(error, "")
                 }
             } else if attachment.type == "image" {
                 if let builder = SCTUIKitComponents.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)) {
@@ -251,5 +259,10 @@ open class SCTUploadOperation: AsyncOperation {
     override open func cancel() {
         videoProcessInfo?.cancel()
         super.cancel()
+    }
+    
+    override open func complete() {
+        videoProcessInfo?.cancel()
+        super.complete()
     }
 }

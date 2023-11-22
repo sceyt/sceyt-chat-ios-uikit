@@ -70,7 +70,7 @@ extension MessageInfoVC {
                 } else {
                     setupLayout()
                 }
-                sentValueLabel.text = Formatters.channelTimestamp.format(data.message.createdAt)
+                sentValueLabel.text = Formatters.messageInfoTimestamp.format(data.message.createdAt)
                 if let fileSize = data.attachments.first?.fileSize {
                     sizeHStack.isHidden = false
                     sizeValueLabel.text = fileSize
@@ -127,11 +127,11 @@ extension MessageInfoVC {
             .contentMode(.scaleAspectFill)
         
         open lazy var nameLabel = UILabel()
-            .contentCompressionResistancePriorityH(.defaultHigh)
         
         open lazy var dateTimeLabel = UILabel()
-            .contentCompressionResistancePriorityH(.defaultLow)
-        
+            .contentCompressionResistancePriorityH(.required)
+            .contentHuggingPriorityH(.required)
+
         open lazy var hStack = UIStackView(row: [avatarView, nameLabel, dateTimeLabel],
                                            spacing: 12, alignment: .center)
             .withoutAutoresizingMask

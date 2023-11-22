@@ -96,7 +96,8 @@ public final class ContextMenu {
         alignments[identifier] = alignment
     }
     
-    public func disconnect(from view: UIView) {
+    public func disconnect(from view: UIView, identifier: Identifier) {
+        alignments[identifier] = nil
         view.gestureRecognizers?.reversed().forEach {
             if $0 is IdentifiableLongPressGestureRecognizer {
                 view.removeGestureRecognizer($0)

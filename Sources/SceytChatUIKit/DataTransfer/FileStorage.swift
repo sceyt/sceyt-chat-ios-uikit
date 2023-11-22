@@ -10,7 +10,6 @@ import Foundation
 import SceytChat
 
 open class FileStorage: Storage {
-    
     public static let `default` = FileStorage()
     
     var fileManager: FileManager { FileManager.default }
@@ -56,7 +55,7 @@ open class FileStorage: Storage {
                 try fileManager.createDirectory(at: URL(fileURLWithPath: newPath), withIntermediateDirectories: true, attributes: nil)
                 newPath = (newPath as NSString).appendingPathComponent(fileName)
             } catch {
-                debugPrint("store error", error)
+                logger.errorIfNotNil(error, "store")
             }
         }
         do {
@@ -68,7 +67,7 @@ open class FileStorage: Storage {
                 try fileManager.copyItem(atPath: path, toPath: newPath)
             }
         } catch {
-            debugPrint(error)
+            logger.errorIfNotNil(error, "")
             if (error as NSError).code == NSFileWriteFileExistsError {
                 return newPath
             }
@@ -98,7 +97,7 @@ open class FileStorage: Storage {
                     try fileManager.removeItem(atPath: path)
                 }
             } catch {
-                debugPrint("store error", error)
+                logger.errorIfNotNil(error, "store")
             }
         }
         return path
@@ -117,7 +116,7 @@ open class FileStorage: Storage {
         do {
             try fileManager.createDirectory(at: tmUrl.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)
         } catch {
-            debugPrint("thumbnailPath error", error)
+            logger.errorIfNotNil(error, "thumbnailPath")
         }
         return tmUrl.path
     }
@@ -149,7 +148,7 @@ open class FileStorage: Storage {
                         try fileManager.copyItem(at: tmpUrl, to: newTmpUrl)
                         try fileManager.removeItem(at: tmpUrl)
                     } catch {
-                        debugPrint(error)
+                        logger.errorIfNotNil(error, "")
                     }
                 }
             }

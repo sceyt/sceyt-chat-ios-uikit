@@ -23,7 +23,7 @@ public struct Validator {
             let range = NSRange(location: 0, length: lowercased.utf16.count)
             isValid = regex.firstMatch(in: lowercased, options: [], range: range) != nil
         } catch {
-            print(error)
+            logger.errorIfNotNil(error, "")
         }
         return isValid ? .success(true) : .failure(.regex(Config.channelURIRegex))
     }

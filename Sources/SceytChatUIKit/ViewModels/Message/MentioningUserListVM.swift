@@ -14,7 +14,7 @@ open class MentioningUserListVM: NSObject {
 
     public let channelId: ChannelId
     public let provider: ChannelMemberListProvider
-    public lazy var defaultPredicate = NSPredicate(format: "ANY channels.id == %lld AND user.id != %@", channelId, me)
+    public lazy var defaultPredicate = NSPredicate(format: "channelId == %lld AND user.id != %@", channelId, me)
     
     @Published public var event: Event?
     public var isSearching = false
@@ -46,7 +46,7 @@ open class MentioningUserListVM: NSObject {
         do {
             try memberObserver.startObserver()
         } catch {
-            debugPrint("observer.startObserver", error)
+            logger.errorIfNotNil(error, "observer.startObserver")
         }
     }
 

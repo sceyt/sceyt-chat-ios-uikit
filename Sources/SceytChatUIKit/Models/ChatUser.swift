@@ -70,7 +70,8 @@ public class ChatUser {
 }
 
 public extension ChatUser {
-    enum State {
+    
+    enum State: Int {
         case active
         case inactive
         case deleted
@@ -170,6 +171,23 @@ public extension ChatUser.Presence {
                 self = .dnd
             default:
                 return nil
+            }
+        }
+        
+        public var presenceState: PresenceState {
+            switch self {
+            case .offline:
+                return .offline
+            case .online:
+                return .online
+            case .invisible:
+                return .invisible
+            case .away:
+                return .away
+            case .dnd:
+                return .DND
+            @unknown default:
+                return .offline
             }
         }
     }

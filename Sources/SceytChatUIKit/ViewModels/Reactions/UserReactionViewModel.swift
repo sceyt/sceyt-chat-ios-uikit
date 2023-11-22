@@ -53,7 +53,7 @@ open class UserReactionViewModel: NSObject {
         do {
             try reactionObserver.startObserver()
         } catch {
-            debugPrint("observer.startObserver", error)
+            logger.errorIfNotNil(error, "observer.startObserver")
         }
     }
 

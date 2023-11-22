@@ -48,7 +48,7 @@ extension MessageCell {
             imageView.resize(anchors: [.height(Layouts.attachmentIconSize), .width(Layouts.attachmentIconSize)])
             titleLabel.leadingAnchor.pin(to: imageView.trailingAnchor, constant: Layouts.horizontalPadding)
             titleLabel.topAnchor.pin(to: imageView.topAnchor, constant: 2)
-            titleLabel.trailingAnchor.pin(lessThanOrEqualTo: trailingAnchor)
+            titleLabel.trailingAnchor.pin(lessThanOrEqualTo: trailingAnchor, constant: -Layouts.horizontalPadding)
             sizeLabel.leadingAnchor.pin(to: titleLabel.leadingAnchor)
             sizeLabel.topAnchor.pin(to: titleLabel.bottomAnchor, constant: 4)
 

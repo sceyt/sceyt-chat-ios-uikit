@@ -14,6 +14,7 @@ import CoreData
 public final class SyncService: NSObject {
     
     public static var workerQueue = DispatchQueue(label: "com.sceytchat.uikit.syncService")
+    public private(set) static var isSyncing = false
     
     public static var reactionQueue: OperationQueue = {
         let op = OperationQueue()
@@ -28,7 +29,7 @@ public final class SyncService: NSObject {
     }()
     
     public class func resendPendingItems() {
-        log.verbose("SyncService: resendPendingItems")
+        logger.verbose("SyncService: resendPendingItems")
         workerQueue.async {
             makePendingReactionOperations {
                 if !$0.isEmpty {
@@ -43,10 +44,10 @@ public final class SyncService: NSObject {
     }
     
     public class func resendPendingMessage() {
-        log.verbose("SyncService: makeMessageResendOperations")
+        logger.verbose("SyncService: makeMessageResendOperations")
         Components.channelMessageProvider
             .fetchPendingMessages { messages in
-                log.verbose("SyncService: makeMessageResendOperations fetched \(messages.count) messages")
+                logger.verbose("SyncService: makeMessageResendOperations fetched \(messages.count) messages")
                 let groupByChannel = Dictionary(grouping: messages, by: { $0.channelId })
                 groupByChannel.forEach { item in
                     let sender = Components.channelMessageSender.init(channelId: item.key)
@@ -54,10 +55,10 @@ public final class SyncService: NSObject {
                     let sorted = item.value.sorted(by: { $0.createdAt < $1.createdAt })
                     sorted.forEach { message in
                         if message.attachments?.contains(where: { $0.status == .pauseDownloading || $0.status == .pauseUploading }) == true {
-                            log.verbose("SyncService: makeMessageResendOperations DO NOT RESEND (has paused attachment) message: tid \(message.tid), body \(message.body)")
+                            logger.verbose("SyncService: makeMessageResendOperations DO NOT RESEND (has paused attachment) message: tid \(message.tid), body \(message.body)")
                             return
                         }
-                        log.verbose("SyncService: makeMessageResendOperations fetched message: tid \(message.tid), body \(message.body)")
+                        logger.verbose("SyncService: makeMessageResendOperations fetched message: tid \(message.tid), body \(message.body)")
                         sender.resendMessage(message) {error in
                             if error?.sceytChatCode == .channelNotExists {
                                 provider.deletePending(message: message.tid)
@@ -71,17 +72,17 @@ public final class SyncService: NSObject {
     public class func makePendingMarkerOperations(
         completion: @escaping ([MarkerResendOperation]) -> Void
     ) {
-        log.verbose("SyncService: makePendingMarkerOperations")
+        logger.verbose("SyncService: makePendingMarkerOperations")
         var operations = [MarkerResendOperation]()
         Components.channelMessageProvider
             .fetchPendingMarkers { markers in
-                log.verbose("SyncService: makePendingMarkerOperations fetched \(markers.count) markers")
+                logger.verbose("SyncService: makePendingMarkerOperations fetched \(markers.count) markers")
                 markers.forEach { (cid, markers) in
                     markers.forEach { (markerName, ids) in
                         let chunked = Array(ids).chunked(into: 50)
                         chunked.forEach { chunk in
                             let provider = Components.channelMessageMarkerProvider.init(channelId: cid)
-                            log.verbose("SyncService: makePendingMarkerOperations fetched markers with MessageIds \(chunk), for markerName \(markerName)")
+                            logger.verbose("SyncService: makePendingMarkerOperations fetched markers with MessageIds \(chunk), for markerName \(markerName)")
                             let op = MarkerResendOperation(provider: provider, messageIds: Array(chunk), markerName: markerName)
                             operations.append(op)
                         }
@@ -138,7 +139,7 @@ public final class SyncService: NSObject {
         task: BGAppRefreshTask? = nil,
         completion: ((Bool) -> Void)? = nil) {
             Components.channelMessageMarkerProvider.canMarkMessage = false
-            
+            Self.isSyncing = true
             Self.sendPendingReactions()
             
             let channelSyncQueue = OperationQueue()
@@ -195,14 +196,17 @@ public final class SyncService: NSObject {
                 task.expirationHandler = {
                     channelSyncQueue.cancelAllOperations()
                     messageSyncQueue.cancelAllOperations()
+                    Self.isSyncing = false
                 }
                 
                 completionOperator.completionBlock = {
                     task.setTaskCompleted(success: !completionOperator.isCancelled)
                     completion?(completionOperator.isFinished)
+                    Self.isSyncing = false
                 }
             } else {
                 completionOperator.completionBlock = {
+                    Self.isSyncing = false
                     completion?(completionOperator.isFinished)
                 }
             }
@@ -257,8 +261,14 @@ public struct Operations {
                 provider.store(messages: messages) { _ in
                     end()
                 }
+                let messageIds = messages.compactMap {
+                    if $0.incoming && ($0.userMarkers == nil || !$0.userMarkers!.contains(where: { $0.name == ChatMessage.DeliveryStatus.received.rawValue })) {
+                        return $0.id
+                    }
+                    return nil
+                }
                 provider.markMessagesAsReceived(
-                    ids: messages.map { $0.id },
+                    ids: messageIds,
                     storeForResend: true
                 )
             }
@@ -273,7 +283,7 @@ public struct Operations {
                 let chunked = Array(ids).chunked(into: 50)
                 chunked.forEach { chunk in
                     let provider = Components.channelMessageMarkerProvider.init(channelId: cid)
-                    log.verbose("SyncService: makePendingMarkerOperations fetched markers with MessageIds \(chunk), for markerName \(markerName)")
+                    logger.verbose("SyncService: makePendingMarkerOperations fetched markers with MessageIds \(chunk), for markerName \(markerName)")
                     let op = MarkerResendOperation(provider: provider, messageIds: Array(chunk), markerName: markerName)
                     operations.append(op)
                 }
@@ -314,9 +324,8 @@ private extension MessageDatabaseSession where Self: NSManagedObjectContext {
         return MessageDTO.fetch(request: request, context: self)
             .reduce([ChannelId: [String: Set<MessageId>]]()) { partialResult, element in
                 var result = partialResult
-                let channelId = element.channelId == 0 ? element.ownerChannel?.id : element.channelId
-                guard let channelId,
-                      let pendingMarkerNames = element.pendingMarkerNames
+                let channelId = element.channelId
+                guard let pendingMarkerNames = element.pendingMarkerNames
                 else { return result }
                 let cid = ChannelId(channelId)
                 if result[cid] == nil {

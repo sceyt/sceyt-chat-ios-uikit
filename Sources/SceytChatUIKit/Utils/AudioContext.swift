@@ -37,7 +37,7 @@ final class AudioContext {
         let asset = AVURLAsset(url: audioURL, options: [AVURLAssetPreferPreciseDurationAndTimingKey: NSNumber(value: true as Bool)])
         
         guard let assetTrack = asset.tracks(withMediaType: AVMediaType.audio).first else {
-            print("Couldn't load AVAssetTrack")
+            logger.debug("Couldn't load AVAssetTrack")
             return completionHandler(nil)
         }
         
@@ -58,9 +58,9 @@ final class AudioContext {
                 return
                 
             case .failed, .cancelled, .loading, .unknown:
-                print("Couldn't load asset: \(error?.localizedDescription ?? "Unknown error")")
+                logger.debug("Couldn't load asset: \(error?.localizedDescription ?? "Unknown error")")
             @unknown default:
-                print("Unknown error")
+                logger.debug("Unknown error")
             }
             
             completionHandler(nil)
@@ -143,7 +143,7 @@ final class AudioContext {
                            downSampledLength: downSampledLength,
                            samplesPerPixel: samplesPerPixel,
                            filter: filter)
-            // print("Status: \(reader.status)")
+            // logger.debug("Status: \(reader.status)")
         }
         
         // Process the remaining samples at the end which didn't fit into samplesPerPixel
@@ -159,7 +159,7 @@ final class AudioContext {
                            downSampledLength: downSampledLength,
                            samplesPerPixel: samplesPerPixel,
                            filter: filter)
-            // print("Status: \(reader.status)")
+            // logger.debug("Status: \(reader.status)")
         }
         
         // if (reader.status == AVAssetReaderStatusFailed || reader.status == AVAssetReaderStatusUnknown)

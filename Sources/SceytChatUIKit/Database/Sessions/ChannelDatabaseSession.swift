@@ -58,6 +58,22 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
             dto.createdBy = createOrUpdate(user: createBy)
         }
         
+        var lastReaction: ReactionDTO?
+        if let reactions = channel.lastReactions {
+            let reactionDTOs = createOrUpdate(reactions: reactions)
+            lastReaction = reactionDTOs.max(by: { $0.id < $1.id })
+            if dto.lastReaction == nil {
+                dto.lastReaction = lastReaction
+            } else if let lid = dto.lastReaction?.id,
+                let nlid = lastReaction?.id,
+                nlid != lid {
+                dto.lastReaction = lastReaction
+            }
+        } else {
+            dto.lastReaction = nil
+        }
+        
+        
         if let message = channel.lastMessage {
             createOrUpdate(message: message, channelId: channel.id)
         }
@@ -67,11 +83,6 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         }
         if let members = channel.members {
             createOrUpdate(members: members, channelId: channel.id)
-        }
-        
-        dto.lastReaction = nil
-        if let reactions = channel.lastReactions {
-            createOrUpdate(reactions: reactions)
         }
         
         if let role = channel.userRole {
@@ -94,13 +105,8 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         }
         
         if let members = channel.members {
-            if dto.members == nil {
-                dto.members = .init()
-            }
-            
             for member in members {
                 let mdto = createOrUpdate(member: member, channelId: channel.id)
-                dto.members?.insert(mdto)
             }
         }
         
@@ -149,10 +155,6 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
             let memberDto = MemberDTO.fetchOrCreate(id: member.id, channelId: channelId, context: self).map(member)
             memberDto.user = createOrUpdate(user: member)
             memberDto.role = RoleDTO.fetchOrCreate(name: member.role, context: self)
-            if memberDto.channels == nil {
-                memberDto.channels = .init()
-            }
-            memberDto.channels?.insert(dto)
         }
         
         return dto
@@ -174,18 +176,13 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         } else {
             dto.role = nil
         }
-        let channel = ChannelDTO.fetchOrCreate(id: channelId, context: self)
-        if dto.channels == nil {
-            dto.channels = .init()
-        }
-        dto.channels?.insert(channel)
         return dto
     }
     
     @discardableResult
     public func createOrUpdate(member: ChatChannelMember, channelId: ChannelId) -> MemberDTO {
         let dto = MemberDTO.fetchOrCreate(id: member.id, channelId: channelId, context: self)
-        dto.user = UserDTO.fetch(id: member.id, context: self)
+        dto.user = createOrUpdate(user: member)
         if !member.id.isEmpty, let role = member.roleName {
             dto.role = RoleDTO.fetchOrCreate(name: role, context: self)
         } else {
@@ -203,23 +200,19 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         guard let channel = ChannelDTO.fetch(id: channelId, context: self)
         else { return }
         let toDelete = members.compactMap {
-            let member = MemberDTO.fetch(id: $0.id, channelId: channelId, context: self)
-            if member?.channels?.remove(channel) != nil {
-                return member
-            }
-            return nil
+            MemberDTO.fetch(id: $0.id, channelId: channelId, context: self)
         }
-        toDelete.compactMap { ($0.channels == nil || $0.channels?.count == 0) ? $0 : nil }
+        toDelete
             .forEach {
                 delete($0)
             }
     }
     
     public func deleteMember(id: UserId, from channelId: ChannelId) {
-        if let member = MemberDTO.fetch(id: id, channelId: channelId, context: self),
-           let channel = ChannelDTO.fetch(id: channelId, context: self) {
-            member.channels?.remove(channel)
+        if let member = MemberDTO.fetch(id: id, channelId: channelId, context: self) {
+            delete(member)
         }
+           
     }
     
     @discardableResult
@@ -240,11 +233,11 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         return 0;
         
         let predicate = NSPredicate(format: "pendingMarkerNames != nil")
-            .and(predicate: .init(format: "(channelId == %lld OR (channelId == 0 AND ownerChannel.id == %lld))", channel.id, channel.id))
+            .and(predicate: .init(format: "(channelId == %lld", channel.id, channel.id))
         let count = MessageDTO.fetch(predicate: predicate, context: self).filter { message in
             message.pendingMarkerNames?.contains(name) == true
         }.count
-        log.debug("[MARKER CHECK] numberOfPendingMarkers (\(name)) count: \(count), from server \(channel.newMessageCount)")
+        logger.debug("[MARKER CHECK] numberOfPendingMarkers (\(name)) count: \(count), from server \(channel.newMessageCount)")
         return Int64(count)
     }
 }

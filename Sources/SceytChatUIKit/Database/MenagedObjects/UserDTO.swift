@@ -64,6 +64,20 @@ public class UserDTO: NSManagedObject {
         presenceLastActiveAt = map.presence.lastActiveAt
         return self
     }
+    
+    public func map(_ map: ChatUser) -> UserDTO {
+        id = map.id
+        firstName = map.firstName
+        lastName = map.lastName
+        avatarUrl = map.avatarUrl
+        metadata = map.metadata
+        blocked = map.blocked
+        state = Int16(map.state.rawValue)
+        presenceState = Int16(map.presence.state.presenceState.rawValue)
+        presenceStatus = map.presence.status
+        presenceLastActiveAt = map.presence.lastActiveAt
+        return self
+    }
 
     public func convert() -> ChatUser {
         .init(dto: self)

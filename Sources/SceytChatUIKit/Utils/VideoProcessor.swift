@@ -23,7 +23,7 @@ open class VideoProcessor {
     
     open class func copyFrame(
         url: URL,
-        at time: TimeInterval = 1
+        at time: TimeInterval = 0
     ) -> UIImage? {
         let asset = AVAsset(url: url)
         return copyFrame(asset: asset, at: time)
@@ -31,7 +31,7 @@ open class VideoProcessor {
     
     open class func copyFrame(
         asset: AVAsset,
-        at time: TimeInterval = 1
+        at time: TimeInterval = 0
     ) -> UIImage? {
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
@@ -41,7 +41,7 @@ open class VideoProcessor {
             let cgImage = try generator.copyCGImage(at: duration, actualTime: nil)
             return UIImage(cgImage: cgImage)
         } catch {
-            log.errorIfNotNil(error, "Copy video frame at \(CMTimeGetSeconds(duration)) s., given value id \(time) s.")
+            logger.errorIfNotNil(error, "Copy video frame at \(CMTimeGetSeconds(duration)) s., given value id \(time) s.")
             return nil
         }
     }
@@ -194,12 +194,12 @@ open class SCVideoProcessInfo: NSObject {
 
     override public init() {
         super.init()
-        debugPrint("[SCVideoProcessInfo] init \(self)")
+        logger.debug("[SCVideoProcessInfo] init \(self)")
     }
     
     open func cancel() {
         isCancelled = true
-        debugPrint("[SCVideoProcessInfo] cancel \(self)")
+        logger.debug("[SCVideoProcessInfo] cancel \(self)")
     }
 }
 
@@ -375,18 +375,18 @@ open class VideoOperation: AsyncOperation {
             audioSettings = createAudioSettingsWithAudioTrack(adTrack, bitrate: targetAudioBitrate, sampleRate: targetSampleRate)
         }
         
-        debugPrint("[VideoProcessor][\(uuid)] ************** Video info **************")
-        debugPrint("[VideoProcessor][\(uuid)] 🎬 Video ")
-        debugPrint("[VideoProcessor][\(uuid)] INPUT:")
-        debugPrint("[VideoProcessor][\(uuid)] video size: \(inputURL.sizeInMB())M")
-        debugPrint("[VideoProcessor][\(uuid)] bitrate: \(videoTrack.estimatedDataRate) b/s")
-        debugPrint("[VideoProcessor][\(uuid)] fps: \(videoTrack.nominalFrameRate)") //
-        debugPrint("[VideoProcessor][\(uuid)] scale size: \(videoTrack.naturalSize)")
-        debugPrint("[VideoProcessor][\(uuid)] OUTPUT:")
-        debugPrint("[VideoProcessor][\(uuid)] video bitrate: \(targetVideoBitrate) b/s")
-        debugPrint("[VideoProcessor][\(uuid)] fps: \(targetFrameRate)")
-        debugPrint("[VideoProcessor][\(uuid)] scale size: (\(targetSize))")
-        debugPrint("[VideoProcessor][\(uuid)] ****************************************")
+        logger.debug("[VideoProcessor][\(uuid)] ************** Video info **************")
+        logger.debug("[VideoProcessor][\(uuid)] 🎬 Video ")
+        logger.debug("[VideoProcessor][\(uuid)] INPUT:")
+        logger.debug("[VideoProcessor][\(uuid)] video size: \(inputURL.sizeInMB())M")
+        logger.debug("[VideoProcessor][\(uuid)] bitrate: \(videoTrack.estimatedDataRate) b/s")
+        logger.debug("[VideoProcessor][\(uuid)] fps: \(videoTrack.nominalFrameRate)") //
+        logger.debug("[VideoProcessor][\(uuid)] scale size: \(videoTrack.naturalSize)")
+        logger.debug("[VideoProcessor][\(uuid)] OUTPUT:")
+        logger.debug("[VideoProcessor][\(uuid)] video bitrate: \(targetVideoBitrate) b/s")
+        logger.debug("[VideoProcessor][\(uuid)] fps: \(targetFrameRate)")
+        logger.debug("[VideoProcessor][\(uuid)] scale size: (\(targetSize))")
+        logger.debug("[VideoProcessor][\(uuid)] ****************************************")
         
         _compress(asset: asset,
                   fileType: config.fileType,
@@ -486,7 +486,7 @@ open class VideoOperation: AsyncOperation {
             group.notify(queue: .main) { [weak self] in
                 guard let self else { return }
                 if self.isCancelled {
-                    debugPrint("[VideoProcessor][\(self.uuid)] cancelled")
+                    logger.debug("[VideoProcessor][\(self.uuid)] cancelled")
                     return completion(.failure(Errors.cancelled))
                 }
                 switch writer.status {
@@ -495,12 +495,12 @@ open class VideoOperation: AsyncOperation {
                         guard let self else { return }
                         let endTime = Date()
                         let elapse = endTime.timeIntervalSince(startTime)
-                        debugPrint("[VideoProcessor][\(self.uuid)] ******** Compression finished ✅**********")
-                        debugPrint("[VideoProcessor][\(self.uuid)] Compressed video:")
-                        debugPrint("[VideoProcessor][\(self.uuid)] time: \(elapse)")
-                        debugPrint("[VideoProcessor][\(self.uuid)] size: \(outputURL.sizeInMB())M")
-                        debugPrint("[VideoProcessor][\(self.uuid)] url: \(outputURL)")
-                        debugPrint("[VideoProcessor][\(self.uuid)] ******************************************")
+                        logger.debug("[VideoProcessor][\(self.uuid)] ******** Compression finished ✅**********")
+                        logger.debug("[VideoProcessor][\(self.uuid)] Compressed video:")
+                        logger.debug("[VideoProcessor][\(self.uuid)] time: \(elapse)")
+                        logger.debug("[VideoProcessor][\(self.uuid)] size: \(outputURL.sizeInMB())M")
+                        logger.debug("[VideoProcessor][\(self.uuid)] url: \(outputURL)")
+                        logger.debug("[VideoProcessor][\(self.uuid)] ******************************************")
                         DispatchQueue.main.sync {
                             completion(.success(outputURL))
                         }
@@ -553,18 +553,18 @@ open class VideoOperation: AsyncOperation {
     
     private func createAudioSettingsWithAudioTrack(_ audioTrack: AVAssetTrack, bitrate: Float, sampleRate: Int) -> [String: Any] {
         if let audioFormatDescs = audioTrack.formatDescriptions as? [CMFormatDescription], let formatDescription = audioFormatDescs.first {
-            debugPrint("[VideoProcessor][\(uuid)] 🔊 Audio")
-            debugPrint("[VideoProcessor][\(uuid)] INPUT:")
-            debugPrint("[VideoProcessor][\(uuid)] bitrate: \(audioTrack.estimatedDataRate)")
+            logger.debug("[VideoProcessor][\(uuid)] 🔊 Audio")
+            logger.debug("[VideoProcessor][\(uuid)] INPUT:")
+            logger.debug("[VideoProcessor][\(uuid)] bitrate: \(audioTrack.estimatedDataRate)")
             if let streamBasicDescription = CMAudioFormatDescriptionGetStreamBasicDescription(formatDescription) {
-                debugPrint("[VideoProcessor][\(uuid)] sampleRate: \(streamBasicDescription.pointee.mSampleRate)")
-                debugPrint("[VideoProcessor][\(uuid)] channels: \(streamBasicDescription.pointee.mChannelsPerFrame)")
-                debugPrint("[VideoProcessor][\(uuid)] formatID: \(streamBasicDescription.pointee.mFormatID)")
+                logger.debug("[VideoProcessor][\(uuid)] sampleRate: \(streamBasicDescription.pointee.mSampleRate)")
+                logger.debug("[VideoProcessor][\(uuid)] channels: \(streamBasicDescription.pointee.mChannelsPerFrame)")
+                logger.debug("[VideoProcessor][\(uuid)] formatID: \(streamBasicDescription.pointee.mFormatID)")
             }
-            debugPrint("[VideoProcessor][\(uuid)] OUTPUT:")
-            debugPrint("[VideoProcessor][\(uuid)] bitrate: \(bitrate)")
-            debugPrint("[VideoProcessor][\(uuid)] sampleRate: \(sampleRate)")
-            debugPrint("[VideoProcessor][\(uuid)] formatID: \(kAudioFormatMPEG4AAC)")
+            logger.debug("[VideoProcessor][\(uuid)] OUTPUT:")
+            logger.debug("[VideoProcessor][\(uuid)] bitrate: \(bitrate)")
+            logger.debug("[VideoProcessor][\(uuid)] sampleRate: \(sampleRate)")
+            logger.debug("[VideoProcessor][\(uuid)] formatID: \(kAudioFormatMPEG4AAC)")
         }
         
         var audioChannelLayout = AudioChannelLayout()
@@ -695,7 +695,7 @@ private extension URL {
                 return size.doubleValue / (1024 * 1024)
             }
         } catch {
-            debugPrint("[VideoProcessor] Error: \(error)")
+            logger.debug("[VideoProcessor] Error: \(error)")
         }
         return 0.0
     }

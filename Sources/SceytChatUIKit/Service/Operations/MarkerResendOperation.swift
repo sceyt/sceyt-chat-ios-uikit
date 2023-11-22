@@ -31,12 +31,12 @@ open class MarkerResendOperation: AsyncOperation {
     
     private func mark(_ completion: @escaping () -> Void) {
         let mids = messageIds
-        log.verbose("SyncService: Resending Marker with messageIds \(mids)")
+        logger.verbose("SyncService: Resending Marker with messageIds \(mids)")
         provider.mark(
             ids: messageIds,
             markerName: markerName
         ) { error in
-            log.errorIfNotNil(error, "SyncService: Resending Marker with messageIds \(mids)")
+            logger.errorIfNotNil(error, "SyncService: Resending Marker with messageIds \(mids)")
             completion()
         }
     }

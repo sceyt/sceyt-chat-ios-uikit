@@ -382,7 +382,7 @@ extension MessageCell {
                 ) { [weak self] progress in
                     guard let self, self.data == data
                     else {
-                        log.verbose("[Attachment] progress self is nil thumbnail load from filePath \(data.attachment.description)")
+                        logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(data.attachment.description)")
                         return
                     }
                     
@@ -397,10 +397,10 @@ extension MessageCell {
                 } completion: {[weak self] done in
                     guard self?.data == data
                     else {
-                        log.verbose("[Attachment] completion self is nil \(data.attachment.description)")
+                        logger.verbose("[Attachment] completion self is nil \(data.attachment.description)")
                         return
                     }
-                    debugPrint("[AWSSTASK] completion", done.attachment.status)
+                    logger.debug("[Attachment] completion \(done.attachment.status)")
                     if done.error == nil {
                         fileProvider.removeProgressObserver(message: done.message, attachment: done.attachment)
                     } else {

@@ -215,14 +215,14 @@ open class ChannelMessageProvider: Provider {
         completion: ((Error?) -> Void)? = nil
     ) {
         database.write ({
-            let ownerChannel =
             $0.createOrUpdate(
                 message: message,
                 channelId: self.channelId
-            ).ownerChannel
-            if let createdAt = ownerChannel?.lastMessage?.createdAt.bridgeDate,
+            )
+            if let ownerChannel = ChannelDTO.fetch(id: self.channelId, context: $0),
+                let createdAt = ownerChannel.lastMessage?.createdAt.bridgeDate,
                createdAt < message.createdAt {
-                ownerChannel?.lastDisplayedMessageId = 0
+                ownerChannel.lastDisplayedMessageId = 0
             }
         }) { error in
             
@@ -439,7 +439,7 @@ extension ChannelMessageProvider {
                 case .success(let result):
                     completion(result)
                 case .failure(let error):
-                    debugPrint(error)
+                    logger.errorIfNotNil(error, "")
                     completion([])
                 }
             }
@@ -455,9 +455,8 @@ extension ChannelMessageProvider {
                 return MessageDTO.fetch(request: request, context: $0)
                     .reduce([ChannelId: [String: Set<MessageId>]]()) { partialResult, element in
                         var result = partialResult
-                        let channelId = element.channelId == 0 ? element.ownerChannel?.id : element.channelId
-                        guard let channelId,
-                              let pendingMarkerNames = element.pendingMarkerNames
+                        let channelId = element.channelId
+                        guard let pendingMarkerNames = element.pendingMarkerNames
                         else { return result }
                         let cid = ChannelId(channelId)
                         if result[cid] == nil {
@@ -477,7 +476,7 @@ extension ChannelMessageProvider {
                 case .success(let result):
                     completion(result)
                 case .failure(let error):
-                    debugPrint(error)
+                    logger.errorIfNotNil(error, "")
                     completion([:])
                 }
             }
@@ -501,7 +500,7 @@ extension ChannelMessageProvider {
                 case .success(let result):
                     completion(result)
                 case .failure(let error):
-                    debugPrint(error)
+                    logger.errorIfNotNil(error, "")
                     completion([])
                 }
             }

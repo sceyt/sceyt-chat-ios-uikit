@@ -37,13 +37,13 @@ import CoreData
 //                do {
 //                    try $0.batchDelete(fetchRequest: request)
 //                } catch {
-//                    print(error)
+//                    logger.debug(error)
 //                }
 //            }
 //
 //            self.channels.forEach { channel in
 //                if channel.newMessageCount > 0 {
-//                    log.debug("[MARKER CHECK] Store Operator fetched channels: \(channel.id) for \(channel.newMessageCount)")
+//                    logger.debug("[MARKER CHECK] Store Operator fetched channels: \(channel.id) for \(channel.newMessageCount)")
 //                }
 //            }
 //            for channel in self.channels {
@@ -77,7 +77,7 @@ open class StoreChannelsOperation: AsyncOperation {
         database.write({
             $0.createOrUpdate(channels: self.channels)
         }, completion: { [weak self] error in
-            log.errorIfNotNil(error, "StoreChannelsOperation completed with ")
+            logger.errorIfNotNil(error, "StoreChannelsOperation completed with ")
             self?.complete()
         })
 //        Components.channelListProvider.syncMessageForReactions(channels: channels)
@@ -115,10 +115,10 @@ open class DeleteChannelsOperation: AsyncOperation {
             do {
                 try $0.batchDelete(fetchRequest: request)
             } catch {
-                print(error)
+                logger.errorIfNotNil(error, "")
             }
         }, completion: { [weak self] error in
-            log.errorIfNotNil(error, "StoreChannelsOperation completed with ")
+            logger.errorIfNotNil(error, "StoreChannelsOperation completed with ")
             self?.complete()
         })
     }

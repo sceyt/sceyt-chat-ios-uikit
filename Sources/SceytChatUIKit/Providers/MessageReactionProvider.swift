@@ -79,7 +79,7 @@ open class MessageReactionProvider: Provider {
                     self.syncMessagesForReactions(messageIds: ids, reactions: reactions)
                 }
         } completion: { error in
-            debugPrint(error as Any)
+            logger.debug(error?.localizedDescription ?? "")
             completion?(error)
         }
     }

@@ -143,7 +143,7 @@ open class ChannelProfileEditVM: NSObject {
                 .build()
                 .loadNext()
             if let error = error {
-                log.debug(error.localizedDescription)
+                logger.errorIfNotNil(error, "")
                 guard error.sceytChatCode == .queryInProgress
                 else { return }
                 uriError = error

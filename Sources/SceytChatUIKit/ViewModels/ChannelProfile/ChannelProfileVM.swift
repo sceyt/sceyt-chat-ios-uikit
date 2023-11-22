@@ -60,7 +60,7 @@ open class ChannelProfileVM: NSObject {
         do {
             try channelObserver.startObserver(fetchedAllObjects: false)
         } catch {
-            debugPrint("observer.startObserver", error)
+            logger.errorIfNotNil(error, "observer.startObserver")
         }
     }
 

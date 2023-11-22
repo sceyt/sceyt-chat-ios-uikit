@@ -427,17 +427,17 @@ open class IncomingMessageCell: MessageCell {
         if model.hasReactions {
             switch model.reactionType {
             case .interactive:
-                print("not implemented yet")
+                logger.debug("not implemented yet")
             case .withTotalScore:
                 let size = ReactionTotalView.measure(model: model, appearance: appearance)
                 bubbleSize.height += size.height - 4
                 bubbleSize.width = max(bubbleSize.width, size.width)
             }
         }
-        if model.isFirstUnreadMessage {
+        if model.isLastDisplayedMessage {
             bubbleSize.height += UnreadView.measure(model: model, appearance: appearance).height
         }
-        log.debug("IncomingMessageCell: measure messageId: \(model.message.id), measure: \(bubbleSize) body: \(model.message.body)")
+        logger.debug("IncomingMessageCell: measure messageId: \(model.message.id), measure: \(bubbleSize) body: \(model.message.body)")
         return bubbleSize
     }
 }

@@ -6,17 +6,15 @@
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
-import Foundation
 import CoreData
+import Foundation
 import SceytChat
 
 @objc(MarkerDTO)
 public class MarkerDTO: NSManagedObject {
-    
     @NSManaged public var messageId: Int64
     @NSManaged public var name: String
     @NSManaged public var createdAt: CDDate
-    
     @NSManaged public var user: UserDTO?
     @NSManaged public var message: MessageDTO?
     

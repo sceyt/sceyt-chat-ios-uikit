@@ -11,7 +11,7 @@ import UIKit
 
 open class ChannelCell: TableViewCell {
     
-    open lazy var badgeStackView = UIStackView(arrangedSubviews: [atView, unreadCount])
+    open lazy var badgeStackView = UIStackView(arrangedSubviews: [pinView, atView, unreadCount])
         .withoutAutoresizingMask
         .contentCompressionResistancePriorityH(.required)
     
@@ -43,7 +43,11 @@ open class ChannelCell: TableViewCell {
 
     open lazy var dateLabel = UILabel()
         .withoutAutoresizingMask
-
+    
+    open lazy var pinView = UIImageView(image: Images.channelPin)
+        .withoutAutoresizingMask
+        .contentMode(.center)
+    
     open lazy var ticksView = UIImageView()
         .withoutAutoresizingMask
         .contentMode(.center)
@@ -117,8 +121,10 @@ open class ChannelCell: TableViewCell {
         messageStackView.topAnchor.pin(to: contentView.topAnchor, constant: 10)
         messageLabel.trailingAnchor.pin(lessThanOrEqualTo: dateLabel.trailingAnchor)
         messageLabel.trailingAnchor.pin(lessThanOrEqualTo: badgeStackView.leadingAnchor)
+        
         muteView.centerYAnchor.pin(to: subjectLabel.centerYAnchor)
         muteView.leadingAnchor.pin(to: subjectLabel.trailingAnchor, constant: 4)
+
         ticksView.leadingAnchor.pin(greaterThanOrEqualTo: subjectLabel.trailingAnchor, constant: 8)
         ticksView.leadingAnchor.pin(greaterThanOrEqualTo: muteView.trailingAnchor, constant: 2)
         ticksView.trailingAnchor.pin(to: dateLabel.leadingAnchor, constant: -4)
@@ -135,7 +141,7 @@ open class ChannelCell: TableViewCell {
         separatorView.pin(to: contentView, anchors: [.bottom(), .trailing(-Layouts.horizontalPadding)])
         separatorView.leadingAnchor.pin(to: messageStackView.leadingAnchor)
         separatorView.heightAnchor.pin(constant: 1)
-        updateMessageLabelTrailingAnchor()
+        updateContraints()
     }
 
     override open func setupAppearance() {
@@ -156,7 +162,7 @@ open class ChannelCell: TableViewCell {
         separatorView.backgroundColor = appearance.separatorColor
     }
 
-    private func updateMessageLabelTrailingAnchor() {
+    private func updateContraints() {
         if !unreadCount.isHidden {
             unreadCountWidthAnchorConstraint?.constant = 20
         }
@@ -175,6 +181,8 @@ open class ChannelCell: TableViewCell {
         subjectLabel.text = data.formatedSubject
         messageLabel.attributedText = data.attributedView
         dateLabel.text = data.formatedDate
+        pinView.isHidden = data.channel.pinnedAt == nil
+        backgroundColor = data.channel.pinnedAt == nil ? .clear : .background2
         ticksView.tintColor = deliveryStatusColor(message: data.lastMessage)
         ticksView.image = deliveryStatusImage(message: data.lastMessage)?.withRenderingMode(.alwaysTemplate)
         ticksView.isHidden = data.lastMessage?.state == .deleted
@@ -201,7 +209,7 @@ open class ChannelCell: TableViewCell {
             .sink {[weak self] image in
                 self?.avatarView.image = image
             }.store(in: &subscriptions)
-        updateMessageLabelTrailingAnchor()
+        updateContraints()
     }
     
     open func deliveryStatusImage(message: ChatMessage?) -> UIImage? {

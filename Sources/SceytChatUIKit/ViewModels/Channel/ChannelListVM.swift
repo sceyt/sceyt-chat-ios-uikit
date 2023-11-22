@@ -40,13 +40,14 @@ open class ChannelListVM: NSObject,
         return LazyDatabaseObserver<ChannelDTO, ChatChannel>(
             context: Config.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)],
+            sectionNameKeyPath: #keyPath(ChannelDTO.pinSectionIdentifier),
             fetchPredicate: fetchPredicate,
             relationshipKeyPathsObserver: [
                 #keyPath(ChannelDTO.lastMessage.deliveryStatus),
                 #keyPath(ChannelDTO.lastMessage.updatedAt),
                 #keyPath(ChannelDTO.lastMessage.state),
-                #keyPath(ChannelDTO.members.user),
-                #keyPath(ChannelDTO.lastReaction.messageId),
+//                #keyPath(ChannelDTO.members.user),
+                #keyPath(ChannelDTO.lastReaction.message),
                 #keyPath(ChannelDTO.lastReaction.key)
             ]
         ) { [weak self] in
@@ -76,11 +77,15 @@ open class ChannelListVM: NSObject,
         do {
             try channelObserver.startObserver()
         } catch {
-            log.errorIfNotNil(error, "startDatabaseObserver")
+            logger.errorIfNotNil(error, "startDatabaseObserver")
         }
     }
     open func onDidChangeEvent(items: Paths) {
-        event = .change(items)
+        if SyncService.isSyncing || items.numberOfChangedItems > 2 {
+            event = .reload
+        } else {
+            event = .change(items)
+        }
         Components.channelListProvider
             .totalUnreadMessagesCount { [weak self] sum in
                 DispatchQueue.main.async {
@@ -131,8 +136,12 @@ open class ChannelListVM: NSObject,
         return nil
     }
     
-    open var numberOfChannels: Int {
-        channelObserver.numberOfItems(in: 0)
+    open var numberOfSections: Int {
+        channelObserver.numberOfSections
+    }
+    
+    open func numberOfChannel(at section: Int) -> Int {
+        channelObserver.numberOfItems(in: section)
     }
     
     //MARK: Channel search
@@ -142,7 +151,7 @@ open class ChannelListVM: NSObject,
             try channelObserver.restartObserver(fetchPredicate: predicate)
             provider.loadChannels(query: channelListQuery)
         } catch {
-            log.errorIfNotNil(error, "restartObserver")
+            logger.errorIfNotNil(error, "restartObserver")
         }
     }
    
@@ -166,7 +175,7 @@ open class ChannelListVM: NSObject,
                 self.event = .reloadSearch
             }
         } errorBlock: { error in
-            log.error("[search] error \(error)")
+            logger.error("[search] error \(error)")
         }
     }
     
@@ -231,14 +240,24 @@ open class ChannelListVM: NSObject,
         channelProvider(channel).unmute()
     }
     
-    open func pin(_ value: Bool, at indexPath: IndexPath) {
+    open func pin(at indexPath: IndexPath) {
         guard let channel = channel(at: indexPath)
         else { return }
-        pin(value, channel: channel)
+        pin(channel: channel)
     }
     
-    open func pin(_ value: Bool, channel: ChatChannel) {
-        // TODO: pin chat
+    open func pin(channel: ChatChannel) {
+        channelProvider(channel).pin()
+    }
+    
+    open func unpin(at indexPath: IndexPath) {
+        guard let channel = channel(at: indexPath)
+        else { return }
+        unpin(channel: channel)
+    }
+    
+    open func unpin(channel: ChatChannel) {
+        channelProvider(channel).unpin()
     }
     
     open func deleteAllMessages(at indexPath: IndexPath, forEveryone: Bool) {

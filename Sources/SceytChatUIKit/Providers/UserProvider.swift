@@ -18,15 +18,15 @@ open class UserProvider: Provider {
     open func blockUsers(
         ids: [UserId],
         completion: ((Error?) -> Void)? = nil) {
-            log.verbose("Request to block users \(ids)")
+            logger.verbose("Request to block users \(ids)")
             chatClient.blockUsers(ids: ids) { users, error in
                 if let users = users {
                     self.store(users: users) { error in
-                        log.errorIfNotNil(error, "Store users")
+                        logger.errorIfNotNil(error, "Store users")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Response block users")
+                    logger.errorIfNotNil(error, "Response block users")
                     completion?(error)
                 }
             }
@@ -35,15 +35,15 @@ open class UserProvider: Provider {
     open func unblockUsers(
         ids: [UserId],
         completion: ((Error?) -> Void)? = nil) {
-            log.verbose("Request to unblock users \(ids)")
+            logger.verbose("Request to unblock users \(ids)")
             chatClient.unblockUsers(ids: ids) { users, error in
                 if let users = users {
                     self.store(users: users) { error in
-                        log.errorIfNotNil(error, "Store users")
+                        logger.errorIfNotNil(error, "Store users")
                         completion?(error)
                     }
                 } else {
-                    log.errorIfNotNil(error, "Response unblock users")
+                    logger.errorIfNotNil(error, "Response unblock users")
                     completion?(error)
                 }
             }
@@ -71,7 +71,7 @@ open class UserProvider: Provider {
         database.write {
             $0.createOrUpdate(users: users)
         } completion: { error in
-            log.errorIfNotNil(error, "Unable Store users")
+            logger.errorIfNotNil(error, "Unable Store users")
             completion?(error)
 
         }

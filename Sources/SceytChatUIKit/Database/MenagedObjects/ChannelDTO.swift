@@ -48,10 +48,6 @@ public class ChannelDTO: NSManagedObject {
     @NSManaged public var userRole: RoleDTO?
     
     @NSManaged public var unsubscribed: Bool
-
-    
-    @NSManaged public var members: Set<MemberDTO>?
-    @NSManaged public var messages: Set<MessageDTO>?
     
     @NSManaged public var createdBy: UserDTO?
 
@@ -72,15 +68,19 @@ public class ChannelDTO: NSManagedObject {
             date = updatedAt != nil ? updatedAt?.bridgeDate : createdAt.bridgeDate
         }
         let sortingDate: Date?
-        switch (date, draftDate) {
-        case (.some(let d), .none):
-            sortingDate = d
-        case (.none, .some(let d)):
-            sortingDate = d
-        case (.some(let d1), .some(let d2)):
-            sortingDate = max(d1, d2)
-        case (.none, .none):
-            sortingDate = nil
+        if let pinnedAt {
+            sortingDate = pinnedAt.bridgeDate
+        } else {
+            switch (date, draftDate) {
+            case (.some(let d), .none):
+                sortingDate = d
+            case (.none, .some(let d)):
+                sortingDate = d
+            case (.some(let d1), .some(let d2)):
+                sortingDate = max(d1, d2)
+            case (.none, .none):
+                sortingDate = nil
+            }
         }
         
         if sortingDate != sortingKey?.bridgeDate {
@@ -224,6 +224,18 @@ extension ChannelDTO {
 
 extension ChannelDTO: Identifiable { }
 
+
+extension ChannelDTO {
+    
+    @objc
+    public var pinSectionIdentifier: Int {
+        if pinnedAt == nil {
+            return 0
+        }
+        return 1
+    }
+}
+
 //Helper:
 extension ChannelDTO {
     
@@ -241,7 +253,7 @@ extension ChannelDTO {
             let results = try context.fetch(fetchRequest)
             return results.first?.value(forKey: "sumOfUnreadMessageCount") as? Int ?? 0
         } catch {
-            debugPrint(error)
+            logger.errorIfNotNil(error, "")
         }
         return 0
     }

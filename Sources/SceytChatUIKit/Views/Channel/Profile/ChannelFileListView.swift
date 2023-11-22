@@ -86,9 +86,10 @@ open class ChannelFileListView: ChannelAttachmentListView,
 
     open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileFileCell.self)
-        cell.data = fileViewModel.attachmentLayout(at: indexPath) { [weak cell] in
-            cell?.iconView.image = $0
-        }
+        cell.data = fileViewModel.attachmentLayout(at: indexPath, onLoadThumbnail: { [weak cell] layout in
+            guard layout == cell?.data else { return }
+            cell?.iconView.image = layout.thumbnail
+        })
         cell.event
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
