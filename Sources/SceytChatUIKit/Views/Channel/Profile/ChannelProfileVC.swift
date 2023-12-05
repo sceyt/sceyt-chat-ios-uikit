@@ -101,7 +101,7 @@ open class ChannelProfileVC: ViewController,
                 $0.shouldReceiveTouch = { [weak self] in
                     guard let self else { return false }
                     let contentOffsetY = ceil(self.tableView.contentOffset.y)
-                    if contentOffsetY < self.headerHeight - self.tableView.contentInset.top {
+                    if contentOffsetY < ceil(self.headerHeight) - ceil(self.tableView.contentInset.top) {
                         return false
                     }
                     return true
