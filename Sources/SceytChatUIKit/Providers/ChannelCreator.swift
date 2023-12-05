@@ -220,21 +220,22 @@ open class ChannelCreator: Provider {
 extension ChannelDTO {
  
     class func fetchChannelByMembers(channel: ChatChannel, context: NSManagedObjectContext) -> ChatChannel? {
-//        let request = ChannelDTO.fetchRequest()
-//        request.predicate = NSPredicate(format: "type == %@", channel.type)
-//        let channelDtos = ChannelDTO.fetch(request: request, context: context)
-//        for dto in channelDtos {
-//            if let channelMembers = dto.members, channelMembers.count == channel.members?.count ?? 0 {
-//                let join: String = channelMembers.compactMap { $0.user?.id }.sorted().joined(separator: "$")
-//                var hash: Int64 = Crypto.hash(value: join)
-//                if hash < 0 {
-//                    hash *= -1
-//                }
-//                if hash == channel.id {
-//                    return dto.convert()
-//                }
-//            }
-//        }
+        let request = ChannelDTO.fetchRequest()
+        request.predicate = NSPredicate(format: "type == %@", channel.type)
+        let channelDtos = ChannelDTO.fetch(request: request, context: context)
+        for dto in channelDtos {
+            let channelMembers = MemberDTO.fetch(channelId: ChannelId(dto.id), context: context)
+            if channelMembers.count == channel.members?.count ?? 0 {
+                let join: String = channelMembers.compactMap { $0.user?.id }.sorted().joined(separator: "$")
+                var hash: Int64 = Crypto.hash(value: join)
+                if hash < 0 {
+                    hash *= -1
+                }
+                if hash == channel.id {
+                    return dto.convert()
+                }
+            }
+        }
         return nil
     }
 }
