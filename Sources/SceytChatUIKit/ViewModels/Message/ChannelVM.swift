@@ -611,6 +611,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             return message
         }
         if let message = messageObserver.itemFromPrevCache(at: indexPath) {
+            logger.verbose("[CELL SIZE] found message from prev cache for mid: \(message.id) ip: \(indexPath)")
             return message
         }
         return nil
