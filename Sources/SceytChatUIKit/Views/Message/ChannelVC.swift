@@ -10,8 +10,6 @@ import Photos
 import SceytChat
 import UIKit
 
-private let messageBottomSpace = CGFloat(5)
-
 open class ChannelVC: ViewController,
                       UIGestureRecognizerDelegate,
                       UICollectionViewDelegateFlowLayout,
@@ -1139,6 +1137,7 @@ open class ChannelVC: ViewController,
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: Components.incomingMessageCell.reuseId, for: indexPath)
             return cell
         }
+        logger.verbose("[CELL SIZE] create cell for mid: \(model.message.id) pref size: \(model.measureSize.height) ip: \(indexPath)")
         return cellForItemAt(indexPath: indexPath, collectionView: collectionView, model: model)
     }
     
@@ -1249,7 +1248,7 @@ open class ChannelVC: ViewController,
         return cell
     }
     
-    public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+    open func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard channelViewModel.canSelectMessage(at: indexPath)
         else { return }
         channelViewModel.didChangeSelection(for: indexPath)
@@ -1278,8 +1277,10 @@ open class ChannelVC: ViewController,
     ) -> CGSize {
         let width = collectionView.bounds.width
         if let lm = channelViewModel.layoutModel(at: indexPath) {
+            logger.verbose("[CELL SIZE] get cell size for mid: \(lm.message.id) pref size: \(lm.measureSize.height) ip: \(indexPath)")
             return CGSize(width: width, height: lm.measureSize.height)
         }
+        logger.verbose("[CELL SIZE] get cell size for not found ip: \(indexPath)")
         return CGSize(width: width, height: 33)
     }
     
@@ -1613,6 +1614,7 @@ open class ChannelVC: ViewController,
             if !noDataView.isHidden {
                 showEmptyViewIfNeeded()
             }
+            logger.verbose("[CELL SIZE] Receive EVENT")
             if let unreadMessageIndexPath, checkOnlyFirstTimeReceivedMessagesFromArchive {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
                 if inserts.count == 1,
@@ -1682,6 +1684,7 @@ open class ChannelVC: ViewController,
                 } completion: { [weak self] _ in
                     var scrollBottom = false
                     defer {
+                        logger.verbose("[CELL SIZE] Receive EVENT ENDED")
                         self?.isCollectionViewUpdating = false
                         if scrollBottom, let self = self {
                             self.scrollToBottom(animated: animatedScroll)
@@ -2117,6 +2120,7 @@ open class ChannelVC: ViewController,
 }
 
 extension ChannelVC {
+    
     open class BarCoverView: UIView {
         override open func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             subviews.first { view in

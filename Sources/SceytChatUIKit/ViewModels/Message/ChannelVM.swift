@@ -1590,6 +1590,7 @@ public extension ChannelVM {
 }
 
 public extension ChannelVM {
+    
     struct Key: Equatable, Hashable {
         private let id: MessageId
         private let tid: Int64
