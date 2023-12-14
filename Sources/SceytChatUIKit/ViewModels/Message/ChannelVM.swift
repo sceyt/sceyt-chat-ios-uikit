@@ -376,7 +376,11 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                     }
                 }
                 isUpdated = updateOptions.rawValue != 0
+                if isUpdated {
+                    model.updateOptions = []
+                }
             }
+            
             return isUpdated
         }
         
