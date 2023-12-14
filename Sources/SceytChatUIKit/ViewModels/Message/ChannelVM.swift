@@ -365,7 +365,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         var events = [Event]()
         @discardableResult
         func updateLayoutModel(at indexPath: IndexPath) -> Bool {
-            var isUpdated = false
+//            var isUpdated = false
             if let message = messageObserver.workingCacheItem(at: indexPath),
                 let model = layoutModel(for: message) {
                 var updateOptions = model.updateOptions
@@ -375,13 +375,13 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                         events.append(.updateDeliveryStatus(model, indexPath))
                     }
                 }
-                isUpdated = updateOptions.rawValue != 0
-                if isUpdated {
-                    model.updateOptions = []
-                }
+//                isUpdated = updateOptions.rawValue != 0
+//                if isUpdated {
+//                    model.updateOptions = []
+//                }
             }
             
-            return isUpdated
+            return true
         }
         
         var paths = CollectionUpdateIndexPaths(
