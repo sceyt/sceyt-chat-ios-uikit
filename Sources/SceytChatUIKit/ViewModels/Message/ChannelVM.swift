@@ -377,6 +377,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 }
                 isUpdated = updateOptions.rawValue != 0
             }
+            
             return isUpdated
         }
         
@@ -1590,6 +1591,7 @@ public extension ChannelVM {
 }
 
 public extension ChannelVM {
+    
     struct Key: Equatable, Hashable {
         private let id: MessageId
         private let tid: Int64

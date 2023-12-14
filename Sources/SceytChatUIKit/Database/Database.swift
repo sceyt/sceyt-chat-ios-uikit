@@ -56,32 +56,31 @@ public extension Database {
         resetStalenessInterval: Bool = true,
         completion: (() -> Void)? = nil
     ) {
-        let group = DispatchGroup()
-        group.enter()
-        viewContext.perform {
-            if resetStalenessInterval {
-                self.viewContext.stalenessInterval = 0
-            }
-            self.viewContext.refreshAllObjects()
-            if resetStalenessInterval {
-                self.viewContext.stalenessInterval = -1
-            }
-            group.leave()
+        
+        if resetStalenessInterval {
+            self.backgroundPerformContext.stalenessInterval = 0
         }
-        group.enter()
-        backgroundReadOnlyObservableContext.perform {
-            if resetStalenessInterval {
-                self.backgroundReadOnlyObservableContext.stalenessInterval = 0
-            }
-            self.backgroundReadOnlyObservableContext.refreshAllObjects()
-            if resetStalenessInterval {
-                self.backgroundReadOnlyObservableContext.stalenessInterval = -1
-            }
-            group.leave()
+        self.backgroundPerformContext.refreshAllObjects()
+        if resetStalenessInterval {
+            self.backgroundPerformContext.stalenessInterval = -1
         }
-        group.notify(queue: .main) {
-            completion?()
+        
+        if resetStalenessInterval {
+            self.backgroundReadOnlyObservableContext.stalenessInterval = 0
         }
+        self.backgroundReadOnlyObservableContext.refreshAllObjects()
+        if resetStalenessInterval {
+            self.backgroundReadOnlyObservableContext.stalenessInterval = -1
+        }
+        
+        if resetStalenessInterval {
+            self.viewContext.stalenessInterval = 0
+        }
+        self.viewContext.refreshAllObjects()
+        if resetStalenessInterval {
+            self.viewContext.stalenessInterval = -1
+        }
+        completion?()
     }
 }
 

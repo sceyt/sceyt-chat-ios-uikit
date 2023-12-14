@@ -10,8 +10,6 @@ import Photos
 import SceytChat
 import UIKit
 
-private let messageBottomSpace = CGFloat(5)
-
 open class ChannelVC: ViewController,
                       UIGestureRecognizerDelegate,
                       UICollectionViewDelegateFlowLayout,
@@ -1249,7 +1247,7 @@ open class ChannelVC: ViewController,
         return cell
     }
     
-    public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+    open func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard channelViewModel.canSelectMessage(at: indexPath)
         else { return }
         channelViewModel.didChangeSelection(for: indexPath)
@@ -1664,6 +1662,7 @@ open class ChannelVC: ViewController,
             if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil {
                 needsToScrollBottom = false
             }
+            
             UIView.performWithoutAnimation {
                 isCollectionViewUpdating = true
                 collectionView.performBatchUpdates {
@@ -1689,7 +1688,7 @@ open class ChannelVC: ViewController,
                     }
                     guard let self = self else { return }
                     UIView.performWithoutAnimation {
-                        let reloads = moves.map(\.to)
+                        let reloads = paths.reloads + moves.map(\.to)
                         if !reloads.isEmpty {
                             self.collectionView.performBatchUpdates {
                                 self.collectionView.reloadItems(at: reloads)
@@ -2117,6 +2116,7 @@ open class ChannelVC: ViewController,
 }
 
 extension ChannelVC {
+    
     open class BarCoverView: UIView {
         override open func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             subviews.first { view in
