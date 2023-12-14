@@ -364,8 +364,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     -> [Event] {
         var events = [Event]()
         @discardableResult
-        func updateLayoutModel(at indexPath: IndexPath) -> Bool {
-//            var isUpdated = false
+        func updateLayoutModel(at indexPath: IndexPath, log: String) -> Bool {
+            var isUpdated = false
             if let message = messageObserver.workingCacheItem(at: indexPath),
                 let model = layoutModel(for: message) {
                 var updateOptions = model.updateOptions
@@ -375,13 +375,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                         events.append(.updateDeliveryStatus(model, indexPath))
                     }
                 }
-//                isUpdated = updateOptions.rawValue != 0
-//                if isUpdated {
-//                    model.updateOptions = []
-//                }
+                isUpdated = updateOptions.rawValue != 0
             }
             
-            return true
+            return isUpdated
         }
         
         var paths = CollectionUpdateIndexPaths(
@@ -417,23 +414,23 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             } else {
                 paths.continuesOptions.insert(.middle)
             }
-            updateLayoutModel(at: indexPath)
+            updateLayoutModel(at: indexPath, log: "insert")
         }
         items.updates.forEach { indexPath in
             union[indexPath] = true
-            if !updateLayoutModel(at: indexPath) {
+            if !updateLayoutModel(at: indexPath, log: "update") {
                 paths.reloads.removeAll(where: { $0 == indexPath })
             }
         }
         items.deletes.forEach { indexPath in
             union[indexPath] = true
-            updateLayoutModel(at: indexPath)
+            updateLayoutModel(at: indexPath, log: "delete")
         }
         items.moves.forEach { fromIndexPath, toIndexPath in
             union[fromIndexPath] = true
             union[toIndexPath] = true
-            updateLayoutModel(at: fromIndexPath)
-            updateLayoutModel(at: toIndexPath)
+            updateLayoutModel(at: fromIndexPath, log: "move from")
+            updateLayoutModel(at: toIndexPath, log: "move to")
         }
         var indexPaths = union.keys.sorted()
         if !indexPaths.isEmpty {
@@ -615,7 +612,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             return message
         }
         if let message = messageObserver.itemFromPrevCache(at: indexPath) {
-            logger.verbose("[CELL SIZE] found message from prev cache for mid: \(message.id) ip: \(indexPath)")
             return message
         }
         return nil

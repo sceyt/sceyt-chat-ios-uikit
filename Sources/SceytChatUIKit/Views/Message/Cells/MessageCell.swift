@@ -277,6 +277,7 @@ open class MessageCell: CollectionViewCell,
             avatarView.isHidden = true
         }
         forwardView.isHidden = !data.isForwarded
+        data.updateOptions = []
     }
     
     private func makeConstraints() {
