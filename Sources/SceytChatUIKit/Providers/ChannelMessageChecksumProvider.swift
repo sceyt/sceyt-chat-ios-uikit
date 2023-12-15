@@ -94,17 +94,17 @@ open class ChannelMessageChecksumProvider: Provider {
                 completion: { [weak self] checksum in
                     guard let self else { return }
                     if let checksum, let link = checksum.data {
-                        self.database.read { checksum -> ChatMessage.Attachment? in
-                            var dto = MessageDTO.fetch(tid: message.tid, context: checksum)
+                        self.database.read { context -> ChatMessage.Attachment? in
+                            var dto = MessageDTO.fetch(tid: message.tid, context: context)
                             if dto == nil, message.id > 0 {
-                                dto = MessageDTO.fetch(id: message.id, context: checksum)
+                                dto = MessageDTO.fetch(id: message.id, context: context)
                                 logger.debug("Found message by tid not found \(message.tid) is fetch by id \(message.id) \(dto != nil)")
                             }
                             if dto == nil {
                                 logger.debug("Found message by tid not found \(message.tid)  will insert new message")
-                                dto = checksum.createOrUpdate(message: message.builder.build(), channelId: message.channelId)
+                                dto = context.createOrUpdate(message: message.builder.build(), channelId: message.channelId)
                             }
-                            return AttachmentDTO.fetch(url: link, context: checksum)?.convert()
+                            return AttachmentDTO.fetch(url: link, context: context)?.convert()
                         } completion: { [weak self] result in
                             guard let self else { return }
                             switch result {
@@ -133,7 +133,17 @@ open class ChannelMessageChecksumProvider: Provider {
                                         }
                                     }
                                 } else {
-                                    completion(.success(nil))
+                                    self.createChecksum(
+                                        message: message,
+                                        attachment: attachment)
+                                    { [weak self] error in
+                                        if let error {
+                                            completion(.failure(error))
+                                        } else {
+                                            completion(.success(nil))
+                                        }
+                                    }
+//                                    completion(.success(nil))
                                 }
                             case .failure(let error):
                                 logger.errorIfNotNil(error, "Getting Attachment by url")

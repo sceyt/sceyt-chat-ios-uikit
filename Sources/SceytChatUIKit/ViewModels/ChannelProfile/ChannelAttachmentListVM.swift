@@ -156,7 +156,8 @@ open class ChannelAttachmentListVM: NSObject {
         let attachment = layout.attachment
         downloadQueue.async { [weak self] in
             guard let self,
-                  attachment.type != "file" || Config.minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= Config.minAutoDownloadSize,
+                  attachment.type != "link",
+                  Config.minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= Config.minAutoDownloadSize,
                   attachment.status != .done,
                   attachment.status != .failedDownloading,
                   attachment.status != .failedUploading
@@ -190,6 +191,8 @@ open class ChannelAttachmentListVM: NSObject {
 
     open func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
+        guard attachment.type != "link"
+        else { return }
         getMessage(layout) { message in
             if let message {
                 fileProvider.resumeTransfer(message: message, attachment: attachment) {

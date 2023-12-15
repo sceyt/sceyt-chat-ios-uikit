@@ -308,18 +308,18 @@ public struct AttachmentView {
                     with: options,
                     completionHandler: { contentEditingInput, _ in
                         if let value = contentEditingInput, let fullSizeImageURL = value.fullSizeImageURL {
+                            let fileUrl = Components.storage.copyFile(fullSizeImageURL) ?? fullSizeImageURL
                             var imageUrl: URL?
-                            if let jpeg = Components.imageBuilder.init(imageUrl: fullSizeImageURL)?.jpegData() {
-                                let fileName = fullSizeImageURL
+                            if let jpeg = Components.imageBuilder.init(imageUrl: fileUrl)?.jpegData() {
+                                let fileName = fileUrl
                                     .deletingPathExtension()
                                     .appendingPathExtension("jpg")
                                     .lastPathComponent
                                 imageUrl = Components.storage.storeData(jpeg, filename: fileName)
                             }
                             if imageUrl == nil {
-                                imageUrl = Components.storage.copyFile(fullSizeImageURL) ?? fullSizeImageURL
+                                imageUrl = fileUrl
                             }
-                            
                             var v = AttachmentView(
                                 mediaUrl: imageUrl ?? fullSizeImageURL,
                                 thumbnail: value.displaySizeImage

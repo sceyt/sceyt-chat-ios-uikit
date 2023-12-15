@@ -171,9 +171,10 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
     }
     
     open func downloadAttachmentIfNeeded(_ attachment: ChatMessage.Attachment) {
-        guard attachment.status != .done,
-                attachment.status != .failedDownloading,
-                attachment.status != .failedUploading,
+        guard attachment.type != "link",
+              attachment.status != .done,
+              attachment.status != .failedDownloading,
+              attachment.status != .failedUploading,
               fileProvider.filePath(attachment: attachment) == nil
         else { return }
         downloadQueue.async {
