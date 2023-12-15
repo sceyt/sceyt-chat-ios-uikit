@@ -1039,9 +1039,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(checksum: ChatMessage.Attachment.Checksum) -> ChecksumDTO {
-        let dto = ChecksumDTO.fetchOrCreate(message: checksum.messageTid, attachmentTid: checksum.attachmentTid, context: self)
-        dto.checksum = checksum.checksum
-        dto.data = checksum.data
+        let dto = ChecksumDTO.fetchOrCreate(checksum: checksum.checksum, context: self).map(checksum)
         return dto
     }
     
