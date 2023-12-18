@@ -128,6 +128,7 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
         addGestureRecognizers()
         
         viewModel.$event
+            .receive(on: DispatchQueue.main)
             .compactMap { $0 }
             .sink { [weak self] event in
                 self?.onEvent(event)
