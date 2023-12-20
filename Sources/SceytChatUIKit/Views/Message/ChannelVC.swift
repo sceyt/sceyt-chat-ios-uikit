@@ -1050,6 +1050,10 @@ open class ChannelVC: ViewController,
     }
     
     open func updateUnreadViewVisibility() {
+        if isScrollingBottom {
+            unreadCountView.isHidden = true
+            return
+        }
         guard !collectionView.indexPathsForVisibleItems.isEmpty,
               let lastAttributesFrame = collectionView.lastVisibleAttributes?.frame
         else {
