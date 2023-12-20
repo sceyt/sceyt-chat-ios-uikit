@@ -149,6 +149,7 @@ internal enum Assets {
   internal static let react = ImageAsset(name: "react")
   internal static let replyFile = ImageAsset(name: "reply-file")
   internal static let replyVoice = ImageAsset(name: "reply-voice")
+  internal static let replyPlay = ImageAsset(name: "reply.play")
   internal static let replyX = ImageAsset(name: "replyX")
   internal static let searchBackground = ImageAsset(name: "search-background")
   internal static let searchIcon = ImageAsset(name: "search-icon")
