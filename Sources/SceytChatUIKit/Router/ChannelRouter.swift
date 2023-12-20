@@ -32,9 +32,14 @@ open class ChannelRouter: Router<ChannelVC> {
     }
 
     open func showAttachment(_ attachment: ChatMessage.Attachment) {
+        
+        let items = AttachmentView.items(attachments: [attachment])
+        guard !items.isEmpty else { return }
         let preview = FilePreviewController(
-            items: [.init(title: attachment.name, url: attachment.fileUrl ??  attachment.originUrl)]
+            items: items
+                .map { .init(title: $0.name, url: $0.url) }
         )
+        
         let isFirstResponder = rootVC.inputTextView.isFirstResponder
         rootVC.inputTextView.resignFirstResponder()
         preview.present(on: rootVC) {
