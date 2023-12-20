@@ -28,7 +28,7 @@ open class ChannelLayoutModel {
         if let reaction = channel.lastReaction,
            let lastMessage = channel.lastMessage,
            reaction.createdAt > lastMessage.createdAt,
-           reaction.message != nil {  
+           reaction.message != nil {
             return true
         }
         return false
@@ -65,39 +65,52 @@ open class ChannelLayoutModel {
         loadAvatar()
     }
     
-    open func update(channel: ChatChannel) -> Bool {
-        let selfChannel = self.channel
-        let update =
-        channel.draftMessage != selfChannel.draftMessage ||
-        channel.lastMessage?.id != selfChannel.lastMessage?.id ||
-        channel.lastMessage?.state != selfChannel.lastMessage?.state ||
-        channel.lastMessage?.updatedAt != selfChannel.lastMessage?.updatedAt ||
-        channel.lastReaction?.id != selfChannel.lastReaction?.id ||
-        channel.lastReaction?.message?.id != selfChannel.lastReaction?.message?.id ||
-        channel.lastMessage?.deliveryStatus != selfChannel.lastMessage?.deliveryStatus
-        
-        self.channel = channel
-        
-        if channel.imageUrl != selfChannel.imageUrl {
-            loadAvatar()
-        }
-        formatedSubject = createFormattedSubject()
-        formatedDate = createFormattedDate()
-        formatedUnreadCount = createFormattedUnreadCount()
-        
-        if update {
-            if let message = createDraftMessageIfNeeded() {
-                attributedView = message
-            } else {
-                attributedView = attributedBody()
+    open func update(
+        channel: ChatChannel,
+        force: Bool = false) -> Bool {
+            let selfChannel = self.channel
+            
+            func updateChannel() {
+                if let message = createDraftMessageIfNeeded() {
+                    attributedView = message
+                } else {
+                    attributedView = attributedBody()
+                }
             }
+            
+            if force {
+                self.channel = channel
+                updateChannel()
+                return true
+            }
+            
+            let update =
+            channel.draftMessage != selfChannel.draftMessage ||
+            channel.lastMessage?.id != selfChannel.lastMessage?.id ||
+            channel.lastMessage?.state != selfChannel.lastMessage?.state ||
+            channel.lastMessage?.updatedAt != selfChannel.lastMessage?.updatedAt ||
+            channel.lastReaction?.id != selfChannel.lastReaction?.id ||
+            channel.lastReaction?.message?.id != selfChannel.lastReaction?.message?.id ||
+            channel.lastMessage?.deliveryStatus != selfChannel.lastMessage?.deliveryStatus
+            
+            self.channel = channel
+            
+            if channel.imageUrl != selfChannel.imageUrl {
+                loadAvatar()
+            }
+            formatedSubject = createFormattedSubject()
+            formatedDate = createFormattedDate()
+            formatedUnreadCount = createFormattedUnreadCount()
+            
+            if update {
+                updateChannel()
+            }
+            return update
         }
-        return update
-    }
     
     open func updateMemberWithUser(_ user: ChatUser) {
         if let members = channel.members,
-            let index = members.firstIndex(where: {$0.id == user.id}) {
+           let index = members.firstIndex(where: {$0.id == user.id}) {
             let currentUser = members[index]
             let shouldUpdateAvatar = currentUser.avatarUrl != user.avatarUrl
             currentUser.firstName = user.firstName
