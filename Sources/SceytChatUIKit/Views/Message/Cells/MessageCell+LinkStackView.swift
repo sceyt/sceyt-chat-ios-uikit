@@ -11,10 +11,13 @@ import LinkPresentation
 
 extension MessageCell {
 
-    open class LinkStackView: UIStackView {
-
-        open var provider: LinkMetadataProvider!
-        open var layoutModel: MessageLayoutModel!
+    open class LinkStackView: UIStackView, Measurable {
+        
+        public lazy var appearance = MessageCell.appearance {
+            didSet {
+                setupAppearance()
+            }
+        }
 
         open var onDidTapContentView: ((LinkView) -> Void)?
 
@@ -65,7 +68,7 @@ extension MessageCell {
                     v.widthAnchor.pin(to: widthAnchor)
                     let tap = UITapGestureRecognizer(target: self, action: #selector(openUrlAction(_:)))
                     v.addGestureRecognizer(tap)
-                    v.bind($0)
+                    v.data = $0
                 }
             }
         }
@@ -77,12 +80,33 @@ extension MessageCell {
             }
             onDidTapContentView?(linkView)
         }
+        
+        open class func measure(model: MessageLayoutModel, appearance: Appearance) -> CGSize {
+            guard let linkPreviews = model.linkPreviews,
+                  !linkPreviews.isEmpty
+            else { return .zero }
+            
+            let size = linkPreviews.reduce(CGSize.zero) { partialResult, preview in
+                let size = LinkView.measure(model: preview, appearance: appearance)
+                var result = partialResult
+                result.width = max(result.width, size.width)
+                result.height += 4 + size.height
+                return result
+            }
+            return size
+        }
     }
 }
 
 extension MessageCell {
 
-    open class LinkView: View, Bindable {
+    open class LinkView: View, Measurable {
+        
+        public lazy var appearance = MessageCell.appearance {
+            didSet {
+                setupAppearance()
+            }
+        }
 
         open lazy var imageView = ImageView()
             .withoutAutoresizingMask
@@ -90,19 +114,28 @@ extension MessageCell {
 
         open lazy var titleLabel = UILabel()
             .withoutAutoresizingMask
-            .contentHuggingPriorityV(.required)
+            .contentCompressionResistancePriorityV(.required)
 
         open lazy var descriptionLabel = UILabel()
             .withoutAutoresizingMask
-            .contentHuggingPriorityV(.required)
+            .contentCompressionResistancePriorityV(.required)
 
         open private(set) var link: URL!
+        
+        open override func setup() {
+            super.setup()
+            imageView.clipsToBounds = true
+            titleLabel.numberOfLines = 1
+            descriptionLabel.numberOfLines = 2
+            
+        }
 
         open override func setupAppearance() {
             super.setupAppearance()
-            imageView.clipsToBounds = true
-            titleLabel.numberOfLines = 1
-            descriptionLabel.numberOfLines = 3
+            titleLabel.font = appearance.linkTitleFont
+            titleLabel.textColor = appearance.linkTitleColor
+            descriptionLabel.font = appearance.linkDescriptionFont
+            descriptionLabel.textColor = appearance.linkDescriptionColor
         }
 
         open override func setupLayout() {
@@ -110,19 +143,36 @@ extension MessageCell {
             addSubview(imageView)
             addSubview(titleLabel)
             addSubview(descriptionLabel)
-            imageView.pin(to: self, anchors: [.top(), .trailing(), .leading()])
-            titleLabel.pin(to: self, anchors: [.leading(8), .trailing()])
-            descriptionLabel.pin(to: self, anchors: [.leading(8), .trailing(0)])
-            titleLabel.topAnchor.pin(to: imageView.bottomAnchor, constant: 2)
+            imageView.pin(to: self, anchors: [.bottom, .leading(2), .trailing(-2)])
+            titleLabel.pin(to: self, anchors: [.leading(12), .trailing(-12)])
+            descriptionLabel.pin(to: self, anchors: [.leading(12), .trailing(-12)])
+            titleLabel.topAnchor.pin(to: self.topAnchor)
             descriptionLabel.topAnchor.pin(to: titleLabel.bottomAnchor, constant: 2)
-            descriptionLabel.bottomAnchor.pin(to: bottomAnchor, constant: 2)
+            descriptionLabel.bottomAnchor.pin(to: imageView.topAnchor, constant: -6)
+        }
+        
+        open var data: MessageLayoutModel.LinkPreview! {
+            didSet {
+                imageView.image = data.image// ?? data.icon
+                titleLabel.attributedText = data.title
+                descriptionLabel.attributedText = data.description
+                link = data.url
+            }
         }
 
-        open func bind(_ data: MessageLayoutModel.LinkPreview) {
-            imageView.image = data.image
-            titleLabel.attributedText = data.title
-            descriptionLabel.attributedText = data.description
-            link = data.url
+        open class func measure(model: MessageLayoutModel.LinkPreview, appearance: Appearance) -> CGSize {
+            var size = CGSize()
+            if let image = model.image ?? model.icon {
+                size.width = min(image.size.width, 260)
+                size.height = min(image.size.height, 140)
+            } else {
+                size.width = max(model.titleSize.width, model.descriptionSize.width)
+            }
+            size.height += model.titleSize.height //size name
+            size.height += model.descriptionSize.height // desc
+            size.height += 8 // padding
+            return size
         }
     }
 }
+

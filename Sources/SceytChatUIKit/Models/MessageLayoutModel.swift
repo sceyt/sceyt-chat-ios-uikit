@@ -57,6 +57,7 @@ open class MessageLayoutModel {
     public private(set) var textSize: CGSize
     public private(set) var parentTextSize: CGSize
     public private(set) var infoViewMeasure: CGSize = .zero
+    public private(set) var linkViewMeasure: CGSize = .zero
     public private(set) var lastCharRect: CGRect
     public private(set) var replyCount = 0
     public              var contentInsets: UIEdgeInsets = .zero
@@ -99,7 +100,7 @@ open class MessageLayoutModel {
         userSendMessage: UserSendMessage? = nil,
         lastDisplayedMessageId: MessageId = 0
     ) {
-        links = []// DataDetector.getLinks(text: message.body)
+        links = DataDetector.getLinks(text: message.body)
         self.channel = channel
         self.message = message
         self.lastDisplayedMessageId = lastDisplayedMessageId
@@ -196,19 +197,18 @@ open class MessageLayoutModel {
         if hasVoiceAttachments {
             contentOptions.insert(.voice)
         }
-//        message.linkMetadatas?.forEach({
-//            let link = LinkMetadata(
-//                url: $0.url,
-//                title: $0.title,
-//                summary: $0.summary,
-//                creator: $0.creator,
-//                iconUrl: $0.iconUrl,
-//                imageUrl: $0.imageUrl
-//            )
-//            link.loadImages()
-//            addLinkPreview(linkMetadata: link)
-//        })
-//
+        message.linkMetadatas?.forEach({
+            let link = LinkMetadata(
+                url: $0.url,
+                title: $0.title,
+                summary: $0.summary,
+                creator: $0.creator,
+                iconUrl: $0.iconUrl,
+                imageUrl: $0.imageUrl
+            )
+            addLinkPreview(linkMetadata: link)
+        })
+        
         reactions = createReactions(message: message)
         attachmentsContainerSize = calculateAttachmentsContainerSize()
         if !isForwarded {
@@ -221,7 +221,7 @@ open class MessageLayoutModel {
                 textSize = size.textSize
             }
         }
-//        updateOptions.insert(.reload)
+        //        updateOptions.insert(.reload)
         measureSize = measure()
     }
     
@@ -231,169 +231,188 @@ open class MessageLayoutModel {
         message: ChatMessage,
         force: Bool = false
     ) -> Bool {
-            guard self.channel.id == channel.id,
-                  ((self.message.id != 0 && self.message.id == message.id) ||
-                   (self.message.id == 0 && self.message.tid == message.tid))
-            else { return false }
-            var updateOptions = self.updateOptions
-            if messageDeliveryStatus != message.deliveryStatus {
-                messageDeliveryStatus = message.deliveryStatus
-                updateOptions.insert(.deliveryStatus)
+        guard self.channel.id == channel.id,
+              ((self.message.id != 0 && self.message.id == message.id) ||
+               (self.message.id == 0 && self.message.tid == message.tid))
+        else { return false }
+        var updateOptions = self.updateOptions
+        if messageDeliveryStatus != message.deliveryStatus {
+            messageDeliveryStatus = message.deliveryStatus
+            updateOptions.insert(.deliveryStatus)
+        }
+        if replyCount != message.replyCount {
+            replyCount = message.replyCount
+            updateOptions.insert(.replyCount)
+        }
+        var hasUpdatesInAttachments = false
+        if self.message.attachments?.count != message.attachments?.count {
+            hasUpdatesInAttachments = true
+        } else {
+            let selfAttachments = self.message.attachments ?? []
+            let newAttachments = message.attachments ?? []
+            for item in zip(selfAttachments, newAttachments) {
+                if item.0.id != 0, item.0.id != item.1.id {// ||
+                    //                        item.0.filePath != item.1.filePath ||
+                    //                        item.0.url != item.1.url ||
+                    //                        item.0.status != item.1.status {
+                    hasUpdatesInAttachments = true
+                    break
+                }
             }
-            if replyCount != message.replyCount {
-                replyCount = message.replyCount
-                updateOptions.insert(.replyCount)
+        }
+        updateAttachmentLayouts(message: message)
+        if hasUpdatesInAttachments {
+            hasMediaAttachments = false
+            hasVoiceAttachments = false
+            hasFileAttachments = false
+            for attachment in attachments {
+                switch attachment.type {
+                case .image, .video:
+                    hasMediaAttachments = true
+                case .voice:
+                    hasVoiceAttachments = true
+                case .file:
+                    hasFileAttachments = true
+                default:
+                    break
+                }
             }
-            var hasUpdatesInAttachments = false
-            if self.message.attachments?.count != message.attachments?.count {
-                hasUpdatesInAttachments = true
+            if hasMediaAttachments {
+                contentOptions.insert(.image)
             } else {
-                let selfAttachments = self.message.attachments ?? []
-                let newAttachments = message.attachments ?? []
-                for item in zip(selfAttachments, newAttachments) {
-                    if item.0.id != 0, item.0.id != item.1.id {// ||
-//                        item.0.filePath != item.1.filePath ||
-//                        item.0.url != item.1.url ||
-//                        item.0.status != item.1.status {
-                        hasUpdatesInAttachments = true
-                        break
-                    }
-                }
+                contentOptions.remove(.image)
             }
-            updateAttachmentLayouts(message: message)
-            if hasUpdatesInAttachments {
-                hasMediaAttachments = false
-                hasVoiceAttachments = false
-                hasFileAttachments = false
-                for attachment in attachments {
-                    switch attachment.type {
-                    case .image, .video:
-                        hasMediaAttachments = true
-                    case .voice:
-                        hasVoiceAttachments = true
-                    case .file:
-                        hasFileAttachments = true
-                    default:
-                        break
-                    }
-                }
-                if hasMediaAttachments {
-                    contentOptions.insert(.image)
-                } else {
-                    contentOptions.remove(.image)
-                }
-                if hasFileAttachments {
-                    contentOptions.insert(.file)
-                } else {
-                    contentOptions.remove(.file)
-                }
-                if hasVoiceAttachments {
-                    contentOptions.insert(.voice)
-                } else {
-                    contentOptions.remove(.voice)
-                }
-                if !attachments.isEmpty, !contentOptions.contains(.attachment) {
-                    updateOptions.insert(.attachment)
-                }
+            if hasFileAttachments {
+                contentOptions.insert(.file)
+            } else {
+                contentOptions.remove(.file)
             }
-            
-            let restrictingTextWidth = Self.restrictingWidth(attachments: attachments) - 12 * 2
-
-            if force || self.message.body != message.body || self.message.state != message.state || self.message.bodyAttributes != message.bodyAttributes {
-                attributedView = Self.attributedView(
-                    message: message,
-                    userSendMessage: userSendMessage
-                )
-                let size = Self.textSizeMeasure.calculateSize(of: attributedView.content,
-                                                              config: .init(restrictingWidth: restrictingTextWidth))
-                textSize = size.textSize
-                lastCharRect = size.lastCharRect
-                if textSize != .zero {
-                    contentOptions.insert(.text)
-                }
-                updateOptions.insert(.body)
+            if hasVoiceAttachments {
+                contentOptions.insert(.voice)
+            } else {
+                contentOptions.remove(.voice)
             }
-            let title = Formatters.userDisplayName.format(message.user)
-            if !message.incoming || 
-                channel.channelType == .direct ||
-                channel.channelType == .broadcast {
-                messageUserTitleSize = .zero
-            } else if messageUserTitle != title {
-                messageUserTitle = title
-                messageUserTitleSize = Self.textSizeMeasure.calculateSize(
+            if !attachments.isEmpty, !contentOptions.contains(.attachment) {
+                updateOptions.insert(.attachment)
+            }
+        }
+        
+        let restrictingTextWidth = Self.restrictingWidth(attachments: attachments) - 12 * 2
+        
+        if force || self.message.body != message.body || self.message.state != message.state || self.message.bodyAttributes != message.bodyAttributes {
+            attributedView = Self.attributedView(
+                message: message,
+                userSendMessage: userSendMessage
+            )
+            let size = Self.textSizeMeasure.calculateSize(of: attributedView.content,
+                                                          config: .init(restrictingWidth: restrictingTextWidth))
+            textSize = size.textSize
+            lastCharRect = size.lastCharRect
+            if textSize != .zero {
+                contentOptions.insert(.text)
+            }
+            updateOptions.insert(.body)
+            links = DataDetector.getLinks(text: message.body)
+        }
+        let title = Formatters.userDisplayName.format(message.user)
+        if !message.incoming ||
+            channel.channelType == .direct ||
+            channel.channelType == .broadcast {
+            messageUserTitleSize = .zero
+        } else if messageUserTitle != title {
+            messageUserTitle = title
+            messageUserTitleSize = Self.textSizeMeasure.calculateSize(
+                of:
+                    NSAttributedString(
+                        string: title,
+                        attributes: [.font: (Self.appearance.titleFont ?? Fonts.bold.withSize(12)) as Any]
+                    ),
+                config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
+            ).textSize
+            contentOptions.insert(.name)
+            updateOptions.insert(.user)
+        }
+        
+        if messageUserTitleSize != .zero {
+            contentOptions.insert(.name)
+        }
+        if self.message.user.avatarUrl != message.user.avatarUrl,
+           !updateOptions.contains(.user) {
+            updateOptions.insert(.user)
+        }
+        
+        if let parent = message.parent {
+            let title = Formatters.userDisplayName.format(parent.user)
+            if title != parentMessageUserTitle {
+                parentMessageUserTitle = Formatters.userDisplayName.format(parent.user)
+                parentMessageUserTitleSize = Self.textSizeMeasure.calculateSize(
                     of:
                         NSAttributedString(
-                            string: title,
+                            string: parentMessageUserTitle,
                             attributes: [.font: (Self.appearance.titleFont ?? Fonts.bold.withSize(12)) as Any]
                         ),
                     config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
                 ).textSize
-                contentOptions.insert(.name)
-                updateOptions.insert(.user)
+                updateOptions.insert(.parentMessageUser)
             }
             
-            if messageUserTitleSize != .zero {
-                contentOptions.insert(.name)
-            }
-            if self.message.user.avatarUrl != message.user.avatarUrl,
-               !updateOptions.contains(.user) {
-                updateOptions.insert(.user)
-            }
-            
-            if let parent = message.parent {
-                let title = Formatters.userDisplayName.format(parent.user)
-                if title != parentMessageUserTitle {
-                    parentMessageUserTitle = Formatters.userDisplayName.format(parent.user)
-                    parentMessageUserTitleSize = Self.textSizeMeasure.calculateSize(
-                        of:
-                            NSAttributedString(
-                                string: parentMessageUserTitle,
-                                attributes: [.font: (Self.appearance.titleFont ?? Fonts.bold.withSize(12)) as Any]
-                            ),
-                        config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
-                    ).textSize
-                    updateOptions.insert(.parentMessageUser)
-                }
-                
-                if force || self.message.parent?.body != message.parent?.body || self.message.parent?.state != message.parent?.state {
-                    let parentAttributedView = Self.attributedView(
-                        message: parent,
-                        userSendMessage: userSendMessage
-                    )
-                    
-                    let parentSize = Self.textSizeMeasure.calculateSize(of: parentAttributedView.content,
-                                                                        config: .init(restrictingWidth: restrictingTextWidth))
-                    self.parentAttributedView = parentAttributedView
-                    parentTextSize = parentSize.textSize
-                    updateOptions.insert(.parentMessageBody)
-                }
-                replyLayout = .init(
+            if force || self.message.parent?.body != message.parent?.body || self.message.parent?.state != message.parent?.state {
+                let parentAttributedView = Self.attributedView(
                     message: parent,
-                    channel: channel,
-                    thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
-                    attributedBody: parentAttributedView?.content)
-            } else {
-                parentTextSize = .zero
-                parentMessageUserTitle = ""
-                parentMessageUserTitleSize = .zero
-                parentAttributedView = nil
-                replyLayout = nil
+                    userSendMessage: userSendMessage
+                )
+                
+                let parentSize = Self.textSizeMeasure.calculateSize(of: parentAttributedView.content,
+                                                                    config: .init(restrictingWidth: restrictingTextWidth))
+                self.parentAttributedView = parentAttributedView
+                parentTextSize = parentSize.textSize
+                updateOptions.insert(.parentMessageBody)
             }
-            var isUpdated = self.updateOptions != updateOptions
-            self.updateOptions = updateOptions
-            self.channel = channel
-            self.message = message
-            let newReactions = createReactions(message: message)
-            if newReactions != reactions {
-                isUpdated = true
-                self.updateOptions.insert(.reaction)
+            replyLayout = .init(
+                message: parent,
+                channel: channel,
+                thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
+                attributedBody: parentAttributedView?.content)
+        } else {
+            parentTextSize = .zero
+            parentMessageUserTitle = ""
+            parentMessageUserTitleSize = .zero
+            parentAttributedView = nil
+            replyLayout = nil
+        }
+        
+        if message.linkMetadatas != self.message.linkMetadatas {
+            if let linkMetadatas = message.linkMetadatas {
+                linkMetadatas.forEach({
+                    let link = LinkMetadata(
+                        url: $0.url,
+                        title: $0.title,
+                        summary: $0.summary,
+                        creator: $0.creator,
+                        iconUrl: $0.iconUrl,
+                        imageUrl: $0.imageUrl
+                    )
+                    addLinkPreview(linkMetadata: link)
+                })
+                updateOptions.insert(.link)
             }
-            reactions = newReactions
-            attachmentsContainerSize = calculateAttachmentsContainerSize()
-            if isUpdated || force {
-                measureSize = measure()
-            }
-            return true
+        }
+        
+        var isUpdated = self.updateOptions != updateOptions
+        self.updateOptions = updateOptions
+        self.channel = channel
+        self.message = message
+        let newReactions = createReactions(message: message)
+        if newReactions != reactions {
+            isUpdated = true
+            self.updateOptions.insert(.reaction)
+        }
+        reactions = newReactions
+        attachmentsContainerSize = calculateAttachmentsContainerSize()
+        if isUpdated || force {
+            measureSize = measure()
+        }
+        return true
     }
     
     internal func replace(channel: ChatChannel) {
@@ -413,7 +432,7 @@ open class MessageLayoutModel {
         if showUserInfo != show {
             if show,
                channel.channelType == .broadcast {
-               // do not show
+                // do not show
             } else {
                 showUserInfo = show
                 measureSize = measure()
@@ -492,7 +511,7 @@ open class MessageLayoutModel {
             accumWidth += emojiItemWidth + interItemSpacing
             itemCount += 1
         } while accumWidth < fitWidth
-
+        
         return itemCount
     }
     
@@ -542,8 +561,8 @@ open class MessageLayoutModel {
         switch message.state {
         case .deleted:
             return .init(content: NSAttributedString(string: L10n.Message.deleted,
-                                                  attributes: [.font: deletedStateFont,
-                                                               .foregroundColor: deletedStateColor]))
+                                                     attributes: [.font: deletedStateFont,
+                                                                  .foregroundColor: deletedStateColor]))
         default:
             var content = multiLine ? message.body : message.body.replacingOccurrences(of: "\n", with: " ")
             content = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -652,34 +671,44 @@ open class MessageLayoutModel {
            linkPreviews.contains(where: { $0.url == url}) {
             return false
         }
-        var preview = LinkPreview(url: url, image: linkMetadata.image)
+        if linkMetadata.imageUrl == nil {
+            return false
+        }
+        linkMetadata.loadImages()
+        var preview = LinkPreview(url: url, image: linkMetadata.image, icon: linkMetadata.icon)
         if let description = linkMetadata.summary {
-            let font = Fonts.regular.withSize(14)
+            let font = Self.appearance.linkDescriptionFont ?? Fonts.regular.withSize(13)
             let text = NSMutableAttributedString(
                 attributedString: NSAttributedString(string: description,
-                                                     attributes: [.font: font, .foregroundColor: Appearance.Colors.textBlack]))
+                                                     attributes:
+                                                        [.font: font,
+                                                         .foregroundColor: Self.appearance.linkDescriptionColor ?? Appearance.Colors.textBlack
+                                                        ])
+            )
+            
             preview.descriptionSize = Self.textSizeMeasure
                 .calculateSize(of: text,
-                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width,
-                               maximumNumberOfLines: 3)).textSize
+                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 8,
+                                             maximumNumberOfLines: 2)).textSize
             preview.description = text
         }
         if let title = linkMetadata.title {
-            let font = Fonts.bold.withSize(16)
+            let font = Self.appearance.linkTitleFont ?? Fonts.semiBold.withSize(14)
             let text = NSMutableAttributedString(
                 attributedString: NSAttributedString(string: title,
-                                                     attributes: [.font: font, .foregroundColor: Appearance.Colors.textBlack]))
+                                                     attributes: [.font: font, .foregroundColor: Self.appearance.linkTitleColor ?? Appearance.Colors.textBlack]))
             preview.titleSize = Self.textSizeMeasure
                 .calculateSize(of: text,
-                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width,
-                               maximumNumberOfLines: 1)).textSize
+                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 8,
+                                             maximumNumberOfLines: 1)).textSize
             preview.title = text
         }
         if linkPreviews == nil {
             linkPreviews = []
         }
         linkPreviews?.append(preview)
-        if !contentOptions.contains(.link) {
+        
+        if !(contentOptions.contains(.link) || contentOptions.contains(.file) || contentOptions.contains(.image) || contentOptions.contains(.voice)) {
             contentOptions.insert(.link)
         }
         return true
@@ -691,6 +720,7 @@ open class MessageLayoutModel {
     
     open func measure() -> CGSize {
         infoViewMeasure = MessageCell.InfoView.measure(model: self, appearance: Self.appearance)
+        linkViewMeasure = MessageCell.LinkStackView.measure(model: self, appearance: Self.appearance)
         if message.incoming {
             return Components.incomingMessageCell.measure(model: self, appearance: Self.appearance)
         } else {
@@ -727,7 +757,7 @@ public extension MessageLayoutModel {
         public static let file     = MessageContentOptions(rawValue: 1 << 3)
         public static let link     = MessageContentOptions(rawValue: 1 << 4)
         public static let voice    = MessageContentOptions(rawValue: 1 << 5)
-
+        
         public static let attachment: MessageContentOptions = [.image, .file, .voice]
         public static let all: MessageContentOptions = [.name, .text, .image, file, link, voice]
     }
@@ -747,9 +777,10 @@ public extension MessageLayoutModel {
         public static let attachment            = MessageUpdateOptions(rawValue: 1 << 5)
         public static let deliveryStatus        = MessageUpdateOptions(rawValue: 1 << 6)
         public static let reaction              = MessageUpdateOptions(rawValue: 1 << 7)
-        public static let reload                = MessageUpdateOptions(rawValue: 1 << 8)
+        public static let link                  = MessageUpdateOptions(rawValue: 1 << 8)
+        public static let reload                = MessageUpdateOptions(rawValue: 1 << 9)
         
-        public static let all: MessageUpdateOptions = [.body, .user, .replyCount, parentMessageUser, .parentMessageBody, .attachment, deliveryStatus]
+        public static let all: MessageUpdateOptions = [.body, .user, .replyCount, parentMessageUser, .parentMessageBody, .attachment, .link, deliveryStatus]
     }
     
     struct Defaults {
@@ -761,16 +792,17 @@ public extension MessageLayoutModel {
         public var fileAttachmentSize   = CGSize(width: CGFloat.infinity, height: 54)
         public var audioAttachmentSize  = CGSize(width: CGFloat.infinity, height: 54)
     }
-  
+    
     struct LinkPreview {
         public let url: URL
         public var image: UIImage?
+        public var icon: UIImage?
         public var title: NSAttributedString?
         public var titleSize: CGSize = .zero
         public var description: NSAttributedString?
         public var descriptionSize: CGSize = .zero
     }
-
+    
     struct ReactionInfo: Equatable {
         public let key: String
         public let score: UInt
@@ -778,7 +810,7 @@ public extension MessageLayoutModel {
         public var isCommonScoreNumber = false
         public let width: CGFloat
     }
-
+    
     enum ReactionViewType {
         case interactive
         case withTotalScore
@@ -978,8 +1010,8 @@ extension MessageLayoutModel {
             switch type {
             case .image, .video:
                 if let data = attachment.imageDecodedMetadata,
-                    data.width > 0,
-                    data.height > 0 {
+                   data.width > 0,
+                   data.height > 0 {
                     let thumbnailSize = CGSize(width: data.width, height: data.height)
                     size = preferredImageSize(
                         maxSize: defaults.imageAttachmentSize.width,

@@ -1149,9 +1149,7 @@ open class ChannelVC: ViewController,
         collectionView: UICollectionView,
         model: MessageLayoutModel
     ) -> UICollectionViewCell {
-        let message = model.message
-        //        channelViewModel.updateLinkPreviewsForLayoutModelIfNeeded(model, at: indexPath)
-        
+        let message = model.message        
         let type: MessageCell.Type =
         model.message.incoming ?
         Components.incomingMessageCell :

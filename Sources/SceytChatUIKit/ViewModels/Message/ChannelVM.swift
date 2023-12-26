@@ -54,6 +54,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 #keyPath(MessageDTO.user.lastName),
                 #keyPath(MessageDTO.parent.state),
                 #keyPath(MessageDTO.bodyAttributes),
+                #keyPath(MessageDTO.linkMetadatas),
             ]
         ) { [weak self] in
             let message = $0.convert()
@@ -589,6 +590,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open func createLayoutModel(for message: ChatMessage, force: Bool = false) -> MessageLayoutModel {
         if let model = layoutModels[.init(message: message)] {
             model.update(channel: channel, message: message, force: force)
+            updateLinkPreviewsForLayoutModelIfNeeded(model: model)
             return model
         }
         let model = Components.messageLayoutModel
@@ -597,6 +599,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 message: message,
                 lastDisplayedMessageId: lastDisplayedMessageId)
         layoutModels[.init(message: message)] = model
+        updateLinkPreviewsForLayoutModelIfNeeded(model: model)
         return model
     }
     
@@ -1213,34 +1216,21 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     //MARK: Link preview
-    open func updateLinkPreviewsForLayoutModelIfNeeded(_ model: MessageLayoutModel, at indexPath: IndexPath) {
-        guard let message = message(at: indexPath)
-        else { return }
+    open func updateLinkPreviewsForLayoutModelIfNeeded(model: MessageLayoutModel) {
         guard !model.links.isEmpty,
               model.linkPreviews == nil,
               model.attachments.isEmpty,
-              let first = model.links.first else { return }
-        var loads = [URL]()
-        if let md = linkMetadataProvider.metadata(for: first) {
-            _ = model.addLinkPreview(linkMetadata: md)
-            provider.storeLinkMetadata(md, to: message)
+              let link = model.links.first else { return }
+        if let md = linkMetadataProvider.metadata(for: link) {
+            provider.storeLinkMetadata(md, to: model.message)
         } else {
-            loads.append(first)
-        }
-        if model.linkPreviews != nil {
-            DispatchQueue.main.async {
-                self.event = .reload(indexPath)
-            }
-            return
-        }
-        
-        loads.forEach {
-            linkMetadataProvider.fetch(url: $0) { [weak self] result in
-                guard let self = self, case let .success(md) = result else { return }
-                if model.addLinkPreview(linkMetadata: md) {
-                    self.provider.storeLinkMetadata(md, to: message)
+            Task {
+                switch await linkMetadataProvider.fetch(url: link) {
+                case .success(let data):
+                    self.provider.storeLinkMetadata(data, to: model.message)
+                case .failure(let error):
+                    logger.verbose("Failed to load link Open Graph data error: \(error)")
                 }
-                self.event = .reload(indexPath)
             }
         }
     }

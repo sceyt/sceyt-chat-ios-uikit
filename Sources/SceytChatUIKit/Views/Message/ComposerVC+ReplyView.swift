@@ -9,7 +9,9 @@
 import UIKit
 
 extension ComposerVC {
+    
     open class ActionView: View {
+        
         public lazy var appearance = ComposerVC.appearance {
             didSet {
                 setupAppearance()
