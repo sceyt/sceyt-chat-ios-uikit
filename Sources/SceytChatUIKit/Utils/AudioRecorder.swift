@@ -49,6 +49,7 @@ open class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     }
     
     open func stopRecording() {
+        UIApplication.shared.isIdleTimerDisabled = false
         audioRecorder?.stop()
         audioRecorder?.isMeteringEnabled = false
         audioRecorder = nil
@@ -103,6 +104,7 @@ open class AudioRecorder: NSObject, AVAudioRecorderDelegate {
             }
             timer?.fire()
             onEvent(.start)
+            UIApplication.shared.isIdleTimerDisabled = true
         } catch {
             stopRecording()
             onEvent(.noPermission)
