@@ -60,10 +60,9 @@ extension MessageCell {
         open var data: MessageLayoutModel! {
             didSet {
                 removeArrangedSubviews()
-                guard let previews = data.linkPreviews, 
-                        !previews.isEmpty
+                guard let preview = data.linkPreviews?.first
                 else { return }
-                previews.forEach {
+                [preview].forEach {
                     let v = LinkView()
                         .withoutAutoresizingMask
                     addArrangedSubview(v)
@@ -88,11 +87,10 @@ extension MessageCell {
         }
         
         open class func measure(model: MessageLayoutModel, appearance: Appearance) -> CGSize {
-            guard let linkPreviews = model.linkPreviews,
-                  !linkPreviews.isEmpty
+            guard let linkPreview = model.linkPreviews?.first
             else { return .zero }
             
-            let size = linkPreviews.reduce(CGSize.zero) { partialResult, preview in
+            let size = [linkPreview].reduce(CGSize.zero) { partialResult, preview in
                 let size = LinkView.measure(model: preview, appearance: appearance)
                 var result = partialResult
                 result.width = max(result.width, size.width)
