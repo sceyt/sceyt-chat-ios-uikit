@@ -163,6 +163,8 @@ open class AttachmentTransfer: Provider {
             $0.status != .done &&
             Components.dataSession?.getFilePath(attachment: $0) == nil
         }
+        guard !needsToDownloadAttachments.isEmpty
+        else { return [] }
         downloadMessageAttachments(
             message: message,
             attachments: needsToDownloadAttachments,

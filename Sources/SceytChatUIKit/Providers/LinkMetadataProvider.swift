@@ -14,7 +14,7 @@ open class LinkMetadataProvider: Provider {
 
     public var cache = defaultCache
     private var observer: NSObjectProtocol?
-    @Atomic private var fetchCache = [URL: [(Result<LinkMetadata, Error>) -> Void]]()
+    @Atomic private var fetchCache = Set<URL>()
 
     public required override init() {
         super.init()
@@ -38,11 +38,31 @@ open class LinkMetadataProvider: Provider {
     }
 
     open func metadata(for url: URL) -> LinkMetadata? {
-        cache.object(forKey: url.absoluteString as NSString)
+        if url.scheme == nil {
+            var https: URL? {
+                URL(string: "https://" + url.absoluteString)
+            }
+            var http: URL? {
+                URL(string: "http://" + url.absoluteString)
+            }
+          
+            logger.verbose("[LOAD LINK] metadata from cache url: \(https)")
+            if let url = https, let object = cache.object(forKey: url.absoluteString as NSString) {
+                return object
+            }
+            
+            logger.verbose("[LOAD LINK] metadata from cache url: \(http)")
+            if let url = http, let object = cache.object(forKey: url.absoluteString as NSString) {
+                return object
+            }
+            
+        }
+        logger.verbose("[LOAD LINK] metadata from cache url: \(url.absoluteString)")
+        return cache.object(forKey: url.absoluteString as NSString)
     }
 
     open func isFetching(url: URL) -> Bool {
-        fetchCache[url] != nil
+        fetchCache.contains(url)
     }
 
     @discardableResult
@@ -51,6 +71,10 @@ open class LinkMetadataProvider: Provider {
         downloadImage: Bool = true, 
         downloadIcon: Bool = true
     ) async -> Result<LinkMetadata, Error> {
+        fetchCache.insert(url)
+        defer {
+            fetchCache.remove(url)
+        }
         let log_hv = url.absoluteString.hashValue
         logger.verbose("[LOAD LINK] \(log_hv) Will load link Open Graph data from SceytChat url: \(url.absoluteString)")
         if let metadata = cache.object(forKey: url.absoluteString as NSString) {
@@ -85,7 +109,7 @@ open class LinkMetadataProvider: Provider {
         let linkMetadata = LinkMetadata(url: url)
         
         do {
-            let (link, error) = await chatClient.loadLinkDetails(for: url.sanitise)
+            let (link, error) = await chatClient.loadLinkDetails(for: url)
             if let error {
                 logger.verbose("[LOAD LINK] \(log_hv) Failed to load link Open Graph data from SceytChat error: \(error)")
                 return .failure(error)
@@ -103,7 +127,11 @@ open class LinkMetadataProvider: Provider {
                     linkMetadata.imageUrl = url
                 }
                 
-                await downloadImagesIfNeeded(linkMetadata: linkMetadata)
+                await downloadImagesIfNeeded(
+                    linkMetadata: linkMetadata,
+                    downloadImage: downloadImage,
+                    downloadIcon: downloadIcon
+                )
                 
                 logger.verbose("[LOAD LINK] \(log_hv) Load link Open Graph data siteName: \(link.siteName), title: \(link.title), type: \(link.type), info: \(link.info), locale: \(link.locale), localeAlternates: \(link.localeAlternates)")
                 if let favicon = link.favicon {
@@ -135,6 +163,7 @@ open class LinkMetadataProvider: Provider {
             logger.verbose("[LOAD LINK] \(log_hv) Failed to load link Open Graph data error: \(error)")
             return .failure(error)
         }
+        logger.verbose("[LOAD LINK] metadata from cache ADD: \(url.absoluteString)")
         cache.setObject(linkMetadata, forKey: url.absoluteString as NSString)
         return .success(linkMetadata)
     }
@@ -149,7 +178,11 @@ open class LinkMetadataProvider: Provider {
             if downloadImage, let imageUrl = linkMetadata.imageUrl,
                 linkMetadata.image == nil {
                 let (data, _) = try await URLSession.shared.data(from: imageUrl)
-                linkMetadata.image = Components.imageBuilder.image(from: data)
+                if let image = Components.imageBuilder.image(from: data) {
+                    linkMetadata.image = (try? Components.imageBuilder.init(image: image)
+                        .resize(max: SCTUIKitConfig.maximumImageAttachmentSize))?
+                        .uiImage ?? image
+                }
                 
                 if linkMetadata.image != nil {
                     logger.verbose("[LOAD LINK] \(log_hv) Load Image from \(linkMetadata.imageUrl): SUCCESS")

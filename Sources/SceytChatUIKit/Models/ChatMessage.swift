@@ -433,7 +433,7 @@ extension ChatMessage {
         public var creator: String?
         public var iconUrl: URL?
         public var imageUrl: URL?
-        
+                
         public init(
             url: URL,
             title: String? = nil,

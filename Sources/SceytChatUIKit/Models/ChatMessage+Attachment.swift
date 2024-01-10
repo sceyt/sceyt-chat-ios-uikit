@@ -159,25 +159,37 @@ extension ChatMessage {
             public var height: Int
             public var thumbnail: T
             public var duration: Int
+            public var description: String?
             public var thumbnailImage: UIImage?
+            public var imageUrl: String?
+            public var thumbnailUrl: String?
             
             enum CodingKeys: String, CodingKey {
                 case width = "szw"
                 case height = "szh"
                 case thumbnail = "tmb"
                 case duration = "dur"
+                case description = "dsc"
+                case imageUrl = "iur"
+                case thumbnailUrl = "tur"
             }
             
             public init(
                 width: Int = 0,
                 height: Int = 0,
                 thumbnail: T,
-                duration: Int = 0
+                duration: Int = 0,
+                description: String? = nil,
+                imageUrl: String? = nil,
+                thumbnailUrl: String? = nil
             ) {
                 self.width = width
                 self.height = height
                 self.thumbnail = thumbnail
                 self.duration = duration
+                self.description = description
+                self.imageUrl = imageUrl
+                self.thumbnailUrl = thumbnailUrl
             }
             
             func build() -> String? {
@@ -198,6 +210,9 @@ extension ChatMessage {
                 height = (try? container.decode(Int.self, forKey: CodingKeys.height)) ?? 0
                 thumbnail = (try container.decode(T.self, forKey: CodingKeys.thumbnail))
                 duration = (try? container.decode(Int.self, forKey: CodingKeys.duration)) ?? 0
+                description = (try? container.decode(String.self, forKey: CodingKeys.description))
+                imageUrl = (try? container.decode(String.self, forKey: CodingKeys.imageUrl))
+                thumbnailUrl = (try? container.decode(String.self, forKey: CodingKeys.thumbnailUrl))
                 if let base64 = thumbnail as? String, !base64.isEmpty {
                     thumbnailImage = Components.imageBuilder.image(thumbHash: base64)
                     if thumbnailImage == nil,

@@ -186,6 +186,8 @@ extension MessageCell: AppearanceProvider {
         public var linkTitleColor: UIColor? = Colors.textBlack
         public var linkDescriptionFont: UIFont? = Fonts.regular.withSize(13)
         public var linkDescriptionColor: UIColor? = Colors.textGray
+        public var linkPreviewBackgroundColor: (in: UIColor?, out: UIColor?) = (.init(light: 0xDFE1EA, dark: 0xC9D1FF),
+                                                                                .init(light: 0xC9D1FF, dark: 0x212239))
         public var highlightedLinkBackgroundColor: UIColor? = Colors.textGray2
         public var mentionUserColor: UIColor? = Colors.kitBlue
         public var dateTickBackgroundViewColor: UIColor? = Colors.backgroundTransparent

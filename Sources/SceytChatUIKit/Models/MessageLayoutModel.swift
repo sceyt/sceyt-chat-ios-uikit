@@ -21,6 +21,7 @@ open class MessageLayoutModel {
     public private(set) var channel: ChatChannel
     public private(set) var message: ChatMessage
     public private(set) var attachments: [AttachmentLayout]
+    public private(set) var linkAttachments: [AttachmentLayout]
     public private(set) var replyLayout: ReplyLayout?
     public private(set) var lastDisplayedMessageId: MessageId = 0
     
@@ -69,7 +70,6 @@ open class MessageLayoutModel {
     public private(set) var reactions: [ReactionInfo]?
     public private(set) var groupedReactions: [ArraySlice<ReactionInfo>]?
     
-    public private(set) var links: [URL]
     public private(set) var linkPreviews: [LinkPreview]?
     public private(set) var reactionType: ReactionViewType = .withTotalScore
     public private(set) var estimatedReactionsNumberPerRow: Int = 0
@@ -100,7 +100,6 @@ open class MessageLayoutModel {
         userSendMessage: UserSendMessage? = nil,
         lastDisplayedMessageId: MessageId = 0
     ) {
-        links = DataDetector.getLinks(text: message.body)
         self.channel = channel
         self.message = message
         self.lastDisplayedMessageId = lastDisplayedMessageId
@@ -113,6 +112,7 @@ open class MessageLayoutModel {
         )
         
         attachments = Self.attachmentLayout(message: message, channel: channel)
+        linkAttachments = Self.linkAttachmentLayout(message: message, channel: channel)
         let restrictingTextWidth = Self.restrictingWidth(attachments: attachments) - 12 * 2
         
         let size = Self.textSizeMeasure
@@ -197,18 +197,10 @@ open class MessageLayoutModel {
         if hasVoiceAttachments {
             contentOptions.insert(.voice)
         }
-        message.linkMetadatas?.forEach({
-            let link = LinkMetadata(
-                url: $0.url,
-                title: $0.title,
-                summary: $0.summary,
-                creator: $0.creator,
-                iconUrl: $0.iconUrl,
-                imageUrl: $0.imageUrl
-            )
+        for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
             addLinkPreview(linkMetadata: link)
-        })
-        
+        }
+       
         reactions = createReactions(message: message)
         attachmentsContainerSize = calculateAttachmentsContainerSize()
         if !isForwarded {
@@ -312,7 +304,6 @@ open class MessageLayoutModel {
                 contentOptions.insert(.text)
             }
             updateOptions.insert(.body)
-            links = DataDetector.getLinks(text: message.body)
         }
         let title = Formatters.userDisplayName.format(message.user)
         if !message.incoming ||
@@ -380,22 +371,10 @@ open class MessageLayoutModel {
             parentAttributedView = nil
             replyLayout = nil
         }
-        
-        if message.linkMetadatas != self.message.linkMetadatas {
-            if let linkMetadatas = message.linkMetadatas {
-                linkMetadatas.forEach({
-                    let link = LinkMetadata(
-                        url: $0.url,
-                        title: $0.title,
-                        summary: $0.summary,
-                        creator: $0.creator,
-                        iconUrl: $0.iconUrl,
-                        imageUrl: $0.imageUrl
-                    )
-                    addLinkPreview(linkMetadata: link)
-                })
-                updateOptions.insert(.link)
-            }
+        linkPreviews?.removeAll()
+        for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
+            addLinkPreview(linkMetadata: link)
+            updateOptions.insert(.link)
         }
         
         var isUpdated = self.updateOptions != updateOptions
@@ -528,6 +507,14 @@ open class MessageLayoutModel {
         }
     }
     
+    open class func linkAttachmentLayout(message: ChatMessage, channel: ChatChannel) -> [AttachmentLayout] {
+        (message.attachments?.compactMap {
+            logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
+            let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel)
+            return layout.type != .link ? nil : layout
+        } ?? [])
+    }
+    
     open func updateAttachmentLayouts(message: ChatMessage) {
         attachments =
         (message.attachments?.compactMap { attachment in
@@ -544,6 +531,17 @@ open class MessageLayoutModel {
             let rd = rh.type == .image || rh.type == .video ? 0 : 1
             return ld < rd
         }
+        
+        linkAttachments =
+        (message.attachments?.compactMap { attachment in
+            logger.verbose("[Attachment] link attachmentLayout update attachment \(attachment.description)")
+            if let index = attachments.firstIndex(where: { $0.attachment == attachment }) {
+                attachments[index].update(attachment: attachment)
+                return attachments[index]
+            }
+            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel)
+            return layout.type != .link ? nil : layout
+        } ?? [])
     }
     
     open class func attributedView(message: ChatMessage,
@@ -664,18 +662,76 @@ open class MessageLayoutModel {
         }
     }
     
+    open class func createLinkPreviews(message: ChatMessage, linkAttachments: [AttachmentLayout]) -> [LinkMetadata] {
+        var attachments = linkAttachments
+        var linkMetadatas = [LinkMetadata]()
+        if let links = message.linkMetadatas, !links.isEmpty {
+            linkMetadatas += links.map { data in
+                var image: UIImage? = nil
+                if !attachments.isEmpty, let firstIndex = attachments.firstIndex(where: { $0.attachment.url == data.url.absoluteString }) {
+                    let first = attachments[firstIndex]
+                    image = first.thumbnail ?? first.attachment.imageDecodedMetadata?.thumbnailImage
+                    attachments.remove(at: firstIndex)
+                }
+                
+                let link = LinkMetadata(
+                    isThumbnailData: image != nil,
+                    url: data.url,
+                    title: data.title,
+                    summary: data.summary,
+                    creator: data.creator,
+                    iconUrl: data.iconUrl,
+                    image: image,
+                    imageUrl: data.imageUrl
+                    
+                )
+                return link
+            }
+        }
+        if !attachments.isEmpty {
+            for attachment in attachments where attachment.attachment.imageDecodedMetadata != nil {
+                if let metadata = attachment.attachment.imageDecodedMetadata, 
+                    let urlString = attachment.attachment.url,
+                   let url = URL(string: urlString) {
+                    let isImage = metadata.width > 0 && metadata.height > 0 && metadata.thumbnailImage != nil
+                    let isText = (metadata.description?.count ?? 0) > 0
+                    var isTitle: Bool {
+                        if !isImage, !isText, (attachment.attachment.name?.count ?? 0) > 0 {
+                            return true
+                        }
+                        return false
+                    }
+                    if isText || isImage || isTitle {
+                        let link = LinkMetadata(
+                            isThumbnailData: true,
+                            url: url,
+                            title: attachment.attachment.name,
+                            summary: metadata.description,
+                            image: metadata.thumbnailImage,
+                            imageOriginalSize: CGSize(width: metadata.width, height: metadata.height)
+                        )
+                        linkMetadatas.append(link)
+                    }
+                }
+            }
+        }
+       
+        return linkMetadatas
+    }
+    
     @discardableResult
     open func addLinkPreview(linkMetadata: LinkMetadata) -> Bool {
         let url = linkMetadata.url
         if let linkPreviews = linkPreviews,
-           linkPreviews.contains(where: { $0.url == url}) {
+           linkPreviews.contains(where: { $0.url == url && $0.image == linkMetadata.image && $0.icon == linkMetadata.icon}) {
             return false
         }
-        if linkMetadata.imageUrl == nil {
-            return false
-        }
+
         linkMetadata.loadImages()
-        var preview = LinkPreview(url: url, image: linkMetadata.image, icon: linkMetadata.icon)
+        var preview = LinkPreview(url: url, isThumbnailData: linkMetadata.isThumbnailData, image: linkMetadata.image, icon: linkMetadata.icon)
+        preview.metadata = linkMetadata
+        preview.imageOriginalSize = linkMetadata.imageOriginalSize
+        preview.iconOriginalSize = linkMetadata.iconOriginalSize
         if let description = linkMetadata.summary {
             let font = Self.appearance.linkDescriptionFont ?? Fonts.regular.withSize(13)
             let text = NSMutableAttributedString(
@@ -688,7 +744,7 @@ open class MessageLayoutModel {
             
             preview.descriptionSize = Self.textSizeMeasure
                 .calculateSize(of: text,
-                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 8,
+                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 16,
                                              maximumNumberOfLines: 2)).textSize
             preview.description = text
         }
@@ -699,15 +755,19 @@ open class MessageLayoutModel {
                                                      attributes: [.font: font, .foregroundColor: Self.appearance.linkTitleColor ?? Appearance.Colors.textBlack]))
             preview.titleSize = Self.textSizeMeasure
                 .calculateSize(of: text,
-                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 8,
+                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 16,
                                              maximumNumberOfLines: 1)).textSize
             preview.title = text
         }
         if linkPreviews == nil {
             linkPreviews = []
         }
-        linkPreviews?.append(preview)
-        
+        if let index = linkPreviews?.firstIndex(where: { $0.url == preview.url}) {
+            linkPreviews?[index] = preview
+        } else {
+            linkPreviews?.append(preview)
+        }
+       
         if !(contentOptions.contains(.link) || contentOptions.contains(.file) || contentOptions.contains(.image) || contentOptions.contains(.voice)) {
             contentOptions.insert(.link)
         }
@@ -795,12 +855,16 @@ public extension MessageLayoutModel {
     
     struct LinkPreview {
         public let url: URL
+        public let isThumbnailData: Bool
         public var image: UIImage?
         public var icon: UIImage?
         public var title: NSAttributedString?
         public var titleSize: CGSize = .zero
         public var description: NSAttributedString?
         public var descriptionSize: CGSize = .zero
+        public var imageOriginalSize: CGSize?
+        public var iconOriginalSize: CGSize?
+        public var metadata: LinkMetadata?
     }
     
     struct ReactionInfo: Equatable {
@@ -976,6 +1040,18 @@ extension MessageLayoutModel {
                 }
                 if thumbnail == nil {
                     thumbnail = .replyFile
+                }
+            case .link:
+                if thumbnail == nil {
+                    let metadata = attachment.imageDecodedMetadata
+                    if let data = metadata?.thumbnailImage {
+                        thumbnail = data
+                    } else if let base64 = metadata?.thumbnail,
+                              let image = Components.imageBuilder.image(thumbHash: base64) {
+                        thumbnail = image
+                    } else {
+                        thumbnail = nil
+                    }
                 }
             default:
                 break

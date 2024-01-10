@@ -538,7 +538,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         if dto.linkMetadatas == nil {
             dto.linkMetadatas = links
         } else {
-            dto.linkMetadatas?.formUnion(links)
+            dto.linkMetadatas = links
+//            dto.linkMetadatas?.formUnion(links)
         }
     }
     

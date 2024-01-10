@@ -9,8 +9,9 @@
 import UIKit
 
 open class LinkMetadata {
-
+    
     public let url: URL
+    public let isThumbnailData: Bool
     open var title: String?
     open var summary: String?
     open var creator: String?
@@ -18,20 +19,28 @@ open class LinkMetadata {
     open var iconUrl: URL?
     open var image: UIImage?
     open var imageUrl: URL?
+    open var imageOriginalSize: CGSize?
+    open var iconOriginalSize: CGSize?
     
-    public required init(url: URL) {
+    public required init(isThumbnailData: Bool = false, url: URL) {
+        self.isThumbnailData = isThumbnailData
         self.url = url
     }
-
-    public init(url: URL,
-                title: String? = nil,
-                summary: String? = nil,
-                creator: String? = nil,
-                icon: UIImage? = nil,
-                iconUrl: URL? = nil,
-                image: UIImage? = nil,
-                imageUrl: URL? = nil)
+    
+    public init(
+        isThumbnailData: Bool = false,
+        url: URL,
+        title: String? = nil,
+        summary: String? = nil,
+        creator: String? = nil,
+        icon: UIImage? = nil,
+        iconUrl: URL? = nil,
+        iconOriginalSize: CGSize? = nil,
+        image: UIImage? = nil,
+        imageUrl: URL? = nil,
+        imageOriginalSize: CGSize? = nil)
     {
+        self.isThumbnailData = isThumbnailData
         self.url = url
         self.title = title
         self.summary = summary
@@ -40,6 +49,8 @@ open class LinkMetadata {
         self.iconUrl = iconUrl
         self.image = image
         self.imageUrl = imageUrl
+        self.iconOriginalSize = iconOriginalSize
+        self.imageOriginalSize = imageOriginalSize
     }
     
     public convenience init(dto: LinkMetadataDTO) {
@@ -69,13 +80,13 @@ open class LinkMetadata {
     open func loadImages() {
         if let filename = Crypto.hash(value: url.absoluteString) {
             if let path = Storage
-                .filePath(filename: "icon_" + filename)
-            {
+                .filePath(filename: "icon_" + filename),
+                icon == nil {
                 icon = UIImage(contentsOfFile: path)
             }
             if let path = Storage
-                .filePath(filename: "image_" + filename)
-            {
+                .filePath(filename: "image_" + filename),
+                (image == nil || isThumbnailData) {
                 image = UIImage(contentsOfFile: path)
             }
         }

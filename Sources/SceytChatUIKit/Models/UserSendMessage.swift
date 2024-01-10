@@ -25,16 +25,19 @@ open class UserSendMessage {
     open var bodyAttributes: [ChatMessage.BodyAttribute]?
     open var attachments: [AttachmentView]?
     open var type = ChannelVM.MessageType.text
+    open var linkMetadata: LinkMetadata?
     
     open var linkAttachments: [AttachmentView] {
-        Self.createLinkAttachmentsFrom(text: text)
+        Self.createLinkAttachmentsFrom(text: text, linkMetaData: linkMetadata)
     }
     
     public required init(sendText: NSAttributedString,
-                         attachments: [AttachmentView]? = nil)
-    {
+                         attachments: [AttachmentView]? = nil,
+                         linkMetadata: LinkMetadata? = nil
+    ) {
         let sendText = sendText.trimWhitespacesAndNewlines().mutableCopy() as! NSMutableAttributedString
         self.attachments = attachments
+        self.linkMetadata = linkMetadata
         
         let nsString = sendText.string as NSString
         var users = [(id: UserId, displayName: String)]()
@@ -96,10 +99,10 @@ open class UserSendMessage {
         }
     }
     
-    open class func createLinkAttachmentsFrom(text: String) -> [AttachmentView] {
+    open class func createLinkAttachmentsFrom(text: String, linkMetaData: LinkMetadata?) -> [AttachmentView] {
         DataDetector.getLinks(text: text)
             .map { url in
-                AttachmentView(link: url)
+                AttachmentView(link: url, linkMetaData: linkMetaData)
             }
     }
     
@@ -138,6 +141,8 @@ public struct AttachmentView {
     public var isLocalFile: Bool
     public var type: AttachmentType
     
+    public var linkMetaData: LinkMetadata?
+    
     public var photoAsset: PHAsset? {
         didSet {
             if let photoAsset {
@@ -154,6 +159,7 @@ public struct AttachmentView {
     public var duration: Int = 0
     public var thumb: [Int] = []
     public var fileSize: UInt = 0
+    
     private var needsToUploadInternally: Bool {
         Components.dataSession == nil && isLocalFile
     }
@@ -165,7 +171,7 @@ public struct AttachmentView {
                 .Builder(filePath: url.path,
                          type: type.rawValue)
 
-                .size(fileSize) // MARK: db RENAME
+                .size(fileSize)
         } else {
             builder = Attachment
                 .Builder(url: url.absoluteString,
@@ -192,6 +198,29 @@ public struct AttachmentView {
                     .chunked(into: Int(ceil(Float(thumb.count) / Float(targetCount))))
                     .map { $0.reduce(0, +) / Int($0.count) },
                 duration: duration
+            ).build() {
+                builder.metadata(json)
+            }
+        } else if type == .link {
+            builder.name(linkMetaData?.title ?? name)
+            var thumbnail = ""
+            var width = 0
+            var height = 0
+            if let image = linkMetaData?.image {
+                width = Int(image.size.width)
+                height = Int(image.size.height)
+                thumbnail = Components
+                    .imageBuilder.init(image: image)
+                    .thumbHashBase64() ?? ""
+            }
+            if let json = ChatMessage.Attachment.Metadata<String>(
+                width: width,
+                height: height,
+                thumbnail: thumbnail,
+                duration: 0,
+                description: linkMetaData?.summary,
+                imageUrl: linkMetaData?.imageUrl?.absoluteString,
+                thumbnailUrl: linkMetaData?.iconUrl?.absoluteString
             ).build() {
                 builder.metadata(json)
             }
@@ -285,12 +314,13 @@ public struct AttachmentView {
         fileSize = Components.storage.sizeOfItem(at: url)
     }
     
-    public init(link: URL) {
+    public init(link: URL, linkMetaData: LinkMetadata? = nil) {
         url = link
         name = link.host ?? ""
         isLocalFile = false
         type = .link
         thumbnail = Appearance.Images.link
+        self.linkMetaData = linkMetaData
     }
     
     static func view(from asset: PHAsset, completion: @escaping (AttachmentView?) -> Void, progressHandler: ((Float) -> Void)? = nil) {

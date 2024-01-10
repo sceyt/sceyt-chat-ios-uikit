@@ -96,7 +96,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     @Published public var action: Action?
     
     private var selectedPhotoAssetIdentifiers = Set<String>()
-    private var lastSelectedLinkMetadata: LinkMetadata?
+    public private(set) var lastDetectedLinkMetadata: LinkMetadata?
     private var actionViewHeightLayoutConstraint: NSLayoutConstraint!
     
     deinit {
@@ -265,6 +265,11 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             sendButton.cancelTracking(with: nil)
         }
         recordButton.isHidden = !sendButton.isHidden || shouldHideRecordButton
+        if !mediaView.items.isEmpty, lastDetectedLinkMetadata != nil {
+            removeActionView()
+        } else if mediaView.items.isEmpty {
+            findLink()
+        }
     }
     
     open func update(height: CGFloat) {
@@ -403,32 +408,49 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         }
     }
     
+    private var findLinkTask: Task<Void, Error>?
     open func findLink() {
+        
+        func getUrl() -> URL? {
+            guard let text = inputTextView.text, !text.isEmpty
+            else {
+                return nil
+            }
+            
+            return DataDetector.matches(text: text).first(where: { $0.url?.scheme != "mailto" && $0.url != nil })?.url
+        }
+        
         guard let text = inputTextView.text, !text.isEmpty
         else {
-            if lastSelectedLinkMetadata != nil {
+            if lastDetectedLinkMetadata != nil, self.currentState == nil {
                 self.removeActionView()
             }
             return
         }
-        Task {[weak self] in
+//        if let findLinkTask, !findLinkTask.isCancelled {
+//            findLinkTask.cancel()
+//        }
+            
+        findLinkTask =  Task {[weak self] in
             func removeActionView() async {
                 await MainActor.run { [weak self] in
                     guard let self
                     else { return }
-                    if self.lastSelectedLinkMetadata != nil  {
+                    if self.lastDetectedLinkMetadata != nil, self.currentState == nil  {
                         self.removeActionView()
                     }
                 }
             }
-            if let result = DataDetector.matches(text: text).first(where: { $0.url?.scheme != "mailto" && $0.url != nil }),
-                let url = result.url {
-                if let last = self?.lastSelectedLinkMetadata, last.url == url {
+            if let url = getUrl() {
+                if let last = self?.lastDetectedLinkMetadata, last.url == url {
                     return
                 }
-                guard let metadata = await try? LinkMetadataProvider.default.fetch(url: url, downloadImage: false, downloadIcon: false).get()
+                guard let metadata = await try? LinkMetadataProvider.default.fetch(url: url).get()
                 else {
                     await removeActionView()
+                    return
+                }
+                if url != getUrl() {
                     return
                 }
                 await MainActor.run { [weak self] in
@@ -441,6 +463,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 await removeActionView()
             }
         }
+        
     }
     
     open func showNoMicrophonePermission() {
@@ -449,6 +472,9 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     
     @objc
     open func actionViewCancelAction() {
+        if lastDetectedLinkMetadata != nil {
+            cachedMessage = inputTextView.attributedText
+        }
         if case .edit = currentState {
             inputTextView.attributedText = cachedMessage
             cachedMessage = nil
@@ -558,6 +584,8 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         addMediaButton.isHidden = false
         selectedPhotoAssetIdentifiers.removeAll()
         action = .send(true)
+        currentState = nil
+        nextState = nil
         //        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
         //            guard let self else { return }
         //            let rnd1 = arc4random_uniform(UInt32(min(Self.loren.count, 40)))
@@ -575,7 +603,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     }
     
     open func addReply(layoutModel: MessageLayoutModel) {
-        self.lastSelectedLinkMetadata = nil
+        self.lastDetectedLinkMetadata = nil
         let hasActionView = !actionView.isHidden
         
         if case .edit = currentState {
@@ -659,7 +687,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
 
     var cachedMessage: NSAttributedString?
     open func addEdit(layoutModel: MessageLayoutModel) {
-        self.lastSelectedLinkMetadata = nil
+        self.lastDetectedLinkMetadata = nil
         let hasActionView = !actionView.isHidden
 
         let state = currentState
@@ -741,20 +769,31 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     }
     
     open func addOrUpdateLinkPreview(linkDetails: LinkMetadata) {
+        guard mediaView.items.isEmpty
+        else { return }
         
-        if let last = self.lastSelectedLinkMetadata, 
+        if let last = self.lastDetectedLinkMetadata,
             last.url == linkDetails.url {
             return
         }
         
         let hasActionView = !actionView.isHidden
         
-        if hasActionView, lastSelectedLinkMetadata == nil {
-            return
+        if hasActionView, lastDetectedLinkMetadata == nil {
+            switch currentState {
+            case .edit(let model):
+                self.lastDetectedLinkMetadata = linkDetails
+                self.nextState = .edit(model)
+            case .reply(let model):
+                self.lastDetectedLinkMetadata = linkDetails
+                self.nextState = .reply(model)
+            case .none:
+                return
+            }
         }
-        let shouldUpdate = lastSelectedLinkMetadata != nil
+        let shouldUpdate = lastDetectedLinkMetadata != nil
         
-        self.lastSelectedLinkMetadata = linkDetails
+        self.lastDetectedLinkMetadata = linkDetails
         let message = linkDetails.summary ?? ""
         
         let titleAttributedString = NSMutableAttributedString(
@@ -775,7 +814,11 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
         actionView.imageView.isHidden = false
-        actionView.imageView.image = .link
+        if let icon = linkDetails.icon ?? linkDetails.image {
+            actionView.imageView.image = icon
+        } else {
+            actionView.imageView.image = .link
+        }
         
         actionViewHeightLayoutConstraint.constant = Layouts.actionViewHeight
 
@@ -789,7 +832,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     private var isRemovingActionView = false
     open func removeActionView() {
         guard !actionView.isHidden, !isRemovingActionView else { return }
-        lastSelectedLinkMetadata = nil
+        lastDetectedLinkMetadata = nil
         isRemovingActionView = true
         addMediaButton.isHidden = false
         selectedPhotoAssetIdentifiers.removeAll()

@@ -60,15 +60,21 @@ extension MessageCell {
         open var data: MessageLayoutModel! {
             didSet {
                 removeArrangedSubviews()
-                guard let previews = data.linkPreviews, !previews.isEmpty else { return }
+                guard let previews = data.linkPreviews, 
+                        !previews.isEmpty
+                else { return }
                 previews.forEach {
                     let v = LinkView()
                         .withoutAutoresizingMask
                     addArrangedSubview(v)
-                    v.widthAnchor.pin(to: widthAnchor)
+                    v.leadingAnchor.pin(to: self.leadingAnchor, constant: 8)
+                    v.trailingAnchor.pin(to: self.trailingAnchor, constant: -8)
                     let tap = UITapGestureRecognizer(target: self, action: #selector(openUrlAction(_:)))
                     v.addGestureRecognizer(tap)
                     v.data = $0
+                    v.backgroundColor = data.message.incoming ?
+                    appearance.linkPreviewBackgroundColor.in :
+                    appearance.linkPreviewBackgroundColor.out
                 }
             }
         }
@@ -90,7 +96,9 @@ extension MessageCell {
                 let size = LinkView.measure(model: preview, appearance: appearance)
                 var result = partialResult
                 result.width = max(result.width, size.width)
-                result.height += 4 + size.height
+                if size.height > 0 {
+                    result.height += 4 + size.height
+                }
                 return result
             }
             return size
@@ -143,17 +151,22 @@ extension MessageCell {
             addSubview(imageView)
             addSubview(titleLabel)
             addSubview(descriptionLabel)
-            imageView.pin(to: self, anchors: [.bottom, .leading(2), .trailing(-2)])
-            titleLabel.pin(to: self, anchors: [.leading(12), .trailing(-12)])
-            descriptionLabel.pin(to: self, anchors: [.leading(12), .trailing(-12)])
-            titleLabel.topAnchor.pin(to: self.topAnchor)
+            imageView.pin(to: self, anchors: [.top, .leading, .trailing])
+            titleLabel.pin(to: self, anchors: [.leading(8), .trailing(-8)])
+            descriptionLabel.pin(to: self, anchors: [.leading(8), .trailing(-8)])
+            titleLabel.topAnchor.pin(to: imageView.bottomAnchor, constant: 6)
             descriptionLabel.topAnchor.pin(to: titleLabel.bottomAnchor, constant: 2)
-            descriptionLabel.bottomAnchor.pin(to: imageView.topAnchor, constant: -6)
+            descriptionLabel.bottomAnchor.pin(to: self.bottomAnchor, constant: -8)
+        }
+        
+        open override func layoutSubviews() {
+            super.layoutSubviews()
+            layer.cornerRadius = 16
         }
         
         open var data: MessageLayoutModel.LinkPreview! {
             didSet {
-                imageView.image = data.image// ?? data.icon
+                imageView.image = data.image
                 titleLabel.attributedText = data.title
                 descriptionLabel.attributedText = data.description
                 link = data.url
@@ -162,15 +175,19 @@ extension MessageCell {
 
         open class func measure(model: MessageLayoutModel.LinkPreview, appearance: Appearance) -> CGSize {
             var size = CGSize()
-            if let image = model.image ?? model.icon {
-                size.width = min(image.size.width, 260)
-                size.height = min(image.size.height, 140)
+            if let image = model.image {
+                
+                size.width = min(max(model.imageOriginalSize?.width ?? 0, image.size.width), 260)
+                size.height = min(max(model.imageOriginalSize?.height ?? 0, image.size.height), 140)
+                size.height += 10 // padding
             } else {
                 size.width = max(model.titleSize.width, model.descriptionSize.width)
             }
             size.height += model.titleSize.height //size name
             size.height += model.descriptionSize.height // desc
-            size.height += 8 // padding
+            if size.height > 0 {
+                size.height += 8 // padding
+            }
             return size
         }
     }

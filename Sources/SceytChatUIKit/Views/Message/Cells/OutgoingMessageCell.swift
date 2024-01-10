@@ -135,9 +135,6 @@ open class OutgoingMessageCell: MessageCell {
                 attachmentView.bottomAnchor.pin(to: bubbleView.bottomAnchor, constant: 0),
             ]
         } else if layout.contentOptions.contains(.link), layout.attachments.isEmpty {
-            infoView.dateLabel.textColor = appearance.infoViewRevertColorOnBackgroundView
-            infoView.displayedLabel.textColor = infoView.dateLabel.textColor
-            infoView.eyeView.tintColor = infoView.dateLabel.textColor
             
             layoutConstraint += [
                 bubbleView.leadingAnchor.pin(to: textLabel.leadingAnchor, constant: -12),
@@ -157,16 +154,9 @@ open class OutgoingMessageCell: MessageCell {
                 linkView.trailingAnchor.pin(to: bubbleView.trailingAnchor),
                 linkView.heightAnchor.pin(constant: layout.linkViewMeasure.height),
             ]
-            if layout.linkPreviews?.last?.image != nil || layout.linkPreviews?.last?.icon != nil {
-                layoutConstraint += [ linkView.bottomAnchor.pin(to: bubbleView.bottomAnchor, constant: -1) ]
-            } else {
-                layoutConstraint += [ linkView.bottomAnchor.pin(to: infoView.topAnchor, constant: -4) ]
-            }
-//            if layout.textSize.width > layout.linkViewMeasure.width + 8 {
-//                bubbleView.leadingAnchor.pin(to: textLabel.leadingAnchor, constant: -12)
-//            } else {
-//                bubbleView.leadingAnchor.pin(to: linkView.leadingAnchor, constant: -8)
-//            }
+
+            
+            layoutConstraint += [ linkView.bottomAnchor.pin(to: infoView.topAnchor, constant: -4) ]
         } else {
             dateTickBackgroundView.isHidden = layout.contentOptions.contains(.file)
             if !dateTickBackgroundView.isHidden {
@@ -355,6 +345,7 @@ open class OutgoingMessageCell: MessageCell {
             bubbleSize.height += linkSize.height
             bubbleSize.height += (model.hasReply ? 8 : model.isForwarded ? hasVoicesOrFiles ? 0 : 8 : 2)
             bubbleSize.height += 12 //padding
+            bubbleSize.height += 8 //padding
             
             let infoViewSize = InfoView.measure(model: model, appearance: appearance)
             bubbleSize.height += infoViewSize.height
