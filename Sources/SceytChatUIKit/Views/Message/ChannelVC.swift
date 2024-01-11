@@ -1674,7 +1674,7 @@ open class ChannelVC: ViewController,
                 animatedScroll = true
             } else if unreadCountView.isHidden {
                 isStartedDragging = true
-                needsToScrollBottom = true
+                needsToScrollBottom = isInsertLastIndexPath
                 animatedScroll = isInsertLastIndexPath
             } else {
                 needsToScrollBottom = false

@@ -132,7 +132,7 @@ extension MessageCell {
             super.setup()
             imageView.clipsToBounds = true
             titleLabel.numberOfLines = 2
-            descriptionLabel.numberOfLines = 2
+            descriptionLabel.numberOfLines = 3
             
         }
 

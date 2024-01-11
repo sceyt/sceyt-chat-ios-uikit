@@ -761,7 +761,7 @@ open class MessageLayoutModel {
             preview.descriptionSize = Self.textSizeMeasure
                 .calculateSize(of: text,
                                config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 16,
-                                             maximumNumberOfLines: 2)).textSize
+                                             maximumNumberOfLines: 3)).textSize
             preview.description = text
         }
         if let title = linkMetadata.title {
