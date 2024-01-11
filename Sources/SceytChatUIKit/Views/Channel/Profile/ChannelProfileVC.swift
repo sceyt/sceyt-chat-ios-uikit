@@ -286,10 +286,12 @@ open class ChannelProfileVC: ViewController,
                 cell.data = profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata
             }
             _cell = cell
-        //        case .uri:
-        //            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileURICell.self)
-        //            cell.data = profileViewModel.channel.uri
-        //            _cell = cell
+        case .uri:
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileItemCell.self)
+            cell.iconView.image = .channelProfileURI
+            cell.titleLabel.text = "@" + (profileViewModel.channel.uri)
+            cell.selectionStyle = .none
+            _cell = cell
         case .options, .items:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileItemCell.self)
             let action = (sections[indexPath.section] == .options ? options() : items())[indexPath.row]
@@ -607,6 +609,7 @@ open class ChannelProfileVC: ViewController,
             if !(profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata ?? "").isEmpty {
                 sections.append(.description)
             }
+            sections.append(.uri)
         case .private:
             if !(profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata ?? "").isEmpty {
                 sections.append(.description)
@@ -1012,6 +1015,7 @@ public extension ChannelProfileVC {
         case header
         case actionMenu
         case description
+        case uri
         case options
         case items
 //        case uri

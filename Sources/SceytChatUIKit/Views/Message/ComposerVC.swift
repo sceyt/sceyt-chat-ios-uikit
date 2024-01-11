@@ -621,6 +621,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         let title = Formatters.userDisplayName.format(message.user)
         var text = layoutModel.attributedView.content.string.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         var image: UIImage?
+        var showPlayIcon = false
         if let attachment = message.attachments?.first {
             switch attachment.type {
             case "image":
@@ -633,6 +634,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                     text = L10n.Message.Attachment.video
                 }
                 image = attachment.thumbnailImage
+                showPlayIcon = true
             case "voice":
                 if text.isEmpty {
                     text = L10n.Message.Attachment.voice
@@ -685,6 +687,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         actionView.iconView.image = .composerReplyMessage
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
+        actionView.playView.isHidden = !showPlayIcon
         
         actionViewHeightLayoutConstraint.constant = Layouts.actionViewHeight
 
@@ -710,6 +713,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         let message = layoutModel.message
         var image: UIImage?
         var text = layoutModel.attributedView.content.string
+        var showPlayIcon = false
         if let attachment = message.attachments?.first {
             switch attachment.type {
             case "image":
@@ -722,6 +726,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                     text = L10n.Message.Attachment.video
                 }
                 image = attachment.thumbnailImage
+                showPlayIcon = true
             case "voice":
                 if text.isEmpty {
                     text = L10n.Message.Attachment.voice
@@ -768,6 +773,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
         addMediaButton.isHidden = true
+        actionView.playView.isHidden = !showPlayIcon
 
         actionViewHeightLayoutConstraint.constant = Layouts.actionViewHeight
 

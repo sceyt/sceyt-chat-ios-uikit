@@ -17,10 +17,13 @@ extension ComposerVC {
                 setupAppearance()
             }
         }
-
+        
         open lazy var iconView = UIImageView()
             .withoutAutoresizingMask
             .contentHuggingPriorityH(.required)
+        
+        open lazy var playView = UIImageView()
+            .withoutAutoresizingMask
 
         open lazy var titleLabel = UILabel()
             .withoutAutoresizingMask
@@ -72,10 +75,15 @@ extension ComposerVC {
             mediaTimestampLabel.isHidden = true
             
             cancelButton.setImage(.replyX, for: .normal)
+            
+            playView.image = .replyPlay
         }
 
         override open func setupLayout() {
             super.setupLayout()
+            
+            imageView.addSubview(playView)
+            playView.pin(to: imageView, anchors: [.centerX, .centerY])
 
             addSubview(contentStackView)
             addSubview(cancelButton)
