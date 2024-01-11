@@ -149,12 +149,12 @@ extension MessageCell {
             addSubview(imageView)
             addSubview(titleLabel)
             addSubview(descriptionLabel)
-            imageView.pin(to: self, anchors: [.top, .leading, .trailing])
-            titleLabel.pin(to: self, anchors: [.leading(8), .trailing(-8)])
-            descriptionLabel.pin(to: self, anchors: [.leading(8), .trailing(-8)])
+            imageView.pin(to: self, anchors: [.top(6), .leading(6), .trailing(-6)])
+            titleLabel.pin(to: self, anchors: [.leading(6), .trailing(-6)])
+            descriptionLabel.pin(to: self, anchors: [.leading(6), .trailing(-6)])
             titleLabel.topAnchor.pin(to: imageView.bottomAnchor, constant: 6)
             descriptionLabel.topAnchor.pin(to: titleLabel.bottomAnchor, constant: 2)
-            descriptionLabel.bottomAnchor.pin(to: self.bottomAnchor, constant: -8)
+            descriptionLabel.bottomAnchor.pin(to: self.bottomAnchor, constant: -6)
         }
         
         open override func layoutSubviews() {
@@ -182,7 +182,7 @@ extension MessageCell {
             size.height += model.titleSize.height //size name
             size.height += model.descriptionSize.height // desc
             if size.height > 0 {
-                size.height += 16 // padding
+                size.height += 20 // padding
             }
             return size
         }

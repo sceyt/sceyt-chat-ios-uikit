@@ -760,7 +760,7 @@ open class MessageLayoutModel {
             
             preview.descriptionSize = Self.textSizeMeasure
                 .calculateSize(of: text,
-                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 16,
+                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 12,
                                              maximumNumberOfLines: 3)).textSize
             preview.description = text
         }
@@ -771,7 +771,7 @@ open class MessageLayoutModel {
                                                      attributes: [.font: font, .foregroundColor: Self.appearance.linkTitleColor ?? Appearance.Colors.textBlack]))
             preview.titleSize = Self.textSizeMeasure
                 .calculateSize(of: text,
-                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 16,
+                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 12,
                                              maximumNumberOfLines: 2)).textSize
             preview.title = text
         }
