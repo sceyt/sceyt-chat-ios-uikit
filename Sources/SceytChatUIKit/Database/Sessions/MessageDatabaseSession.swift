@@ -60,7 +60,12 @@ public protocol MessageDatabaseSession {
     func createOrUpdate(forwardDetail: ForwardingDetails?, dto: MessageDTO) -> MessageDTO
 
     @discardableResult
-    func add(linkMetadatas: [LinkMetadata], toMessage id: MessageId) -> MessageDTO
+    func add(linkMetadatas: [LinkMetadata], messageId: MessageId) -> MessageDTO?
+    
+    @discardableResult
+    func add(linkMetadatas: [LinkMetadata], messageTid: Int64) -> MessageDTO?
+    
+    func add(linkMetadatas: [LinkMetadata], dto: MessageDTO)
 
     @discardableResult
     func update(messageMarkers: MessageListMarker) -> [MessageDTO]
@@ -507,8 +512,22 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     }
     
     @discardableResult
-    public func add(linkMetadatas: [LinkMetadata], toMessage id: MessageId) -> MessageDTO {
-        let dto = MessageDTO.fetchOrCreate(id: id, context: self)
+    public func add(linkMetadatas: [LinkMetadata], messageId: MessageId) -> MessageDTO? {
+        guard let dto = MessageDTO.fetch(id: messageId, context: self)
+        else { return nil }
+        add(linkMetadatas: linkMetadatas, dto: dto)
+        return dto
+    }
+    
+    @discardableResult
+    public func add(linkMetadatas: [LinkMetadata], messageTid: Int64) -> MessageDTO? {
+        guard let dto = MessageDTO.fetch(tid: messageTid, context: self)
+        else { return nil }
+        add(linkMetadatas: linkMetadatas, dto: dto)
+        return dto
+    }
+    
+    public func add(linkMetadatas: [LinkMetadata], dto: MessageDTO) {
         let links: Set<LinkMetadataDTO> = .init(
             linkMetadatas.map {
                 LinkMetadataDTO.fetchOrCreate(
@@ -519,9 +538,9 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         if dto.linkMetadatas == nil {
             dto.linkMetadatas = links
         } else {
-            dto.linkMetadatas?.formUnion(links)
+            dto.linkMetadatas = links
+//            dto.linkMetadatas?.formUnion(links)
         }
-        return dto
     }
     
     @discardableResult

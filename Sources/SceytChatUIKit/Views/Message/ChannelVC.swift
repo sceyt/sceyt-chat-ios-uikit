@@ -1149,9 +1149,7 @@ open class ChannelVC: ViewController,
         collectionView: UICollectionView,
         model: MessageLayoutModel
     ) -> UICollectionViewCell {
-        let message = model.message
-        //        channelViewModel.updateLinkPreviewsForLayoutModelIfNeeded(model, at: indexPath)
-        
+        let message = model.message        
         let type: MessageCell.Type =
         model.message.incoming ?
         Components.incomingMessageCell :
@@ -1354,7 +1352,8 @@ open class ChannelVC: ViewController,
     open func createMessage(shouldClearText: Bool = true) -> UserSendMessage {
         let m = UserSendMessage(
             sendText: shouldClearText ? inputTextView.attributedText : .init(),
-            attachments: mediaView.items
+            attachments: mediaView.items,
+            linkMetadata: composerVC.lastDetectedLinkMetadata
         )
         if let ma = channelViewModel.selectedMessageForAction {
             switch ma {
@@ -1638,29 +1637,47 @@ open class ChannelVC: ViewController,
             } else {
                 layout.isInsertingItemsToTop = false
             }
+//            var animatedScroll = inserts.count == 1
+//            if isScrollingBottom {
+//                needsToScrollBottom = true
+//                animatedScroll = true
+//            } else if paths.numberOfIndexPaths == 1 &&
+//                        (!paths.reloads.isEmpty || !paths.inserts.isEmpty),
+//                      let lastIndexPath = collectionView.lastIndexPath,
+//                      collectionView.lastVisibleIndexPath == lastIndexPath {
+//                isStartedDragging = true
+//                var isReloadLastIndexPath: Bool {
+//                    guard let last = paths.reloads.last else { return false }
+//                    return last >= lastIndexPath
+//                }
+//                var isInsertLastIndexPath: Bool {
+//                    guard let last = paths.inserts.last else { return false }
+//                    return last >= lastIndexPath
+//                }
+//                if isReloadLastIndexPath || isInsertLastIndexPath {
+//                    needsToScrollBottom = true
+//                    animatedScroll = true
+//                } else {
+//                    needsToScrollBottom = false
+//                }
+//            }
+            
+            var isInsertLastIndexPath: Bool {
+                guard let last = paths.inserts.last, 
+                        let lastIndexPath = collectionView.lastIndexPath
+                else { return false }
+                return last >= lastIndexPath
+            }
             var animatedScroll = inserts.count == 1
             if isScrollingBottom {
                 needsToScrollBottom = true
                 animatedScroll = true
-            } else if paths.numberOfIndexPaths == 1 &&
-                        (!paths.reloads.isEmpty || !paths.inserts.isEmpty),
-                      let lastIndexPath = collectionView.lastIndexPath,
-                      collectionView.lastVisibleIndexPath == lastIndexPath {
+            } else if unreadCountView.isHidden {
                 isStartedDragging = true
-                var isReloadLastIndexPath: Bool {
-                    guard let last = paths.reloads.last else { return false }
-                    return last >= lastIndexPath
-                }
-                var isInsertLastIndexPath: Bool {
-                    guard let last = paths.inserts.last else { return false }
-                    return last >= lastIndexPath
-                }
-                if isReloadLastIndexPath || isInsertLastIndexPath {
-                    needsToScrollBottom = true
-                    animatedScroll = true
-                } else {
-                    needsToScrollBottom = false
-                }
+                needsToScrollBottom = true
+                animatedScroll = isInsertLastIndexPath
+            } else {
+                needsToScrollBottom = false
             }
                         
             if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil {

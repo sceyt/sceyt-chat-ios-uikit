@@ -242,6 +242,15 @@ open class ImageBuilder {
         return nil
     }
     
+    open class func image(from data: Data) -> UIImage? {
+        if let imageSource = CGImageSourceCreateWithData(data as CFData, nil),
+           let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) {
+            let image = UIImage(cgImage: cgImage)
+            return image
+        }
+        return nil
+    }
+    
     open class func lowMemory_resizeImage(fileUrl: URL, maxPixelSize: CGFloat) -> ImageBuilder? {
         let imageSourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
         let downsampleOptions =  [kCGImageSourceCreateThumbnailFromImageAlways: true,

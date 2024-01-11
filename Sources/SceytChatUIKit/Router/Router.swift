@@ -47,7 +47,12 @@ open class Router<VC: UIViewController>: NSObject {
     
     @available(iOSApplicationExtension, unavailable)
     open func showLink(_ link: URL) {
-        UIApplication.shared.open(link)
+        if link.scheme == nil,
+            let httpLink = URL(string: "http://\(link.absoluteString)") {
+            UIApplication.shared.open(httpLink)
+        } else {
+            UIApplication.shared.open(link)
+        }
     }
     
     open func showLinkAlert(

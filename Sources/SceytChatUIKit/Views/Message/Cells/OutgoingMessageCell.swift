@@ -135,12 +135,12 @@ open class OutgoingMessageCell: MessageCell {
                 attachmentView.bottomAnchor.pin(to: bubbleView.bottomAnchor, constant: 0),
             ]
         } else if layout.contentOptions.contains(.link), layout.attachments.isEmpty {
-
+            
             layoutConstraint += [
                 bubbleView.leadingAnchor.pin(to: textLabel.leadingAnchor, constant: -12),
                 bubbleView.trailingAnchor.pin(to: containerView.trailingAnchor, constant: -12),
                 bubbleView.topAnchor.pin(to: containerView.topAnchor),
-                bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: linksContainerSize.width + 8),
+                bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.linkViewMeasure.width + 24),
                 bubbleView.widthAnchor.pin(lessThanOrEqualToConstant: Components.messageLayoutModel.defaults.messageWidth).priority(.required),
 
                 textLabel.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -12),
@@ -148,17 +148,15 @@ open class OutgoingMessageCell: MessageCell {
                 textLabel.widthAnchor.pin(greaterThanOrEqualToConstant: layout.textSize.width),
                 textLabel.heightAnchor.pin(constant: layout.textSize.height),
 
-                linkView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 4),
+                linkView.leadingAnchor.pin(to: bubbleView.leadingAnchor),
                 linkView.topAnchor.pin(to: textLabel.bottomAnchor, constant: 8),
-                linkView.bottomAnchor.pin(to: infoView.topAnchor, constant: -4),
-                linkView.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -8),
-                linkView.heightAnchor.pin(constant: linksContainerSize.height),
+//                linkView.bottomAnchor.pin(to: infoView.topAnchor, constant: -4),
+                linkView.trailingAnchor.pin(to: bubbleView.trailingAnchor),
+                linkView.heightAnchor.pin(constant: layout.linkViewMeasure.height),
             ]
-            if layout.textSize.width > linksContainerSize.width + 8 {
-                bubbleView.leadingAnchor.pin(to: textLabel.leadingAnchor, constant: -12)
-            } else {
-                bubbleView.leadingAnchor.pin(to: linkView.leadingAnchor, constant: -8)
-            }
+
+            
+            layoutConstraint += [ linkView.bottomAnchor.pin(to: infoView.topAnchor, constant: -4) ]
         } else {
             dateTickBackgroundView.isHidden = layout.contentOptions.contains(.file)
             if !dateTickBackgroundView.isHidden {
@@ -338,7 +336,19 @@ open class OutgoingMessageCell: MessageCell {
             bubbleSize = model.attachmentsContainerSize
             bubbleSize.width += 4
             bubbleSize.height += (model.hasReply ? 8 : model.isForwarded ? hasVoicesOrFiles ? 0 : 8 : 2)
+        } else if model.contentOptions.contains(.link) {
+            let linkSize = model.linkViewMeasure
+            textSize = model.textSize
+            textSize.width = max(textSize.width, model.parentTextSize.width - 70)
+            bubbleSize = textSize
+            bubbleSize.width = max(bubbleSize.width, linkSize.width)
+            bubbleSize.height += linkSize.height
+            bubbleSize.height += (model.hasReply ? 8 : model.isForwarded ? hasVoicesOrFiles ? 0 : 8 : 2)
+            bubbleSize.height += 12 //padding
+            bubbleSize.height += 8 //padding
             
+            let infoViewSize = InfoView.measure(model: model, appearance: appearance)
+            bubbleSize.height += infoViewSize.height
         } else {
             shouldShowDateTickBackground = false
             bubbleSize = model.attachmentsContainerSize

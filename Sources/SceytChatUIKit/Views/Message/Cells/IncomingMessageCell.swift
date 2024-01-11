@@ -182,12 +182,13 @@ open class IncomingMessageCell: MessageCell {
                 layoutConstraint += [attachmentView.topAnchor.pin(to: bubbleViewTopAnchor, constant: layout.isForwarded ? hasVoicesOrFiles ? 0 : 8 : 2)]
             }
         } else if layout.contentOptions.contains(.link), layout.attachments.isEmpty {
-            
             layoutConstraint += [
                 bubbleView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 10),
                 bubbleView.trailingAnchor.pin(to: infoView.trailingAnchor, constant: 12),
                 bubbleView.topAnchor.pin(to: containerView.topAnchor),
                 bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.messageUserTitleSize.width + 24),
+                bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.linkViewMeasure.width + 24),
+                bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.textSize.width + 24),
                 bubbleView.widthAnchor.pin(lessThanOrEqualToConstant: Components.messageLayoutModel.defaults.messageWidth).priority(.required),
 
                 textLabel.topAnchor.pin(to: contentTopAnchor, constant: (layout.isForwarded || showSenderInfo) ? 2 : 8),
@@ -195,19 +196,16 @@ open class IncomingMessageCell: MessageCell {
                 textLabel.heightAnchor.pin(constant: layout.textSize.height),
                 textLabel.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 12),
                 
-                linkView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 4),
+                linkView.leadingAnchor.pin(to: bubbleView.leadingAnchor),
                 linkView.topAnchor.pin(to: textLabel.bottomAnchor, constant: 8),
-                linkView.bottomAnchor.pin(to: infoView.topAnchor, constant: -4),
-                linkView.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -8),
-                linkView.heightAnchor.pin(constant: linksContainerSize.height),
+                linkView.trailingAnchor.pin(to: bubbleView.trailingAnchor),
+                linkView.heightAnchor.pin(constant: layout.linkViewMeasure.height),
+                
                 infoView.topAnchor.pin(to: bubbleView.bottomAnchor, constant: -24)
             ]
             
-            if layout.textSize.width > linksContainerSize.width + 8 {
-                bubbleView.trailingAnchor.pin(to: textLabel.trailingAnchor, constant: 12)
-            } else {
-                bubbleView.widthAnchor.pin(constant: linksContainerSize.width + 8)
-            }
+            layoutConstraint += [ linkView.bottomAnchor.pin(lessThanOrEqualTo: infoView.topAnchor, constant: -4) ]
+            
         } else {
             dateTickBackgroundView.isHidden = layout.contentOptions.contains(.file)
             if !dateTickBackgroundView.isHidden {
@@ -251,13 +249,14 @@ open class IncomingMessageCell: MessageCell {
                 infoView.bottomAnchor.pin(to: bubbleView.bottomAnchor, constant: -8)
             ]
         } else {
+            let infoAnchorView = (layout.contentOptions.contains(.link) && layout.attachments.isEmpty) ? linkView : attachmentView
             layoutConstraint += [
                 dateTickBackgroundView.leadingAnchor.pin(to: infoView.leadingAnchor, constant: -6),
                 dateTickBackgroundView.topAnchor.pin(to: infoView.topAnchor, constant: -3),
                 dateTickBackgroundView.trailingAnchor.pin(to: infoView.trailingAnchor, constant: 6),
                 dateTickBackgroundView.bottomAnchor.pin(to: infoView.bottomAnchor, constant: 3),
-                infoView.trailingAnchor.pin(to: attachmentView.trailingAnchor, constant: -12),
-                infoView.bottomAnchor.pin(to: attachmentView.bottomAnchor, constant: -9)
+                infoView.trailingAnchor.pin(to: infoAnchorView.trailingAnchor, constant: -12),
+                infoView.bottomAnchor.pin(to: infoAnchorView.bottomAnchor, constant: -9)
             ]
         }
         
@@ -400,6 +399,26 @@ open class IncomingMessageCell: MessageCell {
             } else {
                 bubbleSize.height += model.isForwarded ? hasVoicesOrFiles ? 0 : 8 : 2
             }
+        } else if options.contains(.link) {
+            let linkSize = model.linkViewMeasure
+            textSize = model.textSize
+            textSize.width = max(textSize.width, model.parentTextSize.width - 70)
+            bubbleSize = textSize
+            bubbleSize.width = max(bubbleSize.width, linkSize.width)
+            bubbleSize.height += linkSize.height
+            if showName, !model.isForwarded, model.hasReply {
+                bubbleSize.height += 2
+            } else {
+                bubbleSize.height += model.isForwarded ? hasVoicesOrFiles ? 0 : 8 : 2
+            }
+            bubbleSize.height += 12 //padding
+            if userNameSize == .zero {
+                bubbleSize.height += 14
+            }
+
+            let infoViewSize = InfoView.measure(model: model, appearance: appearance)
+            bubbleSize.height += infoViewSize.height
+            logger.debug("[LINK SIZE] \(model.message.id), \(bubbleSize.height)")
         } else {
             bubbleSize = model.attachmentsContainerSize
             bubbleSize.width += 4
@@ -410,7 +429,7 @@ open class IncomingMessageCell: MessageCell {
             bubbleSize.height += (model.textSize.height > 0 && model.showUserInfo) ? 8 : 2
             bubbleSize.height += 8//Attachment padding
         }
-        
+        logger.debug("IncomingMessageCell: measure 1 messageId: \(model.message.id), measure: \(bubbleSize) body: \(model.message.body)")
         if replySize != .zero {
             bubbleSize.height += replySize.height
             bubbleSize.width = max(bubbleSize.width, replySize.width)
@@ -423,7 +442,7 @@ open class IncomingMessageCell: MessageCell {
             bubbleSize.height += userNameSize.height
             bubbleSize.width = max(bubbleSize.width, userNameSize.width)
         }
-        
+        logger.debug("IncomingMessageCell: measure 2 messageId: \(model.message.id), measure: \(bubbleSize) body: \(model.message.body)")
         if model.hasReactions {
             switch model.reactionType {
             case .interactive:
@@ -434,6 +453,7 @@ open class IncomingMessageCell: MessageCell {
                 bubbleSize.width = max(bubbleSize.width, size.width)
             }
         }
+        
         if model.isLastDisplayedMessage {
             bubbleSize.height += UnreadView.measure(model: model, appearance: appearance).height
         }

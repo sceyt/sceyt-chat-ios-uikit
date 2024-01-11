@@ -83,11 +83,11 @@ open class ChannelLinkListView: ChannelAttachmentListView,
                     if cell?.titleLabel.text == nil || cell?.titleLabel.text == metadata.url.absoluteString {
                         cell?.metadata = metadata
                     }
-                    self?.layout.calculateLinkHeight(metadata)
+                    self?.layout.calculateLinkHeight(metadata, attachment: cell?.data)
                 }
             })
         cell.data = attachmentLayout?.attachment
-        if let attachmentLayout {
+        if let attachmentLayout, !(attachmentLayout.attachment.imageDecodedMetadata?.hideLinkDetails == true) {
             linkViewModel.downloadAttachmentIfNeeded(attachmentLayout)
         }
         return cell
@@ -140,18 +140,21 @@ extension ChannelLinkListView {
     open class Layout: ChannelAttachmentListView.Layout {
         open var cellHeights: [URL: CGFloat] = [:]
         
-        open func calculateLinkHeight(_ metadata: LinkMetadata) {
+        open func calculateLinkHeight(_ metadata: LinkMetadata, attachment: ChatMessage.Attachment?) {
             let appearance = ChannelLinkListView.appearance
+            var hideLinkDetails: Bool {
+                attachment?.imageDecodedMetadata?.hideLinkDetails == true
+            }
             let maxSize = CGSize(width: (collectionView?.width ?? 0) - Layouts.iconSize - Layouts.horizontalPadding * 3, height: 32)
-            let title = metadata.title ?? ""
-            let summary = metadata.summary ?? ""
+            let title = hideLinkDetails ? "" : (metadata.title ?? "")
+            let summary = hideLinkDetails ? "" : (metadata.summary ?? "")
             let titleHeight: CGFloat = title.isEmpty ? 0 : (22 + 4)
             let linkHeight: CGFloat = 20
             let detailHeight: CGFloat = summary.isEmpty ? 0 : (max(16, ceil(NSAttributedString(
                 string: summary,
                 attributes: [.font: appearance.detailLabelFont ?? Fonts.regular.withSize(13)])
                 .boundingRect(with: maxSize, options: [.usesLineFragmentOrigin], context: nil).height)) + 4)
-            let cellHeight = min(100, titleHeight + linkHeight + detailHeight + Layouts.verticalPadding * 2)
+            let cellHeight = max(Layouts.iconSize + Layouts.verticalPadding * 2, min(100, titleHeight + linkHeight + detailHeight + Layouts.verticalPadding * 2))
             if cellHeights[metadata.url] != cellHeight {
                 cellHeights[metadata.url] = cellHeight
                 invalidateLayout()
