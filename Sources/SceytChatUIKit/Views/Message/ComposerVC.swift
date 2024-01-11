@@ -581,6 +581,10 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     //    let links = ["http://www.sceyt.com", "http://www.google.com", "http://www.test.com", "http://www.example.com"]
     @objc
     open func sendButtonAction(_ sender: UIButton) {
+        if case .reply(let model) = currentState, 
+            lastDetectedLinkMetadata === model.linkPreviews?.first?.metadata {
+            lastDetectedLinkMetadata = nil
+        }
         addMediaButton.isHidden = false
         selectedPhotoAssetIdentifiers.removeAll()
         action = .send(true)
@@ -635,6 +639,10 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 }
                 image = Images.replyVoice
             case "link":
+                if let metadata = layoutModel.linkPreviews?.first?.metadata {
+                    addOrUpdateLinkPreview(linkDetails: metadata)
+                    return
+                }
                 if text.isEmpty {
                     text = L10n.Message.Attachment.link
                 }

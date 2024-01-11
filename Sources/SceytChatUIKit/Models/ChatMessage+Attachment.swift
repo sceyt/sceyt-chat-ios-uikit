@@ -163,6 +163,7 @@ extension ChatMessage {
             public var thumbnailImage: UIImage?
             public var imageUrl: String?
             public var thumbnailUrl: String?
+            public var hideLinkDetails: Bool?
             
             enum CodingKeys: String, CodingKey {
                 case width = "szw"
@@ -172,6 +173,8 @@ extension ChatMessage {
                 case description = "dsc"
                 case imageUrl = "iur"
                 case thumbnailUrl = "tur"
+                case hideLinkDetails = "hld"
+                
             }
             
             public init(
@@ -213,6 +216,7 @@ extension ChatMessage {
                 description = (try? container.decode(String.self, forKey: CodingKeys.description))
                 imageUrl = (try? container.decode(String.self, forKey: CodingKeys.imageUrl))
                 thumbnailUrl = (try? container.decode(String.self, forKey: CodingKeys.thumbnailUrl))
+                hideLinkDetails = (try? container.decode(Bool.self, forKey: CodingKeys.hideLinkDetails))
                 if let base64 = thumbnail as? String, !base64.isEmpty {
                     thumbnailImage = Components.imageBuilder.image(thumbHash: base64)
                     if thumbnailImage == nil,

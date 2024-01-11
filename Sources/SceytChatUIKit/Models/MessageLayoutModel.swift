@@ -371,9 +371,20 @@ open class MessageLayoutModel {
             parentAttributedView = nil
             replyLayout = nil
         }
+        var prevLinkPreviews = linkPreviews
         linkPreviews?.removeAll()
         for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
             addLinkPreview(linkMetadata: link)
+            updateOptions.insert(.link)
+        }
+        if let linkPreviews {
+            for lp in linkPreviews {
+                prevLinkPreviews?.removeAll(where: { plp in
+                    plp.url.isEqual(url: lp.url) && plp.hasImage == lp.hasImage && plp.hasIcon == lp.hasIcon
+                })
+            }
+        }
+        if (prevLinkPreviews?.count ?? 0) > 0 {
             updateOptions.insert(.link)
         }
         
@@ -668,7 +679,12 @@ open class MessageLayoutModel {
         if let links = message.linkMetadatas, !links.isEmpty {
             linkMetadatas += links.map { data in
                 var image: UIImage? = nil
-                if !attachments.isEmpty, let firstIndex = attachments.firstIndex(where: { $0.attachment.url == data.url.absoluteString }) {
+                if !attachments.isEmpty, let firstIndex = attachments.firstIndex(where: {
+                    if let urlStr = $0.attachment.url, let url = URL(string: urlStr) {
+                        return url.isEqual(url: data.url)
+                    }
+                    return $0.attachment.url == data.url.absoluteString
+                }) {
                     let first = attachments[firstIndex]
                     image = first.thumbnail ?? first.attachment.imageDecodedMetadata?.thumbnailImage
                     attachments.remove(at: firstIndex)
@@ -689,8 +705,8 @@ open class MessageLayoutModel {
             }
         }
         if !attachments.isEmpty {
-            for attachment in attachments where attachment.attachment.imageDecodedMetadata != nil {
-                if let metadata = attachment.attachment.imageDecodedMetadata, 
+            for attachment in attachments where attachment.attachment.imageDecodedMetadata != nil && attachment.type == .link {
+                if let metadata = attachment.attachment.imageDecodedMetadata,
                     let urlString = attachment.attachment.url,
                    let url = URL(string: urlString) {
                     let isImage = metadata.width > 0 && metadata.height > 0 && metadata.thumbnailImage != nil
@@ -723,7 +739,7 @@ open class MessageLayoutModel {
     open func addLinkPreview(linkMetadata: LinkMetadata) -> Bool {
         let url = linkMetadata.url
         if let linkPreviews = linkPreviews,
-           linkPreviews.contains(where: { $0.url == url && $0.image == linkMetadata.image && $0.icon == linkMetadata.icon}) {
+           linkPreviews.contains(where: { $0.url.isEqual(url: url) && $0.hasImage == linkMetadata.hasImage && $0.hasIcon == linkMetadata.hasIcon}) {
             return false
         }
 
@@ -756,13 +772,13 @@ open class MessageLayoutModel {
             preview.titleSize = Self.textSizeMeasure
                 .calculateSize(of: text,
                                config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 16,
-                                             maximumNumberOfLines: 1)).textSize
+                                             maximumNumberOfLines: 2)).textSize
             preview.title = text
         }
         if linkPreviews == nil {
             linkPreviews = []
         }
-        if let index = linkPreviews?.firstIndex(where: { $0.url == preview.url}) {
+        if let index = linkPreviews?.firstIndex(where: { $0.url.isEqual(url: preview.url)}) {
             linkPreviews?[index] = preview
         } else {
             linkPreviews?.append(preview)
@@ -1293,5 +1309,27 @@ extension MessageLayoutModel: Comparable {
     
     public static func < (lhs: MessageLayoutModel, rhs: MessageLayoutModel) -> Bool {
         lhs.message < rhs.message
+    }
+}
+
+fileprivate extension MessageLayoutModel.LinkPreview {
+    
+    var hasImage: Bool {
+        image != nil
+    }
+    
+    var hasIcon: Bool {
+        icon != nil
+    }
+}
+
+fileprivate extension LinkMetadata {
+    
+    var hasImage: Bool {
+        image != nil
+    }
+    
+    var hasIcon: Bool {
+        icon != nil
     }
 }

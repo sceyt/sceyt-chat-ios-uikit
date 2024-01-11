@@ -131,7 +131,7 @@ extension MessageCell {
         open override func setup() {
             super.setup()
             imageView.clipsToBounds = true
-            titleLabel.numberOfLines = 1
+            titleLabel.numberOfLines = 2
             descriptionLabel.numberOfLines = 2
             
         }
@@ -174,17 +174,15 @@ extension MessageCell {
         open class func measure(model: MessageLayoutModel.LinkPreview, appearance: Appearance) -> CGSize {
             var size = CGSize()
             if let image = model.image {
-                
                 size.width = min(max(model.imageOriginalSize?.width ?? 0, image.size.width), 260)
                 size.height = min(max(model.imageOriginalSize?.height ?? 0, image.size.height), 140)
-                size.height += 10 // padding
             } else {
                 size.width = max(model.titleSize.width, model.descriptionSize.width)
             }
             size.height += model.titleSize.height //size name
             size.height += model.descriptionSize.height // desc
             if size.height > 0 {
-                size.height += 8 // padding
+                size.height += 16 // padding
             }
             return size
         }

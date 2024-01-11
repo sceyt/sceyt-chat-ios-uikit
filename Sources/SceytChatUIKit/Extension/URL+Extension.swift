@@ -71,4 +71,23 @@ public extension URL {
             return nil
         }
     }
+    
+    func isEqual(url: URL) -> Bool {
+        
+        func normalizeURL(_ urlString: String) -> URL {
+            // Check if the URL has a scheme, if not, prepend 'http://'
+            var normalizedString = urlString
+            if !normalizedString.contains("://") {
+                normalizedString = "http://" + normalizedString
+            }
+
+            // Return URL, assuming the string is a valid URL
+            return URL(string: normalizedString)!
+        }
+        
+        let normalizedUrl1 = normalizeURL(self.absoluteString)
+        let normalizedUrl2 = normalizeURL(url.absoluteString)
+
+        return normalizedUrl1.host == normalizedUrl2.host && normalizedUrl1.path == normalizedUrl2.path
+    }
 }
