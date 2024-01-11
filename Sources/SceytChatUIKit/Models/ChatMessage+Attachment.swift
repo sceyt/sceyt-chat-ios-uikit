@@ -184,7 +184,8 @@ extension ChatMessage {
                 duration: Int = 0,
                 description: String? = nil,
                 imageUrl: String? = nil,
-                thumbnailUrl: String? = nil
+                thumbnailUrl: String? = nil,
+                hideLinkDetails: Bool? = nil
             ) {
                 self.width = width
                 self.height = height
@@ -193,6 +194,7 @@ extension ChatMessage {
                 self.description = description
                 self.imageUrl = imageUrl
                 self.thumbnailUrl = thumbnailUrl
+                self.hideLinkDetails = hideLinkDetails
             }
             
             func build() -> String? {

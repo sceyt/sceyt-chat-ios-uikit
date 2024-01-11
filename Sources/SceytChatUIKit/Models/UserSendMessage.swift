@@ -220,7 +220,8 @@ public struct AttachmentView {
                 duration: 0,
                 description: linkMetaData?.summary,
                 imageUrl: linkMetaData?.imageUrl?.absoluteString,
-                thumbnailUrl: linkMetaData?.iconUrl?.absoluteString
+                thumbnailUrl: linkMetaData?.iconUrl?.absoluteString,
+                hideLinkDetails: linkMetaData == nil ? true: false
             ).build() {
                 builder.metadata(json)
             }
