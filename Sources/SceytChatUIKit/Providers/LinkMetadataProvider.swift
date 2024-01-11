@@ -122,7 +122,7 @@ open class LinkMetadataProvider: Provider {
                     linkMetadata.iconUrl = url
                 }
                 
-                if let urlStr = link.images?.first?.url ?? link.videos?.first?.url ?? link.audios?.first?.url,
+                if let urlStr = link.images?.first?.url,
                    let url = URL(string: urlStr) {
                     linkMetadata.imageUrl = url
                 }
@@ -141,18 +141,6 @@ open class LinkMetadataProvider: Provider {
                 if let images = link.images {
                     images.forEach { image in
                         logger.verbose("[LOAD LINK] \(log_hv) Load link Open Graph data image url: \(image.url), secureUrl: \(image.secureUrl), secureUrl: \(image.type), width: \(image.width), height: \(image.height)")
-                    }
-                }
-                
-                if let videos = link.videos {
-                    videos.forEach { video in
-                        logger.verbose("[LOAD LINK] \(log_hv) Load link Open Graph data video url: \(video.url), secureUrl: \(video.secureUrl), secureUrl: \(video.type), width: \(video.width), height: \(video.height), duration: \(video.duration)")
-                    }
-                }
-                
-                if let audios = link.audios {
-                    audios.forEach { audio in
-                        logger.verbose("[LOAD LINK] \(log_hv) Load link Open Graph data audios url: \(audio.url), secureUrl: \(audio.secureUrl), secureUrl: \(audio.type)")
                     }
                 }
                 
