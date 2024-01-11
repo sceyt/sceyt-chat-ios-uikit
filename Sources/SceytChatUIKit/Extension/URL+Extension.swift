@@ -90,4 +90,17 @@ public extension URL {
 
         return normalizedUrl1.host == normalizedUrl2.host && normalizedUrl1.path == normalizedUrl2.path
     }
+    
+    var normalizedURL: URL {
+        if self.scheme != nil {
+            return self
+        }
+        if absoluteString.contains("://") {
+            return self
+        }
+        if let url = URL(string: "http://" + absoluteString) {
+            return url
+        }
+        return normalizedURL
+    }
 }

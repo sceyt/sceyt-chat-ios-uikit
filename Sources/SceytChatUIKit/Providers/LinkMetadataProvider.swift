@@ -167,13 +167,15 @@ open class LinkMetadataProvider: Provider {
                 linkMetadata.image == nil {
                 let (data, _) = try await URLSession.shared.data(from: imageUrl)
                 if let image = Components.imageBuilder.image(from: data) {
+                    logger.debug("[LOAD LINK] \(log_hv) image of size: \(image.size) from \(imageUrl)")
                     linkMetadata.image = (try? Components.imageBuilder.init(image: image)
                         .resize(max: SCTUIKitConfig.maximumImageAttachmentSize))?
                         .uiImage ?? image
+                    logger.debug("[LOAD LINK] \(log_hv) image of resize: \(linkMetadata.image!.size) from \(imageUrl)")
                 }
                 
                 if linkMetadata.image != nil {
-                    logger.verbose("[LOAD LINK] \(log_hv) Load Image from \(linkMetadata.imageUrl): SUCCESS")
+                    logger.verbose("[LOAD LINK] \(log_hv) Load Image size: \(linkMetadata.image!.size) from \(linkMetadata.imageUrl): SUCCESS")
                 } else {
                     logger.error("[LOAD LINK] \(log_hv) Load Image from \(linkMetadata.imageUrl): FAILE")
                 }
@@ -185,7 +187,7 @@ open class LinkMetadataProvider: Provider {
                 linkMetadata.icon = Components.imageBuilder.image(from: data)
                 
                 if linkMetadata.icon != nil {
-                    logger.verbose("[LOAD LINK] \(log_hv) Load Icon from \(linkMetadata.iconUrl): SUCCESS")
+                    logger.verbose("[LOAD LINK] \(log_hv) Load Icon size: \(linkMetadata.icon!.size) from \(linkMetadata.iconUrl): SUCCESS")
                 } else {
                     logger.error("[LOAD LINK] \(log_hv) Load Icon from \(linkMetadata.iconUrl): FAILE")
                 }

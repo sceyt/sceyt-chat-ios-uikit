@@ -522,7 +522,7 @@ open class MessageLayoutModel {
         (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
             let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel)
-            return layout.type != .link ? nil : layout
+            return layout.type != .link || $0.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
     
@@ -551,7 +551,7 @@ open class MessageLayoutModel {
                 return attachments[index]
             }
             let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel)
-            return layout.type != .link ? nil : layout
+            return layout.type != .link || attachment.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
     
@@ -674,10 +674,15 @@ open class MessageLayoutModel {
     }
     
     open class func createLinkPreviews(message: ChatMessage, linkAttachments: [AttachmentLayout]) -> [LinkMetadata] {
+        guard message.state != .deleted
+        else { return [] }
         var attachments = linkAttachments
         var linkMetadatas = [LinkMetadata]()
         if let links = message.linkMetadatas, !links.isEmpty {
-            linkMetadatas += links.map { data in
+            linkMetadatas += links.compactMap { data in
+                if message.attachments?.first(where: { $0.url == data.url.absoluteString})?.imageDecodedMetadata?.hideLinkDetails == true {
+                    return nil
+                }
                 var image: UIImage? = nil
                 if !attachments.isEmpty, let firstIndex = attachments.firstIndex(where: {
                     if let urlStr = $0.attachment.url, let url = URL(string: urlStr) {
@@ -737,6 +742,8 @@ open class MessageLayoutModel {
     
     @discardableResult
     open func addLinkPreview(linkMetadata: LinkMetadata) -> Bool {
+        guard message.state != .deleted
+        else { return false }
         let url = linkMetadata.url
         if let linkPreviews = linkPreviews,
            linkPreviews.contains(where: { $0.url.isEqual(url: url) && $0.hasImage == linkMetadata.hasImage && $0.hasIcon == linkMetadata.hasIcon}) {
