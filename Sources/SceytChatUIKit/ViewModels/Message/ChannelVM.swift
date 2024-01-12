@@ -1221,28 +1221,48 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     //MARK: Link preview
     open func updateLinkPreviewsForLayoutModelIfNeeded(model: MessageLayoutModel) {
-        guard !DataDetector.matches(text: model.message.body).isEmpty
+        let matches = DataDetector.matches(text: model.message.body)
+        guard !matches.isEmpty
                else { return }
-        for preview in model.linkPreviews ?? [] where preview.isThumbnailData {
-            let link = preview.url
+        if let linkPreviews = model.linkPreviews {
+            for preview in linkPreviews where preview.isThumbnailData {
+                let link = preview.url
+                if let md = linkMetadataProvider.metadata(for: link) {
+                    provider.storeLinkMetadata(md, to: model.message)
+                } else {
+                    guard !linkMetadataProvider.isFetching(url: link)
+                    else { return }
+                    Task {
+                        if let metadata = preview.metadata,
+                            let imageUrl = metadata.imageUrl {
+                            await linkMetadataProvider.downloadImagesIfNeeded(linkMetadata: metadata)
+                            self.provider.storeLinkMetadata(metadata, to: model.message)
+                        } else {
+                            switch await linkMetadataProvider.fetch(url: link) {
+                            case .success(let data):
+                                logger.verbose("Successfully loaded link Open Graph data mid: \(model.message.id) link: \(link), imageUrl: \(data.imageUrl) image: \(data.image)")
+                                self.provider.storeLinkMetadata(data, to: model.message)
+                            case .failure(let error):
+                                logger.verbose("Failed to load link Open Graph data error: \(error)")
+                            }
+                        }
+                    }
+                }
+            }
+        } else if let first = model.linkAttachments.first,
+                    let link = URL(string: first.attachment.url) {
             if let md = linkMetadataProvider.metadata(for: link) {
                 provider.storeLinkMetadata(md, to: model.message)
             } else {
                 guard !linkMetadataProvider.isFetching(url: link)
                 else { return }
                 Task {
-                    if let metadata = preview.metadata, 
-                        let imageUrl = metadata.imageUrl {
-                        await linkMetadataProvider.downloadImagesIfNeeded(linkMetadata: metadata)
-                        self.provider.storeLinkMetadata(metadata, to: model.message)
-                    } else {
-                        switch await linkMetadataProvider.fetch(url: link) {
-                        case .success(let data):
-                            logger.verbose("Successfully loaded link Open Graph data mid: \(model.message.id) link: \(link), imageUrl: \(data.imageUrl) image: \(data.image)")
-                            self.provider.storeLinkMetadata(data, to: model.message)
-                        case .failure(let error):
-                            logger.verbose("Failed to load link Open Graph data error: \(error)")
-                        }
+                    switch await linkMetadataProvider.fetch(url: link) {
+                    case .success(let data):
+                        logger.verbose("Successfully loaded link Open Graph data mid: \(model.message.id) link: \(link), imageUrl: \(data.imageUrl) image: \(data.image)")
+                        self.provider.storeLinkMetadata(data, to: model.message)
+                    case .failure(let error):
+                        logger.verbose("Failed to load link Open Graph data error: \(error)")
                     }
                 }
             }

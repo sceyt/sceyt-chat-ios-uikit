@@ -130,6 +130,7 @@ extension MessageCell {
         
         open override func setup() {
             super.setup()
+            imageView.cornerRadius = 8
             imageView.clipsToBounds = true
             titleLabel.numberOfLines = 2
             descriptionLabel.numberOfLines = 3
@@ -159,7 +160,7 @@ extension MessageCell {
         
         open override func layoutSubviews() {
             super.layoutSubviews()
-            layer.cornerRadius = 16
+            layer.cornerRadius = 8
         }
         
         open var data: MessageLayoutModel.LinkPreview! {

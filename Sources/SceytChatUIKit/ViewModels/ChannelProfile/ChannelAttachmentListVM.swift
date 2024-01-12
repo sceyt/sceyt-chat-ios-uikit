@@ -126,7 +126,7 @@ open class ChannelAttachmentListVM: NSObject {
 
             if let onLoadLinkMetadata,
                let urlStr = attachment.url,
-               let url = URL(string: urlStr) {
+               let url = URL(string: urlStr)?.normalizedURL {
                 Task {
                     switch await LinkMetadataProvider.default.fetch(url: url) {
                     case .success(let metadata):
