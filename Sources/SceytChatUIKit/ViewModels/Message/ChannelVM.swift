@@ -1281,7 +1281,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         selectedMessageForAction = nil
     }
     
-    open func separatorDateForMessage(at indexPath: IndexPath) -> Date? {
+    open func separatorDateForMessage(at indexPath: IndexPath) -> String? {
         let firstPath = IndexPath(row: 0, section: indexPath.section)
         guard let current = message(at: firstPath)
         else { return nil }
@@ -1289,13 +1289,23 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
               let prev = message(at: .init(row: 0,
                                            section: indexPath.section - 1))
         else {
-            return current.createdAt
+            return Formatters.messageListSeparator.format(current.createdAt, showYear: false) 
         }
-        return !Calendar.current.isDate(
+        
+        let calendar = Calendar.current
+        
+        let date = !calendar.isDate(
             prev.createdAt,
             equalTo: current.createdAt,
             toGranularity: .day
         ) ? current.createdAt : nil
+        if let date {
+            let dateYear = calendar.component(.year, from: date)
+            let currentYear = calendar.component(.year, from: Date())
+            return Formatters.messageListSeparator.format(date, showYear: dateYear < currentYear)
+            
+        }
+        return nil
     }
     
     open var isThread: Bool {

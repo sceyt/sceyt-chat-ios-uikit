@@ -175,8 +175,14 @@ extension MessageCell {
         open class func measure(model: MessageLayoutModel.LinkPreview, appearance: Appearance) -> CGSize {
             var size = CGSize()
             if let image = model.image {
-                size.width = min(max(model.imageOriginalSize?.width ?? 0, image.size.width), 260)
-                size.height = min(max(model.imageOriginalSize?.height ?? 0, image.size.height), 140)
+                if let imageOriginalSize = model.imageOriginalSize, 
+                    max(imageOriginalSize.width, imageOriginalSize.height) <=
+                    max(MessageLayoutModel.defaults.imageAttachmentSize.width, MessageLayoutModel.defaults.imageAttachmentSize.height) {
+                    size = imageOriginalSize
+                } else {
+                    size.width = min(max(model.imageOriginalSize?.width ?? 0, image.size.width), MessageLayoutModel.defaults.imageAttachmentSize.width)
+                    size.height = min(max(model.imageOriginalSize?.height ?? 0, image.size.height), MessageLayoutModel.defaults.imageAttachmentSize.height)
+                }
             } else {
                 size.width = max(model.titleSize.width, model.descriptionSize.width)
             }

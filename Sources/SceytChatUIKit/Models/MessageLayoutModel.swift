@@ -753,8 +753,13 @@ open class MessageLayoutModel {
         linkMetadata.loadImages()
         var preview = LinkPreview(url: url, isThumbnailData: linkMetadata.isThumbnailData, image: linkMetadata.image, icon: linkMetadata.icon)
         preview.metadata = linkMetadata
-        preview.imageOriginalSize = linkMetadata.imageOriginalSize
         preview.iconOriginalSize = linkMetadata.iconOriginalSize
+        if let imageSize = linkMetadata.image?.size ?? linkMetadata.imageOriginalSize {
+            preview.imageOriginalSize = AttachmentLayout.preferredImageSize(maxSize: Self.defaults.imageAttachmentSize.width, imageSize: imageSize)
+        } else {
+            preview.imageOriginalSize = linkMetadata.imageOriginalSize
+        }
+        
         if let description = linkMetadata.summary {
             let font = Self.appearance.linkDescriptionFont ?? Fonts.regular.withSize(13)
             let text = NSMutableAttributedString(
@@ -1112,7 +1117,7 @@ extension MessageLayoutModel {
                    data.width > 0,
                    data.height > 0 {
                     let thumbnailSize = CGSize(width: data.width, height: data.height)
-                    size = preferredImageSize(
+                    size = Self.preferredImageSize(
                         maxSize: defaults.imageAttachmentSize.width,
                         imageSize: thumbnailSize,
                         minSize: type == .video ? 120 : nil)
@@ -1144,7 +1149,7 @@ extension MessageLayoutModel {
             return size
         }
         
-        private func preferredImageSize(maxSize: CGFloat, imageSize: CGSize, minSize: CGFloat? = nil) -> CGSize {
+        public static func preferredImageSize(maxSize: CGFloat, imageSize: CGSize, minSize: CGFloat? = nil) -> CGSize {
             let coefficient = imageSize.width / imageSize.height
             var scaleWidth = maxSize
             var scaleHeight = maxSize
