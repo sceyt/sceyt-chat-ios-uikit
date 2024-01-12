@@ -1250,7 +1250,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 }
             }
         } else if let first = model.linkAttachments.first,
-                    let link = URL(string: first.attachment.url) {
+                  let link = URL(string: first.attachment.url)?.normalizedURL {
             if let md = linkMetadataProvider.metadata(for: link) {
                 provider.storeLinkMetadata(md, to: model.message)
             } else {
