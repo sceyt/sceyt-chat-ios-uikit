@@ -128,6 +128,8 @@ extension MessageCell {
 
         open private(set) var link: URL!
         
+        private var imageViewSizeConstraints: [NSLayoutConstraint]?
+        
         open override func setup() {
             super.setup()
             imageView.cornerRadius = 8
@@ -156,6 +158,7 @@ extension MessageCell {
             titleLabel.topAnchor.pin(to: imageView.bottomAnchor, constant: 6)
             descriptionLabel.topAnchor.pin(to: titleLabel.bottomAnchor, constant: 2)
             descriptionLabel.bottomAnchor.pin(to: self.bottomAnchor, constant: -6)
+            imageViewSizeConstraints = imageView.resize(anchors: [.width, .height])
         }
         
         open override func layoutSubviews() {
@@ -169,13 +172,18 @@ extension MessageCell {
                 titleLabel.attributedText = data.title
                 descriptionLabel.attributedText = data.description
                 link = data.url
+                if let imageViewSizeConstraints, imageViewSizeConstraints.count == 2 {
+                    let size = Self.imageSize(model: data)
+                    imageViewSizeConstraints[0].constant = size.width
+                    imageViewSizeConstraints[1].constant = size.height
+                }
             }
         }
-
-        open class func measure(model: MessageLayoutModel.LinkPreview, appearance: Appearance) -> CGSize {
+        
+        private static func imageSize(model: MessageLayoutModel.LinkPreview) -> CGSize {
             var size = CGSize()
             if let image = model.image {
-                if let imageOriginalSize = model.imageOriginalSize, 
+                if let imageOriginalSize = model.imageOriginalSize,
                     max(imageOriginalSize.width, imageOriginalSize.height) <=
                     max(MessageLayoutModel.defaults.imageAttachmentSize.width, MessageLayoutModel.defaults.imageAttachmentSize.height) {
                     size = imageOriginalSize
@@ -183,6 +191,14 @@ extension MessageCell {
                     size.width = min(max(model.imageOriginalSize?.width ?? 0, image.size.width), MessageLayoutModel.defaults.imageAttachmentSize.width)
                     size.height = min(max(model.imageOriginalSize?.height ?? 0, image.size.height), MessageLayoutModel.defaults.imageAttachmentSize.height)
                 }
+            }
+            return size
+        }
+
+        open class func measure(model: MessageLayoutModel.LinkPreview, appearance: Appearance) -> CGSize {
+            var size = CGSize()
+            if let image = model.image {
+                size = imageSize(model: model)
             } else {
                 size.width = max(model.titleSize.width, model.descriptionSize.width)
             }
