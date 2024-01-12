@@ -191,7 +191,9 @@ open class ChannelMemberListVM: NSObject {
         guard let m = member(at: indexPath), m.id != me else {
             return
         }
-        let members = [m.id, me].map { Member.Builder(id: $0).roleName(Config.chatRoleOwner).build()}
+        
+        let members = [ChatChannelMember(user: m, roleName: Config.chatRoleOwner),
+                       ChatChannelMember(id: me, roleName: Config.chatRoleOwner)]
         ChannelCreator()
             .createLocalChannel(type: Config.directChannel,
                                 members: members) { channel, error in

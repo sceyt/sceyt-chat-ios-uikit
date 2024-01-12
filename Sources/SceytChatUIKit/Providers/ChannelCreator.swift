@@ -115,7 +115,7 @@ open class ChannelCreator: Provider {
         subject: String? = nil,
         metadata: String? = nil,
         avatarUrl: String? = nil,
-        members: [Member]? = nil,
+        members: [ChatChannelMember]? = nil,
         completion: ((ChatChannel?, Error?) -> Void)? = nil
     ) {
         var channelId: Int64 = Crypto.hash(value: (members ?? []).map { $0.id }.sorted().joined(separator: "$"))
@@ -123,42 +123,59 @@ open class ChannelCreator: Provider {
             channelId *= -1
         }
         
-        let chatMembers = members?.map { ChatChannelMember(member: $0) }
-        let channel = ChatChannel(
-            id: ChannelId(channelId),
-            type: type,
-            createdAt: Date(),
-            memberCount: Int64(members?.count ?? 0),
-            subject: subject,
-            metadata: metadata,
-            avatarUrl: avatarUrl,
-            uri: "",
-            members: chatMembers,
-            userRole: Config.chatRoleOwner,
-            draftMessage: nil
-        )
         self.database.read {
-            ChannelDTO.fetchChannelByMembers(channel: channel, context: $0)
+            UserDTO.fetch(ids: members?.map { $0.id } ?? [], context: $0).map { $0.convert() }
         } completion: { result in
-            if let chatChannel = try? result.get() {
-                logger.info("Found channel with id: \(channelId) for members \(String(describing: chatMembers?.map { $0.id}))")
-                completion?(chatChannel, nil)
+            let newMembers: [ChatChannelMember]
+            if let users = try? result.get() {
+                var group = [UserId: ChatChannelMember]()
+                for m in members ?? [] {
+                    group[m.id] = m
+                }
+                newMembers = group.values.map { ChatChannelMember(user: $0, roleName: $0.roleName)}
+                
             } else {
-                self.database.write { 
-                    $0.createOrUpdate(channel: channel)
-                        .unsynched = true
-                } completion: { error in
-                    logger.errorIfNotNil(error, "Store created channel in db")
-                    self.database.read {
-                        ChannelDTO.fetch(id: ChannelId(channelId), context: $0)?
-                            .convert()
-                    } completion: { result in
-                        switch result {
-                        case .success(let chatChannel):
-                            logger.info("Get channel after store with id: \(channelId)")
-                            completion?(chatChannel, nil)
-                        case .failure(let error):
-                            completion?(channel, error)
+                newMembers = members ?? []
+            }
+            
+            let channel = ChatChannel(
+                id: ChannelId(channelId),
+                type: type,
+                createdAt: Date(),
+                memberCount: Int64(newMembers.count),
+                subject: subject,
+                metadata: metadata,
+                avatarUrl: avatarUrl,
+                uri: "",
+                members: newMembers,
+                userRole: Config.chatRoleOwner,
+                draftMessage: nil
+            )
+            
+            self.database.read {
+                ChannelDTO.fetchChannelByMembers(channel: channel, context: $0)
+            } completion: { result in
+                if let chatChannel = try? result.get() {
+                    logger.info("Found channel with id: \(channelId) for members \(String(describing: members?.map { $0.id}))")
+                    completion?(chatChannel, nil)
+                } else {
+                    self.database.write {
+                        
+                        $0.createOrUpdate(channel: channel)
+                            .unsynched = true
+                    } completion: { error in
+                        logger.errorIfNotNil(error, "Store created channel in db")
+                        self.database.read {
+                            ChannelDTO.fetch(id: ChannelId(channelId), context: $0)?
+                                .convert()
+                        } completion: { result in
+                            switch result {
+                            case .success(let chatChannel):
+                                logger.info("Get channel after store with id: \(channelId)")
+                                completion?(chatChannel, nil)
+                            case .failure(let error):
+                                completion?(channel, error)
+                            }
                         }
                     }
                 }

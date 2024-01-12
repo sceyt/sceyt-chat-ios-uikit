@@ -1546,10 +1546,43 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                         self.channelCreator
                             .createLocalChannel(
                                 type: "direct",
-                                members: [userId, me].map { Member.Builder(id: $0).roleName(Config.chatRoleOwner).build()},
+                                members: [userId, me].map { ChatChannelMember(id: $0, roleName: Config.chatRoleOwner)},
                                 completion: completion
                             )
                     }
+        }
+    }
+    
+    open func directChannel(user: ChatUser, 
+                            completion: ((ChatChannel?, Error?) -> Void)? = nil) {
+        guard user.id != me else { return }
+
+        channelProvider
+            .getLocalChannel(
+                type: Config.directChannel,
+                userId: user.id) { channel in
+                    if let channel {
+                        completion?(channel, nil)
+                    } else {
+                        let member = ChatChannelMember(
+                            user: user,
+                            roleName: Config.chatRoleOwner
+                        )
+                        self.channelCreator
+                            .createLocalChannel(
+                                type: "direct",
+                                members: [ChatChannelMember(id: me, roleName: Config.chatRoleOwner), member],
+                                completion: completion
+                            )
+                    }
+        }
+    }
+    
+    open func user(id: UserId, 
+                   completion: @escaping ((ChatUser) -> Void)) {
+        Components.userProvider.init()
+            .fetch(userIds: [id]) {
+            completion($0.first ?? ChatUser(id: id))
         }
     }
     

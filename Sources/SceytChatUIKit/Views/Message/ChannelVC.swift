@@ -1496,16 +1496,23 @@ open class ChannelVC: ViewController,
     }
     
     open func didSelectAvatar(layoutModel: MessageLayoutModel) {
-        showProfile(userId: layoutModel.message.user.id)
+        showProfile(user: layoutModel.message.user)
     }
     
     open func didSelectMentionUser(userId: UserId, layoutModel: MessageLayoutModel) {
-        showProfile(userId: userId)
+        if let user = layoutModel.message.mentionedUsers?.first(where: { $0.id == userId}) {
+            showProfile(user: user)
+        } else {
+            channelViewModel.user(id: userId) {[weak self] user in
+                self?.showProfile(user: user)
+            }
+        }
+        
     }
     
-    open func showProfile(userId: UserId) {
-        logger.debug("showProfile for \(userId)")
-        channelViewModel.directChannel(userId: userId) { [weak self] channel, error in
+    open func showProfile(user: ChatUser) {
+        logger.debug("showProfile for \(user.id)")
+        channelViewModel.directChannel(user: user) { [weak self] channel, error in
             guard let self else { return }
             if let channel {
                 self.router.showChannelProfileVC(channel: channel)
