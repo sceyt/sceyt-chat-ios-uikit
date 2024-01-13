@@ -103,6 +103,7 @@ open class LinkMetadataProvider: Provider {
                 linkMetadata: metadata,
                 downloadImage: downloadImage,
                 downloadIcon: downloadIcon)
+            cache.setObject(metadata, forKey: url.absoluteString as NSString)
             return .success(metadata)
         }
         
