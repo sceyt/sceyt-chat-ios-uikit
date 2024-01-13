@@ -193,7 +193,7 @@ open class LinkMetadataProvider: Provider {
                     logger.error("[LOAD LINK] \(log_hv) Load Icon from \(linkMetadata.iconUrl): FAILE")
                 }
             }
-            
+            cache.setObject(linkMetadata, forKey: linkMetadata.url.absoluteString as NSString)
         } catch {
             logger.verbose("[LOAD LINK] \(log_hv) Failed to download image data error: \(error)")
         }
