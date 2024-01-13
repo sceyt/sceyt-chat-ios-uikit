@@ -1239,7 +1239,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 } else {
                     guard !linkMetadataProvider.isFetching(url: link)
                     else { return }
-                    guard preview.metadata?.image == nil
+                    guard let metadata = preview.metadata,
+                            metadata.image == nil,
+                            !metadata.isThumbnailData
                     else { return }
                     Task {
                         if let metadata = preview.metadata,
