@@ -531,16 +531,19 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         let channels: [ChatChannel]? = items.items()
         guard let ch = channels?.first(where: { $0.id == channel.id })
         else { return }
-        if !channel.unSynched, channel.userRole != nil,
+        if !channel.unSynched, 
+            channel.userRole != nil,
            ch.userRole == nil {
             event = .close
         }
         if newMessageCount != ch.newMessageCount {
             newMessageCount = ch.newMessageCount
         }
-        channel = ch
         if isUpdateForView(channel: ch) {
+            channel = ch
             event = .updateChannel
+        } else {
+            channel = ch
         }
     }
     
@@ -1186,6 +1189,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         channelProvider
             .join(completion: completion)
         
+    }
+    
+    open func refreshChannel() {
+        channelObserver.refresh(at: .zero)
     }
     
     //MARK: Presence

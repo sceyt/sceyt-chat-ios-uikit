@@ -939,6 +939,7 @@ open class ChannelProfileVC: ViewController,
             if let error = error {
                 self.showAlert(error: error)
             } else {
+                self.router.channelVC?.channelViewModel.refreshChannel()
                 self.router.goChannelListVC()
             }
         }
@@ -950,6 +951,7 @@ open class ChannelProfileVC: ViewController,
             if let error = error {
                 self.showAlert(error: error)
             } else {
+                self.router.channelVC?.channelViewModel.refreshChannel()
                 self.router.goChannelVC()
             }
         }
