@@ -522,7 +522,7 @@ open class MessageLayoutModel {
         (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
             let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel)
-            return layout.type != .link ? nil : layout
+            return layout.type != .link || $0.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
     
@@ -551,7 +551,7 @@ open class MessageLayoutModel {
                 return attachments[index]
             }
             let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel)
-            return layout.type != .link ? nil : layout
+            return layout.type != .link || attachment.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
     
@@ -674,10 +674,15 @@ open class MessageLayoutModel {
     }
     
     open class func createLinkPreviews(message: ChatMessage, linkAttachments: [AttachmentLayout]) -> [LinkMetadata] {
+        guard message.state != .deleted
+        else { return [] }
         var attachments = linkAttachments
         var linkMetadatas = [LinkMetadata]()
         if let links = message.linkMetadatas, !links.isEmpty {
-            linkMetadatas += links.map { data in
+            linkMetadatas += links.compactMap { data in
+                if message.attachments?.first(where: { $0.url == data.url.absoluteString})?.imageDecodedMetadata?.hideLinkDetails == true {
+                    return nil
+                }
                 var image: UIImage? = nil
                 if !attachments.isEmpty, let firstIndex = attachments.firstIndex(where: {
                     if let urlStr = $0.attachment.url, let url = URL(string: urlStr) {
@@ -737,6 +742,8 @@ open class MessageLayoutModel {
     
     @discardableResult
     open func addLinkPreview(linkMetadata: LinkMetadata) -> Bool {
+        guard message.state != .deleted
+        else { return false }
         let url = linkMetadata.url
         if let linkPreviews = linkPreviews,
            linkPreviews.contains(where: { $0.url.isEqual(url: url) && $0.hasImage == linkMetadata.hasImage && $0.hasIcon == linkMetadata.hasIcon}) {
@@ -746,8 +753,13 @@ open class MessageLayoutModel {
         linkMetadata.loadImages()
         var preview = LinkPreview(url: url, isThumbnailData: linkMetadata.isThumbnailData, image: linkMetadata.image, icon: linkMetadata.icon)
         preview.metadata = linkMetadata
-        preview.imageOriginalSize = linkMetadata.imageOriginalSize
         preview.iconOriginalSize = linkMetadata.iconOriginalSize
+        if let imageSize = linkMetadata.image?.size ?? linkMetadata.imageOriginalSize {
+            preview.imageOriginalSize = AttachmentLayout.preferredImageSize(maxSize: Self.defaults.imageAttachmentSize.width, imageSize: imageSize)
+        } else {
+            preview.imageOriginalSize = linkMetadata.imageOriginalSize
+        }
+        
         if let description = linkMetadata.summary {
             let font = Self.appearance.linkDescriptionFont ?? Fonts.regular.withSize(13)
             let text = NSMutableAttributedString(
@@ -760,8 +772,8 @@ open class MessageLayoutModel {
             
             preview.descriptionSize = Self.textSizeMeasure
                 .calculateSize(of: text,
-                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 16,
-                                             maximumNumberOfLines: 2)).textSize
+                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 12,
+                                             maximumNumberOfLines: 3)).textSize
             preview.description = text
         }
         if let title = linkMetadata.title {
@@ -771,7 +783,7 @@ open class MessageLayoutModel {
                                                      attributes: [.font: font, .foregroundColor: Self.appearance.linkTitleColor ?? Appearance.Colors.textBlack]))
             preview.titleSize = Self.textSizeMeasure
                 .calculateSize(of: text,
-                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 16,
+                               config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 12,
                                              maximumNumberOfLines: 2)).textSize
             preview.title = text
         }
@@ -1105,7 +1117,7 @@ extension MessageLayoutModel {
                    data.width > 0,
                    data.height > 0 {
                     let thumbnailSize = CGSize(width: data.width, height: data.height)
-                    size = preferredImageSize(
+                    size = Self.preferredImageSize(
                         maxSize: defaults.imageAttachmentSize.width,
                         imageSize: thumbnailSize,
                         minSize: type == .video ? 120 : nil)
@@ -1137,7 +1149,7 @@ extension MessageLayoutModel {
             return size
         }
         
-        private func preferredImageSize(maxSize: CGFloat, imageSize: CGSize, minSize: CGFloat? = nil) -> CGSize {
+        public static func preferredImageSize(maxSize: CGFloat, imageSize: CGSize, minSize: CGFloat? = nil) -> CGSize {
             let coefficient = imageSize.width / imageSize.height
             var scaleWidth = maxSize
             var scaleHeight = maxSize

@@ -102,7 +102,7 @@ open class UserSendMessage {
     open class func createLinkAttachmentsFrom(text: String, linkMetaData: LinkMetadata?) -> [AttachmentView] {
         DataDetector.getLinks(text: text)
             .map { url in
-                AttachmentView(link: url, linkMetaData: linkMetaData)
+                AttachmentView(link: url, linkMetaData: linkMetaData, hideLinkDetails: linkMetaData == nil)
             }
     }
     
@@ -142,6 +142,7 @@ public struct AttachmentView {
     public var type: AttachmentType
     
     public var linkMetaData: LinkMetadata?
+    public var hideLinkDetails: Bool = false
     
     public var photoAsset: PHAsset? {
         didSet {
@@ -221,7 +222,7 @@ public struct AttachmentView {
                 description: linkMetaData?.summary,
                 imageUrl: linkMetaData?.imageUrl?.absoluteString,
                 thumbnailUrl: linkMetaData?.iconUrl?.absoluteString,
-                hideLinkDetails: linkMetaData == nil ? true: false
+                hideLinkDetails: hideLinkDetails
             ).build() {
                 builder.metadata(json)
             }
@@ -315,13 +316,14 @@ public struct AttachmentView {
         fileSize = Components.storage.sizeOfItem(at: url)
     }
     
-    public init(link: URL, linkMetaData: LinkMetadata? = nil) {
+    public init(link: URL, linkMetaData: LinkMetadata? = nil, hideLinkDetails: Bool = false) {
         url = link
         name = link.host ?? ""
         isLocalFile = false
         type = .link
         thumbnail = Appearance.Images.link
         self.linkMetaData = linkMetaData
+        self.hideLinkDetails = hideLinkDetails
     }
     
     static func view(from asset: PHAsset, completion: @escaping (AttachmentView?) -> Void, progressHandler: ((Float) -> Void)? = nil) {

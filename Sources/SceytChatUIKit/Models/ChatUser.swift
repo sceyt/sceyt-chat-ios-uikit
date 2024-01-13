@@ -207,6 +207,7 @@ extension ChatUser: Equatable {
         lhs.lastName == rhs.lastName &&
         lhs.avatarUrl == rhs.avatarUrl &&
         lhs.metadata == rhs.metadata &&
+        lhs.blocked == rhs.blocked &&
         lhs.state == rhs.state &&
         lhs.presence.state == rhs.presence.state &&
         lhs.presence.status == rhs.presence.status &&

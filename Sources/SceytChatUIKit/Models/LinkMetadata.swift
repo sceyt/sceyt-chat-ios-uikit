@@ -66,7 +66,8 @@ open class LinkMetadata {
 
     open func storeImages() {
         var hasImage: Bool { image != nil || icon != nil }
-        if hasImage, let filename = Crypto.hash(value: url.absoluteString) {
+        if hasImage, let filename = Crypto.hash(value: url.normalizedURL.absoluteString) {
+            logger.debug("[LINK PREVIEV] storeImages \(url), fn: \(filename) isz \(image?.size), icn: isz \(icon?.size)")
             if let icon = icon, let jpeg = icon.jpegData(compressionQuality: Config.jpegDataCompressionQuality) {
                 Components.storage.storeData(jpeg, filename: "icon_" + filename)
                 
@@ -74,11 +75,13 @@ open class LinkMetadata {
             if let image = image, let jpeg = image.jpegData(compressionQuality: Config.jpegDataCompressionQuality) {
                 Components.storage.storeData(jpeg, filename: "image_" + filename)
             }
+        } else {
+            logger.debug("[LINK PREVIEV] storeImages \(url)")
         }
     }
 
     open func loadImages() {
-        if let filename = Crypto.hash(value: url.absoluteString) {
+        if let filename = Crypto.hash(value: url.normalizedURL.absoluteString) {
             if let path = Storage
                 .filePath(filename: "icon_" + filename),
                 icon == nil {
@@ -89,6 +92,9 @@ open class LinkMetadata {
                 (image == nil || isThumbnailData) {
                 image = UIImage(contentsOfFile: path)
             }
+            logger.debug("[LINK PREVIEV] loadImages \(url), fn: \(filename) isz \(image?.size), icn: isz \(icon?.size)")
+        } else {
+            logger.debug("[LINK PREVIEV] loadImages \(url)")
         }
     }
 }

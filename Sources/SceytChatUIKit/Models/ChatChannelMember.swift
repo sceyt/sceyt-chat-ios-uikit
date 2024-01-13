@@ -47,6 +47,23 @@ public class ChatChannelMember: ChatUser {
         )
     }
     
+    public convenience init(
+        user: ChatUser,
+        roleName: String? = nil
+    ) {
+        self.init(
+            id: user.id,
+            roleName: roleName,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            avatarUrl: user.avatarUrl,
+            metadata: user.metadata,
+            blocked: user.blocked,
+            presence: user.presence,
+            activityState: user.state
+        )
+    }
+    
     public convenience init(member: Member) {
         self.init(
             id: member.id,

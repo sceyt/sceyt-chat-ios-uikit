@@ -99,8 +99,10 @@ open class ChannelProfileLinkCell: CollectionViewCell {
                 titleLabel.isHidden = (titleLabel.text ?? "").isEmpty
                 detailLabel.text = metadata.summary
                 detailLabel.isHidden = (detailLabel.text ?? "").isEmpty
-                if let image = metadata.icon ?? metadata.image {
+                if let image = metadata.image {
                     iconView.image = image
+                } else {
+                    iconView.image = Appearance.Images.link
                 }
             }
         }

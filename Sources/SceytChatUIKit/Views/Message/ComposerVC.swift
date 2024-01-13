@@ -828,7 +828,8 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
         actionView.imageView.isHidden = false
-        if let icon = linkDetails.icon ?? linkDetails.image {
+        actionView.playView.isHidden = true
+        if let icon = linkDetails.image {
             actionView.imageView.image = icon
         } else {
             actionView.imageView.image = .link

@@ -41,6 +41,15 @@ public class UserDTO: NSManagedObject {
         request.predicate = .init(format: "id == %@", id)
         return fetch(request: request, context: context).first
     }
+    
+    public static func fetch(ids: [UserId], context: NSManagedObjectContext) -> [UserDTO] {
+        guard !ids.isEmpty
+        else { return [] }
+        let request = fetchRequest()
+        request.sortDescriptor = NSSortDescriptor(keyPath: \UserDTO.id, ascending: false)
+        request.predicate = .init(format: "id in %@", ids)
+        return fetch(request: request, context: context)
+    }
 
     public static func fetchOrCreate(id: UserId, context: NSManagedObjectContext) -> UserDTO {
         if let mo = fetch(id: id, context: context) {

@@ -414,6 +414,8 @@ open class IncomingMessageCell: MessageCell {
             bubbleSize.height += 12 //padding
             if userNameSize == .zero {
                 bubbleSize.height += 14
+            } else {
+                bubbleSize.height += 2
             }
 
             let infoViewSize = InfoView.measure(model: model, appearance: appearance)

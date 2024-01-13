@@ -531,16 +531,19 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         let channels: [ChatChannel]? = items.items()
         guard let ch = channels?.first(where: { $0.id == channel.id })
         else { return }
-        if !channel.unSynched, channel.userRole != nil,
+        if !channel.unSynched, 
+            channel.userRole != nil,
            ch.userRole == nil {
             event = .close
         }
         if newMessageCount != ch.newMessageCount {
             newMessageCount = ch.newMessageCount
         }
-        channel = ch
         if isUpdateForView(channel: ch) {
+            channel = ch
             event = .updateChannel
+        } else {
+            channel = ch
         }
     }
     
@@ -1188,6 +1191,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         
     }
     
+    open func refreshChannel() {
+        channelObserver.refresh(at: .zero)
+    }
+    
     //MARK: Presence
     open func subscribeToPeerPresence() {
         if !channel.isGroup, let peer = channel.peer {
@@ -1221,28 +1228,48 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     //MARK: Link preview
     open func updateLinkPreviewsForLayoutModelIfNeeded(model: MessageLayoutModel) {
-        guard !DataDetector.matches(text: model.message.body).isEmpty
+        let matches = DataDetector.matches(text: model.message.body)
+        guard !matches.isEmpty
                else { return }
-        for preview in model.linkPreviews ?? [] where preview.isThumbnailData {
-            let link = preview.url
+        if let linkPreviews = model.linkPreviews {
+            for preview in linkPreviews where preview.isThumbnailData {
+                let link = preview.url
+                if let md = linkMetadataProvider.metadata(for: link) {
+                    provider.storeLinkMetadata(md, to: model.message)
+                } else {
+                    guard !linkMetadataProvider.isFetching(url: link)
+                    else { return }
+                    Task {
+                        if let metadata = preview.metadata,
+                            let imageUrl = metadata.imageUrl {
+                            await linkMetadataProvider.downloadImagesIfNeeded(linkMetadata: metadata)
+                            self.provider.storeLinkMetadata(metadata, to: model.message)
+                        } else {
+                            switch await linkMetadataProvider.fetch(url: link) {
+                            case .success(let data):
+                                logger.verbose("Successfully loaded link Open Graph data mid: \(model.message.id) link: \(link), imageUrl: \(data.imageUrl) image: \(data.image)")
+                                self.provider.storeLinkMetadata(data, to: model.message)
+                            case .failure(let error):
+                                logger.verbose("Failed to load link Open Graph data error: \(error)")
+                            }
+                        }
+                    }
+                }
+            }
+        } else if let first = model.linkAttachments.first,
+                  let link = URL(string: first.attachment.url)?.normalizedURL {
             if let md = linkMetadataProvider.metadata(for: link) {
                 provider.storeLinkMetadata(md, to: model.message)
             } else {
                 guard !linkMetadataProvider.isFetching(url: link)
                 else { return }
                 Task {
-                    if let metadata = preview.metadata, 
-                        let imageUrl = metadata.imageUrl {
-                        await linkMetadataProvider.downloadImagesIfNeeded(linkMetadata: metadata)
-                        self.provider.storeLinkMetadata(metadata, to: model.message)
-                    } else {
-                        switch await linkMetadataProvider.fetch(url: link) {
-                        case .success(let data):
-                            logger.verbose("Successfully loaded link Open Graph data mid: \(model.message.id) link: \(link), imageUrl: \(data.imageUrl) image: \(data.image)")
-                            self.provider.storeLinkMetadata(data, to: model.message)
-                        case .failure(let error):
-                            logger.verbose("Failed to load link Open Graph data error: \(error)")
-                        }
+                    switch await linkMetadataProvider.fetch(url: link) {
+                    case .success(let data):
+                        logger.verbose("Successfully loaded link Open Graph data mid: \(model.message.id) link: \(link), imageUrl: \(data.imageUrl) image: \(data.image)")
+                        self.provider.storeLinkMetadata(data, to: model.message)
+                    case .failure(let error):
+                        logger.verbose("Failed to load link Open Graph data error: \(error)")
                     }
                 }
             }
@@ -1261,7 +1288,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         selectedMessageForAction = nil
     }
     
-    open func separatorDateForMessage(at indexPath: IndexPath) -> Date? {
+    open func separatorDateForMessage(at indexPath: IndexPath) -> String? {
         let firstPath = IndexPath(row: 0, section: indexPath.section)
         guard let current = message(at: firstPath)
         else { return nil }
@@ -1269,13 +1296,23 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
               let prev = message(at: .init(row: 0,
                                            section: indexPath.section - 1))
         else {
-            return current.createdAt
+            return Formatters.messageListSeparator.format(current.createdAt, showYear: false) 
         }
-        return !Calendar.current.isDate(
+        
+        let calendar = Calendar.current
+        
+        let date = !calendar.isDate(
             prev.createdAt,
             equalTo: current.createdAt,
             toGranularity: .day
         ) ? current.createdAt : nil
+        if let date {
+            let dateYear = calendar.component(.year, from: date)
+            let currentYear = calendar.component(.year, from: Date())
+            return Formatters.messageListSeparator.format(date, showYear: dateYear < currentYear)
+            
+        }
+        return nil
     }
     
     open var isThread: Bool {
@@ -1516,10 +1553,43 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                         self.channelCreator
                             .createLocalChannel(
                                 type: "direct",
-                                members: [userId, me].map { Member.Builder(id: $0).roleName(Config.chatRoleOwner).build()},
+                                members: [userId, me].map { ChatChannelMember(id: $0, roleName: Config.chatRoleOwner)},
                                 completion: completion
                             )
                     }
+        }
+    }
+    
+    open func directChannel(user: ChatUser, 
+                            completion: ((ChatChannel?, Error?) -> Void)? = nil) {
+        guard user.id != me else { return }
+
+        channelProvider
+            .getLocalChannel(
+                type: Config.directChannel,
+                userId: user.id) { channel in
+                    if let channel {
+                        completion?(channel, nil)
+                    } else {
+                        let member = ChatChannelMember(
+                            user: user,
+                            roleName: Config.chatRoleOwner
+                        )
+                        self.channelCreator
+                            .createLocalChannel(
+                                type: "direct",
+                                members: [ChatChannelMember(id: me, roleName: Config.chatRoleOwner), member],
+                                completion: completion
+                            )
+                    }
+        }
+    }
+    
+    open func user(id: UserId, 
+                   completion: @escaping ((ChatUser) -> Void)) {
+        Components.userProvider.init()
+            .fetch(userIds: [id]) {
+            completion($0.first ?? ChatUser(id: id))
         }
     }
     

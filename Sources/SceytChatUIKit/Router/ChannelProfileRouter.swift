@@ -71,11 +71,11 @@ open class ChannelProfileRouter: Router<ChannelProfileVC> {
         rootVC.show(vc, sender: self)
     }
 
-    private var channelListVC: ChannelListVC? {
+    public var channelListVC: ChannelListVC? {
         rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelListVC }) as? ChannelListVC
     }
 
-    private var channelVC: ChannelVC? {
+    public var channelVC: ChannelVC? {
         rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelVC }) as? ChannelVC
     }
     

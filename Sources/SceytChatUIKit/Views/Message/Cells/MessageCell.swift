@@ -627,9 +627,12 @@ public extension MessageCell {
 extension MessageCell {
     
     open class ImageView: UIImageView {
+        
+        var cornerRadius: CGFloat = 16
+        
         open override func layoutSubviews() {
             super.layoutSubviews()
-            layer.cornerRadius = 16
+            layer.cornerRadius = cornerRadius
         }
     }
 }
