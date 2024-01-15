@@ -1237,15 +1237,12 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 if let md = linkMetadataProvider.metadata(for: link) {
                     provider.storeLinkMetadata(md, to: model.message)
                 } else {
-                    guard !linkMetadataProvider.isFetching(url: link)
+                    guard let metadata = preview.metadata
                     else { return }
-                    guard let metadata = preview.metadata,
-                            metadata.image == nil,
-                            !metadata.isThumbnailData
+                    guard (metadata.image == nil || metadata.isThumbnailData)
                     else { return }
                     Task {
-                        if let metadata = preview.metadata,
-                            let imageUrl = metadata.imageUrl {
+                        if let imageUrl = metadata.imageUrl {
                             await linkMetadataProvider.downloadImagesIfNeeded(linkMetadata: metadata)
                             self.provider.storeLinkMetadata(metadata, to: model.message)
                         } else {
