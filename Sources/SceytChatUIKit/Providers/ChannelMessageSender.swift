@@ -89,7 +89,8 @@ open class ChannelMessageSender: Provider {
         }
         
         store {
-            if message.attachments == nil || message.attachments?.count == 0 {
+            let chatMessage = ChatMessage(message: message, channelId: self.channelId)
+            if self.uploadableAttachments(of: chatMessage).isEmpty {
                 guard let message = self.willSend(message)
                 else {
                     completion?(nil)
@@ -101,7 +102,6 @@ open class ChannelMessageSender: Provider {
                 }
             } else {
                  logger.info("The message has attachments. will send message with tid \(message.tid) after upload")
-                let chatMessage = ChatMessage(message: message, channelId: self.channelId)
                 self.uploadAttachmentsIfNeeded(message: chatMessage)
                 { message, error in
                     if error == nil, let message {
@@ -293,8 +293,8 @@ open class ChannelMessageSender: Provider {
     open func uploadAttachmentsIfNeeded(
         message: ChatMessage,
         completion: @escaping (ChatMessage?, Error?) -> Void) {
-            guard let attachments = message.attachments?.filter({ $0.status != .done && $0.type != "link" && $0.filePath != nil }),
-                  !attachments.isEmpty
+            let attachments = uploadableAttachments(of: message)
+            guard !attachments.isEmpty
             else {
                 completion(message, nil)
                 return
@@ -307,6 +307,14 @@ open class ChannelMessageSender: Provider {
                     completion(chatMessage, error)
                 }
         }
+    
+    open func uploadableAttachments(of message: ChatMessage) -> [ChatMessage.Attachment] {
+        guard let attachments = message.attachments?.filter({ $0.status != .done && $0.type != "link" && $0.filePath != nil }),
+              !attachments.isEmpty
+        else { return [] }
+        
+        return attachments
+    }
 }
 
 private extension ChannelMessageSender {

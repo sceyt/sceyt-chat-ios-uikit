@@ -55,7 +55,24 @@ public class ChecksumDTO: NSManagedObject {
         return mo
     }
     
+    public static func fetchOrCreate(checksum: Int64, context: NSManagedObjectContext) -> ChecksumDTO {
+        if let mo = fetch(checksum: checksum, context: context) {
+            return mo
+        }
+
+        let mo = insertNewObject(into: context)
+        return mo
+    }
+    
     public func convert() -> ChatMessage.Attachment.Checksum {
         .init(dto: self)
+    }
+    
+    public func map(_ map: ChatMessage.Attachment.Checksum) -> ChecksumDTO {
+        messageTid = map.messageTid
+        attachmentTid = map.attachmentTid
+        checksum = map.checksum
+        data = map.data
+        return self
     }
 }

@@ -26,7 +26,7 @@ open class ChannelProfileLinkCell: CollectionViewCell {
     
     open lazy var contentHStack = UIStackView(row: [iconView, textVStack], 
                                               spacing: Layouts.horizontalPadding,
-                                              alignment: .top)
+                                              alignment: .center)
         .withoutAutoresizingMask
     
     public lazy var appearance = ChannelLinkListView.appearance {
@@ -72,9 +72,9 @@ open class ChannelProfileLinkCell: CollectionViewCell {
         contentHStack.topAnchor.pin(to: contentView.topAnchor, constant: Layouts.verticalPadding)
         
         iconView.resize(anchors: [.height(Layouts.iconSize), .width(Layouts.iconSize)])
-        titleLabel.heightAnchor.pin(greaterThanOrEqualToConstant: 22)
+//        titleLabel.heightAnchor.pin(greaterThanOrEqualToConstant: 22)
         linkLabel.heightAnchor.pin(greaterThanOrEqualToConstant: 20)
-        detailLabel.heightAnchor.pin(greaterThanOrEqualToConstant: 16)
+//        detailLabel.heightAnchor.pin(greaterThanOrEqualToConstant: 16)
     }
     
     open var data: ChatMessage.Attachment! {
@@ -88,12 +88,22 @@ open class ChannelProfileLinkCell: CollectionViewCell {
     open var metadata: LinkMetadata? {
         didSet {
             guard let metadata else { return }
-            titleLabel.text = metadata.title
-            titleLabel.isHidden = (titleLabel.text ?? "").isEmpty
-            detailLabel.text = metadata.summary
-            detailLabel.isHidden = (detailLabel.text ?? "").isEmpty
-            if let image = metadata.icon ?? metadata.image {
-                iconView.image = image
+            if let data, data.imageDecodedMetadata?.hideLinkDetails == true {
+                titleLabel.text = nil
+                detailLabel.text = nil
+                titleLabel.isHidden = true
+                detailLabel.isHidden = true
+                iconView.image = Appearance.Images.link
+            } else {
+                titleLabel.text = metadata.title
+                titleLabel.isHidden = (titleLabel.text ?? "").isEmpty
+                detailLabel.text = metadata.summary
+                detailLabel.isHidden = (detailLabel.text ?? "").isEmpty
+                if let image = metadata.image {
+                    iconView.image = image
+                } else {
+                    iconView.image = Appearance.Images.link
+                }
             }
         }
     }

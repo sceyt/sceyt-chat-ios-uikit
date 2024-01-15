@@ -54,6 +54,10 @@ public class LinkMetadataDTO: NSManagedObject {
         imageUrl = map.imageUrl
         return self
     }
+    
+    public func convert() -> LinkMetadata {
+        .init(dto: self)
+    }
 }
 
 extension LinkMetadataDTO: Identifiable { }

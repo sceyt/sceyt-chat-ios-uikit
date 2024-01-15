@@ -155,6 +155,7 @@ public extension Appearance {
         public static var downloadStart: UIImage = { Assets.downloadStart.image }()
         public static var downloadStop: UIImage = { Assets.downloadStop.image }()
         
+        public static var replyPlay: UIImage = { Assets.replyPlay.image }()
         public static var replyX: UIImage = { Assets.replyX.image }()
         public static var replyVoice: UIImage = { Assets.replyVoice.image }()
         public static var replyFile: UIImage = { Assets.replyFile.image }()
@@ -287,6 +288,7 @@ extension UIImage {
     static var downloadStart: UIImage { Images.downloadStart }
     static var downloadStop: UIImage { Images.downloadStop }
         
+    static var replyPlay: UIImage { Images.replyPlay }
     static var replyX: UIImage { Images.replyX }
     static var replyVoice: UIImage { Images.replyVoice }
     static var replyFile: UIImage { Images.replyFile }

@@ -126,14 +126,23 @@ open class ChannelAttachmentListVM: NSObject {
 
             if let onLoadLinkMetadata,
                let urlStr = attachment.url,
-               let url = URL(string: urlStr)
-            {
-                LinkMetadataProvider.default.fetch(url: url) {
-                    switch $0 {
-                    case .success(let metadata):
-                        onLoadLinkMetadata(metadata)
-                    case .failure:
-                        onLoadLinkMetadata(nil)
+               let url = URL(string: urlStr)?.normalizedURL {
+                if let metadata = LinkMetadataProvider.default.metadata(for: url) {
+                    logger.debug("[LONK LOAD] HAS META \(url)")
+                    onLoadLinkMetadata(metadata)
+                } else {
+                    Task {
+                        switch await LinkMetadataProvider.default.fetch(url: url) {
+                        case .success(let metadata):
+                            logger.debug("[LONK LOAD] HAS META fetch \(url)")
+                            await MainActor.run {
+                                onLoadLinkMetadata(metadata)
+                            }
+                        case .failure(let error):
+                            await MainActor.run {
+                                onLoadLinkMetadata(nil)
+                            }
+                        }
                     }
                 }
             }
@@ -156,7 +165,8 @@ open class ChannelAttachmentListVM: NSObject {
         let attachment = layout.attachment
         downloadQueue.async { [weak self] in
             guard let self,
-                  attachment.type != "file" || Config.minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= Config.minAutoDownloadSize,
+                  attachment.type != "link",
+                  Config.minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= Config.minAutoDownloadSize,
                   attachment.status != .done,
                   attachment.status != .failedDownloading,
                   attachment.status != .failedUploading
@@ -190,6 +200,8 @@ open class ChannelAttachmentListVM: NSObject {
 
     open func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
+        guard attachment.type != "link"
+        else { return }
         getMessage(layout) { message in
             if let message {
                 fileProvider.resumeTransfer(message: message, attachment: attachment) {

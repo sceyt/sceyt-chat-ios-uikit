@@ -50,11 +50,11 @@ open class MessageSectionSeparatorView: CollectionReusableView, MessageSectionSe
         )
     }
     
-    open var date: Date? {
+    open var date: String? {
         didSet {
             if let date = date {
                 titleLabel.edgeInsets = .init(top: 4, left: 12, bottom: 4, right: 12)
-                titleLabel.text = Formatters.messageListSeparator.format(date)
+                titleLabel.text = date
                 titleLabel.isHidden = false
             } else {
                 titleLabel.edgeInsets = .zero

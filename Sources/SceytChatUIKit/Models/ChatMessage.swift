@@ -426,14 +426,14 @@ extension ChatMessage {
             }
     }
     
-    public struct LinkMetadata {
+    public struct LinkMetadata: Equatable {
         public var url: URL
         public var title: String?
         public var summary: String?
         public var creator: String?
         public var iconUrl: URL?
         public var imageUrl: URL?
-        
+                
         public init(
             url: URL,
             title: String? = nil,
@@ -457,6 +457,10 @@ extension ChatMessage {
             creator = dto.creator
             iconUrl = dto.iconUrl
             imageUrl = dto.imageUrl
+        }
+        
+        public static func == (lhs: LinkMetadata, rhs: LinkMetadata) -> Bool {
+            lhs.url == rhs.url
         }
     }
 }

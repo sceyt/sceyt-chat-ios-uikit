@@ -181,6 +181,13 @@ extension MessageCell: AppearanceProvider {
         public var highlightedBubbleColor: (in: UIColor?, out: UIColor?) = (Colors.textGray.withAlphaComponent(0.4), Colors.textGray.withAlphaComponent(0.4))
         public var highlightedOverlayColor: (in: UIColor?, out: UIColor?) = (UIColor(hex: "#17191C", alpha: 0.4), UIColor(hex: "#17191C", alpha: 0.4))
         public var linkColor: UIColor? = Colors.kitBlue
+        public var linkFont: UIFont? = Fonts.regular.withSize(16)
+        public var linkTitleFont: UIFont? = Fonts.semiBold.withSize(14)
+        public var linkTitleColor: UIColor? = Colors.textBlack
+        public var linkDescriptionFont: UIFont? = Fonts.regular.withSize(13)
+        public var linkDescriptionColor: UIColor? = Colors.textGray
+        public var linkPreviewBackgroundColor: (in: UIColor?, out: UIColor?) = (.init(light: 0xE4E6EE, dark: 0xC9D1FF),
+                                                                                .init(light: 0xD1D8FF, dark: 0x212239))
         public var highlightedLinkBackgroundColor: UIColor? = Colors.textGray2
         public var mentionUserColor: UIColor? = Colors.kitBlue
         public var dateTickBackgroundViewColor: UIColor? = Colors.backgroundTransparent
@@ -270,6 +277,8 @@ extension ComposerVC: AppearanceProvider {
         public var actionMessageColor: UIColor? = .textGray
         public var actionMessageVoiceDurationColor: UIColor? = .kitBlue
         public var actionMessageFont: UIFont? = Fonts.regular.withSize(13)
+        public var actionLinkPreviewTitleFont: UIFont? = Fonts.semiBold.withSize(13)
+        public var actionLinkPreviewTitleColor: UIColor? = .kitBlue
         
         public var mediaViewBackgroundColor: UIColor? = .background
 

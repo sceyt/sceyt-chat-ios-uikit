@@ -27,6 +27,10 @@ open class DefaultUserDisplayNameFormatter: UserDisplayNameFormatter {
             break
         }
         
+        if user.id == me {
+            return L10n.User.current
+        }
+        
         let displayName = [user.firstName, user.lastName]
             .compactMap { 
                 let name = $0?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

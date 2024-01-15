@@ -140,11 +140,9 @@ open class ChannelProfileVM: NSObject {
     open func block(completion: @escaping (Error?) -> Void) {
         switch channel.channelType {
         case .direct:
-            if let userIds = channel.members?.map({ $0.id }) {
+            if let userIds = channel.members?.compactMap({ $0.id == me ? nil : $0.id }) {
                 userProvider.blockUsers(ids: userIds) { error in
-                    Provider.refreshAllObjects {
-                        completion(error)
-                    }
+                    completion(error)
                 }
             }
         default:
@@ -155,11 +153,9 @@ open class ChannelProfileVM: NSObject {
     open func unblock(completion: @escaping (Error?) -> Void) {
         switch channel.channelType {
         case .direct:
-            if let userIds = channel.members?.map({ $0.id }) {
+            if let userIds = channel.members?.compactMap({ $0.id == me ? nil : $0.id }) {
                 userProvider.unblockUsers(ids: userIds) { error in
-                    Provider.refreshAllObjects {
-                        completion(error)
-                    }
+                    completion(error)
                 }
             }
         default:

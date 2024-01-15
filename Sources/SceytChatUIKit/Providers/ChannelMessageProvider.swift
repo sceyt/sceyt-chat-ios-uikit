@@ -395,10 +395,17 @@ open class ChannelMessageProvider: Provider {
     ) {
         metadata.storeImages()
         database.write {
-            $0.add(
-                linkMetadatas: [metadata],
-                toMessage: message.id
-            )
+            if message.id > 0 {
+                $0.add(
+                    linkMetadatas: [metadata],
+                    messageId: message.id
+                )
+            } else {
+                $0.add(
+                    linkMetadatas: [metadata],
+                    messageTid: message.tid
+                )
+            }   
         }
     }
     

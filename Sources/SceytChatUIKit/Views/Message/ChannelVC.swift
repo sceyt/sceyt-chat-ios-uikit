@@ -10,8 +10,6 @@ import Photos
 import SceytChat
 import UIKit
 
-private let messageBottomSpace = CGFloat(5)
-
 open class ChannelVC: ViewController,
                       UIGestureRecognizerDelegate,
                       UICollectionViewDelegateFlowLayout,
@@ -1052,6 +1050,10 @@ open class ChannelVC: ViewController,
     }
     
     open func updateUnreadViewVisibility() {
+        if isScrollingBottom {
+            unreadCountView.isHidden = true
+            return
+        }
         guard !collectionView.indexPathsForVisibleItems.isEmpty,
               let lastAttributesFrame = collectionView.lastVisibleAttributes?.frame
         else {
@@ -1147,9 +1149,7 @@ open class ChannelVC: ViewController,
         collectionView: UICollectionView,
         model: MessageLayoutModel
     ) -> UICollectionViewCell {
-        let message = model.message
-        //        channelViewModel.updateLinkPreviewsForLayoutModelIfNeeded(model, at: indexPath)
-        
+        let message = model.message        
         let type: MessageCell.Type =
         model.message.incoming ?
         Components.incomingMessageCell :
@@ -1249,7 +1249,7 @@ open class ChannelVC: ViewController,
         return cell
     }
     
-    public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+    open func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard channelViewModel.canSelectMessage(at: indexPath)
         else { return }
         channelViewModel.didChangeSelection(for: indexPath)
@@ -1352,7 +1352,8 @@ open class ChannelVC: ViewController,
     open func createMessage(shouldClearText: Bool = true) -> UserSendMessage {
         let m = UserSendMessage(
             sendText: shouldClearText ? inputTextView.attributedText : .init(),
-            attachments: mediaView.items
+            attachments: mediaView.items,
+            linkMetadata: composerVC.lastDetectedLinkMetadata
         )
         if let ma = channelViewModel.selectedMessageForAction {
             switch ma {
@@ -1495,16 +1496,23 @@ open class ChannelVC: ViewController,
     }
     
     open func didSelectAvatar(layoutModel: MessageLayoutModel) {
-        showProfile(userId: layoutModel.message.user.id)
+        showProfile(user: layoutModel.message.user)
     }
     
     open func didSelectMentionUser(userId: UserId, layoutModel: MessageLayoutModel) {
-        showProfile(userId: userId)
+        if let user = layoutModel.message.mentionedUsers?.first(where: { $0.id == userId}) {
+            showProfile(user: user)
+        } else {
+            channelViewModel.user(id: userId) {[weak self] user in
+                self?.showProfile(user: user)
+            }
+        }
+        
     }
     
-    open func showProfile(userId: UserId) {
-        logger.debug("showProfile for \(userId)")
-        channelViewModel.directChannel(userId: userId) { [weak self] channel, error in
+    open func showProfile(user: ChatUser) {
+        logger.debug("showProfile for \(user.id)")
+        channelViewModel.directChannel(user: user) { [weak self] channel, error in
             guard let self else { return }
             if let channel {
                 self.router.showChannelProfileVC(channel: channel)
@@ -1636,34 +1644,53 @@ open class ChannelVC: ViewController,
             } else {
                 layout.isInsertingItemsToTop = false
             }
+//            var animatedScroll = inserts.count == 1
+//            if isScrollingBottom {
+//                needsToScrollBottom = true
+//                animatedScroll = true
+//            } else if paths.numberOfIndexPaths == 1 &&
+//                        (!paths.reloads.isEmpty || !paths.inserts.isEmpty),
+//                      let lastIndexPath = collectionView.lastIndexPath,
+//                      collectionView.lastVisibleIndexPath == lastIndexPath {
+//                isStartedDragging = true
+//                var isReloadLastIndexPath: Bool {
+//                    guard let last = paths.reloads.last else { return false }
+//                    return last >= lastIndexPath
+//                }
+//                var isInsertLastIndexPath: Bool {
+//                    guard let last = paths.inserts.last else { return false }
+//                    return last >= lastIndexPath
+//                }
+//                if isReloadLastIndexPath || isInsertLastIndexPath {
+//                    needsToScrollBottom = true
+//                    animatedScroll = true
+//                } else {
+//                    needsToScrollBottom = false
+//                }
+//            }
+            
+            var isInsertLastIndexPath: Bool {
+                guard let last = paths.inserts.last, 
+                        let lastIndexPath = collectionView.lastIndexPath
+                else { return false }
+                return last >= lastIndexPath
+            }
             var animatedScroll = inserts.count == 1
             if isScrollingBottom {
                 needsToScrollBottom = true
                 animatedScroll = true
-            } else if paths.numberOfIndexPaths == 1 &&
-                        (!paths.reloads.isEmpty || !paths.inserts.isEmpty),
-                      let lastIndexPath = collectionView.lastIndexPath,
-                      collectionView.lastVisibleIndexPath == lastIndexPath {
+            } else if unreadCountView.isHidden {
                 isStartedDragging = true
-                var isReloadLastIndexPath: Bool {
-                    guard let last = paths.reloads.last else { return false }
-                    return last >= lastIndexPath
-                }
-                var isInsertLastIndexPath: Bool {
-                    guard let last = paths.inserts.last else { return false }
-                    return last >= lastIndexPath
-                }
-                if isReloadLastIndexPath || isInsertLastIndexPath {
-                    needsToScrollBottom = true
-                    animatedScroll = true
-                } else {
-                    needsToScrollBottom = false
-                }
+                needsToScrollBottom = isInsertLastIndexPath
+                animatedScroll = isInsertLastIndexPath
+            } else {
+                needsToScrollBottom = false
             }
                         
             if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil {
                 needsToScrollBottom = false
             }
+            
             UIView.performWithoutAnimation {
                 isCollectionViewUpdating = true
                 collectionView.performBatchUpdates {
@@ -1689,7 +1716,7 @@ open class ChannelVC: ViewController,
                     }
                     guard let self = self else { return }
                     UIView.performWithoutAnimation {
-                        let reloads = moves.map(\.to)
+                        let reloads = paths.reloads + moves.map(\.to)
                         if !reloads.isEmpty {
                             self.collectionView.performBatchUpdates {
                                 self.collectionView.reloadItems(at: reloads)
@@ -2117,6 +2144,7 @@ open class ChannelVC: ViewController,
 }
 
 extension ChannelVC {
+    
     open class BarCoverView: UIView {
         override open func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             subviews.first { view in

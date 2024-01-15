@@ -14,7 +14,6 @@ open class MessageCell: CollectionViewCell,
                         MessageCellMeasurable,
                         ContextMenuSnapshotProviding {
     
-    open private(set) var linksContainerSize = CGSize.zero
     open var onAction: ((Action) -> Void)?
     
     open lazy var checkBoxView = {
@@ -246,9 +245,8 @@ open class MessageCell: CollectionViewCell,
         infoView.data = data
         nameLabel.text = Formatters.userDisplayName.format(message.user)
         nameLabel.textColor = appearance.titleColor ?? .initial(title: message.user.id)
-        calculateLinksContainerSize()
         attachmentView.data = data
-//                linkView.data = data
+        linkView.data = data
         switch data.reactionType {
         case .interactive:
             reactionView.data = data
@@ -332,26 +330,6 @@ open class MessageCell: CollectionViewCell,
     }
     
     open var imageTask: Cancellable?
-    
-    open func calculateLinksContainerSize() {
-        guard let data = data,
-              let linkPreviews = data.linkPreviews,
-              !linkPreviews.isEmpty
-        else { return }
-        linksContainerSize = CGSize(
-            width: Components.messageLayoutModel.defaults.imageAttachmentSize.width,
-            height: CGFloat(linkPreviews.count - 1) * 4
-        )
-        
-        linksContainerSize.height += linkPreviews.reduce(CGFloat(0)) {
-            $0
-            + $1.descriptionSize.height
-            + $1.titleSize.height
-            + min(
-                Components.messageLayoutModel.defaults.imageAttachmentSize.height,
-                $1.image?.size.height ?? 0)
-        }
-    }
     
     open var hasBackground: Bool {
         !data.attachments.isEmpty
@@ -649,9 +627,12 @@ public extension MessageCell {
 extension MessageCell {
     
     open class ImageView: UIImageView {
+        
+        var cornerRadius: CGFloat = 16
+        
         open override func layoutSubviews() {
             super.layoutSubviews()
-            layer.cornerRadius = 16
+            layer.cornerRadius = cornerRadius
         }
     }
 }

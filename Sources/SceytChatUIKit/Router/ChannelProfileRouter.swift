@@ -32,9 +32,10 @@ open class ChannelProfileRouter: Router<ChannelProfileVC> {
     }
     
     open func showAttachment(_ attachment: ChatMessage.Attachment) {
-        guard attachment.status == .done else { return }
+        let items = AttachmentView.items(attachments: [attachment])
+        guard !items.isEmpty else { return }
         let preview = FilePreviewController(
-            items: AttachmentView.items(attachments: [attachment])
+            items: items
                 .map { .init(title: $0.name, url: $0.url) }
         )
         
@@ -70,11 +71,11 @@ open class ChannelProfileRouter: Router<ChannelProfileVC> {
         rootVC.show(vc, sender: self)
     }
 
-    private var channelListVC: ChannelListVC? {
+    public var channelListVC: ChannelListVC? {
         rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelListVC }) as? ChannelListVC
     }
 
-    private var channelVC: ChannelVC? {
+    public var channelVC: ChannelVC? {
         rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelVC }) as? ChannelVC
     }
     

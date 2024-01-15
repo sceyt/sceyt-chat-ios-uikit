@@ -11,10 +11,13 @@ import LinkPresentation
 
 extension MessageCell {
 
-    open class LinkStackView: UIStackView {
-
-        open var provider: LinkMetadataProvider!
-        open var layoutModel: MessageLayoutModel!
+    open class LinkStackView: UIStackView, Measurable {
+        
+        public lazy var appearance = MessageCell.appearance {
+            didSet {
+                setupAppearance()
+            }
+        }
 
         open var onDidTapContentView: ((LinkView) -> Void)?
 
@@ -57,15 +60,20 @@ extension MessageCell {
         open var data: MessageLayoutModel! {
             didSet {
                 removeArrangedSubviews()
-                guard let previews = data.linkPreviews, !previews.isEmpty else { return }
-                previews.forEach {
+                guard let preview = data.linkPreviews?.first
+                else { return }
+                [preview].forEach {
                     let v = LinkView()
                         .withoutAutoresizingMask
                     addArrangedSubview(v)
-                    v.widthAnchor.pin(to: widthAnchor)
+                    v.leadingAnchor.pin(to: self.leadingAnchor, constant: 8)
+                    v.trailingAnchor.pin(to: self.trailingAnchor, constant: -8)
                     let tap = UITapGestureRecognizer(target: self, action: #selector(openUrlAction(_:)))
                     v.addGestureRecognizer(tap)
-                    v.bind($0)
+                    v.data = $0
+                    v.backgroundColor = data.message.incoming ?
+                    appearance.linkPreviewBackgroundColor.in :
+                    appearance.linkPreviewBackgroundColor.out
                 }
             }
         }
@@ -77,12 +85,34 @@ extension MessageCell {
             }
             onDidTapContentView?(linkView)
         }
+        
+        open class func measure(model: MessageLayoutModel, appearance: Appearance) -> CGSize {
+            guard let linkPreview = model.linkPreviews?.first
+            else { return .zero }
+            
+            let size = [linkPreview].reduce(CGSize.zero) { partialResult, preview in
+                let size = LinkView.measure(model: preview, appearance: appearance)
+                var result = partialResult
+                result.width = max(result.width, size.width)
+                if size.height > 0 {
+                    result.height += 4 + size.height
+                }
+                return result
+            }
+            return size
+        }
     }
 }
 
 extension MessageCell {
 
-    open class LinkView: View, Bindable {
+    open class LinkView: View, Measurable {
+        
+        public lazy var appearance = MessageCell.appearance {
+            didSet {
+                setupAppearance()
+            }
+        }
 
         open lazy var imageView = ImageView()
             .withoutAutoresizingMask
@@ -90,19 +120,31 @@ extension MessageCell {
 
         open lazy var titleLabel = UILabel()
             .withoutAutoresizingMask
-            .contentHuggingPriorityV(.required)
+            .contentCompressionResistancePriorityV(.required)
 
         open lazy var descriptionLabel = UILabel()
             .withoutAutoresizingMask
-            .contentHuggingPriorityV(.required)
+            .contentCompressionResistancePriorityV(.required)
 
         open private(set) var link: URL!
+        
+        private var imageViewSizeConstraints: [NSLayoutConstraint]?
+        
+        open override func setup() {
+            super.setup()
+            imageView.cornerRadius = 8
+            imageView.clipsToBounds = true
+            titleLabel.numberOfLines = 2
+            descriptionLabel.numberOfLines = 3
+            
+        }
 
         open override func setupAppearance() {
             super.setupAppearance()
-            imageView.clipsToBounds = true
-            titleLabel.numberOfLines = 1
-            descriptionLabel.numberOfLines = 3
+            titleLabel.font = appearance.linkTitleFont
+            titleLabel.textColor = appearance.linkTitleColor
+            descriptionLabel.font = appearance.linkDescriptionFont
+            descriptionLabel.textColor = appearance.linkDescriptionColor
         }
 
         open override func setupLayout() {
@@ -110,19 +152,63 @@ extension MessageCell {
             addSubview(imageView)
             addSubview(titleLabel)
             addSubview(descriptionLabel)
-            imageView.pin(to: self, anchors: [.top(), .trailing(), .leading()])
-            titleLabel.pin(to: self, anchors: [.leading(8), .trailing()])
-            descriptionLabel.pin(to: self, anchors: [.leading(8), .trailing(0)])
-            titleLabel.topAnchor.pin(to: imageView.bottomAnchor, constant: 2)
+            imageView.pin(to: self, anchors: [.top(6), .leading(6), .trailing(-6)])
+            titleLabel.pin(to: self, anchors: [.leading(6), .trailing(-6)])
+            descriptionLabel.pin(to: self, anchors: [.leading(6), .trailing(-6)])
+            titleLabel.topAnchor.pin(to: imageView.bottomAnchor, constant: 6)
             descriptionLabel.topAnchor.pin(to: titleLabel.bottomAnchor, constant: 2)
-            descriptionLabel.bottomAnchor.pin(to: bottomAnchor, constant: 2)
+            descriptionLabel.bottomAnchor.pin(to: self.bottomAnchor, constant: -6)
+            imageViewSizeConstraints = imageView.resize(anchors: [.width, .height])
+        }
+        
+        open override func layoutSubviews() {
+            super.layoutSubviews()
+            layer.cornerRadius = 8
+        }
+        
+        open var data: MessageLayoutModel.LinkPreview! {
+            didSet {
+                imageView.image = data.image
+                titleLabel.attributedText = data.title
+                descriptionLabel.attributedText = data.description
+                link = data.url
+                if let imageViewSizeConstraints, imageViewSizeConstraints.count == 2 {
+                    let size = Self.imageSize(model: data)
+                    imageViewSizeConstraints[0].constant = size.width
+                    imageViewSizeConstraints[1].constant = size.height
+                }
+            }
+        }
+        
+        private static func imageSize(model: MessageLayoutModel.LinkPreview) -> CGSize {
+            var size = CGSize()
+            if let image = model.image {
+                if let imageOriginalSize = model.imageOriginalSize,
+                    max(imageOriginalSize.width, imageOriginalSize.height) <=
+                    max(MessageLayoutModel.defaults.imageAttachmentSize.width, MessageLayoutModel.defaults.imageAttachmentSize.height) {
+                    size = imageOriginalSize
+                } else {
+                    size.width = min(max(model.imageOriginalSize?.width ?? 0, image.size.width), MessageLayoutModel.defaults.imageAttachmentSize.width)
+                    size.height = min(max(model.imageOriginalSize?.height ?? 0, image.size.height), MessageLayoutModel.defaults.imageAttachmentSize.height)
+                }
+            }
+            return size
         }
 
-        open func bind(_ data: MessageLayoutModel.LinkPreview) {
-            imageView.image = data.image
-            titleLabel.attributedText = data.title
-            descriptionLabel.attributedText = data.description
-            link = data.url
+        open class func measure(model: MessageLayoutModel.LinkPreview, appearance: Appearance) -> CGSize {
+            var size = CGSize()
+            if let image = model.image {
+                size = imageSize(model: model)
+            } else {
+                size.width = max(model.titleSize.width, model.descriptionSize.width)
+            }
+            size.height += model.titleSize.height //size name
+            size.height += model.descriptionSize.height // desc
+            if size.height > 0 {
+                size.height += 20 // padding
+            }
+            return size
         }
     }
 }
+
