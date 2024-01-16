@@ -18,7 +18,8 @@
 		C54DF6C42AECF09400767983 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C54DF6C32AECF09400767983 /* Assets.xcassets */; };
 		C54DF6C72AECF09400767983 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C54DF6C52AECF09400767983 /* LaunchScreen.storyboard */; };
 		C54DF6CF2AECF19300767983 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6CE2AECF19300767983 /* Config.swift */; };
-		C5F467AF2AEFED69009AB0E5 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = C5F467AE2AEFED69009AB0E5 /* SceytChatUIKit */; };
+		C5B97EA42B5692070070C913 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = C5B97EA32B5692070070C913 /* SceytChatUIKit */; };
+		C5EA9A922B56960F00891FBF /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = C5EA9A912B56960F00891FBF /* SceytChatUIKit */; };
 		C5F467D42AF020B2009AB0E5 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = C5F467D32AF020B2009AB0E5 /* README.md */; };
 /* End PBXBuildFile section */
 
@@ -44,7 +45,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				C5F467AF2AEFED69009AB0E5 /* SceytChatUIKit in Frameworks */,
+				C5EA9A922B56960F00891FBF /* SceytChatUIKit in Frameworks */,
+				C5B97EA42B5692070070C913 /* SceytChatUIKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -104,7 +106,8 @@
 			);
 			name = SceytDemoApp;
 			packageProductDependencies = (
-				C5F467AE2AEFED69009AB0E5 /* SceytChatUIKit */,
+				C5B97EA32B5692070070C913 /* SceytChatUIKit */,
+				C5EA9A912B56960F00891FBF /* SceytChatUIKit */,
 			);
 			productName = SceytDemoApp;
 			productReference = C54DF6B72AECF09100767983 /* SceytDemoApp.app */;
@@ -136,7 +139,7 @@
 			);
 			mainGroup = C54DF6AE2AECF09100767983;
 			packageReferences = (
-				C5F467AD2AEFED69009AB0E5 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */,
+				C5EA9A902B56960F00891FBF /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */,
 			);
 			productRefGroup = C54DF6B82AECF09100767983 /* Products */;
 			projectDirPath = "";
@@ -398,20 +401,24 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		C5F467AD2AEFED69009AB0E5 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */ = {
+		C5EA9A902B56960F00891FBF /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sceyt/sceyt-chat-ios-uikit.git";
 			requirement = {
-				branch = dev;
-				kind = branch;
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.2;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		C5F467AE2AEFED69009AB0E5 /* SceytChatUIKit */ = {
+		C5B97EA32B5692070070C913 /* SceytChatUIKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = C5F467AD2AEFED69009AB0E5 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */;
+			productName = SceytChatUIKit;
+		};
+		C5EA9A912B56960F00891FBF /* SceytChatUIKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C5EA9A902B56960F00891FBF /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */;
 			productName = SceytChatUIKit;
 		};
 /* End XCSwiftPackageProductDependency section */

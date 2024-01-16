@@ -38,22 +38,12 @@ class LoginViewController: UIViewController {
         return $0.withoutAutoresizingMask
     }(UITextField())
     
-    func imageWithColor(_ color: UIColor, size: CGSize = CGSize(width: 1, height: 1)) -> UIImage {
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let img = renderer.image { ctx in
-            ctx.cgContext.setFillColor(color.cgColor)
-            ctx.cgContext.fill(CGRect(origin: .zero, size: size))
-        }
-        return img
-    }
-    
     lazy var connectButton: UIButton = {
         $0.setTitle("CONNECT", for: .normal)
         $0.setTitleColor(.white, for: .normal)
         
-        let image = imageWithColor(Appearance.Colors.kitBlue.withAlphaComponent(0.5))
-        $0.setBackgroundImage(imageWithColor(Appearance.Colors.kitBlue), for: .normal)
-        $0.setBackgroundImage(imageWithColor(Appearance.Colors.kitBlue.withAlphaComponent(0.5)), for: .disabled)
+        $0.setBackgroundImage(ImageBuilder.build(fillColor: Appearance.Colors.kitBlue), for: .normal)
+        $0.setBackgroundImage(ImageBuilder.build(fillColor: Appearance.Colors.kitBlue.withAlphaComponent(0.5)), for: .disabled)
         $0.layer.cornerRadius = 8
         $0.layer.masksToBounds = true
         return $0.withoutAutoresizingMask
