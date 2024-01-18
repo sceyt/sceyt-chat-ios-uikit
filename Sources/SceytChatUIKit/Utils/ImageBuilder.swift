@@ -66,6 +66,7 @@ open class ImageBuilder {
         let renderer = UIGraphicsImageRenderer(size: size)
         return renderer.image {
             $0.cgContext.setFillColor(fillColor.cgColor)
+            $0.cgContext.fill(CGRect(origin: .zero, size: size))
         }
     }
     
