@@ -1,10 +1,9 @@
 Pod::Spec.new do |s|
   s.name         = "SceytChatUIKit"
   s.version      = "1.5.4"
-  s.summary      = "Fully customizable UI Kit on top of SceytChat SDK"
-  s.description  = "Messaging and Chat API for Mobile Apps and Websites"
+  s.summary      = "Fully customizable Chat UI Kit on top of SceytChat SDK."
   s.homepage     = "https://sceyt.com"
-  s.license      = "Commercial"
+  s.license      = "MIT"
   s.authors      = { 
 	"Ovsep Keropian" => "ovsep@sceyt.com"
   }
