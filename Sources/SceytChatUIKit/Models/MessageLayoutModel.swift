@@ -293,7 +293,33 @@ open class MessageLayoutModel {
         
         let restrictingTextWidth = Self.restrictingWidth(attachments: attachments) - 12 * 2
         
-        if force || self.message.body != message.body || self.message.state != message.state || self.message.bodyAttributes != message.bodyAttributes {
+        var isEqualMentionedUsers: Bool {
+            if self.message.mentionedUsers != message.mentionedUsers {
+                return false
+            }
+            if let currentMentionedUsers = self.message.mentionedUsers, 
+                let updatedMentionedUsers = message.mentionedUsers {
+                var group = [UserId: ChatUser]()
+                currentMentionedUsers.forEach { group[$0.id] = $0 }
+                for user in updatedMentionedUsers {
+                    if let currentUser = group[user.id] {
+                        if currentUser.firstName != user.firstName || currentUser.lastName != user.lastName {
+                            return false
+                        }
+                        
+                    } else {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
+        
+        if force ||
+            self.message.body != message.body ||
+            self.message.state != message.state ||
+            self.message.bodyAttributes != message.bodyAttributes,
+            !isEqualMentionedUsers {
             attributedView = Self.attributedView(
                 message: message,
                 userSendMessage: userSendMessage
