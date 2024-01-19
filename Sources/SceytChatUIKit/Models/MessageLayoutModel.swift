@@ -318,7 +318,7 @@ open class MessageLayoutModel {
         if force ||
             self.message.body != message.body ||
             self.message.state != message.state ||
-            self.message.bodyAttributes != message.bodyAttributes,
+            self.message.bodyAttributes != message.bodyAttributes ||
             !isEqualMentionedUsers {
             attributedView = Self.attributedView(
                 message: message,
