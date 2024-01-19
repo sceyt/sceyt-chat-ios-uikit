@@ -167,7 +167,7 @@ open class ChannelMessageSender: Provider {
                         completion?(error)
                         return
                     }
-                    if sentMessage.deliveryStatus != .pending || sentMessage.deliveryStatus != .failed {
+                    if sentMessage.deliveryStatus == .pending || sentMessage.deliveryStatus == .failed {
                         logger.error("Resending message with tid \(String(describing: sentMessage.tid)) failed error: \(error)")
                         completion?(error)
                         return
