@@ -135,7 +135,12 @@ open class ChannelMessageSender: Provider {
             let hexString = data.map{ String(format:"%02x", $0) }.joined()
             logger.verbose("[EMPTY] ReSend text message by hex [\(hexString)] orig [\(chatMessage.body.prefix(5))]")
         }
-         logger.info("Resend message with tid \(chatMessage.tid) upload attachments if needed")
+         
+        if let parent = chatMessage.parent {
+            logger.info("Resending message with tid \(chatMessage.tid) parent: \(parent.id) upload attachments if needed")
+        } else {
+            logger.info("Resending message with tid \(chatMessage.tid) upload attachments if needed")
+        }
         uploadAttachmentsIfNeeded(message: chatMessage) { message, error in
             if error == nil, let message {
                 let sendableMessage = message.builder.build()
@@ -162,6 +167,11 @@ open class ChannelMessageSender: Provider {
                         completion?(error)
                         return
                     }
+                    if sentMessage.deliveryStatus == .pending || sentMessage.deliveryStatus == .failed {
+                        logger.error("Resending message with tid \(String(describing: sentMessage.tid)) failed error: \(error)")
+                        completion?(error)
+                        return
+                    }
                      logger.info("Message with tid \(sentMessage.tid), id \(sentMessage.id) will store in db")
                     self.database.write ({
                         $0.createOrUpdate(
@@ -176,7 +186,7 @@ open class ChannelMessageSender: Provider {
                 }
                 switch message.state {
                 case .none:
-                     logger.info("Resending message with tid \(chatMessage.tid)")
+                    logger.info("Resending message with tid \(chatMessage.tid) \(sendableMessage.parent != nil ? "parent: \(sendableMessage.parent?.id)" : "")")
                     self.channelOperator.resendMessage(sendableMessage, completion: callback(sentMessage:error:))
                 case .edited:
                      logger.info("Reediting message with tid \(chatMessage.tid)")
