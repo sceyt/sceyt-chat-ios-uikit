@@ -413,7 +413,7 @@ open class IncomingMessageCell: MessageCell {
             }
             bubbleSize.height += 12 //padding
             if userNameSize == .zero {
-                bubbleSize.height += 14
+                bubbleSize.height += 18
             } else {
                 bubbleSize.height += 2
             }

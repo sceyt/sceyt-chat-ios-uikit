@@ -127,15 +127,21 @@ open class ChannelAttachmentListVM: NSObject {
             if let onLoadLinkMetadata,
                let urlStr = attachment.url,
                let url = URL(string: urlStr)?.normalizedURL {
-                Task {
-                    switch await LinkMetadataProvider.default.fetch(url: url) {
-                    case .success(let metadata):
-                        await MainActor.run {
-                            onLoadLinkMetadata(metadata)
-                        }
-                    case .failure(let error):
-                        await MainActor.run {
-                            onLoadLinkMetadata(nil)
+                if let metadata = LinkMetadataProvider.default.metadata(for: url) {
+                    logger.debug("[LONK LOAD] HAS META \(url)")
+                    onLoadLinkMetadata(metadata)
+                } else {
+                    Task {
+                        switch await LinkMetadataProvider.default.fetch(url: url) {
+                        case .success(let metadata):
+                            logger.debug("[LONK LOAD] HAS META fetch \(url)")
+                            await MainActor.run {
+                                onLoadLinkMetadata(metadata)
+                            }
+                        case .failure(let error):
+                            await MainActor.run {
+                                onLoadLinkMetadata(nil)
+                            }
                         }
                     }
                 }

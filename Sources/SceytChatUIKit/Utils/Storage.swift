@@ -77,6 +77,11 @@ open class Storage: NSObject {
         else { return nil }
         return fileUrl(for: url)?.path
     }
+    
+    open class func createFilePath(filename: String) -> String {
+        let fileUrl = storingKey.storingFileFullUrl(filename: filename)
+        return fileUrl.path
+    }
 
     @discardableResult
     open class func storeFile(originalUrl: URL, file srcUrl: URL, deleteFromSrc: Bool = false) -> URL? {

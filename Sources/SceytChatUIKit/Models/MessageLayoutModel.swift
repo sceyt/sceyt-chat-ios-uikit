@@ -197,10 +197,12 @@ open class MessageLayoutModel {
         if hasVoiceAttachments {
             contentOptions.insert(.voice)
         }
-        for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
-            addLinkPreview(linkMetadata: link)
+        if attachments.isEmpty {
+            for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
+                addLinkPreview(linkMetadata: link)
+            }
         }
-       
+        
         reactions = createReactions(message: message)
         attachmentsContainerSize = calculateAttachmentsContainerSize()
         if !isForwarded {
@@ -291,7 +293,33 @@ open class MessageLayoutModel {
         
         let restrictingTextWidth = Self.restrictingWidth(attachments: attachments) - 12 * 2
         
-        if force || self.message.body != message.body || self.message.state != message.state || self.message.bodyAttributes != message.bodyAttributes {
+        var isEqualMentionedUsers: Bool {
+            if self.message.mentionedUsers != message.mentionedUsers {
+                return false
+            }
+            if let currentMentionedUsers = self.message.mentionedUsers, 
+                let updatedMentionedUsers = message.mentionedUsers {
+                var group = [UserId: ChatUser]()
+                currentMentionedUsers.forEach { group[$0.id] = $0 }
+                for user in updatedMentionedUsers {
+                    if let currentUser = group[user.id] {
+                        if currentUser.firstName != user.firstName || currentUser.lastName != user.lastName {
+                            return false
+                        }
+                        
+                    } else {
+                        return false
+                    }
+                }
+            }
+            return true
+        }
+        
+        if force ||
+            self.message.body != message.body ||
+            self.message.state != message.state ||
+            self.message.bodyAttributes != message.bodyAttributes,
+            !isEqualMentionedUsers {
             attributedView = Self.attributedView(
                 message: message,
                 userSendMessage: userSendMessage
@@ -371,21 +399,16 @@ open class MessageLayoutModel {
             parentAttributedView = nil
             replyLayout = nil
         }
-        var prevLinkPreviews = linkPreviews
-        linkPreviews?.removeAll()
-        for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
-            addLinkPreview(linkMetadata: link)
-            updateOptions.insert(.link)
-        }
-        if let linkPreviews {
-            for lp in linkPreviews {
-                prevLinkPreviews?.removeAll(where: { plp in
-                    plp.url.isEqual(url: lp.url) && plp.hasImage == lp.hasImage && plp.hasIcon == lp.hasIcon
-                })
+        if attachments.isEmpty {
+            var prevLinkPreviews = linkPreviews
+            linkPreviews?.removeAll()
+            for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
+                if addLinkPreview(linkMetadata: link) {
+                    self.updateOptions.remove(.link)
+                    updateOptions.insert(.link)
+                }
+                
             }
-        }
-        if (prevLinkPreviews?.count ?? 0) > 0 {
-            updateOptions.insert(.link)
         }
         
         var isUpdated = self.updateOptions != updateOptions
@@ -691,12 +714,17 @@ open class MessageLayoutModel {
                     return $0.attachment.url == data.url.absoluteString
                 }) {
                     let first = attachments[firstIndex]
-                    image = first.thumbnail ?? first.attachment.imageDecodedMetadata?.thumbnailImage
+                    if let thumbnail = first.thumbnail {
+                        image = thumbnail
+                    } else {
+                        image = first.attachment.imageDecodedMetadata?.thumbnailImage
+                    }
+                    
                     attachments.remove(at: firstIndex)
                 }
                 
                 let link = LinkMetadata(
-                    isThumbnailData: image != nil,
+                    isThumbnailData: true,
                     url: data.url,
                     title: data.title,
                     summary: data.summary,
@@ -751,15 +779,21 @@ open class MessageLayoutModel {
         }
 
         linkMetadata.loadImages()
-        var preview = LinkPreview(url: url, isThumbnailData: linkMetadata.isThumbnailData, image: linkMetadata.image, icon: linkMetadata.icon)
+        var preview = LinkPreview(url: url, isThumbnailData: linkMetadata.isThumbnailData, icon: linkMetadata.icon)
         preview.metadata = linkMetadata
         preview.iconOriginalSize = linkMetadata.iconOriginalSize
-        if let imageSize = linkMetadata.image?.size ?? linkMetadata.imageOriginalSize {
+        if let imageSize = linkMetadata.imageOriginalSize ?? linkMetadata.image?.size {
             preview.imageOriginalSize = AttachmentLayout.preferredImageSize(maxSize: Self.defaults.imageAttachmentSize.width, imageSize: imageSize)
         } else {
             preview.imageOriginalSize = linkMetadata.imageOriginalSize
         }
-        
+        if let image = linkMetadata.image {
+            let thumbnailSize =
+                AttachmentLayout
+                .preferredImageSize(maxSize: Self.defaults.imageAttachmentSize.width, imageSize: image.size)
+            linkMetadata.loadThumbnail(of: thumbnailSize)
+        }
+        preview.image = linkMetadata.thumbnail ?? linkMetadata.image
         if let description = linkMetadata.summary {
             let font = Self.appearance.linkDescriptionFont ?? Fonts.regular.withSize(13)
             let text = NSMutableAttributedString(

@@ -21,6 +21,7 @@ open class LinkMetadata {
     open var imageUrl: URL?
     open var imageOriginalSize: CGSize?
     open var iconOriginalSize: CGSize?
+    open var thumbnail: UIImage?
     
     public required init(isThumbnailData: Bool = false, url: URL) {
         self.isThumbnailData = isThumbnailData
@@ -78,6 +79,8 @@ open class LinkMetadata {
         } else {
             logger.debug("[LINK PREVIEV] storeImages \(url)")
         }
+        
+        
     }
 
     open func loadImages() {
@@ -95,6 +98,29 @@ open class LinkMetadata {
             logger.debug("[LINK PREVIEV] loadImages \(url), fn: \(filename) isz \(image?.size), icn: isz \(icon?.size)")
         } else {
             logger.debug("[LINK PREVIEV] loadImages \(url)")
+        }
+    }
+    
+    open func loadThumbnail(of size: CGSize) {
+        
+        guard let image
+        else { return }
+        guard 1.5 * size.maxSide < image.size.maxSide
+        else { return }
+        if let filename = Crypto.hash(value: url.normalizedURL.absoluteString) {
+            let thName = "thumbnail_link_" + filename
+            
+            let filePath = Components.storage.createFilePath(filename: thName)
+            if let path = Components.storage.filePath(filename: thName) {
+                thumbnail = UIImage(contentsOfFile: path)
+            } else {
+                if let ib = try? Components.imageBuilder.init(image: image).resize(max: size.maxSide),
+                   let data = ib.jpegData() {
+                    Components.storage.storeData(data, filePath: filePath)
+                    thumbnail = ib.uiImage
+                    
+                }
+            }            
         }
     }
 }

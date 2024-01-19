@@ -51,6 +51,10 @@ struct UserDefaultsConfig<T> {
 
 
 func configureSceytChatUIKit() {
+    if let currentUserId = Config.currentUserId {
+        SCTUIKitConfig.currentUserId = currentUserId
+    }
     SCTUIKitConfig.initialize(apiUrl: Config.sceytApiURL, appId: Config.sceytAppId, clientId: Config.clientId!)
     SCTUIKitConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
+    SCTUIKitConfig.setLogLevel(.verbose)
 }

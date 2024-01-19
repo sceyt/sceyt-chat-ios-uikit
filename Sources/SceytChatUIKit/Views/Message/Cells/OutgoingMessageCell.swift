@@ -345,7 +345,7 @@ open class OutgoingMessageCell: MessageCell {
             bubbleSize.height += linkSize.height
             bubbleSize.height += (model.hasReply ? 8 : model.isForwarded ? hasVoicesOrFiles ? 0 : 8 : 2)
             bubbleSize.height += 12 //padding
-            bubbleSize.height += 8 //padding
+            bubbleSize.height += 12 //padding
             
             let infoViewSize = InfoView.measure(model: model, appearance: appearance)
             bubbleSize.height += infoViewSize.height
