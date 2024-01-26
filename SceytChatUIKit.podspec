@@ -8,6 +8,7 @@ Pod::Spec.new do |s|
 	"Ovsep Keropian" => "ovsep@sceyt.com"
   }
   s.source       = { :git => "https://github.com/sceyt/sceyt-chat-ios-uikit.git", :tag => "v#{s.version}" }
+  s.source_files  = ["Sources/SceytChatUIKit/**/*.swift"]
   s.requires_arc = true
   s.platform = :ios, "13.0"
   s.ios.frameworks = ["UIKit", "Foundation", "CoreData"]
