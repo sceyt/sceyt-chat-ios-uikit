@@ -406,7 +406,7 @@
 			repositoryURL = "https://github.com/sceyt/sceyt-chat-ios-uikit.git";
 			requirement = {
 				kind = upToNextMajorVersion;
-				minimumVersion = 1.5.2;
+				minimumVersion = 1.5.5;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
