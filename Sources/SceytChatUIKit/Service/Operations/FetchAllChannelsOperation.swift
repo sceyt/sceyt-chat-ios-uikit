@@ -18,10 +18,10 @@ open class FetchAllChannelsOperation: SyncOperation {
     private var fetching = false
     
     private let query: ChannelListQuery
-    private let provider: SyncChannelListProvider
+    private let provider: ChannelListProvider
     public init(query: ChannelListQuery) {
         self.query = query
-        provider = .init()
+        provider = Components.channelListProvider.init()
     }
     
     open override var isAsynchronous: Bool {
@@ -47,7 +47,7 @@ open class FetchAllChannelsOperation: SyncOperation {
         }
         
         loadChannels()
-        provider.onLoad = {[weak self] channels in
+        provider.onStoreChannels = {[weak self] channels in
             guard let self
             else { return }
             self.onLoad?(channels)
@@ -87,15 +87,5 @@ open class FetchAllChannelsOperation: SyncOperation {
         } else {
             self.finish(result: .failure(OperationError.cancelled))
         }
-    }
-}
-
-private class SyncChannelListProvider: ChannelListProvider {
-    
-    public var onLoad: (([Channel]) -> Void)?
-    
-    override func store(channels: [Channel], completion: ((Error?) -> Void)? = nil) {
-        super.store(channels: channels, completion: completion)
-        onLoad?(channels)
     }
 }

@@ -169,16 +169,21 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         dto.replied = false
         dto.unlisted = false
         if let parent = message.parent {
+            let parentMessage = MessageDTO.fetch(id: parent.id, context: self)
             if message.id > 0 {
-                let isReplied = MessageDTO.fetch(id: parent.id, context: self)?.replied
-                dto.parent = createOrUpdate(message: parent, channelId: channelId)
+                let isReplied = parentMessage?.replied
+                if let parentMessage {
+                    dto.parent = parentMessage
+                } else {
+                    dto.parent = createOrUpdate(message: parent, channelId: channelId)
+                }
                 if isReplied == nil || isReplied == true {
                     dto.parent?.replied = true
                 } else {
                     dto.parent?.replied = false
                 }
             } else {
-                dto.parent = MessageDTO.fetch(id: parent.id, context: self)
+                dto.parent = parentMessage
             }
         } else if message.state == .deleted {
             dto.parent = nil

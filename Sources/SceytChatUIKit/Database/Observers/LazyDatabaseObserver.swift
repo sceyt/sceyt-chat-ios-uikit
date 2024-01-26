@@ -415,9 +415,9 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         else { return }
         if let currentContext = notification.object as? NSManagedObjectContext,
            (currentContext === context) {
-            var sendEvent = false
             
             func perform() {
+                var sendEvent = false
                 var changeItems = [ChangeItem]()
                 var changeSections = [ChangeSection]()
                 var insertCache = workingCache

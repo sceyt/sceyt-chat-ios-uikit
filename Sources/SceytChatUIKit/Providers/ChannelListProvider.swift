@@ -16,6 +16,9 @@ open class ChannelListProvider: Provider {
 
     open private(set) var defaultQuery: ChannelListQuery!
     open var defaultParams: ChannelQueryParam
+    
+    internal var onStoreChannels: (([Channel]) -> Void)?
+    
     public required override init() {
         defaultParams = ChannelQueryParam()
         defaultParams.userMessageReactionCount = 1
@@ -82,6 +85,7 @@ open class ChannelListProvider: Provider {
         channels: [Channel],
         completion: ((Error?) -> Void)? = nil
     ) {
+        onStoreChannels?(channels)
         database.write {
             $0.createOrUpdate(channels: channels)
         } completion: { error in
