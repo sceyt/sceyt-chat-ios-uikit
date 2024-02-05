@@ -60,6 +60,7 @@ open class ChannelCell: TableViewCell {
 
     private var unreadCountWidthAnchorConstraint: NSLayoutConstraint?
     private var messageStackViewCenterYConstraint: NSLayoutConstraint?
+    private var messageVerticalConstraints: [NSLayoutConstraint] = []
 
     override open func prepareForReuse() {
         super.prepareForReuse()
@@ -116,10 +117,11 @@ open class ChannelCell: TableViewCell {
             .bottom(-2)
         ])
 
+        let topConstraint = messageStackView.topAnchor.pin(to: contentView.topAnchor, constant: 10)
+        let bottomConstraint = messageStackView.bottomAnchor.pin(lessThanOrEqualTo: contentView.bottomAnchor, constant: -6)
+        messageVerticalConstraints = [topConstraint, bottomConstraint]
         messageStackView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 12)
-        messageStackView.bottomAnchor.pin(lessThanOrEqualTo: contentView.bottomAnchor, constant: -6)
         messageStackView.trailingAnchor.pin(lessThanOrEqualTo: dateLabel.trailingAnchor)
-        messageStackView.topAnchor.pin(greaterThanOrEqualTo: contentView.topAnchor, constant: 10)
         messageStackViewCenterYConstraint = messageStackView.centerYAnchor.pin(to: contentView.centerYAnchor, activate: false)
         updateCenterYConstraint()
         messageLabel.trailingAnchor.pin(lessThanOrEqualTo: dateLabel.trailingAnchor)
@@ -177,7 +179,9 @@ open class ChannelCell: TableViewCell {
     }
     
     private func updateCenterYConstraint() {
-        messageStackViewCenterYConstraint?.isActive = messageLabel.attributedText?.string.isEmpty != false
+        let shouldCenter = messageLabel.attributedText?.string.isEmpty != false
+        messageStackViewCenterYConstraint?.isActive = shouldCenter
+        messageVerticalConstraints.forEach { $0.isActive = !shouldCenter }
     }
 
     open var data: ChannelLayoutModel! {
