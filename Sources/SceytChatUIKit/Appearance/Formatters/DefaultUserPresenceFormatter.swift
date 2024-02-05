@@ -10,8 +10,8 @@ import Foundation
 import SceytChat
 
 public protocol UserPresenceFormatter {
-    func format(_ presence: ChatUser.Presence) -> String
-    func format(_ presence: Presence) -> String
+    func format(_ presence: ChatUser.Presence) -> String?
+    func format(_ presence: Presence) -> String?
 }
 
 open class DefaultUserPresenceFormatter: UserPresenceFormatter {
@@ -44,7 +44,7 @@ open class DefaultUserPresenceFormatter: UserPresenceFormatter {
         return formatter
     }()
     
-    open func format(_ presence: ChatUser.Presence) -> String {
+    open func format(_ presence: ChatUser.Presence) -> String? {
         switch presence.state {
         case .online:
             return L10n.User.Presence.online
@@ -57,10 +57,10 @@ open class DefaultUserPresenceFormatter: UserPresenceFormatter {
                 return dateAgo(lastActiveAt)
             }
         }
-        return "" //L10n.User.Presence.offline
+        return nil //L10n.User.Presence.offline
     }
     
-    open func format(_ presence: Presence) -> String {
+    open func format(_ presence: Presence) -> String? {
         switch presence.state {
         case .online:
             return L10n.User.Presence.online
@@ -73,7 +73,7 @@ open class DefaultUserPresenceFormatter: UserPresenceFormatter {
                 return dateAgo(lastActiveAt)
             }
         }
-        return "" //L10n.User.Presence.offline
+        return nil //L10n.User.Presence.offline
     }
     
     private func dateAgo(_ date: Date) -> String {
