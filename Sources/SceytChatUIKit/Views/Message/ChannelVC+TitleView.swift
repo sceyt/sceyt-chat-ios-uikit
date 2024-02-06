@@ -29,6 +29,16 @@ extension ChannelVC {
         open lazy var typingView = Components.typingView
             .init()
             .withoutAutoresizingMask
+        
+        private lazy var stackView = UIStackView(
+            column: [
+                headLabel,
+                subLabel,
+                typingView
+            ],
+            spacing: 0
+        )
+            .withoutAutoresizingMask
 
         open var mode: Mode = .default {
             didSet {
@@ -60,22 +70,14 @@ extension ChannelVC {
         open override func setupLayout() {
             super.setupLayout()
             addSubview(profileImageView)
-            addSubview(headLabel)
-            addSubview(subLabel)
             addSubview(typingView)
+            addSubview(stackView)
+            
             profileImageView.widthAnchor.pin(to: profileImageView.heightAnchor)
             profileImageView.pin(to: self, anchors: [.leading(), .top(4), .bottom(-4)])
-            headLabel.pin(to: self, anchors: [.trailing(0, .lessThanOrEqual)])
-            headLabel.bottomAnchor.pin(to: profileImageView.centerYAnchor, constant: 3)
-            headLabel.leadingAnchor.pin(to: profileImageView.trailingAnchor, constant: 12)
-            
-            subLabel.pin(to: self, anchors: [.bottom(0, .lessThanOrEqual), .trailing(0, .lessThanOrEqual)])
-            subLabel.topAnchor.pin(to: headLabel.bottomAnchor)
-            subLabel.leadingAnchor.pin(to: profileImageView.trailingAnchor, constant: 12)
-            
-            typingView.pin(to: self, anchors: [.trailing(0, .lessThanOrEqual), .centerX()])
-            typingView.pin(to: subLabel, anchors: [.top, .bottom])
-            typingView.leadingAnchor.pin(to: profileImageView.trailingAnchor, constant: 12)
+            stackView.pin(to: self, anchors: [.trailing(0)])
+            stackView.centerYAnchor.pin(to: profileImageView.centerYAnchor)
+            stackView.leadingAnchor.pin(to: profileImageView.trailingAnchor, constant: 12)
         }
         
         open override func setupDone() {

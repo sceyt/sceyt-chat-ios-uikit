@@ -59,6 +59,8 @@ open class ChannelCell: TableViewCell {
         .withoutAutoresizingMask
 
     private var unreadCountWidthAnchorConstraint: NSLayoutConstraint?
+    private var messageStackViewCenterYConstraint: NSLayoutConstraint?
+    private var messageVerticalConstraints: [NSLayoutConstraint] = []
 
     override open func prepareForReuse() {
         super.prepareForReuse()
@@ -115,10 +117,13 @@ open class ChannelCell: TableViewCell {
             .bottom(-2)
         ])
 
+        let topConstraint = messageStackView.topAnchor.pin(to: contentView.topAnchor, constant: 10)
+        let bottomConstraint = messageStackView.bottomAnchor.pin(lessThanOrEqualTo: contentView.bottomAnchor, constant: -6)
+        messageVerticalConstraints = [topConstraint, bottomConstraint]
         messageStackView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 12)
-        messageStackView.bottomAnchor.pin(lessThanOrEqualTo: contentView.bottomAnchor, constant: -6)
         messageStackView.trailingAnchor.pin(lessThanOrEqualTo: dateLabel.trailingAnchor)
-        messageStackView.topAnchor.pin(to: contentView.topAnchor, constant: 10)
+        messageStackViewCenterYConstraint = messageStackView.centerYAnchor.pin(to: contentView.centerYAnchor, activate: false)
+        updateCenterYConstraint()
         messageLabel.trailingAnchor.pin(lessThanOrEqualTo: dateLabel.trailingAnchor)
         messageLabel.trailingAnchor.pin(lessThanOrEqualTo: badgeStackView.leadingAnchor)
         
@@ -167,6 +172,17 @@ open class ChannelCell: TableViewCell {
             unreadCountWidthAnchorConstraint?.constant = 20
         }
     }
+    
+    private func update(messageText: NSAttributedString?) {
+        messageLabel.attributedText = messageText
+        updateCenterYConstraint()
+    }
+    
+    private func updateCenterYConstraint() {
+        let shouldCenter = messageLabel.attributedText?.string.isEmpty != false
+        messageStackViewCenterYConstraint?.isActive = shouldCenter
+        messageVerticalConstraints.forEach { $0.isActive = !shouldCenter }
+    }
 
     open var data: ChannelLayoutModel! {
         didSet {
@@ -179,7 +195,7 @@ open class ChannelCell: TableViewCell {
 
     open func bind(_ data: ChannelLayoutModel) {
         subjectLabel.text = data.formatedSubject
-        messageLabel.attributedText = data.attributedView
+        update(messageText: data.attributedView)
         dateLabel.text = data.formatedDate
         pinView.isHidden = data.channel.pinnedAt == nil
         backgroundColor = data.channel.pinnedAt == nil ? .clear : .background2
@@ -262,13 +278,13 @@ open class ChannelCell: TableViewCell {
             string: "\(L10n.Channel.Member.typing)...",
             attributes: [.font: appearance.typingFont ?? Fonts.regular.with(traits: .traitItalic).withSize(15), .foregroundColor: appearance.typingTextColor ?? .textGray]
         ))
-        messageLabel.attributedText = message
+        update(messageText: message)
         messageLabel.setNeedsLayout()
         messageLabel.layoutIfNeeded()
     }
 
     open func didStopTyping(member: ChatChannelMember) {
-        messageLabel.attributedText = data.attributedView
+        update(messageText: data.attributedView)
         messageLabel.setNeedsLayout()
         messageLabel.layoutIfNeeded()
     }
