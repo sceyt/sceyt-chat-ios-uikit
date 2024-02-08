@@ -934,31 +934,36 @@ open class ChannelProfileVC: ViewController,
     }
     
     open func block() {
+        hud.isLoading = true
         profileViewModel.block { [weak self] error in
+            hud.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
             } else {
                 self.router.channelVC?.channelViewModel.refreshChannel()
-                self.router.goChannelListVC()
+//                self.router.goChannelListVC()
             }
         }
     }
     
     open func unblock() {
+        hud.isLoading = true
         profileViewModel.unblock { [weak self] error in
+            hud.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
             } else {
                 self.router.channelVC?.channelViewModel.refreshChannel()
-                self.router.goChannelVC()
             }
         }
     }
     
     open func leave() {
+        hud.isLoading = true
         profileViewModel.leave { [weak self] error in
+            hud.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -969,7 +974,9 @@ open class ChannelProfileVC: ViewController,
     }
     
     open func blockAndLeave() {
+        hud.isLoading = true
         profileViewModel.blockAndLeave { [weak self] error in
+            hud.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -998,7 +1005,9 @@ open class ChannelProfileVC: ViewController,
                   actions: [
                     .init(title: L10n.Alert.Button.cancel, style: .cancel),
                     .init(title: L10n.Alert.Button.delete, style: .destructive) { [weak self] in
+                        hud.isLoading = true
                         self?.profileViewModel.delete { [weak self] error in
+                            hud.isLoading = false
                             guard let self else { return }
                             if let error = error {
                                 self.showAlert(error: error)
