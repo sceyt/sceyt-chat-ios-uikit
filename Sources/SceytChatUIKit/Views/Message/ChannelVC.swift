@@ -147,6 +147,7 @@ open class ChannelVC: ViewController,
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.delegate = self
+        showBottomViewIfNeeded()
         updateTitle()
         updateUnreadViewVisibility()
     }
@@ -306,8 +307,6 @@ open class ChannelVC: ViewController,
         view.addSubview(selectingView)
         selectingView.pin(to: view, anchors: [.leading, .trailing])
         selectingView.bottomAnchor.pin(to: composerVC.view.bottomAnchor)
-        
-        showBottomViewIfNeeded()
     }
     
     override open func setupAppearance() {

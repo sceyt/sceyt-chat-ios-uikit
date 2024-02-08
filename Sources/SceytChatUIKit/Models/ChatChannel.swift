@@ -41,6 +41,8 @@ public class ChatChannel {
     
     public var decodedMetadata: Metadata?
     
+    public static var shouldCreateMembersObserver = true
+    
     /// available only if channel type is direct
     public private(set) var members: [ChatChannelMember]?
     
@@ -104,6 +106,9 @@ public class ChatChannel {
         }
         if let members {
             self.members = members
+            if Self.shouldCreateMembersObserver {
+                createMembersObserver()
+            }
         }
     }
     
@@ -144,6 +149,9 @@ public class ChatChannel {
                 fatalError("ChannelDTO managedObjectContext is nil")
                 #endif
             }
+            if Self.shouldCreateMembersObserver {
+                createMembersObserver()
+            }
         }
     }
     
@@ -175,8 +183,14 @@ public class ChatChannel {
             userRole: channel.userRole)
         if self.channelType == .direct {
             members = channel.members?.map { .init(member: $0)}
+            if Self.shouldCreateMembersObserver {
+                createMembersObserver()
+            }
         }
     }
+    
+    fileprivate var memberObserver: DatabaseObserver<MemberDTO, ChatChannelMember>?
+    
 }
 
 extension ChatChannel {
@@ -231,6 +245,65 @@ public extension ChatChannel {
     
     var isGroup: Bool {
         channelType != .direct
+    }
+    
+    public func reloadMembers(_ members: [ChatChannelMember]) {
+        var group = [UserId: ChatChannelMember]()
+        for member in members {
+            group[member.id] = member
+        }
+        if var newMembers = self.members {
+            for (index, member) in newMembers.enumerated() {
+                if let new = group[member.id] {
+                    newMembers[index] = new
+                }
+            }
+            self.members = newMembers
+        }
+        
+    }
+}
+
+public extension ChatChannel {
+    
+    public func createMembersObserver() {
+        guard channelType == .direct,
+              memberObserver == nil,
+              let members,
+              !members.isEmpty
+        else { return }
+        
+        let ids = members.map { $0.id }
+        memberObserver = DatabaseObserver<MemberDTO, ChatChannelMember>(
+            request: MemberDTO.fetchRequest()
+                .relationshipKeyPathsFor(refreshing: [
+                    #keyPath(MemberDTO.user.blocked),
+                    #keyPath(MemberDTO.user.state),
+                    #keyPath(MemberDTO.user.firstName),
+                    #keyPath(MemberDTO.user.lastName),
+                    #keyPath(MemberDTO.user.avatarUrl)
+                ])
+                .fetch(predicate: NSPredicate(format: "channelId == %lld AND user.id IN %@", id, ids))
+                .sort(descriptors: [
+                    .init(keyPath: \MemberDTO.user?.id, ascending: true)
+                ]),
+            context: Config.database.viewContext
+        ) { $0.convert() }
+        
+        memberObserver?.onDidChange = {[weak self] items in
+            guard let self
+            else { return }
+            let items: [ChatChannelMember]? = items.items()
+            if  let items {
+                var _members = members
+                for item in items  {
+                    if let index = members.firstIndex(of: item) {
+                        _members[index] = item
+                    }
+                }
+                self.members = _members
+            }
+        }
     }
 }
 
