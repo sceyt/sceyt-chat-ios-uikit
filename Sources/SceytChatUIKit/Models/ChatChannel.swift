@@ -189,6 +189,9 @@ public class ChatChannel {
         }
     }
     
+    deinit {
+        try? memberObserver?.stopObserver()
+    }
     fileprivate var memberObserver: DatabaseObserver<MemberDTO, ChatChannelMember>?
     
 }
@@ -304,6 +307,7 @@ public extension ChatChannel {
                 self.members = _members
             }
         }
+        try? memberObserver?.startObserver()
     }
 }
 
