@@ -49,6 +49,7 @@ open class AudioRecorder: NSObject, AVAudioRecorderDelegate {
     }
     
     open func stopRecording() {
+        try? Components.audioSession.notifyOthersOnDeactivation()
         UIApplication.shared.isIdleTimerDisabled = false
         audioRecorder?.stop()
         audioRecorder?.isMeteringEnabled = false
