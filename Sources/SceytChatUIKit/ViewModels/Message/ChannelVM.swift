@@ -1293,14 +1293,15 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         let firstPath = IndexPath(row: 0, section: indexPath.section)
         guard let current = message(at: firstPath)
         else { return nil }
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: Date())
         guard indexPath.section > 0,
               let prev = message(at: .init(row: 0,
                                            section: indexPath.section - 1))
         else {
-            return Formatters.messageListSeparator.format(current.createdAt, showYear: false) 
+            let dateYear = calendar.component(.year, from: current.createdAt)
+            return Formatters.messageListSeparator.format(current.createdAt, showYear: dateYear < currentYear)
         }
-        
-        let calendar = Calendar.current
         
         let date = !calendar.isDate(
             prev.createdAt,
@@ -1309,7 +1310,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         ) ? current.createdAt : nil
         if let date {
             let dateYear = calendar.component(.year, from: date)
-            let currentYear = calendar.component(.year, from: Date())
             return Formatters.messageListSeparator.format(date, showYear: dateYear < currentYear)
             
         }

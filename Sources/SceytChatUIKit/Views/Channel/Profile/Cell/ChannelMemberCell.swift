@@ -15,6 +15,13 @@ open class ChannelMemberCell: TableViewCell {
         .contentMode(.scaleAspectFill)
         .withoutAutoresizingMask
     
+    private lazy var textStackView = UIStackView(
+        column: [titleLabel, statusLabel],
+        spacing: 3,
+        alignment: .leading
+    )
+        .withoutAutoresizingMask
+    
     open lazy var titleLabel = UILabel()
         .withoutAutoresizingMask
         .contentCompressionResistancePriorityH(.defaultLow)
@@ -58,22 +65,19 @@ open class ChannelMemberCell: TableViewCell {
     override open func setupLayout() {
         super.setupLayout()
         contentView.addSubview(avatarView)
-        contentView.addSubview(titleLabel)
-        contentView.addSubview(statusLabel)
+        contentView.addSubview(textStackView)
         contentView.addSubview(roleLabel)
         contentView.addSubview(separatorView)
       
         avatarView.leadingAnchor.pin(to: contentView.leadingAnchor, constant: 16)
         avatarView.pin(to: contentView, anchors: [.top(8, .greaterThanOrEqual), .centerY()])
         avatarView.resize(anchors: [.height(40), .width(40)])
-        titleLabel.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 12)
-        titleLabel.pin(to: contentView, anchors: [.top(8)])
-        titleLabel.heightAnchor.pin(greaterThanOrEqualToConstant: 22)
-        titleLabel.trailingAnchor.pin(lessThanOrEqualTo: roleLabel.leadingAnchor)
-        statusLabel.leadingAnchor.pin(to: titleLabel.leadingAnchor)
-        statusLabel.pin(to: contentView, anchors: [.bottom(-8), .trailing(-16, .greaterThanOrEqual)])
-        statusLabel.topAnchor.pin(to: titleLabel.bottomAnchor)
-        statusLabel.heightAnchor.pin(greaterThanOrEqualToConstant: 16)
+        
+        textStackView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 12)
+        textStackView.pin(to: contentView, anchors: [.top(8, .greaterThanOrEqual), .centerY])
+        separatorView.topAnchor.pin(greaterThanOrEqualTo: textStackView.bottomAnchor, constant: 8)
+        textStackView.trailingAnchor.pin(lessThanOrEqualTo: roleLabel.leadingAnchor)
+        
         roleLabel.pin(to: contentView, anchors: [.centerY, .trailing(-16)])
         separatorView.pin(to: contentView, anchors: [.bottom, .trailing(-16)])
         separatorView.leadingAnchor.pin(to: titleLabel.leadingAnchor)

@@ -28,7 +28,7 @@ open class ChannelUserCell: TableViewCell {
         .withoutAutoresizingMask
         .contentCompressionResistancePriorityH(.defaultLow)
     
-    open lazy var textVStack = UIStackView(column: [titleLabel, statusLabel])
+    open lazy var textVStack = UIStackView(column: [titleLabel, statusLabel], spacing: Layouts.textPadding)
         .withoutAutoresizingMask
         
     open lazy var checkBoxView = Components.checkBoxView.init()
@@ -68,8 +68,7 @@ open class ChannelUserCell: TableViewCell {
         avatarView.resize(anchors: [.height(Layouts.iconSize), .width(Layouts.iconSize)])
         textVStack.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: Layouts.horizontalPadding)
         textVStack.pin(to: contentView, anchors: [.top(Layouts.verticalPadding, .greaterThanOrEqual), .trailing(-Layouts.horizontalPadding), .centerY])
-        titleLabel.heightAnchor.pin(greaterThanOrEqualToConstant: Layouts.titleLabelLineHeight)
-        statusLabel.heightAnchor.pin(greaterThanOrEqualToConstant: Layouts.statusLabelLineHeight)
+        separatorView.topAnchor.pin(greaterThanOrEqualTo: textVStack.bottomAnchor, constant: Layouts.verticalPadding)
         separatorView.pin(to: contentView, anchors: [.bottom, .trailing(-Layouts.horizontalPadding)])
         separatorView.leadingAnchor.pin(to: titleLabel.leadingAnchor)
         separatorView.heightAnchor.pin(constant: 1)
@@ -156,10 +155,9 @@ open class ChannelUserCell: TableViewCell {
 
 public extension ChannelUserCell {
     enum Layouts {
-        public static var titleLabelLineHeight: CGFloat = 22
-        public static var statusLabelLineHeight: CGFloat = 16
         public static var iconSize: CGFloat = 40
         public static var verticalPadding: CGFloat = 8
         public static var horizontalPadding: CGFloat = 16
+        public static var textPadding: CGFloat = 3
     }
 }
