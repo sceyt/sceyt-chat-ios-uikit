@@ -192,7 +192,7 @@ public class ChatChannel {
     deinit {
         try? memberObserver?.stopObserver()
     }
-    fileprivate var memberObserver: DatabaseObserver<MemberDTO, ChatChannelMember>?
+    fileprivate var memberObserver: LazyDatabaseObserver<MemberDTO, ChatChannelMember>?
     
 }
 
@@ -269,6 +269,35 @@ public extension ChatChannel {
 
 public extension ChatChannel {
     
+    
+    /*
+     open lazy var messageObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> = {
+         return LazyDatabaseObserver<MessageDTO, ChatMessage>(
+             context: Config.database.backgroundReadOnlyObservableContext,
+             sortDescriptors: [.init(keyPath: \MessageDTO.createdAt, ascending: true),
+                               .init(keyPath: \MessageDTO.id, ascending: true)],
+             sectionNameKeyPath: #keyPath(MessageDTO.daySectionIdentifier),
+             fetchPredicate: messageFetchPredicate,
+             relationshipKeyPathsObserver: [
+                 #keyPath(MessageDTO.attachments.status),
+                 #keyPath(MessageDTO.attachments.filePath),
+                 #keyPath(MessageDTO.user.avatarUrl),
+                 #keyPath(MessageDTO.user.firstName),
+                 #keyPath(MessageDTO.user.lastName),
+                 #keyPath(MessageDTO.parent.state),
+                 #keyPath(MessageDTO.bodyAttributes),
+                 #keyPath(MessageDTO.linkMetadatas),
+             ]
+         ) { [weak self] in
+             let message = $0.convert()
+             self?.updateUnreadIndexIfNeeded(message: message)
+             self?.createLayoutModel(for: message)
+             return message
+         }
+         
+     }()
+     */
+    
     public func createMembersObserver() {
         guard channelType == .direct,
               memberObserver == nil,
@@ -277,39 +306,43 @@ public extension ChatChannel {
         else { return }
         logger.debug("[ChatChannel] observer, start \(id), members: \(members.map { ($0.id, $0.blocked)})")
         let ids = members.map { $0.id }
-        memberObserver = DatabaseObserver<MemberDTO, ChatChannelMember>(
-            request: MemberDTO.fetchRequest()
-                .relationshipKeyPathsFor(refreshing: [
-                    #keyPath(MemberDTO.user.blocked),
-                    #keyPath(MemberDTO.user.state),
-                    #keyPath(MemberDTO.user.firstName),
-                    #keyPath(MemberDTO.user.lastName),
-                    #keyPath(MemberDTO.user.avatarUrl)
-                ])
-                .fetch(predicate: NSPredicate(format: "channelId == %lld AND user.id IN %@", id, ids))
-                .sort(descriptors: [
-                    .init(keyPath: \MemberDTO.user?.id, ascending: true)
-                ]),
-            context: Config.database.viewContext
+        memberObserver = LazyDatabaseObserver<MemberDTO, ChatChannelMember>(
+            context: Config.database.backgroundReadOnlyObservableContext,
+            sortDescriptors: [.init(keyPath: \MemberDTO.channelId, ascending: true)],
+            sectionNameKeyPath: nil,
+            fetchPredicate: NSPredicate(format: "channelId == %lld AND user.id IN %@", id, ids),
+            relationshipKeyPathsObserver: [
+                #keyPath(MemberDTO.user.blocked),
+                #keyPath(MemberDTO.user.state),
+                #keyPath(MemberDTO.user.firstName),
+                #keyPath(MemberDTO.user.lastName),
+                #keyPath(MemberDTO.user.avatarUrl)
+            ]
+            
         ) { $0.convert() }
         
-        memberObserver?.onChange = {[weak self] item in
+        memberObserver?.onDidChange = {[weak self] items, _ in
             guard let self
             else { return }
             var _members = members
             
-            if let item = self.memberObserver?.item(at: item.indexPath),
-               let index = _members.firstIndex(where: { $0.id == item.id}) {
-                logger.debug("[ChatChannel] observer, receive \(id), member: \((item.id, item.blocked))")
-                _members[index] = item
-            }
-            Provider.database.read {
-                MemberDTO.fetch(id: item.item.id, channelId: self.id, context: $0)?.convert()
-            } completion: { result in
-                if let member = try? result.get() {
-                    logger.debug("[ChatChannel] observer, db check \(member.id), member: \((member.id, member.blocked))")
+            for indexPath in Set(items.updates + items.moves.map(\.to)) {
+                if let item = self.memberObserver?.item(at: indexPath) {
+                    if let index = _members.firstIndex(where: { $0.id == item.id}) {
+                        logger.debug("[ChatChannel] observer, receive \(id), member: \((item.id, item.blocked))")
+                        _members[index] = item
+                    }
+                    Provider.database.read {
+                        MemberDTO.fetch(id: item.id, channelId: self.id, context: $0)?.convert()
+                    } completion: { result in
+                        if let member = try? result.get() {
+                            logger.debug("[ChatChannel] observer, db check \(member.id), member: \((member.id, member.blocked))")
+                        }
+                    }
                 }
             }
+            
+            
 
             self.members = _members
         }
