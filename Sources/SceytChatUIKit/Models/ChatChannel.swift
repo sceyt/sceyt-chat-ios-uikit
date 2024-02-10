@@ -296,17 +296,15 @@ public extension ChatChannel {
         memberObserver?.onDidChange = {[weak self] items in
             guard let self
             else { return }
-            let items: [ChatChannelMember]? = items.items()
-            if  let items {
-                logger.debug("[ChatChannel] observer, receive \(id), members: \(items.map { ($0.id, $0.blocked)})")
-                var _members = members
-                for item in items  {
-                    if let index = members.firstIndex(of: item) {
-                        _members[index] = item
-                    }
+            var _members = members
+            for indexPath in items.updates {
+                if let item = self.memberObserver?.item(at: indexPath),
+                   let index = _members.firstIndex(where: { $0.id == item.id}) {
+                    logger.debug("[ChatChannel] observer, receive \(id), member: \((item.id, item.blocked))")
+                    _members[index] = item
                 }
-                self.members = _members
             }
+            self.members = _members
         }
         try? memberObserver?.startObserver()
     }
