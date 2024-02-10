@@ -269,35 +269,6 @@ public extension ChatChannel {
 
 public extension ChatChannel {
     
-    
-    /*
-     open lazy var messageObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> = {
-         return LazyDatabaseObserver<MessageDTO, ChatMessage>(
-             context: Config.database.backgroundReadOnlyObservableContext,
-             sortDescriptors: [.init(keyPath: \MessageDTO.createdAt, ascending: true),
-                               .init(keyPath: \MessageDTO.id, ascending: true)],
-             sectionNameKeyPath: #keyPath(MessageDTO.daySectionIdentifier),
-             fetchPredicate: messageFetchPredicate,
-             relationshipKeyPathsObserver: [
-                 #keyPath(MessageDTO.attachments.status),
-                 #keyPath(MessageDTO.attachments.filePath),
-                 #keyPath(MessageDTO.user.avatarUrl),
-                 #keyPath(MessageDTO.user.firstName),
-                 #keyPath(MessageDTO.user.lastName),
-                 #keyPath(MessageDTO.parent.state),
-                 #keyPath(MessageDTO.bodyAttributes),
-                 #keyPath(MessageDTO.linkMetadatas),
-             ]
-         ) { [weak self] in
-             let message = $0.convert()
-             self?.updateUnreadIndexIfNeeded(message: message)
-             self?.createLayoutModel(for: message)
-             return message
-         }
-         
-     }()
-     */
-    
     public func createMembersObserver() {
         guard channelType == .direct,
               memberObserver == nil,
