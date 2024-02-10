@@ -29,7 +29,8 @@ extension NSManagedObjectContext: UserDatabaseSession {
 
     @discardableResult
     public func createOrUpdate(user: User) -> UserDTO {
-        UserDTO.fetchOrCreate(id: user.id, context: self).map(user)
+        logger.debug("[ChatChannel] observer, update \(user.id), blocked: \(user.blocked)")
+        return UserDTO.fetchOrCreate(id: user.id, context: self).map(user)
     }
 
     @discardableResult

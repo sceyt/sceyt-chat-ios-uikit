@@ -275,7 +275,7 @@ public extension ChatChannel {
               let members,
               !members.isEmpty
         else { return }
-        
+        logger.debug("[ChatChannel] observer, start \(id), members: \(members.map { ($0.id, $0.blocked)})")
         let ids = members.map { $0.id }
         memberObserver = DatabaseObserver<MemberDTO, ChatChannelMember>(
             request: MemberDTO.fetchRequest()
@@ -298,6 +298,7 @@ public extension ChatChannel {
             else { return }
             let items: [ChatChannelMember]? = items.items()
             if  let items {
+                logger.debug("[ChatChannel] observer, receive \(id), members: \(items.map { ($0.id, $0.blocked)})")
                 var _members = members
                 for item in items  {
                     if let index = members.firstIndex(of: item) {
