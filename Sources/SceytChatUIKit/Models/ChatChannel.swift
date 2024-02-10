@@ -324,27 +324,13 @@ public extension ChatChannel {
         memberObserver?.onDidChange = {[weak self] items, _ in
             guard let self
             else { return }
-            var _members = members
-            
-            for indexPath in Set(items.updates + items.moves.map(\.to)) {
-                if let item = self.memberObserver?.item(at: indexPath) {
-                    if let index = _members.firstIndex(where: { $0.id == item.id}) {
-                        logger.debug("[ChatChannel] observer, receive \(id), member: \((item.id, item.blocked))")
-                        _members[index] = item
-                    }
-                    Provider.database.read {
-                        MemberDTO.fetch(id: item.id, channelId: self.id, context: $0)?.convert()
-                    } completion: { result in
-                        if let member = try? result.get() {
-                            logger.debug("[ChatChannel] observer, db check \(member.id), member: \((member.id, member.blocked))")
-                        }
-                    }
+            Provider.database.read {
+                MemberDTO.fetch(channelId: self.id, context: $0).map { $0.convert() }
+            } completion: {[weak self] result in
+                if let members = try? result.get() {
+                    self?.members = members
                 }
             }
-            
-            
-
-            self.members = _members
         }
         try? memberObserver?.startObserver()
     }
