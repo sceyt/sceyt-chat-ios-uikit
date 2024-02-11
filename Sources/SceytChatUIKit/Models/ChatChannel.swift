@@ -278,7 +278,7 @@ public extension ChatChannel {
         ) { $0.convert() }
         
         memberObserver?.onDidChange = {[weak self] items, _ in
-            guard let self
+            guard let self, !items.updates.isEmpty
             else { return }
             Provider.database.performBgTask(resultQueue: .global()) {
                 MemberDTO.fetch(channelId: self.id, context: $0).map { $0.convert() }
