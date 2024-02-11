@@ -249,22 +249,6 @@ public extension ChatChannel {
     var isGroup: Bool {
         channelType != .direct
     }
-    
-    public func reloadMembers(_ members: [ChatChannelMember]) {
-        var group = [UserId: ChatChannelMember]()
-        for member in members {
-            group[member.id] = member
-        }
-        if var newMembers = self.members {
-            for (index, member) in newMembers.enumerated() {
-                if let new = group[member.id] {
-                    newMembers[index] = new
-                }
-            }
-            self.members = newMembers
-        }
-        
-    }
 }
 
 public extension ChatChannel {
@@ -275,8 +259,9 @@ public extension ChatChannel {
               let members,
               !members.isEmpty
         else { return }
-        logger.debug("[ChatChannel] observer, start \(id), members: \(members.map { ($0.id, $0.blocked)})")
-        let ids = members.map { $0.id }
+        let ids = members.compactMap { $0.id == me ? nil : $0.id }
+        guard !ids.isEmpty
+        else { return }
         memberObserver = LazyDatabaseObserver<MemberDTO, ChatChannelMember>(
             context: Config.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \MemberDTO.channelId, ascending: true)],
@@ -295,7 +280,7 @@ public extension ChatChannel {
         memberObserver?.onDidChange = {[weak self] items, _ in
             guard let self
             else { return }
-            Provider.database.read {
+            Provider.database.performBgTask(resultQueue: .global()) {
                 MemberDTO.fetch(channelId: self.id, context: $0).map { $0.convert() }
             } completion: {[weak self] result in
                 if let members = try? result.get() {
