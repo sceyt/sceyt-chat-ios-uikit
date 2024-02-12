@@ -104,12 +104,12 @@ public class ChatChannel {
         if let metadata {
             decodedMetadata = try? Metadata.decode(metadata)
         }
-//        if let members {
-//            self.members = members
+        if let members {
+            self.members = members
 //            if Self.shouldCreateMembersObserver {
 //                createMembersObserver()
 //            }
-//        }
+        }
     }
     
     public convenience init(dto: ChannelDTO) {
