@@ -37,7 +37,6 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
                 .relationshipKeyPathsFor(refreshing: [#keyPath(ChannelDTO.lastMessage.deliveryStatus),
                                                       #keyPath(ChannelDTO.lastMessage.updatedAt),
                                                       #keyPath(ChannelDTO.lastMessage.state),
-//                                                      #keyPath(ChannelDTO.members.user),
                                                       #keyPath(ChannelDTO.lastReaction.messageId),
                                                       #keyPath(ChannelDTO.lastReaction.key)]),
             context: Config.database.viewContext
