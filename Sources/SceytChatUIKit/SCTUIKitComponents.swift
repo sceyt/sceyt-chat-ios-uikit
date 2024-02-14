@@ -29,6 +29,7 @@ public enum SCTUIKitComponents {
     public static var channelUnreadCountView: ChannelUnreadCountView.Type = ChannelUnreadCountView.self
     public static var channelTitleView: ChannelVC.TitleView.Type = ChannelVC.TitleView.self
     public static var channelBottomView: ChannelVC.BottomView.Type = ChannelVC.BottomView.self
+    public static var channelSearchControlsView: ChannelVC.SearchControlsView.Type = ChannelVC.SearchControlsView.self
 
     public static var channelProfileVC: ChannelProfileVC.Type = ChannelProfileVC.self
     public static var channelProfileVM: ChannelProfileVM.Type = ChannelProfileVM.self

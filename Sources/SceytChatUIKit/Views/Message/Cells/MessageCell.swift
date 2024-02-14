@@ -92,7 +92,7 @@ open class MessageCell: CollectionViewCell,
     open lazy var replyIcon = UIImageView(image: .channelReply)
         .withoutAutoresizingMask
     
-    open var isHighlightedBubbleView = false
+    open var hightlightMode = HighlightMode.none
         
     public private(set) var contentConstraints: [NSLayoutConstraint]?
     
@@ -308,7 +308,7 @@ open class MessageCell: CollectionViewCell,
     
     open override func prepareForReuse() {
         super.prepareForReuse()
-        isHighlightedBubbleView = false
+        hightlightMode = .none
         longPressItem = nil
         deliveryStatus = .pending
         NSLayoutConstraint.deactivate(contentView.constraints + containerView.constraints + (contentConstraints ?? []))
@@ -643,5 +643,13 @@ public extension MessageCell {
         public static var checkBoxPadding: CGFloat = 12
         public static var horizontalPadding: CGFloat = 12
         public static var attachmentIconSize: CGFloat = 40
+    }
+}
+
+public extension MessageCell {
+    enum HighlightMode {
+        case reply
+        case search
+        case none
     }
 }

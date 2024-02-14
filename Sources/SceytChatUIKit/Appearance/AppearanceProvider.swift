@@ -179,6 +179,10 @@ extension MessageCell: AppearanceProvider {
         public var bubbleColor: (in: UIColor?, out: UIColor?) = (.background2,
                                                                  .init(light: 0xE3E7FF, dark: 0x212239))
         public var highlightedBubbleColor: (in: UIColor?, out: UIColor?) = (Colors.textGray.withAlphaComponent(0.4), Colors.textGray.withAlphaComponent(0.4))
+        public var highlightedSearchResultColor: (in: UIColor?, out: UIColor?) = (
+            .init(light: 0xE4E6EE, dark: 0x303032),
+            .init(light: 0xD1D8FF, dark: 0x2E3052)
+        )
         public var highlightedOverlayColor: (in: UIColor?, out: UIColor?) = (UIColor(hex: "#17191C", alpha: 0.4), UIColor(hex: "#17191C", alpha: 0.4))
         public var linkColor: UIColor? = Colors.kitBlue
         public var linkFont: UIFont? = Fonts.regular.withSize(16)
@@ -1040,6 +1044,19 @@ extension ChannelVC.BottomView: AppearanceProvider {
         public var labelColor: UIColor? = .textBlack
         public var iconColor: UIColor? = .kitBlue
         public var separatorColor: UIColor? = .separator
+    }
+}
+
+extension ChannelVC.SearchControlsView: AppearanceProvider {
+    public static var appearance = Appearance()
+    
+    public struct Appearance {
+        public init() {}
+        
+        public var backgroundColor: UIColor? = .background
+        public var buttonTintColor: UIColor? = .kitBlue
+        public var textColor: UIColor? = .init(light: 0x000000, dark: 0xFFFFFF)
+        public var textFont: UIFont? = Fonts.regular.withSize(16)
     }
 }
 

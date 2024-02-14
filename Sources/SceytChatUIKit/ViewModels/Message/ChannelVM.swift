@@ -17,7 +17,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     @Published public var peerPresence: Presence?
     
     @Published public var isEditing: Bool = false
+    @Published public var isSearching: Bool = false
     @Published public var selectedMessages = Set<MessageLayoutModel>()
+    @Published public var searchResult = SearchResultModel()
 
     //MARK: Delegate identifier
     public let clientDelegateIdentifier = NSUUID().uuidString
@@ -1226,6 +1228,74 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         })
     }
     
+    // MARK: Search
+    public func toggleSearch(isSearching: Bool?) {
+        if let isSearching {
+            self.isSearching = isSearching
+        } else {
+            self.isSearching.toggle()
+        }
+        searchResult.searchResults.removeAll()
+        resetSearchResultHighlight()
+        searchResult.lastViewedSearchResult = nil
+    }
+    
+    public func search(with query: String) {
+        guard !query.isEmpty else {
+            searchResult.searchResults.removeAll()
+            searchResult.lastViewedSearchResult = nil
+            return
+        }
+        MessageListQuery
+            .Builder(channelId: channel.id)
+            .searchFields([.init(key: .body, search: .contains, searchWord: query)])
+            .build()
+            .loadNext { query, messages, error in
+                self.searchResult.searchResults = messages?.map { $0.id } ?? []
+                if let lastFound = messages?.first?.id, self.searchResult.lastViewedSearchResult == nil {
+                    self.searchResult.lastViewedSearchResult = lastFound
+                    self.scroll(to: lastFound)
+                }
+            }
+    }
+    
+    public func onPreviousSearchResultTap() {
+        resetSearchResultHighlight()
+        guard let previousResult = searchResult.previousResult else { return }
+        if !scroll(to: previousResult) {
+            loadAllToShowMessage(messageId: previousResult) { [weak self] in
+                self?.scroll(to: previousResult)
+            }
+        }
+    }
+    
+    public func onNextSearchResultTap() {
+        resetSearchResultHighlight()
+        guard let nextResult = searchResult.nextResult else { return }
+        if !scroll(to: nextResult) {
+            loadAllToShowMessage(messageId: nextResult) { [weak self] in
+                self?.scroll(to: nextResult)
+            }
+        }
+    }
+    
+    private func resetSearchResultHighlight() {
+        if let currentResult = searchResult.lastViewedSearchResult,
+           let indexPath = messageObserver.indexPath({ $0.id == currentResult }) {
+            event = .resetSearchResultHighlight(indexPath)
+        }
+    }
+    
+    @discardableResult
+    private func scroll(to messageId: MessageId) -> Bool {
+        guard let indexPath = messageObserver.indexPath({ message in
+            return message.id == messageId
+        }) else { return false }
+        searchResult.lastViewedSearchResult = messageId
+        event = .scrollTo(indexPath)
+        return true
+    }
+    
     //MARK: Link preview
     open func updateLinkPreviewsForLayoutModelIfNeeded(model: MessageLayoutModel) {
         let matches = DataDetector.matches(text: model.message.body)
@@ -1655,6 +1725,8 @@ public extension ChannelVM {
         case reloadData
         case reloadDataAndScrollToBottom
         case reloadDataAndScroll(IndexPath)
+        case scrollTo(IndexPath)
+        case resetSearchResultHighlight(IndexPath)
         case didSetUnreadIndexPath(IndexPath)
         case typing(Bool, ChatUser)
         case changePresence(Presence)

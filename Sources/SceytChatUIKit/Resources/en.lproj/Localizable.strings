@@ -73,6 +73,7 @@
 "channel.profile.item.title.members" = "Members";
 "channel.profile.item.title.subscribers" = "Subscribers";
 "channel.profile.item.title.admins" = "Admins";
+"channel.profile.item.title.messageSearch" = "Message Search";
 
 "channel.profile.segment.members" = "Members";
 "channel.profile.segment.medias" = "Media";
@@ -135,6 +136,10 @@
 
 "channel.profile.members.title" = "Members";
 "channel.profile.admins.title" = "Admins";
+
+"channel.search.search" = "Search";
+"channel.search.found-index" = "%d of %d";
+"channel.search.not-found" = "Not found";
 
 "channel.members-count.one" = "1 member";
 "channel.members-count.more" = "%d members";

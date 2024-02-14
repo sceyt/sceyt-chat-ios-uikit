@@ -59,6 +59,10 @@ open class ChannelVC: ViewController,
         .init()
         .withoutAutoresizingMask
     
+    open var searchControlsView = Components.channelSearchControlsView
+        .init()
+        .withoutAutoresizingMask
+    
     open lazy var joinGlobalChannelButton = UIButton()
         .withoutAutoresizingMask
     
@@ -91,6 +95,14 @@ open class ChannelVC: ViewController,
         return tap
     }()
     
+    open lazy var searchBar = {
+        let searchBar = UISearchBar()
+        searchBar.placeholder = L10n.Channel.Search.search
+        searchBar.showsCancelButton = true
+        searchBar.delegate = self
+        return searchBar
+    }()
+    
     @objc public lazy var tapGestureRecognizer = UITapGestureRecognizer()
     @objc public lazy var longPressGestureRecognizer = UILongPressGestureRecognizer()
     @objc public lazy var panGestureRecognizer = UIPanGestureRecognizer()
@@ -103,6 +115,7 @@ open class ChannelVC: ViewController,
     public var avatarTask: Cancellable?
     
     public var messageComposerViewBottomConstraint: NSLayoutConstraint!
+    public var searchControlsViewBottomConstraint: NSLayoutConstraint!
     public var messageComposerViewHeightConstraint: NSLayoutConstraint!
     
     override open var disablesAutomaticKeyboardDismissal: Bool {
@@ -110,6 +123,7 @@ open class ChannelVC: ViewController,
     }
     
     public var highlightedDurationForReplyMessage = TimeInterval(1)
+    private let highlightedDurationForSearchMessage = TimeInterval(0.5)
     
     public private(set) var keyboardObserver: KeyboardObserver?
     private var needToMarkMessageAsDisplayed = false
@@ -234,6 +248,26 @@ open class ChannelVC: ViewController,
                 self.showForwardSelectedMessages()
             }
         }
+        searchControlsView.isHidden = true
+        searchControlsView.onAction = { [weak self] in
+            guard let self else { return }
+            switch $0 {
+            case .previousResult:
+                channelViewModel.onPreviousSearchResultTap()
+            case .nextResult:
+                channelViewModel.onNextSearchResultTap()
+            }
+        }
+        NotificationCenter.default.publisher(
+            for: UITextField.textDidChangeNotification,
+            object: searchBar.searchTextField
+        )
+        .compactMap { ($0.object as? UITextField)?.text }
+        .debounce(for: .milliseconds(600), scheduler: DispatchQueue.main)
+        .sink { [weak self] query in
+            self?.channelViewModel.search(with: query)
+        }
+        .store(in: &subscriptions)
         
         collectionView.delegate = self
         collectionView.dataSource = self
@@ -273,6 +307,7 @@ open class ChannelVC: ViewController,
         view.addSubview(noDataView)
         view.addSubview(createdView)
         view.addSubview(coverView)
+        view.addSubview(searchControlsView)
         addChild(composerVC)
         coverView.addSubview(composerVC.view)
         coverView.addSubview(unreadCountView)
@@ -282,6 +317,10 @@ open class ChannelVC: ViewController,
         
         messageComposerViewBottomConstraint = composerVC.view.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
         messageComposerViewHeightConstraint = composerVC.view.resize(anchors: [.height(52)]).first!
+        
+        searchControlsViewBottomConstraint = searchControlsView.bottomAnchor.pin(to: view.safeAreaLayoutGuide.bottomAnchor)
+        searchControlsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing])
+        
         updateCollectionViewInsets()
         //        collectionView.scrollToTop(animated: false)
         coverView.pin(to: view.safeAreaLayoutGuide)
@@ -457,6 +496,29 @@ open class ChannelVC: ViewController,
                 self?.unreadCountView.unreadCount.value = Formatters.channelUnreadMessageCount.format(value)
             }.store(in: &subscriptions)
         
+        channelViewModel
+            .$isSearching
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isSearching in
+                self?.updateNavigationItems()
+                self?.composerVC.view.isHidden = isSearching
+                self?.searchControlsView.isHidden = !isSearching
+            }
+            .store(in: &subscriptions)
+        
+        channelViewModel
+            .$searchResult
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] searchResult in
+                self?.searchControlsView.update(
+                    with: searchResult, 
+                    query: self?.searchBar.searchTextField.text
+                )
+            }
+            .store(in: &subscriptions)
+        
         inputTextView.attributedText = channelViewModel.draftMessage
         
         ApplicationStateObserver()
@@ -472,10 +534,17 @@ open class ChannelVC: ViewController,
     }
     
     private func updateCollectionViewInsets() {
+        let bottomConstraint = searchControlsView.isHidden
+        ? messageComposerViewBottomConstraint.constant
+        : searchControlsViewBottomConstraint.constant
+        let controlHeight = searchControlsView.isHidden
+        ? messageComposerViewHeightConstraint.constant
+        : searchControlsView.frame.height
+        
         collectionView.contentInset.bottom =
         10 +
-        abs(messageComposerViewBottomConstraint.constant) +
-        abs(messageComposerViewHeightConstraint.constant)
+        abs(bottomConstraint) +
+        abs(controlHeight)
         collectionView.scrollIndicatorInsets = .init(
             top: collectionView.contentInset.top,
             left: 0,
@@ -521,6 +590,7 @@ open class ChannelVC: ViewController,
             )
         )
         messageComposerViewBottomConstraint.constant = shift
+        searchControlsViewBottomConstraint.constant = shift
         updateCollectionViewInsets()
         let newBottom = collectionView.contentInset.bottom
         if newBottom != bottom {
@@ -550,6 +620,7 @@ open class ChannelVC: ViewController,
         let bottom = collectionView.contentInset.bottom
         var contentOffsetY = collectionView.contentOffset.y
         messageComposerViewBottomConstraint.constant = 0
+        searchControlsViewBottomConstraint.constant = 0
         updateCollectionViewInsets()
         let newBottom = collectionView.contentInset.bottom
         contentOffsetY += newBottom - bottom
@@ -573,20 +644,39 @@ open class ChannelVC: ViewController,
         if channelViewModel.isEditing {
             composerVC.actionViewCancelAction()
             view.endEditing(true)
+            navigationItem.setHidesBackButton(false, animated: false)
             navigationItem.leftItemsSupplementBackButton = false
             navigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.Channel.Selecting.ClearChat.clear,
                                                                style: .done,
                                                                target: router,
                                                                action: #selector(ChannelRouter.clearChat))
+            navigationItem.titleView = nil
             navigationItem.title = L10n.Channel.Selecting.selected(channelViewModel.selectedMessages.count)
             navigationItem.rightBarButtonItems = [UIBarButtonItem(title: L10n.Alert.Button.cancel,
                                                                   style: .done,
                                                                   target: self,
                                                                   action: #selector(cancelSelecting))]
+//            navigationItem./*searchController = nil*/
+        } else if channelViewModel.isSearching {
+            definesPresentationContext = true
+            navigationItem.setHidesBackButton(true, animated: false)
+            navigationItem.leftBarButtonItem = nil
+            navigationItem.titleView = searchBar
+            
+            DispatchQueue.main.async {
+                self.searchBar.searchTextField.becomeFirstResponder()
+            }
+            let appearance = UINavigationBarAppearance()
+            appearance.backgroundColor = self.appearance.backgroundColor
+            navigationController?.navigationBar.standardAppearance = appearance
+            navigationController?.navigationBar.scrollEdgeAppearance = appearance
+            
         } else {
+            navigationItem.setHidesBackButton(false, animated: false)
             navigationItem.leftItemsSupplementBackButton = true
             navigationItem.leftBarButtonItem = UIBarButtonItem(customView: titleView)
             navigationItem.title = nil
+            navigationItem.titleView = nil
             navigationItem.rightBarButtonItems = []
         }
         selectingView.isHidden = !channelViewModel.isEditing
@@ -1174,6 +1264,11 @@ open class ChannelVC: ViewController,
         }
         cell.checkBoxView.isSelected = channelViewModel.selectedMessages.contains(model)
         cell.data = model
+        if message.id == channelViewModel.searchResult.lastViewedSearchResult {
+            cell.hightlightMode = .search
+        } else {
+            cell.hightlightMode = .none
+        }
         cell.previewer = { [weak self] in
             guard let self
             else { return nil }
@@ -1585,8 +1680,8 @@ open class ChannelVC: ViewController,
     
     open func highlightCell(_ cell: MessageCell) {
         UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak cell] in
-            cell?.isHighlightedBubbleView = true
-            cell?.isHighlightedBubbleView = false
+            cell?.hightlightMode = .reply
+            cell?.hightlightMode = .none
         }
     }
     
@@ -1819,6 +1914,20 @@ open class ChannelVC: ViewController,
                 )
             @unknown default:
                 break
+            }
+        case .scrollTo(let indexPath):
+            collectionView.scrollToItem(at: indexPath, at: .bottom, animated: true)
+            if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {
+                UIView.animate(withDuration: highlightedDurationForSearchMessage) {
+                    cell.hightlightMode = .search
+                }
+                
+            }
+        case .resetSearchResultHighlight(let indexPath):
+            if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {
+                UIView.animate(withDuration: highlightedDurationForSearchMessage) {
+                    cell.hightlightMode = .none
+                }
             }
         }
     }
@@ -2167,5 +2276,14 @@ extension ChannelVC {
                 return .none
             }
         }
+    }
+}
+
+// MARK: UISearchBarDelegate
+
+extension ChannelVC: UISearchBarDelegate {
+    public func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.text = nil
+        channelViewModel.toggleSearch(isSearching: false)
     }
 }

@@ -309,9 +309,12 @@ open class ChannelProfileVC: ViewController,
                 sw.addTarget(self, action: #selector(muteAction), for: .valueChanged)
                 sw.isOn = !profileViewModel.channel.muted
                 cell.accessoryView = sw
-            } else {
+            } else if action.displayArrow {
                 cell.selectionStyle = .gray
                 cell.accessoryView = UIImageView(image: .chevron)
+            } else {
+                cell.selectionStyle = .none
+                cell.accessoryView = nil
             }
             _cell = cell
         case .attachment:
@@ -344,6 +347,8 @@ open class ChannelProfileVC: ViewController,
                 self?.profileViewModel.autoDelete = $0.timeInterval
                 self?.tableView.reloadData()
             }, canceled: {})
+        case ActionTag.messageSearch:
+            router.goMessageSearch()
         default:
             break
         }
@@ -579,6 +584,12 @@ open class ChannelProfileVC: ViewController,
                 actions += [.init(title: L10n.Channel.Profile.Item.Title.admins, image: .channelProfileAdmins, tag: ActionTag.admins)]
             }
         }
+        actions.append(.init(
+            title: L10n.Channel.Profile.Item.Title.messageSearch,
+            image: .searchFill,
+            tag: ActionTag.messageSearch,
+            displayArrow: false
+        ))
         return actions
     }
     
@@ -1038,17 +1049,20 @@ public extension ChannelProfileVC {
         public var image: UIImage
         public var tag: Int
         public var toggle: Bool?
+        public var displayArrow: Bool
         
         public init(
             title: String,
             image: UIImage,
             tag: Int,
-            toggle: Bool? = nil)
-        {
+            toggle: Bool? = nil,
+            displayArrow: Bool = true
+        ) {
             self.title = title
             self.image = image
             self.tag = tag
             self.toggle = toggle
+            self.displayArrow = displayArrow
         }
     }
     
@@ -1063,6 +1077,7 @@ public extension ChannelProfileVC {
         public static var message = 10008
         public static var notifications = 10009
         public static var autoDeleteMessages = 10010
+        public static var messageSearch = 10011
     }
 }
 
