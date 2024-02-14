@@ -56,7 +56,7 @@
 		C54DF6AE2AECF09100767983 = {
 			isa = PBXGroup;
 			children = (
-				C1A349432B767D43001DC91A /* sceyt-chat-ios-uikit */,
+				C54DF6B92AECF09100767983 /* SceytDemoApp */,
 				C54DF6B82AECF09100767983 /* Products */,
 			);
 			sourceTree = "<group>";
