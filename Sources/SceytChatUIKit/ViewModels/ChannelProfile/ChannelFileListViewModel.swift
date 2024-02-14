@@ -24,29 +24,14 @@ open class ChannelFileListViewModel: NSObject {
         super.init()
     }
 
-        // TODO: Fix MessageListQueryByType
-//    open lazy var fileListQuery: MessageListQueryByType = {
-//        MessageListQueryByType
-//            .Builder(channelId: channel.id,
-//                     type: Self.queryType)
-//            .limit(Self.queryLimit)
-//            .build()
-//    }()
-
-    open func loadFiles(_ completion: @escaping ([Item]) -> Void) {
-//        if !fileListQuery.hasNext || fileListQuery.loading {
-//            completion([])
-//            return
-//        }
-//        fileListQuery.loadNext {[weak self] (_, messages, _) in
-//            if let messages = messages {
-//                let items = self?.filter(messages: messages) ?? []
-//                completion(items)
-//            } else {
-//                completion([])
-//            }
-//        }
-    }
+    open lazy var fileListQuery: MessageListQuery = {
+        MessageListQuery
+            .Builder(channelId: channel.id)
+            .searchFields([.init(key: .attachmentType, search: .contains, searchWord: Self.queryType),
+                .init(key: .type, search: .contains, searchWord: Self.queryType)])
+            .limit(Self.queryLimit)
+            .build()
+    }()
 
     open func filter(messages: [Message]) -> [Item] {
         var files: [Item] = []

@@ -400,6 +400,10 @@ open class MessageCell: CollectionViewCell,
     
     @objc
     func didUpdateDeliveryStatus(_ notification: Notification) {
+        guard let data,
+              let object = notification.object as? MessageLayoutModel,
+              data.message == object.message
+        else { return }
         deliveryStatus = data.messageDeliveryStatus
     }
     

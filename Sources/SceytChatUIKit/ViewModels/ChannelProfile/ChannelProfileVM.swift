@@ -31,15 +31,7 @@ open class ChannelProfileVM: NSObject {
         DatabaseObserver<ChannelDTO, ChatChannel>(
             request: ChannelDTO.fetchRequest()
                 .fetch(predicate: .init(format: "id == %lld", channel.id))
-                .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)])
-//                .relationshipKeyPathsFor(refreshing: [
-//                    #keyPath(ChannelDTO.members.user.blocked),
-//                    #keyPath(ChannelDTO.members.user.state),
-//                    #keyPath(ChannelDTO.members.user.firstName),
-//                    #keyPath(ChannelDTO.members.user.lastName),
-//                    #keyPath(ChannelDTO.members.user.avatarUrl)
-//                ])
-            ,
+                .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)]),
             context: Config.database.viewContext) { $0.convert() }
     }()
 

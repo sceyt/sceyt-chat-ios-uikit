@@ -192,7 +192,7 @@ public class ChatChannel {
     deinit {
         try? memberObserver?.stopObserver()
     }
-    fileprivate var memberObserver: DatabaseObserver<MemberDTO, ChatChannelMember>?
+    fileprivate var memberObserver: LazyDatabaseObserver<MemberDTO, ChatChannelMember>?
     
 }
 
@@ -249,22 +249,6 @@ public extension ChatChannel {
     var isGroup: Bool {
         channelType != .direct
     }
-    
-    public func reloadMembers(_ members: [ChatChannelMember]) {
-        var group = [UserId: ChatChannelMember]()
-        for member in members {
-            group[member.id] = member
-        }
-        if var newMembers = self.members {
-            for (index, member) in newMembers.enumerated() {
-                if let new = group[member.id] {
-                    newMembers[index] = new
-                }
-            }
-            self.members = newMembers
-        }
-        
-    }
 }
 
 public extension ChatChannel {
@@ -275,36 +259,33 @@ public extension ChatChannel {
               let members,
               !members.isEmpty
         else { return }
-        
-        let ids = members.map { $0.id }
-        memberObserver = DatabaseObserver<MemberDTO, ChatChannelMember>(
-            request: MemberDTO.fetchRequest()
-                .relationshipKeyPathsFor(refreshing: [
-                    #keyPath(MemberDTO.user.blocked),
-                    #keyPath(MemberDTO.user.state),
-                    #keyPath(MemberDTO.user.firstName),
-                    #keyPath(MemberDTO.user.lastName),
-                    #keyPath(MemberDTO.user.avatarUrl)
-                ])
-                .fetch(predicate: NSPredicate(format: "channelId == %lld AND user.id IN %@", id, ids))
-                .sort(descriptors: [
-                    .init(keyPath: \MemberDTO.user?.id, ascending: true)
-                ]),
-            context: Config.database.viewContext
+        let ids = members.compactMap { $0.id == me ? nil : $0.id }
+        guard !ids.isEmpty
+        else { return }
+        memberObserver = LazyDatabaseObserver<MemberDTO, ChatChannelMember>(
+            context: Config.database.backgroundReadOnlyObservableContext,
+            sortDescriptors: [.init(keyPath: \MemberDTO.channelId, ascending: true)],
+            sectionNameKeyPath: nil,
+            fetchPredicate: NSPredicate(format: "channelId == %lld AND user.id IN %@", id, ids),
+            relationshipKeyPathsObserver: [
+                #keyPath(MemberDTO.user.blocked),
+                #keyPath(MemberDTO.user.state),
+                #keyPath(MemberDTO.user.firstName),
+                #keyPath(MemberDTO.user.lastName),
+                #keyPath(MemberDTO.user.avatarUrl)
+            ]
+            
         ) { $0.convert() }
         
-        memberObserver?.onDidChange = {[weak self] items in
-            guard let self
+        memberObserver?.onDidChange = {[weak self] items, _ in
+            guard let self, !items.updates.isEmpty
             else { return }
-            let items: [ChatChannelMember]? = items.items()
-            if  let items {
-                var _members = members
-                for item in items  {
-                    if let index = members.firstIndex(of: item) {
-                        _members[index] = item
-                    }
+            Provider.database.performBgTask(resultQueue: .global()) {
+                MemberDTO.fetch(channelId: self.id, context: $0).map { $0.convert() }
+            } completion: {[weak self] result in
+                if let members = try? result.get() {
+                    self?.members = members
                 }
-                self.members = _members
             }
         }
         try? memberObserver?.startObserver()
