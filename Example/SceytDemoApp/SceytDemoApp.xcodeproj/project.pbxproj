@@ -24,7 +24,6 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		C1A349432B767D43001DC91A /* sceyt-chat-ios-uikit */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "sceyt-chat-ios-uikit"; path = ../..; sourceTree = "<group>"; };
 		C51C930D2B565C9C0069F9DA /* LoginViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewController.swift; sourceTree = "<group>"; };
 		C51C930F2B5660CB0069F9DA /* ConnectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionService.swift; sourceTree = "<group>"; };
 		C51C93112B566FF50069F9DA /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
@@ -58,7 +57,6 @@
 			isa = PBXGroup;
 			children = (
 				C1A349432B767D43001DC91A /* sceyt-chat-ios-uikit */,
-				C54DF6B92AECF09100767983 /* SceytDemoApp */,
 				C54DF6B82AECF09100767983 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -330,7 +328,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JDBYBPJR5R;
+				DEVELOPMENT_TEAM = 289SR6UP83;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SceytDemoApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -358,7 +356,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = JDBYBPJR5R;
+				DEVELOPMENT_TEAM = 289SR6UP83;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SceytDemoApp/Info.plist;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
