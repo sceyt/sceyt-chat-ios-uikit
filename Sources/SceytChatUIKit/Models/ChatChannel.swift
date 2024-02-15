@@ -178,11 +178,6 @@ public class ChatChannel {
         }
     }
     
-    deinit {
-        try? memberObserver?.stopObserver()
-    }
-    fileprivate var memberObserver: LazyDatabaseObserver<MemberDTO, ChatChannelMember>?
-    
 }
 
 extension ChatChannel {
