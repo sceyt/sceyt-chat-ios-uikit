@@ -150,6 +150,7 @@ open class ChannelVC: ViewController,
     private var scrollTimer: Timer?
     private var isAppActive: Bool = true
     private var shouldAnimateEditing: Bool = false
+    private var lastAnimatedIndexPath: IndexPath? = nil
     
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -1095,6 +1096,14 @@ open class ChannelVC: ViewController,
         }
     }
     
+    public func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        if let lastAnimatedIndexPath, !isCollectionViewUpdating {
+            if !self.isCollectionViewUpdating {
+                self.channelViewModel.loadNearMessages(arMessageAt: lastAnimatedIndexPath)
+            }
+        }
+    }
+    
     open func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         if let userSelectOnRepliedMessage,
             !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
@@ -1909,11 +1918,11 @@ open class ChannelVC: ViewController,
             }
         case .scrollTo(let indexPath):
             collectionView.scrollToItem(at: indexPath, at: .bottom, animated: true)
+            lastAnimatedIndexPath = indexPath
             if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {
                 UIView.animate(withDuration: highlightedDurationForSearchMessage) {
                     cell.hightlightMode = .search
                 }
-                
             }
         case .resetSearchResultHighlight(let indexPath):
             if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {

@@ -329,6 +329,30 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     }
     
+    open func loadNear(
+        predicate: NSPredicate? = nil,
+        done: (() -> Void)? = nil
+    ) {
+        guard isObserverStarted else {
+            done?()
+            return
+        }
+        willChangeCache()
+        let minOffset = min(currentFetchOffset, fetchLimit / 2)
+        currentFetchOffset = max(0, currentFetchOffset - minOffset)
+        fetchAndUpdate(
+            predicate: predicate,
+            offset: currentFetchOffset,
+            limit: fetchLimit,
+            fetched: { count in
+                
+            },
+            done: {
+                done?()
+            }
+        )
+    }
+    
     open func load(
         from offset: Int,
         limit: Int,

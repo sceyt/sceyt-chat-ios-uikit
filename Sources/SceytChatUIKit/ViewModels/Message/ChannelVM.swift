@@ -126,6 +126,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     private var loadLastMessagesAfterConnect = false
     private var lastLoadPrevMessageId: MessageId = 0
     private var lastLoadNextMessageId: MessageId = 0
+    private var lastLoadNearMessageId: MessageId = 0
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
     @Atomic private var lasMarkDisplayedMessageId: MessageId = 0
     @Atomic private var lastPendingMarkDisplayedMessageId: MessageId = 0
@@ -773,6 +774,27 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         ) {[weak self] error in
             if error != nil {
                 self?.lastLoadNextMessageId = 0
+            }
+        }
+    }
+    
+    open func loadNearMessages(arMessageAt indexPath: IndexPath) {
+        guard let message = message(at: indexPath) else { return }
+        loadNearMessages(at: message.id)
+    }
+    
+    open func loadNearMessages(at messageId: MessageId) {
+        guard !isFetchingData,
+              lastLoadNearMessageId != messageId
+        else { return }
+        lastLoadNearMessageId = messageId
+        isFetchingData = true
+        messageObserver.loadNear { [weak self] in
+            self?.isFetchingData = false
+        }
+        provider.loadNearMessages(near: messageId) { [weak self] error in
+            if error != nil {
+                self?.lastLoadNearMessageId = 0
             }
         }
     }
