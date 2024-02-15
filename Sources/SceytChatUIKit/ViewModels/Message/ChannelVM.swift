@@ -60,6 +60,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             let message = $0.convert()
             self?.updateUnreadIndexIfNeeded(message: message)
             self?.createLayoutModel(for: message)
+            logger.verbose("[CHANNEL MEM OBS] RECEIVE CONVERT message cid: \(message.channelId), id: \(message.id) tid \(message.tid)")
             return message
         }
         
@@ -850,6 +851,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if isTyping {
             isTyping = false
         }
+        logger.verbose("[CHANNEL MEM OBS] CREATE SEND message cid: \(channel.id)")
         if userMessage.text.count < 10 || userMessage.text.count > 0 && (userMessage.text as NSString).length == 0 {
             let data = Data(userMessage.text.utf8)
             let hexString = data.map{ String(format:"%02x", $0) }.joined()
@@ -945,6 +947,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         _ message: Message,
         action: UserSendMessage.Action
     ) {
+        logger.verbose("[CHANNEL MEM OBS] CREATE SEND message cid: \(channel.id), tid \(message.tid), b: \(message.body)")
         provider.storePending(message: message)
         
         @Sendable func send() {

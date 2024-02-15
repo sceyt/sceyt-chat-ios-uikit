@@ -262,6 +262,7 @@ public extension ChatChannel {
         let ids = members.compactMap { $0.id == me ? nil : $0.id }
         guard !ids.isEmpty
         else { return }
+        logger.verbose("[CHANNEL MEM OBS] START id: \(id), members: \(ids)")
         memberObserver = LazyDatabaseObserver<MemberDTO, ChatChannelMember>(
             context: Config.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \MemberDTO.channelId, ascending: true)],
@@ -280,12 +281,16 @@ public extension ChatChannel {
         memberObserver?.onDidChange = {[weak self] items, _ in
             guard let self, !items.updates.isEmpty
             else { return }
+            logger.verbose("[CHANNEL MEM OBS] UPDATE id: \(id), members: \(ids)")
             Provider.database.performBgTask(resultQueue: .global()) {
                 MemberDTO.fetch(channelId: self.id, context: $0).map { $0.convert() }
             } completion: {[weak self] result in
+                guard let self
+                else { return }
                 if let members = try? result.get() {
-                    self?.members = members
+                    self.members = members
                 }
+                logger.verbose("[CHANNEL MEM OBS] UPDATE DONE id: \(id), members: \(ids)")
             }
         }
         try? memberObserver?.startObserver()

@@ -47,11 +47,6 @@ open class ChannelMessageSender: Provider {
         storeBeforeSend: Bool = true,
         completion: ((Error?) -> Void)? = nil
     ) {
-        if ((message.body as NSString).length == 0 && (message.attachments ?? []).isEmpty) || (message.body as NSString).length > 1_000 {
-            let data = Data(message.body.utf8)
-            let hexString = data.map{ String(format:"%02x", $0) }.joined()
-            logger.verbose("[EMPTY] Send text message by hex [\(hexString)] orig [\(message.body.prefix(5))]")
-        }
         
         logger.info("Prepare send message with tid \(message.tid)")
         func store(completion: @escaping () -> Void) {
@@ -78,6 +73,7 @@ open class ChannelMessageSender: Provider {
                 completion?(error)
                 return
             }
+            logger.verbose("[CHANNEL MEM OBS] DID SENT message cid: \(sentMessage.channelId), id: \(sentMessage.id) tid \(sentMessage.tid)")
              logger.info("message with tid \(sentMessage.tid) id: \(sentMessage.id) sent successfully")
             self.database.write ({
                 $0.update(message: sentMessage, channelId: self.channelId)

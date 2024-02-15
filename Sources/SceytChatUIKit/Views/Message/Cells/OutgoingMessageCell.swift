@@ -388,6 +388,7 @@ open class OutgoingMessageCell: MessageCell {
             bubbleSize.height += UnreadView.measure(model: model, appearance: appearance).height
         }
         logger.debug("OutgoingMessageCell: measure messageId: \(model.message.id), measure: \(bubbleSize) body: \(model.message.body)")
+        logger.verbose("[CHANNEL MEM OBS] RECEIVE CONVERT message cid: \(model.message.channelId), id: \(model.message.id) tid \(model.message.tid)")
         return bubbleSize
     }
 }
