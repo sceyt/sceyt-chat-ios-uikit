@@ -16,8 +16,8 @@ extension ChannelVC {
         open override func setup() {
             super.setup()
             
-            previousResultButton.setImage(.chevronUp, for: .normal)
-            nextResultButton.setImage(.chevronDown, for: .normal)
+            previousResultButton.setImage(.chevronUp.withRenderingMode(.alwaysTemplate), for: .normal)
+            nextResultButton.setImage(.chevronDown.withRenderingMode(.alwaysTemplate), for: .normal)
             
             previousResultButton.addTarget(self, action: #selector(onPrevious), for: .touchUpInside)
             nextResultButton.addTarget(self, action: #selector(onNext), for: .touchUpInside)
@@ -65,15 +65,23 @@ extension ChannelVC {
             previousResultButton.isEnabled = searchResult.previousResult != nil
             nextResultButton.isEnabled = searchResult.nextResult != nil
             if let index = searchResult.lastViewedSearchResultReversedIndex {
-                resultsCounterLabel.text = L10n.Channel.Search.foundIndex(
-                    index,
-                    searchResult.searchResults.count
-                )
+                setCounterText(currentIndex: index, resultsCount: searchResult.searchResults.count)
             } else if query?.isEmpty == false {
-                resultsCounterLabel.text = L10n.Channel.Search.notFound
+                setNotFoundCounterText()
             } else {
                 resultsCounterLabel.text = nil
             }
+        }
+        
+        open func setCounterText(currentIndex: Int, resultsCount: Int) {
+            resultsCounterLabel.text = L10n.Channel.Search.foundIndex(
+                currentIndex,
+                resultsCount
+            )
+        }
+        
+        open func setNotFoundCounterText() {
+            resultsCounterLabel.text = L10n.Channel.Search.notFound
         }
         
         @objc open func onPrevious() {

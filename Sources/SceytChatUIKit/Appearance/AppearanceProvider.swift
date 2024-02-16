@@ -130,6 +130,14 @@ extension ChannelVC: AppearanceProvider {
         public var backgroundColor: UIColor? = .background
         public var coverViewBackgroundColor: UIColor? = .clear
         public var navigationBarBackgroundColor: UIColor? = .init(light: 0xFFFFFF, dark: 0x19191B)
+        public var searchBarBackgroundColor: UIColor? = .init(
+            light: 0xF1F2F6,
+            dark: 0x232324
+        )
+        public var searchBarActivityIndicatorColor: UIColor? = .init(
+            light: 0xA0A1B0,
+            dark: 0x969A9F
+        )
         
         public var joinFont: UIFont? = Fonts.semiBold.withSize(16)
         public var joinColor: UIColor? = .kitBlue

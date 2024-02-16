@@ -18,6 +18,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     @Published public var isEditing: Bool = false
     @Published public var isSearching: Bool = false
+    @Published public var isSearchResultsLoading: Bool = false
     @Published public var selectedMessages = Set<MessageLayoutModel>()
     @Published public var searchResult = SearchResultModel()
 
@@ -1260,12 +1261,14 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             searchResult.lastViewedSearchResult = nil
             return
         }
+        isSearchResultsLoading = true
         MessageListQuery
             .Builder(channelId: channel.id)
             .searchFields([.init(key: .body, search: .contains, searchWord: query)])
             .build()
             .loadNext { query, messages, error in
                 self.searchResult.searchResults = messages?.map { $0.id } ?? []
+                self.isSearchResultsLoading = false
                 if let lastFound = messages?.first?.id, self.searchResult.lastViewedSearchResult == nil {
                     self.searchResult.lastViewedSearchResult = lastFound
                     self.scroll(to: lastFound)

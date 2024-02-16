@@ -93,7 +93,18 @@ open class ChannelVC: ViewController,
         searchBar.placeholder = L10n.Channel.Search.search
         searchBar.showsCancelButton = true
         searchBar.delegate = self
+        searchBar.searchTextField.returnKeyType = .default
+        searchBar.barTintColor = appearance.searchBarBackgroundColor
+        searchBar.searchTextField.backgroundColor = appearance.searchBarBackgroundColor
         return searchBar
+    }()
+    
+    open lazy var searchBarActivityIndicator = {
+        let activityIndicator = UIActivityIndicatorView(style: .medium)
+        activityIndicator.backgroundColor = appearance.searchBarBackgroundColor
+        activityIndicator.color = appearance.searchBarActivityIndicatorColor
+        activityIndicator.hidesWhenStopped = true
+        return activityIndicator
     }()
     
     @objc public lazy var tapGestureRecognizer = UITapGestureRecognizer()
@@ -338,6 +349,12 @@ open class ChannelVC: ViewController,
         view.addSubview(selectingView)
         selectingView.pin(to: view, anchors: [.leading, .trailing])
         selectingView.bottomAnchor.pin(to: composerVC.view.bottomAnchor)
+        
+        
+        if let view = searchBar.searchTextField.leftView {
+            view.addSubview(searchBarActivityIndicator)
+            searchBarActivityIndicator.pin(to: view)
+        }
     }
     
     override open func setupAppearance() {
@@ -511,6 +528,19 @@ open class ChannelVC: ViewController,
             }
             .store(in: &subscriptions)
         
+        channelViewModel
+            .$isSearchResultsLoading
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                if isLoading {
+                    self?.searchBarActivityIndicator.startAnimating()
+                } else {
+                    self?.searchBarActivityIndicator.stopAnimating()
+                }
+            }
+            .store(in: &subscriptions)
+        
         inputTextView.attributedText = channelViewModel.draftMessage
         
         ApplicationStateObserver()
@@ -650,19 +680,7 @@ open class ChannelVC: ViewController,
                                                                   action: #selector(cancelSelecting))]
 //            navigationItem./*searchController = nil*/
         } else if channelViewModel.isSearching {
-            definesPresentationContext = true
-            navigationItem.setHidesBackButton(true, animated: false)
-            navigationItem.leftBarButtonItem = nil
-            navigationItem.titleView = searchBar
-            
-            DispatchQueue.main.async {
-                self.searchBar.searchTextField.becomeFirstResponder()
-            }
-            let appearance = UINavigationBarAppearance()
-            appearance.backgroundColor = self.appearance.backgroundColor
-            navigationController?.navigationBar.standardAppearance = appearance
-            navigationController?.navigationBar.scrollEdgeAppearance = appearance
-            
+            showSearchBar()
         } else {
             navigationItem.setHidesBackButton(false, animated: false)
             navigationItem.leftItemsSupplementBackButton = true
@@ -673,6 +691,22 @@ open class ChannelVC: ViewController,
         }
         selectingView.isHidden = !channelViewModel.isEditing
         coverView.isHidden = channelViewModel.isEditing
+    }
+    
+    open func showSearchBar() {
+        definesPresentationContext = true
+        navigationItem.setHidesBackButton(true, animated: false)
+        navigationItem.leftBarButtonItem = nil
+        navigationItem.rightBarButtonItems = nil
+        navigationItem.titleView = searchBar
+        
+        DispatchQueue.main.async {
+            self.searchBar.searchTextField.becomeFirstResponder()
+        }
+        let appearance = UINavigationBarAppearance()
+        appearance.backgroundColor = self.appearance.backgroundColor
+        navigationController?.navigationBar.standardAppearance = appearance
+        navigationController?.navigationBar.scrollEdgeAppearance = appearance
     }
     
     // MARK: Title
@@ -1917,7 +1951,7 @@ open class ChannelVC: ViewController,
                 break
             }
         case .scrollTo(let indexPath):
-            collectionView.scrollToItem(at: indexPath, at: .bottom, animated: true)
+            collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
             lastAnimatedIndexPath = indexPath
             if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {
                 UIView.animate(withDuration: highlightedDurationForSearchMessage) {
@@ -2286,5 +2320,9 @@ extension ChannelVC: UISearchBarDelegate {
     public func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
         searchBar.text = nil
         channelViewModel.toggleSearch(isSearching: false)
+    }
+    
+    public func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
     }
 }
