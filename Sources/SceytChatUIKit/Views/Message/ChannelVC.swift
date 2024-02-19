@@ -276,6 +276,8 @@ open class ChannelVC: ViewController,
         
         collectionView.delegate = self
         collectionView.dataSource = self
+        collectionView.prefetchDataSource = self
+        collectionView.isPrefetchingEnabled = true
         
         noDataView.icon = Images.noMessages
         noDataView.title = L10n.Channel.NoMessages.title
@@ -588,6 +590,23 @@ open class ChannelVC: ViewController,
                         cell.unreadView.isHidden = true
                     }
                 }
+            }
+        }
+    }
+    
+    func goTo(indexPath: IndexPath, completion: @escaping (MessageCell) -> Void) {
+        collectionView.reloadData()
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
+                guard let self else { return }
+                self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
+            } completion: { [weak self] _ in
+                guard let self else { return }
+                if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
+                    completion(cell)
+                }
+                self.updateUnreadViewVisibility()
             }
         }
     }
@@ -1273,7 +1292,8 @@ open class ChannelVC: ViewController,
         collectionView: UICollectionView,
         model: MessageLayoutModel
     ) -> UICollectionViewCell {
-        let message = model.message        
+        print("Section: \(indexPath.section), row: \(indexPath.row)")
+        let message = model.message
         let type: MessageCell.Type =
         model.message.incoming ?
         Components.incomingMessageCell :
@@ -1666,29 +1686,16 @@ open class ChannelVC: ViewController,
         guard !paths.isEmpty else { return }
         userSelectOnRepliedMessage = layoutModel.message
         
-        func goTo(indexPath: IndexPath) {
-            collectionView.reloadData()
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
-                    guard let self else { return }
-                    self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
-                } completion: { [weak self] _ in
-                    guard let self else { return }
-                    if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
-                        self.highlightCell(cell)
-                    }
-                    self.updateUnreadViewVisibility()
-                }
-            }
-        }
-        
         if let indexPath = paths[parent.id] {
-            goTo(indexPath: indexPath)
+            goTo(indexPath: indexPath) { [weak self] cell in
+                self?.highlightCell(cell)
+            }
         } else {
             channelViewModel.loadAllToShowMessage(messageId: parent.id) { [weak self] in
                 if let indexPath = self?.channelViewModel.indexPaths(for: [parent]).values.first {
-                    goTo(indexPath: indexPath)
+                    self?.goTo(indexPath: indexPath) { cell in
+                        self?.highlightCell(cell)
+                    }
                 } else {
                     self?.userSelectOnRepliedMessage = nil
                 }
@@ -1951,10 +1958,10 @@ open class ChannelVC: ViewController,
                 break
             }
         case .scrollTo(let indexPath):
-            collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
-            lastAnimatedIndexPath = indexPath
-            if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {
-                UIView.animate(withDuration: highlightedDurationForSearchMessage) {
+            goTo(indexPath: indexPath) { [weak self] cell in
+                guard let self else { return }
+                self.lastAnimatedIndexPath = indexPath
+                UIView.animate(withDuration: self.highlightedDurationForSearchMessage) {
                     cell.hightlightMode = .search
                 }
             }
@@ -2324,5 +2331,12 @@ extension ChannelVC: UISearchBarDelegate {
     
     public func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
+    }
+}
+
+extension ChannelVC: UICollectionViewDataSourcePrefetching {
+    
+    public func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        print()
     }
 }

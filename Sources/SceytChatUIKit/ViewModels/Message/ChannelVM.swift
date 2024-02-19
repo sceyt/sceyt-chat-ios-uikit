@@ -811,12 +811,23 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func loadAllToShowMessage(messageId: MessageId,
                                    completion: (() -> Void)? = nil) {
-        let offset = max(calculateMessageFetchOffset(messageId: messageId) - 10, 0)
-        let limit = messageObserver.fetchOffset - offset
-        guard limit > 0 else { return }
-        messageObserver.load(from: offset, limit: limit) {
-            DispatchQueue.main.async {
-                completion?()
+        lastLoadNextMessageId = messageId
+        
+        provider.loadNearMessages(near: messageId) { [weak self] error in
+            guard let self else { return }
+            if error != nil {
+                self.lastLoadNearMessageId = 0
+            } else {
+                let offset = max(self.calculateMessageFetchOffset(messageId: messageId) - 10, 0)
+                let limit = self.messageObserver.fetchOffset == 0
+                ? self.messageObserver.fetchLimit 
+                : self.messageObserver.fetchOffset - offset
+                guard limit > 0 else { return }
+                self.messageObserver.load(from: offset, limit: limit) {
+                    DispatchQueue.main.async {
+                        completion?()
+                    }
+                }
             }
         }
     }
@@ -1272,7 +1283,11 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 self.isSearchResultsLoading = false
                 if let lastFound = messages?.first?.id, self.searchResult.lastViewedSearchResult == nil {
                     self.searchResult.lastViewedSearchResult = lastFound
-                    self.scroll(to: lastFound)
+                    if !self.scroll(to: lastFound) {
+                        self.loadAllToShowMessage(messageId: lastFound) {
+                            self.scroll(to: lastFound)
+                        }
+                    }
                 } else if messages?.isEmpty != false {
                     self.searchResult.lastViewedSearchResult = nil
                 }
