@@ -66,10 +66,16 @@ open class UserProvider: Provider {
     
     open func store(
         users: [User],
+        updateChannelsForUsers: Bool = true,
         completion: ((Error?) -> Void)? = nil
     ) {
         database.write {
             $0.createOrUpdate(users: users)
+            if updateChannelsForUsers {
+                for user in users {
+                    $0.updateChannelDTOs(for: user.id)
+                }
+            }
         } completion: { error in
             logger.errorIfNotNil(error, "Unable Store users")
             completion?(error)

@@ -485,6 +485,8 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
            let updatedObjectIDs = objs.updatedObjectIDs(for: keyPaths),
            !updatedObjectIDs.isEmpty {
             self.updatedObjectIDs = self.updatedObjectIDs.union(updatedObjectIDs)
+        } else if (notification.object as? NSManagedObjectContext) === viewContext {
+            context.mergeChanges(fromContextDidSave: notification)
         }
     }
 }

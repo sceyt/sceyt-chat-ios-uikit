@@ -42,6 +42,8 @@ public protocol ChannelDatabaseSession {
     
     func deleteMember(id: UserId, from channelId: ChannelId)
     
+    func updateChannelDTOs(for userId: UserId)
+    
     @discardableResult
     func update(draft message: NSAttributedString?, date: Date?, channelId: ChannelId) -> ChannelDTO?
 }
@@ -212,7 +214,23 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         if let member = MemberDTO.fetch(id: id, channelId: channelId, context: self) {
             delete(member)
         }
-           
+    }
+    
+    public func updateChannelDTOs(for userId: UserId) {
+        let fetchRequest = NSFetchRequest<NSDictionary>(entityName: MemberDTO.entityName)
+        fetchRequest.predicate = NSPredicate(format: "user.id == %@", userId)
+        fetchRequest.propertiesToFetch = ["channelId"]
+        fetchRequest.resultType = .dictionaryResultType
+        
+        if let results = MemberDTO.fetch(request: fetchRequest, context: self) as? [[String: Int64]] {
+            let channelIds = results.compactMap { $0.values.first.map { ChannelId($0) }}
+            let fetchRequest = ChannelDTO.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "(type == %@) AND (id IN %@)", "direct", channelIds)
+            let channels = ChannelDTO.fetch(request: fetchRequest, context: self)
+            channels.forEach { dto in
+                dto.toggle.toggle()
+            }
+        }
     }
     
     @discardableResult
