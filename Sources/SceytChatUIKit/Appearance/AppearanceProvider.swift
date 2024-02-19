@@ -1061,6 +1061,7 @@ extension ChannelVC.SearchControlsView: AppearanceProvider {
     public struct Appearance {
         public init() {}
         
+        public var separatorColor: UIColor? = .init(light: 0xE8E9EE, dark: 0x303032)
         public var backgroundColor: UIColor? = .background
         public var buttonTintColor: UIColor? = .kitBlue
         public var textColor: UIColor? = .init(light: 0x000000, dark: 0xFFFFFF)

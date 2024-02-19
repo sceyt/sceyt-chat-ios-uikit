@@ -2,6 +2,9 @@ import UIKit
 
 extension ChannelVC {
     open class SearchControlsView: View {
+        open lazy var separatorView = UIView()
+            .withoutAutoresizingMask
+        
         open lazy var previousResultButton = UIButton()
             .withoutAutoresizingMask
         
@@ -26,12 +29,16 @@ extension ChannelVC {
         open override func setupLayout() {
             super.setupLayout()
             
+            addSubview(separatorView)
             addSubview(previousResultButton)
             addSubview(nextResultButton)
             addSubview(resultsCounterLabel)
             
             previousResultButton.resize(anchors: [.height(28), .width(28)])
             nextResultButton.resize(anchors: [.height(28), .width(28)])
+            
+            separatorView.resize(anchors: [.height(1)])
+            separatorView.pin(to: self, anchors: [.leading, .top, .trailing])
             
             previousResultButton.pin(
                 to: self,
@@ -55,6 +62,7 @@ extension ChannelVC {
             super.setupAppearance()
             
             backgroundColor = appearance.backgroundColor
+            separatorView.backgroundColor = appearance.separatorColor
             previousResultButton.tintColor = appearance.buttonTintColor
             nextResultButton.tintColor = appearance.buttonTintColor
             resultsCounterLabel.textColor = appearance.textColor
@@ -65,7 +73,7 @@ extension ChannelVC {
             previousResultButton.isEnabled = searchResult.previousResult != nil
             nextResultButton.isEnabled = searchResult.nextResult != nil
             if let index = searchResult.lastViewedSearchResultReversedIndex {
-                setCounterText(currentIndex: index, resultsCount: searchResult.searchResults.count)
+                setCounterText(currentIndex: index, resultsCount: searchResult.searchResults?.count ?? 0)
             } else if query?.isEmpty == false {
                 setNotFoundCounterText()
             } else {

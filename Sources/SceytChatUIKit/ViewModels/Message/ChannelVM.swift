@@ -1250,14 +1250,15 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         } else {
             self.isSearching.toggle()
         }
-        searchResult.searchResults.removeAll()
+        searchResult.searchResults?.removeAll()
         resetSearchResultHighlight()
         searchResult.lastViewedSearchResult = nil
     }
     
     public func search(with query: String) {
+        resetSearchResultHighlight()
         guard !query.isEmpty else {
-            searchResult.searchResults.removeAll()
+            searchResult.searchResults = nil
             searchResult.lastViewedSearchResult = nil
             return
         }
@@ -1272,6 +1273,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 if let lastFound = messages?.first?.id, self.searchResult.lastViewedSearchResult == nil {
                     self.searchResult.lastViewedSearchResult = lastFound
                     self.scroll(to: lastFound)
+                } else if messages?.isEmpty != false {
+                    self.searchResult.lastViewedSearchResult = nil
                 }
             }
     }
