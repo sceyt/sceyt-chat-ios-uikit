@@ -70,9 +70,16 @@ open class UserProvider: Provider {
         completion: ((Error?) -> Void)? = nil
     ) {
         database.write {
-            $0.createOrUpdate(users: users)
-            if updateChannelsForUsers {
-                for user in users {
+            for user in users {
+                var isUpdated = false
+                if updateChannelsForUsers {
+                    if let _user = UserDTO.fetch(id: user.id, context: $0)?.convert(),
+                       _user !~= ChatUser(user: user) {
+                        isUpdated = true
+                    }
+                }
+                $0.createOrUpdate(user: user)
+                if isUpdated {
                     $0.updateChannelDTOs(for: user.id)
                 }
             }
