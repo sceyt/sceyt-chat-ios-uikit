@@ -1166,6 +1166,7 @@ open class ChannelVC: ViewController,
     
     open func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateUnreadViewVisibility()
+        updateLastNavigatedIndexPath()
         updatePinnedHeaderVisibility()
     }
     
@@ -1207,6 +1208,14 @@ open class ChannelVC: ViewController,
             unreadCountView.isHidden = true
         } else {
             unreadCountView.isHidden = composerVC.isRecording
+        }
+    }
+    
+    open func updateLastNavigatedIndexPath() {
+        let currentOffset = round(collectionView.contentOffset.y + collectionView.frame.height)
+        let bottomOffset = round(collectionView.contentSize.height + collectionView.contentInset.bottom)
+        if currentOffset == bottomOffset {
+            channelViewModel.clearLastNavigatedIndexPath()
         }
     }
     
@@ -1691,7 +1700,7 @@ open class ChannelVC: ViewController,
                 self?.highlightCell(cell)
             }
         } else {
-            channelViewModel.loadAllToShowMessage(messageId: parent.id) { [weak self] in
+            channelViewModel.loadAllToShowMessage(messageId: parent.id) { [weak self] indexPath in
                 if let indexPath = self?.channelViewModel.indexPaths(for: [parent]).values.first {
                     self?.goTo(indexPath: indexPath) { cell in
                         self?.highlightCell(cell)

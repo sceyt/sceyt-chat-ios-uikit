@@ -280,6 +280,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     
     open func loadNext(
         predicate: NSPredicate? = nil,
+        itemOffset: Int? = nil,
         done: (() -> Void)? = nil
     ) {
         guard isObserverStarted else {
@@ -287,7 +288,11 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             return
         }
         willChangeCache()
-        currentFetchOffset += fetchLimit
+        if let itemOffset {
+            currentFetchOffset = itemOffset + fetchLimit
+        } else {
+            currentFetchOffset += fetchLimit
+        }
         fetchAndUpdate(
             predicate: predicate,
             offset: currentFetchOffset,
@@ -303,6 +308,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     
     open func loadPrev(
         predicate: NSPredicate? = nil,
+        itemOffset: Int,
         done: (() -> Void)? = nil
     ) {
         guard isObserverStarted else {
@@ -315,7 +321,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             done?()
             return
         }
-        currentFetchOffset = max(0, currentFetchOffset - fetchLimit)
+        currentFetchOffset = max(0, itemOffset - fetchLimit)
         fetchAndUpdate(
             predicate: predicate,
             offset: currentFetchOffset,
@@ -369,6 +375,25 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         } done: {
             done?()
         }
+    }
+    
+    open func loadAll(
+        from offset: Int,
+        limit: Int,
+        predicate: NSPredicate? = nil,
+        done: (() -> Void)? = nil
+    ) {
+        guard isObserverStarted else {
+            done?()
+            return
+        }
+        currentFetchOffset = offset
+        load(
+            from: offset,
+            limit: limit,
+            predicate: predicate,
+            done: done
+        )
     }
     
     private func fetchAndUpdate(

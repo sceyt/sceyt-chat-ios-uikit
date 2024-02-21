@@ -128,6 +128,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     private var lastLoadPrevMessageId: MessageId = 0
     private var lastLoadNextMessageId: MessageId = 0
     private var lastLoadNearMessageId: MessageId = 0
+    private var lastNavigatedIndexPath: IndexPath?
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
     @Atomic private var lasMarkDisplayedMessageId: MessageId = 0
     @Atomic private var lastPendingMarkDisplayedMessageId: MessageId = 0
@@ -408,7 +409,14 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             } else if let lastIndexPath,
                       indexPath > lastIndexPath {
                 paths.continuesOptions.insert(.bottom)
-            } else {
+            } 
+            else if let lastNavigatedIndexPath,
+                      let lastIndexPath,
+                      indexPath > lastNavigatedIndexPath,
+                      indexPath < lastIndexPath {
+                paths.continuesOptions.insert(.bottom)
+            } 
+            else {
                 paths.continuesOptions.insert(.middle)
             }
             updateLayoutModel(at: indexPath)
@@ -746,7 +754,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadPrevMessageId = messageId
         isFetchingData = true
-        messageObserver.loadPrev { [weak self] in
+        let offset = calculateMessageFetchOffset(messageId: messageId)
+        messageObserver.loadPrev(itemOffset: offset) { [weak self] in
             self?.isFetchingData = false
         }
         provider.loadPrevMessages(
@@ -767,7 +776,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadNextMessageId = messageId
         isFetchingData = true
-        messageObserver.loadNext { [weak self] in
+        let offset = calculateMessageFetchOffset(messageId: messageId)
+        messageObserver.loadNext(itemOffset: offset) { [weak self] in
             self?.isFetchingData = false
         }
         provider.loadNextMessages(
@@ -810,8 +820,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open func loadAllToShowMessage(messageId: MessageId,
-                                   completion: (() -> Void)? = nil) {
-        lastLoadNextMessageId = messageId
+                                   completion: ((IndexPath?) -> Void)? = nil) {
+        lastLoadNearMessageId = messageId
         
         provider.loadNearMessages(near: messageId) { [weak self] error in
             guard let self else { return }
@@ -823,13 +833,19 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 ? self.messageObserver.fetchLimit 
                 : self.messageObserver.fetchOffset - offset
                 guard limit > 0 else { return }
-                self.messageObserver.load(from: offset, limit: limit) {
+                self.messageObserver.loadAll(from: offset, limit: limit) {
+                    let indexPath = self.messageObserver.indexPath { $0.id == messageId }
+                    self.lastNavigatedIndexPath = indexPath
                     DispatchQueue.main.async {
-                        completion?()
+                        completion?(indexPath)
                     }
                 }
             }
         }
+    }
+    
+    open func clearLastNavigatedIndexPath() {
+        lastNavigatedIndexPath = nil
     }
     
     //MARK: mark messages
@@ -1281,10 +1297,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             .loadNext { query, messages, error in
                 self.searchResult.searchResults = messages?.map { $0.id } ?? []
                 self.isSearchResultsLoading = false
-                if let lastFound = messages?.first?.id, self.searchResult.lastViewedSearchResult == nil {
+                if let lastFound = messages?.first?.id, self.searchResult.lastViewedSearchResult != lastFound {
                     self.searchResult.lastViewedSearchResult = lastFound
                     if !self.scroll(to: lastFound) {
-                        self.loadAllToShowMessage(messageId: lastFound) {
+                        self.loadAllToShowMessage(messageId: lastFound) { _ in
                             self.scroll(to: lastFound)
                         }
                     }
@@ -1298,7 +1314,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         resetSearchResultHighlight()
         guard let previousResult = searchResult.previousResult else { return }
         if !scroll(to: previousResult) {
-            loadAllToShowMessage(messageId: previousResult) { [weak self] in
+            loadAllToShowMessage(messageId: previousResult) { [weak self] _ in
                 self?.scroll(to: previousResult)
             }
         }
@@ -1308,7 +1324,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         resetSearchResultHighlight()
         guard let nextResult = searchResult.nextResult else { return }
         if !scroll(to: nextResult) {
-            loadAllToShowMessage(messageId: nextResult) { [weak self] in
+            loadAllToShowMessage(messageId: nextResult) { [weak self] _ in
                 self?.scroll(to: nextResult)
             }
         }
