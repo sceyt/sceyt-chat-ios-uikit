@@ -602,6 +602,11 @@ open class ChannelProfileVC: ViewController,
         }
     }
     
+    open func reloadAvailableSections() {
+        sections = availableSections()
+        tableView.reloadData()
+    }
+    
     open func availableSections() -> [Sections] {
         var sections: [Sections] = [.header]
         switch profileViewModel.channelType {
@@ -615,7 +620,7 @@ open class ChannelProfileVC: ViewController,
                 sections.append(.description)
             }
         case .direct:
-            if !(profileViewModel.channel.peer?.presence.status ?? "").isEmpty {
+            if let peer = profileViewModel.channel.peer, !peer.blocked, !(peer.presence.status ?? "").isEmpty {
                 sections.append(.description)
             }
         }
@@ -941,6 +946,7 @@ open class ChannelProfileVC: ViewController,
             if let error = error {
                 self.showAlert(error: error)
             } else {
+                self.reloadAvailableSections()
                 self.router.channelVC?.channelViewModel.refreshChannel()
 //                self.router.goChannelListVC()
             }
@@ -955,6 +961,7 @@ open class ChannelProfileVC: ViewController,
             if let error = error {
                 self.showAlert(error: error)
             } else {
+                self.reloadAvailableSections()
                 self.router.channelVC?.channelViewModel.refreshChannel()
             }
         }
