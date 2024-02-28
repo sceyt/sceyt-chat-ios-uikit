@@ -71,16 +71,21 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     open func startObserver(
         fetchOffset: Int = 0,
         fetchLimit: Int = 0,
-        completion: (() -> Void)? = nil) throws {
+        fetchPredicate: NSPredicate? = nil,
+        completion: (() -> Void)? = nil
+    ) {
             self.fetchOffset = max(0, fetchOffset)
             self.fetchLimit = max(0, fetchLimit)
             self.currentFetchOffset = self.fetchOffset
+            if let fetchPredicate {
+                self.fetchPredicate = fetchPredicate
+            }
             if let request = DTO.fetchRequest() as? NSFetchRequest<DTO> {
                 var changeItems = [ChangeItem]()
                 var changeSections = [ChangeSection]()
                 isObserverStarted = true
                 request.sortDescriptors = sortDescriptors
-                request.predicate = fetchPredicate
+                request.predicate = self.fetchPredicate
                 request.fetchLimit = self.fetchLimit
                 request.fetchOffset = self.fetchOffset
                 
@@ -121,10 +126,10 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     
     open func restartObserver(
         fetchPredicate: NSPredicate,
-        completion: (() -> Void)? = nil) throws {
+        completion: (() -> Void)? = nil) {
             stopObserver()
             self.fetchPredicate = fetchPredicate
-            try startObserver(fetchOffset: fetchOffset, fetchLimit: fetchLimit, completion: completion)
+            startObserver(fetchOffset: fetchOffset, fetchLimit: fetchLimit, completion: completion)
         }
     
     open var isEmpty: Bool {
@@ -280,7 +285,6 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     
     open func loadNext(
         predicate: NSPredicate? = nil,
-        itemOffset: Int? = nil,
         done: (() -> Void)? = nil
     ) {
         guard isObserverStarted else {
@@ -288,11 +292,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             return
         }
         willChangeCache()
-        if let itemOffset {
-            currentFetchOffset = itemOffset + fetchLimit
-        } else {
-            currentFetchOffset += fetchLimit
-        }
+        currentFetchOffset += fetchLimit
         fetchAndUpdate(
             predicate: predicate,
             offset: currentFetchOffset,
@@ -308,7 +308,6 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     
     open func loadPrev(
         predicate: NSPredicate? = nil,
-        itemOffset: Int,
         done: (() -> Void)? = nil
     ) {
         guard isObserverStarted else {
@@ -321,7 +320,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             done?()
             return
         }
-        currentFetchOffset = max(0, itemOffset - fetchLimit)
+        currentFetchOffset = max(0, currentFetchOffset - fetchLimit)
         fetchAndUpdate(
             predicate: predicate,
             offset: currentFetchOffset,
@@ -624,7 +623,14 @@ private extension LazyDatabaseObserver {
         changeSections: inout [ChangeSection]
     ) -> [DTO] {
         let startTime = CFAbsoluteTimeGetCurrent()
+        print("<><>-----------------------------<><>")
         let dtos = DTO.fetch(request: request, context: context)
+        dtos.forEach {
+            if let m = $0 as? MessageDTO {
+                print("<><>\(m.id), \(m.user?.firstName ?? ""), \(m.body)<><>")
+            }
+        }
+        print("<><>-----------------------------<><>")
         insert(dtos: dtos, in: &cache, changeItems: &changeItems, changeSections: &changeSections)
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         logger.verbose("[PERFORMANCE] fetch data time elapsed \(timeElapsed) s.")

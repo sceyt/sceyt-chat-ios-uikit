@@ -159,6 +159,7 @@ open class ChannelMessageProvider: Provider {
                     }
                     self.store(
                         messages: messages,
+                        triggerMessage: messageId,
                         completion: completion
                     )
                     self.sendReceivedMarker(messages: messages)
@@ -198,13 +199,53 @@ open class ChannelMessageProvider: Provider {
     
     open func store(
         messages: [Message],
+        triggerMessage: MessageId? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
-        database.write ({
-            $0.createOrUpdate(
+        database.write ({ context in
+            context.createOrUpdate(
                 messages: messages,
                 channelId: self.channelId
             )
+            
+            let sorted = messages.sorted(by: { $0.id < $1.id })
+            if let channelId = sorted.first?.channelId {
+                let startMessageId = sorted.first?.id ?? 0
+                let endMessageId = sorted.last?.id ?? 0
+                
+                let ranges = LoadRangeDTO.fetchMatching(
+                    channelId: channelId,
+                    startMessageId: startMessageId,
+                    endMessageId: endMessageId,
+                    triggerMessageId: triggerMessage,
+                    context: context
+                )
+                
+                let minLocalId = ranges.min(by: { $0.startMessageId < $1.startMessageId })?.startMessageId ?? Int64(startMessageId)
+                let maxLocalId = ranges.max(by: { $0.endMessageId > $1.endMessageId })?.endMessageId ?? Int64(endMessageId)
+                
+                var minId = min(Int64(startMessageId), minLocalId)
+                var maxId = max(Int64(endMessageId), maxLocalId)
+                
+                if let triggerMessage {
+                    if triggerMessage < minId {
+                        minId = Int64(triggerMessage)
+                    }
+                    if triggerMessage > maxId {
+                        maxId = Int64(triggerMessage)
+                    }
+                }
+                
+                if ranges.count == 1 && minId >= ranges[0].startMessageId && maxId <= ranges[0].endMessageId {
+                    return
+                }
+                ranges.forEach { context.delete($0) }
+                
+                let dto = LoadRangeDTO.insertNewObject(into: context)
+                dto.channelId = Int64(channelId)
+                dto.startMessageId = minId
+                dto.endMessageId = maxId
+            }
         }) { error in
             completion?(error)
         }

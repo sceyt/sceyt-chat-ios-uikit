@@ -30,6 +30,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     public private(set) var provider: ChannelMessageProvider
     public private(set) var messageSender: ChannelMessageSender
     public private(set) var channelCreator: ChannelCreator
+    public private(set) var loadRangeProvider: LoadRangeProvider
     public private(set) var messageMarkerProvider: ChannelMessageMarkerProvider
     public private(set) lazy var channelProvider = Components.channelProvider
         .init(channelId: channel.id)
@@ -42,30 +43,13 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     public lazy var messageFetchPredicate = NSPredicate(format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false", channel.id)
     
     //MARK: Message observer
-    open lazy var messageObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> = {
-        return LazyDatabaseObserver<MessageDTO, ChatMessage>(
-            context: Config.database.backgroundReadOnlyObservableContext,
-            sortDescriptors: [.init(keyPath: \MessageDTO.createdAt, ascending: true),
-                              .init(keyPath: \MessageDTO.id, ascending: true)],
-            sectionNameKeyPath: #keyPath(MessageDTO.daySectionIdentifier),
-            fetchPredicate: messageFetchPredicate,
-            relationshipKeyPathsObserver: [
-                #keyPath(MessageDTO.attachments.status),
-                #keyPath(MessageDTO.attachments.filePath),
-                #keyPath(MessageDTO.user.avatarUrl),
-                #keyPath(MessageDTO.user.firstName),
-                #keyPath(MessageDTO.user.lastName),
-                #keyPath(MessageDTO.parent.state),
-                #keyPath(MessageDTO.bodyAttributes),
-                #keyPath(MessageDTO.linkMetadatas),
-            ]
-        ) { [weak self] in
+    open lazy var messageObserver: LazyMessagesObserver = {
+        return LazyMessagesObserver(channelId: Int64(channel.id), loadRangeProvider: loadRangeProvider) { [weak self] in
             let message = $0.convert()
             self?.updateUnreadIndexIfNeeded(message: message)
             self?.createLayoutModel(for: message)
             return message
         }
-        
     }()
     
     //MARK: Channel observer
@@ -128,12 +112,14 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     private var lastLoadPrevMessageId: MessageId = 0
     private var lastLoadNextMessageId: MessageId = 0
     private var lastLoadNearMessageId: MessageId = 0
-    private var lastNavigatedIndexPath: IndexPath?
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
     @Atomic private var lasMarkDisplayedMessageId: MessageId = 0
     @Atomic private var lastPendingMarkDisplayedMessageId: MessageId = 0
     @Atomic private var isAppActive: Bool = true
     @Atomic private var isRestartingMessageObserver: Bool = false
+    
+    // MARK: internal properties
+    var lastNavigatedIndexPath: IndexPath?
     
     //MARK: required init
     public required init(
@@ -150,6 +136,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             .init(channelId: channel.id, threadMessageId: threadMessage?.id)
         channelCreator = Components.channelCreator.init()
         messageMarkerProvider = Components.channelMessageMarkerProvider.init(channelId: channel.id)
+        loadRangeProvider = Components.loadRangeProvider.init()
         self.channel = channel
         self.threadMessage = threadMessage
         if let lastMessage = channel.lastMessage {
@@ -229,33 +216,38 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         channelObserver.onDidChange = { [weak self] in
             self?.onDidChangeChannelEvent(items: $0)
         }
-        do {
-            let fetchOffset = calculateMessageFetchOffset(messageId: lastDisplayedMessageId)
-            try messageObserver.startObserver(fetchOffset: fetchOffset, fetchLimit: Int(Self.messagesFetchLimit), completion: completion)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
-                guard let self else { return }
-                try? self.channelObserver.startObserver()
-                self.event = .updateChannel
+        let initialMessageId: MessageId
+        if lastDisplayedMessageId == 0 {
+            initialMessageId = channel.lastMessage?.id ?? MessageId(Int64.max)
+        } else {
+            initialMessageId = lastDisplayedMessageId
+        }
+        messageObserver.startObserver(
+            initialMessageId: Int64(initialMessageId),
+            fetchLimit: Int(Self.messagesFetchLimit),
+            completion: completion
+        )
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self else { return }
+            try? self.channelObserver.startObserver()
+            self.event = .updateChannel
+        }
+        let sections = messageObserver.numberOfSections
+        if sections > 0 {
+            let item: Int
+            let row = messageObserver.numberOfItems(in: sections - 1)
+            if row > 2 {
+                item = row - 2
+            } else if sections > 1 {
+                let row = messageObserver.numberOfItems(in: sections - 2)
+                item = max(0, row - 1)
+            } else {
+                return
             }
-            let sections = messageObserver.numberOfSections
-            if sections > 0 {
-                let item: Int
-                let row = messageObserver.numberOfItems(in: sections - 1)
-                if row > 2 {
-                    item = row - 2
-                } else if sections > 1 {
-                    let row = messageObserver.numberOfItems(in: sections - 2)
-                    item = max(0, row - 1)
-                } else {
-                    return
-                }
-                if let id = messageObserver.item(at: .init(item: item, section: sections - 1))?.id {
-                    provider.loadNextMessages(after: id)
-                }
+            if let id = messageObserver.item(at: .init(item: item, section: sections - 1))?.id {
+                provider.loadNextMessages(after: id)
             }
-            
-        } catch {
-            logger.errorIfNotNil(error, "observer.startObserver")
         }
     }
     
@@ -754,8 +746,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadPrevMessageId = messageId
         isFetchingData = true
-        let offset = calculateMessageFetchOffset(messageId: messageId)
-        messageObserver.loadPrev(itemOffset: offset) { [weak self] in
+        messageObserver.loadPrev(before: Int64(messageId)) { [weak self] in
             self?.isFetchingData = false
         }
         provider.loadPrevMessages(
@@ -777,7 +768,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         lastLoadNextMessageId = messageId
         isFetchingData = true
         let offset = calculateMessageFetchOffset(messageId: messageId)
-        messageObserver.loadNext(itemOffset: offset) { [weak self] in
+        messageObserver.loadNext { [weak self] in
             self?.isFetchingData = false
         }
         provider.loadNextMessages(
@@ -800,14 +791,15 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadNearMessageId = messageId
         isFetchingData = true
-        messageObserver.loadNear { [weak self] in
+        messageObserver.loadNear(at: Int64(messageId)) { [weak self] in
             self?.isFetchingData = false
+            
         }
-        provider.loadNearMessages(near: messageId) { [weak self] error in
-            if error != nil {
-                self?.lastLoadNearMessageId = 0
-            }
-        }
+//        provider.loadNearMessages(near: messageId) { [weak self] error in
+//            if error != nil {
+//                self?.lastLoadNearMessageId = 0
+//            }
+//        }
     }
     
     open func loadNearMessages(
@@ -823,23 +815,34 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                                    completion: ((IndexPath?) -> Void)? = nil) {
         lastLoadNearMessageId = messageId
         
-        provider.loadNearMessages(near: messageId) { [weak self] error in
-            guard let self else { return }
-            if error != nil {
-                self.lastLoadNearMessageId = 0
-            } else {
-                let offset = max(self.calculateMessageFetchOffset(messageId: messageId) - 10, 0)
-                let limit = self.messageObserver.fetchOffset == 0
-                ? self.messageObserver.fetchLimit 
-                : self.messageObserver.fetchOffset - offset
-                guard limit > 0 else { return }
-                self.messageObserver.loadAll(from: offset, limit: limit) {
-                    let indexPath = self.messageObserver.indexPath { $0.id == messageId }
-                    self.lastNavigatedIndexPath = indexPath
-                    DispatchQueue.main.async {
+        if chatClient.connectionState == .connected {
+            provider.loadNearMessages(near: messageId) { [weak self] error in
+                guard let self else { return }
+                if error != nil {
+                    self.lastLoadNearMessageId = 0
+                } else {
+                    loadNearFromLocalDB(messageId: messageId) { indexPath in
                         completion?(indexPath)
                     }
                 }
+            }
+        } else {
+            loadNearFromLocalDB(messageId: messageId) { indexPath in
+                completion?(indexPath)
+            }
+        }
+    }
+    
+    private func loadNearFromLocalDB(messageId: MessageId, completion: @escaping (IndexPath?) -> Void) {
+        isRestartingMessageObserver = true
+        messageObserver.loadNear(at: Int64(messageId), restart: true) { [weak self] in
+            self?.isRestartingMessageObserver = false
+            let indexPath = self?.messageObserver.indexPath { $0.id == messageId }
+            DispatchQueue.main.async {
+                if indexPath != nil {
+                    
+                }
+                completion(indexPath)
             }
         }
     }
@@ -1624,7 +1627,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.channelProvider = Components.channelProvider
                 .init(channelId: channel.id)
             isRestartingMessageObserver = true
-            try? self.messageObserver.restartObserver(fetchPredicate: self.messageFetchPredicate) {[weak self] in
+            self.messageObserver.restartObserver(fetchPredicate: self.messageFetchPredicate) {[weak self] in
                 self?.isRestartingMessageObserver = false
                 
             }

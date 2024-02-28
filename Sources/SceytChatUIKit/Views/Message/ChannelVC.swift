@@ -1132,7 +1132,6 @@ open class ChannelVC: ViewController,
     
     open func scrollViewWillBeginDecelerating(_ scrollView: UIScrollView) {
         scrollDirection = scrollDirectionForVelocity(scrollView.panGestureRecognizer.velocity(in: scrollView))
-//        addMoreMessage(scrollDirection: scrollDirection)
     }
     
     open func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
@@ -1697,11 +1696,12 @@ open class ChannelVC: ViewController,
         
         if let indexPath = paths[parent.id] {
             goTo(indexPath: indexPath) { [weak self] cell in
+                self?.channelViewModel.lastNavigatedIndexPath = indexPath
                 self?.highlightCell(cell)
             }
         } else {
             channelViewModel.loadAllToShowMessage(messageId: parent.id) { [weak self] indexPath in
-                if let indexPath = self?.channelViewModel.indexPaths(for: [parent]).values.first {
+                if let indexPath {
                     self?.goTo(indexPath: indexPath) { cell in
                         self?.highlightCell(cell)
                     }

@@ -166,6 +166,7 @@ public enum SCTUIKitComponents {
     public static var channelMessageMarkerProvider: ChannelMessageMarkerProvider.Type = ChannelMessageMarkerProvider.self
     public static var messageReactionProvider: MessageReactionProvider.Type = MessageReactionProvider.self
     public static var attachmentTransfer: AttachmentTransfer.Type = AttachmentTransfer.self
+    public static var loadRangeProvider: LoadRangeProvider.Type = LoadRangeProvider.self
     
     public static var hud: HUD.Type = KitHUD.self
     
