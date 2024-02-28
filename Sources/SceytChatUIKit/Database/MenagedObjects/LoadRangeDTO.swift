@@ -33,6 +33,11 @@ public final class LoadRangeDTO: NSManagedObject {
             startMessageId,
             endMessageId
         ))
+        subpredicates.append(NSPredicate(
+            format: "startMessageId <= %lld AND endMessageId >= %lld",
+            startMessageId,
+            endMessageId
+        ))
         if let triggerMessageId {
             subpredicates.append(NSPredicate(
                 format: "startMessageId == %lld OR endMessageId == %lld",
@@ -52,6 +57,22 @@ public final class LoadRangeDTO: NSManagedObject {
     }
     
     public static func fetchPreviousRange(
+        channelId: Int64,
+        lastMessageId: Int64,
+        context: NSManagedObjectContext
+    ) -> LoadRangeDTO? {
+        let request = fetchRequest()
+        request.predicate = NSPredicate(
+            format: "startMessageId <= %lld AND endMessageId >= %lld AND channelId == %lld",
+            lastMessageId,
+            lastMessageId,
+            channelId
+        )
+        request.sortDescriptor = .init(keyPath: \LoadRangeDTO.endMessageId, ascending: true)
+        return fetch(request: request, context: context).last
+    }
+    
+    public static func fetchNextRange(
         channelId: Int64,
         lastMessageId: Int64,
         context: NSManagedObjectContext

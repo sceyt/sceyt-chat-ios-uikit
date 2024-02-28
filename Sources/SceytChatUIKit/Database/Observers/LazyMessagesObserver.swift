@@ -96,6 +96,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         loadRangeProvider.fetchPreviousLoadRange(channelId: channelId, lastMessageId: messageId) { [weak self] range in
             guard let self else { return }
             if let range {
+                print("<><> on load prev for channelId: \(channelId), messageId: \(messageId) <><>")
                 let predicate = self.getMessagesFromRangePredicate(range: range)
                 self.loadPrev(predicate: predicate, done: done)
             } else {
@@ -123,6 +124,33 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
                 done?()
             }
         }
+    }
+    
+    open func loadNext(
+        after messageId: Int64,
+        predicate: NSPredicate? = nil,
+        done: (() -> Void)? = nil
+    ) {
+        guard isObserverStarted else {
+            done?()
+            return
+        }
+        
+        loadRangeProvider.fetchNextLoadRange(channelId: channelId, lastMessageId: messageId) { [weak self] range in
+            guard let self else { return }
+            if let range {
+                print("<><> on load next for channelId: \(channelId), messageId: \(messageId) <><>")
+                let predicate = self.getMessagesFromRangePredicate(range: range)
+                self.loadNext(predicate: predicate, done: done)
+            } else {
+                done?()
+            }
+        }
+    }
+    
+    open override func loadNear(predicate: NSPredicate? = nil, done: (() -> Void)? = nil) {
+        print("<><> on load near <><>")
+        super.loadNear(predicate: predicate, done: done)
     }
     
     private func loadRanges(

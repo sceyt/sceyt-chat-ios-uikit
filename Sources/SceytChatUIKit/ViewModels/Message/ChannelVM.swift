@@ -746,6 +746,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadPrevMessageId = messageId
         isFetchingData = true
+        
         messageObserver.loadPrev(before: Int64(messageId)) { [weak self] in
             self?.isFetchingData = false
         }
@@ -767,8 +768,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadNextMessageId = messageId
         isFetchingData = true
-        let offset = calculateMessageFetchOffset(messageId: messageId)
-        messageObserver.loadNext { [weak self] in
+
+        messageObserver.loadNext(after: Int64(messageId)) { [weak self] in
             self?.isFetchingData = false
         }
         provider.loadNextMessages(
