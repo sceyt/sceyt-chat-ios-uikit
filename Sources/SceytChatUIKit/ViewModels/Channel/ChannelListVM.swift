@@ -77,7 +77,7 @@ open class ChannelListVM: NSObject,
         channelObserver.startObserver()
     }
     open func onDidChangeEvent(items: Paths) {
-        if SyncService.isSyncing || items.numberOfChangedItems > 2 {
+        if SyncService.isSyncing {
             event = .reload
         } else {
             event = .change(items)
