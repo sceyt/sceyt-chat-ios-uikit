@@ -57,8 +57,6 @@ public class ChannelDTO: NSManagedObject {
     
     @NSManaged public var unsynched: Bool
     
-    @NSManaged public var toggle: Bool
-    
     public override func willSave() {
         super.willSave()
         let date: Date?

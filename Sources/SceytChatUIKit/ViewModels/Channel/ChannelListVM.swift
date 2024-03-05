@@ -74,14 +74,10 @@ open class ChannelListVM: NSObject,
         channelObserver.onDidChange = { [weak self] items, events in
             self?.onDidChangeEvent(items: items)
         }
-        do {
-            try channelObserver.startObserver()
-        } catch {
-            logger.errorIfNotNil(error, "startDatabaseObserver")
-        }
+        channelObserver.startObserver()
     }
     open func onDidChangeEvent(items: Paths) {
-        if SyncService.isSyncing {
+        if SyncService.isSyncing || items.numberOfChangedItems > 2 {
             event = .reload
         } else {
             event = .change(items)

@@ -43,5 +43,9 @@ open class ChannelCollectionViewLayout: UICollectionViewFlowLayout {
             isInsertingItemsToTop = false
         }
     }
+    
+    open override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
+        true
+    }
 }
 

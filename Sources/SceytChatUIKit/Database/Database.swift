@@ -162,7 +162,8 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     }
     
     public lazy var backgroundPerformContext: NSManagedObjectContext = {
-        let context = newBackgroundContext()
+        let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
+        context.parent = backgroundReadOnlyObservableContext
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         context.automaticallyMergesChangesFromParent = true
         return context
@@ -191,6 +192,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                 }
                 guard self.backgroundPerformContext.hasChanges else { return }
                 try self.backgroundPerformContext.save()
+                try self.backgroundReadOnlyObservableContext.save()
                 
             } catch {
                 resultQueue.async { completion?(error) }

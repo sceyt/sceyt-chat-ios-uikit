@@ -165,25 +165,21 @@ open class ChannelListVC: ViewController,
         if view.window == nil || tableView.visibleCells.isEmpty || !isViewDidAppear {
             tableView.reloadData()
         } else {
-            UIView.performWithoutAnimation {
-                tableView.performBatchUpdates {
-                    if !paths.sectionInserts.isEmpty {
-                        tableView.insertSections(paths.sectionInserts, with: .none)
-                    }
-                    if !paths.sectionDeletes.isEmpty {
-                        tableView.deleteSections(paths.sectionDeletes, with: .none)
-                    }
-                    tableView.insertRows(at: paths.inserts, with: .none)
-                    tableView.reloadRows(at: paths.updates, with: .none)
-                    tableView.deleteRows(at: paths.deletes, with: .none)
-                    paths.moves.forEach { move in
-                        tableView.moveRow(at: move.from, to: move.to)
-                    }
-                } completion: { [weak self] _ in
-                    UIView.performWithoutAnimation {
-                        self?.tableView.reloadRows(at: paths.moves.map { $0.to }, with: .none)
-                    }
+            tableView.performBatchUpdates {
+                if !paths.sectionInserts.isEmpty {
+                    tableView.insertSections(paths.sectionInserts, with: .none)
                 }
+                if !paths.sectionDeletes.isEmpty {
+                    tableView.deleteSections(paths.sectionDeletes, with: .none)
+                }
+                tableView.insertRows(at: paths.inserts, with: .none)
+                tableView.reloadRows(at: paths.updates, with: .none)
+                tableView.deleteRows(at: paths.deletes, with: .none)
+                paths.moves.forEach { move in
+                    tableView.moveRow(at: move.from, to: move.to)
+                }
+            } completion: { [weak self] _ in
+                self?.tableView.reloadRows(at: paths.moves.map { $0.to }, with: .none)
             }
         }
     }

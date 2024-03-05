@@ -116,6 +116,9 @@ public extension MessageDatabaseSession {
 extension NSManagedObjectContext: MessageDatabaseSession {
     @discardableResult
     public func createOrUpdate(message: Message, channelId: ChannelId, changedBy: User?) -> MessageDTO {
+        if message.body.hasPrefix("1748 dfdfd") {
+            print("stop")
+        }
         let dto = MessageDTO.fetchOrCreate(id: message.id, tid: message.incoming ? 0 : Int64(message.tid), context: self).map(message)
         dto.channelId = Int64(channelId)
         let ownerChannel = ChannelDTO.fetch(id: channelId, context: self)

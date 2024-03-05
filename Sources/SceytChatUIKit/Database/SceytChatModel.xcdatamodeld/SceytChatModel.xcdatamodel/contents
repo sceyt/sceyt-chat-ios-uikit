@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22522" systemVersion="23D60" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22522" systemVersion="23C71" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
     <entity name="AttachmentDTO" representedClassName="AttachmentDTO" syncable="YES">
         <attribute name="channelId" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -48,7 +48,6 @@
         <attribute name="pinnedAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="sortingKey" attributeType="Date" defaultDateTimeInterval="679833480" usesScalarValueType="NO"/>
         <attribute name="subject" optional="YES" attributeType="String"/>
-        <attribute name="toggle" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="type" attributeType="String" defaultValueString=""/>
         <attribute name="unread" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
         <attribute name="unsubscribed" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
@@ -89,6 +88,18 @@
             </uniquenessConstraint>
         </uniquenessConstraints>
     </entity>
+    <entity name="LoadRangeDTO" representedClassName="LoadRangeDTO" syncable="YES">
+        <attribute name="channelId" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="endMessageId" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="startMessageId" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="channelId"/>
+                <constraint value="endMessageId"/>
+                <constraint value="startMessageId"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
     <entity name="MarkerDTO" representedClassName="MarkerDTO" syncable="YES">
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="messageId" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
@@ -100,7 +111,7 @@
         <attribute name="channelId" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="channelOwner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="owner" inverseEntity="ChannelDTO"/>
         <relationship name="role" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RoleDTO" inverseName="members" inverseEntity="RoleDTO"/>
-        <relationship name="user" optional="YES" maxCount="1" deletionRule="No Action" destinationEntity="UserDTO" inverseName="members" inverseEntity="UserDTO"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="No Action" destinationEntity="UserDTO" inverseName="member" inverseEntity="UserDTO"/>
     </entity>
     <entity name="MessageDTO" representedClassName="MessageDTO" syncable="YES">
         <attribute name="autoDeleteAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -197,17 +208,10 @@
         <relationship name="creator" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="createdBy" inverseEntity="ChannelDTO"/>
         <relationship name="forward" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="forwardUser" inverseEntity="MessageDTO"/>
         <relationship name="markers" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MarkerDTO" inverseName="user" inverseEntity="MarkerDTO"/>
-        <relationship name="members" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MemberDTO" inverseName="user" inverseEntity="MemberDTO"/>
+        <relationship name="member" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MemberDTO" inverseName="user" inverseEntity="MemberDTO"/>
         <relationship name="mention" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="mentionedUsers" inverseEntity="MessageDTO"/>
         <relationship name="messageChange" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="changedBy" inverseEntity="MessageDTO"/>
         <relationship name="messages" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="user" inverseEntity="MessageDTO"/>
         <relationship name="reaction" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ReactionDTO" inverseName="user" inverseEntity="ReactionDTO"/>
-        <uniquenessConstraints>
-            <uniquenessConstraint>
-                <constraint value="id"/>
-                <constraint value="blocked"/>
-                <constraint value="state"/>
-            </uniquenessConstraint>
-        </uniquenessConstraints>
     </entity>
 </model>

@@ -40,7 +40,9 @@ public class ChatChannel {
     public var draftMessage: NSAttributedString?
     
     public var decodedMetadata: Metadata?
-        
+    
+    public static var shouldCreateMembersObserver = true
+    
     /// available only if channel type is direct
     public private(set) var members: [ChatChannelMember]?
     
@@ -104,6 +106,9 @@ public class ChatChannel {
         }
         if let members {
             self.members = members
+            if Self.shouldCreateMembersObserver {
+                createMembersObserver()
+            }
         }
     }
     
@@ -144,6 +149,9 @@ public class ChatChannel {
                 fatalError("ChannelDTO managedObjectContext is nil")
                 #endif
             }
+            if Self.shouldCreateMembersObserver {
+                createMembersObserver()
+            }
         }
     }
     
@@ -175,8 +183,16 @@ public class ChatChannel {
             userRole: channel.userRole)
         if self.channelType == .direct {
             members = channel.members?.map { .init(member: $0)}
+            if Self.shouldCreateMembersObserver {
+                createMembersObserver()
+            }
         }
     }
+    
+    deinit {
+        try? memberObserver?.stopObserver()
+    }
+    fileprivate var memberObserver: LazyDatabaseObserver<MemberDTO, ChatChannelMember>?
     
 }
 
@@ -237,6 +253,43 @@ public extension ChatChannel {
 
 public extension ChatChannel {
     
+    public func createMembersObserver() {
+        guard channelType == .direct,
+              memberObserver == nil,
+              let members,
+              !members.isEmpty
+        else { return }
+        let ids = members.compactMap { $0.id == me ? nil : $0.id }
+        guard !ids.isEmpty
+        else { return }
+        memberObserver = LazyDatabaseObserver<MemberDTO, ChatChannelMember>(
+            context: Config.database.backgroundReadOnlyObservableContext,
+            sortDescriptors: [.init(keyPath: \MemberDTO.channelId, ascending: true)],
+            sectionNameKeyPath: nil,
+            fetchPredicate: NSPredicate(format: "channelId == %lld AND user.id IN %@", id, ids),
+            relationshipKeyPathsObserver: [
+                #keyPath(MemberDTO.user.blocked),
+                #keyPath(MemberDTO.user.state),
+                #keyPath(MemberDTO.user.firstName),
+                #keyPath(MemberDTO.user.lastName),
+                #keyPath(MemberDTO.user.avatarUrl)
+            ]
+            
+        ) { $0.convert() }
+        
+        memberObserver?.onDidChange = {[weak self] items, _ in
+            guard let self, !items.updates.isEmpty
+            else { return }
+            Provider.database.performBgTask(resultQueue: .global()) {
+                MemberDTO.fetch(channelId: self.id, context: $0).map { $0.convert() }
+            } completion: {[weak self] result in
+                if let members = try? result.get() {
+                    self?.members = members
+                }
+            }
+        }
+        try? memberObserver?.startObserver()
+    }
 }
 
 extension ChatChannel: Hashable {
