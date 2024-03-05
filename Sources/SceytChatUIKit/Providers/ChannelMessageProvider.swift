@@ -157,6 +157,13 @@ open class ChannelMessageProvider: Provider {
                         completion?(error)
                         return
                     }
+
+                    print("<><>save: on messages save before \(messageId)<><>")
+                    messages.sorted(by: { $0.id < $1.id }).forEach {
+                        print("<><>\($0.id), \($0.user.firstName ?? ""), \($0.body)<><>")
+                    }
+                    print("<><>-------------------<><>")
+
                     self.store(
                         messages: messages,
                         triggerMessage: messageId,
@@ -209,9 +216,9 @@ open class ChannelMessageProvider: Provider {
             )
             
             let sorted = messages.sorted(by: { $0.id < $1.id })
-            if let channelId = sorted.first?.channelId {
-                let startMessageId = sorted.first?.id ?? 0
-                let endMessageId = sorted.last?.id ?? 0
+            if let channelId = sorted.first?.channelId,
+               let startMessageId = sorted.first?.id,
+               let endMessageId = sorted.last?.id {
                 
                 let ranges = LoadRangeDTO.fetchMatching(
                     channelId: channelId,
@@ -227,7 +234,7 @@ open class ChannelMessageProvider: Provider {
                 var minId = min(Int64(startMessageId), minLocalId)
                 var maxId = max(Int64(endMessageId), maxLocalId)
                 
-                if let triggerMessage {
+                if let triggerMessage, triggerMessage != 0 {
                     if triggerMessage < minId {
                         minId = Int64(triggerMessage)
                     }

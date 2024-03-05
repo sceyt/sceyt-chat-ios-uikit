@@ -113,10 +113,11 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     private var lastLoadNextMessageId: MessageId = 0
     private var lastLoadNearMessageId: MessageId = 0
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
+    private var lastRangePredicate: NSPredicate? // TODO: check if needed
     @Atomic private var lasMarkDisplayedMessageId: MessageId = 0
     @Atomic private var lastPendingMarkDisplayedMessageId: MessageId = 0
     @Atomic private var isAppActive: Bool = true
-    @Atomic private var isRestartingMessageObserver: Bool = false
+    @Atomic private(set) var isRestartingMessageObserver: Bool = false
     
     // MARK: internal properties
     var lastNavigatedIndexPath: IndexPath?
@@ -223,7 +224,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             initialMessageId = lastDisplayedMessageId
         }
         messageObserver.startObserver(
-            initialMessageId: Int64(initialMessageId),
+            initialMessageId: initialMessageId,
             fetchLimit: Int(Self.messagesFetchLimit),
             completion: completion
         )
@@ -403,9 +404,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 paths.continuesOptions.insert(.bottom)
             } 
             else if let lastNavigatedIndexPath,
-                      let lastIndexPath,
-                      indexPath > lastNavigatedIndexPath,
-                      indexPath < lastIndexPath {
+                      indexPath > lastNavigatedIndexPath {
                 paths.continuesOptions.insert(.bottom)
             } 
             else {
@@ -570,7 +569,14 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open func numberOfMessages(in section: Int) -> Int {
         messageObserver.numberOfItems(in: section)
     }
-    
+
+    open var isLastMessageLoaded: Bool {
+        guard let lastMessage = channel.lastMessage else {
+            return false
+        }
+        return !indexPaths(for: [lastMessage]).isEmpty
+    }
+
     @discardableResult
     open func createLayoutModels(at indexPaths: [IndexPath]) -> [MessageLayoutModel] {
         var models = [MessageLayoutModel]()
@@ -677,7 +683,11 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         
         layoutModels[.init(message: lastMessage)] = model
     }
-    
+
+    open func isLastMessageCell(indexPath: IndexPath) -> Bool {
+        messageObserver.item(at: indexPath)?.id == channel.lastMessage?.id
+    }
+
     //MARK: Typing
     
     open var isTyping = false {
@@ -747,7 +757,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         lastLoadPrevMessageId = messageId
         isFetchingData = true
         
-        messageObserver.loadPrev(before: Int64(messageId)) { [weak self] in
+        messageObserver.loadPrev(before: messageId) { [weak self] in
             self?.isFetchingData = false
         }
         provider.loadPrevMessages(
@@ -769,7 +779,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         lastLoadNextMessageId = messageId
         isFetchingData = true
 
-        messageObserver.loadNext(after: Int64(messageId)) { [weak self] in
+        messageObserver.loadNext(after: messageId) { [weak self] in
             self?.isFetchingData = false
         }
         provider.loadNextMessages(
@@ -792,15 +802,11 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadNearMessageId = messageId
         isFetchingData = true
-        messageObserver.loadNear(at: Int64(messageId)) { [weak self] in
+        messageObserver.loadNear(at: messageId) { [weak self] predicate in
+            self?.lastRangePredicate = predicate
             self?.isFetchingData = false
             
         }
-//        provider.loadNearMessages(near: messageId) { [weak self] error in
-//            if error != nil {
-//                self?.lastLoadNearMessageId = 0
-//            }
-//        }
     }
     
     open func loadNearMessages(
@@ -812,10 +818,12 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         )
     }
     
-    open func loadAllToShowMessage(messageId: MessageId,
-                                   completion: ((IndexPath?) -> Void)? = nil) {
+    open func loadRangeToShowMessage(
+        messageId: MessageId,
+        completion: ((IndexPath?) -> Void)? = nil
+    ) {
         lastLoadNearMessageId = messageId
-        
+
         if chatClient.connectionState == .connected {
             provider.loadNearMessages(near: messageId) { [weak self] error in
                 guard let self else { return }
@@ -833,23 +841,30 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             }
         }
     }
+
+    open func updateLastRangePredicate(with indexPath: IndexPath) {
+        guard lastRangePredicate != nil else { return }
+        if isLastMessageCell(indexPath: indexPath) {
+            lastRangePredicate = nil
+        }
+    }
     
     private func loadNearFromLocalDB(messageId: MessageId, completion: @escaping (IndexPath?) -> Void) {
         isRestartingMessageObserver = true
-        messageObserver.loadNear(at: Int64(messageId), restart: true) { [weak self] in
-            self?.isRestartingMessageObserver = false
+        messageObserver.resetToNear(at: messageId) { [weak self] in
             let indexPath = self?.messageObserver.indexPath { $0.id == messageId }
+            self?.lastNavigatedIndexPath = indexPath
             DispatchQueue.main.async {
-                if indexPath != nil {
-                    
-                }
                 completion(indexPath)
+                self?.isRestartingMessageObserver = false
             }
         }
     }
     
-    open func clearLastNavigatedIndexPath() {
-        lastNavigatedIndexPath = nil
+    open func clearLastNavigatedIndexPath(lastVisibleIndexPath: IndexPath) {
+        if isLastMessageCell(indexPath: lastVisibleIndexPath) {
+            lastNavigatedIndexPath = nil
+        }
     }
     
     //MARK: mark messages
@@ -1304,7 +1319,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 if let lastFound = messages?.first?.id, self.searchResult.lastViewedSearchResult != lastFound {
                     self.searchResult.lastViewedSearchResult = lastFound
                     if !self.scroll(to: lastFound) {
-                        self.loadAllToShowMessage(messageId: lastFound) { _ in
+                        self.loadRangeToShowMessage(messageId: lastFound) { _ in
                             self.scroll(to: lastFound)
                         }
                     }
@@ -1318,7 +1333,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         resetSearchResultHighlight()
         guard let previousResult = searchResult.previousResult else { return }
         if !scroll(to: previousResult) {
-            loadAllToShowMessage(messageId: previousResult) { [weak self] _ in
+            loadRangeToShowMessage(messageId: previousResult) { [weak self] _ in
                 self?.scroll(to: previousResult)
             }
         }
@@ -1328,7 +1343,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         resetSearchResultHighlight()
         guard let nextResult = searchResult.nextResult else { return }
         if !scroll(to: nextResult) {
-            loadAllToShowMessage(messageId: nextResult) { [weak self] _ in
+            loadRangeToShowMessage(messageId: nextResult) { [weak self] _ in
                 self?.scroll(to: nextResult)
             }
         }
@@ -1628,9 +1643,18 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.channelProvider = Components.channelProvider
                 .init(channelId: channel.id)
             isRestartingMessageObserver = true
-            self.messageObserver.restartObserver(fetchPredicate: self.messageFetchPredicate) {[weak self] in
+            let initialMessageId: MessageId
+            if lastDisplayedMessageId == 0 {
+                initialMessageId = channel.lastMessage?.id ?? MessageId(Int64.max)
+            } else {
+                initialMessageId = lastDisplayedMessageId
+            }
+            
+            self.messageObserver.restartObserver(
+                initialMessageId: initialMessageId,
+                messageFetchPredicate: self.messageFetchPredicate
+            ) { [weak self] in
                 self?.isRestartingMessageObserver = false
-                
             }
             self.channel = channel
             for model in self.layoutModels.values {

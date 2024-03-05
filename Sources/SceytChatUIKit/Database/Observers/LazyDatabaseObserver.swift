@@ -26,7 +26,11 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     public var onDidChange: ((ChangeItemPaths, Any?) -> Void)?
     
     private let cacheQueue = DispatchQueue(label: "com.uikit.lazyDBO.access.cache", attributes: .concurrent)
-    @Atomic private var mainCache = Cache()
+    @Atomic private var mainCache = Cache() {
+        didSet {
+            print("<><> Cache updated: \(mainCache.count)")
+        }
+    }
     @Atomic private var workingCache = Cache()
     @Atomic private var prevCache: Cache?
     @Atomic private var mapItems = [NSManagedObjectID: Item]()
@@ -126,10 +130,15 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     
     open func restartObserver(
         fetchPredicate: NSPredicate,
+        offset: Int? = nil,
         completion: (() -> Void)? = nil) {
             stopObserver()
             self.fetchPredicate = fetchPredicate
-            startObserver(fetchOffset: fetchOffset, fetchLimit: fetchLimit, completion: completion)
+            startObserver(
+                fetchOffset: offset ?? fetchOffset,
+                fetchLimit: fetchLimit,
+                completion: completion
+            )
         }
     
     open var isEmpty: Bool {
@@ -180,7 +189,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             return item
         }
         let objectID = dto.objectID
-        context.perform {[weak self] in
+        context.perform { [weak self] in
             guard let self, let obj = try? self.context.existingObject(with: objectID) as? DTO
             else { return }
             let item = self.itemCreator(obj)
@@ -623,14 +632,17 @@ private extension LazyDatabaseObserver {
         changeSections: inout [ChangeSection]
     ) -> [DTO] {
         let startTime = CFAbsoluteTimeGetCurrent()
-        print("<><>-----------------------------<><>")
+        print("<><>--------------start----------<><>")
+        print("<><> \(request.predicate?.description ?? "")")
+        print("<><> offset: \(request.fetchOffset), limit: \(request.fetchLimit)")
+        print("<><> total for predicate: \(totalCountOfItems(predicate: request.predicate))")
         let dtos = DTO.fetch(request: request, context: context)
         dtos.forEach {
             if let m = $0 as? MessageDTO {
-                print("<><>\(m.id), \(m.user?.firstName ?? ""), \(m.body)<><>")
+                print("<><>fetch: \(m.id), \(m.user?.firstName ?? ""), \(m.body)<><>")
             }
         }
-        print("<><>-----------------------------<><>")
+        print("<><>---------------end-----------<><>")
         insert(dtos: dtos, in: &cache, changeItems: &changeItems, changeSections: &changeSections)
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         logger.verbose("[PERFORMANCE] fetch data time elapsed \(timeElapsed) s.")

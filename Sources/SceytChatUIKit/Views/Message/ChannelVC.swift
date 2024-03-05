@@ -883,7 +883,7 @@ open class ChannelVC: ViewController,
             showRepliedMessage(userSelectOnRepliedMessage)
             self.userSelectOnRepliedMessage = nil
         } else {
-            scrollToBottom()
+            scrollToLastMessage()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 self?.channelViewModel.markChannelAsDisplayed()
                 self?.channelViewModel.loadPrevMessages(before: 0)
@@ -1166,6 +1166,7 @@ open class ChannelVC: ViewController,
     open func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateUnreadViewVisibility()
         updateLastNavigatedIndexPath()
+        updateLastRangePredicate()
         updatePinnedHeaderVisibility()
     }
     
@@ -1191,19 +1192,29 @@ open class ChannelVC: ViewController,
             self?.isScrollingBottom = false
         }
     }
-    
+
+    open func scrollToLastMessage(animated: Bool = true, duration: CGFloat = 0.22) {
+        if channelViewModel.isLastMessageLoaded {
+            scrollToBottom(animated: animated, duration: duration)
+        } else {
+            if let lastMessage = channelViewModel.channel.lastMessage {
+                loadRangeAndNavigate(to: lastMessage.id)
+            }
+        }
+    }
+
     open func updateUnreadViewVisibility() {
         if isScrollingBottom {
             unreadCountView.isHidden = true
             return
         }
         guard !collectionView.indexPathsForVisibleItems.isEmpty,
-              let lastAttributesFrame = collectionView.lastVisibleAttributes?.frame
+              let lastIndexPath = collectionView.lastVisibleAttributes?.indexPath
         else {
             unreadCountView.isHidden = true
             return
         }
-        if round(lastAttributesFrame.maxY) >= round(collectionView.safeContentSize.height - collectionView.contentInset.top - layout.sectionInset.top) {
+        if channelViewModel.isLastMessageCell(indexPath: lastIndexPath) {
             unreadCountView.isHidden = true
         } else {
             unreadCountView.isHidden = composerVC.isRecording
@@ -1211,10 +1222,14 @@ open class ChannelVC: ViewController,
     }
     
     open func updateLastNavigatedIndexPath() {
-        let currentOffset = round(collectionView.contentOffset.y + collectionView.frame.height)
-        let bottomOffset = round(collectionView.contentSize.height + collectionView.contentInset.bottom)
-        if currentOffset == bottomOffset {
-            channelViewModel.clearLastNavigatedIndexPath()
+        if let indexPath = collectionView.lastVisibleAttributes?.indexPath {
+            channelViewModel.clearLastNavigatedIndexPath(lastVisibleIndexPath: indexPath)
+        }
+    }
+    
+    open func updateLastRangePredicate() {
+        if let indexPath = collectionView.lastVisibleAttributes?.indexPath {
+            channelViewModel.updateLastRangePredicate(with: indexPath)
         }
     }
     
@@ -1700,39 +1715,50 @@ open class ChannelVC: ViewController,
                 self?.highlightCell(cell)
             }
         } else {
-            channelViewModel.loadAllToShowMessage(messageId: parent.id) { [weak self] indexPath in
-                if let indexPath {
-                    self?.goTo(indexPath: indexPath) { cell in
-                        self?.highlightCell(cell)
-                    }
-                } else {
-                    self?.userSelectOnRepliedMessage = nil
+            loadRangeAndNavigate(to: parent.id)
+        }
+    }
+
+    open func loadRangeAndNavigate(to messageId: MessageId) {
+        channelViewModel.loadRangeToShowMessage(messageId: messageId) { [weak self] indexPath in
+            if let indexPath {
+                self?.goTo(indexPath: indexPath) { cell in
+                    self?.highlightCell(cell)
+                    self?.showEmptyViewIfNeeded()
                 }
+            } else {
+                self?.userSelectOnRepliedMessage = nil
             }
         }
     }
-    
+
     open func showRepliedMessage(_ message: ChatMessage) {
         let paths = channelViewModel.indexPaths(for: [message])
-        guard let indexPath = paths.values.first else { return }
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
+        if let indexPath = paths.values.first {
+            DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
-            } completion: { [weak self] _ in
-                guard let self else { return }
-                if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
-                    self.highlightCell(cell)
+                UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
+                    guard let self else { return }
+                    self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
+                } completion: { [weak self] _ in
+                    guard let self else { return }
+                    if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
+                        self.highlightCell(cell)
+                    }
+                    self.showEmptyViewIfNeeded()
                 }
             }
+        } else {
+            loadRangeAndNavigate(to: message.id)
         }
     }
     
-    open func highlightCell(_ cell: MessageCell) {
+    open func highlightCell(_ cell: MessageCell, completion: (() -> Void)? = nil) {
         UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak cell] in
             cell?.hightlightMode = .reply
             cell?.hightlightMode = .none
+        } completion: { _ in
+            completion?()
         }
     }
     
@@ -1984,7 +2010,9 @@ open class ChannelVC: ViewController,
     }
     
     open func showEmptyViewIfNeeded() {
-        noDataView.isHidden = (channelViewModel.channel.channelType == .broadcast && channelViewModel.channel.userRole == Config.chatRoleOwner) || channelViewModel.numberOfSections > 0
+        noDataView.isHidden = (channelViewModel.channel.channelType == .broadcast && channelViewModel.channel.userRole == Config.chatRoleOwner) 
+        || channelViewModel.numberOfSections > 0
+        || channelViewModel.isRestartingMessageObserver
         createdView.isHidden = channelViewModel.channel.channelType != .broadcast || channelViewModel.numberOfSections > 0 || channelViewModel.channel.userRole != Config.chatRoleOwner
     }
     
