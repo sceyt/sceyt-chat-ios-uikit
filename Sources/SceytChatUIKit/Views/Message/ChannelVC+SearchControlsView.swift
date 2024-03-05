@@ -4,98 +4,98 @@ extension ChannelVC {
     open class SearchControlsView: View {
         open lazy var separatorView = UIView()
             .withoutAutoresizingMask
-        
-        open lazy var previousResultButton = UIButton()
-            .withoutAutoresizingMask
-        
+
         open lazy var nextResultButton = UIButton()
             .withoutAutoresizingMask
-        
+
+        open lazy var prevResultButton = UIButton()
+            .withoutAutoresizingMask
+
         open lazy var resultsCounterLabel = UILabel()
             .withoutAutoresizingMask
-        
+
         open var onAction: ((Action) -> Void)?
-        
+
         open override func setup() {
             super.setup()
-            
-            previousResultButton.setImage(.chevronUp.withRenderingMode(.alwaysTemplate), for: .normal)
-            nextResultButton.setImage(.chevronDown.withRenderingMode(.alwaysTemplate), for: .normal)
-            
-            previousResultButton.addTarget(self, action: #selector(onPrevious), for: .touchUpInside)
+
+            nextResultButton.setImage(.chevronUp.withRenderingMode(.alwaysTemplate), for: .normal)
+            prevResultButton.setImage(.chevronDown.withRenderingMode(.alwaysTemplate), for: .normal)
+
             nextResultButton.addTarget(self, action: #selector(onNext), for: .touchUpInside)
+            prevResultButton.addTarget(self, action: #selector(onPrevious), for: .touchUpInside)
         }
-        
+
         open override func setupLayout() {
             super.setupLayout()
-            
+
             addSubview(separatorView)
-            addSubview(previousResultButton)
             addSubview(nextResultButton)
+            addSubview(prevResultButton)
             addSubview(resultsCounterLabel)
-            
-            previousResultButton.resize(anchors: [.height(28), .width(28)])
+
             nextResultButton.resize(anchors: [.height(28), .width(28)])
-            
+            prevResultButton.resize(anchors: [.height(28), .width(28)])
+
             separatorView.resize(anchors: [.height(1)])
             separatorView.pin(to: self, anchors: [.leading, .top, .trailing])
-            
-            previousResultButton.pin(
+
+            nextResultButton.pin(
                 to: self,
                 anchors: [.leading(12), .top(12), .bottom(-12)]
             )
-            previousResultButton.trailingAnchor.pin(to: nextResultButton.leadingAnchor, constant: -12)
-            
-            nextResultButton.pin(
+            nextResultButton.trailingAnchor.pin(to: prevResultButton.leadingAnchor, constant: -12)
+
+            prevResultButton.pin(
                 to: self,
                 anchors: [.top(12), .bottom(-12)]
             )
-            nextResultButton.trailingAnchor.pin(lessThanOrEqualTo: resultsCounterLabel.leadingAnchor, constant: -12)
-            
+            prevResultButton.trailingAnchor.pin(lessThanOrEqualTo: resultsCounterLabel.leadingAnchor, constant: -12)
+
             resultsCounterLabel.pin(
                 to: self,
                 anchors: [.top(12), .bottom(-12), .trailing(-16)]
             )
         }
-        
+
         open override func setupAppearance() {
             super.setupAppearance()
-            
+
             backgroundColor = appearance.backgroundColor
             separatorView.backgroundColor = appearance.separatorColor
-            previousResultButton.tintColor = appearance.buttonTintColor
             nextResultButton.tintColor = appearance.buttonTintColor
+            prevResultButton.tintColor = appearance.buttonTintColor
             resultsCounterLabel.textColor = appearance.textColor
             resultsCounterLabel.font = appearance.textFont
         }
-        
-        open func update(with searchResult: SearchResultModel, query: String?) {
-            previousResultButton.isEnabled = searchResult.previousResult != nil
-            nextResultButton.isEnabled = searchResult.nextResult != nil
-            if let index = searchResult.lastViewedSearchResultReversedIndex {
-                setCounterText(currentIndex: index, resultsCount: searchResult.searchResults?.count ?? 0)
-            } else if query?.isEmpty == false {
+
+        open func update(with searchResult: MessageSearchCoordinator, query: String) {
+            nextResultButton.isEnabled = searchResult.hasNext
+            prevResultButton.isEnabled = searchResult.hasPrev
+            if query.isEmpty {
+                resultsCounterLabel.text = nil
+            } else if searchResult.cacheCount == 0 {
                 setNotFoundCounterText()
             } else {
-                resultsCounterLabel.text = nil
+                setCounterText(currentIndex: searchResult.currentIndex + 1, resultsCount: searchResult.cacheCount)
             }
         }
-        
+
         open func setCounterText(currentIndex: Int, resultsCount: Int) {
             resultsCounterLabel.text = L10n.Channel.Search.foundIndex(
                 currentIndex,
                 resultsCount
             )
         }
-        
+
         open func setNotFoundCounterText() {
             resultsCounterLabel.text = L10n.Channel.Search.notFound
         }
-        
+
         @objc open func onPrevious() {
             onAction?(.previousResult)
         }
-        
+
         @objc open func onNext() {
             onAction?(.nextResult)
         }

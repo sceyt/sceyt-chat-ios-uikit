@@ -571,6 +571,32 @@ extension ChannelMessageProvider {
             completion(try? result.get())
         }
     }
+
+    public class func updateFromDatabase(
+        messages: [Message],
+        sortDescriptors: [NSSortDescriptor] = [],
+        completion: @escaping ([ChatMessage]?) -> Void) {
+
+            database.performBgTask(resultQueue: .global()) { context in
+                var chatMessages = NSMutableArray()
+                for message in messages {
+                    if let m = MessageDTO.fetch(id: message.id, context: context) {
+                        chatMessages.add(m)
+                    } else {
+                        let dto = context.createOrUpdate(message: message, channelId: message.channelId)
+                        dto.unlisted = true
+                        chatMessages.add(dto)
+                    }
+                }
+                if !sortDescriptors.isEmpty {
+                    chatMessages.sort(using: sortDescriptors)
+                }
+                return chatMessages.compactMap { ChatMessage(dto: $0 as! MessageDTO)}
+
+            } completion: { result in
+                completion(try? result.get())
+            }
+        }
 }
 
 private extension ChannelMessageProvider {
