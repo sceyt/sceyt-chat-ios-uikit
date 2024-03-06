@@ -8,10 +8,10 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
     public var currentFetchPredicate: NSPredicate
     public private(set) var loadRangeProvider: LoadRangeProvider
 
-    private let channelId: Int64
+    private let channelId: ChannelId
 
     public init(
-        channelId: Int64,
+        channelId: ChannelId,
         loadRangeProvider: LoadRangeProvider,
         itemCreator: @escaping (MessageDTO) -> ChatMessage
     ) {
@@ -125,7 +125,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         }
         loadRangeProvider.fetchPreviousLoadRange(
             channelId: channelId,
-            lastMessageId: Int64(messageId)
+            lastMessageId: messageId
         ) { [weak self] range in
             guard let self else { return }
             if let range {
@@ -147,7 +147,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         }
         loadRangeProvider.fetchPreviousLoadRange(
             channelId: channelId,
-            lastMessageId: Int64(messageId)
+            lastMessageId: messageId
         ) { [weak self] range in
             guard let self else { return }
             if let range {
@@ -169,7 +169,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         }
         loadRangeProvider.fetchPreviousLoadRange(
             channelId: channelId,
-            lastMessageId: Int64(messageId)
+            lastMessageId: messageId
         ) { [weak self] range in
             guard let self else { return }
             if let range {
@@ -210,7 +210,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
 
         loadRangeProvider.fetchNextLoadRange(
             channelId: channelId,
-            lastMessageId: Int64(messageId)
+            lastMessageId: messageId
         ) { [weak self] range in
             guard let self else { return }
             if let range {
@@ -268,7 +268,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         } else {
             loadRangeProvider.fetchPreviousLoadRange(
                 channelId: channelId,
-                lastMessageId: Int64(lastMessageId)
+                lastMessageId: lastMessageId
             ) { range in
                 if let range {
                     completion([range])
@@ -307,7 +307,6 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             return 0
         }
         let startMessageId = range.startMessageId
-        let endMessageId = range.endMessageId
         let predicate = defaultFetchPredicate
             .and(predicate: .init(format: "id >= %lld AND id <= %lld", startMessageId, lowestMessageId))
         let totalCount = self.totalCountOfItems(predicate: predicate)
@@ -325,6 +324,6 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             .and(predicate: .init(format: "id >= %lld AND id <= %lld", startMessageId, highMessageId))
         let totalCount = self.totalCountOfItems(predicate: predicate) - fetchLimit
 
-        return totalCount
+        return max(0, totalCount)
     }
 }

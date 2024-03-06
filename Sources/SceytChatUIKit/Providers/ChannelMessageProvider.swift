@@ -158,12 +158,6 @@ open class ChannelMessageProvider: Provider {
                         return
                     }
 
-                    print("<><>save: on messages save before \(messageId)<><>")
-                    messages.sorted(by: { $0.id < $1.id }).forEach {
-                        print("<><>\($0.id), \($0.user.firstName ?? ""), \($0.body)<><>")
-                    }
-                    print("<><>-------------------<><>")
-
                     self.store(
                         messages: messages,
                         triggerMessage: messageId,

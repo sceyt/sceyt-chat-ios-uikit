@@ -81,15 +81,12 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             self.fetchOffset = max(0, fetchOffset)
             self.fetchLimit = max(0, fetchLimit)
             self.currentFetchOffset = self.fetchOffset
-            if let fetchPredicate {
-                self.fetchPredicate = fetchPredicate
-            }
             if let request = DTO.fetchRequest() as? NSFetchRequest<DTO> {
                 var changeItems = [ChangeItem]()
                 var changeSections = [ChangeSection]()
                 isObserverStarted = true
                 request.sortDescriptors = sortDescriptors
-                request.predicate = self.fetchPredicate
+                request.predicate = fetchPredicate ?? self.fetchPredicate
                 request.fetchLimit = self.fetchLimit
                 request.fetchOffset = self.fetchOffset
                 
@@ -133,10 +130,10 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         offset: Int? = nil,
         completion: (() -> Void)? = nil) {
             stopObserver()
-            self.fetchPredicate = fetchPredicate
             startObserver(
                 fetchOffset: offset ?? fetchOffset,
                 fetchLimit: fetchLimit,
+                fetchPredicate: fetchPredicate,
                 completion: completion
             )
         }

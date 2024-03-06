@@ -57,8 +57,8 @@ public final class LoadRangeDTO: NSManagedObject {
     }
     
     public static func fetchPreviousRange(
-        channelId: Int64,
-        lastMessageId: Int64,
+        channelId: ChannelId,
+        lastMessageId: MessageId,
         context: NSManagedObjectContext
     ) -> LoadRangeDTO? {
         let request = fetchRequest()
@@ -73,8 +73,8 @@ public final class LoadRangeDTO: NSManagedObject {
     }
     
     public static func fetchNextRange(
-        channelId: Int64,
-        lastMessageId: Int64,
+        channelId: ChannelId,
+        lastMessageId: MessageId,
         context: NSManagedObjectContext
     ) -> LoadRangeDTO? {
         let request = fetchRequest()
@@ -88,7 +88,7 @@ public final class LoadRangeDTO: NSManagedObject {
         return fetch(request: request, context: context).first
     }
     
-    public static func fetchAll(channelId: Int64, context: NSManagedObjectContext) -> [LoadRangeDTO] {
+    public static func fetchAll(channelId: ChannelId, context: NSManagedObjectContext) -> [LoadRangeDTO] {
         let request = fetchRequest()
         request.predicate = NSPredicate(format: "channelId == %lld", channelId)
         request.sortDescriptor = NSSortDescriptor(keyPath: \LoadRangeDTO.endMessageId, ascending: true)

@@ -1,10 +1,11 @@
 import Foundation
+import SceytChat
 
 public final class LoadRangeProvider: Provider {
     
     func fetchPreviousLoadRange(
-        channelId: Int64,
-        lastMessageId: Int64,
+        channelId: ChannelId,
+        lastMessageId: MessageId,
         completion: @escaping (LoadRangeDTO?) -> Void
     ) {
         database.read { context in
@@ -31,8 +32,8 @@ public final class LoadRangeProvider: Provider {
     }
     
     func fetchNextLoadRange(
-        channelId: Int64,
-        lastMessageId: Int64,
+        channelId: ChannelId,
+        lastMessageId: MessageId,
         completion: @escaping (LoadRangeDTO?) -> Void
     ) {
         database.read { context in
@@ -51,7 +52,7 @@ public final class LoadRangeProvider: Provider {
         }
     }
     
-    func fetchLoadRanges(channelId: Int64, completion: @escaping ([LoadRangeDTO]) -> Void) {
+    func fetchLoadRanges(channelId: ChannelId, completion: @escaping ([LoadRangeDTO]) -> Void) {
         database.read { context in
             let request = LoadRangeDTO.fetchRequest()
             request.sortDescriptor = .init(keyPath: \LoadRangeDTO.endMessageId, ascending: true)

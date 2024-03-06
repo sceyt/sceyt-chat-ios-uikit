@@ -1203,12 +1203,12 @@ open class ChannelVC: ViewController,
             return
         }
         guard !collectionView.indexPathsForVisibleItems.isEmpty,
-              let lastAttributesFrame = collectionView.lastVisibleAttributes?.frame
+              let lastIndexPath = collectionView.lastVisibleAttributes?.indexPath
         else {
             unreadCountView.isHidden = true
             return
         }
-        if round(lastAttributesFrame.maxY) >= round(collectionView.safeContentSize.height - collectionView.contentInset.top - layout.sectionInset.top) {
+        if channelViewModel.isLastMessage(at: lastIndexPath) {
             unreadCountView.isHidden = true
         } else {
             unreadCountView.isHidden = composerVC.isRecording
@@ -1216,10 +1216,8 @@ open class ChannelVC: ViewController,
     }
 
     open func updateLastNavigatedIndexPath() {
-        let currentOffset = round(collectionView.contentOffset.y + collectionView.frame.height)
-        let bottomOffset = round(collectionView.contentSize.height + collectionView.contentInset.bottom)
-        if currentOffset == bottomOffset {
-            channelViewModel.clearLastNavigatedIndexPath()
+        if let indexPath = collectionView.lastVisibleIndexPath, channelViewModel.isLastMessage(at: indexPath) {
+            channelViewModel.updateLastNavigatedIndexPath(indexPath: nil)
         }
     }
 
@@ -1701,7 +1699,10 @@ open class ChannelVC: ViewController,
 
     open func showRepliedMessage(_ message: ChatMessage) {
         let paths = channelViewModel.indexPaths(for: [message])
-        guard let indexPath = paths.values.first else { return }
+        guard let indexPath = paths.values.first else {
+            channelViewModel.findReplayedMessage(id: message.id)
+            return
+        }
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in

@@ -44,7 +44,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
 
     //MARK: Message observer
     open lazy var messageObserver: LazyMessagesObserver = {
-        return LazyMessagesObserver(channelId: Int64(channel.id), loadRangeProvider: loadRangeProvider) { [weak self] in
+        return LazyMessagesObserver(channelId: channel.id, loadRangeProvider: loadRangeProvider) { [weak self] in
             let message = $0.convert()
             self?.updateUnreadIndexIfNeeded(message: message)
             self?.createLayoutModel(for: message)
@@ -406,9 +406,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 paths.continuesOptions.insert(.bottom)
             }
             else if let lastNavigatedIndexPath,
-                      let lastIndexPath,
-                      indexPath > lastNavigatedIndexPath,
-                      indexPath < lastIndexPath {
+                      indexPath > lastNavigatedIndexPath {
                 paths.continuesOptions.insert(.bottom)
             }
             else {
@@ -510,12 +508,15 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if self.isSearching,
            let indexPath = indexPath(of: self.scrollToMessageIdIfSearching, items: items) {
             self.scroll(to: indexPath)
+            self.updateLastNavigatedIndexPath(indexPath: indexPath)
             self.scrollToMessageIdIfSearching = 0
             self.isSearchResultsLoading = false
         } else if let indexPath = indexPath(of: self.scrollToRepliedMessageId, items: items) {
+            self.updateLastNavigatedIndexPath(indexPath: indexPath)
             self.scroll(to: indexPath)
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 self.scrollToRepliedMessageId = 0
+                self.isRestartingMessageObserver = false
             }
 
         }
@@ -621,6 +622,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
 
     open func numberOfMessages(in section: Int) -> Int {
         messageObserver.numberOfItems(in: section)
+    }
+
+    open func isLastMessage(at indexPath: IndexPath) -> Bool {
+        messageObserver.item(at: indexPath)?.id == channel.lastMessage?.id
     }
 
     @discardableResult
@@ -807,7 +812,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         provider.loadPrevMessages(
             query: provider.makeQuery(),
             before: messageId
-        ) {[weak self] error in
+        ) { [weak self] error in
             if error != nil {
                 self?.lastLoadPrevMessageId = 0
             }
@@ -850,11 +855,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self?.isFetchingData = false
 
         }
-//        provider.loadNearMessages(near: messageId) { [weak self] error in
-//            if error != nil {
-//                self?.lastLoadNearMessageId = 0
-//            }
-//        }
     }
 
     open func loadNearMessages(
@@ -874,27 +874,12 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         }
     }
 
-//    open func loadAllToShowMessage(messageId: MessageId,
-//                                   completion: ((IndexPath?) -> Void)? = nil) {
-//        lastLoadNearMessageId = messageId
-//
-//        if chatClient.connectionState == .connected {
-//            provider.loadNearMessages(near: messageId) { [weak self] error in
-//                guard let self else { return }
-//                if error != nil {
-//                    self.lastLoadNearMessageId = 0
-//                } else {
-//                    loadNearFromLocalDB(messageId: messageId) { indexPath in
-//                        completion?(indexPath)
-//                    }
-//                }
-//            }
-//        } else {
-//            loadNearFromLocalDB(messageId: messageId) { indexPath in
-//                completion?(indexPath)
-//            }
-//        }
-//    }
+    open func loadNearMessagesOfRepliedMessage(id: MessageId) {
+        provider.loadNearMessages(near: id) { [weak self] _ in
+            self?.isRestartingMessageObserver = true
+            self?.messageObserver.resetToNear(at: id)
+        }
+    }
 
     private func loadNearFromLocalDB(messageId: MessageId, completion: @escaping (IndexPath?) -> Void) {
         isRestartingMessageObserver = true
@@ -907,22 +892,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 completion(indexPath)
             }
         }
-
-
-//        messageObserver.loadNear(at: Int64(messageId), restart: true) { [weak self] in
-//            self?.isRestartingMessageObserver = false
-//            let indexPath = self?.messageObserver.indexPath { $0.id == messageId }
-//            DispatchQueue.main.async {
-//                if indexPath != nil {
-//
-//                }
-//                completion(indexPath)
-//            }
-//        }
     }
 
-    open func clearLastNavigatedIndexPath() {
-        lastNavigatedIndexPath = nil
+    open func updateLastNavigatedIndexPath(indexPath: IndexPath?) {
+        lastNavigatedIndexPath = indexPath
     }
 
     //MARK: mark messages
@@ -1355,7 +1328,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.isSearching.toggle()
         }
         searchResult.resetCache()
-//        resetSearchResultHighlight()
     }
 
     public func search(with query: String) {
@@ -1383,7 +1355,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 self.searchResult.addCache(items: chatMessages.map { $0.id }.reversed())
                 if let lastFound = chatMessages.last?.id {
                     self.scrollToMessageIdIfSearching = lastFound
-                    self.loadNearMessages(messageId: lastFound)
+                    self.loadNearMessagesOfSearchMessage(id: lastFound)
                 }
             }
         })
@@ -1403,6 +1375,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         guard let messageId = searchResult.next() else { return }
         if let indexPath = indexPathOf(messageId: messageId) {
             scroll(to: indexPath)
+            self.updateLastNavigatedIndexPath(indexPath: indexPath)
         } else {
             scrollToMessageIdIfSearching = messageId
             loadNearMessagesOfSearchMessage(id: messageId)
@@ -1427,7 +1400,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open func findReplayedMessage(id: MessageId) {
         guard id != 0 else { return }
         scrollToRepliedMessageId = id
-        loadNearMessagesOfSearchMessage(id: id)
+        loadNearMessagesOfRepliedMessage(id: id)
     }
 
     open func updateSearchedMessageFromDatabase(
@@ -1440,13 +1413,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 ) {
                 completion($0 ?? [])
             }
-    }
-
-    private func resetSearchResultHighlight() {
-//        if let currentResult = searchResult.lastViewedSearchResult,
-//           let indexPath = messageObserver.indexPath({ $0.id == currentResult }) {
-//            event = .resetSearchResultHighlight(indexPath)
-//        }
     }
 
     open func indexPathOf(messageId: MessageId) -> IndexPath? {
