@@ -745,7 +745,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if messageId == 0 {
             fetchOffset = messageObserver.totalCountOfItems() - Int(fetchLimit)
         } else {
-            let beforePredicate = messageObserver.fetchPredicate
+            let beforePredicate = messageObserver.defaultFetchPredicate
                 .and(predicate: .init(format: "id < %lld", messageId))
             let beforeCount = messageObserver.totalCountOfItems(predicate: beforePredicate)
             fetchOffset = beforeCount
@@ -869,13 +869,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open func loadNearMessagesOfSearchMessage(id: MessageId) {
         if chatClient.connectionState == .connected {
             provider.loadNearMessages(near: id) { [weak self] error in
-            }
-        } else {
-            let offset = max(calculateMessageFetchOffset(messageId: id) - 10, 0)
-            let limit = messageObserver.fetchOffset - offset
-            guard limit > 0 else { return }
-            messageObserver.load(from: offset, limit: limit) {
-
+                self?.messageObserver.loadNear(at: id)
             }
         }
     }
@@ -1380,7 +1374,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 self?.isSearchResultsLoading = false
                 return
             }
-            updateSearchedMessageFromDatabase(messages: messages) {[weak self] chatMessages in
+            updateSearchedMessageFromDatabase(messages: messages) { [weak self] chatMessages in
                 guard let self, !chatMessages.isEmpty
                 else {
                     self?.isSearchResultsLoading = false

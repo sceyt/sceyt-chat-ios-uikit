@@ -151,8 +151,20 @@ open class MessageCell: CollectionViewCell,
             self?.previewer?()
         }
                 
-        NotificationCenter.default.addObserver(self, selector: #selector(didUpdateDeliveryStatus(_:)), name: .didUpdateDeliveryStatus, object: nil)
-        
+        let notificationCenter = NotificationCenter.default
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(didUpdateDeliveryStatus(_:)),
+            name: .didUpdateDeliveryStatus,
+            object: nil
+        )
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(didUpdateSelectMessage(_:)),
+            name: .selectMessage,
+            object: nil
+        )
+
         replyIcon.isHidden = true
     }
     
@@ -406,7 +418,20 @@ open class MessageCell: CollectionViewCell,
         else { return }
         deliveryStatus = data.messageDeliveryStatus
     }
-    
+
+    @objc
+    open func didUpdateSelectMessage(_ notification: Notification) {
+        if let messageId = notification.object as? MessageId,
+           messageId > 0,
+           let data,
+           data.message.id == messageId {
+            hightlightMode = .search
+            logger.debug("[SEARCH MESSAGE] SELECT CELL \(messageId)")
+        } else if hightlightMode == .search {
+            hightlightMode = .none
+        }
+    }
+
     open override func apply(_ layoutAttributes: UICollectionViewLayoutAttributes) {
         super.apply(layoutAttributes)
     }

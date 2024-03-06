@@ -3,21 +3,23 @@ import CoreData
 import SceytChat
 
 open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
-    
-    public var messageFetchPredicate: NSPredicate
+
+    public let defaultFetchPredicate: NSPredicate
+    public var currentFetchPredicate: NSPredicate
     public private(set) var loadRangeProvider: LoadRangeProvider
-    
+
     private let channelId: Int64
-    
+
     public init(
         channelId: Int64,
         loadRangeProvider: LoadRangeProvider,
         itemCreator: @escaping (MessageDTO) -> ChatMessage
     ) {
-        messageFetchPredicate = NSPredicate(
+        defaultFetchPredicate = NSPredicate(
             format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false",
             channelId
         )
+        currentFetchPredicate = defaultFetchPredicate
         self.loadRangeProvider = loadRangeProvider
         self.channelId = channelId
         super.init(
@@ -27,7 +29,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
                 .init(keyPath: \MessageDTO.id, ascending: true)
             ],
             sectionNameKeyPath: #keyPath(MessageDTO.daySectionIdentifier),
-            fetchPredicate: messageFetchPredicate,
+            fetchPredicate: defaultFetchPredicate,
             relationshipKeyPathsObserver: [
                 #keyPath(MessageDTO.attachments.status),
                 #keyPath(MessageDTO.attachments.filePath),
@@ -41,7 +43,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             itemCreator: itemCreator
         )
     }
-    
+
     @available(*, unavailable)
     public required init(
         context: NSManagedObjectContext,
@@ -54,7 +56,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
     ) {
         fatalError("Not implemented, use init(channelId:loadRangeProvider:itemCreator:) instead")
     }
-    
+
     open func startObserver(
         initialMessageId: MessageId,
         fetchPredicate: NSPredicate? = nil,
@@ -62,16 +64,16 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         completion: (() -> Void)? = nil
     ) {
         if let fetchPredicate {
-            self.messageFetchPredicate = fetchPredicate
+            self.currentFetchPredicate = fetchPredicate
         }
         loadRanges(for: initialMessageId) { [weak self] ranges in
             guard let self else {
                 return
             }
             let range = ranges.last
-            
+
             let messagesFromRangePredicate = self.getMessagesFromRangePredicate(range: range)
-            
+
             let fetchOffset = calculateMessageFetchOffset(
                 predicate: messagesFromRangePredicate,
                 messageId: initialMessageId,
@@ -92,7 +94,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         messageFetchPredicate: NSPredicate,
         done: (() -> Void)? = nil
     ) {
-        self.messageFetchPredicate = fetchPredicate
+        self.currentFetchPredicate = fetchPredicate
         loadRanges(for: initialMessageId) { [weak self] ranges in
             guard let self else {
                 return
@@ -128,14 +130,15 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             guard let self else { return }
             if let range {
                 let predicate = self.getMessagesFromRangePredicate(range: range)
-                self.loadPrev(predicate: predicate, done: done)
+                let offset = self.calculateFetchOffset(range: range, highMessageId: messageId, fetchLimit: self.fetchLimit)
+                self.load(from: offset, limit: fetchLimit, predicate: predicate, done: done)
             } else {
                 done?()
             }
         }
-        
+
     }
-    
+
     open func loadNear(at messageId: MessageId, done: ((NSPredicate?) -> Void)? = nil) {
         print("<><> on load near for channelId: \(channelId), messageId: \(messageId) <><>")
         guard isObserverStarted else {
@@ -149,7 +152,8 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             guard let self else { return }
             if let range {
                 let predicate = self.getMessagesFromRangePredicate(range: range)
-                self.loadNear(predicate: predicate) {
+                let offset = self.calculateFetchOffset(range: range, middleMessageId: messageId, fetchLimit: self.fetchLimit)
+                self.loadNear(predicate: predicate, fetchOffset: offset) {
                     done?(predicate)
                 }
             } else {
@@ -163,7 +167,6 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             done?()
             return
         }
-        print("<><> on reset to near for channelId: \(channelId), messageId: \(messageId) <><>")
         loadRangeProvider.fetchPreviousLoadRange(
             channelId: channelId,
             lastMessageId: Int64(messageId)
@@ -204,7 +207,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             done?()
             return
         }
-        
+
         loadRangeProvider.fetchNextLoadRange(
             channelId: channelId,
             lastMessageId: Int64(messageId)
@@ -212,7 +215,8 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             guard let self else { return }
             if let range {
                 let predicate = self.getMessagesFromRangePredicate(range: range)
-                self.loadNext(predicate: predicate, done: done)
+                let fetchOffset = self.calculateFetchOffset(range: range, lowestMessageId: messageId, fetchLimit: self.fetchLimit)
+                self.load(from: fetchOffset, limit: self.fetchLimit, predicate: predicate, done: done)
             } else {
                 done?()
             }
@@ -244,11 +248,15 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         return max(fetchOffset, 0)
     }
 
-    open override func loadNear(predicate: NSPredicate? = nil, done: (() -> Void)? = nil) {
-        print("<><> on load near <><>")
-        super.loadNear(predicate: predicate, done: done)
+    open func loadNear(
+        predicate: NSPredicate? = nil,
+        fetchOffset: Int = 0,
+        fetchLimit: Int = 0,
+        done: (() -> Void)? = nil
+    ) {
+        self.load(from: fetchOffset, limit: fetchLimit, predicate: predicate, done: done)
     }
-    
+
     private func loadRanges(
         for lastMessageId: MessageId,
         completion: @escaping ([LoadRangeDTO]) -> Void
@@ -270,14 +278,53 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             }
         }
     }
-    
+
     private func getMessagesFromRangePredicate(range: LoadRangeDTO?) -> NSPredicate {
         guard let range else {
-            return messageFetchPredicate
+            return currentFetchPredicate
         }
         let startMessageId = range.startMessageId
         let endMessageId = range.endMessageId
-        return messageFetchPredicate
+        return defaultFetchPredicate
             .and(predicate: .init(format: "id >= %lld AND id <= %lld", startMessageId, endMessageId))
+    }
+
+    private func calculateFetchOffset(range: LoadRangeDTO?, middleMessageId: MessageId, fetchLimit: Int) -> Int {
+        guard let range else {
+            return 0
+        }
+        let startMessageId = range.startMessageId
+        let endMessageId = range.endMessageId
+        let predicate = defaultFetchPredicate
+            .and(predicate: .init(format: "id >= %lld AND id <= %lld", startMessageId, middleMessageId))
+        let totalCount = self.totalCountOfItems(predicate: predicate) - fetchLimit / 2
+
+        return totalCount > 0 ? totalCount : 0
+    }
+
+    private func calculateFetchOffset(range: LoadRangeDTO?, lowestMessageId: MessageId, fetchLimit: Int) -> Int {
+        guard let range else {
+            return 0
+        }
+        let startMessageId = range.startMessageId
+        let endMessageId = range.endMessageId
+        let predicate = defaultFetchPredicate
+            .and(predicate: .init(format: "id >= %lld AND id <= %lld", startMessageId, lowestMessageId))
+        let totalCount = self.totalCountOfItems(predicate: predicate)
+
+        return totalCount
+    }
+
+    private func calculateFetchOffset(range: LoadRangeDTO?, highMessageId: MessageId, fetchLimit: Int) -> Int {
+        guard let range else {
+            return 0
+        }
+        let startMessageId = range.startMessageId
+        let endMessageId = range.endMessageId
+        let predicate = defaultFetchPredicate
+            .and(predicate: .init(format: "id >= %lld AND id <= %lld", startMessageId, highMessageId))
+        let totalCount = self.totalCountOfItems(predicate: predicate) - fetchLimit
+
+        return totalCount
     }
 }
