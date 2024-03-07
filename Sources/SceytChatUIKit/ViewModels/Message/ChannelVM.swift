@@ -511,6 +511,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.updateLastNavigatedIndexPath(indexPath: indexPath)
             self.scrollToMessageIdIfSearching = 0
             self.isSearchResultsLoading = false
+            self.isRestartingMessageObserver = false
         } else if let indexPath = indexPath(of: self.scrollToRepliedMessageId, items: items) {
             self.updateLastNavigatedIndexPath(indexPath: indexPath)
             self.scroll(to: indexPath)
@@ -869,7 +870,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open func loadNearMessagesOfSearchMessage(id: MessageId) {
         if chatClient.connectionState == .connected {
             provider.loadNearMessages(near: id) { [weak self] error in
-                self?.messageObserver.loadNear(at: id)
+                self?.isRestartingMessageObserver = true
+                self?.messageObserver.resetToNear(at: id)
             }
         }
     }
