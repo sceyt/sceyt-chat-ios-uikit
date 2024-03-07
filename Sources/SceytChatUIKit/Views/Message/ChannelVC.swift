@@ -1978,7 +1978,10 @@ open class ChannelVC: ViewController,
     }
 
     open func showEmptyViewIfNeeded() {
-        noDataView.isHidden = (channelViewModel.channel.channelType == .broadcast && channelViewModel.channel.userRole == Config.chatRoleOwner) || channelViewModel.numberOfSections > 0
+        noDataView.isHidden = (channelViewModel.channel.channelType == .broadcast && channelViewModel.channel.userRole == Config.chatRoleOwner)
+        || channelViewModel.numberOfSections > 0
+        || channelViewModel.scrollToMessageIdIfSearching != 0
+        || channelViewModel.scrollToRepliedMessageId != 0
         createdView.isHidden = channelViewModel.channel.channelType != .broadcast || channelViewModel.numberOfSections > 0 || channelViewModel.channel.userRole != Config.chatRoleOwner
     }
 

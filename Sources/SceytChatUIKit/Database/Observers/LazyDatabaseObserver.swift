@@ -130,12 +130,15 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         offset: Int? = nil,
         completion: (() -> Void)? = nil) {
             stopObserver()
+            let prevFetchPredicate = self.fetchPredicate
+            self.fetchPredicate = fetchPredicate
             startObserver(
                 fetchOffset: offset ?? fetchOffset,
                 fetchLimit: fetchLimit,
                 fetchPredicate: fetchPredicate,
                 completion: completion
             )
+            self.fetchPredicate = prevFetchPredicate
         }
     
     open var isEmpty: Bool {
