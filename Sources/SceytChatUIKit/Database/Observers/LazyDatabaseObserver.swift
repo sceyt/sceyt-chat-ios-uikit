@@ -112,6 +112,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     
     open func stopObserver() {
+        removeObservers()
         isObserverStarted = false
         writeCache {
             self.mapItems.removeAll(keepingCapacity: true)
@@ -120,9 +121,6 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         mainCache.removeAll(keepingCapacity: true)
         workingCache.removeAll(keepingCapacity: true)
         prevCache?.removeAll(keepingCapacity: true)
-        
-        
-        removeObservers()
     }
     
     open func restartObserver(
@@ -135,10 +133,10 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             startObserver(
                 fetchOffset: offset ?? fetchOffset,
                 fetchLimit: fetchLimit,
-                fetchPredicate: fetchPredicate,
-                completion: completion
-            )
-            self.fetchPredicate = prevFetchPredicate
+                fetchPredicate: fetchPredicate) { [weak self] in
+                    self?.fetchPredicate = prevFetchPredicate
+                    completion?()
+                }
         }
     
     open var isEmpty: Bool {
