@@ -26,11 +26,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     public var onDidChange: ((ChangeItemPaths, Any?) -> Void)?
     
     private let cacheQueue = DispatchQueue(label: "com.uikit.lazyDBO.access.cache", attributes: .concurrent)
-    @Atomic private var mainCache = Cache() {
-        didSet {
-            print("<><> Cache updated: \(mainCache.count)")
-        }
-    }
+    @Atomic private var mainCache = Cache()
     @Atomic private var workingCache = Cache()
     @Atomic private var prevCache: Cache?
     @Atomic private var mapItems = [NSManagedObjectID: Item]()
@@ -634,17 +630,7 @@ private extension LazyDatabaseObserver {
         changeSections: inout [ChangeSection]
     ) -> [DTO] {
         let startTime = CFAbsoluteTimeGetCurrent()
-        print("<><>--------------start----------<><>")
-        print("<><> \(request.predicate?.description ?? "")")
-        print("<><> offset: \(request.fetchOffset), limit: \(request.fetchLimit)")
-        print("<><> total for predicate: \(totalCountOfItems(predicate: request.predicate))")
         let dtos = DTO.fetch(request: request, context: context)
-        dtos.forEach {
-            if let m = $0 as? MessageDTO {
-                print("<><>fetch: \(m.id), \(m.user?.firstName ?? ""), \(m.body)<><>")
-            }
-        }
-        print("<><>---------------end-----------<><>")
         insert(dtos: dtos, in: &cache, changeItems: &changeItems, changeSections: &changeSections)
         let timeElapsed = CFAbsoluteTimeGetCurrent() - startTime
         logger.verbose("[PERFORMANCE] fetch data time elapsed \(timeElapsed) s.")

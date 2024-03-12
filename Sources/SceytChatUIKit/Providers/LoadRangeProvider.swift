@@ -9,12 +9,6 @@ public final class LoadRangeProvider: Provider {
         completion: @escaping (LoadRangeDTO?) -> Void
     ) {
         database.read { context in
-            let request = LoadRangeDTO.fetchRequest()
-            request.sortDescriptor = .init(keyPath: \LoadRangeDTO.endMessageId, ascending: true)
-            let ranges = LoadRangeDTO.fetch(request: request, context: context)
-            print()
-        }
-        database.read { context in
             return LoadRangeDTO.fetchPreviousRange(
                 channelId: channelId,
                 lastMessageId: lastMessageId,
@@ -53,12 +47,6 @@ public final class LoadRangeProvider: Provider {
     }
     
     func fetchLoadRanges(channelId: ChannelId, completion: @escaping ([LoadRangeDTO]) -> Void) {
-        database.read { context in
-            let request = LoadRangeDTO.fetchRequest()
-            request.sortDescriptor = .init(keyPath: \LoadRangeDTO.endMessageId, ascending: true)
-            let ranges = LoadRangeDTO.fetch(request: request, context: context)
-            print()
-        }
         database.read { context in
             return LoadRangeDTO.fetchAll(channelId: channelId, context: context)
         } completion: { result in

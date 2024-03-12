@@ -118,7 +118,6 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
     }
 
     open func loadPrev(before messageId: MessageId, done: (() -> Void)? = nil) {
-        print("<><> on load prev for channelId: \(channelId), messageId: \(messageId) <><>")
         guard isObserverStarted else {
             done?()
             return
@@ -140,7 +139,6 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
     }
 
     open func loadNear(at messageId: MessageId, done: ((NSPredicate?) -> Void)? = nil) {
-        print("<><> on load near for channelId: \(channelId), messageId: \(messageId) <><>")
         guard isObserverStarted else {
             done?(nil)
             return
@@ -152,8 +150,16 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             guard let self else { return }
             if let range {
                 let predicate = self.getMessagesFromRangePredicate(range: range)
-                let offset = self.calculateFetchOffset(range: range, middleMessageId: messageId, fetchLimit: self.fetchLimit)
-                self.loadNear(predicate: predicate, fetchOffset: offset) {
+                let offset = self.calculateFetchOffset(
+                    range: range,
+                    middleMessageId: messageId,
+                    fetchLimit: self.fetchLimit
+                )
+                self.loadNear(
+                    predicate: predicate,
+                    fetchOffset: offset,
+                    fetchLimit: self.fetchLimit
+                ) {
                     done?(predicate)
                 }
             } else {
@@ -202,7 +208,6 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         predicate: NSPredicate? = nil,
         done: (() -> Void)? = nil
     ) {
-        print("<><> on load next for channelId: \(channelId), messageId: \(messageId) <><>")
         guard isObserverStarted else {
             done?()
             return
@@ -319,7 +324,6 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             return 0
         }
         let startMessageId = range.startMessageId
-        let endMessageId = range.endMessageId
         let predicate = defaultFetchPredicate
             .and(predicate: .init(format: "id >= %lld AND id <= %lld", startMessageId, highMessageId))
         let totalCount = self.totalCountOfItems(predicate: predicate) - fetchLimit
