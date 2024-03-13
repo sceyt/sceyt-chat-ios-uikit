@@ -233,6 +233,13 @@ public extension ChatChannel {
     var isGroup: Bool {
         channelType != .direct
     }
+
+    var isSelfChannel: Bool {
+        if let metadata, let selfMetadata = try? SelfChannelMetadata(jsonString: metadata) {
+            return selfMetadata.s
+        }
+        return false
+    }
 }
 
 public extension ChatChannel {

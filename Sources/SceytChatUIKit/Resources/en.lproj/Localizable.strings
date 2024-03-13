@@ -30,7 +30,7 @@
 "channel.message.attachment" = "Attachment";
 "channel.message.lastReaction" = "Reacted %@ to:";
 "channel.join" = "Join";
-"channel.member.deleted" = "Deleted User";
+"channel.member.deleted" = "Deleted User 11";
 "channel.member.inactive" = "Inactive User";
 "channel.member.role.title" = "Change Role";
 "channel.member.typing" = "typing";
@@ -202,7 +202,7 @@
 "imagePicker.title" = "Gallery";
 "imagePicker.attach.button.title" = "Attach";
 
-"user.deleted" = "Deleted user";
+"user.deleted" = "Deleted user 22";
 "user.inactive" = "Inactive user";
 "user.current" = "You";
 
@@ -289,3 +289,5 @@
 "channel.noMessages.message" = "No messages yet, start the chat";
 "channel.created.title" = "You created a channel";
 "channel.created.message" = "Add subscribers so they can join\nthe channel.";
+
+"channel.self.hint" = "message yourself";

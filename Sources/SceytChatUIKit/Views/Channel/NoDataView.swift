@@ -15,20 +15,23 @@ open class NoDataView: View {
     open lazy var vStack = UIStackView(column: [iconView, titleLabel, messageLabel], alignment: .center)
         .withoutAutoresizingMask
     
-    open lazy var icon = Images.noResultsSearch {
+    open lazy var icon: UIImage? = Images.noResultsSearch {
         didSet {
+            iconView.isHidden = icon == nil
             iconView.image = icon
         }
     }
     
-    open lazy var title = L10n.Search.NoResults.title {
+    open lazy var title: String? = L10n.Search.NoResults.title {
         didSet {
+            titleLabel.isHidden = title == nil
             titleLabel.text = title
         }
     }
     
-    open lazy var message = L10n.Search.NoResults.message {
+    open lazy var message: String? = L10n.Search.NoResults.message {
         didSet {
+            messageLabel.isHidden = message == nil
             messageLabel.text = message
         }
     }

@@ -241,6 +241,8 @@ extension ChatChannel: AvatarBuildable {
     public var imageUrl: URL? {
         if !isGroup, let peer = peer {
             return URL(string: peer.avatarUrl)
+        } else if let member = members?.first, isSelfChannel {
+            return URL(string: member.avatarUrl)
         }
         return URL(string: avatarUrl)
     }

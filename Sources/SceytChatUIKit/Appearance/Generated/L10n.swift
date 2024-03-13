@@ -109,6 +109,9 @@ internal enum L10n {
       /// You created a channel
       internal static let title = L10n.tr("Localizable", "channel.created.title", fallback: "You created a channel")
     }
+    internal enum `Self` {
+      internal static let hint = L10n.tr("Localizable", "channel.self.hint", fallback: "message yourself")
+    }
     internal enum DeletedUser {
       /// This user has been deleted.
       internal static let message = L10n.tr("Localizable", "channel.deletedUser.message", fallback: "This user has been deleted.")
