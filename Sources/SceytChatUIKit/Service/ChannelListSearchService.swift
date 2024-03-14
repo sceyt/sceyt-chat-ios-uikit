@@ -9,11 +9,15 @@
 import CoreData
 import SceytChat
 
-public struct ChannelListSearchService {
+open class ChannelListSearchService {
     let filter: Filter
     let provider: ChannelListProvider
-    
-    public init(provider: ChannelListProvider = .init(), filter: Filter = .all) {
+
+    open var selfChatKeyword: String {
+        L10n.Channel.Self.title
+    }
+
+    required public init(provider: ChannelListProvider = .init(), filter: Filter = .all) {
         self.provider = provider
         self.filter = filter
     }
@@ -25,7 +29,11 @@ public struct ChannelListSearchService {
     {
         Task(priority: .userInitiated) {
             do {
-                let directChannel = try await searchDirectChatsBy(query: query)
+                var directChannel = try await searchDirectChatsBy(query: query)
+                if let username = Config.currentUser.firstName,
+                   selfChatKeyword.lowercased().contains(query.lowercased()) || "me".contains(query.lowercased()) {
+                    directChannel += try await searchDirectChatsBy(query: username)
+                }
                 let groupChats: [ChatChannel]
                 let channels: [ChatChannel]
                 if filter.contains(.groups) {
@@ -49,14 +57,15 @@ public struct ChannelListSearchService {
                     .limit(20)
                     .query(query)
                     .build()
-                provider.loadChannels(query: channelListQuery) { error in
-                    guard error == nil
+                provider.loadChannels(query: channelListQuery) { [weak self] error in
+                    guard let self,
+                          error == nil
                     else {
                         logger.debug("[search] loadChannels \(error!)")
                         return
                     }
                     Task(priority: .userInitiated) {
-                        if let channels = try? await searchChannels(query: query) {
+                        if let channels = try? await self.searchChannels(query: query) {
                             globalBlock(channels)
                         }
                     }
@@ -66,7 +75,7 @@ public struct ChannelListSearchService {
             }
         }
     }
-    
+
     private func sort(chats: [ChatChannel]) -> [ChatChannel] {
         return chats.sorted { v1, v2 in
             (v1.lastMessage?.createdAt ?? v1.createdAt) > (v2.lastMessage?.createdAt ?? v1.createdAt)

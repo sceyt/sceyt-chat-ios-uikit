@@ -14,7 +14,10 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
     public required init(handler: @escaping ([ChatChannel]) -> Void) {
         self.handler = handler
         provider = Components.channelListProvider.init()
-        searchService = .init(provider: provider, filter: [.chats, .groups, .channels])
+        searchService = Components.channelListSearchService.init(
+            provider: provider,
+            filter: [.chats, .groups, .channels]
+        )
         super.init()
     }
     

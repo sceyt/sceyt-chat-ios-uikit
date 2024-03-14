@@ -236,7 +236,7 @@ public extension ChatChannel {
 
     var isSelfChannel: Bool {
         if let metadata, let selfMetadata = try? SelfChannelMetadata(jsonString: metadata) {
-            return selfMetadata.s
+            return Bool(truncating: selfMetadata.s as NSNumber)
         }
         return false
     }

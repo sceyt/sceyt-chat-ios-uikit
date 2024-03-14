@@ -291,3 +291,4 @@
 "channel.created.message" = "Add subscribers so they can join\nthe channel.";
 
 "channel.self.hint" = "message yourself";
+"channel.self.title" = "Me";
