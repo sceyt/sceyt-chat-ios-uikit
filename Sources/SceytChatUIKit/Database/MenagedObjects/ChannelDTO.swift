@@ -208,9 +208,6 @@ public class ChannelDTO: NSManagedObject {
         } else {
             unsubscribed = false
         }
-        if map.isSelfChannel {
-            print()
-        }
         isSelf = map.isSelfChannel
 
         return self
