@@ -19,61 +19,65 @@ open class ChannelVC: ViewController,
                       ContextMenuDelegate,
                       ContextMenuSnapshotDelegate,
                       AttachmentPreviewDataSourceDelegate
-{    
+{
     open var channelViewModel: ChannelVM!
-    
+
     open lazy var router = Components.channelRouter
         .init(rootVC: self)
-    
+
     open lazy var collectionView = Components.channelCollectionView
         .init()
         .withoutAutoresizingMask
-    
+
     public var layout: ChannelCollectionViewLayout {
         collectionView.layout
     }
-    
+
     open lazy var coverView = BarCoverView()
         .withoutAutoresizingMask
-    
+
     open lazy var composerVC = Components.composerVC
         .init()
-    
+
     open var inputTextView: ComposerVC.InputTextView {
         composerVC.inputTextView
     }
-    
+
     open var mediaView: ComposerVC.MediaView {
         composerVC.mediaView
     }
-    
+
     open var titleView = Components.channelTitleView
         .init()
         .withoutAutoresizingMask
-    
+
     open var unreadCountView = Components.channelUnreadCountView
         .init()
         .withoutAutoresizingMask
-    
+
     open var bottomView = Components.channelBottomView
         .init()
         .withoutAutoresizingMask
-    
+
+    open var searchControlsView = Components.channelSearchControlsView
+        .init()
+        .withoutAutoresizingMask
+
     open lazy var joinGlobalChannelButton = UIButton()
         .withoutAutoresizingMask
-    
+
     open lazy var selectingView = Components.channelSelectingView
         .init()
         .withoutAutoresizingMask
-    
+
     open lazy var noDataView = Components.noDataView
         .init()
         .withoutAutoresizingMask
-    
+
     open lazy var createdView = Components.channelCreatedView
         .init()
         .withoutAutoresizingMask
-    
+
     open lazy var tapAction: UITapGestureRecognizer = {
         let tap = UITapGestureRecognizer(
             target: self,
@@ -83,27 +87,48 @@ open class ChannelVC: ViewController,
         tap.cancelsTouchesInView = true
         return tap
     }()
-    
+
+    open lazy var searchBar = {
+        let searchBar = UISearchBar()
+        searchBar.placeholder = L10n.Channel.Search.search
+        searchBar.showsCancelButton = true
+        searchBar.delegate = self
+        searchBar.searchTextField.returnKeyType = .default
+        searchBar.barTintColor = appearance.searchBarBackgroundColor
+        searchBar.searchTextField.backgroundColor = appearance.searchBarBackgroundColor
+        return searchBar
+    }()
+
+    open lazy var searchBarActivityIndicator = {
+        let activityIndicator = UIActivityIndicatorView(style: .medium)
+        activityIndicator.backgroundColor = appearance.searchBarBackgroundColor
+        activityIndicator.color = appearance.searchBarActivityIndicatorColor
+        activityIndicator.hidesWhenStopped = true
+        return activityIndicator
+    }()
+
     @objc public lazy var tapGestureRecognizer = UITapGestureRecognizer()
     @objc public lazy var longPressGestureRecognizer = UILongPressGestureRecognizer()
     @objc public lazy var panGestureRecognizer = UIPanGestureRecognizer()
-    
+
     open lazy var displayedTimer = DisplayedTimer()
-    
+
     private lazy var keyboardBgView = UIView()
         .withoutAutoresizingMask
-    
+
     public var avatarTask: Cancellable?
-    
+
     public var messageComposerViewBottomConstraint: NSLayoutConstraint!
+    public var searchControlsViewBottomConstraint: NSLayoutConstraint!
     public var messageComposerViewHeightConstraint: NSLayoutConstraint!
-    
+
     override open var disablesAutomaticKeyboardDismissal: Bool {
         return true
     }
-    
+
     public var highlightedDurationForReplyMessage = TimeInterval(1)
-    
+    private let highlightedDurationForSearchMessage = TimeInterval(0.5)
+
     public private(set) var keyboardObserver: KeyboardObserver?
     private var needToMarkMessageAsDisplayed = false
     private var needToScrollBottom = true
@@ -118,9 +143,9 @@ open class ChannelVC: ViewController,
     }
     private var longPressItem: MessageCell.LongPressItem?
     public var unreadMessageIndexPath: IndexPath?
-    
+
     open var userSelectOnRepliedMessage: ChatMessage?
-    
+
     private var isCollectionViewUpdating = false
     private var isStartedDragging = false {
         didSet {
@@ -136,7 +161,9 @@ open class ChannelVC: ViewController,
     private var scrollTimer: Timer?
     private var isAppActive: Bool = true
     private var shouldAnimateEditing: Bool = false
-    
+    private var lastAnimatedIndexPath: IndexPath? = nil
+    private var selectMessageId: MessageId = 0
+
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.delegate = self
@@ -144,10 +171,10 @@ open class ChannelVC: ViewController,
         updateTitle()
         updateUnreadViewVisibility()
     }
-    
+
     override open func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        
+
         updateUnreadViewVisibility()
         isViewDidAppear = true
         keyboardObserver = KeyboardObserver()
@@ -167,55 +194,55 @@ open class ChannelVC: ViewController,
             else { return}
             self.markMessageAsDisplayed()
         }
-        
+
         if navigationController?.navigationBar.isUserInteractionEnabled == false { // system bug
             navigationController?.navigationBar.isUserInteractionEnabled = true
         }
     }
-    
+
     override open func viewWillLayoutSubviews() {
         super.viewWillLayoutSubviews()
-        
+
     }
-    
+
     override open func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         isViewDidAppear = false
         keyboardObserver = nil
     }
-    
+
     override open func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
-        
+
         guard isViewLoaded
         else { return }
-        
+
         Components.messageLayoutModel.defaults.messageWidth = floor(Components.messageLayoutModel.defaults.messageWidthRatio * size.width)
         channelViewModel.invalidateLayout()
         collectionView.reloadData()
-        
+
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self else { return }
             self.titleView.setNeedsLayout()
             self.titleView.layoutIfNeeded()
         })
     }
-    
+
     override open func setup() {
         super.setup()
-        
+
         contextMenu = ContextMenu(parent: self)
         contextMenu.dataSource = self
         contextMenu.delegate = self
         contextMenu.snapshotDelegate = self
-                
+
         composerVC.mentionUserListVC = { [unowned self] in
             let vc = Components.mentioningUserListVC.init()
             vc.viewModel = Components.mentioningUserListVM
                 .init(channelId: channelViewModel.channel.id)
             return vc
         }
-        
+
         selectingView.onAction = { [weak self] in
             guard let self else { return }
             switch $0 {
@@ -227,10 +254,32 @@ open class ChannelVC: ViewController,
                 self.showForwardSelectedMessages()
             }
         }
-        
+        searchControlsView.isHidden = true
+        searchControlsView.onAction = { [weak self] in
+            guard let self else { return }
+            switch $0 {
+            case .previousResult:
+                channelViewModel.findPreviousSearchedMessage()
+            case .nextResult:
+                channelViewModel.findNextSearchedMessage()
+            }
+        }
+        NotificationCenter.default.publisher(
+            for: UITextField.textDidChangeNotification,
+            object: searchBar.searchTextField
+        )
+        .compactMap { ($0.object as? UITextField)?.text }
+        .debounce(for: .milliseconds(600), scheduler: DispatchQueue.main)
+        .sink { [weak self] query in
+            self?.channelViewModel.search(with: query)
+        }
+        .store(in: &subscriptions)
+
         collectionView.delegate = self
         collectionView.dataSource = self
-        
+        collectionView.prefetchDataSource = self
+        collectionView.isPrefetchingEnabled = true
+
         noDataView.icon = Images.noMessages
         noDataView.title = L10n.Channel.NoMessages.title
         noDataView.message = L10n.Channel.NoMessages.message
@@ -242,7 +291,7 @@ open class ChannelVC: ViewController,
         joinGlobalChannelButton.addTarget(self, action: #selector(joinButtonAction(_:)), for: .touchUpInside)
         titleView.profileImageView.isUserInteractionEnabled = false
         titleView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(showChannelProfileAction)))
-        
+
         tapGestureRecognizer.addTarget(self, action: #selector(handleTapGestureRecognizer(_:)))
         collectionView.addGestureRecognizer(tapGestureRecognizer)
         longPressGestureRecognizer.minimumPressDuration = 0.2
@@ -254,26 +303,31 @@ open class ChannelVC: ViewController,
         panGestureRecognizer.addTarget(self, action: #selector(handlePanGestureRecognizer))
         panGestureRecognizer.delegate = self
         updateNavigationItems()
-        
+
         bottomView.icon = Images.warning
         bottomView.message = L10n.Channel.BlockedUser.message
     }
-    
+
     override open func setupLayout() {
         super.setupLayout()
-        
+
         view.addSubview(collectionView)
         view.addSubview(noDataView)
         view.addSubview(createdView)
         view.addSubview(coverView)
+        view.addSubview(searchControlsView)
         addChild(composerVC)
         coverView.addSubview(composerVC.view)
         coverView.addSubview(unreadCountView)
         view.addSubview(joinGlobalChannelButton)
         view.addGestureRecognizer(tapAction)
-        
+
         messageComposerViewBottomConstraint = composerVC.view.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
         messageComposerViewHeightConstraint = composerVC.view.resize(anchors: [.height(52)]).first!
+
+        searchControlsViewBottomConstraint = searchControlsView.bottomAnchor.pin(to: view.safeAreaLayoutGuide.bottomAnchor)
+        searchControlsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing])
+
         updateCollectionViewInsets()
         //        collectionView.scrollToTop(animated: false)
         coverView.pin(to: view.safeAreaLayoutGuide)
@@ -290,23 +344,29 @@ open class ChannelVC: ViewController,
         unreadCountView.resize(anchors: [.width(44), .height(48)])
         joinGlobalChannelButton.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .bottom])
         joinGlobalChannelButton.resize(anchors: [.height(52)])
-        
+
         view.addSubview(keyboardBgView)
         keyboardBgView.pin(to: view, anchors: [.leading, .trailing, .bottom])
         keyboardBgView.topAnchor.pin(to: composerVC.view.bottomAnchor)
-        
+
         view.addSubview(selectingView)
         selectingView.pin(to: view, anchors: [.leading, .trailing])
         selectingView.bottomAnchor.pin(to: composerVC.view.bottomAnchor)
+
+
+        if let view = searchBar.searchTextField.leftView {
+            view.addSubview(searchBarActivityIndicator)
+            searchBarActivityIndicator.pin(to: view)
+        }
     }
-    
+
     override open func setupAppearance() {
         super.setupAppearance()
-        
+
         view.backgroundColor = appearance.backgroundColor
         coverView.backgroundColor = appearance.coverViewBackgroundColor
         collectionView.backgroundColor = appearance.backgroundColor
-        
+
         joinGlobalChannelButton.setAttributedTitle(.init(
             string: L10n.Channel.join,
             attributes: [
@@ -316,18 +376,18 @@ open class ChannelVC: ViewController,
         joinGlobalChannelButton.backgroundColor = appearance.joinBackgroundColor
         keyboardBgView.backgroundColor = view.backgroundColor
     }
-    
+
     override open func setupDone() {
         super.setupDone()
         updateJoinButtonVisibility()
-        
+
         inputTextView
             .typingEvent
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isTyping in
                 self?.channelViewModel.isTyping = isTyping
             }.store(in: &subscriptions)
-        
+
         composerVC.onContentHeightUpdate = { [weak self] height, completion in
             guard let self else { return }
             if height != self.messageComposerViewHeightConstraint.constant {
@@ -357,7 +417,7 @@ open class ChannelVC: ViewController,
                 } completion: { _ in completion?() }
             }
         }
-        
+
         composerVC.$action
             .compactMap { $0 }
             .sink { [unowned self] in
@@ -392,13 +452,13 @@ open class ChannelVC: ViewController,
                     didStopVoiceRecording()
                 }
             }.store(in: &subscriptions)
-        
+
         channelViewModel.$event
             .compactMap { $0 }
             .sink { [weak self] in
                 self?.onEvent($0)
             }.store(in: &subscriptions)
-        
+
         channelViewModel.$selectedMessages
             .dropFirst()
             .receive(on: DispatchQueue.main)
@@ -407,7 +467,7 @@ open class ChannelVC: ViewController,
                 self.updateNavigationItems()
                 self.collectionView.reloadData()
             }.store(in: &subscriptions)
-        
+
         channelViewModel.$isEditing
             .dropFirst()
             .receive(on: DispatchQueue.main)
@@ -439,7 +499,7 @@ open class ChannelVC: ViewController,
                     self.showBottomViewIfNeeded()
                 }
         }.store(in: &subscriptions)
-        
+
         channelViewModel
             .$newMessageCount
             .receive(on: DispatchQueue.main)
@@ -447,9 +507,49 @@ open class ChannelVC: ViewController,
             .sink { [weak self] value in
                 self?.unreadCountView.unreadCount.value = Formatters.channelUnreadMessageCount.format(value)
             }.store(in: &subscriptions)
-        
+
+        channelViewModel
+            .$isSearching
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isSearching in
+                self?.updateNavigationItems()
+                self?.composerVC.view.isHidden = isSearching
+                self?.searchControlsView.isHidden = !isSearching
+            }
+            .store(in: &subscriptions)
+
+        channelViewModel
+            .$searchResult
+            .receive(on: DispatchQueue.main)
+            .compactMap { $0?.state == .loaded ? $0 : nil }
+            .sink { [weak self] searchResult in
+                guard let self else { return }
+                self.searchControlsView.update(
+                    with: searchResult,
+                    query: self.searchBar.searchTextField.text ?? ""
+                )
+                if searchResult.cacheCount == 0 {
+                    NotificationCenter.default.post(name: .selectMessage, object: 0)
+                }
+            }
+            .store(in: &subscriptions)
+
+        channelViewModel
+            .$isSearchResultsLoading
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isLoading in
+                if isLoading {
+                    self?.searchBarActivityIndicator.startAnimating()
+                } else {
+                    self?.searchBarActivityIndicator.stopAnimating()
+                }
+            }
+            .store(in: &subscriptions)
+
         inputTextView.attributedText = channelViewModel.draftMessage
-        
+
         ApplicationStateObserver()
             .didBecomeActive { [weak self] _ in
                 self?.isAppActive = true
@@ -461,19 +561,26 @@ open class ChannelVC: ViewController,
                 self?.channelViewModel.canUpdateUnreadPosition = true
             }
     }
-    
+
     private func updateCollectionViewInsets() {
+        let bottomConstraint = searchControlsView.isHidden
+        ? messageComposerViewBottomConstraint.constant
+        : searchControlsViewBottomConstraint.constant
+        let controlHeight = searchControlsView.isHidden
+        ? messageComposerViewHeightConstraint.constant
+        : searchControlsView.frame.height
+
         collectionView.contentInset.bottom =
         10 +
-        abs(messageComposerViewBottomConstraint.constant) +
-        abs(messageComposerViewHeightConstraint.constant)
+        abs(bottomConstraint) +
+        abs(controlHeight)
         collectionView.scrollIndicatorInsets = .init(
             top: collectionView.contentInset.top,
             left: 0,
             bottom: collectionView.contentInset.bottom,
             right: 0)
     }
-    
+
     private func removePrevUnreadSeparatorView(
         escape messageId: UInt64
     ) {
@@ -491,7 +598,24 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
+    func goTo(indexPath: IndexPath, completion: @escaping (MessageCell) -> Void) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: true)
+            UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
+            } completion: { [weak self] _ in
+                guard let self else { return }
+                if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
+                    completion(cell)
+                } else {
+                    print("[STOP] cell not exist")
+                }
+                self.updateUnreadViewVisibility()
+            }
+        }
+    }
+
     open func keyboardWillShow(notification: Notification) {
         setSectionHeadersPinToVisibleBounds(false)
         guard let keyboardFrameEndValue = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue
@@ -512,6 +636,7 @@ open class ChannelVC: ViewController,
             )
         )
         messageComposerViewBottomConstraint.constant = shift
+        searchControlsViewBottomConstraint.constant = shift
         updateCollectionViewInsets()
         let newBottom = collectionView.contentInset.bottom
         if newBottom != bottom {
@@ -535,17 +660,18 @@ open class ChannelVC: ViewController,
             self.collectionView.setContentOffset(.init(x: 0, y: contentOffsetY), animated: false)
         }
     }
-    
+
     open func keyboardWillHide(notification: Notification) {
         setSectionHeadersPinToVisibleBounds(false)
         let bottom = collectionView.contentInset.bottom
         var contentOffsetY = collectionView.contentOffset.y
         messageComposerViewBottomConstraint.constant = 0
+        searchControlsViewBottomConstraint.constant = 0
         updateCollectionViewInsets()
         let newBottom = collectionView.contentInset.bottom
         contentOffsetY += newBottom - bottom
         contentOffsetY = max(contentOffsetY, 0)
-        
+
         let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
         let animation = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
         UIView.animate(
@@ -559,33 +685,56 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     open func updateNavigationItems() {
         if channelViewModel.isEditing {
             composerVC.actionViewCancelAction()
             view.endEditing(true)
+            navigationItem.setHidesBackButton(false, animated: false)
             navigationItem.leftItemsSupplementBackButton = false
             navigationItem.leftBarButtonItem = UIBarButtonItem(title: L10n.Channel.Selecting.ClearChat.clear,
                                                                style: .done,
                                                                target: router,
                                                                action: #selector(ChannelRouter.clearChat))
+            navigationItem.titleView = nil
             navigationItem.title = L10n.Channel.Selecting.selected(channelViewModel.selectedMessages.count)
             navigationItem.rightBarButtonItems = [UIBarButtonItem(title: L10n.Alert.Button.cancel,
                                                                   style: .done,
                                                                   target: self,
                                                                   action: #selector(cancelSelecting))]
+//            navigationItem./*searchController = nil*/
+        } else if channelViewModel.isSearching {
+            showSearchBar()
         } else {
+            navigationItem.setHidesBackButton(false, animated: false)
             navigationItem.leftItemsSupplementBackButton = true
             navigationItem.leftBarButtonItem = UIBarButtonItem(customView: titleView)
             navigationItem.title = nil
+            navigationItem.titleView = nil
             navigationItem.rightBarButtonItems = []
         }
         selectingView.isHidden = !channelViewModel.isEditing
         coverView.isHidden = channelViewModel.isEditing
     }
-    
+
+    open func showSearchBar() {
+        definesPresentationContext = true
+        navigationItem.setHidesBackButton(true, animated: false)
+        navigationItem.leftBarButtonItem = nil
+        navigationItem.rightBarButtonItems = nil
+        navigationItem.titleView = searchBar
+
+        DispatchQueue.main.async {
+            self.searchBar.searchTextField.becomeFirstResponder()
+        }
+        let appearance = UINavigationBarAppearance()
+        appearance.backgroundColor = self.appearance.backgroundColor
+        navigationController?.navigationBar.standardAppearance = appearance
+        navigationController?.navigationBar.scrollEdgeAppearance = appearance
+    }
+
     // MARK: Title
-    
+
     open func updateTitle() {
         showTitle(
             title: channelViewModel.title,
@@ -599,36 +748,36 @@ open class ChannelVC: ViewController,
             appearance: appearance
         )
     }
-    
+
     open func showTitle(
         title: String,
         subTitle: String?
     ) {
         titleView.mode = .default
         var attrs = [NSAttributedString.Key: Any]()
-        
+
         if let font = titleView.appearance.titleFont {
             attrs[.font] = font
         }
         if let color = titleView.appearance.titleColor {
             attrs[.foregroundColor] = color
         }
-        
+
         let head = NSMutableAttributedString(
             string: title,
             attributes: attrs
         )
         titleView.headLabel.attributedText = head
-        
+
         attrs.removeAll(keepingCapacity: true)
-        
+
         if let font = titleView.appearance.subtitleFont {
             attrs[.font] = font
         }
         if let color = titleView.appearance.subtitleColor {
             attrs[.foregroundColor] = color
         }
-        
+
         guard let subTitle else { return }
         let sub = NSAttributedString(
             string: subTitle,
@@ -636,51 +785,51 @@ open class ChannelVC: ViewController,
         )
         titleView.subLabel.attributedText = sub
     }
-    
+
     open func reloadTitle() {
         updateTitle()
     }
-    
+
     open func updateJoinButtonVisibility() {
         joinGlobalChannelButton.isHidden = !channelViewModel.isUnsubscribedChannel
     }
-    
+
     open func showConnectionState(
         text: String,
         color: UIColor
     ) {
         titleView.mode = .default
         var attrs = [NSAttributedString.Key: Any]()
-        
+
         if let font = titleView.appearance.titleFont {
             attrs[.font] = font
         }
         if let color = titleView.appearance.titleColor {
             attrs[.foregroundColor] = color
         }
-        
+
         let head = NSMutableAttributedString(
             string: Formatters.channelDisplayName.format(channelViewModel.channel),
             attributes: attrs
         )
         titleView.headLabel.attributedText = head
-        
+
         attrs.removeAll(keepingCapacity: true)
-        
+
         if let font = titleView.appearance.subtitleFont {
             attrs[.font] = font
         }
         if let color = titleView.appearance.subtitleColor {
             attrs[.foregroundColor] = color
         }
-        
+
         let sub = NSAttributedString(
             string: text,
             attributes: attrs
         )
         titleView.subLabel.attributedText = sub
     }
-    
+
     open func showTyping(
         member: String,
         isTyping: Bool
@@ -692,21 +841,21 @@ open class ChannelVC: ViewController,
             return titleView.typingView.typers.count
         }
         titleView.mode = .typing
-        
+
         var attrs = [NSAttributedString.Key: Any]()
-        
+
         if let font = titleView.appearance.titleFont {
             attrs[.font] = font
         }
         if let color = titleView.appearance.titleColor {
             attrs[.foregroundColor] = color
         }
-        
+
         let head = NSMutableAttributedString(
             string: Formatters.channelDisplayName.format(channelViewModel.channel),
             attributes: attrs
         )
-        
+
         titleView.headLabel.attributedText = head
         titleView.typingView.label.font = titleView.appearance.subtitleFont
         titleView.typingView.update(
@@ -715,9 +864,9 @@ open class ChannelVC: ViewController,
         )
         return titleView.typingView.typers.count
     }
-    
+
     // MARK: Actions
-    
+
     @objc
     open func joinButtonAction(_ sender: UIButton) {
         hud.isLoading = true
@@ -732,7 +881,7 @@ open class ChannelVC: ViewController,
             self.updateTitle()
         }
     }
-    
+
     @objc
     open func unreadButtonAction(_ sender: ChannelUnreadCountView) {
         if let userSelectOnRepliedMessage {
@@ -747,12 +896,12 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     @objc
     open func showChannelProfileAction() {
         router.showChannelProfile()
     }
-    
+
     //MARK: Gesture actions
     @objc
     open func viewTapped(gesture: UITapGestureRecognizer) {
@@ -768,7 +917,7 @@ open class ChannelVC: ViewController,
         needToScrollBottom = true
         inputTextView.resignFirstResponder()
     }
-    
+
     @objc
     public func handleTapGestureRecognizer(_ sender: UITapGestureRecognizer) {
         guard sender.state == .recognized
@@ -781,17 +930,17 @@ open class ChannelVC: ViewController,
             viewTapped(gesture: sender)
         }
     }
-    
+
     @objc
     public func handleLongPressGestureRecognizer(_ sender: UILongPressGestureRecognizer) {
         guard !channelViewModel.isEditing, !composerVC.isRecording
         else { return }
-        
+
         func reset() {
             sender.isEnabled = false
             sender.isEnabled = true
         }
-        
+
         switch sender.state {
         case .began:
             guard let cell = collectionView.findCell(forGesture: sender) as? MessageCell
@@ -810,7 +959,7 @@ open class ChannelVC: ViewController,
             break
         }
     }
-    
+
     private var panningCell: MessageCell?
     @objc
     open func handlePanGestureRecognizer(_ sender: UIPanGestureRecognizer) {
@@ -831,7 +980,7 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     open func select(layoutModel: MessageLayoutModel) {
         channelViewModel.isEditing = true
         channelViewModel.selectedMessages = [layoutModel]
@@ -839,12 +988,12 @@ open class ChannelVC: ViewController,
 //            collectionView.scrollToItem(at: indexPath, at: .centeredVertically, animated: true)
 //        }
     }
-    
+
     @objc
     open func cancelSelecting() {
         channelViewModel.isEditing = false
     }
-    
+
     open func showShareSelectedMessages() {
         channelViewModel.isEditing = false
         var items = [Any]()
@@ -856,7 +1005,7 @@ open class ChannelVC: ViewController,
             if !body.isEmpty {
                 items.append("\(Formatters.userDisplayName.format(user)) [\(Formatters.attachmentTimestamp.format(message.createdAt))]\n\(body)")
             }
-            items += message.attachments?.compactMap { 
+            items += message.attachments?.compactMap {
                 if $0.type == "link" {
                     return nil
                 }
@@ -867,13 +1016,13 @@ open class ChannelVC: ViewController,
             router.share(items, from: self)
         }
     }
-    
+
     open func showForwardSelectedMessages() {
         channelViewModel.isEditing = false
         let messages = channelViewModel.selectedMessages.sorted().map { $0.message }
         forward(messages: messages)
     }
-    
+
     open func forward(messages: [ChatMessage]) {
         guard !composerVC.isRecording else {
             return showRecordDiscardAlertIfNeeded()
@@ -893,9 +1042,9 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     // MARK: UIGestureRecognizer delegate
-    
+
     open func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if gestureRecognizer == panGestureRecognizer {
             let translation = panGestureRecognizer.translation(in: collectionView)
@@ -909,7 +1058,7 @@ open class ChannelVC: ViewController,
         }
         return true
     }
-    
+
     open func gestureRecognizer(
         _ gestureRecognizer: UIGestureRecognizer,
         shouldReceive touch: UITouch
@@ -936,7 +1085,7 @@ open class ChannelVC: ViewController,
         }
         return composerVC.presentedMentionUserListVC?.parent == nil
     }
-    
+
     @discardableResult
     open func addMoreMessage(scrollDirection: ScrollDirection, force: Bool = false) -> IndexPath? {
         guard !isCollectionViewUpdating,
@@ -962,41 +1111,40 @@ open class ChannelVC: ViewController,
         }
         return nil
     }
-    
+
     open func syncVisibleMessageAfterConnect() {
         if let indexPath = collectionView.indexPathsForVisibleItems.min() {
             channelViewModel.loadNextMessages(afterMessageAt: indexPath)
         }
     }
-    
+
     open func loadPrevMessages(beforeMessageAt indexPath: IndexPath) {
         channelViewModel.loadPrevMessages(beforeMessageAt: indexPath)
     }
-    
+
     open func loadNextMessages(afterMessageAt indexPath: IndexPath) {
         channelViewModel.loadNextMessages(afterMessageAt: indexPath)
     }
-    
+
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         isStartedDragging = true
     }
-    
+
     open func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
         self.scrollDirection = self.scrollDirectionForVelocity(scrollView.panGestureRecognizer.velocity(in: scrollView))
         self.addMoreMessage(scrollDirection: self.scrollDirection, force: true)
     }
-    
+
     open func scrollViewWillBeginDecelerating(_ scrollView: UIScrollView) {
         scrollDirection = scrollDirectionForVelocity(scrollView.panGestureRecognizer.velocity(in: scrollView))
-//        addMoreMessage(scrollDirection: scrollDirection)
     }
-    
+
     open func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         if let userSelectOnRepliedMessage,
             !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
             self.userSelectOnRepliedMessage = nil
         }
-        
+
         if lastScrollDirection == .down,
            let indexPath = addMoreMessage(scrollDirection: lastScrollDirection, force: true) {
             RunLoop.current.perform { [weak self] in
@@ -1004,24 +1152,33 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
+    public func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        if let lastAnimatedIndexPath, !isCollectionViewUpdating {
+            if !self.isCollectionViewUpdating {
+//                self.channelViewModel.loadNearMessages(arMessageAt: lastAnimatedIndexPath)
+            }
+        }
+    }
+
     open func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         if let userSelectOnRepliedMessage,
             !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
             self.userSelectOnRepliedMessage = nil
         }
     }
-    
+
     open func scrollViewDidScroll(_ scrollView: UIScrollView) {
         updateUnreadViewVisibility()
+        updateLastNavigatedIndexPath()
         updatePinnedHeaderVisibility()
     }
-    
+
     open func scrollViewDidScrollToTop(_ scrollView: UIScrollView) {
         isStartedDragging = true
         addMoreMessage(scrollDirection: .up, force: true)
     }
-    
+
     open func scrollDirectionForVelocity(_ velocity: CGPoint) -> ScrollDirection {
         if velocity.y < 0 {
             return .down
@@ -1030,7 +1187,7 @@ open class ChannelVC: ViewController,
         }
         return .none
     }
-    
+
     open func scrollToBottom(animated: Bool = true, duration: CGFloat = 0.22) {
         guard isAppActive else { return }
         isStartedDragging = true
@@ -1039,25 +1196,31 @@ open class ChannelVC: ViewController,
             self?.isScrollingBottom = false
         }
     }
-    
+
     open func updateUnreadViewVisibility() {
         if isScrollingBottom {
             unreadCountView.isHidden = true
             return
         }
         guard !collectionView.indexPathsForVisibleItems.isEmpty,
-              let lastAttributesFrame = collectionView.lastVisibleAttributes?.frame
+              let lastIndexPath = collectionView.lastVisibleAttributes?.indexPath
         else {
             unreadCountView.isHidden = true
             return
         }
-        if round(lastAttributesFrame.maxY) >= round(collectionView.safeContentSize.height - collectionView.contentInset.top - layout.sectionInset.top) {
+        if channelViewModel.isLastMessage(at: lastIndexPath) {
             unreadCountView.isHidden = true
         } else {
             unreadCountView.isHidden = composerVC.isRecording
         }
     }
-    
+
+    open func updateLastNavigatedIndexPath() {
+        if let indexPath = collectionView.lastVisibleIndexPath, channelViewModel.isLastMessage(at: indexPath) {
+            channelViewModel.updateLastNavigatedIndexPath(indexPath: nil)
+        }
+    }
+
     open func updatePinnedHeaderVisibility() {
         guard collectionView.isDragging || collectionView.isDecelerating
         else { return }
@@ -1070,7 +1233,7 @@ open class ChannelVC: ViewController,
             self.setSectionHeadersPinToVisibleBounds(false)
         })
     }
-    
+
     open func setSectionHeadersPinToVisibleBounds(_ show: Bool) {
         if layout.sectionHeadersPinToVisibleBounds != show {
             let context = UICollectionViewFlowLayoutInvalidationContext()
@@ -1078,7 +1241,7 @@ open class ChannelVC: ViewController,
             layout.invalidateLayout(with: context)
         }
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         willDisplay cell: UICollectionViewCell,
@@ -1093,7 +1256,7 @@ open class ChannelVC: ViewController,
 //        if isStartedDragging {
 ////            channelViewModel.markMessageAsDisplayed([model.message])
 //        }
-        
+
         guard shouldAnimateEditing, let cell = cell as? MessageCell
         else { return }
         if cell.isEditing, cell.checkBoxView.transform != .identity {
@@ -1106,14 +1269,14 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     // MARK: UICollectionViewDataSource
-    
+
     open func numberOfSections(in collectionView: UICollectionView) -> Int {
         let s = channelViewModel.numberOfSections
         return s
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         numberOfItemsInSection section: Int
@@ -1121,12 +1284,12 @@ open class ChannelVC: ViewController,
         let ns = channelViewModel.numberOfMessages(in: section)
         return ns
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-        
+
         guard let model = channelViewModel.layoutModel(at: indexPath) ?? channelViewModel.createLayoutModels(at: [indexPath]).first
         else {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: Components.incomingMessageCell.reuseId, for: indexPath)
@@ -1134,13 +1297,14 @@ open class ChannelVC: ViewController,
         }
         return cellForItemAt(indexPath: indexPath, collectionView: collectionView, model: model)
     }
-    
+
     open func cellForItemAt(
         indexPath: IndexPath,
         collectionView: UICollectionView,
         model: MessageLayoutModel
     ) -> UICollectionViewCell {
-        let message = model.message        
+        print("Section: \(indexPath.section), row: \(indexPath.row)")
+        let message = model.message
         let type: MessageCell.Type =
         model.message.incoming ?
         Components.incomingMessageCell :
@@ -1166,6 +1330,11 @@ open class ChannelVC: ViewController,
         }
         cell.checkBoxView.isSelected = channelViewModel.selectedMessages.contains(model)
         cell.data = model
+        if message.id == selectMessageId {
+            cell.hightlightMode = .search
+        } else if cell.hightlightMode == .search {
+            cell.hightlightMode = .none
+        }
         cell.previewer = { [weak self] in
             guard let self
             else { return nil }
@@ -1176,9 +1345,9 @@ open class ChannelVC: ViewController,
         }
         cell.onAction = { [weak self] action in
             guard let self else { return }
-            
+
             self.isStartedDragging = true
-            
+
             switch action {
             case .editMessage:
                 self.edit(layoutModel: model)
@@ -1233,19 +1402,19 @@ open class ChannelVC: ViewController,
             case .didSwipe:
                 self.reply(layoutModel: model, in: false)
             }
-            
+
         }
         cell.contextMenu = contextMenu
         channelViewModel.downloadMessageAttachmentsIfNeeded(layoutModel: model)
         return cell
     }
-    
+
     open func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard channelViewModel.canSelectMessage(at: indexPath)
         else { return }
         channelViewModel.didChangeSelection(for: indexPath)
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         viewForSupplementaryElementOfKind kind: String,
@@ -1259,9 +1428,9 @@ open class ChannelVC: ViewController,
         cell.date = channelViewModel.separatorDateForMessage(at: indexPath)
         return cell
     }
-    
+
     // MARK: ChannelCollectionViewLayoutDelegate
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
@@ -1273,7 +1442,7 @@ open class ChannelVC: ViewController,
         }
         return CGSize(width: width, height: 33)
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
@@ -1285,7 +1454,7 @@ open class ChannelVC: ViewController,
 //        return .init(top: 8, left: 0, bottom: 8, right: 0)
         .zero
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
@@ -1293,7 +1462,7 @@ open class ChannelVC: ViewController,
     ) -> CGFloat {
         0
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
@@ -1310,7 +1479,7 @@ open class ChannelVC: ViewController,
         let width = collectionView.bounds.width
         return CGSize(width: width, height: 40)
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
@@ -1318,7 +1487,7 @@ open class ChannelVC: ViewController,
     ) -> CGSize {
         .zero
     }
-    
+
     open func canPerformMessageActions(
         indexPath: IndexPath,
         point: CGPoint
@@ -1327,19 +1496,19 @@ open class ChannelVC: ViewController,
               let item = channelViewModel.message(at: indexPath),
               item.state != .deleted
         else { return false }
-        
+
         guard let cell = collectionView.cell(
             for: indexPath,
             cellType: MessageCell.self
         )
         else { return false }
-        
+
         let point = collectionView.convert(point, to: cell)
         return cell.bubbleView.frame.contains(point)
     }
-    
+
     // MARK: Send message
-    
+
     open func createMessage(shouldClearText: Bool = true) -> UserSendMessage {
         let m = UserSendMessage(
             sendText: shouldClearText ? inputTextView.attributedText : .init(),
@@ -1358,7 +1527,7 @@ open class ChannelVC: ViewController,
         }
         return m
     }
-    
+
     open func sendMessage(_ message: UserSendMessage, shouldClearText: Bool = true) {
         channelViewModel.createAndSendUserMessage(message)
         if shouldClearText {
@@ -1381,15 +1550,15 @@ open class ChannelVC: ViewController,
         composerVC.removeActionView()
         channelViewModel.removeSelectedMessage()
     }
-    
+
     open func info(layoutModel: MessageLayoutModel) {
         router.showMessageInfo(layoutModel: layoutModel)
     }
-    
+
     open func report(layoutModel: MessageLayoutModel) {
         channelViewModel.report(layoutModel: layoutModel)
     }
-    
+
     open func edit(layoutModel: MessageLayoutModel) {
         composerVC.addEdit(layoutModel: layoutModel)
         inputTextView.attributedText = layoutModel.attributedView.content
@@ -1398,7 +1567,7 @@ open class ChannelVC: ViewController,
             self?.view.layoutIfNeeded()
         }
     }
-    
+
     open func reply(
         layoutModel: MessageLayoutModel,
         in thread: Bool
@@ -1416,7 +1585,7 @@ open class ChannelVC: ViewController,
             showThreadForMessage(layoutModel.message)
         }
     }
-    
+
     open func delete(
         layoutModel: MessageLayoutModel,
         forMeOnly: Bool = false
@@ -1426,7 +1595,7 @@ open class ChannelVC: ViewController,
             forMeOnly: forMeOnly
         )
     }
-    
+
     open func tapReaction(layoutModel: MessageLayoutModel) {
         router.showReactions(
             message: layoutModel.message
@@ -1441,7 +1610,7 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     open func addReaction(layoutModel: MessageLayoutModel) {
         router.showEmojis()
             .onEvent = { [weak self] emoji in
@@ -1451,7 +1620,7 @@ open class ChannelVC: ViewController,
                 )
             }
     }
-    
+
     open func deleteReaction(
         layoutModel: MessageLayoutModel,
         reaction key: String
@@ -1461,7 +1630,7 @@ open class ChannelVC: ViewController,
             key: key
         )
     }
-    
+
     open func updateReaction(
         layoutModel: MessageLayoutModel,
         reaction key: String,
@@ -1481,15 +1650,15 @@ open class ChannelVC: ViewController,
             )
         }
     }
-    
+
     open func showLink(_ link: URL) {
         router.showLink(link)
     }
-    
+
     open func didSelectAvatar(layoutModel: MessageLayoutModel) {
         showProfile(user: layoutModel.message.user)
     }
-    
+
     open func didSelectMentionUser(userId: UserId, layoutModel: MessageLayoutModel) {
         if let user = layoutModel.message.mentionedUsers?.first(where: { $0.id == userId}) {
             showProfile(user: user)
@@ -1498,9 +1667,9 @@ open class ChannelVC: ViewController,
                 self?.showProfile(user: user)
             }
         }
-        
+
     }
-    
+
     open func showProfile(user: ChatUser) {
         logger.debug("showProfile for \(user.id)")
         channelViewModel.directChannel(user: user) { [weak self] channel, error in
@@ -1512,7 +1681,7 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     open func copy(layoutModel: MessageLayoutModel) {
         do {
             try UIPasteboard.general.set(layoutModel.attributedView.content)
@@ -1520,47 +1689,20 @@ open class ChannelVC: ViewController,
             UIPasteboard.general.string = layoutModel.message.body
         }
     }
-    
+
     open func showReply(layoutModel: MessageLayoutModel) {
         guard let parent = layoutModel.message.parent
         else { return }
-        let paths = channelViewModel.indexPaths(for: [layoutModel.message, parent])
-        guard !paths.isEmpty else { return }
         userSelectOnRepliedMessage = layoutModel.message
-        
-        func goTo(indexPath: IndexPath) {
-            collectionView.reloadData()
-            DispatchQueue.main.async { [weak self] in
-                guard let self else { return }
-                UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
-                    guard let self else { return }
-                    self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
-                } completion: { [weak self] _ in
-                    guard let self else { return }
-                    if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
-                        self.highlightCell(cell)
-                    }
-                    self.updateUnreadViewVisibility()
-                }
-            }
-        }
-        
-        if let indexPath = paths[parent.id] {
-            goTo(indexPath: indexPath)
-        } else {
-            channelViewModel.loadAllToShowMessage(messageId: parent.id) { [weak self] in
-                if let indexPath = self?.channelViewModel.indexPaths(for: [parent]).values.first {
-                    goTo(indexPath: indexPath)
-                } else {
-                    self?.userSelectOnRepliedMessage = nil
-                }
-            }
-        }
+        channelViewModel.findReplayedMessage(id: parent.id)
     }
-    
+
     open func showRepliedMessage(_ message: ChatMessage) {
         let paths = channelViewModel.indexPaths(for: [message])
-        guard let indexPath = paths.values.first else { return }
+        guard let indexPath = paths.values.first else {
+            channelViewModel.findReplayedMessage(id: message.id)
+            return
+        }
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
@@ -1574,30 +1716,30 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     open func highlightCell(_ cell: MessageCell) {
         UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak cell] in
-            cell?.isHighlightedBubbleView = true
-            cell?.isHighlightedBubbleView = false
+            cell?.hightlightMode = .reply
+            cell?.hightlightMode = .none
         }
     }
-    
+
     open func showThreadForMessage(_ message: ChatMessage) {
         router.showThreadForMessage(message)
     }
-    
+
     open func showAttachment(_ attachment: ChatMessage.Attachment) {
         router.showAttachment(attachment)
     }
-    
+
     open func markMessageAsDisplayed() {
         guard isViewDidAppear
         else { return }
         channelViewModel.markMessageAsDisplayed(indexPaths: collectionView.indexPathsForVisibleItems)
     }
-    
+
     // MARK: ViewModel Events
-    
+
     open func onEvent(_ event: ChannelVM.Event) {
         switch event {
         case .update(let paths):
@@ -1622,14 +1764,14 @@ open class ChannelVC: ViewController,
                     return
                 }
             }
-            
+
             if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
                 layout.isInsertingItemsToTop = false
                 collectionView.reloadDataAndScrollToBottom()
                 return
             }
-            
+
             if continuesOptions.isEmpty || continuesOptions.contains(.top) || continuesOptions.contains(.middle) {
                 layout.isInsertingItemsToTop = true
             } else {
@@ -1659,9 +1801,9 @@ open class ChannelVC: ViewController,
 //                    needsToScrollBottom = false
 //                }
 //            }
-            
+
             var isInsertLastIndexPath: Bool {
-                guard let last = paths.inserts.last, 
+                guard let last = paths.inserts.last,
                         let lastIndexPath = collectionView.lastIndexPath
                 else { return false }
                 return last >= lastIndexPath
@@ -1677,11 +1819,11 @@ open class ChannelVC: ViewController,
             } else {
                 needsToScrollBottom = false
             }
-                        
+
             if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil {
                 needsToScrollBottom = false
             }
-            
+
             UIView.performWithoutAnimation {
                 isCollectionViewUpdating = true
                 collectionView.performBatchUpdates {
@@ -1697,12 +1839,16 @@ open class ChannelVC: ViewController,
                     moves.forEach { from, to in
                         collectionView.moveItem(at: from, to: to)
                     }
+                    logger.debug("[isCollectionViewUpdating] \(isCollectionViewUpdating) start")
                 } completion: { [weak self] _ in
                     var scrollBottom = false
                     defer {
-                        self?.isCollectionViewUpdating = false
-                        if scrollBottom, let self = self {
-                            self.scrollToBottom(animated: animatedScroll)
+                        logger.debug("[isCollectionViewUpdating] \(self?.isCollectionViewUpdating) end")
+                        if let self = self {
+                            self.isCollectionViewUpdating = false
+                            if scrollBottom {
+                                self.scrollToBottom(animated: animatedScroll)
+                            }
                         }
                     }
                     guard let self = self else { return }
@@ -1714,7 +1860,7 @@ open class ChannelVC: ViewController,
                             }
                         }
                     }
-                    
+
                     if needsToScrollBottom, !(self.collectionView.isDragging || self.collectionView.isDecelerating) {
                         scrollBottom = true
                     } else {
@@ -1722,7 +1868,7 @@ open class ChannelVC: ViewController,
                     }
                 }
             }
-            
+
         case .updateDeliveryStatus(let model, let indexPath):
             if let cell = collectionView.cell(for: indexPath, cellType: MessageCell.self),
                cell.data?.message.id == model.message.id {
@@ -1775,7 +1921,7 @@ open class ChannelVC: ViewController,
                     self.titleView.mode = mode
                 }
             }
-            
+
         case .updateChannel:
             updateTitle()
             updateJoinButtonVisibility()
@@ -1812,14 +1958,33 @@ open class ChannelVC: ViewController,
             @unknown default:
                 break
             }
+        case let .scrollAndSelect(indexPath, messageId):
+            selectMessageId = messageId
+            self.lastAnimatedIndexPath = indexPath
+            logger.debug("[isCollectionViewUpdating] \(isCollectionViewUpdating) scroll")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                logger.debug("[isCollectionViewUpdating] \(self.isCollectionViewUpdating) scroll2")
+            }
+            self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: true)
+            NotificationCenter.default.post(name: .selectMessage, object: messageId)
+        case .resetSearchResultHighlight(let indexPath):
+            break
+//            if let cell = collectionView.cellForItem(at: indexPath) as? MessageCell {
+//                UIView.animate(withDuration: highlightedDurationForSearchMessage) {
+//                    cell.hightlightMode = .none
+//                }
+//            }
         }
     }
-    
+
     open func showEmptyViewIfNeeded() {
-        noDataView.isHidden = (channelViewModel.channel.channelType == .broadcast && channelViewModel.channel.userRole == Config.chatRoleOwner) || channelViewModel.numberOfSections > 0
+        noDataView.isHidden = (channelViewModel.channel.channelType == .broadcast && channelViewModel.channel.userRole == Config.chatRoleOwner)
+        || channelViewModel.numberOfSections > 0
+        || channelViewModel.scrollToMessageIdIfSearching != 0
+        || channelViewModel.scrollToRepliedMessageId != 0
         createdView.isHidden = channelViewModel.channel.channelType != .broadcast || channelViewModel.numberOfSections > 0 || channelViewModel.channel.userRole != Config.chatRoleOwner
     }
-    
+
     open func showBottomViewIfNeeded() {
         var icon: UIImage?
         var message: String?
@@ -1853,9 +2018,9 @@ open class ChannelVC: ViewController,
             composerVC.updateState()
         }
     }
-    
+
     // MARK: UINavigationControllerDelegate
-    
+
     public func navigationController(
         _ navigationController: UINavigationController,
         willShow viewController: UIViewController,
@@ -1868,13 +2033,13 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     private var isShowingRecordDiscardAlert = false
     open func showRecordDiscardAlertIfNeeded() {
         guard composerVC.isRecording,
               !isShowingRecordDiscardAlert
         else { return }
-        
+
         isShowingRecordDiscardAlert = true
         router.showAlert(
             message: L10n.Channel.StopRecording.message,
@@ -1890,39 +2055,39 @@ open class ChannelVC: ViewController,
             preferredActionIndex: 1
         )
     }
-    
+
     // MARK: ContextMenuDataSource
-    
+
     open func canShow(contextMenu: ContextMenu, identifier: Identifier) -> Bool {
         guard let model = identifier.value as? MessageLayoutModel,
               model.message.state != .deleted
         else { return false }
         return true
     }
-    
+
     open func canShowEmojis(contextMenu: ContextMenu, identifier: Identifier) -> Bool {
         guard let model = identifier.value as? MessageLayoutModel
         else { return false }
         return ![.pending, .failed].contains(model.message.deliveryStatus)
     }
-    
+
     open func emojis(contextMenu: ContextMenu, identifier: Identifier) -> [String] {
         return channelViewModel.emojis(identifier: identifier)
     }
-    
+
     open func showPlusAfterEmojis(contextMenu: ContextMenu, identifier: Identifier) -> Bool {
         return channelViewModel.showPlusAfterEmojis(identifier: identifier)
     }
-    
+
     open func selectedEmojis(contextMenu: ContextMenu, identifier: Identifier) -> [String] {
         return channelViewModel.selectedEmojis(identifier: identifier)
     }
-    
+
     open func items(contextMenu: ContextMenu, identifier: Identifier) -> [MenuItem] {
         guard let model = identifier.value as? MessageLayoutModel,
               model.message.state != .deleted
         else { return [] }
-        
+
         var items: [MenuItem] = []
         if channelViewModel.canShowInfo(model: model) {
             items += [
@@ -1968,7 +2133,7 @@ open class ChannelVC: ViewController,
 //                )
             ]
         }
-        
+
         items += [
             .init(
                 title: L10n.Message.Action.Title.forward,
@@ -2032,7 +2197,7 @@ open class ChannelVC: ViewController,
 //                                    }
                                 }
                             ),
-                            
+
                                 .init(
                                     title: L10n.Message.Action.Subtitle.deleteMe,
                                     image: .messageActionDelete,
@@ -2050,32 +2215,32 @@ open class ChannelVC: ViewController,
                 )
             )
         }
-        
+
         return items
     }
-    
+
     // MARK: ContextMenuDelegate
-    
+
     open func didSelect(emoji: String, forViewWith identifier: Identifier) {
         if let model = identifier.value as? MessageLayoutModel {
             channelViewModel.addReaction(layoutModel: model, key: emoji)
         }
     }
-    
+
     open func didDeselect(emoji: String, forViewWith identifier: Identifier) {
         if let model = identifier.value as? MessageLayoutModel {
             channelViewModel.deleteReaction(layoutModel: model, key: emoji)
         }
     }
-    
+
     open func didSelectMoreAction(forViewWith identifier: Identifier) {
         if let model = identifier.value as? MessageLayoutModel {
             addReaction(layoutModel: model)
         }
     }
-    
+
     // MARK: ContextMenuSnapshotDelegate
-    
+
     open func willMakeSnapshot(forViewWith identifier: Identifier) {
         if #unavailable(iOS 16) {
             if let model = identifier.value as? MessageLayoutModel,
@@ -2085,7 +2250,7 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     open func didMakeSnapshot(forViewWith identifier: Identifier) {
         if #unavailable(iOS 16) {
             if let model = identifier.value as? MessageLayoutModel,
@@ -2095,23 +2260,23 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    
+
     deinit {
         SimpleSinglePlayer.stop()
         avatarTask?.cancel()
         navigationController?.interactivePopGestureRecognizer?.isEnabled = true
     }
-    
+
     open func didStartVoiceRecording() {
         navigationController?.interactivePopGestureRecognizer?.isEnabled = false
         updateUnreadViewVisibility()
     }
-    
+
     open func didStopVoiceRecording() {
         navigationController?.interactivePopGestureRecognizer?.isEnabled = true
         updateUnreadViewVisibility()
     }
-    
+
     override open var supportedInterfaceOrientations: UIInterfaceOrientationMask {
         if composerVC.isRecording {
             if view.window?.windowScene?.interfaceOrientation.isLandscape == true {
@@ -2122,7 +2287,7 @@ open class ChannelVC: ViewController,
         }
         return .allButUpsideDown
     }
-    
+
     @objc
     open func canShowPreviewer() -> Bool {
         if composerVC.isRecording {
@@ -2135,7 +2300,7 @@ open class ChannelVC: ViewController,
 }
 
 extension ChannelVC {
-    
+
     open class BarCoverView: UIView {
         override open func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             subviews.first { view in
@@ -2143,12 +2308,12 @@ extension ChannelVC {
             } != nil
         }
     }
-    
+
     public enum ScrollDirection {
         case none
         case up
         case down
-        
+
         var reversed: ScrollDirection {
             switch self {
             case .down:
@@ -2159,5 +2324,25 @@ extension ChannelVC {
                 return .none
             }
         }
+    }
+}
+
+// MARK: UISearchBarDelegate
+
+extension ChannelVC: UISearchBarDelegate {
+    public func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.text = nil
+        channelViewModel.toggleSearch(isSearching: false)
+    }
+
+    public func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        searchBar.resignFirstResponder()
+    }
+}
+
+extension ChannelVC: UICollectionViewDataSourcePrefetching {
+
+    public func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        print()
     }
 }

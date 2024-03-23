@@ -10,14 +10,19 @@ import UIKit
 
 open class OutgoingMessageCell: MessageCell {
     
-    open override var isHighlightedBubbleView: Bool {
+    open override var hightlightMode: MessageCell.HighlightMode {
         didSet {
-            bubbleView.backgroundColor = isHighlightedBubbleView
-            ? appearance.highlightedBubbleColor.out
-            : appearance.bubbleColor.out
-            if data.hasMediaAttachments {
+            switch hightlightMode {
+            case .reply:
+                bubbleView.backgroundColor = appearance.highlightedBubbleColor.out
+            case .search:
+                bubbleView.backgroundColor = appearance.highlightedSearchResultColor.out
+            case .none:
+                bubbleView.backgroundColor = appearance.bubbleColor.out
+            }
+            if data?.hasMediaAttachments == true {
                 attachmentOverlayView.backgroundColor = appearance.highlightedOverlayColor.out
-                attachmentOverlayView.alpha = isHighlightedBubbleView ? 1 : 0
+                attachmentOverlayView.alpha = hightlightMode == .reply ? 1 : 0
             } else {
                 attachmentOverlayView.alpha = 0
             }

@@ -71,7 +71,9 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     open func startObserver(
         fetchOffset: Int = 0,
         fetchLimit: Int = 0,
-        completion: (() -> Void)? = nil) throws {
+        fetchPredicate: NSPredicate? = nil,
+        completion: (() -> Void)? = nil
+    ) {
             self.fetchOffset = max(0, fetchOffset)
             self.fetchLimit = max(0, fetchLimit)
             self.currentFetchOffset = self.fetchOffset
@@ -80,7 +82,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 var changeSections = [ChangeSection]()
                 isObserverStarted = true
                 request.sortDescriptors = sortDescriptors
-                request.predicate = fetchPredicate
+                request.predicate = fetchPredicate ?? self.fetchPredicate
                 request.fetchLimit = self.fetchLimit
                 request.fetchOffset = self.fetchOffset
                 
@@ -106,6 +108,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     
     open func stopObserver() {
+        removeObservers()
         isObserverStarted = false
         writeCache {
             self.mapItems.removeAll(keepingCapacity: true)
@@ -114,17 +117,22 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         mainCache.removeAll(keepingCapacity: true)
         workingCache.removeAll(keepingCapacity: true)
         prevCache?.removeAll(keepingCapacity: true)
-        
-        
-        removeObservers()
     }
     
     open func restartObserver(
         fetchPredicate: NSPredicate,
-        completion: (() -> Void)? = nil) throws {
+        offset: Int? = nil,
+        completion: (() -> Void)? = nil) {
             stopObserver()
+            let prevFetchPredicate = self.fetchPredicate
             self.fetchPredicate = fetchPredicate
-            try startObserver(fetchOffset: fetchOffset, fetchLimit: fetchLimit, completion: completion)
+            startObserver(
+                fetchOffset: offset ?? fetchOffset,
+                fetchLimit: fetchLimit,
+                fetchPredicate: fetchPredicate) { [weak self] in
+                    self?.fetchPredicate = prevFetchPredicate
+                    completion?()
+                }
         }
     
     open var isEmpty: Bool {
@@ -175,7 +183,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             return item
         }
         let objectID = dto.objectID
-        context.perform {[weak self] in
+        context.perform { [weak self] in
             guard let self, let obj = try? self.context.existingObject(with: objectID) as? DTO
             else { return }
             let item = self.itemCreator(obj)
@@ -329,6 +337,30 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     }
     
+    open func loadNear(
+        predicate: NSPredicate? = nil,
+        done: (() -> Void)? = nil
+    ) {
+        guard isObserverStarted else {
+            done?()
+            return
+        }
+        willChangeCache()
+        let minOffset = min(currentFetchOffset, fetchLimit / 2)
+        currentFetchOffset = max(0, currentFetchOffset - minOffset)
+        fetchAndUpdate(
+            predicate: predicate,
+            offset: currentFetchOffset,
+            limit: fetchLimit,
+            fetched: { count in
+                
+            },
+            done: {
+                done?()
+            }
+        )
+    }
+    
     open func load(
         from offset: Int,
         limit: Int,
@@ -345,6 +377,25 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         } done: {
             done?()
         }
+    }
+    
+    open func loadAll(
+        from offset: Int,
+        limit: Int,
+        predicate: NSPredicate? = nil,
+        done: (() -> Void)? = nil
+    ) {
+        guard isObserverStarted else {
+            done?()
+            return
+        }
+        currentFetchOffset = offset
+        load(
+            from: offset,
+            limit: limit,
+            predicate: predicate,
+            done: done
+        )
     }
     
     private func fetchAndUpdate(

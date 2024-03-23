@@ -92,7 +92,7 @@ open class MessageCell: CollectionViewCell,
     open lazy var replyIcon = UIImageView(image: .channelReply)
         .withoutAutoresizingMask
     
-    open var isHighlightedBubbleView = false
+    open var hightlightMode = HighlightMode.none
         
     public private(set) var contentConstraints: [NSLayoutConstraint]?
     
@@ -151,8 +151,20 @@ open class MessageCell: CollectionViewCell,
             self?.previewer?()
         }
                 
-        NotificationCenter.default.addObserver(self, selector: #selector(didUpdateDeliveryStatus(_:)), name: .didUpdateDeliveryStatus, object: nil)
-        
+        let notificationCenter = NotificationCenter.default
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(didUpdateDeliveryStatus(_:)),
+            name: .didUpdateDeliveryStatus,
+            object: nil
+        )
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(didUpdateSelectMessage(_:)),
+            name: .selectMessage,
+            object: nil
+        )
+
         replyIcon.isHidden = true
     }
     
@@ -308,7 +320,7 @@ open class MessageCell: CollectionViewCell,
     
     open override func prepareForReuse() {
         super.prepareForReuse()
-        isHighlightedBubbleView = false
+        hightlightMode = .none
         longPressItem = nil
         deliveryStatus = .pending
         NSLayoutConstraint.deactivate(contentView.constraints + containerView.constraints + (contentConstraints ?? []))
@@ -406,7 +418,20 @@ open class MessageCell: CollectionViewCell,
         else { return }
         deliveryStatus = data.messageDeliveryStatus
     }
-    
+
+    @objc
+    open func didUpdateSelectMessage(_ notification: Notification) {
+        if let messageId = notification.object as? MessageId,
+           messageId > 0,
+           let data,
+           data.message.id == messageId {
+            hightlightMode = .search
+            logger.debug("[SEARCH MESSAGE] SELECT CELL \(messageId)")
+        } else if hightlightMode == .search {
+            hightlightMode = .none
+        }
+    }
+
     open override func apply(_ layoutAttributes: UICollectionViewLayoutAttributes) {
         super.apply(layoutAttributes)
     }
@@ -647,5 +672,13 @@ public extension MessageCell {
         public static var checkBoxPadding: CGFloat = 12
         public static var horizontalPadding: CGFloat = 12
         public static var attachmentIconSize: CGFloat = 40
+    }
+}
+
+public extension MessageCell {
+    enum HighlightMode {
+        case reply
+        case search
+        case none
     }
 }

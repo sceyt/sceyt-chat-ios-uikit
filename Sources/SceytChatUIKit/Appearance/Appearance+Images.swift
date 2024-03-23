@@ -25,6 +25,8 @@ public extension Appearance {
         public static var warning: UIImage = { Assets.warning.image }()
         public static var eye: UIImage = { Assets.eye.image }()
         public static var chevron: UIImage = { Assets.chevron.image }()
+        public static var chevronUp: UIImage = { Assets.chevronUp.image }()
+        public static var chevronDown: UIImage = { Assets.chevronDown.image }()
         public static var deletedUser: UIImage = { Assets.deletedUser.image }()
         public static var attachment: UIImage = { Assets.attach.image }()
         public static var swipeIndicator: UIImage = { Assets.swipeIndicator.image }()
@@ -151,6 +153,7 @@ public extension Appearance {
 
         public static var searchIcon: UIImage = { Assets.searchIcon.image }()
         public static var searchBackground: UIImage = { Assets.searchBackground.image }()
+        public static var searchFill: UIImage = { Assets.searchFill.image }()
         
         public static var downloadStart: UIImage = { Assets.downloadStart.image }()
         public static var downloadStop: UIImage = { Assets.downloadStop.image }()
@@ -182,6 +185,8 @@ extension UIImage {
     static var warning: UIImage { Images.warning }
     static var eye: UIImage { Images.eye }
     static var chevron: UIImage { Images.chevron }
+    static var chevronUp: UIImage { Images.chevronUp }
+    static var chevronDown: UIImage { Images.chevronDown }
     static var deletedUser: UIImage { Images.deletedUser }
     static var attachment: UIImage { Images.attachment }
     static var swipeIndicator: UIImage { Images.swipeIndicator }
@@ -283,6 +288,7 @@ extension UIImage {
     static var chatActionLocation: UIImage { Images.chatActionLocation }
     
     static var searchIcon: UIImage { Images.searchIcon }
+    static var searchFill: UIImage { Images.searchFill }
     static var searchBackground: UIImage { Images.searchBackground }
     
     static var downloadStart: UIImage { Images.downloadStart }

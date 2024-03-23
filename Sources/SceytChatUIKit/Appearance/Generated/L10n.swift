@@ -334,6 +334,8 @@ internal enum L10n {
           internal static let autoDeleteMessages = L10n.tr("Localizable", "channel.profile.item.title.autoDeleteMessages", fallback: "Auto-Delete messages")
           /// Members
           internal static let members = L10n.tr("Localizable", "channel.profile.item.title.members", fallback: "Members")
+          /// Message Search
+          internal static let messageSearch = L10n.tr("Localizable", "channel.profile.item.title.messageSearch", fallback: "Message Search")
           /// Subscribers
           internal static let subscribers = L10n.tr("Localizable", "channel.profile.item.title.subscribers", fallback: "Subscribers")
         }
@@ -392,6 +394,16 @@ internal enum L10n {
     internal enum ReadOnly {
       /// Read Only.
       internal static let message = L10n.tr("Localizable", "channel.readOnly.message", fallback: "Read Only.")
+    }
+    internal enum Search {
+      /// %d of %d
+      internal static func foundIndex(_ p1: Int, _ p2: Int) -> String {
+        return L10n.tr("Localizable", "channel.search.found-index", p1, p2, fallback: "%d of %d")
+      }
+      /// Not found
+      internal static let notFound = L10n.tr("Localizable", "channel.search.not-found", fallback: "Not found")
+      /// Search
+      internal static let search = L10n.tr("Localizable", "channel.search.search", fallback: "Search")
     }
     internal enum Selecting {
       /// Clear Messages

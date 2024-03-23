@@ -85,4 +85,13 @@ open class ChannelProfileRouter: Router<ChannelProfileVC> {
         vc.viewModel = Components.channelAvatarVM.init(channel: rootVC.profileViewModel.channel)
         rootVC.show(vc, sender: self)
     }
+    
+    open func goMessageSearch() {
+        CATransaction.setCompletionBlock { [channelVC] in
+            channelVC?.channelViewModel.toggleSearch(isSearching: true)
+        }
+        CATransaction.begin()
+        goChannelVC()
+        CATransaction.commit()
+    }
 }

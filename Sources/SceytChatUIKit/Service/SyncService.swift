@@ -248,7 +248,6 @@ public struct Operations {
     }
     
     public static func syncChannelMessagesOperations(startMessageId: MessageId, channelId: ChannelId) -> Operation {
-        
         let query = MessageListQuery
             .Builder(channelId: channelId)
             .limit(30)
