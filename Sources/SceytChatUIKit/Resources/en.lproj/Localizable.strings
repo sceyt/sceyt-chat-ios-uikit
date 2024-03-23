@@ -289,3 +289,6 @@
 "channel.noMessages.message" = "No messages yet, start the chat";
 "channel.created.title" = "You created a channel";
 "channel.created.message" = "Add subscribers so they can join\nthe channel.";
+
+"channel.self.hint" = "message yourself";
+"channel.self.title" = "Me";

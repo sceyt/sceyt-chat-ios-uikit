@@ -35,9 +35,9 @@ open class ChannelProfileMenuCell: TableViewCell {
                         .centerX,
                             .centerY,
                             .top(0, .greaterThanOrEqual),
-                            .leading(0, .greaterThanOrEqual),
+                            .leading(0, .equal),
                             .bottom(0, .lessThanOrEqual),
-                            .trailing(0, .lessThanOrEqual)]
+                            .trailing(0, .equal)]
         )
     }
     
