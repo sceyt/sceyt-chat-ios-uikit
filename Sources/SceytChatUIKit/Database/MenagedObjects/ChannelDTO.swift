@@ -172,8 +172,12 @@ public class ChannelDTO: NSManagedObject {
             unsubscribed = false
         }
         unsynched = false
-        if let metadata = map.metadata, let selfMeta = try? SelfChannelMetadata(jsonString: metadata) {
-            isSelf = Bool(truncating: selfMeta.s as NSNumber)
+
+        if let metadata = map.metadata, let decodedMetadata = try? ChatChannel.Metadata.decode(metadata) {
+            let isSelf = Bool(truncating: decodedMetadata.isSelf as NSNumber)
+            if self.isSelf != isSelf {
+                self.isSelf = isSelf
+            }
         }
         return self
     }

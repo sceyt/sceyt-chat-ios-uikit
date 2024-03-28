@@ -185,13 +185,19 @@ extension ChatChannel {
     public struct Metadata: Codable {
         
         public var description: String
-        
+        public var isSelf: Int
+
         enum CodingKeys: String, CodingKey {
             case description = "d"
+            case isSelf = "s"
         }
         
-        public init(description: String = "") {
+        public init(
+            description: String = "",
+            isSelf: Int = 0
+        ) {
             self.description = description
+            self.isSelf = isSelf
         }
         
         func build() -> String? {
@@ -209,6 +215,7 @@ extension ChatChannel {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             description = (try? container.decode(String.self, forKey: CodingKeys.description)) ?? ""
+            isSelf = (try? container.decode(Int.self, forKey: CodingKeys.isSelf)) ?? 0
         }
     }
 }
@@ -235,8 +242,8 @@ public extension ChatChannel {
     }
 
     var isSelfChannel: Bool {
-        if let metadata, let selfMetadata = try? SelfChannelMetadata(jsonString: metadata) {
-            return Bool(truncating: selfMetadata.s as NSNumber)
+        if let decodedMetadata {
+            return Bool(truncating: decodedMetadata.isSelf as NSNumber)
         }
         return false
     }
