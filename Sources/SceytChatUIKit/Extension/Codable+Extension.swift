@@ -8,15 +8,6 @@
 
 import Foundation
 
-extension Decodable {
-    init(jsonString: String) throws {
-        guard let data = jsonString.data(using: .utf8) else {
-            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
-        }
-        self = try JSONDecoder().decode(Self.self, from: data)
-    }
-}
-
 extension Encodable {
     
     func jsonString() throws -> String {
