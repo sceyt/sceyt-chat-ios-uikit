@@ -354,12 +354,7 @@ open class MessageCell: CollectionViewCell,
     
     open var contextMenu: ContextMenu? {
         didSet {
-            let alignment: ContextMenu.HorizontalAlignment = data.message.incoming ? .leading : .trailing
-            contextMenu?.connect(
-                to: bubbleView,
-                identifier: .init(value: data),
-                alignment: effectiveUserInterfaceLayoutDirection == .rightToLeft ? alignment.reversed : alignment
-            )
+            connectContextMenu()
         }
     }
 
@@ -477,6 +472,7 @@ open class MessageCell: CollectionViewCell,
     open func handleLongPress(sender: UILongPressGestureRecognizer) -> LongPressItem? {
         switch sender.state {
         case .began:
+            connectContextMenuIfNeeded(identifier: .init(value: data))
             if textLabel.contains(gestureRecognizer: sender),
                let index = textLabel.indexForGesture(sender: sender),
                let item = data.attributedView.items.first(where: { $0.range.contains(index)}) {
@@ -518,7 +514,22 @@ open class MessageCell: CollectionViewCell,
         }
         return longPressItem
     }
-    
+
+    private func connectContextMenuIfNeeded(identifier: Identifier) {
+        if contextMenu?.alignments[identifier] == nil {
+            connectContextMenu()
+        }
+    }
+
+    private func connectContextMenu() {
+        let alignment: ContextMenu.HorizontalAlignment = data.message.incoming ? .leading : .trailing
+        contextMenu?.connect(
+            to: bubbleView,
+            identifier: .init(value: data),
+            alignment: effectiveUserInterfaceLayoutDirection == .rightToLeft ? alignment.reversed : alignment
+        )
+    }
+
     private func selectLink(range: NSRange) {
         guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString,
                 let color = appearance.highlightedLinkBackgroundColor
