@@ -870,6 +870,7 @@ extension SearchController: AppearanceProvider {
         public var font: UIFont? = Fonts.regular.withSize(16)
         public var textColor: UIColor? = .textBlack
         public var placeholderColor: UIColor? = .init(light: 0xA0A1B0, dark: 0x76787A)
+        public var tintColor: UIColor? = .kitBlue
 
         public init() {}
     }

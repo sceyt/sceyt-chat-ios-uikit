@@ -303,7 +303,7 @@ open class ChannelLayoutModel {
                 user = lastMessage?.user
             }
             if let user {
-                if lastMessage?.state == .deleted {
+                if lastMessage?.state == .deleted || channel.isSelfChannel {
                     // don't display sender
                 } else if (user.id == me) || (user.id.isEmpty && lastMessage?.incoming == false) {
                     sender = "\(L10n.User.current): "

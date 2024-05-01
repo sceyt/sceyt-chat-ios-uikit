@@ -84,7 +84,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open var isDeletedUser: Bool {
-        isDirectChat && channel.peer?.state != .active
+        isDirectChat && channel.peer?.state != .active && !channel.isSelfChannel
     }
     
     public private(set) var channel: ChatChannel {
@@ -1567,7 +1567,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open var isBlocked: Bool {
         guard channel.channelType == .direct,
                 let members = channel.members,
-              !members.isEmpty
+              !members.isEmpty,
+              !channel.isSelfChannel
         else { return false }
         return members.filter({ $0.blocked }).count >= members.count - 1 //except current user
     }
@@ -1610,6 +1611,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open var subTitle: String? {
+        if channel.isSelfChannel {
+            return L10n.Channel.Self.hint
+        }
         let memberCount = (isThread ||
                            !channel.isGroup) ? 0 : channel.memberCount
         var subTitle: String?

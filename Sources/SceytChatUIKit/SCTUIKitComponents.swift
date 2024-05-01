@@ -29,7 +29,6 @@ public enum SCTUIKitComponents {
     public static var channelUnreadCountView: ChannelUnreadCountView.Type = ChannelUnreadCountView.self
     public static var channelTitleView: ChannelVC.TitleView.Type = ChannelVC.TitleView.self
     public static var channelBottomView: ChannelVC.BottomView.Type = ChannelVC.BottomView.self
-    public static var channelSearchControlsView: ChannelVC.SearchControlsView.Type = ChannelVC.SearchControlsView.self
 
     public static var channelProfileVC: ChannelProfileVC.Type = ChannelProfileVC.self
     public static var channelProfileVM: ChannelProfileVM.Type = ChannelProfileVM.self
@@ -166,8 +165,9 @@ public enum SCTUIKitComponents {
     public static var channelMessageMarkerProvider: ChannelMessageMarkerProvider.Type = ChannelMessageMarkerProvider.self
     public static var messageReactionProvider: MessageReactionProvider.Type = MessageReactionProvider.self
     public static var attachmentTransfer: AttachmentTransfer.Type = AttachmentTransfer.self
-    public static var loadRangeProvider: LoadRangeProvider.Type = LoadRangeProvider.self
-    
+
+    public static var channelListSearchService: ChannelListSearchService.Type = ChannelListSearchService.self
+
     public static var hud: HUD.Type = KitHUD.self
     
     public static var logger: SCTUIKitLog.Type = SCTUIKitLog.self
