@@ -47,11 +47,6 @@ open class ChannelMessageSender: Provider {
         storeBeforeSend: Bool = true,
         completion: ((Error?) -> Void)? = nil
     ) {
-        if ((message.body as NSString).length == 0 && (message.attachments ?? []).isEmpty) || (message.body as NSString).length > 1_000 {
-            let data = Data(message.body.utf8)
-            let hexString = data.map{ String(format:"%02x", $0) }.joined()
-            logger.verbose("[EMPTY] Send text message by hex [\(hexString)] orig [\(message.body.prefix(5))]")
-        }
         
         logger.info("Prepare send message with tid \(message.tid)")
         func store(completion: @escaping () -> Void) {
@@ -80,9 +75,15 @@ open class ChannelMessageSender: Provider {
             }
              logger.info("message with tid \(sentMessage.tid) id: \(sentMessage.id) sent successfully")
             self.database.write ({
+                let predicate = NSPredicate(format: "channelId == %lld AND id > 0", self.channelId)
+                let message = MessageDTO.lastMessage(predicate: predicate, context: $0)
+                let channel = ChannelDTO.fetch(id: self.channelId, context: $0)
+                let lastMessageId = message?.id
                 $0.update(message: sentMessage, channelId: self.channelId)
-                ChannelDTO.fetch(id: self.channelId, context: $0)?
-                    .lastReceivedMessageId = Int64(sentMessage.id)
+                if let channel {
+                    channel.lastReceivedMessageId = Int64(sentMessage.id)
+                    $0.updateRanges(startMessageId: sentMessage.id, endMessageId: MessageId(lastMessageId ?? Int64(sentMessage.id)), channelId: ChannelId(channel.id))
+                }
             }) { dbError in
                 completion?(error ?? dbError)
             }
@@ -174,13 +175,21 @@ open class ChannelMessageSender: Provider {
                     }
                      logger.info("Message with tid \(sentMessage.tid), id \(sentMessage.id) will store in db")
                     self.database.write ({
+                        let predicate = NSPredicate(format: "channelId == %lld AND id > 0", self.channelId)
+                        let message = MessageDTO.lastMessage(predicate: predicate, context: $0)
+                        let channel = ChannelDTO.fetch(id: self.channelId, context: $0)
+                        let lastMessageId = message?.id
+                        
                         $0.createOrUpdate(
                             message: sentMessage,
                             channelId: self.channelId
                         )
-                        if let ownerChannel = ChannelDTO.fetch(id: self.channelId, context: $0),
-                           ownerChannel.lastDisplayedMessageId < Int64(sentMessage.id) {
-                            ownerChannel.lastDisplayedMessageId = Int64(sentMessage.id)
+                        
+                        if let channel {
+                            $0.updateRanges(startMessageId: sentMessage.id, endMessageId: MessageId(lastMessageId ?? Int64(sentMessage.id)), channelId: ChannelId(channel.id))
+                            if channel.lastDisplayedMessageId < Int64(sentMessage.id) {
+                                channel.lastDisplayedMessageId = Int64(sentMessage.id)
+                            }
                         }
                     }, completion: completion)
                 }

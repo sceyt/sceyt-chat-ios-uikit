@@ -18,9 +18,8 @@ open class MessageCell: CollectionViewCell,
     
     open lazy var checkBoxView = {
         $0.isUserInteractionEnabled = false
-        return $0
+        return $0.withoutAutoresizingMask
     }(CheckBoxView())
-        .withoutAutoresizingMask
     
     open lazy var containerView = UIView()
         .withoutAutoresizingMask
@@ -92,7 +91,7 @@ open class MessageCell: CollectionViewCell,
     open lazy var replyIcon = UIImageView(image: .channelReply)
         .withoutAutoresizingMask
     
-    open var hightlightMode = HighlightMode.none
+    open var highlightMode = HighlightMode.none
         
     public private(set) var contentConstraints: [NSLayoutConstraint]?
     
@@ -150,22 +149,21 @@ open class MessageCell: CollectionViewCell,
         attachmentView.previewer = { [weak self] in
             self?.previewer?()
         }
-        
-        let notification = NotificationCenter.default
-        notification
-            .addObserver(
-                self,
-                selector: #selector(didUpdateDeliveryStatus(_:)),
-                name: .didUpdateDeliveryStatus,
-                object: nil
-            )
-        notification.addObserver(
+                
+        let notificationCenter = NotificationCenter.default
+        notificationCenter.addObserver(
+            self,
+            selector: #selector(didUpdateDeliveryStatus(_:)),
+            name: .didUpdateDeliveryStatus,
+            object: nil
+        )
+        notificationCenter.addObserver(
             self,
             selector: #selector(didUpdateSelectMessage(_:)),
             name: .selectMessage,
             object: nil
         )
-        
+
         replyIcon.isHidden = true
     }
     
@@ -321,7 +319,7 @@ open class MessageCell: CollectionViewCell,
     
     open override func prepareForReuse() {
         super.prepareForReuse()
-        hightlightMode = .none
+        highlightMode = .none
         longPressItem = nil
         deliveryStatus = .pending
         NSLayoutConstraint.deactivate(contentView.constraints + containerView.constraints + (contentConstraints ?? []))
@@ -367,7 +365,12 @@ open class MessageCell: CollectionViewCell,
     
     open var contextMenu: ContextMenu? {
         didSet {
-            connectContextMenu()
+            let alignment: ContextMenu.HorizontalAlignment = data.message.incoming ? .leading : .trailing
+            contextMenu?.connect(
+                to: bubbleView,
+                identifier: .init(value: data),
+                alignment: effectiveUserInterfaceLayoutDirection == .rightToLeft ? alignment.reversed : alignment
+            )
         }
     }
 
@@ -414,20 +417,19 @@ open class MessageCell: CollectionViewCell,
         else { return }
         deliveryStatus = data.messageDeliveryStatus
     }
-    
+
     @objc
     open func didUpdateSelectMessage(_ notification: Notification) {
         if let messageId = notification.object as? MessageId,
            messageId > 0,
            let data,
            data.message.id == messageId {
-            hightlightMode = .search
-            logger.debug("[SEARCH MESSAGE] SELECT CELL \(messageId)")
-        } else if hightlightMode == .search {
-            hightlightMode = .none
+            highlightMode = .search
+        } else if case .search = highlightMode  {
+            highlightMode = .none
         }
     }
-    
+
     open override func apply(_ layoutAttributes: UICollectionViewLayoutAttributes) {
         super.apply(layoutAttributes)
     }
@@ -498,7 +500,6 @@ open class MessageCell: CollectionViewCell,
     open func handleLongPress(sender: UILongPressGestureRecognizer) -> LongPressItem? {
         switch sender.state {
         case .began:
-            connectContextMenuIfNeeded(identifier: .init(value: data))
             if textLabel.contains(gestureRecognizer: sender),
                let index = textLabel.indexForGesture(sender: sender),
                let item = data.attributedView.items.first(where: { $0.range.contains(index)}) {
@@ -540,22 +541,7 @@ open class MessageCell: CollectionViewCell,
         }
         return longPressItem
     }
-
-    private func connectContextMenuIfNeeded(identifier: Identifier) {
-        if contextMenu?.alignments[identifier] == nil {
-            connectContextMenu()
-        }
-    }
-
-    private func connectContextMenu() {
-        let alignment: ContextMenu.HorizontalAlignment = data.message.incoming ? .leading : .trailing
-        contextMenu?.connect(
-            to: bubbleView,
-            identifier: .init(value: data),
-            alignment: effectiveUserInterfaceLayoutDirection == .rightToLeft ? alignment.reversed : alignment
-        )
-    }
-
+    
     private func selectLink(range: NSRange) {
         guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString,
                 let color = appearance.highlightedLinkBackgroundColor

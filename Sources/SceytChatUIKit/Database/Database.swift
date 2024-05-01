@@ -28,7 +28,7 @@ public protocol Database {
     var backgroundReadOnlyObservableContext: NSManagedObjectContext { get }
     
     func recreate(completion: @escaping ((Error?) -> Void))
-    func deleteAll()
+    func deleteAll(completion: (() -> Void)?)
 }
 
 public extension Database {
@@ -81,6 +81,10 @@ public extension Database {
             self.viewContext.stalenessInterval = -1
         }
         completion?()
+    }
+    
+    func deleteAll() {
+        deleteAll(completion: nil)
     }
 }
 
@@ -162,8 +166,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     }
     
     public lazy var backgroundPerformContext: NSManagedObjectContext = {
-        let context = NSManagedObjectContext(concurrencyType: .privateQueueConcurrencyType)
-        context.parent = backgroundReadOnlyObservableContext
+        let context = newBackgroundContext()
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         context.automaticallyMergesChangesFromParent = true
         return context
@@ -190,10 +193,9 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                         self.backgroundPerformContext.refresh(object, mergeChanges: false)
                     }
                 }
-                guard self.backgroundPerformContext.hasChanges else { return }
-                try self.backgroundPerformContext.save()
-                try self.backgroundReadOnlyObservableContext.save()
-                
+                if self.backgroundPerformContext.hasChanges {
+                    try self.backgroundPerformContext.save()
+                }
             } catch {
                 resultQueue.async { completion?(error) }
             }
@@ -280,14 +282,23 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         }
     }
     
-    public func deleteAll() {
+    public func deleteAll(completion: (() -> Void)? = nil) {
         backgroundPerformContext.perform {
             for key in self.managedObjectModel.entitiesByName.keys {
                 let request = NSFetchRequest<NSFetchRequestResult>(entityName: key)
                 try? self.backgroundPerformContext.batchDelete(fetchRequest: request)
             }
+            completion?()
         }
-        
+    }
+    
+    deinit {
+        NotificationCenter.default
+            .removeObserver(
+                self,
+                name: .NSManagedObjectContextDidSave,
+                object: backgroundPerformContext)
+
     }
 }
 

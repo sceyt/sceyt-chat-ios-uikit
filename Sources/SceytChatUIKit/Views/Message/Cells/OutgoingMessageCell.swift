@@ -10,9 +10,9 @@ import UIKit
 
 open class OutgoingMessageCell: MessageCell {
     
-    open override var hightlightMode: MessageCell.HighlightMode {
+    open override var highlightMode: MessageCell.HighlightMode {
         didSet {
-            switch hightlightMode {
+            switch highlightMode {
             case .reply:
                 bubbleView.backgroundColor = appearance.highlightedBubbleColor.out
             case .search:
@@ -22,7 +22,7 @@ open class OutgoingMessageCell: MessageCell {
             }
             if data?.hasMediaAttachments == true {
                 attachmentOverlayView.backgroundColor = appearance.highlightedOverlayColor.out
-                attachmentOverlayView.alpha = hightlightMode == .reply ? 1 : 0
+                attachmentOverlayView.alpha = highlightMode == .reply ? 1 : 0
             } else {
                 attachmentOverlayView.alpha = 0
             }

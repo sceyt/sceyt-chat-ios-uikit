@@ -137,8 +137,18 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
     
     open func channel(_ channel: Channel, didReceive message: Message) {
         database.write {
+            let lastMessageId: MessageId = MessageId(
+                ChannelDTO
+                .fetch(id: channel.id, context: $0)?.lastMessage?.id ?? 
+                Int64((channel.lastMessage?.id ?? message.id))
+            )
             $0.createOrUpdate(channel: channel)
             $0.createOrUpdate(message: message, channelId: channel.id)
+            $0.updateRanges(
+                startMessageId: lastMessageId,
+                endMessageId: message.id,
+                channelId: channel.id
+            )
         } completion: { error in
             logger.debug(error?.localizedDescription ?? "")
         }

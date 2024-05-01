@@ -1,6 +1,7 @@
 import UIKit
 
 extension ChannelVC {
+    
     open class SearchControlsView: View {
         open lazy var separatorView = UIView()
             .withoutAutoresizingMask
@@ -72,7 +73,9 @@ extension ChannelVC {
         open func update(with searchResult: MessageSearchCoordinator, query: String) {
             nextResultButton.isEnabled = searchResult.hasNext
             prevResultButton.isEnabled = searchResult.hasPrev
-            if query.isEmpty {
+            if (query.isEmpty || searchResult.state == .loadFailed),
+               !searchResult.hasNext,
+               !searchResult.hasPrev {
                 resultsCounterLabel.text = nil
             } else if searchResult.cacheCount == 0 {
                 setNotFoundCounterText()

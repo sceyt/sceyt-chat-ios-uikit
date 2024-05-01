@@ -71,7 +71,7 @@ open class ChannelListVM: NSObject,
     }
     
     open func startDatabaseObserver() {
-        channelObserver.onDidChange = { [weak self] items, events in
+        channelObserver.onDidChange = { [weak self] _, items, _ in
             self?.onDidChangeEvent(items: items)
         }
         channelObserver.startObserver()
@@ -330,5 +330,21 @@ public extension ChannelListVM {
         case typing(Bool, ChatChannelMember, ChatChannel)
         case connection(ConnectionState)
         case showChannel(ChatChannel)
+    }
+}
+
+
+extension ChannelListVM {
+    
+    func deleteDataBase(completion: (() -> Void)? = nil) {
+        channelObserver.stopObserver()
+        layoutModels.removeAll(keepingCapacity: true)
+        Components.storage.deleteAll()
+        Provider.database.deleteAll { [weak self] in
+            guard let self else { return }
+            channelObserver.startObserver()
+            completion?()
+            SyncService.syncChannels()
+        }
     }
 }

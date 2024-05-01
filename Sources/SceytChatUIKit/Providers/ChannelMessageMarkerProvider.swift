@@ -99,7 +99,7 @@ open class ChannelMessageMarkerProvider: Provider {
                 }
                 completion?(error)
             } else if let markerList {
-                logger.debug("[MARKER CK] receive \(markerList.messageIds.count)")
+                logger.debug("[MARKER CHECK] receive \(markerList.messageIds.count)")
                 logger.debug("[MARKER CHECK] received mark: \(markerList.name) for \(markerList.messageIds) in channelId:\(markerList.channelId)")
                 self.database.write ({
                     $0.update(messageSelfMarkers: markerList)

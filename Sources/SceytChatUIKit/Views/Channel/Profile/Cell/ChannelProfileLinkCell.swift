@@ -79,8 +79,7 @@ open class ChannelProfileLinkCell: CollectionViewCell {
     
     open var data: ChatMessage.Attachment! {
         didSet {
-            guard let data
-            else { return }
+            guard let data else { return }
             linkLabel.text = data.url
             titleLabel.isHidden = (titleLabel.text ?? "").isEmpty
             detailLabel.isHidden = (detailLabel.text ?? "").isEmpty

@@ -3,7 +3,7 @@ import Foundation
 import SceytChat
 
 @objc(LoadRangeDTO)
-public final class LoadRangeDTO: NSManagedObject {
+public class LoadRangeDTO: NSManagedObject {
     
     @NSManaged public var startMessageId: Int64
     @NSManaged public var endMessageId: Int64
@@ -56,39 +56,7 @@ public final class LoadRangeDTO: NSManagedObject {
         return fetch(request: request, context: context)
     }
     
-    public static func fetchPreviousRange(
-        channelId: Int64,
-        lastMessageId: Int64,
-        context: NSManagedObjectContext
-    ) -> LoadRangeDTO? {
-        let request = fetchRequest()
-        request.predicate = NSPredicate(
-            format: "startMessageId <= %lld AND endMessageId >= %lld AND channelId == %lld",
-            lastMessageId,
-            lastMessageId,
-            channelId
-        )
-        request.sortDescriptor = .init(keyPath: \LoadRangeDTO.endMessageId, ascending: true)
-        return fetch(request: request, context: context).last
-    }
-    
-    public static func fetchNextRange(
-        channelId: Int64,
-        lastMessageId: Int64,
-        context: NSManagedObjectContext
-    ) -> LoadRangeDTO? {
-        let request = fetchRequest()
-        request.predicate = NSPredicate(
-            format: "startMessageId <= %lld AND endMessageId >= %lld AND channelId == %lld",
-            lastMessageId,
-            lastMessageId,
-            channelId
-        )
-        request.sortDescriptor = .init(keyPath: \LoadRangeDTO.endMessageId, ascending: true)
-        return fetch(request: request, context: context).first
-    }
-    
-    public static func fetchAll(channelId: Int64, context: NSManagedObjectContext) -> [LoadRangeDTO] {
+    public static func fetchAll(channelId: ChannelId, context: NSManagedObjectContext) -> [LoadRangeDTO] {
         let request = fetchRequest()
         request.predicate = NSPredicate(format: "channelId == %lld", channelId)
         request.sortDescriptor = NSSortDescriptor(keyPath: \LoadRangeDTO.endMessageId, ascending: true)

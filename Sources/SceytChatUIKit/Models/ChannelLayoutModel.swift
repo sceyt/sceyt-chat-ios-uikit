@@ -84,14 +84,19 @@ open class ChannelLayoutModel {
                 return true
             }
             
-            let update =
+            var update =
             channel.draftMessage != selfChannel.draftMessage ||
             channel.lastMessage?.id != selfChannel.lastMessage?.id ||
+            channel.lastMessage?.tid != selfChannel.lastMessage?.tid ||
             channel.lastMessage?.state != selfChannel.lastMessage?.state ||
             channel.lastMessage?.updatedAt != selfChannel.lastMessage?.updatedAt ||
             channel.lastReaction?.id != selfChannel.lastReaction?.id ||
             channel.lastReaction?.message?.id != selfChannel.lastReaction?.message?.id ||
             channel.lastMessage?.deliveryStatus != selfChannel.lastMessage?.deliveryStatus
+            
+            if !update, let p1 = channel.peer, let p2 = selfChannel.peer, p1 !~= p2 {
+                update = true
+            }
             
             self.channel = channel
             

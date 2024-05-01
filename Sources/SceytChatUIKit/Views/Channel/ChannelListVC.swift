@@ -45,6 +45,11 @@ open class ChannelListVC: ViewController,
                                                   target: self,
                                                   action: #selector(newChannelAction(_:)))
         
+//        navigationItem.leftBarButtonItem = .init(
+//            image: ImageBuilder.build(fillColor: .clear, size: .init(width: 36, height: 36)),
+//            style: .plain,
+//            target: self, 
+//            action: #selector(leftButtonAction(_:event:)))
         tableView.delegate = self
         tableView.dataSource = self
                 
@@ -127,6 +132,21 @@ open class ChannelListVC: ViewController,
         channelListRouter.showNewChannel()
     }
     
+    @objc
+    private func leftButtonAction(_ sender: UIBarItem, event: UIEvent) {
+        guard let touch = event.allTouches?.first
+        else { return }
+        guard touch.tapCount == 5
+        else { return }
+        sender.isEnabled = false
+        channelListViewModel.deleteDataBase { [weak self] in
+            DispatchQueue.main.async {
+                self?.tableView.reloadData()
+                sender.isEnabled = true
+            }
+        }
+    }
+    
     // MARK: ViewModel Event
     
     open func onEvent(_ event: ChannelListVM.Event) {
@@ -165,21 +185,25 @@ open class ChannelListVC: ViewController,
         if view.window == nil || tableView.visibleCells.isEmpty || !isViewDidAppear {
             tableView.reloadData()
         } else {
-            tableView.performBatchUpdates {
-                if !paths.sectionInserts.isEmpty {
-                    tableView.insertSections(paths.sectionInserts, with: .none)
+            UIView.performWithoutAnimation {
+                tableView.performBatchUpdates {
+                    if !paths.sectionInserts.isEmpty {
+                        tableView.insertSections(paths.sectionInserts, with: .none)
+                    }
+                    if !paths.sectionDeletes.isEmpty {
+                        tableView.deleteSections(paths.sectionDeletes, with: .none)
+                    }
+                    tableView.insertRows(at: paths.inserts, with: .none)
+                    tableView.reloadRows(at: paths.updates, with: .none)
+                    tableView.deleteRows(at: paths.deletes, with: .none)
+                    paths.moves.forEach { move in
+                        tableView.moveRow(at: move.from, to: move.to)
+                    }
+                } completion: { [weak self] _ in
+                    UIView.performWithoutAnimation {
+                        self?.tableView.reloadRows(at: paths.moves.map { $0.to }, with: .none)
+                    }
                 }
-                if !paths.sectionDeletes.isEmpty {
-                    tableView.deleteSections(paths.sectionDeletes, with: .none)
-                }
-                tableView.insertRows(at: paths.inserts, with: .none)
-                tableView.reloadRows(at: paths.updates, with: .none)
-                tableView.deleteRows(at: paths.deletes, with: .none)
-                paths.moves.forEach { move in
-                    tableView.moveRow(at: move.from, to: move.to)
-                }
-            } completion: { [weak self] _ in
-                self?.tableView.reloadRows(at: paths.moves.map { $0.to }, with: .none)
             }
         }
     }

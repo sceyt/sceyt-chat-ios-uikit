@@ -293,6 +293,10 @@ open class Storage: NSObject {
         return 0
     }
     
+    open class func deleteAll() {
+        storingKey.removeStorageFolder()
+    }
+    
     static func subPath(filePath: String) -> String {
         if filePath.hasPrefix(storingKey.storageFolderPath) {
             return String(filePath.dropFirst(storingKey.storageFolderPath.count))

@@ -1,24 +1,30 @@
 import Foundation
+import SceytChat
 
-public final class LoadRangeProvider: Provider {
+public enum LoadDirection {
+    case next, prev, near
+}
+
+open class LoadRangeProvider: Provider {
     
-    func fetchPreviousLoadRange(
-        channelId: Int64,
-        lastMessageId: Int64,
-        completion: @escaping (LoadRangeDTO?) -> Void
+    public required override init() {
+        super.init()
+    }
+    
+    open func fetchPreviousRange(
+        channelId: ChannelId,
+        lastMessageId: MessageId,
+        completion: @escaping (ChatLoadRange?) -> Void
     ) {
-        database.read { context in
-            let request = LoadRangeDTO.fetchRequest()
-            request.sortDescriptor = .init(keyPath: \LoadRangeDTO.endMessageId, ascending: true)
-            let ranges = LoadRangeDTO.fetch(request: request, context: context)
-            print()
-        }
-        database.read { context in
-            return LoadRangeDTO.fetchPreviousRange(
+        database.read {
+            let range = $0.previousRange(
                 channelId: channelId,
-                lastMessageId: lastMessageId,
-                context: context
-            )
+                lastMessageId: lastMessageId
+            )?.convert()
+            if let id = ChannelDTO.fetch(id: channelId, context: $0)?.lastMessage?.id {
+                range?.channelLastMessageId = MessageId(id)
+            }
+            return range
         } completion: { result in
             switch result {
             case let .success(range):
@@ -30,17 +36,20 @@ public final class LoadRangeProvider: Provider {
 
     }
     
-    func fetchNextLoadRange(
-        channelId: Int64,
-        lastMessageId: Int64,
-        completion: @escaping (LoadRangeDTO?) -> Void
+    open func fetchNextRange(
+        channelId: ChannelId,
+        lastMessageId: MessageId,
+        completion: @escaping (ChatLoadRange?) -> Void
     ) {
-        database.read { context in
-            return LoadRangeDTO.fetchNextRange(
+        database.read {
+            let range = $0.nextRange(
                 channelId: channelId,
-                lastMessageId: lastMessageId,
-                context: context
-            )
+                lastMessageId: lastMessageId
+            )?.convert()
+            if let id = ChannelDTO.fetch(id: channelId, context: $0)?.lastMessage?.id {
+                range?.channelLastMessageId = MessageId(id)
+            }
+            return range
         } completion: { result in
             switch result {
             case let .success(range):
@@ -51,15 +60,34 @@ public final class LoadRangeProvider: Provider {
         }
     }
     
-    func fetchLoadRanges(channelId: Int64, completion: @escaping ([LoadRangeDTO]) -> Void) {
-        database.read { context in
-            let request = LoadRangeDTO.fetchRequest()
-            request.sortDescriptor = .init(keyPath: \LoadRangeDTO.endMessageId, ascending: true)
-            let ranges = LoadRangeDTO.fetch(request: request, context: context)
-            print()
+    
+    open func maxRange(
+        channelId: ChannelId,
+        triggeredMessageId: MessageId,
+        completion: @escaping (ChatLoadRange?) -> Void
+    ) {
+        database.read {
+            let range = $0.maxRange(
+                    channelId: channelId,
+                    messageId: triggeredMessageId)?
+                .convert()
+            if let id = ChannelDTO.fetch(id: channelId, context: $0)?.lastMessage?.id {
+                range?.channelLastMessageId = MessageId(id)
+            }
+            return range
+        } completion: { result in
+            switch result {
+            case let .success(range):
+                completion(range)
+            case .failure:
+                completion(nil)
+            }
         }
+    }
+    
+    open func fetchLoadRanges(channelId: ChannelId, completion: @escaping ([ChatLoadRange]) -> Void) {
         database.read { context in
-            return LoadRangeDTO.fetchAll(channelId: channelId, context: context)
+            return LoadRangeDTO.fetchAll(channelId: channelId, context: context).map { $0.convert() }
         } completion: { result in
             switch result {
             case let .success(ranges):

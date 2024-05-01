@@ -922,12 +922,10 @@ open class ChannelProfileVC: ViewController,
     }
     
     open func messageAction(_ sender: HoldButton) {
-        logger.debug("message")
         ChannelListRouter.findAndShowChannel(id: profileViewModel.channel.id)
     }
     
     open func searchAction(_ sender: HoldButton) {
-        logger.debug("search")
         router.goMessageSearch()
     }
     

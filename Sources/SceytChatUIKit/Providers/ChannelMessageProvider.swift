@@ -69,6 +69,8 @@ open class ChannelMessageProvider: Provider {
                 )
                 self.sendReceivedMarker(messages: messages)
             }
+        } else {
+            completion?(SceytChatError.queryInProgress)
         }
     }
     
@@ -97,10 +99,13 @@ open class ChannelMessageProvider: Provider {
                     }
                     self.store(
                         messages: messages,
+                        triggerMessage: messageId,
                         completion: completion
                     )
                     self.sendReceivedMarker(messages: messages)
                 }
+            } else {
+                completion?(SceytChatError.queryInProgress)
             }
         }
     
@@ -131,6 +136,8 @@ open class ChannelMessageProvider: Provider {
                 )
                 self.sendReceivedMarker(messages: messages)
             }
+        } else {
+            completion?(SceytChatError.queryInProgress)
         }
     }
     
@@ -164,6 +171,8 @@ open class ChannelMessageProvider: Provider {
                     )
                     self.sendReceivedMarker(messages: messages)
                 }
+            } else {
+                completion?(SceytChatError.queryInProgress)
             }
         }
     
@@ -208,44 +217,16 @@ open class ChannelMessageProvider: Provider {
                 channelId: self.channelId
             )
             
-//            let sorted = messages.sorted(by: { $0.id < $1.id })
-//            if let channelId = sorted.first?.channelId {
-//                let startMessageId = sorted.first?.id ?? 0
-//                let endMessageId = sorted.last?.id ?? 0
-//                
-//                let ranges = LoadRangeDTO.fetchMatching(
-//                    channelId: channelId,
-//                    startMessageId: startMessageId,
-//                    endMessageId: endMessageId,
-//                    triggerMessageId: triggerMessage,
-//                    context: context
-//                )
-//                
-//                let minLocalId = ranges.min(by: { $0.startMessageId < $1.startMessageId })?.startMessageId ?? Int64(startMessageId)
-//                let maxLocalId = ranges.max(by: { $0.endMessageId > $1.endMessageId })?.endMessageId ?? Int64(endMessageId)
-//                
-//                var minId = min(Int64(startMessageId), minLocalId)
-//                var maxId = max(Int64(endMessageId), maxLocalId)
-//                
-//                if let triggerMessage {
-//                    if triggerMessage < minId {
-//                        minId = Int64(triggerMessage)
-//                    }
-//                    if triggerMessage > maxId {
-//                        maxId = Int64(triggerMessage)
-//                    }
-//                }
-//                
-//                if ranges.count == 1 && minId >= ranges[0].startMessageId && maxId <= ranges[0].endMessageId {
-//                    return
-//                }
-//                ranges.forEach { context.delete($0) }
-//                
-//                let dto = LoadRangeDTO.insertNewObject(into: context)
-//                dto.channelId = Int64(channelId)
-//                dto.startMessageId = minId
-//                dto.endMessageId = maxId
-//            }
+            guard let startMessageId = messages.min(by: { $0.id < $1.id})?.id,
+                  let endMessageId = messages.max(by: { $0.id < $1.id})?.id
+            else { return }
+            context.updateRanges(
+                startMessageId: startMessageId,
+                endMessageId: endMessageId,
+                triggerMessage: triggerMessage,
+                channelId: self.channelId
+            )
+            
         }) { error in
             completion?(error)
         }
@@ -564,32 +545,32 @@ extension ChannelMessageProvider {
             completion(try? result.get())
         }
     }
-    
+
     public class func updateFromDatabase(
         messages: [Message],
         sortDescriptors: [NSSortDescriptor] = [],
         completion: @escaping ([ChatMessage]?) -> Void) {
-        
-        database.performBgTask(resultQueue: .global()) { context in
-            var chatMessages = NSMutableArray()
-            for message in messages {
-                if let m = MessageDTO.fetch(id: message.id, context: context) {
-                    chatMessages.add(m)
-                } else {
-                    let dto = context.createOrUpdate(message: message, channelId: message.channelId)
-                    dto.unlisted = true
-                    chatMessages.add(dto)
+
+            database.performBgTask(resultQueue: .global()) { context in
+                var chatMessages = NSMutableArray()
+                for message in messages {
+                    if let m = MessageDTO.fetch(id: message.id, context: context) {
+                        chatMessages.add(m)
+                    } else {
+                        let dto = context.createOrUpdate(message: message, channelId: message.channelId)
+                        dto.unlisted = true
+                        chatMessages.add(dto)
+                    }
                 }
+                if !sortDescriptors.isEmpty {
+                    chatMessages.sort(using: sortDescriptors)
+                }
+                return chatMessages.compactMap { ChatMessage(dto: $0 as! MessageDTO)}
+
+            } completion: { result in
+                completion(try? result.get())
             }
-            if !sortDescriptors.isEmpty {
-                chatMessages.sort(using: sortDescriptors)
-            }
-            return chatMessages.compactMap { ChatMessage(dto: $0 as! MessageDTO)}
-            
-        } completion: { result in
-            completion(try? result.get())
         }
-    }
 }
 
 private extension ChannelMessageProvider {

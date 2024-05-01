@@ -87,11 +87,7 @@ open class ChannelProfileRouter: Router<ChannelProfileVC> {
     }
     
     open func goMessageSearch() {
-        CATransaction.setCompletionBlock { [channelVC] in
-            channelVC?.channelViewModel.toggleSearch(isSearching: true)
-        }
-        CATransaction.begin()
+        channelVC?.channelViewModel.startMessagesSearch()
         goChannelVC()
-        CATransaction.commit()
     }
 }
