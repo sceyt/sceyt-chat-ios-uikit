@@ -1185,9 +1185,19 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         @Sendable func send() {
             switch action {
             case .send, .reply, .forward:
-                messageSender.sendMessage(message, storeBeforeSend: false)
+                messageSender.sendMessage(message, storeBeforeSend: false) {[weak self] _ in
+                    guard let self else { return }
+                    if case .reload = isRestartingMessageObserver {
+                        isRestartingMessageObserver = .none
+                    }
+                }
             case .edit:
-                messageSender.editMessage(message, storeBeforeSend: false)
+                messageSender.editMessage(message, storeBeforeSend: false) {[weak self] _ in
+                    guard let self else { return }
+                    if case .reload = isRestartingMessageObserver {
+                        isRestartingMessageObserver = .none
+                    }
+                }
             }
         }
         

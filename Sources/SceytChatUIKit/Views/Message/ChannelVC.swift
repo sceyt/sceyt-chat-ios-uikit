@@ -1200,6 +1200,7 @@ open class ChannelVC: ViewController,
         guard isAppActive else { return }
         isStartedDragging = true
         isScrollingBottom = true
+        updateUnreadViewVisibility()
         collectionView.scrollToBottom(animated: animated) { [weak self] _ in
             self?.isScrollingBottom = false
         }
@@ -1212,6 +1213,10 @@ open class ChannelVC: ViewController,
             return
         }
         if isScrollingBottom {
+            unreadCountView.isHidden = true
+            return
+        }
+        if collectionView.contentSize.height < collectionView.frame.height {
             unreadCountView.isHidden = true
             return
         }
@@ -1786,6 +1791,7 @@ open class ChannelVC: ViewController,
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
                 layout.isInsertingItemsToTop = false
                 collectionView.reloadDataAndScrollToBottom()
+                updateUnreadViewVisibility()
                 return
             }
             
@@ -1880,6 +1886,7 @@ open class ChannelVC: ViewController,
             } else {
                 collectionView.reloadDataIfNeeded()
             }
+            updateUnreadViewVisibility()
         case .reload(let indexPath):
             UIView.performWithoutAnimation {
                 collectionView.performUpdates {
@@ -1894,6 +1901,7 @@ open class ChannelVC: ViewController,
         case .reloadDataAndScroll(let indexPath):
             needToMarkMessageAsDisplayed = true
             collectionView.reloadDataAndScrollTo(indexPath: indexPath)
+            updateUnreadViewVisibility()
         case let .resetSections(old, new):
             UIView.performWithoutAnimation {
                 collectionView.reloadDataAndScrollToBottom()
