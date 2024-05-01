@@ -1704,8 +1704,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open var isBlocked: Bool {
         guard channel.channelType == .direct,
-              let members = channel.members,
-              !members.isEmpty
+                let members = channel.members,
+              !members.isEmpty,
+              !channel.isSelfChannel
         else { return false }
         return members.filter({ $0.blocked }).count >= members.count - 1 //except current user
     }
