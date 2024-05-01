@@ -41,17 +41,20 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     public let presenceProvider = PresenceProvider.default
-    public lazy var messageFetchPredicate = NSPredicate(format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false", channel.id)
     
     //MARK: Message observer
     open lazy var messageObserver: LazyMessagesObserver = {
-        return LazyMessagesObserver(channelId: channel.id, loadRangeProvider: loadRangeProvider) { [weak self] in
+        createMessageObserver()
+    }()
+    
+    private func createMessageObserver() -> LazyMessagesObserver {
+        LazyMessagesObserver(channelId: channel.id, loadRangeProvider: loadRangeProvider) { [weak self] in
             let message = $0.convert()
             self?.updateUnreadIndexIfNeeded(message: message)
             self?.createLayoutModel(for: message)
             return message
         }
-    }()
+    }
     
     //MARK: Channel observer
     open lazy var channelObserver: DatabaseObserver<ChannelDTO, ChatChannel> = {
@@ -994,7 +997,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         isRestartingMessageObserver = .reloadToLatestState
         let offset = calculateMessageFetchOffset(messageId: initialMessageId)
         messageObserver
-            .restartObserver(fetchPredicate: self.messageFetchPredicate, offset: offset)
+            .restartObserver(fetchPredicate: messageObserver.defaultFetchPredicate,
+                             offset: offset)
         { [weak self] in
             self?.isRestartingMessageObserver = .none
         }
@@ -1877,6 +1881,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             }
             guard let self
             else { return }
+            self.channel = channel
             self.provider = Components.channelMessageProvider.init(
                 channelId: channel.id,
                 threadMessageId: self.threadMessage?.id
@@ -1885,15 +1890,17 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.messageSender = Components.channelMessageSender
                 .init(channelId: channel.id, threadMessageId: self.threadMessage?.id)
             self.messageMarkerProvider = Components.channelMessageMarkerProvider.init(channelId: channel.id)
-            self.messageFetchPredicate = NSPredicate(format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false", channel.id, channel.id)
+            
             self.channelProvider = Components.channelProvider
                 .init(channelId: channel.id)
+            self.messageObserver.stopObserver()
+            self.channelObserver.stopObserver()
+            self.messageObserver = createMessageObserver()
             isRestartingMessageObserver = .reload
-            self.messageObserver.restartObserver(fetchPredicate: self.messageFetchPredicate) {[weak self] in
+            
+            startDatabaseObserver {[weak self] in
                 self?.isRestartingMessageObserver = .none
-                
             }
-            self.channel = channel
             for model in self.layoutModels.values {
                 model.replace(channel: channel)
             }
