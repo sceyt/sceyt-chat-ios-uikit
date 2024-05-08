@@ -556,35 +556,39 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     @discardableResult
     public func createOrUpdate(markers: [Marker], messageId: MessageId) -> [MarkerDTO] {
         markers.map {
-            MarkerDTO.fetchOrCreate(messageId: messageId, name: $0.name, context: self).map($0)
+            let markerDTO = MarkerDTO.fetchOrCreate(messageId: messageId, name: $0.name, context: self).map($0)
+			markerDTO.user = UserDTO.fetchOrCreate(id: $0.user.id, context: self).map($0.user)
+			return markerDTO
         }
     }
     
     @discardableResult
-    public func createOrUpdate(messageMarkers: MessageListMarker) -> [MarkerDTO] {
+    public func createOrUpdate(messageMarkers: MessageListMarker) -> [MessageDTO] {
         let predicate = NSPredicate(format: "id IN %@",
                                     messageMarkers.messageIds.map { MessageId($0.uint64Value) })
         let messages = MessageDTO.fetch(
             predicate: predicate,
             context: self
         )
-        return messages.map {
-            let markerDTO = MarkerDTO.fetchOrCreate(
-                messageId: MessageId($0.id),
-                name: messageMarkers.name,
-                context: self
-            )
-            markerDTO.createdAt = messageMarkers.createdAt.bridgeDate
-            markerDTO.user = UserDTO.fetchOrCreate(id: messageMarkers.user.id, context: self).map(messageMarkers.user)
-            return markerDTO
-        }
+		
+		messages.forEach {
+			let markerDTO = MarkerDTO.fetchOrCreate(
+				messageId: MessageId($0.id),
+				name: messageMarkers.name,
+				context: self
+			)
+			markerDTO.createdAt = messageMarkers.createdAt.bridgeDate
+			markerDTO.user = UserDTO.fetchOrCreate(id: messageMarkers.user.id, context: self).map(messageMarkers.user)
+		}
+        return messages
     }
 
     @discardableResult
     public func update(messageMarkers: MessageListMarker) -> [MessageDTO] {
-        guard let status = ChatMessage.DeliveryStatus(rawValue: messageMarkers.name),
-              !messageMarkers.messageIds.isEmpty
-        else { return [] }
+		guard let status = ChatMessage.DeliveryStatus(rawValue: messageMarkers.name) else {
+			return update(customMessageMarkers: messageMarkers)
+		}
+		guard !messageMarkers.messageIds.isEmpty else { return [] }
         let maxId = messageMarkers.messageIds.max(by: { $0.int64Value < $1.int64Value }) ?? messageMarkers.messageIds.last!
         guard let channelId = MessageDTO.fetch(id: MessageId(maxId.int64Value), context: self)?.channelId
         else { return [] }
@@ -613,6 +617,15 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         return messages
     }
     
+	public func update(customMessageMarkers messageMarkers: MessageListMarker) -> [MessageDTO] {
+		guard !messageMarkers.messageIds.isEmpty else { return [] }
+		if messageMarkers.user.id == me {
+			return update(messageSelfMarkers: messageMarkers)
+		} else {
+			return createOrUpdate(messageMarkers: messageMarkers)
+		}
+	}
+	
     @discardableResult
     public func update(messageSelfMarkers: MessageListMarker) -> [MessageDTO] {
         let predicate = NSPredicate(format: "id IN %@",

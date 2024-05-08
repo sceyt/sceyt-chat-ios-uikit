@@ -124,7 +124,44 @@ open class ChannelMessageMarkerProvider: Provider {
     }
 }
 
+extension ChannelMessageMarkerProvider {
+	
+	open func loadMarkers(_ query: MessageMarkerListQuery, completion: ((Error?) -> Void)? = nil) {
+		guard chatClient.connectionState == .connected else { return }
+		guard query.hasNext, !query.loading else { return }
+		
+		query.loadNext { [weak self] query, markers, error in
+			guard let self else { return }
+			
+			if let error {
+				logger.errorIfNotNil(error, "")
+			} else {
+				if let markers {
+					store(markers: markers, for: query.messageId, completion: completion)
+				}
+			}
+		}
+	}
+	
+	open func store(markers: [Marker],
+					for messageId: MessageId,
+					completion: ((Error?) -> Void)? = nil) {
+		guard !markers.isEmpty else {
+			completion?(nil)
+			return
+		}
+		database.write {
+			$0.createOrUpdate(markers: markers, messageId: messageId)
+			
+		} completion: { error in
+			logger.debug(error?.localizedDescription ?? "")
+			completion?(error)
+		}
+	}
+}
+
 enum DefaultMarker {
     static let displayed = "displayed"
     static let received = "received"
+	static let played = "played"
 }
