@@ -70,14 +70,14 @@ open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDele
         switch event {
         case .reload:
             tableView.reloadData()
-		case .insert(let indexPaths):
-			if view.superview == nil || tableView.visibleCells.isEmpty {
-				tableView.reloadData()
-			} else {
-				tableView.performBatchUpdates {
-					tableView.insertRows(at: indexPaths, with: .automatic)
-				}
-			}
+//		case .insert(let indexPaths):
+//			if view.superview == nil || tableView.visibleCells.isEmpty {
+//				tableView.reloadData()
+//			} else {
+//				tableView.performBatchUpdates {
+//					tableView.insertRows(at: indexPaths, with: .automatic)
+//				}
+//			}
 		}
     }
 

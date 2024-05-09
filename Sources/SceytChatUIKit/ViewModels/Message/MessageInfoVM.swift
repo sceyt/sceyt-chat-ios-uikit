@@ -15,17 +15,32 @@ open class MessageInfoVM: NSObject {
 	
 	public let data: MessageLayoutModel
 	private let queries: [MessageMarkerListQuery]
-	private let localizedMarkerNames: [String]?
+	private let localizedMarkerNames: [String: String]
 	
-	var markers: [String: [ChatMessage.Marker]] {
-		var markers: [String: [ChatMessage.Marker]] = [:]
-		markerObserver.items.map { marker in
-			if markers[marker.name] == nil {
-				markers[marker.name] = []
+	var markers: [(markerName: String, markerArray: [ChatMessage.Marker])] {
+		var markersArray: [(markerName: String, markerArray: [ChatMessage.Marker])] = []
+		
+		markerObserver.items.forEach { marker in
+			if let index = markersArray.firstIndex(where: { $0.markerName == marker.name }) {
+				markersArray[index].markerArray.append(marker)
+			} else {
+				markersArray.append((markerName: marker.name, markerArray: [marker]))
 			}
-			markers[marker.name]?.append(marker)
 		}
-		return markers
+		
+		if let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }),
+		   let receivedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.received.rawValue }) {
+			for displayedMarker in markersArray[displayedIndex].markerArray {
+				markersArray[receivedIndex].markerArray.removeAll { $0.user?.id == displayedMarker.user?.id }
+				if markersArray[receivedIndex].markerArray.isEmpty {
+					markersArray.remove(at: receivedIndex)
+				}
+			}
+		}
+		
+		markersArray.sort { DefaultMarker(rawValue: $0.markerName) ?? .played < DefaultMarker(rawValue: $1.markerName) ?? .played }
+		
+		return markersArray
 	}
 	
 	public private(set) var messageMarkerProvider: ChannelMessageMarkerProvider
@@ -45,12 +60,14 @@ open class MessageInfoVM: NSObject {
 		messageMarkerProvider: ChannelMessageMarkerProvider,
 		data: MessageLayoutModel,
 		markerNames: [String]? = nil,
-		localizedMarkerNames: [String]? = nil)
+		localizedMarkerNames: [String: String]? = nil)
 	{
 		self.messageMarkerProvider = messageMarkerProvider
 		self.data = data
-		let markerNames = markerNames ?? [DefaultMarker.displayed, DefaultMarker.received, DefaultMarker.played]
-		self.localizedMarkerNames = localizedMarkerNames ?? [L10n.Message.Info.readBy, L10n.Message.Info.deliveredTo, L10n.Message.Info.playedBy]
+		let markerNames = markerNames ?? [DefaultMarker.displayed.rawValue, DefaultMarker.received.rawValue, DefaultMarker.played.rawValue]
+		self.localizedMarkerNames = localizedMarkerNames ?? [DefaultMarker.displayed.rawValue: L10n.Message.Info.readBy,
+															 DefaultMarker.received.rawValue: L10n.Message.Info.deliveredTo,
+															 DefaultMarker.played.rawValue: L10n.Message.Info.playedBy]
 		self.queries = markerNames.map {
 			.Builder(messageId: data.message.id, markerName: $0)
 			.build()
@@ -80,41 +97,41 @@ extension MessageInfoVM {
 	}
 	
 	open func onDidChangeEvent(items: DBChangeItemPaths) {
-		if markerObserver.isEmpty || items.inserts.isEmpty {
-			event = .reload
-			return
-		}
-		
-		event = .insert(calculateIndexPaths(for: items))
+		event = .reload
+//		let calculatedIndices = calculateIndexPaths(for: items)
+//		if markerObserver.isEmpty || items.inserts.isEmpty || calculatedIndices.isEmpty {
+//			event = .reload
+//			return
+//		}
+//		
+//		event = .insert(calculatedIndices)
 	}
 	
-	private func calculateIndexPaths(for items: DBChangeItemPaths) -> [IndexPath] {
-		var correctIndexPaths: [IndexPath] = []
-		
-		let markers: [ChatMessage.Marker]? = items.items()
-		
-		markers?.forEach({ marker in
-			var index = 0
-			queries.enumerated().forEach { (section, query) in
-				if query.markerName == marker.name {
-					correctIndexPaths.append(IndexPath(row: index, section: section + 1))
-					index += 1
-				}
-			}
-		})
-		
-		return correctIndexPaths
-	}
+//	private func calculateIndexPaths(for items: DBChangeItemPaths) -> [IndexPath] {
+//		var correctIndexPaths: [IndexPath] = []
+//		
+//		guard let changedMarkers: [ChatMessage.Marker] = items.items() else { return [] }
+//		
+//		self.markers.enumerated().forEach { (section, markers) in
+//			markers.markerArray.enumerated().forEach { (index, marker) in
+//				if changedMarkers.contains(where: { $0 == marker }) {
+//					correctIndexPaths.append(IndexPath(row: index, section: section + 1))
+//				}
+//			}
+//		}
+//		
+//		return correctIndexPaths
+//	}
 }
 
 extension MessageInfoVM {
 
-	open var numberOfSections: Int { queries.count + 1 }
+	open var numberOfSections: Int { markers.count + 1 }
     
     open func numberOfRows(section: Int) -> Int {
 		switch section {
 		case 0: return 1
-		default: return markers[queries[section - 1].markerName]?.count ?? 0
+		default: return markers[section - 1].markerArray.count
 		}
     }
     
@@ -124,35 +141,21 @@ extension MessageInfoVM {
         
         switch section {
 		case 0: return nil
-		default: return localizedMarkerNames?[section - 1]
+		default: return localizedMarkerNames[markers[section - 1].markerName]
         }
     }
     
     open func marker(at indexPath: IndexPath) -> ChatMessage.Marker? {
 		switch indexPath.section {
 		case 0: nil
-		default: markers[queries[indexPath.section - 1].markerName]?[indexPath.row]
+		default: markers[indexPath.section - 1].markerArray[indexPath.row]
 		}
     }
-    
-//    open func filter() {
-//        var markers = self.markers
-//        read.forEach { marker in
-//            markers.forEach { key, value in
-//                if key != DefaultMarker.displayed {
-//                    var value = value
-//                    value.removeAll(where: { $0.user?.id == marker.user?.id })
-//                    markers[key] = value
-//                }
-//            }
-//        }
-//        self.markers = markers
-//    }
 }
 
 public extension MessageInfoVM {
     enum Event {
         case reload
-		case insert([IndexPath])
+//		case insert([IndexPath])
     }
 }

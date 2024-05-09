@@ -113,10 +113,10 @@ open class ChannelMessageMarkerProvider: Provider {
             return
         }
         logger.debug("[MARKER CK] send \(ids.count)")
-        switch markerName {
-        case DefaultMarker.received:
+        switch DefaultMarker(rawValue: markerName) {
+        case .received:
             channelOperator.markMessagesAsReceived(ids: ids.map { NSNumber(value: $0)}, completion: completed(_:error:))
-        case DefaultMarker.displayed:
+        case .displayed:
             channelOperator.markMessagesAsDisplayed(ids: ids.map { NSNumber(value: $0)}, completion: completed(_:error:))
         default:
             channelOperator.markMessages(markerName: markerName, ids: ids.map { NSNumber(value: $0)}, completion: completed(_:error:))
@@ -160,8 +160,29 @@ extension ChannelMessageMarkerProvider {
 	}
 }
 
-enum DefaultMarker {
-    static let displayed = "displayed"
-    static let received = "received"
-	static let played = "played"
+//enum DefaultMarker {
+//    static let displayed = "displayed"
+//    static let received = "received"
+//	static let played = "played"
+//}
+
+enum DefaultMarker: String, Comparable {
+	case displayed
+	case received
+	case played
+	
+	static func < (lhs: DefaultMarker, rhs: DefaultMarker) -> Bool {
+		switch (lhs, rhs) {
+		case (.played, _):
+			return true
+		case (.displayed, .played):
+			return false
+		case (.displayed, .received):
+			return true
+		case (.received, _):
+			return false
+		default:
+			return false
+		}
+	}
 }

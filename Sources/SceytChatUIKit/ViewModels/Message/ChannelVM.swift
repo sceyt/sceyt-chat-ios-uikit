@@ -821,7 +821,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.messageMarkerProvider.markIfNeeded(
                 after: prevLasMarkDisplayedMessageId,
                 before: message.id,
-                markerName: DefaultMarker.displayed)
+				markerName: DefaultMarker.displayed.rawValue)
             { error in
                 semafore.signal()
             }

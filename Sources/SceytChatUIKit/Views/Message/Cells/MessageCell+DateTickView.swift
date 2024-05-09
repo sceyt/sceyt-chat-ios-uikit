@@ -79,7 +79,7 @@ extension MessageCell {
                     if data.channel.channelType == .broadcast {
                         eyeView.isHidden = false
                         displayedLabel.isHidden = false
-                        displayedLabel.text = "\(Formatters.number.short(message.markerCount?[DefaultMarker.displayed] ?? 0)) •"
+						displayedLabel.text = "\(Formatters.number.short(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0)) •"
                         tickView.isHidden = true
                     } else if !message.incoming {
                         eyeView.isHidden = true
@@ -130,7 +130,7 @@ extension MessageCell {
             
             if message.state != .deleted {
                 if channel.channelType == .broadcast {
-                    let displayed = "\(Formatters.number.short(message.markerCount?[DefaultMarker.displayed] ?? 0)) •"
+					let displayed = "\(Formatters.number.short(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0)) •"
                     let displayedSize = TextSizeMeasure.calculateSize(of: displayed, config: config).textSize
                     size.width += 4 + displayedSize.width
                     size.height = max(size.height, displayedSize.height)
