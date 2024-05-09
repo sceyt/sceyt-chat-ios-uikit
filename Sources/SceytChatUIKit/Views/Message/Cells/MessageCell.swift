@@ -118,6 +118,8 @@ open class MessageCell: CollectionViewCell,
                 onAction?(.resumeTransfer(message, attachment))
             case .play(let url):
                 onAction?(.playAtUrl(url))
+			case .playAudio(let url):
+				onAction?(.playAudioAtUrl(url))
             }
         }
         
@@ -611,6 +613,7 @@ public extension MessageCell {
         case resumeTransfer(ChatMessage, ChatMessage.Attachment)
         case openUrl(URL)
         case playAtUrl(URL)
+		case playAudioAtUrl(URL)
         case didTapLink(URL)
         case didLongPressLink(URL)
         case didTapAvatar

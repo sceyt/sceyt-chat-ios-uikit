@@ -1212,6 +1212,8 @@ open class ChannelVC: ViewController,
                 self.showLink(url)
             case .playAtUrl(let url):
                 self.router.playFrom(url: url)
+			case .playAudioAtUrl(_):
+				self.channelViewModel.markMessageAsPlayed(indexPath: indexPath)
             case .didTapLink(let link):
                 self.showLink(link)
             case .didLongPressLink(let link):
