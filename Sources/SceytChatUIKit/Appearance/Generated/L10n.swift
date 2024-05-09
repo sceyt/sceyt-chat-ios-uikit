@@ -581,7 +581,7 @@ internal enum L10n {
 	  /// Played by
 	  internal static let playedBy = L10n.tr("Localizable", "message.info.playedBy", fallback: "Played by")
       /// Read by
-      internal static let readBy = L10n.tr("Localizable", "message.info.readBy", fallback: "Read by")
+      internal static let readBy = L10n.tr("Localizable", "message.info.readBy", fallback: "Seen by")
       /// Sent:
       internal static let sent = L10n.tr("Localizable", "message.info.sent", fallback: "Sent:")
       /// Size:

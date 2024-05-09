@@ -160,12 +160,6 @@ extension ChannelMessageMarkerProvider {
 	}
 }
 
-//enum DefaultMarker {
-//    static let displayed = "displayed"
-//    static let received = "received"
-//	static let played = "played"
-//}
-
 enum DefaultMarker: String, Comparable {
 	case displayed
 	case received
