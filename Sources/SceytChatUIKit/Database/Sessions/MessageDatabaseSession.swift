@@ -448,7 +448,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         
         for marker in userMarkers {
-            let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId(dto.id), name: marker.name, context: self).map(marker)
+			let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId(dto.id), name: marker.name, userId: marker.user.id, context: self).map(marker)
             markerDTO.user = UserDTO.fetchOrCreate(id: marker.user.id, context: self).map(marker.user)
             dto.userMarkers?.insert(markerDTO)
             dto.pendingMarkerNames?.remove(marker.name)
@@ -550,13 +550,13 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(marker: Marker, messageId: MessageId) -> MarkerDTO {
-        MarkerDTO.fetchOrCreate(messageId: messageId, name: marker.name, context: self).map(marker)
+		MarkerDTO.fetchOrCreate(messageId: messageId, name: marker.name, userId: marker.user.id, context: self).map(marker)
     }
     
     @discardableResult
     public func createOrUpdate(markers: [Marker], messageId: MessageId) -> [MarkerDTO] {
         markers.map {
-            let markerDTO = MarkerDTO.fetchOrCreate(messageId: messageId, name: $0.name, context: self).map($0)
+            let markerDTO = MarkerDTO.fetchOrCreate(messageId: messageId, name: $0.name, userId: $0.user.id, context: self).map($0)
 			markerDTO.user = UserDTO.fetchOrCreate(id: $0.user.id, context: self).map($0.user)
 			return markerDTO
         }
@@ -575,6 +575,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
 			let markerDTO = MarkerDTO.fetchOrCreate(
 				messageId: MessageId($0.id),
 				name: messageMarkers.name,
+				userId: messageMarkers.user.id,
 				context: self
 			)
 			markerDTO.createdAt = messageMarkers.createdAt.bridgeDate
@@ -639,7 +640,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             if $0.userMarkers == nil {
                 $0.userMarkers = .init()
             }
-            let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId($0.id), name: messageSelfMarkers.name, context: self)
+			let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId($0.id), name: messageSelfMarkers.name, userId: messageSelfMarkers.user.id, context: self)
             markerDTO.createdAt = messageSelfMarkers.createdAt.bridgeDate
             markerDTO.user = UserDTO.fetchOrCreate(id: messageSelfMarkers.user.id, context: self).map(messageSelfMarkers.user)
             $0.userMarkers?.insert(markerDTO)

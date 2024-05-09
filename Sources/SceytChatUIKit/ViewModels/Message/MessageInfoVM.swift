@@ -28,12 +28,24 @@ open class MessageInfoVM: NSObject {
 			}
 		}
 		
+		// remove displayed markers from received
 		if let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }),
 		   let receivedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.received.rawValue }) {
 			for displayedMarker in markersArray[displayedIndex].markerArray {
 				markersArray[receivedIndex].markerArray.removeAll { $0.user?.id == displayedMarker.user?.id }
 				if markersArray[receivedIndex].markerArray.isEmpty {
 					markersArray.remove(at: receivedIndex)
+				}
+			}
+		}
+		
+		// remove played markers from displayed
+		if let playedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.played.rawValue }),
+		   let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }) {
+			for playedMarker in markersArray[playedIndex].markerArray {
+				markersArray[displayedIndex].markerArray.removeAll { $0.user?.id == playedMarker.user?.id }
+				if markersArray[displayedIndex].markerArray.isEmpty {
+					markersArray.remove(at: displayedIndex)
 				}
 			}
 		}
@@ -70,6 +82,7 @@ open class MessageInfoVM: NSObject {
 															 DefaultMarker.played.rawValue: L10n.Message.Info.playedBy]
 		self.queries = markerNames.map {
 			.Builder(messageId: data.message.id, markerName: $0)
+			.limit(100)
 			.build()
 		}
 		super.init()

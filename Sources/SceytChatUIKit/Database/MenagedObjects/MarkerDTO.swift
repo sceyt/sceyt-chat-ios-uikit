@@ -36,21 +36,23 @@ public class MarkerDTO: NSManagedObject {
     public static func fetch(
         messageId: MessageId,
         name: String,
+		userId: UserId,
         context: NSManagedObjectContext
     ) -> MarkerDTO? {
         let request = fetchRequest()
         request.sortDescriptor = NSSortDescriptor(keyPath: \MarkerDTO.name, ascending: false)
-        request.predicate = .init(format: "messageId == %lld AND name = %@", messageId, name)
+        request.predicate = .init(format: "messageId == %lld AND name = %@ AND user.id == %@", messageId, name, userId)
         return fetch(request: request, context: context).first
     }
     
-    public static func fetchOrCreate(messageId: MessageId, name: String, context: NSManagedObjectContext) -> MarkerDTO {
-        if let r = fetch(messageId: messageId, name: name, context: context) {
+    public static func fetchOrCreate(messageId: MessageId, name: String, userId: UserId, context: NSManagedObjectContext) -> MarkerDTO {
+		if let r = fetch(messageId: messageId, name: name, userId: userId, context: context) {
             return r
         }
         
         let mo = insertNewObject(into: context)
         mo.messageId = Int64(messageId)
+		mo.user = UserDTO.fetchOrCreate(id: userId, context: context)
         mo.name = name
         return mo
     }
