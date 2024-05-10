@@ -641,7 +641,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 $0.userMarkers = .init()
             }
             let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId($0.id), name: messageSelfMarkers.name, userId: messageSelfMarkers.user.id, context: self)
-            marokerDTO.createdAt = messageSelfMarkers.createdAt.bridgeDate
+            markerDTO.createdAt = messageSelfMarkers.createdAt.bridgeDate
             markerDTO.user = UserDTO.fetchOrCreate(id: messageSelfMarkers.user.id, context: self).map(messageSelfMarkers.user)
             $0.userMarkers?.insert(markerDTO)
             
