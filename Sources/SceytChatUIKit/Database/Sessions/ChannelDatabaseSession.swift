@@ -54,7 +54,7 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     public func createOrUpdate(channel: Channel) -> ChannelDTO {
         let dto = ChannelDTO.fetchOrCreate(id: channel.id, context: self).map(channel)
         if channel.newMessageCount > 0 {
-			dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfPendingMarkers(name: DefaultMarker.displayed.rawValue, in: dto))
+            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfPendingMarkers(name: DefaultMarker.displayed.rawValue, in: dto))
         }
         if let createBy = channel.createdBy {
             dto.createdBy = createOrUpdate(user: createBy)
@@ -103,7 +103,7 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     public func createOrUpdate(channel: ChatChannel) -> ChannelDTO {
         let dto = ChannelDTO.fetchOrCreate(id: channel.id, context: self).map(channel)
         if channel.newMessageCount > 0 {
-			dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfPendingMarkers(name: DefaultMarker.displayed.rawValue, in: dto))
+            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfPendingMarkers(name: DefaultMarker.displayed.rawValue, in: dto))
         }
         
         if let members = channel.members {

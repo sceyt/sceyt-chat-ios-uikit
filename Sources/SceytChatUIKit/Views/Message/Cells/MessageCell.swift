@@ -118,8 +118,8 @@ open class MessageCell: CollectionViewCell,
                 onAction?(.resumeTransfer(message, attachment))
             case .play(let url):
                 onAction?(.playAtUrl(url))
-			case .playAudio(let url):
-				onAction?(.playAudioAtUrl(url))
+            case .playAudio(let url):
+                onAction?(.playAudioAtUrl(url))
             }
         }
         
@@ -522,7 +522,7 @@ open class MessageCell: CollectionViewCell,
             connectContextMenu()
         }
     }
-
+    
     private func connectContextMenu() {
         let alignment: ContextMenu.HorizontalAlignment = data.message.incoming ? .leading : .trailing
         contextMenu?.connect(
@@ -531,7 +531,7 @@ open class MessageCell: CollectionViewCell,
             alignment: effectiveUserInterfaceLayoutDirection == .rightToLeft ? alignment.reversed : alignment
         )
     }
-
+    
     private func selectLink(range: NSRange) {
         guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString,
                 let color = appearance.highlightedLinkBackgroundColor
@@ -613,7 +613,7 @@ public extension MessageCell {
         case resumeTransfer(ChatMessage, ChatMessage.Attachment)
         case openUrl(URL)
         case playAtUrl(URL)
-		case playAudioAtUrl(URL)
+        case playAudioAtUrl(URL)
         case didTapLink(URL)
         case didLongPressLink(URL)
         case didTapAvatar

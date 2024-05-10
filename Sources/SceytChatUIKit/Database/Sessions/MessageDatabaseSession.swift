@@ -448,7 +448,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         
         for marker in userMarkers {
-			let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId(dto.id), name: marker.name, userId: marker.user.id, context: self).map(marker)
+            let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId(dto.id), name: marker.name, userId: marker.user.id, context: self).map(marker)
             markerDTO.user = UserDTO.fetchOrCreate(id: marker.user.id, context: self).map(marker.user)
             dto.userMarkers?.insert(markerDTO)
             dto.pendingMarkerNames?.remove(marker.name)
@@ -550,15 +550,15 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(marker: Marker, messageId: MessageId) -> MarkerDTO {
-		MarkerDTO.fetchOrCreate(messageId: messageId, name: marker.name, userId: marker.user.id, context: self).map(marker)
+        MarkerDTO.fetchOrCreate(messageId: messageId, name: marker.name, userId: marker.user.id, context: self).map(marker)
     }
     
     @discardableResult
     public func createOrUpdate(markers: [Marker], messageId: MessageId) -> [MarkerDTO] {
         markers.map {
             let markerDTO = MarkerDTO.fetchOrCreate(messageId: messageId, name: $0.name, userId: $0.user.id, context: self).map($0)
-			markerDTO.user = UserDTO.fetchOrCreate(id: $0.user.id, context: self).map($0.user)
-			return markerDTO
+            markerDTO.user = UserDTO.fetchOrCreate(id: $0.user.id, context: self).map($0.user)
+            return markerDTO
         }
     }
     
@@ -570,26 +570,26 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             predicate: predicate,
             context: self
         )
-		
-		messages.forEach {
-			let markerDTO = MarkerDTO.fetchOrCreate(
-				messageId: MessageId($0.id),
-				name: messageMarkers.name,
-				userId: messageMarkers.user.id,
-				context: self
-			)
-			markerDTO.createdAt = messageMarkers.createdAt.bridgeDate
-			markerDTO.user = UserDTO.fetchOrCreate(id: messageMarkers.user.id, context: self).map(messageMarkers.user)
-		}
+        
+        messages.forEach {
+            let markerDTO = MarkerDTO.fetchOrCreate(
+                messageId: MessageId($0.id),
+                name: messageMarkers.name,
+                userId: messageMarkers.user.id,
+                context: self
+            )
+            markerDTO.createdAt = messageMarkers.createdAt.bridgeDate
+            markerDTO.user = UserDTO.fetchOrCreate(id: messageMarkers.user.id, context: self).map(messageMarkers.user)
+        }
         return messages
     }
-
+    
     @discardableResult
     public func update(messageMarkers: MessageListMarker) -> [MessageDTO] {
-		guard let status = ChatMessage.DeliveryStatus(rawValue: messageMarkers.name) else {
-			return update(customMessageMarkers: messageMarkers)
-		}
-		guard !messageMarkers.messageIds.isEmpty else { return [] }
+        guard let status = ChatMessage.DeliveryStatus(rawValue: messageMarkers.name) else {
+            return update(customMessageMarkers: messageMarkers)
+        }
+        guard !messageMarkers.messageIds.isEmpty else { return [] }
         let maxId = messageMarkers.messageIds.max(by: { $0.int64Value < $1.int64Value }) ?? messageMarkers.messageIds.last!
         guard let channelId = MessageDTO.fetch(id: MessageId(maxId.int64Value), context: self)?.channelId
         else { return [] }
@@ -618,15 +618,15 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         return messages
     }
     
-	public func update(customMessageMarkers messageMarkers: MessageListMarker) -> [MessageDTO] {
-		guard !messageMarkers.messageIds.isEmpty else { return [] }
-		if messageMarkers.user.id == me {
-			return update(messageSelfMarkers: messageMarkers)
-		} else {
-			return createOrUpdate(messageMarkers: messageMarkers)
-		}
-	}
-	
+    public func update(customMessageMarkers messageMarkers: MessageListMarker) -> [MessageDTO] {
+        guard !messageMarkers.messageIds.isEmpty else { return [] }
+        if messageMarkers.user.id == me {
+            return update(messageSelfMarkers: messageMarkers)
+        } else {
+            return createOrUpdate(messageMarkers: messageMarkers)
+        }
+    }
+    
     @discardableResult
     public func update(messageSelfMarkers: MessageListMarker) -> [MessageDTO] {
         let predicate = NSPredicate(format: "id IN %@",
@@ -640,8 +640,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             if $0.userMarkers == nil {
                 $0.userMarkers = .init()
             }
-			let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId($0.id), name: messageSelfMarkers.name, userId: messageSelfMarkers.user.id, context: self)
-            markerDTO.createdAt = messageSelfMarkers.createdAt.bridgeDate
+            let markerDTO = MarkerDTO.fetchOrCreate(messageId: MessageId($0.id), name: messageSelfMarkers.name, userId: messageSelfMarkers.user.id, context: self)
+            marokerDTO.createdAt = messageSelfMarkers.createdAt.bridgeDate
             markerDTO.user = UserDTO.fetchOrCreate(id: messageSelfMarkers.user.id, context: self).map(messageSelfMarkers.user)
             $0.userMarkers?.insert(markerDTO)
             

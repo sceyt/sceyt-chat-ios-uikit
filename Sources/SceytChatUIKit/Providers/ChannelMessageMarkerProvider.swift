@@ -125,58 +125,58 @@ open class ChannelMessageMarkerProvider: Provider {
 }
 
 extension ChannelMessageMarkerProvider {
-	
-	open func loadMarkers(_ query: MessageMarkerListQuery, completion: ((Error?) -> Void)? = nil) {
-		guard chatClient.connectionState == .connected else { return }
-		guard query.hasNext, !query.loading else { return }
-		
-		query.loadNext { [weak self] query, markers, error in
-			guard let self else { return }
-			
-			if let error {
-				logger.errorIfNotNil(error, "")
-			} else {
-				if let markers {
-					store(markers: markers, for: query.messageId, completion: completion)
-				}
-			}
-		}
-	}
-	
-	open func store(markers: [Marker],
-					for messageId: MessageId,
-					completion: ((Error?) -> Void)? = nil) {
-		guard !markers.isEmpty else {
-			completion?(nil)
-			return
-		}
-		database.write {
-			$0.createOrUpdate(markers: markers, messageId: messageId)
-			
-		} completion: { error in
-			logger.debug(error?.localizedDescription ?? "")
-			completion?(error)
-		}
-	}
+    
+    open func loadMarkers(_ query: MessageMarkerListQuery, completion: ((Error?) -> Void)? = nil) {
+        guard chatClient.connectionState == .connected else { return }
+        guard query.hasNext, !query.loading else { return }
+        
+        query.loadNext { [weak self] query, markers, error in
+            guard let self else { return }
+            
+            if let error {
+                logger.errorIfNotNil(error, "")
+            } else {
+                if let markers {
+                    store(markers: markers, for: query.messageId, completion: completion)
+                }
+            }
+        }
+    }
+    
+    open func store(markers: [Marker],
+                    for messageId: MessageId,
+                    completion: ((Error?) -> Void)? = nil) {
+        guard !markers.isEmpty else {
+            completion?(nil)
+            return
+        }
+        database.write {
+            $0.createOrUpdate(markers: markers, messageId: messageId)
+            
+        } completion: { error in
+            logger.debug(error?.localizedDescription ?? "")
+            completion?(error)
+        }
+    }
 }
 
 enum DefaultMarker: String, Comparable {
-	case displayed
-	case received
-	case played
-	
-	static func < (lhs: DefaultMarker, rhs: DefaultMarker) -> Bool {
-		switch (lhs, rhs) {
-		case (.played, _):
-			return true
-		case (.displayed, .played):
-			return false
-		case (.displayed, .received):
-			return true
-		case (.received, _):
-			return false
-		default:
-			return false
-		}
-	}
+    case displayed
+    case received
+    case played
+    
+    static func < (lhs: DefaultMarker, rhs: DefaultMarker) -> Bool {
+        switch (lhs, rhs) {
+        case (.played, _):
+            return true
+        case (.displayed, .played):
+            return false
+        case (.displayed, .received):
+            return true
+        case (.received, _):
+            return false
+        default:
+            return false
+        }
+    }
 }

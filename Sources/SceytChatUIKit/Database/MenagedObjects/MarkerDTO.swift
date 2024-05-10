@@ -36,7 +36,7 @@ public class MarkerDTO: NSManagedObject {
     public static func fetch(
         messageId: MessageId,
         name: String,
-		userId: UserId,
+        userId: UserId,
         context: NSManagedObjectContext
     ) -> MarkerDTO? {
         let request = fetchRequest()
@@ -46,13 +46,13 @@ public class MarkerDTO: NSManagedObject {
     }
     
     public static func fetchOrCreate(messageId: MessageId, name: String, userId: UserId, context: NSManagedObjectContext) -> MarkerDTO {
-		if let r = fetch(messageId: messageId, name: name, userId: userId, context: context) {
+        if let r = fetch(messageId: messageId, name: name, userId: userId, context: context) {
             return r
         }
         
         let mo = insertNewObject(into: context)
         mo.messageId = Int64(messageId)
-		mo.user = UserDTO.fetchOrCreate(id: userId, context: context)
+        mo.user = UserDTO.fetchOrCreate(id: userId, context: context)
         mo.name = name
         return mo
     }

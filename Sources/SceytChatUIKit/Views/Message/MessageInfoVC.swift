@@ -10,7 +10,7 @@ import UIKit
 
 open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDelegate {
     
-	open var viewModel: MessageInfoVM!
+    open var viewModel: MessageInfoVM!
     open lazy var router = MessageInfoRouter(rootVC: self)
 
     open lazy var tableView = TableView(frame: .zero, style: .insetGrouped)
@@ -39,46 +39,46 @@ open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDele
         tableView.separatorStyle = .none
     }
 
-	override open func setupAppearance() {
-		super.setupAppearance()
-
-		view.backgroundColor = appearance.backgroundColor
-		tableView.backgroundColor = .clear
-	}
-	
+    override open func setupAppearance() {
+        super.setupAppearance()
+        
+        view.backgroundColor = appearance.backgroundColor
+        tableView.backgroundColor = .clear
+    }
+    
     override open func setupLayout() {
         super.setupLayout()
-
+        
         view.addSubview(tableView)
         tableView.pin(to: view)
     }
-	
-	open override func setupDone() {
-		super.setupDone()
-		viewModel.startDatabaseObserver()
-		viewModel.$event
-			.compactMap { $0 }
-			.sink { [weak self] in
-				self?.onEvent($0)
-			}
-			.store(in: &subscriptions)
-		viewModel.loadMarkers()
-	}
+    
+    open override func setupDone() {
+        super.setupDone()
+        viewModel.startDatabaseObserver()
+        viewModel.$event
+            .compactMap { $0 }
+            .sink { [weak self] in
+                self?.onEvent($0)
+            }
+            .store(in: &subscriptions)
+        viewModel.loadMarkers()
+    }
 
     // MARK: - Actions
     open func onEvent(_ event: MessageInfoVM.Event) {
         switch event {
         case .reload:
             tableView.reloadData()
-//		case .insert(let indexPaths):
-//			if view.superview == nil || tableView.visibleCells.isEmpty {
-//				tableView.reloadData()
-//			} else {
-//				tableView.performBatchUpdates {
-//					tableView.insertRows(at: indexPaths, with: .automatic)
-//				}
-//			}
-		}
+            //        case .insert(let indexPaths):
+            //            if view.superview == nil || tableView.visibleCells.isEmpty {
+            //                tableView.reloadData()
+            //            } else {
+            //                tableView.performBatchUpdates {
+            //                    tableView.insertRows(at: indexPaths, with: .automatic)
+            //                }
+            //            }
+        }
     }
 
     open func onCancelTapped() {

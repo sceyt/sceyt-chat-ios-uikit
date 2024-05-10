@@ -164,9 +164,9 @@ extension MessageCell {
         private func onTapPlay() {
             guard let audioView = (subviews.first(where: { $0 is AttachmentAudioView }) as? AttachmentAudioView)
             else { return }
-			audioView.play(onPlayed: { url in
-				onAction?(.playAudio(url))
-			})
+            audioView.play(onPlayed: { url in
+                onAction?(.playAudio(url))
+            })
         }
         
         @objc
@@ -210,7 +210,7 @@ public extension MessageCell.AttachmentStackView {
         case pauseTransfer(ChatMessage, ChatMessage.Attachment)
         case resumeTransfer(ChatMessage, ChatMessage.Attachment)
         case play(URL)
-		case playAudio(URL)
+        case playAudio(URL)
     }
 }
 

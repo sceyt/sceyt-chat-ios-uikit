@@ -320,7 +320,7 @@ open class ChannelMessageProvider: Provider {
         guard !ids.isEmpty else { return }
         if storeForResend {
             database.write ({
-				$0.update(messagePendingMarkers: ids, markerName: DefaultMarker.received.rawValue)
+                $0.update(messagePendingMarkers: ids, markerName: DefaultMarker.received.rawValue)
             })
         }
         channelOperator.markMessagesAsReceived(
@@ -345,7 +345,7 @@ open class ChannelMessageProvider: Provider {
         guard !ids.isEmpty else { return }
         if storeForResend {
             database.write ({
-				$0.update(messagePendingMarkers: ids, markerName: DefaultMarker.displayed.rawValue)
+                $0.update(messagePendingMarkers: ids, markerName: DefaultMarker.displayed.rawValue)
             })
         }
         channelOperator.markMessagesAsDisplayed(
@@ -415,7 +415,7 @@ open class ChannelMessageProvider: Provider {
     ) {
         database.write ({
             if let dto = try $0.createOrUpdate(notificationContent: userInfo) {
-				$0.update(messagePendingMarkers: [MessageId(dto.id)], markerName: DefaultMarker.received.rawValue)
+                $0.update(messagePendingMarkers: [MessageId(dto.id)], markerName: DefaultMarker.received.rawValue)
             }
         }) { error in
             completion?(error)

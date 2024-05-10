@@ -138,14 +138,14 @@ extension MessageInfoVM {
 }
 
 extension MessageInfoVM {
-
-	open var numberOfSections: Int { markers.count + 1 }
+    
+    open var numberOfSections: Int { markers.count + 1 }
     
     open func numberOfRows(section: Int) -> Int {
-		switch section {
-		case 0: return 1
-		default: return markers[section - 1].markerArray.count
-		}
+        switch section {
+        case 0: return 1
+        default: return markers[section - 1].markerArray.count
+        }
     }
     
     open func header(section: Int) -> String? {
@@ -153,22 +153,22 @@ extension MessageInfoVM {
         else { return nil }
         
         switch section {
-		case 0: return nil
-		default: return localizedMarkerNames[markers[section - 1].markerName]
+        case 0: return nil
+        default: return localizedMarkerNames[markers[section - 1].markerName]
         }
     }
     
     open func marker(at indexPath: IndexPath) -> ChatMessage.Marker? {
-		switch indexPath.section {
-		case 0: nil
-		default: markers[indexPath.section - 1].markerArray[indexPath.row]
-		}
+        switch indexPath.section {
+        case 0: nil
+        default: markers[indexPath.section - 1].markerArray[indexPath.row]
+        }
     }
 }
 
 public extension MessageInfoVM {
     enum Event {
         case reload
-//		case insert([IndexPath])
+        //        case insert([IndexPath])
     }
 }
