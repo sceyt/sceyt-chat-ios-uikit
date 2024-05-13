@@ -179,12 +179,14 @@ open class ChannelVC: ViewController,
                 self?.keyboardWillShow(notification: $0)
             }
         
-        displayedTimer.start { [weak self] _ in
-            guard let self,
-                  !self.isCollectionViewUpdating,
-                  self.isAppActive
-            else { return}
-            self.markMessageAsDisplayed()
+        if !displayedTimer.isStarted {
+            displayedTimer.start { [weak self] _ in
+                guard let self,
+                      !self.isCollectionViewUpdating,
+                      self.isAppActive
+                else { return}
+                self.markMessageAsDisplayed()
+            }
         }
         
         if navigationController?.navigationBar.isUserInteractionEnabled == false { // system bug
@@ -214,12 +216,12 @@ open class ChannelVC: ViewController,
         
         Components.messageLayoutModel.defaults.messageWidth = floor(Components.messageLayoutModel.defaults.messageWidthRatio * size.width)
         channelViewModel.invalidateLayout()
-        collectionView.reloadDataIfNeeded()
         
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self else { return }
             self.titleView.setNeedsLayout()
             self.titleView.layoutIfNeeded()
+            self.collectionView.reloadData()
         })
     }
     
@@ -266,7 +268,7 @@ open class ChannelVC: ViewController,
         .compactMap { ($0.object as? UITextField)?.text }
         .debounce(for: .milliseconds(600), scheduler: DispatchQueue.main)
         .sink { [weak self] query in
-            self?.channelViewModel.search(with: query)
+            self?.channelViewModel.searchMessages(with: query)
         }
         .store(in: &subscriptions)
         
@@ -326,7 +328,6 @@ open class ChannelVC: ViewController,
         searchControlsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing])
         
         updateCollectionViewInsets()
-        //        collectionView.scrollToTop(animated: false)
         coverView.pin(to: view.safeAreaLayoutGuide)
         collectionView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
         collectionView.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
@@ -1212,24 +1213,31 @@ open class ChannelVC: ViewController,
             unreadCountView.isHidden = true
             return
         }
-        if isScrollingBottom {
-            unreadCountView.isHidden = true
-            return
-        }
-        if collectionView.contentSize.height < collectionView.frame.height {
-            unreadCountView.isHidden = true
-            return
-        }
-        guard let lastIndexPath = collectionView.lastVisibleAttributes?.indexPath
-        else {
-            unreadCountView.isHidden = true
-            return
-        }
-        if channelViewModel.isLastMessage(at: lastIndexPath) {
-            unreadCountView.isHidden = true
+        let visibleRect = collectionView.visibleContentRect
+        if collectionView.contentSize.height - visibleRect.maxY > 30 {
+            unreadCountView.isHidden = false
         } else {
-            unreadCountView.isHidden = composerVC.isRecording
+            unreadCountView.isHidden = true
         }
+        
+//        if isScrollingBottom {
+//            unreadCountView.isHidden = true
+//            return
+//        }
+//        if collectionView.contentSize.height < collectionView.frame.height {
+//            unreadCountView.isHidden = true
+//            return
+//        }
+//        guard let lastIndexPath = collectionView.lastVisibleAttributes?.indexPath
+//        else {
+//            unreadCountView.isHidden = true
+//            return
+//        }
+//        if channelViewModel.isLastMessage(at: lastIndexPath) {
+//            unreadCountView.isHidden = true
+//        } else {
+//            unreadCountView.isHidden = composerVC.isRecording
+//        }
     }
     
     open func updateLastNavigatedIndexPath() {
@@ -1264,9 +1272,16 @@ open class ChannelVC: ViewController,
         willDisplay cell: UICollectionViewCell,
         forItemAt indexPath: IndexPath
     ) {
-        guard shouldAnimateEditing, let cell = cell as? MessageCell
+        guard let cell = cell as? MessageCell
         else { return }
-        if cell.isEditing, cell.checkBoxView.transform != .identity {
+        
+        if cell.data.message.id == selectMessageId {
+            cell.highlightMode = .search
+        } else if cell.highlightMode == .search {
+            cell.highlightMode = .none
+        }
+       
+        if shouldAnimateEditing, cell.isEditing, cell.checkBoxView.transform != .identity {
             cell.contentView.alpha = 1
             UIView.animate(withDuration: 0.3) { [weak self] in
                 guard let self else { return }
@@ -1274,11 +1289,6 @@ open class ChannelVC: ViewController,
                 cell.containerView.transform = .identity
                 cell.contentView.alpha = self.channelViewModel.canSelectMessage(at: indexPath) ? 1 : 0.5
             }
-        }
-        if cell.data.message.id == selectMessageId {
-            cell.highlightMode = .search
-        } else if cell.highlightMode == .search {
-            cell.highlightMode = .none
         }
     }
     
@@ -1305,6 +1315,7 @@ open class ChannelVC: ViewController,
         guard let model = channelViewModel.layoutModel(at: indexPath) ??
                 channelViewModel.createLayoutModels(at: [indexPath]).first
         else {
+            logger.error("[MEESS] not found \(indexPath), lm: \(channelViewModel.layoutModel(at: indexPath)), ms: \(channelViewModel.message(at: indexPath)), lms: \(channelViewModel.createLayoutModels(at: [indexPath]))")
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: Components.incomingMessageCell.reuseId,
                 for: indexPath
@@ -1562,11 +1573,15 @@ open class ChannelVC: ViewController,
                 self?.view.layoutIfNeeded()
             }
             isScrollingBottom = true
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.scrollToBottom(animated: true)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
                     self?.canShowUnreadCountView = canShowUnread
                 }
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                self?.canShowUnreadCountView = canShowUnread
             }
         }
         composerVC.removeActionView()
@@ -2347,6 +2362,7 @@ open class ChannelVC: ViewController,
     open func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
         searchBar.text = nil
         selectMessageId = nil
+        NotificationCenter.default.post(name: .selectMessage, object: nil)
         searchBarActivityIndicator.stopAnimating()
         channelViewModel.stopMessagesSearch()
     }

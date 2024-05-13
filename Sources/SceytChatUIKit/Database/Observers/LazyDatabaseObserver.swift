@@ -26,16 +26,36 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     public var onDidChange: ((Bool, ChangeItemPaths, Any?) -> Void)?
     
     private let cacheQueue = DispatchQueue(label: "com.uikit.lazyDBO.access.cache", attributes: .concurrent)
-    @Atomic private var mainCache = Cache()
-    @Atomic private var workingCache = Cache()
-    @Atomic private var prevCache: Cache?
-    @Atomic private var mapItems = [NSManagedObjectID: Item]()
-    @Atomic private var mapDeletedItems = [NSManagedObjectID: Item]()
+    
+    private struct Caches {
+        @Atomic var mainCache = Cache()
+        @Atomic var workingCache = Cache()
+        @Atomic var prevCache: Cache?
+        @Atomic var mapItems = [NSManagedObjectID: Item]()
+        @Atomic var mapDeletedItems = [NSManagedObjectID: Item]()
+        
+        func copy() -> Caches {
+            .init(
+                mainCache: mainCache,
+                workingCache: workingCache,
+                prevCache: prevCache,
+                mapItems: mapItems,
+                mapDeletedItems: mapDeletedItems
+            )
+        }
+    }
+    
+    @Atomic private var mainCaches = Caches()
+    @Atomic private var tmpCaches = Caches()
+    private var currentCaches: Caches {
+        isObserverRestarting ? tmpCaches : mainCaches
+    }
     
     public let keyPaths: Set<RelationshipKeyPath>
     @Atomic private var updatedObjectIDs: Set<NSManagedObjectID> = []
     
     @Atomic public private(set) var isObserverStarted = false
+    @Atomic private var isObserverRestarting = false
     
     public var viewContext: NSManagedObjectContext {
         Config.database.viewContext
@@ -74,6 +94,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         fetchPredicate: NSPredicate? = nil,
         completion: (() -> Void)? = nil
     ) {
+        logger.debug("[MESS] STARTED")
             self.fetchPredicate = fetchPredicate ?? self.fetchPredicate
             self.fetchOffset = max(0, fetchOffset)
             self.fetchLimit = max(0, fetchLimit)
@@ -87,19 +108,22 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 request.fetchOffset = self.fetchOffset
                 
                 context.perform {
+                    logger.debug("[MESS] STARTED PERFORM")
                     self.clearCache()
-                    var insertCache = self.workingCache
+                    var insertCache = self.mainCaches.workingCache
                     self.fetchObjects(context: self.context,
                                       request: request,
                                       in: &insertCache,
                                       changeItems: &changeItems,
                                       changeSections: &changeSections)
                     self.isObserverStarted = true
-                    self.workingCache = insertCache
+                    self.mainCaches.workingCache = insertCache
                     let path = ChangeItemPaths(changeItems: changeItems, changeSections: changeSections)
-                    let userInfo = self.onWillChange?(self.workingCache, path)
+                    let userInfo = self.onWillChange?(self.mainCaches.workingCache, path)
                     self.queue {
-                        self.mainCache = insertCache
+                        logger.debug("[MESS] STARTED EVENT")
+                        self.mainCaches.mainCache = insertCache
+                        self.isObserverRestarting = false
                         self.onDidChange?(true, path, userInfo)
                         completion?()
                     }
@@ -118,7 +142,16 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         fetchPredicate: NSPredicate,
         offset: Int? = nil,
         completion: (() -> Void)? = nil) {
-            stopObserver()
+            if isObserverRestarting {
+                fatalError("[MEESS] restartObserver \(fetchPredicate)")
+                return
+            }
+            if isObserverStarted {
+                tmpCaches = mainCaches.copy()
+            }
+            isObserverRestarting = true
+            isObserverStarted = false
+            removeObservers()
             self.fetchPredicate = fetchPredicate
             startObserver(
                 fetchOffset: offset ?? fetchOffset,
@@ -136,25 +169,25 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     }
     
     open var isEmpty: Bool {
-        isObserverStarted ? mainCache.isEmpty : true
+        (isObserverStarted || isObserverRestarting) ? currentCaches.mainCache.isEmpty : true
     }
     
     open var numberOfSections: Int {
-        isObserverStarted ? mainCache.count : 0
+        (isObserverStarted || isObserverRestarting) ? currentCaches.mainCache.count : 0
     }
     
     open func numberOfItems(in section: Int) -> Int {
-        if isObserverStarted, mainCache.indices.contains(section) {
-            return mainCache[section].count
+        if (isObserverStarted || isObserverRestarting), currentCaches.mainCache.indices.contains(section) {
+            return currentCaches.mainCache[section].count
         }
         return 0
     }
     
     open var count: Int {
-        guard isObserverStarted
+        guard isObserverStarted || isObserverRestarting
         else { return 0 }
         var count = 0
-        mainCache.forEach {
+        currentCaches.mainCache.forEach {
             count += $0.count
         }
         return count
@@ -170,16 +203,21 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     }
     
     open func item(at indexPath: IndexPath) -> Item? {
-        guard isObserverStarted
-        else { return nil }
-        guard mainCache.indices.contains(indexPath.section),
-              mainCache[indexPath.section].indices.contains(indexPath.row)
+        guard isObserverStarted || isObserverRestarting
         else {
+            fatalError()
             return nil
         }
-        let dto = mainCache[indexPath.section][indexPath.row]
+        let caches = currentCaches
+        guard caches.mainCache.indices.contains(indexPath.section),
+              caches.mainCache[indexPath.section].indices.contains(indexPath.row)
+        else {
+            fatalError()
+            return nil
+        }
+        let dto = caches.mainCache[indexPath.section][indexPath.row]
         
-        if let item = readCache({ self.mapItems[dto.objectID] ?? self.mapDeletedItems[dto.objectID] }) {
+        if let item = _item(for: dto.objectID) {
             return item
         }
         let objectID = dto.objectID
@@ -188,8 +226,8 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             else { return }
             let item = self.itemCreator(obj)
             self.writeCache {
-                self.mapItems[dto.objectID] = item
-                self.mapDeletedItems[dto.objectID] = nil
+                caches.mapItems[dto.objectID] = item
+                caches.mapDeletedItems[dto.objectID] = nil
             }
             
             logger.error("object did not find with id \(objectID.uriRepresentation()), found from context \(obj) ")
@@ -203,38 +241,41 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     }
     
     public var lastItem: Item? {
-        guard let lastSection = mainCache.indices.last
+        let caches = currentCaches
+        guard let lastSection = caches.mainCache.indices.last
         else { return nil }
-        guard let lastRow = mainCache.last?.indices.last
+        guard let lastRow = caches.mainCache.last?.indices.last
         else { return nil }
         let indexPath = IndexPath(row: lastRow, section: lastSection)
         return item(at: indexPath)
     }
     
     open func workingCacheItem(at indexPath: IndexPath) -> Item? {
-        guard isObserverStarted
+        guard isObserverStarted || isObserverRestarting
         else { return nil }
-        guard workingCache.indices.contains(indexPath.section),
-              workingCache[indexPath.section].indices.contains(indexPath.row)
+        let caches = isObserverStarted ? mainCaches : tmpCaches
+        guard caches.workingCache.indices.contains(indexPath.section),
+              caches.workingCache[indexPath.section].indices.contains(indexPath.row)
         else {
             return nil
         }
-        let dto = workingCache[indexPath.section][indexPath.row]
-        if let item = readCache({ self.mapItems[dto.objectID] ?? self.mapDeletedItems[dto.objectID] }) {
+        let dto = caches.workingCache[indexPath.section][indexPath.row]
+        if let item = readCache({ caches.mapItems[dto.objectID] ?? caches.mapDeletedItems[dto.objectID] }) {
             return item
         }
         return nil
     }
     
     open func itemFromPrevCache(at indexPath: IndexPath) -> Item? {
-        guard isObserverStarted
+        guard isObserverStarted || isObserverRestarting
         else { return nil }
-        guard let prevCache,
+        let caches = currentCaches
+        guard let prevCache = caches.prevCache,
               prevCache.indices.contains(indexPath.section),
               prevCache[indexPath.section].indices.contains(indexPath.row)
         else { return nil }
         let dto = prevCache[indexPath.section][indexPath.row]
-        if let item = readCache({self.mapItems[dto.objectID]}) {
+        if let item = readCache({caches.mapItems[dto.objectID]}) {
             return item
         }
         let objectID = dto.objectID
@@ -243,8 +284,8 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             else { return }
             let item = self.itemCreator(obj)
             self.writeCache {
-                self.mapItems[dto.objectID] = item
-                self.mapDeletedItems[dto.objectID] = nil
+                caches.mapItems[dto.objectID] = item
+                caches.mapDeletedItems[dto.objectID] = nil
             }
             logger.error("object did not find from prev cache with id \(objectID.uriRepresentation()), found from context \(obj) ")
         }
@@ -269,14 +310,19 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     
     open func item(for objectID: NSManagedObjectID) -> Item? {
-        readCache({self.mapItems[objectID]})
+        readCache({self.currentCaches.mapItems[objectID]})
+    }
+    
+    private func _item(for objectID: NSManagedObjectID) -> Item? {
+        readCache({ self.currentCaches.mapItems[objectID] ?? self.currentCaches.mapDeletedItems[objectID] })
     }
     
     public func indexPath(_ body: (Item) throws -> Bool) rethrows -> IndexPath? {
-        let _mapItem = mapItems
-        for section in 0 ..< mainCache.count {
-            for row in 0 ..< mainCache[section].count {
-                let objectID = mainCache[section][row].objectID
+        let caches = currentCaches
+        let _mapItem = caches.mapItems
+        for section in 0 ..< caches.mainCache.count {
+            for row in 0 ..< caches.mainCache[section].count {
+                let objectID = caches.mainCache[section][row].objectID
                 if let item = _mapItem[objectID] {
                     if try body(item) {
                         logger.debug("[LDBO] indexPath found row: \(row) section: \(section)")
@@ -289,10 +335,11 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     }
     
     public func forEach(_ body: (IndexPath, Item) throws -> Bool) rethrows {
-        let _mapItem = mapItems
-        for section in 0 ..< mainCache.count {
-            for row in 0 ..< mainCache[section].count {
-                let objectID = mainCache[section][row].objectID
+        let caches = currentCaches
+        let _mapItem = caches.mapItems
+        for section in 0 ..< caches.mainCache.count {
+            for row in 0 ..< caches.mainCache[section].count {
+                let objectID = caches.mainCache[section][row].objectID
                 if let item = _mapItem[objectID] {
                     let ip = IndexPath(row: row, section: section)
                     if try body(ip, item) {
@@ -424,7 +471,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     ) {
         func perform(context: NSManagedObjectContext) {
             if let request = DTO.fetchRequest() as? NSFetchRequest<DTO> {
-                var insertCache = workingCache
+                var insertCache = mainCaches.workingCache
                 var changeItems = [ChangeItem]()
                 var changeSections = [ChangeSection]()
                 request.sortDescriptors = sortDescriptors
@@ -487,7 +534,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 var sendEvent = false
                 var changeItems = [ChangeItem]()
                 var changeSections = [ChangeSection]()
-                var insertCache = workingCache
+                var insertCache = mainCaches.workingCache
                 var shouldInsert: [DTO]?
                 if let objs = userInfo[NSInsertedObjectsKey] as? Set<NSManagedObject> {
                     let dtos = sorted(objs)
@@ -514,7 +561,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                         sendEvent = true
                     }
                 }
-                workingCache = insertCache
+                mainCaches.workingCache = insertCache
                 if sendEvent {
                     didUpdate(
                         insertCache: insertCache,
@@ -527,7 +574,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                        !dtos.isEmpty {
                         var changeItems = [ChangeItem]()
                         var changeSections = [ChangeSection]()
-                        var insertCache = workingCache
+                        var insertCache = mainCaches.workingCache
                         if !dtos.isEmpty {
                             willChangeCache()
                             insert(dtos: dtos, in: &insertCache, changeItems: &changeItems, changeSections: &changeSections)
@@ -626,8 +673,8 @@ private extension LazyDatabaseObserver {
         let item = itemCreator(dto)
         cache[section].insert(dto, at: foundIndex)
         writeCache {
-            self.mapItems[dto.objectID] = item
-            self.mapDeletedItems[dto.objectID] = nil
+            self.mainCaches.mapItems[dto.objectID] = item
+            self.mainCaches.mapDeletedItems[dto.objectID] = nil
         }
         changeItems.append(.insert(.init(row: foundIndex, section: section), item))
     }
@@ -656,14 +703,14 @@ private extension LazyDatabaseObserver {
     ) {
         var valueCache = [NSManagedObjectID: Any]()
         for dto in dtos {
-            guard readCache({self.mapItems[dto.objectID]}) == nil
+            guard readCache({self.mainCaches.mapItems[dto.objectID]}) == nil
             else { continue }
             if cache.isEmpty {
                 cache.append([dto])
                 let item = itemCreator(dto)
                 writeCache {
-                    self.mapItems[dto.objectID] = item
-                    self.mapDeletedItems[dto.objectID] = nil
+                    self.mainCaches.mapItems[dto.objectID] = item
+                    self.mainCaches.mapDeletedItems[dto.objectID] = nil
                 }
                 changeSections.append(.insert(0))
                 changeItems.append(.insert(.init(row: 0, section: 0), item))
@@ -683,8 +730,8 @@ private extension LazyDatabaseObserver {
                         case .orderedDescending:
                             let item = itemCreator(dto)
                             writeCache {
-                                self.mapItems[dto.objectID] = item
-                                self.mapDeletedItems[dto.objectID] = nil
+                                self.mainCaches.mapItems[dto.objectID] = item
+                                self.mainCaches.mapDeletedItems[dto.objectID] = nil
                             }
                             cache.insert([dto], at: index)
                             for (row, changeItem) in changeItems.enumerated() where changeItem.indexPath.section >= index {
@@ -716,8 +763,8 @@ private extension LazyDatabaseObserver {
                     cache.append([dto])
                     let item = itemCreator(dto)
                     writeCache {
-                        self.mapItems[dto.objectID] = item
-                        self.mapDeletedItems[dto.objectID] = nil
+                        self.mainCaches.mapItems[dto.objectID] = item
+                        self.mainCaches.mapDeletedItems[dto.objectID] = nil
                     }
                     changeSections.append(.insert(cache.count - 1))
                     changeItems.append(.insert(.init(row: 0, section: cache.count - 1), item))
@@ -773,8 +820,8 @@ private extension LazyDatabaseObserver {
                 isRemovedSection = true
             }
             writeCache {
-                self.mapDeletedItems[dto.objectID] = self.mapItems[dto.objectID]
-                self.mapItems[dto.objectID] = nil
+                self.mainCaches.mapDeletedItems[dto.objectID] = self.mainCaches.mapItems[dto.objectID]
+                self.mainCaches.mapItems[dto.objectID] = nil
                 
             }
             var _changeItems = [ChangeItem]()
@@ -832,11 +879,11 @@ private extension LazyDatabaseObserver {
         for (section, objects) in cache.enumerated().reversed() {
             for (row, item) in objects.enumerated().reversed() {
                 if group[item.objectID] != nil,
-                   readCache({self.mapItems[item.objectID]}) != nil {
+                   readCache({self.mainCaches.mapItems[item.objectID]}) != nil {
                     cache[section].remove(at: row)
                     writeCache {
-                        self.mapDeletedItems[item.objectID] = self.mapItems[item.objectID]
-                        self.mapItems[item.objectID] = nil
+                        self.mainCaches.mapDeletedItems[item.objectID] = self.mainCaches.mapItems[item.objectID]
+                        self.mainCaches.mapItems[item.objectID] = nil
                     }
                     
                     changeItems.append(.delete(.init(row: row, section: section)))
@@ -887,16 +934,16 @@ private extension LazyDatabaseObserver {
     
     func clearCache() {
         readCache {
-            self.mapItems.removeAll(keepingCapacity: true)
-            self.mapDeletedItems.removeAll()
+            self.mainCaches.mapItems.removeAll(keepingCapacity: true)
+            self.mainCaches.mapDeletedItems.removeAll()
         }
-        mainCache.removeAll(keepingCapacity: true)
-        workingCache.removeAll(keepingCapacity: true)
-        prevCache?.removeAll(keepingCapacity: true)
+        mainCaches.mainCache.removeAll(keepingCapacity: true)
+        mainCaches.workingCache.removeAll(keepingCapacity: true)
+        mainCaches.prevCache?.removeAll(keepingCapacity: true)
     }
     
     func willChangeCache() {
-        prevCache = mainCache
+        mainCaches.prevCache = mainCaches.mainCache
     }
     
     func queue( _ block: @escaping () -> Void) {
@@ -906,9 +953,10 @@ private extension LazyDatabaseObserver {
                 return
             }
         }
-        eventQueue.async {
+        let item = DispatchWorkItem(qos: .userInteractive, block: {
             block()
-        }
+        })
+        eventQueue.async(execute: item)
     }
     
     func perform( _ block: @escaping () -> Void) {
@@ -931,16 +979,16 @@ private extension LazyDatabaseObserver {
         done: (() -> Void)?
     ) {
         guard isObserverStarted else { return }
-        self.workingCache = insertCache
-        let userInfo = self.onWillChange?(self.workingCache, paths)
+        self.mainCaches.workingCache = insertCache
+        let userInfo = self.onWillChange?(self.mainCaches.workingCache, paths)
         self.queue {[weak self] in
             guard let self else { return }
-            guard self.isObserverStarted
+            guard self.isObserverStarted || self.isObserverRestarting
             else {
                 self.clearCache()
                 return
             }
-            self.mainCache = insertCache
+            self.mainCaches.mainCache = insertCache
             self.onDidChange?(false, paths, userInfo)
             done?()
         }
@@ -1094,3 +1142,4 @@ internal extension LazyDatabaseObserver.ChangeItemPaths {
         "[ChangeItemPaths]: INSERTS: \(inserts), UPDATES: \(updates), DELETES: \(deletes), MOVES: \(moves), SEC_INS \(sectionInserts), SEC_DEL \(sectionDeletes)"
     }
 }
+

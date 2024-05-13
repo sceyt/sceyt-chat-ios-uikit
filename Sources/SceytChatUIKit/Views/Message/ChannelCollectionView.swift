@@ -121,17 +121,17 @@ open class ChannelCollectionView: CollectionView {
         setContentOffset(contentOffset, animated: false)
         reloadData()
         layoutIfNeeded()
-        if collectionViewLayout.layoutAttributesForItem(at: indexPath) != nil {
+        if contains(indexPath: indexPath) {
             scrollToItem(at: indexPath, pos: pos, animated: animated)
         }
     }
     
     open func scrollToItem(at indexPath: IndexPath, pos: UICollectionView.ScrollPosition = .top, animated: Bool = true) {
-        if collectionViewLayout.layoutAttributesForItem(at: indexPath) != nil {
+        if contains(indexPath: indexPath) {
             scrollToItem(at: indexPath, at: pos, animated: animated)
         } else {
             #if DEBUG
-            fatalError("scrollToItem at: \(indexPath) out-of-bounds")
+//            fatalError("scrollToItem at: \(indexPath) out-of-bounds")
             #endif
         }
     }
@@ -143,15 +143,16 @@ open class ChannelCollectionView: CollectionView {
             + contentInset.bottom
         let offsetY = max(-contentInset.top, newOffsetY)
         if animated {
-//            UIView.animate(
-//                withDuration: animationDuration
-//            ){
+            UIView.animate(
+                withDuration: animationDuration
+            ){
+                super.contentOffset = CGPoint(x: 0, y: offsetY)
 //                super.setContentOffset(CGPoint(x: 0, y: offsetY), animated: false)
-//            } completion: {
-//                completion?($0)
-//            }
-            super.setContentOffset(CGPoint(x: 0, y: offsetY), animated: true)
-            completion?(true)
+            } completion: {
+                completion?($0)
+            }
+//            super.setContentOffset(CGPoint(x: 0, y: offsetY), animated: true)
+//            completion?(true)
         } else {
             super.setContentOffset(CGPoint(x: 0, y: offsetY), animated: false)
             completion?(true)

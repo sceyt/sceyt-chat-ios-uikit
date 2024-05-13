@@ -82,16 +82,15 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             guard let self else {
                 return
             }
-            let messagesFromRangePredicate: NSPredicate
+            let messagesFromRangePredicate = defaultFetchPredicate
             var range = ranges.last
-            if lastMessageId != 0,
-               let currentRange = range,
-               currentRange.endMessageId == lastMessageId {
-                messagesFromRangePredicate = self.createRangePredicate(startMessageId: currentRange.startMessageId, endMessageId: nil)
-            } else {
-                messagesFromRangePredicate = self.createRangePredicate(startMessageId: range?.startMessageId, endMessageId: range?.endMessageId)
-            }
-            
+//            if lastMessageId != 0,
+//               let currentRange = range,
+//               currentRange.endMessageId == lastMessageId {
+//                messagesFromRangePredicate = self.createRangePredicate(startMessageId: currentRange.startMessageId, endMessageId: nil)
+//            } else {
+//                messagesFromRangePredicate = self.createRangePredicate(startMessageId: range?.startMessageId, endMessageId: range?.endMessageId)
+//            }
             let fetchOffset = calculateMessageFetchOffset(
                 predicate: messagesFromRangePredicate,
                 messageId: initialMessageId,

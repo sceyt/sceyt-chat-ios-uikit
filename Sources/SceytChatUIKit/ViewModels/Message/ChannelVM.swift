@@ -1177,9 +1177,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         _ message: Message,
         action: UserSendMessage.Action
     ) {
-        if messageObserver.resetRangePredicateIfNeeded() {
-            isRestartingMessageObserver = .reload
-        }
         provider.storePending(message: message)
         
         @Sendable func send() {
@@ -1476,9 +1473,12 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             isSearching = false
             searchResult?.resetCache()
         }
+        if messageObserver.resetRangePredicateIfNeeded() {
+            isRestartingMessageObserver = .reload
+        }
     }
     
-    open func search(with query: String) {
+    open func searchMessages(with query: String) {
         guard !query.isEmpty else {
             searchResult?.resetCache()
             return
@@ -1511,16 +1511,19 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open func findPreviousSearchedMessage() {
-        guard let messageId = searchResult.prevItem() else { return }
+        guard let messageId = searchResult.prevItem() else {
+            return
+        }
         if let indexPath = indexPathOf(messageId: messageId) {
             searchResult.prev()
             scroll(to: indexPath, messageId: messageId)
-        } else if chatClient.connectionState == .connected {
+        } else if !searchResult.isLoadedNearMessages(for: messageId), chatClient.connectionState == .connected {
             searchDirection = .prev
             scrollToMessageIdIfSearching = messageId
             loadNearMessagesOfSearchMessage(id: messageId) {[weak self] error in
-                if error == nil {
-                    self?.searchResult.prev()
+                if let self, error == nil {
+                    self.searchResult.setLoadedNearMessages(messageId: messageId)
+                    self.searchResult.prev()
                 }
             }
         } else {
@@ -1546,12 +1549,13 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             if index < 5 {
                 loadPrevMessages(before: messageId)
             }
-        } else if chatClient.connectionState == .connected {
+        } else if !searchResult.isLoadedNearMessages(for: messageId), chatClient.connectionState == .connected {
             scrollToMessageIdIfSearching = messageId
             searchDirection = .next
             loadNearMessagesOfSearchMessage(id: messageId) {[weak self] error in
-                if error == nil {
-                    self?.searchResult.next()
+                if let self, error == nil {
+                    self.searchResult.setLoadedNearMessages(messageId: messageId)
+                    self.searchResult.next()
                 }
             }
         } else {
@@ -2108,3 +2112,5 @@ public extension ChannelVM {
         }
     }
 }
+
+

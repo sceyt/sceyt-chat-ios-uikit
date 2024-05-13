@@ -28,9 +28,10 @@ public struct MessageSearchCoordinator: SearchCoordinator {
 
     private var searchResults = [Item]()
     private(set) var currentIndex: Int = 0
+    @Atomic private var loadNearMessages = Set<MessageId>()
 
     @Atomic public private(set) var state: State = .pending
-
+    
     public func nextItem() -> Item? {
         let nextIndex = currentIndex + 1
         if searchResults.indices.contains(nextIndex) {
@@ -87,6 +88,7 @@ public struct MessageSearchCoordinator: SearchCoordinator {
     public mutating func resetCache() {
         currentIndex = 0
         searchResults.removeAll(keepingCapacity: true)
+        loadNearMessages.removeAll(keepingCapacity: true)
     }
 
     public var cacheCount: Int {
@@ -99,6 +101,14 @@ public struct MessageSearchCoordinator: SearchCoordinator {
 
     public mutating func setCurrentIndex( _ index: Int) {
         currentIndex = index
+    }
+    
+    public func isLoadedNearMessages(for messageId: MessageId) -> Bool {
+        loadNearMessages.contains(messageId)
+    }
+    
+    public func setLoadedNearMessages(messageId: MessageId) {
+        loadNearMessages.insert(messageId)
     }
 
     public private(set) var searchQuery: MessageListQuery?
