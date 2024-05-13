@@ -16,8 +16,9 @@ open class MessageInfoVM: NSObject {
 	public let data: MessageLayoutModel
 	private let queries: [MessageMarkerListQuery]
 	private let localizedMarkerNames: [String: String]
+    public var queryLimit: UInt
 	
-	var markers: [(markerName: String, markerArray: [ChatMessage.Marker])] {
+    public var markers: [(markerName: String, markerArray: [ChatMessage.Marker])] {
 		var markersArray: [(markerName: String, markerArray: [ChatMessage.Marker])] = []
 		
 		markerObserver.items.forEach { marker in
@@ -55,9 +56,9 @@ open class MessageInfoVM: NSObject {
 		return markersArray
 	}
 	
-	public private(set) var messageMarkerProvider: ChannelMessageMarkerProvider
+    open var messageMarkerProvider: ChannelMessageMarkerProvider
 	
-	public private(set) lazy var markerObserver: DatabaseObserver<MarkerDTO, ChatMessage.Marker> = {
+    open lazy var markerObserver: DatabaseObserver<MarkerDTO, ChatMessage.Marker> = {
 		let predicate = NSPredicate(format: "messageId == %lld AND user.id != %@", data.message.id, data.message.user.id)
 		
 		return DatabaseObserver<MarkerDTO, ChatMessage.Marker>(
@@ -71,26 +72,26 @@ open class MessageInfoVM: NSObject {
 	public required init(
 		messageMarkerProvider: ChannelMessageMarkerProvider,
 		data: MessageLayoutModel,
+        queryLimit: UInt = 100,
 		markerNames: [String]? = nil,
 		localizedMarkerNames: [String: String]? = nil)
 	{
 		self.messageMarkerProvider = messageMarkerProvider
 		self.data = data
+        self.queryLimit = queryLimit
 		let markerNames = markerNames ?? [DefaultMarker.displayed.rawValue, DefaultMarker.received.rawValue, DefaultMarker.played.rawValue]
 		self.localizedMarkerNames = localizedMarkerNames ?? [DefaultMarker.displayed.rawValue: L10n.Message.Info.readBy,
 															 DefaultMarker.received.rawValue: L10n.Message.Info.deliveredTo,
 															 DefaultMarker.played.rawValue: L10n.Message.Info.playedBy]
 		self.queries = markerNames.map {
 			.Builder(messageId: data.message.id, markerName: $0)
-			.limit(100)
+			.limit(queryLimit)
 			.build()
 		}
 		super.init()
 	}
-}
 
-extension MessageInfoVM {
-	
+    // MARK: - Data handling
 	open func loadMarkers() {
 		guard !queries.isEmpty else { return }
 		for query in queries {
@@ -135,10 +136,8 @@ extension MessageInfoVM {
 //		
 //		return correctIndexPaths
 //	}
-}
 
-extension MessageInfoVM {
-    
+    // MARK: - Data source
     open var numberOfSections: Int { markers.count + 1 }
     
     open func numberOfRows(section: Int) -> Int {

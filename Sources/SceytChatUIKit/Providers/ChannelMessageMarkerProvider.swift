@@ -127,11 +127,20 @@ open class ChannelMessageMarkerProvider: Provider {
 extension ChannelMessageMarkerProvider {
     
     open func loadMarkers(_ query: MessageMarkerListQuery, completion: ((Error?) -> Void)? = nil) {
-        guard chatClient.connectionState == .connected else { return }
-        guard query.hasNext, !query.loading else { return }
+        guard chatClient.connectionState == .connected else {
+            completion?(SceytChatError.notConnect)
+            return
+        }
+        guard query.hasNext, !query.loading else {
+            completion?(SceytChatError.queryInProgress)
+            return
+        }
         
         query.loadNext { [weak self] query, markers, error in
-            guard let self else { return }
+            guard let self else {
+                completion?(error)
+                return
+            }
             
             if let error {
                 logger.errorIfNotNil(error, "")
@@ -160,12 +169,15 @@ extension ChannelMessageMarkerProvider {
     }
 }
 
-enum DefaultMarker: String, Comparable {
+public enum DefaultMarker: String {
     case displayed
     case received
     case played
+}
+
+extension DefaultMarker: Comparable {
     
-    static func < (lhs: DefaultMarker, rhs: DefaultMarker) -> Bool {
+    public static func < (lhs: DefaultMarker, rhs: DefaultMarker) -> Bool {
         switch (lhs, rhs) {
         case (.played, _):
             return true
