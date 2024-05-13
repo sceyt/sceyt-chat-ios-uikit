@@ -100,7 +100,7 @@ open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDele
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         guard let header = viewModel.header(section: section)
         else { return nil }
-        let headerView = tableView.dequeueReusableHeaderFooterView(HeaderView.self)
+        let headerView = tableView.dequeueReusableHeaderFooterView(Components.messageInfoHeaderView.self)
         headerView.label.text = header
         return headerView
     }
