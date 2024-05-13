@@ -15,7 +15,7 @@ open class MessageInfoVM: NSObject {
 	
 	public let data: MessageLayoutModel
 	private let queries: [MessageMarkerListQuery]
-	private let localizedMarkerNames: [String: String]
+	private let localizedMarkerNames: [DefaultMarker: String]
     public var queryLimit: UInt
 	
     public var markers: [(markerName: String, markerArray: [ChatMessage.Marker])] {
@@ -51,7 +51,7 @@ open class MessageInfoVM: NSObject {
 			}
 		}
 		
-		markersArray.sort { DefaultMarker(rawValue: $0.markerName) ?? .played < DefaultMarker(rawValue: $1.markerName) ?? .played }
+		markersArray.sort { DefaultMarker(rawValue: $0.markerName) > DefaultMarker(rawValue: $1.markerName) }
 		
 		return markersArray
 	}
@@ -73,18 +73,19 @@ open class MessageInfoVM: NSObject {
 		messageMarkerProvider: ChannelMessageMarkerProvider,
 		data: MessageLayoutModel,
         queryLimit: UInt = 100,
-		markerNames: [String]? = nil,
-		localizedMarkerNames: [String: String]? = nil)
-	{
+		markerNames: [DefaultMarker]? = nil,
+		localizedMarkerNames: [DefaultMarker: String]? = nil
+    )
+    {
 		self.messageMarkerProvider = messageMarkerProvider
 		self.data = data
         self.queryLimit = queryLimit
-		let markerNames = markerNames ?? [DefaultMarker.displayed.rawValue, DefaultMarker.received.rawValue, DefaultMarker.played.rawValue]
-		self.localizedMarkerNames = localizedMarkerNames ?? [DefaultMarker.displayed.rawValue: L10n.Message.Info.readBy,
-															 DefaultMarker.received.rawValue: L10n.Message.Info.deliveredTo,
-															 DefaultMarker.played.rawValue: L10n.Message.Info.playedBy]
+		let markerNames = markerNames ?? [DefaultMarker.displayed, DefaultMarker.received, DefaultMarker.played]
+		self.localizedMarkerNames = localizedMarkerNames ?? [DefaultMarker.displayed: L10n.Message.Info.readBy,
+															 DefaultMarker.received: L10n.Message.Info.deliveredTo,
+															 DefaultMarker.played: L10n.Message.Info.playedBy]
 		self.queries = markerNames.map {
-			.Builder(messageId: data.message.id, markerName: $0)
+            .Builder(messageId: data.message.id, markerName: $0.rawValue)
 			.limit(queryLimit)
 			.build()
 		}
@@ -153,7 +154,7 @@ open class MessageInfoVM: NSObject {
         
         switch section {
         case 0: return nil
-        default: return localizedMarkerNames[markers[section - 1].markerName]
+        default: return localizedMarkerNames[DefaultMarker(rawValue: markers[section - 1].markerName)]
         }
     }
     

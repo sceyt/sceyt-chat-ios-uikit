@@ -169,26 +169,52 @@ extension ChannelMessageMarkerProvider {
     }
 }
 
-public enum DefaultMarker: String {
+public enum DefaultMarker: Hashable {
+    
     case displayed
     case received
     case played
+    case custom(String)
+    
+    public init(rawValue: String) {
+        switch rawValue {
+        case "displayed":
+            self = .displayed
+        case "received":
+            self = .received
+        case "played":
+            self = .played
+        default:
+            self = .custom(rawValue)
+        }
+    }
+    
+    public var rawValue: String {
+        switch self {
+        case .displayed:
+            "displayed"
+        case .received:
+            "received"
+        case .played:
+            "played"
+        case .custom(let customMarkerName):
+            customMarkerName
+        }
+    }
 }
 
 extension DefaultMarker: Comparable {
     
-    public static func < (lhs: DefaultMarker, rhs: DefaultMarker) -> Bool {
-        switch (lhs, rhs) {
-        case (.played, _):
-            return true
-        case (.displayed, .played):
-            return false
-        case (.displayed, .received):
-            return true
-        case (.received, _):
-            return false
-        default:
-            return false
+    public var rank: Int {
+        switch self {
+        case .received:     1
+        case .displayed:    2
+        case .played:       3
+        case .custom:       4
         }
+    }
+    
+    public static func < (lhs: DefaultMarker, rhs: DefaultMarker) -> Bool {
+        lhs.rank < rhs.rank
     }
 }
