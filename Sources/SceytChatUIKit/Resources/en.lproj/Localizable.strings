@@ -189,6 +189,7 @@
 
 "message.info.readBy" = "Read by";
 "message.info.deliveredTo" = "Delivered to";
+"message.info.playedBy" = "Played by";
 "message.info.sent" = "Sent:";
 "message.info.size" = "Size:";
 "message.info.title" = "Message Info";

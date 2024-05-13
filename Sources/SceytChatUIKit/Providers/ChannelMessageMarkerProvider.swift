@@ -113,10 +113,10 @@ open class ChannelMessageMarkerProvider: Provider {
             return
         }
         logger.debug("[MARKER CK] send \(ids.count)")
-        switch markerName {
-        case DefaultMarker.received:
+        switch DefaultMarker(rawValue: markerName) {
+        case .received:
             channelOperator.markMessagesAsReceived(ids: ids.map { NSNumber(value: $0)}, completion: completed(_:error:))
-        case DefaultMarker.displayed:
+        case .displayed:
             channelOperator.markMessagesAsDisplayed(ids: ids.map { NSNumber(value: $0)}, completion: completed(_:error:))
         default:
             channelOperator.markMessages(markerName: markerName, ids: ids.map { NSNumber(value: $0)}, completion: completed(_:error:))
@@ -124,7 +124,97 @@ open class ChannelMessageMarkerProvider: Provider {
     }
 }
 
-enum DefaultMarker {
-    static let displayed = "displayed"
-    static let received = "received"
+extension ChannelMessageMarkerProvider {
+    
+    open func loadMarkers(_ query: MessageMarkerListQuery, completion: ((Error?) -> Void)? = nil) {
+        guard chatClient.connectionState == .connected else {
+            completion?(SceytChatError.notConnect)
+            return
+        }
+        guard query.hasNext, !query.loading else {
+            completion?(SceytChatError.queryInProgress)
+            return
+        }
+        
+        query.loadNext { [weak self] query, markers, error in
+            guard let self else {
+                completion?(error)
+                return
+            }
+            
+            if let error {
+                logger.errorIfNotNil(error, "")
+            } else {
+                if let markers {
+                    store(markers: markers, for: query.messageId, completion: completion)
+                }
+            }
+        }
+    }
+    
+    open func store(markers: [Marker],
+                    for messageId: MessageId,
+                    completion: ((Error?) -> Void)? = nil) {
+        guard !markers.isEmpty else {
+            completion?(nil)
+            return
+        }
+        database.write {
+            $0.createOrUpdate(markers: markers, messageId: messageId)
+            
+        } completion: { error in
+            logger.debug(error?.localizedDescription ?? "")
+            completion?(error)
+        }
+    }
+}
+
+public enum DefaultMarker: Hashable {
+    
+    case displayed
+    case received
+    case played
+    case custom(String)
+    
+    public init(rawValue: String) {
+        switch rawValue {
+        case "displayed":
+            self = .displayed
+        case "received":
+            self = .received
+        case "played":
+            self = .played
+        default:
+            self = .custom(rawValue)
+        }
+    }
+    
+    public var rawValue: String {
+        switch self {
+        case .displayed:
+            "displayed"
+        case .received:
+            "received"
+        case .played:
+            "played"
+        case .custom(let customMarkerName):
+            customMarkerName
+        }
+    }
+}
+
+extension DefaultMarker: Comparable {
+    
+    public var rank: Int {
+        switch self {
+        case .received:     1
+        case .displayed:    2
+        case .played:       3
+        case .custom:       4
+        }
+    }
+    
+    public static func < (lhs: DefaultMarker, rhs: DefaultMarker) -> Bool {
+        lhs.rank < rhs.rank
+    }
 }

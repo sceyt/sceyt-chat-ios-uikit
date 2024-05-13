@@ -146,13 +146,14 @@ extension MessageCell {
             }
         }
         
-        func play() {
+        func play(onPlayed: (_ url: URL) -> Void) {
             guard let fileUrl = data.attachment.fileUrl else { return }
 
             switch state {
             case .stopped:
                 state = .playing
                 SimpleSinglePlayer.play(fileUrl, durationBlock: setDuration, stopBlock: stop)
+                onPlayed(fileUrl)
             case .playing:
                 state = .paused
                 SimpleSinglePlayer.pause()

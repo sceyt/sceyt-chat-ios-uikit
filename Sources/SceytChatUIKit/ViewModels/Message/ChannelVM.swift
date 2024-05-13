@@ -800,7 +800,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open func markMessageAsDisplayed(indexPaths: [IndexPath]) {
         guard !indexPaths.isEmpty
         else { return }
-        markMessagesQueue.async {[weak self] in
+        markMessagesQueue.async { [weak self] in
             guard let self
             else { return }
             
@@ -821,7 +821,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.messageMarkerProvider.markIfNeeded(
                 after: prevLasMarkDisplayedMessageId,
                 before: message.id,
-                markerName: DefaultMarker.displayed)
+                markerName: DefaultMarker.displayed.rawValue)
             { error in
                 semafore.signal()
             }
@@ -830,6 +830,25 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         }
     }
     
+    open func markMessageAsPlayed(indexPath: IndexPath) {
+        markMessagesQueue.async { [weak self] in
+            guard let self,
+                  let message = message(at: indexPath),
+                  message.id != 0 else { return }
+            
+            logger.verbose("[MARKER CHECK], ChannelVM markMessageAsPlayed for message id: \(message.id), \(message.body)")
+            let semafore = DispatchSemaphore(value: 1)
+            self.messageMarkerProvider.markIfNeeded(
+                after: message.id,
+                before: message.id,
+                markerName: DefaultMarker.played.rawValue)
+            { error in
+                semafore.signal()
+            }
+            semafore.wait()
+        }
+    }
+
     open func markChannelAs(read: Bool) {
         guard channel.unread == read
         else { return }
