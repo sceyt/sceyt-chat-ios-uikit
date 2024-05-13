@@ -97,7 +97,7 @@ open class ChannelListProvider: Provider {
             channels.forEach { channel in
                 guard let message = channel.lastMessage
                 else { return }
-                if !message.incoming || channel.userRole == nil || message.markerTotals?.contains(where: {$0.name == DefaultMarker.received}) == true {
+                if !message.incoming || channel.userRole == nil || message.markerTotals?.contains(where: {$0.name == DefaultMarker.received.rawValue}) == true {
                     return
                 }
                 Components.channelMessageProvider.init(channelId: channel.id)

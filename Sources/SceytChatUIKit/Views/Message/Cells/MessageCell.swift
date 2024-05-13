@@ -117,6 +117,8 @@ open class MessageCell: CollectionViewCell,
                 onAction?(.resumeTransfer(message, attachment))
             case .play(let url):
                 onAction?(.playAtUrl(url))
+            case .playedAudio(let url):
+                onAction?(.playedAudio(url))
             }
         }
         
@@ -541,6 +543,20 @@ open class MessageCell: CollectionViewCell,
         }
         return longPressItem
     }
+    private func connectContextMenuIfNeeded(identifier: Identifier) {
+        if contextMenu?.alignments[identifier] == nil {
+            connectContextMenu()
+        }
+    }
+    
+    private func connectContextMenu() {
+        let alignment: ContextMenu.HorizontalAlignment = data.message.incoming ? .leading : .trailing
+        contextMenu?.connect(
+            to: bubbleView,
+            identifier: .init(value: data),
+            alignment: effectiveUserInterfaceLayoutDirection == .rightToLeft ? alignment.reversed : alignment
+        )
+    }
     
     private func selectLink(range: NSRange) {
         guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString,
@@ -623,6 +639,7 @@ public extension MessageCell {
         case resumeTransfer(ChatMessage, ChatMessage.Attachment)
         case openUrl(URL)
         case playAtUrl(URL)
+        case playedAudio(URL)
         case didTapLink(URL)
         case didLongPressLink(URL)
         case didTapAvatar
