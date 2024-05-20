@@ -174,7 +174,7 @@ open class EmojiViewPresentationController: UIPresentationController, UIGestureR
     open private(set) var shouldComplete: Bool = false
     open lazy var topAnchor: CGFloat = presentedView?.window?.windowScene?.statusBarManager?.statusBarFrame.height ?? 64
 
-    private var smallHeight: CGFloat { (containerView?.height ?? 0) * Layouts.heightRatio }
+    open var smallHeight: CGFloat { (containerView?.height ?? 0) * Layouts.heightRatio }
 
     lazy var blurEffectView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
 
