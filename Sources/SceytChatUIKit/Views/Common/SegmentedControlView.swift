@@ -157,6 +157,11 @@ public extension SegmentedControlView {
     struct SectionItem {
         public let content: UIView
         public let title: String
+        
+        public init(content: UIView, title: String) {
+            self.content = content
+            self.title = title
+        }
     }
 }
 
