@@ -154,7 +154,7 @@ open class SegmentedControlView: View,
 }
 
 public extension SegmentedControlView {
-    struct SectionItem {
+    public struct SectionItem {
         public let content: UIView
         public let title: String
     }
