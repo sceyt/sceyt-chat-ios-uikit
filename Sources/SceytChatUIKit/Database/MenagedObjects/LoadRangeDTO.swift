@@ -63,6 +63,13 @@ public class LoadRangeDTO: NSManagedObject {
         return fetch(request: request, context: context)
     }
     
+    public static func fetchAll(channelId: ChannelId, messageId: MessageId, context: NSManagedObjectContext) -> [LoadRangeDTO] {
+        let request = fetchRequest()
+        request.predicate = NSPredicate(format: "channelId == %lld AND startMessageId <= %lld AND endMessageId >= %lld", channelId, messageId, messageId)
+        request.sortDescriptor = NSSortDescriptor(keyPath: \LoadRangeDTO.endMessageId, ascending: true)
+        return fetch(request: request, context: context)
+    }
+    
     public static func create(
         channelId: ChannelId,
         startMessageId: MessageId,

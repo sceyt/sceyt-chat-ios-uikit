@@ -59,7 +59,6 @@ open class ChannelMessageSender: Provider {
             }
         }
         func handleAck(sentMessage: Message?, error: Error?) {
-            
             let sentMessage = didSend(sentMessage, error: error)
             guard let sentMessage = sentMessage,
                   sentMessage.deliveryStatus != .failed

@@ -143,7 +143,6 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         offset: Int? = nil,
         completion: (() -> Void)? = nil) {
             if isObserverRestarting {
-                fatalError("[MEESS] restartObserver \(fetchPredicate)")
                 return
             }
             if isObserverStarted {
@@ -204,15 +203,11 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     
     open func item(at indexPath: IndexPath) -> Item? {
         guard isObserverStarted || isObserverRestarting
-        else {
-            fatalError()
-            return nil
-        }
+        else { return nil }
         let caches = currentCaches
         guard caches.mainCache.indices.contains(indexPath.section),
               caches.mainCache[indexPath.section].indices.contains(indexPath.row)
         else {
-            fatalError()
             return nil
         }
         let dto = caches.mainCache[indexPath.section][indexPath.row]
@@ -530,6 +525,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
            (currentContext === context) {
             
             func perform() {
+                logger.debug("[MESSAGE SEND] didChangeObjects perform")
                 readCache {}
                 var sendEvent = false
                 var changeItems = [ChangeItem]()
@@ -616,7 +612,8 @@ private extension LazyDatabaseObserver {
                let r = rhs as? NSString {
                 return l.compare(r as String)
             }
-            fatalError("not implemented")
+            logger.error("not implemented Comparison for \(lhs) and \(rhs)")
+            return .orderedSame
         }
         for sortDescriptor in sortDescriptors {
             let result: ComparisonResult
@@ -953,10 +950,9 @@ private extension LazyDatabaseObserver {
                 return
             }
         }
-        let item = DispatchWorkItem(qos: .userInteractive, block: {
+        eventQueue.async {
             block()
-        })
-        eventQueue.async(execute: item)
+        }
     }
     
     func perform( _ block: @escaping () -> Void) {

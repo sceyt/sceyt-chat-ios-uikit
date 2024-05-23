@@ -556,8 +556,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 isRestartingMessageObserver = .none
             } else {
                 isRestartingMessageObserver = .none
-                scroll(to: indexPath, messageId: mid)
             }
+            scroll(to: indexPath, messageId: mid)
         }
     }
     
@@ -572,6 +572,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 }
             }
             
+            if isInitial {
+                event = .reloadDataAndScrollToBottom
+                return
+            }
             if numberOfSections == 0 {
                 event = .showNoMessage
             }
@@ -595,10 +599,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 }
                 return
             }
-            if isInitial, isSearching {
-                event = .reloadData
-                return
-            }
+            
             if isAppActive {
                 events.forEach {
                     event = $0
@@ -1035,54 +1036,65 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     //MARK: mark messages
-    open func markMessageAsDisplayed(indexPaths: [IndexPath]) {
-        guard !indexPaths.isEmpty
+    
+    
+    open func markMessage(as marker: DefaultMarker, indexPaths: [IndexPath]) {
+        let messages = indexPaths.compactMap {
+            message(at: $0)
+        }
+        
+        if marker == .displayed {
+            markMessageAsDisplayed(messages)
+        } else {
+            markMessage(as: marker, messages: messages)
+        }
+    }
+    
+    private let semaphore = DispatchSemaphore(value: 1)
+    open func markMessage(as marker: DefaultMarker, messages: [ChatMessage]) {
+        guard !messages.isEmpty
+        else { return }
+        
+        markMessagesQueue.async { [weak self] in
+            guard let self, 
+                    let max = messages.max(by: { $0.id < $1.id }),
+                    let min = messages.min(by: { $0.id < $1.id })
+            else { return }
+                        
+            self.messageMarkerProvider.markIfNeeded(
+                after: min.id,
+                before: max.id,
+                markerName: marker.rawValue)
+            {[weak self] error in
+                self?.semaphore.signal()
+            }
+            semaphore.wait()
+        }
+    }
+    
+    open func markMessageAsDisplayed(_ messages: [ChatMessage]) {
+        guard !messages.isEmpty
         else { return }
         markMessagesQueue.async { [weak self] in
             guard let self
             else { return }
             
-            let message: ChatMessage? = indexPaths.compactMap {
-                if let message = self.message(at: $0),
-                   message.id != 0 {
-                    return message
-                }
-                return nil
-            }.max(by: { $0.id < $1.id })
+            let message = messages.max(by: { $0.id < $1.id })
             
             guard let message, self.lasMarkDisplayedMessageId != message.id
             else { return }
             let prevLasMarkDisplayedMessageId = self.lasMarkDisplayedMessageId
             self.lasMarkDisplayedMessageId = message.id
-            let semafore = DispatchSemaphore(value: 1)
+            
             self.messageMarkerProvider.markIfNeeded(
                 after: prevLasMarkDisplayedMessageId,
                 before: message.id,
                 markerName: DefaultMarker.displayed.rawValue)
-            { error in
-                semafore.signal()
+            {[weak self] error in
+                self?.semaphore.signal()
             }
-            semafore.wait()
+            semaphore.wait()
             
-        }
-    }
-    
-    open func markMessageAsPlayed(indexPath: IndexPath) {
-        markMessagesQueue.async { [weak self] in
-            guard let self,
-                  let message = message(at: indexPath),
-                  message.id != 0 else { return }
-            
-            logger.verbose("[MARKER CHECK], ChannelVM markMessageAsPlayed for message id: \(message.id), \(message.body)")
-            let semafore = DispatchSemaphore(value: 1)
-            self.messageMarkerProvider.markIfNeeded(
-                after: message.id,
-                before: message.id,
-                markerName: DefaultMarker.played.rawValue)
-            { error in
-                semafore.signal()
-            }
-            semafore.wait()
         }
     }
 
@@ -1117,7 +1129,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 return
             }
         }
-        
         let builder = Message
             .Builder()
             .type(userMessage.type.rawValue)
@@ -1196,9 +1207,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         _ message: Message,
         action: UserSendMessage.Action
     ) {
-        provider.storePending(message: message)
         
         @Sendable func send() {
+            logger.debug("[MESSAGE SEND] sendUserMessage messageSender \(message.body)")
             switch action {
             case .send, .reply, .forward:
                 messageSender.sendMessage(message, storeBeforeSend: false) {[weak self] _ in
@@ -1218,21 +1229,25 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         
         if channel.unSynched {
-            Task {
-                do {
-                    if let channel = try await channelCreator.createChannelOnServerIfNeeded(channelId: channel.id) {
-                        updateLocalChannel(channel) {
+            provider.storePending(message: message) { _ in
+                Task {
+                    do {
+                        if let channel = try await self.channelCreator.createChannelOnServerIfNeeded(channelId: self.channel.id) {
+                            self.updateLocalChannel(channel) {
+                                send()
+                            }
+                        } else {
                             send()
                         }
-                    } else {
-                        send()
+                    } catch {
+                        
                     }
-                } catch {
-                    
                 }
             }
         } else {
-            send()
+            provider.storePending(message: message) { _ in
+                send()
+            }
         }
     }
     
@@ -1504,7 +1519,15 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         isSearchResultsLoading = true
         
-        searchResult = .init(channelId: channel.id, searchFields: [.init(key: .body, search: .contains, searchWord: query)])
+        searchResult = .init(
+            channelId: channel.id, 
+            searchFields: [
+                .init(
+                    key: .body,
+                    search: .contains,
+                    searchWord: query
+                )
+            ])
         
         searchResult.loadNextMessages({[weak self] messages, error in
             self?.searchResult.resetCache()
@@ -1607,10 +1630,40 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         }
     }
     
-    open func findReplayedMessage(id: MessageId) {
-        guard id != 0 else { return }
-        scrollToRepliedMessageId = id
-        loadNearMessagesOfRepliedMessage(id: id)
+    open func findReplayedMessage(messageId: MessageId) {
+        guard messageId != 0 else { return }
+        scrollToRepliedMessageId = messageId
+        if let (index, indexPath) = cachePosition(messageId: messageId) {
+            scroll(to: indexPath, messageId: messageId)
+            updateLastNavigatedIndexPath(indexPath: indexPath)
+            if index < 5 {
+                loadPrevMessages(before: messageId)
+            }
+            return
+        }
+        
+        messageObserver
+            .loadRangeProvider
+            .fetchLoadRanges(
+                channelId: channel.id,
+                messageId: messageId)
+        {[weak self] ranges in
+            guard let self else { return }
+            if !ranges.isEmpty {
+                let sectionsCount = self.numberOfSections
+                self.messageObserver.restartToNear(at: messageId) {[weak self] isDone in
+                    guard let self else { return }
+                    if isDone {
+                        self.isRestartingMessageObserver = .reloadSections(sectionsCount)
+                    } else {
+                        self.loadNearMessagesOfRepliedMessage(id: messageId)
+                    }
+                }
+            } else {
+                self.loadNearMessagesOfRepliedMessage(id: messageId)
+            }
+        }
+        
     }
     
     open func updateSearchedMessageFromDatabase(

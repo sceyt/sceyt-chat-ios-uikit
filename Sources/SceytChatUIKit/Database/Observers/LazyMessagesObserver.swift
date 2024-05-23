@@ -164,7 +164,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             done?()
             return
         }
-        loadPrev(done:done)
+        loadPrev(done: done)
     }
     
     open func restartToNear(

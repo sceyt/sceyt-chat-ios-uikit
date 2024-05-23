@@ -39,7 +39,7 @@ open class ChannelMessageMarkerProvider: Provider {
         database.read {
             let messageIds: [MessageId] = MessageDTO.fetch(predicate: .init(format: "channelId == %lld AND id => %lld AND id <= %lld AND incoming = YES", self.channelId, toId, fromId, markerName), context: $0)
                 .compactMap {
-                    return $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == markerName} ) == true ? nil : MessageId($0.id)
+                    return $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == markerName } ) == true ? nil : MessageId($0.id)
                 }
             return messageIds
         } completion: { result in

@@ -422,18 +422,14 @@ open class MessageCell: CollectionViewCell,
 
     @objc
     open func didUpdateSelectMessage(_ notification: Notification) {
-        if let messageId = notification.object as? MessageId,
-           messageId > 0,
+        if let object = notification.object as? (MessageId, HighlightMode),
+           object.0 > 0,
            let data,
-           data.message.id == messageId {
-            highlightMode = .search
-        } else if case .search = highlightMode  {
+           data.message.id == object.0 {
+            highlightMode = object.1
+        } else if highlightMode != .none  {
             highlightMode = .none
         }
-    }
-
-    open override func apply(_ layoutAttributes: UICollectionViewLayoutAttributes) {
-        super.apply(layoutAttributes)
     }
     
     // MARK: Actions

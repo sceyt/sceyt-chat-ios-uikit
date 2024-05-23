@@ -528,7 +528,7 @@ open class ChannelVC: ViewController,
                     query: self.searchBar.searchTextField.text ?? ""
                 )
                 if searchResult.cacheCount == 0 {
-                    NotificationCenter.default.post(name: .selectMessage, object: 0)
+                    NotificationCenter.default.post(name: .selectMessage, object: nil)
                 }
             }
             .store(in: &subscriptions)
@@ -1277,7 +1277,13 @@ open class ChannelVC: ViewController,
         
         if cell.data.message.id == selectMessageId {
             cell.highlightMode = .search
-        } else if cell.highlightMode == .search {
+        } else if cell.data.message.id == channelViewModel.scrollToRepliedMessageId {
+            if userSelectOnRepliedMessage != nil {
+                cell.highlightMode = .reply
+            } else {
+                animateHighlightCell(cell, mode: .reply)
+            }
+        } else if cell.highlightMode != .none {
             cell.highlightMode = .none
         }
        
@@ -1413,7 +1419,7 @@ open class ChannelVC: ViewController,
             case .playAtUrl(let url):
                 self.router.playFrom(url: url)
             case .playedAudio(_):
-                self.channelViewModel.markMessageAsPlayed(indexPath: indexPath)
+                self.channelViewModel.markMessage(as: .played, messages: [model.message])
             case .didTapLink(let link):
                 self.showLink(link)
             case .didLongPressLink(let link):
@@ -1562,6 +1568,7 @@ open class ChannelVC: ViewController,
     }
     
     open func sendMessage(_ message: UserSendMessage, shouldClearText: Bool = true) {
+        logger.debug("[MESSAGE SEND] sendMessage \(message.text)")
         let canShowUnread = canShowUnreadCountView
         canShowUnreadCountView = false
         channelViewModel.createAndSendUserMessage(message)
@@ -1733,15 +1740,21 @@ open class ChannelVC: ViewController,
         guard let parent = layoutModel.message.parent
         else { return }
         userSelectOnRepliedMessage = layoutModel.message
-        channelViewModel.findReplayedMessage(id: parent.id)
+        channelViewModel.findReplayedMessage(messageId: parent.id)
+        
     }
     
     open func showRepliedMessage(_ message: ChatMessage) {
         let paths = channelViewModel.indexPaths(for: [message])
         guard let indexPath = paths.values.first else {
-            channelViewModel.findReplayedMessage(id: message.id)
+            channelViewModel.findReplayedMessage(messageId: message.id)
             return
         }
+        if let userSelectOnRepliedMessage {
+            NotificationCenter.default.post(name: .selectMessage,
+                                            object: (userSelectOnRepliedMessage.id, MessageCell.HighlightMode.none))
+        }
+        
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
@@ -1750,15 +1763,15 @@ open class ChannelVC: ViewController,
             } completion: { [weak self] _ in
                 guard let self else { return }
                 if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
-                    self.highlightCell(cell)
+                    self.animateHighlightCell(cell, mode: .reply)
                 }
             }
         }
     }
     
-    open func highlightCell(_ cell: MessageCell) {
+    open func animateHighlightCell(_ cell: MessageCell, mode: MessageCell.HighlightMode) {
+        cell.highlightMode = mode
         UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak cell] in
-            cell?.highlightMode = .reply
             cell?.highlightMode = .none
         }
     }
@@ -1774,7 +1787,14 @@ open class ChannelVC: ViewController,
     open func markMessageAsDisplayed() {
         guard isViewDidAppear
         else { return }
-        channelViewModel.markMessageAsDisplayed(indexPaths: collectionView.indexPathsForVisibleItems)
+        let messages = collectionView.visibleCells.compactMap {
+            ($0 as? MessageCell)?.data?.message
+        }
+        if messages.count == collectionView.indexPathsForVisibleItems.count {
+            channelViewModel.markMessage(as: .displayed, messages: messages)
+        } else {
+            channelViewModel.markMessage(as: .displayed, indexPaths: collectionView.indexPathsForVisibleItems)
+        }
     }
     
     // MARK: ViewModel Events
@@ -1991,7 +2011,19 @@ open class ChannelVC: ViewController,
             }
         case let .scrollAndSelect(indexPath, messageId):
             selectMessageId = messageId
-            NotificationCenter.default.post(name: .selectMessage, object: messageId)
+            var mode = MessageCell.HighlightMode.search
+            if channelViewModel.scrollToRepliedMessageId != 0 {
+                if userSelectOnRepliedMessage != nil {
+                    mode = .reply
+                } else {
+                    mode = .none
+                }
+                selectMessageId = nil
+            } else {
+                selectMessageId = messageId
+            }
+            
+            NotificationCenter.default.post(name: .selectMessage, object: (messageId, mode))
             
             let viewIndexPath: IndexPath
             if collectionView.contains(indexPath: indexPath) {
@@ -2026,9 +2058,20 @@ open class ChannelVC: ViewController,
                 indexPath: indexPath,
                 pos: pos
             )
-            selectMessageId = messageId
+            
             lastAnimatedIndexPath = indexPath
-            NotificationCenter.default.post(name: .selectMessage, object: messageId)
+            var mode = MessageCell.HighlightMode.search
+            if channelViewModel.scrollToRepliedMessageId != 0 {
+                if userSelectOnRepliedMessage != nil {
+                    mode = .reply
+                } else {
+                    mode = .none
+                }
+                selectMessageId = nil
+            } else {
+                selectMessageId = messageId
+            }
+            NotificationCenter.default.post(name: .selectMessage, object: (messageId, mode))
             collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: true)
         }
     }

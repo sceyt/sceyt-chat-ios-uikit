@@ -97,4 +97,17 @@ open class LoadRangeProvider: Provider {
             }
         }
     }
+    
+    open func fetchLoadRanges(channelId: ChannelId, messageId: MessageId, completion: @escaping ([ChatLoadRange]) -> Void) {
+        database.read { context in
+            return LoadRangeDTO.fetchAll(channelId: channelId, messageId: messageId, context: context).map { $0.convert() }
+        } completion: { result in
+            switch result {
+            case let .success(ranges):
+                completion(ranges)
+            case .failure:
+                completion([])
+            }
+        }
+    }
 }
