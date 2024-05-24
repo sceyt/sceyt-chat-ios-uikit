@@ -33,21 +33,33 @@ open class MessageInfoVM: NSObject {
 		if let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }),
 		   let receivedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.received.rawValue }) {
 			for displayedMarker in markersArray[displayedIndex].markerArray {
-				markersArray[receivedIndex].markerArray.removeAll { $0.user?.id == displayedMarker.user?.id }
-				if markersArray[receivedIndex].markerArray.isEmpty {
-					markersArray.remove(at: receivedIndex)
-				}
+                forToBrake: for displayedMarker in markersArray[displayedIndex].markerArray {
+                    for (index, marker) in markersArray[receivedIndex].markerArray.enumerated() {
+                        if marker.user?.id == displayedMarker.user?.id {
+                            markersArray[receivedIndex].markerArray.remove(at: index)
+                            if markersArray[receivedIndex].markerArray.isEmpty {
+                                markersArray.remove(at: receivedIndex)
+                            }
+                            break forToBrake
+                        }
+                    }
+                }
 			}
 		}
 		
 		// remove played markers from displayed
 		if let playedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.played.rawValue }),
 		   let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }) {
-			for playedMarker in markersArray[playedIndex].markerArray {
-				markersArray[displayedIndex].markerArray.removeAll { $0.user?.id == playedMarker.user?.id }
-				if markersArray[displayedIndex].markerArray.isEmpty {
-					markersArray.remove(at: displayedIndex)
-				}
+            forToBrake: for playedMarker in markersArray[playedIndex].markerArray {
+                for (index, marker) in markersArray[displayedIndex].markerArray.enumerated() {
+                    if marker.user?.id == playedMarker.user?.id {
+                        markersArray[displayedIndex].markerArray.remove(at: index)
+                        if markersArray[displayedIndex].markerArray.isEmpty {
+                            markersArray.remove(at: displayedIndex)
+                        }
+                        break forToBrake
+                    }
+                }
 			}
 		}
 		
