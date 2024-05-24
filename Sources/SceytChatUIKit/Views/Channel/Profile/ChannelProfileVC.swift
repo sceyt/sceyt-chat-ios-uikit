@@ -613,11 +613,15 @@ open class ChannelProfileVC: ViewController,
         case .broadcast:
             if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
-            }
+            } else {
+                logger.debug("[ChannelProfileVC] decoded metadata description is missing")
+            }     
             sections.append(.uri)
         case .private:
             if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
+            } else {
+                logger.debug("[ChannelProfileVC] decoded metadata description is missing")
             }
         case .direct:
             if let peer = profileViewModel.channel.peer, !peer.blocked, !(peer.presence.status ?? "").isEmpty {
