@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
   s.swift_version = '5.7'
   s.name         = "SceytChatUIKit"
-  s.version      = "1.5.5"
+  s.version      = "1.5.6"
   s.summary      = "Fully customizable Chat UI Kit on top of SceytChat SDK."
   s.homepage     = "https://sceyt.com"
   s.license      = "MIT"
@@ -16,5 +16,5 @@ Pod::Spec.new do |s|
   s.ios.frameworks = ["UIKit", "Foundation", "CoreData"]
   s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'arm64' }
   s.pod_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'arm64' }
-  s.dependency "SceytChat", ">= 1.5.4"
+  s.dependency "SceytChat", ">= 1.5.5"
 end
