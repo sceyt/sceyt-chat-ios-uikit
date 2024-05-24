@@ -55,6 +55,7 @@ public class UserDTO: NSManagedObject {
         if let mo = fetch(id: id, context: context) {
             return mo
         }
+        logger.debug("[ChatChannel] observer, create \(id)")
         let mo = insertNewObject(into: context)
         mo.id = id
         return mo

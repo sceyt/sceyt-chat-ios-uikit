@@ -289,12 +289,12 @@ open class ChannelProvider: Provider {
     open func join(completion: ((Error?) -> Void)? = nil) {
         channelOperator
             .join { channel, error in
-                
                 if let channel {
                     self.database.write {
                         $0.createOrUpdate(channel: channel)
                     }  completion: { error in
                         logger.errorIfNotNil(error, "Store channel \(self.channelId) in db")
+                        completion?(error)
                     }
                 } else {
                     logger.errorIfNotNil(error, "Join channel \(self.channelId)")

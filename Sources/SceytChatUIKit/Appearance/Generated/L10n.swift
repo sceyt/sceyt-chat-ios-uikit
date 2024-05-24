@@ -411,6 +411,12 @@ internal enum L10n {
         }
       }
     }
+    internal enum `Self` {
+      /// message yourself
+      internal static let hint = L10n.tr("Localizable", "channel.self.hint", fallback: "message yourself")
+      /// Me
+      internal static let title = L10n.tr("Localizable", "channel.self.title", fallback: "Me")
+    }
     internal enum StopRecording {
       /// Are you sure you want to stop recording and discard your voice message?
       internal static let message = L10n.tr("Localizable", "channel.stopRecording.message", fallback: "Are you sure you want to stop recording and discard your voice message?")
@@ -572,8 +578,10 @@ internal enum L10n {
       internal static let deliveredTo = L10n.tr("Localizable", "message.info.deliveredTo", fallback: "Delivered to")
       /// edited
       internal static let edited = L10n.tr("Localizable", "message.info.edited", fallback: "edited")
-      /// Read by
-      internal static let readBy = L10n.tr("Localizable", "message.info.readBy", fallback: "Read by")
+        /// Played by
+        internal static let playedBy = L10n.tr("Localizable", "message.info.playedBy", fallback: "Played by")
+        /// Read by
+        internal static let readBy = L10n.tr("Localizable", "message.info.readBy", fallback: "Seen by")
       /// Sent:
       internal static let sent = L10n.tr("Localizable", "message.info.sent", fallback: "Sent:")
       /// Size:

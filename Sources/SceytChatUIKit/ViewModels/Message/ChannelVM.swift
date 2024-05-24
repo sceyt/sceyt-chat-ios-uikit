@@ -70,15 +70,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         DatabaseObserver<ChannelDTO, ChatChannel>(
             request: ChannelDTO.fetchRequest()
                 .fetch(predicate: .init(format: "id == %lld", channel.id))
-                .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)])
-                .relationshipKeyPathsFor(refreshing: [
-//                    #keyPath(ChannelDTO.members.user),
-//                    #keyPath(ChannelDTO.members.user.blocked),
-//                    #keyPath(ChannelDTO.members.user.state),
-//                    #keyPath(ChannelDTO.members.user.firstName),
-//                    #keyPath(ChannelDTO.members.user.lastName),
-//                    #keyPath(ChannelDTO.members.user.avatarUrl)
-                ]),
+                .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)]),
             context: Config.database.viewContext
         ) { $0.convert() }
     }()
@@ -105,7 +97,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open var isDeletedUser: Bool {
-        isDirectChat && channel.peer?.state != .active
+        isDirectChat && channel.peer?.state != .active && !channel.isSelfChannel
     }
     
     public private(set) var channel: ChatChannel {
@@ -808,7 +800,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open func markMessageAsDisplayed(indexPaths: [IndexPath]) {
         guard !indexPaths.isEmpty
         else { return }
-        markMessagesQueue.async {[weak self] in
+        markMessagesQueue.async { [weak self] in
             guard let self
             else { return }
             
@@ -829,7 +821,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             self.messageMarkerProvider.markIfNeeded(
                 after: prevLasMarkDisplayedMessageId,
                 before: message.id,
-                markerName: DefaultMarker.displayed)
+                markerName: DefaultMarker.displayed.rawValue)
             { error in
                 semafore.signal()
             }
@@ -838,6 +830,25 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         }
     }
     
+    open func markMessageAsPlayed(indexPath: IndexPath) {
+        markMessagesQueue.async { [weak self] in
+            guard let self,
+                  let message = message(at: indexPath),
+                  message.id != 0 else { return }
+            
+            logger.verbose("[MARKER CHECK], ChannelVM markMessageAsPlayed for message id: \(message.id), \(message.body)")
+            let semafore = DispatchSemaphore(value: 1)
+            self.messageMarkerProvider.markIfNeeded(
+                after: message.id,
+                before: message.id,
+                markerName: DefaultMarker.played.rawValue)
+            { error in
+                semafore.signal()
+            }
+            semafore.wait()
+        }
+    }
+
     open func markChannelAs(read: Bool) {
         guard channel.unread == read
         else { return }
@@ -1323,7 +1334,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open var isBlocked: Bool {
         guard channel.channelType == .direct,
                 let members = channel.members,
-              !members.isEmpty
+              !members.isEmpty,
+              !channel.isSelfChannel
         else { return false }
         return members.filter({ $0.blocked }).count >= members.count - 1 //except current user
     }
@@ -1366,6 +1378,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open var subTitle: String? {
+        if channel.isSelfChannel {
+            return L10n.Channel.Self.hint
+        }
         let memberCount = (isThread ||
                            !channel.isGroup) ? 0 : channel.memberCount
         var subTitle: String?

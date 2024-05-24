@@ -174,7 +174,7 @@ open class ChannelRouter: Router<ChannelVC> {
     
     open func showMessageInfo(layoutModel: MessageLayoutModel) {
         let vc = Components.messageInfoVC.init()
-        vc.viewModel = Components.messageInfoVM.init(data: layoutModel)
+        vc.viewModel = Components.messageInfoVM.init(messageMarkerProvider: rootVC.channelViewModel.messageMarkerProvider, data: layoutModel)
         let nav = Components.navigationController.init()
         nav.viewControllers = [vc]
         rootVC.present(nav, animated: true)

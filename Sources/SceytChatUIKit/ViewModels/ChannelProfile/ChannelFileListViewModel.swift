@@ -24,10 +24,11 @@ open class ChannelFileListViewModel: NSObject {
         super.init()
     }
 
-    open lazy var fileListQuery: MessageListQueryByType = {
-        MessageListQueryByType
-            .Builder(channelId: channel.id,
-                     type: Self.queryType)
+    open lazy var fileListQuery: MessageListQuery = {
+        MessageListQuery
+            .Builder(channelId: channel.id)
+            .searchFields([.init(key: .attachmentType, search: .contains, searchWord: Self.queryType),
+                .init(key: .type, search: .contains, searchWord: Self.queryType)])
             .limit(Self.queryLimit)
             .build()
     }()

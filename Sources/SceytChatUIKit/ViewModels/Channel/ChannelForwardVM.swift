@@ -14,7 +14,10 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
     public required init(handler: @escaping ([ChatChannel]) -> Void) {
         self.handler = handler
         provider = Components.channelListProvider.init()
-        searchService = .init(provider: provider, filter: [.chats, .groups, .channels])
+        searchService = Components.channelListSearchService.init(
+            provider: provider,
+            filter: [.chats, .groups, .channels]
+        )
         super.init()
     }
     
@@ -37,7 +40,6 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
                 .relationshipKeyPathsFor(refreshing: [#keyPath(ChannelDTO.lastMessage.deliveryStatus),
                                                       #keyPath(ChannelDTO.lastMessage.updatedAt),
                                                       #keyPath(ChannelDTO.lastMessage.state),
-//                                                      #keyPath(ChannelDTO.members.user),
                                                       #keyPath(ChannelDTO.lastReaction.messageId),
                                                       #keyPath(ChannelDTO.lastReaction.key)]),
             context: Config.database.viewContext

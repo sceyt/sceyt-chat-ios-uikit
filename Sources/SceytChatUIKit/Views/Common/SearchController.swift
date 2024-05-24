@@ -63,6 +63,7 @@ open class SearchController: UISearchController {
         searchBar.searchTextField.font = appearance.font
         searchBar.searchTextField.textColor = appearance.textColor
         searchBar.searchTextPositionAdjustment = UIOffset(horizontal: 4, vertical: 0)
+        searchBar.tintColor = appearance.tintColor
     }
 
     override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {

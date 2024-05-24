@@ -62,13 +62,6 @@ open class ChannelVC: ViewController,
     open lazy var joinGlobalChannelButton = UIButton()
         .withoutAutoresizingMask
     
-    open lazy var indicatorView: UIActivityIndicatorView = {
-        let view = UIActivityIndicatorView(style: .large)
-            .withoutAutoresizingMask
-        view.hidesWhenStopped = true
-        return view
-    }()
-    
     open lazy var selectingView = Components.channelSelectingView
         .init()
         .withoutAutoresizingMask
@@ -147,6 +140,7 @@ open class ChannelVC: ViewController,
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         navigationController?.delegate = self
+        showBottomViewIfNeeded()
         updateTitle()
         updateUnreadViewVisibility()
     }
@@ -276,7 +270,6 @@ open class ChannelVC: ViewController,
         coverView.addSubview(composerVC.view)
         coverView.addSubview(unreadCountView)
         view.addSubview(joinGlobalChannelButton)
-        view.addSubview(indicatorView)
         view.addGestureRecognizer(tapAction)
         
         messageComposerViewBottomConstraint = composerVC.view.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
@@ -297,7 +290,6 @@ open class ChannelVC: ViewController,
         unreadCountView.resize(anchors: [.width(44), .height(48)])
         joinGlobalChannelButton.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .bottom])
         joinGlobalChannelButton.resize(anchors: [.height(52)])
-        indicatorView.pin(to: view, anchors: [.centerX, .centerY])
         
         view.addSubview(keyboardBgView)
         keyboardBgView.pin(to: view, anchors: [.leading, .trailing, .bottom])
@@ -306,8 +298,6 @@ open class ChannelVC: ViewController,
         view.addSubview(selectingView)
         selectingView.pin(to: view, anchors: [.leading, .trailing])
         selectingView.bottomAnchor.pin(to: composerVC.view.bottomAnchor)
-        
-        showBottomViewIfNeeded()
     }
     
     override open func setupAppearance() {
@@ -730,9 +720,10 @@ open class ChannelVC: ViewController,
     
     @objc
     open func joinButtonAction(_ sender: UIButton) {
+        hud.isLoading = true
         channelViewModel.join { [weak self] error in
+            hud.isLoading = false
             guard let self = self else { return }
-            self.indicatorView.stopAnimating()
             if let error = error {
                 self.showAlert(error: error)
             } else {
@@ -1221,6 +1212,8 @@ open class ChannelVC: ViewController,
                 self.showLink(url)
             case .playAtUrl(let url):
                 self.router.playFrom(url: url)
+            case .playedAudio(_):
+                self.channelViewModel.markMessageAsPlayed(indexPath: indexPath)
             case .didTapLink(let link):
                 self.showLink(link)
             case .didLongPressLink(let link):

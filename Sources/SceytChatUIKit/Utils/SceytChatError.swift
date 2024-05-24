@@ -19,6 +19,7 @@ public enum SceytChatError: Int, Error {
     
     case queryInProgress = 10008
     
+    case notConnect = 9001
 }
 
 public extension Error {

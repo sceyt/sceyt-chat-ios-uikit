@@ -248,7 +248,7 @@ extension ChannelDTO {
                 if hash < 0 {
                     hash *= -1
                 }
-                if hash == channel.id {
+                if hash == channel.id && dto.metadata == channel.metadata {
                     return dto.convert()
                 }
             }

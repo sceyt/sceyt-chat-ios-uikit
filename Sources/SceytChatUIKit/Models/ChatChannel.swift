@@ -40,7 +40,7 @@ public class ChatChannel {
     public var draftMessage: NSAttributedString?
     
     public var decodedMetadata: Metadata?
-    
+        
     /// available only if channel type is direct
     public private(set) var members: [ChatChannelMember]?
     
@@ -177,6 +177,7 @@ public class ChatChannel {
             members = channel.members?.map { .init(member: $0)}
         }
     }
+    
 }
 
 extension ChatChannel {
@@ -184,13 +185,19 @@ extension ChatChannel {
     public struct Metadata: Codable {
         
         public var description: String
-        
+        public var isSelf: Int
+
         enum CodingKeys: String, CodingKey {
             case description = "d"
+            case isSelf = "s"
         }
         
-        public init(description: String = "") {
+        public init(
+            description: String = "",
+            isSelf: Int = 0
+        ) {
             self.description = description
+            self.isSelf = isSelf
         }
         
         func build() -> String? {
@@ -208,6 +215,7 @@ extension ChatChannel {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             description = (try? container.decode(String.self, forKey: CodingKeys.description)) ?? ""
+            isSelf = (try? container.decode(Int.self, forKey: CodingKeys.isSelf)) ?? 0
         }
     }
 }
@@ -232,6 +240,17 @@ public extension ChatChannel {
     var isGroup: Bool {
         channelType != .direct
     }
+
+    var isSelfChannel: Bool {
+        if let decodedMetadata {
+            return Bool(truncating: decodedMetadata.isSelf as NSNumber)
+        }
+        return false
+    }
+}
+
+public extension ChatChannel {
+    
 }
 
 extension ChatChannel: Hashable {

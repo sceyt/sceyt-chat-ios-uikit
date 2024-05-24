@@ -57,6 +57,10 @@ public class ChannelDTO: NSManagedObject {
     
     @NSManaged public var unsynched: Bool
     
+    @NSManaged public var toggle: Bool
+
+    @NSManaged public var isSelf: Bool
+
     public override func willSave() {
         super.willSave()
         let date: Date?
@@ -168,6 +172,13 @@ public class ChannelDTO: NSManagedObject {
             unsubscribed = false
         }
         unsynched = false
+
+        if let metadata = map.metadata, let decodedMetadata = try? ChatChannel.Metadata.decode(metadata) {
+            let isSelf = Bool(truncating: decodedMetadata.isSelf as NSNumber)
+            if self.isSelf != isSelf {
+                self.isSelf = isSelf
+            }
+        }
         return self
     }
     
@@ -201,7 +212,8 @@ public class ChannelDTO: NSManagedObject {
         } else {
             unsubscribed = false
         }
-        
+        isSelf = map.isSelfChannel
+
         return self
     }
 

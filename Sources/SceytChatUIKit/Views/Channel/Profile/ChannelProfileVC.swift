@@ -283,7 +283,7 @@ open class ChannelProfileVC: ViewController,
             if !profileViewModel.channel.isGroup {
                 cell.data = profileViewModel.channel.peer?.presence.status
             } else {
-                cell.data = profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata
+                cell.data = profileViewModel.channel.decodedMetadata?.description ?? ""
             }
             _cell = cell
         case .uri:
@@ -602,20 +602,29 @@ open class ChannelProfileVC: ViewController,
         }
     }
     
+    open func reloadAvailableSections() {
+        sections = availableSections()
+        tableView.reloadData()
+    }
+    
     open func availableSections() -> [Sections] {
         var sections: [Sections] = [.header]
         switch profileViewModel.channelType {
         case .broadcast:
-            if !(profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata ?? "").isEmpty {
+            if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
-            }
+            } else {
+                logger.debug("[ChannelProfileVC] decoded metadata description is missing")
+            }     
             sections.append(.uri)
         case .private:
-            if !(profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata ?? "").isEmpty {
+            if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
+            } else {
+                logger.debug("[ChannelProfileVC] decoded metadata description is missing")
             }
         case .direct:
-            if !(profileViewModel.channel.peer?.presence.status ?? "").isEmpty {
+            if let peer = profileViewModel.channel.peer, !peer.blocked, !(peer.presence.status ?? "").isEmpty {
                 sections.append(.description)
             }
         }
@@ -934,31 +943,38 @@ open class ChannelProfileVC: ViewController,
     }
     
     open func block() {
+        hud.isLoading = true
         profileViewModel.block { [weak self] error in
+            hud.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
             } else {
+                self.reloadAvailableSections()
                 self.router.channelVC?.channelViewModel.refreshChannel()
-                self.router.goChannelListVC()
+//                self.router.goChannelListVC()
             }
         }
     }
     
     open func unblock() {
+        hud.isLoading = true
         profileViewModel.unblock { [weak self] error in
+            hud.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
             } else {
+                self.reloadAvailableSections()
                 self.router.channelVC?.channelViewModel.refreshChannel()
-                self.router.goChannelVC()
             }
         }
     }
     
     open func leave() {
+        hud.isLoading = true
         profileViewModel.leave { [weak self] error in
+            hud.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -969,7 +985,9 @@ open class ChannelProfileVC: ViewController,
     }
     
     open func blockAndLeave() {
+        hud.isLoading = true
         profileViewModel.blockAndLeave { [weak self] error in
+            hud.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -998,7 +1016,9 @@ open class ChannelProfileVC: ViewController,
                   actions: [
                     .init(title: L10n.Alert.Button.cancel, style: .cancel),
                     .init(title: L10n.Alert.Button.delete, style: .destructive) { [weak self] in
+                        hud.isLoading = true
                         self?.profileViewModel.delete { [weak self] error in
+                            hud.isLoading = false
                             guard let self else { return }
                             if let error = error {
                                 self.showAlert(error: error)
