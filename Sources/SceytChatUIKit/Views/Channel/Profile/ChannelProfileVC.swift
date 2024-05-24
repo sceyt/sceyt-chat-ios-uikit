@@ -283,7 +283,7 @@ open class ChannelProfileVC: ViewController,
             if !profileViewModel.channel.isGroup {
                 cell.data = profileViewModel.channel.peer?.presence.status
             } else {
-                cell.data = profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata
+                cell.data = profileViewModel.channel.decodedMetadata?.description ?? ""
             }
             _cell = cell
         case .uri:
@@ -611,12 +611,12 @@ open class ChannelProfileVC: ViewController,
         var sections: [Sections] = [.header]
         switch profileViewModel.channelType {
         case .broadcast:
-            if !(profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata ?? "").isEmpty {
+            if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
             }
             sections.append(.uri)
         case .private:
-            if !(profileViewModel.channel.decodedMetadata?.description ?? profileViewModel.channel.metadata ?? "").isEmpty {
+            if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
             }
         case .direct:

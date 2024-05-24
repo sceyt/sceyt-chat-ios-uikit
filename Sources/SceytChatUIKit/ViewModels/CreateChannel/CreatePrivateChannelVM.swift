@@ -46,7 +46,7 @@ open class CreatePrivateChannelVM {
                 .create(
                     type: Config.privateChannel,
                     subject: subject,
-                    metadata: metadata,
+                    metadata: metadataObj,
                     avatarUrl: uploadedAvatarUrl?.absoluteString,
                     userIds: users.map { $0.id })
             { [weak self] channel, error in
