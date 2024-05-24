@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		56F88D9E2C00D3890010C3E4 /* UserDisplayNameFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */; };
 		C51C930E2B565C9C0069F9DA /* LoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C930D2B565C9C0069F9DA /* LoginViewController.swift */; };
 		C51C93102B5660CB0069F9DA /* ConnectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C930F2B5660CB0069F9DA /* ConnectionService.swift */; };
 		C51C93122B566FF50069F9DA /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C93112B566FF50069F9DA /* UserProfile.swift */; };
@@ -24,6 +25,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UserDisplayNameFormatter.swift; sourceTree = "<group>"; };
 		C51C930D2B565C9C0069F9DA /* LoginViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewController.swift; sourceTree = "<group>"; };
 		C51C930F2B5660CB0069F9DA /* ConnectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionService.swift; sourceTree = "<group>"; };
 		C51C93112B566FF50069F9DA /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
@@ -79,6 +81,7 @@
 				C51C930D2B565C9C0069F9DA /* LoginViewController.swift */,
 				C54DF6CE2AECF19300767983 /* Config.swift */,
 				C51C930F2B5660CB0069F9DA /* ConnectionService.swift */,
+				56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */,
 				C51C93112B566FF50069F9DA /* UserProfile.swift */,
 				C54DF6C02AECF09100767983 /* Main.storyboard */,
 				C54DF6C32AECF09400767983 /* Assets.xcassets */,
@@ -170,6 +173,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				C51C93102B5660CB0069F9DA /* ConnectionService.swift in Sources */,
+				56F88D9E2C00D3890010C3E4 /* UserDisplayNameFormatter.swift in Sources */,
 				C51C930E2B565C9C0069F9DA /* LoginViewController.swift in Sources */,
 				C54DF6BF2AECF09100767983 /* ViewController.swift in Sources */,
 				C54CDD3F2B5554D9005A2432 /* UserProfileViewController.swift in Sources */,
