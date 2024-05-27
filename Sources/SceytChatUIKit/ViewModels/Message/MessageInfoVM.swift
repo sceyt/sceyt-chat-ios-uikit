@@ -32,19 +32,17 @@ open class MessageInfoVM: NSObject {
 		// remove displayed markers from received
 		if let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }),
 		   let receivedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.received.rawValue }) {
-			for displayedMarker in markersArray[displayedIndex].markerArray {
-                forToBrake: for displayedMarker in markersArray[displayedIndex].markerArray {
-                    for (index, marker) in markersArray[receivedIndex].markerArray.enumerated() {
-                        if marker.user?.id == displayedMarker.user?.id {
-                            markersArray[receivedIndex].markerArray.remove(at: index)
-                            if markersArray[receivedIndex].markerArray.isEmpty {
-                                markersArray.remove(at: receivedIndex)
-                            }
-                            break forToBrake
+            forToBrake: for displayedMarker in markersArray[displayedIndex].markerArray {
+                for (index, marker) in markersArray[receivedIndex].markerArray.enumerated() {
+                    if marker.user?.id == displayedMarker.user?.id {
+                        markersArray[receivedIndex].markerArray.remove(at: index)
+                        if markersArray[receivedIndex].markerArray.isEmpty {
+                            markersArray.remove(at: receivedIndex)
                         }
+                        break forToBrake
                     }
                 }
-			}
+            }
 		}
 		
 		// remove played markers from displayed
@@ -125,30 +123,7 @@ open class MessageInfoVM: NSObject {
 	
 	open func onDidChangeEvent(items: DBChangeItemPaths) {
 		event = .reload
-//		let calculatedIndices = calculateIndexPaths(for: items)
-//		if markerObserver.isEmpty || items.inserts.isEmpty || calculatedIndices.isEmpty {
-//			event = .reload
-//			return
-//		}
-//		
-//		event = .insert(calculatedIndices)
 	}
-	
-//	private func calculateIndexPaths(for items: DBChangeItemPaths) -> [IndexPath] {
-//		var correctIndexPaths: [IndexPath] = []
-//		
-//		guard let changedMarkers: [ChatMessage.Marker] = items.items() else { return [] }
-//		
-//		self.markers.enumerated().forEach { (section, markers) in
-//			markers.markerArray.enumerated().forEach { (index, marker) in
-//				if changedMarkers.contains(where: { $0 == marker }) {
-//					correctIndexPaths.append(IndexPath(row: index, section: section + 1))
-//				}
-//			}
-//		}
-//		
-//		return correctIndexPaths
-//	}
 
     // MARK: - Data source
     open var numberOfSections: Int { markers.count + 1 }
@@ -181,6 +156,5 @@ open class MessageInfoVM: NSObject {
 public extension MessageInfoVM {
     enum Event {
         case reload
-        //        case insert([IndexPath])
     }
 }
