@@ -30,32 +30,36 @@ open class MessageInfoVM: NSObject {
 		}
 		
 		// remove displayed markers from received
-		if let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }),
-		   let receivedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.received.rawValue }) {
-            forToBrake: for displayedMarker in markersArray[displayedIndex].markerArray {
-                for (index, marker) in markersArray[receivedIndex].markerArray.enumerated() {
-                    if marker.user?.id == displayedMarker.user?.id {
-                        markersArray[receivedIndex].markerArray.remove(at: index)
-                        if markersArray[receivedIndex].markerArray.isEmpty {
-                            markersArray.remove(at: receivedIndex)
+        
+        
+		if let displayedMarkersArrayIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }),
+		   let receivedMarkersArrayIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.received.rawValue }) {
+            displayedMarkersLoop: for displayedMarker in markersArray[displayedMarkersArrayIndex].markerArray {
+                receivedMarkersLoop: for (receivedMarkerIndex, receivedMarker) in markersArray[receivedMarkersArrayIndex].markerArray.enumerated() {
+                    if receivedMarker.user?.id == displayedMarker.user?.id {
+                        markersArray[receivedMarkersArrayIndex].markerArray.remove(at: receivedMarkerIndex)
+                        if markersArray[receivedMarkersArrayIndex].markerArray.isEmpty {
+                            markersArray.remove(at: receivedMarkersArrayIndex)
+                            break displayedMarkersLoop
                         }
-                        break forToBrake
+                        break receivedMarkersLoop
                     }
                 }
             }
 		}
 		
 		// remove played markers from displayed
-		if let playedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.played.rawValue }),
-		   let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }) {
-            forToBrake: for playedMarker in markersArray[playedIndex].markerArray {
-                for (index, marker) in markersArray[displayedIndex].markerArray.enumerated() {
-                    if marker.user?.id == playedMarker.user?.id {
-                        markersArray[displayedIndex].markerArray.remove(at: index)
-                        if markersArray[displayedIndex].markerArray.isEmpty {
-                            markersArray.remove(at: displayedIndex)
+		if let playedMarkersArrayIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.played.rawValue }),
+		   let displayedMarkersArrayIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }) {
+            playedMarkersLoop: for playedMarker in markersArray[playedMarkersArrayIndex].markerArray {
+                displayedMarkersLoop: for (displayedMarkerIndex, displayedMarker) in markersArray[displayedMarkersArrayIndex].markerArray.enumerated() {
+                    if displayedMarker.user?.id == playedMarker.user?.id {
+                        markersArray[displayedMarkersArrayIndex].markerArray.remove(at: displayedMarkerIndex)
+                        if markersArray[displayedMarkersArrayIndex].markerArray.isEmpty {
+                            markersArray.remove(at: displayedMarkersArrayIndex)
+                            break playedMarkersLoop
                         }
-                        break forToBrake
+                        break displayedMarkersLoop
                     }
                 }
 			}
