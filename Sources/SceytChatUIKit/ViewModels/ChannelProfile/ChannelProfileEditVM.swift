@@ -52,7 +52,7 @@ open class ChannelProfileEditVM: NSObject {
             && !(subject ?? "").isEmpty
             && (uri != channel.uri
                 || subject != channel.subject
-                || metadata != channel.metadata
+                || metadata != channel.decodedMetadata?.description
                 || avatarUrl != channel.avatarUrl)
     }
 
@@ -62,7 +62,7 @@ open class ChannelProfileEditVM: NSObject {
         avatarUrl = channel.avatarUrl
         uri = channel.uri
         subject = channel.subject
-        metadata = channel.metadata
+        metadata = channel.decodedMetadata?.description
         super.init()
         
         $avatarUrl
@@ -88,11 +88,25 @@ open class ChannelProfileEditVM: NSObject {
     
     open func update(completion: @escaping (Error?) -> Void) {
         func updateChannel(uploadedAvatarUrl: String?) {
+            
+            var jsonDict: [String : Any] = [:]
+            if let jsonData = channel.metadata?.data(using: .utf8),
+               var deserializedDict = try? JSONSerialization.jsonObject(with: jsonData, options: []) as? [String: Any] {
+                jsonDict = deserializedDict
+            }
+            
+            jsonDict[ChatChannel.Metadata.CodingKeys.description.rawValue] = metadata
+            var updatedJsonString: String? = nil
+            
+            if let updatedJsonData = try? JSONSerialization.data(withJSONObject: jsonDict, options: []) {
+               updatedJsonString = String(data: updatedJsonData, encoding: .utf8)
+            }
+            
             provider
                 .update(
                     uri: uri ?? channel.uri,
                     subject: subject ?? channel.subject ?? "",
-                    metadata: metadata ?? channel.metadata,
+                    metadata: updatedJsonString ?? channel.metadata,
                     avatarUrl: uploadedAvatarUrl,
                     completion: completion)
         }

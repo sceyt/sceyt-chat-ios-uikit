@@ -192,7 +192,7 @@
 "message.attachment.voice" = "Voice";
 "message.forward.title" = "Forwarded message";
 
-"message.info.readBy" = "Read by";
+"message.info.readBy" = "Seen by";
 "message.info.deliveredTo" = "Delivered to";
 "message.info.playedBy" = "Played by";
 "message.info.sent" = "Sent:";

@@ -30,24 +30,38 @@ open class MessageInfoVM: NSObject {
 		}
 		
 		// remove displayed markers from received
-		if let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }),
-		   let receivedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.received.rawValue }) {
-			for displayedMarker in markersArray[displayedIndex].markerArray {
-				markersArray[receivedIndex].markerArray.removeAll { $0.user?.id == displayedMarker.user?.id }
-				if markersArray[receivedIndex].markerArray.isEmpty {
-					markersArray.remove(at: receivedIndex)
-				}
-			}
+        
+        
+		if let displayedMarkersArrayIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }),
+		   let receivedMarkersArrayIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.received.rawValue }) {
+            displayedMarkersLoop: for displayedMarker in markersArray[displayedMarkersArrayIndex].markerArray {
+                receivedMarkersLoop: for (receivedMarkerIndex, receivedMarker) in markersArray[receivedMarkersArrayIndex].markerArray.enumerated() {
+                    if receivedMarker.user?.id == displayedMarker.user?.id {
+                        markersArray[receivedMarkersArrayIndex].markerArray.remove(at: receivedMarkerIndex)
+                        if markersArray[receivedMarkersArrayIndex].markerArray.isEmpty {
+                            markersArray.remove(at: receivedMarkersArrayIndex)
+                            break displayedMarkersLoop
+                        }
+                        break receivedMarkersLoop
+                    }
+                }
+            }
 		}
 		
 		// remove played markers from displayed
-		if let playedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.played.rawValue }),
-		   let displayedIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }) {
-			for playedMarker in markersArray[playedIndex].markerArray {
-				markersArray[displayedIndex].markerArray.removeAll { $0.user?.id == playedMarker.user?.id }
-				if markersArray[displayedIndex].markerArray.isEmpty {
-					markersArray.remove(at: displayedIndex)
-				}
+		if let playedMarkersArrayIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.played.rawValue }),
+		   let displayedMarkersArrayIndex = markersArray.firstIndex(where: { $0.markerName == DefaultMarker.displayed.rawValue }) {
+            playedMarkersLoop: for playedMarker in markersArray[playedMarkersArrayIndex].markerArray {
+                displayedMarkersLoop: for (displayedMarkerIndex, displayedMarker) in markersArray[displayedMarkersArrayIndex].markerArray.enumerated() {
+                    if displayedMarker.user?.id == playedMarker.user?.id {
+                        markersArray[displayedMarkersArrayIndex].markerArray.remove(at: displayedMarkerIndex)
+                        if markersArray[displayedMarkersArrayIndex].markerArray.isEmpty {
+                            markersArray.remove(at: displayedMarkersArrayIndex)
+                            break playedMarkersLoop
+                        }
+                        break displayedMarkersLoop
+                    }
+                }
 			}
 		}
 		
@@ -113,30 +127,7 @@ open class MessageInfoVM: NSObject {
 	
 	open func onDidChangeEvent(items: DBChangeItemPaths) {
 		event = .reload
-//		let calculatedIndices = calculateIndexPaths(for: items)
-//		if markerObserver.isEmpty || items.inserts.isEmpty || calculatedIndices.isEmpty {
-//			event = .reload
-//			return
-//		}
-//		
-//		event = .insert(calculatedIndices)
 	}
-	
-//	private func calculateIndexPaths(for items: DBChangeItemPaths) -> [IndexPath] {
-//		var correctIndexPaths: [IndexPath] = []
-//		
-//		guard let changedMarkers: [ChatMessage.Marker] = items.items() else { return [] }
-//		
-//		self.markers.enumerated().forEach { (section, markers) in
-//			markers.markerArray.enumerated().forEach { (index, marker) in
-//				if changedMarkers.contains(where: { $0 == marker }) {
-//					correctIndexPaths.append(IndexPath(row: index, section: section + 1))
-//				}
-//			}
-//		}
-//		
-//		return correctIndexPaths
-//	}
 
     // MARK: - Data source
     open var numberOfSections: Int { markers.count + 1 }
@@ -169,6 +160,5 @@ open class MessageInfoVM: NSObject {
 public extension MessageInfoVM {
     enum Event {
         case reload
-        //        case insert([IndexPath])
     }
 }

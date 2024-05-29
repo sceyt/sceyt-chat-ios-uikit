@@ -57,4 +57,7 @@ func configureSceytChatUIKit() {
     SCTUIKitConfig.initialize(apiUrl: Config.sceytApiURL, appId: Config.sceytAppId, clientId: Config.clientId!)
     SCTUIKitConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
     SCTUIKitConfig.setLogLevel(.verbose)
+    
+    // Set customized Subclass for formatters
+    Formatters.userDisplayName = UserDisplayNameFormatter()
 }
