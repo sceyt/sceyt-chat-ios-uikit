@@ -1114,7 +1114,7 @@ open class ChannelVC: ViewController,
         return nil
     }
     
-    open func syncVisibleMessageAfterConnect() {
+    open func reloadNearMessages() {
         if let indexPath = collectionView.indexPathsForVisibleItems.min(),
            let model = channelViewModel.layoutModel(at: indexPath) {
             channelViewModel.loadNearMessages(messageId: model.message.id)
@@ -1992,7 +1992,7 @@ open class ChannelVC: ViewController,
                 )
             case .connected:
                 updateTitle()
-                syncVisibleMessageAfterConnect()
+                reloadNearMessages()
             case .reconnecting:
                 showConnectionState(
                     text: L10n.Connection.State.reconnecting,

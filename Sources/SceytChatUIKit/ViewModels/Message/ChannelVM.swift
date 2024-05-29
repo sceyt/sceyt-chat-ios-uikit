@@ -1517,9 +1517,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             isSearching = false
             searchResult?.resetCache()
         }
-        if messageObserver.resetRangePredicateIfNeeded() {
-            isRestartingMessageObserver = .reload
-        }
+        messageObserver.resetRangePredicateIfNeeded(restartObserver: false)
     }
     
     open func searchMessages(with query: String) {
