@@ -60,7 +60,8 @@ extension MessageCell {
         open var data: MessageLayoutModel! {
             didSet {
                 removeArrangedSubviews()
-                guard let preview = data.linkPreviews?.first
+                guard let data,
+                        let preview = data.linkPreviews?.first
                 else { return }
                 [preview].forEach {
                     let v = LinkView()

@@ -49,7 +49,7 @@ open class ChannelMemberListProvider: Provider {
 
     open func store(members: [Member]) {
         let predicate = deleteMembersPredicate(members: members)
-        database.write {
+        database.performWriteTask {
             if let predicate {
                 $0.deleteMembers(predicate: predicate)
             }

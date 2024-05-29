@@ -211,24 +211,27 @@ open class ChannelMessageProvider: Provider {
         triggerMessage: MessageId? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
-        database.write ({ context in
-            context.createOrUpdate(
+        database.performWriteTask ({
+            $0.createOrUpdate(
                 messages: messages,
                 channelId: self.channelId
             )
-            
-            guard let startMessageId = messages.min(by: { $0.id < $1.id})?.id,
-                  let endMessageId = messages.max(by: { $0.id < $1.id})?.id
-            else { return }
-            context.updateRanges(
+        }) { error in
+            completion?(error)
+        }
+        
+        guard let startMessageId = messages.min(by: { $0.id < $1.id})?.id,
+              let endMessageId = messages.max(by: { $0.id < $1.id})?.id
+        else { return }
+        
+        database.performWriteTask {
+            $0.updateRanges(
                 startMessageId: startMessageId,
                 endMessageId: endMessageId,
                 triggerMessage: triggerMessage,
-                channelId: self.channelId
-            )
+                channelId: self.channelId)
+        } completion: { _ in
             
-        }) { error in
-            completion?(error)
         }
     }
     
@@ -551,7 +554,7 @@ extension ChannelMessageProvider {
         sortDescriptors: [NSSortDescriptor] = [],
         completion: @escaping ([ChatMessage]?) -> Void) {
 
-            database.performBgTask(resultQueue: .global()) { context in
+            database.performWriteTask(resultQueue: .global()) { context in
                 var chatMessages = NSMutableArray()
                 for message in messages {
                     if let m = MessageDTO.fetch(id: message.id, context: context) {
@@ -565,10 +568,12 @@ extension ChannelMessageProvider {
                 if !sortDescriptors.isEmpty {
                     chatMessages.sort(using: sortDescriptors)
                 }
-                return chatMessages.compactMap { ChatMessage(dto: $0 as! MessageDTO)}
-
-            } completion: { result in
-                completion(try? result.get())
+                let converted = chatMessages.compactMap { ChatMessage(dto: $0 as! MessageDTO)}
+                DispatchQueue.main.async {
+                    completion(converted)
+                }
+            } completion: { error in
+                completion(nil)
             }
         }
 }

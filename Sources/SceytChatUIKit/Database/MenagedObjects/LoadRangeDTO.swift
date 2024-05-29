@@ -75,11 +75,12 @@ public class LoadRangeDTO: NSManagedObject {
         startMessageId: MessageId,
         endMessageId: MessageId,
         context: NSManagedObjectContext
-    ) {
+    ) -> LoadRangeDTO {
         let mo = insertNewObject(into: context)
         mo.channelId = Int64(channelId)
         mo.startMessageId = Int64(startMessageId)
         mo.endMessageId = Int64(endMessageId)
+        return mo
     }
     
     public func convert() -> ChatLoadRange {

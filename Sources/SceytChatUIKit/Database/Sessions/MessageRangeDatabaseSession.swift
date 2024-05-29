@@ -132,7 +132,7 @@ extension NSManagedObjectContext: MessageRangeDatabaseSession {
         channelId: ChannelId
     ) -> LoadRangeDTO? {
         
-        let ranges = matchingRanges(
+        var ranges = matchingRanges(
             channelId: channelId,
             startMessageId: startMessageId,
             endMessageId: endMessageId,
@@ -150,14 +150,24 @@ extension NSManagedObjectContext: MessageRangeDatabaseSession {
             return ranges.first
         }
         
+        var anyRange: LoadRangeDTO?
         if !ranges.isEmpty {
+            anyRange = ranges.removeLast()
             ranges.forEach { delete($0) }
         }
         
-        let dto = LoadRangeDTO.insertNewObject(into: self)
-        dto.channelId = Int64(channelId)
-        dto.startMessageId = Int64(min)
-        dto.endMessageId = Int64(max)
+        if let anyRange {
+            anyRange.startMessageId = Int64(min)
+            anyRange.endMessageId = Int64(max)
+            return anyRange
+        }
+        let dto = LoadRangeDTO
+            .create(
+                channelId: channelId,
+                startMessageId: min,
+                endMessageId: max,
+                context: self
+            )
         return dto
     }
 }

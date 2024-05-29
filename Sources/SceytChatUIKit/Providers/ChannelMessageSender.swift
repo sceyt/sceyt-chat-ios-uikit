@@ -132,12 +132,6 @@ open class ChannelMessageSender: Provider {
         _ chatMessage: ChatMessage,
         completion: ((Error?) -> Void)? = nil
     ) {
-        if ((chatMessage.body as NSString).length == 0 && (chatMessage.attachments ?? []).isEmpty) || (chatMessage.body as NSString).length > 1_000 {
-            let data = Data(chatMessage.body.utf8)
-            let hexString = data.map{ String(format:"%02x", $0) }.joined()
-            logger.verbose("[EMPTY] ReSend text message by hex [\(hexString)] orig [\(chatMessage.body.prefix(5))]")
-        }
-         
         if let parent = chatMessage.parent {
             logger.info("Resending message with tid \(chatMessage.tid) parent: \(parent.id) upload attachments if needed")
         } else {

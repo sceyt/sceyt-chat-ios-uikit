@@ -86,7 +86,7 @@ open class ChannelListProvider: Provider {
         completion: ((Error?) -> Void)? = nil
     ) {
         onStoreChannels?(channels)
-        database.write {
+        database.performWriteTask {
             $0.createOrUpdate(channels: channels)
         } completion: { error in
             logger.errorIfNotNil(error, "Unable Store channels")
@@ -110,7 +110,7 @@ open class ChannelListProvider: Provider {
 public extension ChannelListProvider {
     
     static func totalUnreadMessagesCount(_ completion: @escaping (Int) -> Void) {
-        database.read {
+        database.performBgTask {
             ChannelDTO.totalUnreadMessageCount(context: $0)
         } completion: { result in
             switch result {
@@ -187,22 +187,23 @@ extension ChannelListProvider {
                     dict[max.id] = (channel.id, max.messageId)
                 }
             }
-            let unownedDict = try? self.database.read {
+            self.database.read {
                 var unownedDict = [ReactionId: (ChannelId, MessageId)]()
                 let unownedIds = ReactionDTO.unownedReactionIds(reactionIds, context: $0)
                 for id in unownedIds {
                     unownedDict[id] = dict[id]
                 }
                 return unownedDict
-            }.get()
-            if let unownedDict {
+            } completion: { result in
+                guard let unownedDict = try? result.get()
+                else { return }
                 for unowned in unownedDict {
                     let channelId = unowned.value.0
                     ChannelOperator(channelId: channelId)
                         .getMessages(ids: [NSNumber(value: unowned.value.1)])
                     { messages, error in
                         if let messages, !messages.isEmpty {
-                            self.database.write {
+                            self.database.performWriteTask {
                                 for message in messages {
                                     if MessageDTO.fetch(id: message.id, context: $0) == nil {
                                         $0.createOrUpdate(message: message, channelId: channelId)

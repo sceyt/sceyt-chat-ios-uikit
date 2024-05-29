@@ -120,6 +120,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     private(set) var scrollToRepliedMessageId: MessageId = 0
     private(set) var searchDirection: SearchDirection = .none
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
+    @Atomic private var markMessagesTaskStarted = false
     @Atomic private var lasMarkDisplayedMessageId: MessageId = 0
     @Atomic private var lastPendingMarkDisplayedMessageId: MessageId = 0
     @Atomic private var isAppActive: Bool = true
@@ -921,12 +922,12 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         
     }
     
-    open func loadNearMessages(arMessageAt indexPath: IndexPath) {
+    open func fetchNearMessages(at indexPath: IndexPath) {
         guard let message = message(at: indexPath) else { return }
-        loadNearMessages(at: message.id)
+        fetchNearMessages(at: message.id)
     }
     
-    open func loadNearMessages(at messageId: MessageId) {
+    open func fetchNearMessages(at messageId: MessageId) {
         guard !isFetchingData,
               lastLoadNearMessageId != messageId
         else { return }
@@ -1046,40 +1047,51 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if marker == .displayed {
             markMessageAsDisplayed(messages)
         } else {
-            markMessage(as: marker, messages: messages)
+            markMessages(messages, as: marker)
         }
     }
     
-    private let semaphore = DispatchSemaphore(value: 1)
-    open func markMessage(as marker: DefaultMarker, messages: [ChatMessage]) {
-        guard !messages.isEmpty
+    open func markMessages( _ messages: [ChatMessage], as marker: DefaultMarker) {
+        guard !markMessagesTaskStarted,
+                !messages.isEmpty
         else { return }
         
+        markMessagesTaskStarted = true
+        
         markMessagesQueue.async { [weak self] in
-            guard let self, 
-                    let max = messages.max(by: { $0.id < $1.id }),
-                    let min = messages.min(by: { $0.id < $1.id })
+            guard let self else { return }
+            let filteredMessages = messages.filter {
+                return !$0.incoming ? false :
+                $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == marker.rawValue } ) == true ? false : true
+            }
+            guard !filteredMessages.isEmpty,
+                    let max = filteredMessages.max(by: { $0.id < $1.id }),
+                    let min = filteredMessages.min(by: { $0.id < $1.id })
             else { return }
-                        
+                        //
             self.messageMarkerProvider.markIfNeeded(
                 after: min.id,
                 before: max.id,
                 markerName: marker.rawValue)
             {[weak self] error in
-                self?.semaphore.signal()
+                self?.markMessagesTaskStarted = false
             }
-            semaphore.wait()
         }
     }
     
-    open func markMessageAsDisplayed(_ messages: [ChatMessage]) {
-        guard !messages.isEmpty
+    open func markMessageAsDisplayed(_ messages: [ChatMessage]) {return;
+        guard !markMessagesTaskStarted,
+                !messages.isEmpty
         else { return }
+        
         markMessagesQueue.async { [weak self] in
             guard let self
             else { return }
             
-            let message = messages.max(by: { $0.id < $1.id })
+            let message = messages.filter {
+                return !$0.incoming ? false :
+                $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == DefaultMarker.displayed.rawValue } ) == true ? false : true
+            }.max(by: { $0.id < $1.id })
             
             guard let message, self.lasMarkDisplayedMessageId != message.id
             else { return }
@@ -1091,10 +1103,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 before: message.id,
                 markerName: DefaultMarker.displayed.rawValue)
             {[weak self] error in
-                self?.semaphore.signal()
+                self?.markMessagesTaskStarted = false
             }
-            semaphore.wait()
-            
         }
     }
 

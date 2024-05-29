@@ -72,7 +72,7 @@ open class ChannelMessageChecksumProvider: Provider {
                 attachmentTid: attachment.tid,
                 data: nil)
             logger.verbose("[CHECKSUM] create checksum \(crc) for mTid: \(message.tid), aTid \(attachment.tid)")
-            self.database.write {
+            self.database.performWriteTask {
                 $0.createOrUpdate(checksum: checksum)
             } completion: { error in
                 logger.errorIfNotNil(error, "Creating check sum result")
@@ -115,7 +115,7 @@ open class ChannelMessageChecksumProvider: Provider {
                                     attachment.metadata = stored.metadata
                                     attachment.uploadedFileSize = stored.uploadedFileSize
                                     attachment.status = .done
-                                    self.database.write { [weak self] context in
+                                    self.database.performWriteTask { [weak self] context in
                                         guard let self else { return }
                                         var attachments = message.attachments ?? []
                                         if attachments.count > 1,

@@ -6,7 +6,6 @@
 //  Copyright © 2022 Sceyt LLC. All rights reserved.
 //
 
-import Photos
 import SceytChat
 import UIKit
 
@@ -1116,8 +1115,9 @@ open class ChannelVC: ViewController,
     }
     
     open func syncVisibleMessageAfterConnect() {
-        if let indexPath = collectionView.indexPathsForVisibleItems.min() {
-            channelViewModel.loadNextMessages(afterMessageAt: indexPath)
+        if let indexPath = collectionView.indexPathsForVisibleItems.min(),
+           let model = channelViewModel.layoutModel(at: indexPath) {
+            channelViewModel.loadNearMessages(messageId: model.message.id)
         }
     }
     
@@ -1275,9 +1275,10 @@ open class ChannelVC: ViewController,
         guard let cell = cell as? MessageCell
         else { return }
         
-        if cell.data.message.id == selectMessageId {
+        if selectMessageId != 0, cell.data.message.id == selectMessageId {
             cell.highlightMode = .search
-        } else if cell.data.message.id == channelViewModel.scrollToRepliedMessageId {
+        } else if channelViewModel.scrollToRepliedMessageId != 0,
+                    cell.data.message.id == channelViewModel.scrollToRepliedMessageId {
             if userSelectOnRepliedMessage != nil {
                 cell.highlightMode = .reply
             } else {
@@ -1419,7 +1420,7 @@ open class ChannelVC: ViewController,
             case .playAtUrl(let url):
                 self.router.playFrom(url: url)
             case .playedAudio(_):
-                self.channelViewModel.markMessage(as: .played, messages: [model.message])
+                self.channelViewModel.markMessages([model.message], as: .played)
             case .didTapLink(let link):
                 self.showLink(link)
             case .didLongPressLink(let link):
@@ -1646,10 +1647,11 @@ open class ChannelVC: ViewController,
         router.showReactions(
             message: layoutModel.message
         ).onEvent = { [weak self] event in
+            guard let self else { return }
             switch event {
             case .removeReaction(let reaction):
-                if self?.channelViewModel.canDeleteReaction(message: layoutModel.message, key: reaction.key) == true {
-                    self?.presentedViewController?.dismiss(animated: true) { [weak self] in
+                if self.channelViewModel.canDeleteReaction(message: layoutModel.message, key: reaction.key) {
+                    self.presentedViewController?.dismiss(animated: true) { [weak self] in
                         self?.deleteReaction(layoutModel: layoutModel, reaction: reaction.key)
                     }
                 }
@@ -1791,7 +1793,7 @@ open class ChannelVC: ViewController,
             ($0 as? MessageCell)?.data?.message
         }
         if messages.count == collectionView.indexPathsForVisibleItems.count {
-            channelViewModel.markMessage(as: .displayed, messages: messages)
+            channelViewModel.markMessages(messages, as: .displayed)
         } else {
             channelViewModel.markMessage(as: .displayed, indexPaths: collectionView.indexPathsForVisibleItems)
         }

@@ -14,6 +14,9 @@ public protocol Database {
     func write(resultQueue: DispatchQueue,
                _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                completion: ((Error?) -> Void)?)
+    func performWriteTask(resultQueue: DispatchQueue,
+                          _ perform: @escaping (NSManagedObjectContext) throws -> Void,
+                          completion: ((Error?) -> Void)?)
     func syncWrite(_ perform: @escaping (NSManagedObjectContext) throws -> Void) throws
     func read<Fetch>(resultQueue: DispatchQueue,
                      _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
@@ -25,6 +28,7 @@ public protocol Database {
     
     var viewContext: NSManagedObjectContext { get }
     var backgroundPerformContext: NSManagedObjectContext { get }
+    var backgroundReadOnlyContext: NSManagedObjectContext { get }
     var backgroundReadOnlyObservableContext: NSManagedObjectContext { get }
     
     func recreate(completion: @escaping ((Error?) -> Void))
@@ -47,9 +51,21 @@ public extension Database {
         write(perform, completion: { _ in })
     }
     
+    func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void, completion: ((Error?) -> Void)?) {
+        performWriteTask(resultQueue: .main, perform, completion: completion)
+    }
+    
+    func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void) {
+        performBgTask(resultQueue: .main, perform, completion: nil)
+    }
+    
     func performBgTask<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
                               completion: ((Result<Fetch, Error>) -> Void)?) {
         performBgTask(resultQueue: .main, perform, completion: completion)
+    }
+    
+    func performBgTask<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch) {
+        performBgTask(resultQueue: .main, perform, completion: nil)
     }
     
     func refreshAllObjects(
@@ -171,6 +187,13 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         context.automaticallyMergesChangesFromParent = true
         return context
     }()
+   
+    public lazy var backgroundReadOnlyContext: NSManagedObjectContext = {
+        let context = newBackgroundContext()
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        context.automaticallyMergesChangesFromParent = true
+        return context
+    }()
     
     public lazy var backgroundReadOnlyObservableContext: NSManagedObjectContext = {
         let context = newBackgroundContext()
@@ -202,8 +225,31 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         }
     }
     
+    public final func performWriteTask(resultQueue: DispatchQueue,
+                                              _ perform: @escaping (NSManagedObjectContext) throws -> Void,
+                                              completion: ((Error?) -> Void)? = nil) {
+        performBackgroundTask {[weak self] context in
+            guard let self = self else { return }
+            do {
+                defer { resultQueue.async { completion?(nil) } }
+                try perform(context)
+                for object in context.updatedObjects {
+                    if object.changedValues().isEmpty {
+                        context.refresh(object, mergeChanges: false)
+                    }
+                }
+                if context.hasChanges {
+                    try context.save()
+                }
+            } catch {
+                resultQueue.async { completion?(error) }
+            }
+        }
+    }
+    
     public final func syncWrite(_ perform: @escaping (NSManagedObjectContext) throws -> Void) throws {
         var _error: Error?
+        let startTime = CFAbsoluteTimeGetCurrent()
         backgroundPerformContext.performAndWait {
             do {
                 try perform(self.backgroundPerformContext)
@@ -228,7 +274,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func read<Fetch>(resultQueue: DispatchQueue,
                                   _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
                                   completion: ((Result<Fetch, Error>) -> Void)?) {
-        let context = backgroundPerformContext
+        let context = backgroundReadOnlyContext
         context.perform {[weak self] in
             guard self != nil else { return }
             do {
@@ -246,7 +292,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     
     public final func read<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch) -> Result<Fetch, Error> {
         var result: Result<Fetch, Error>!
-        let context = Thread.isMainThread ? viewContext : backgroundPerformContext
+        let context = Thread.isMainThread ? viewContext : backgroundReadOnlyContext
         context.performAndWait {
             do {
                 let fetch = try perform(context)
@@ -260,7 +306,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     
     public final func performBgTask<Fetch>(resultQueue: DispatchQueue,
                                            _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
-                                           completion: ((Result<Fetch, Error>) -> Void)?) {
+                                           completion: ((Result<Fetch, Error>) -> Void)? = nil) {
         performBackgroundTask {[weak self] context in
             guard self != nil else { return }
             do {
