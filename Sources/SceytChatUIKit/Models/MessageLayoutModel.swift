@@ -606,16 +606,7 @@ open class MessageLayoutModel {
                                                                   .foregroundColor: bodyColor]))
             
             var items = [ContentItem]()
-            let matches = DataDetector.matches(text: content)
-            for match in matches {
-                let linkAttributes: [NSAttributedString.Key : Any] = [
-                    NSAttributedString.Key.foregroundColor: linkColor,
-                    NSAttributedString.Key.underlineColor: linkColor,
-                    NSAttributedString.Key.underlineStyle: NSUnderlineStyle.single.rawValue
-                ]
-                text.addAttributes(linkAttributes, range: match.range)
-                items.append(.link(match.range, match.url))
-            }
+            var replacedContent = content
             
             let mentionedUsers = message.mentionedUsers != nil ?
             message.mentionedUsers!.map { ($0.id, Formatters.userDisplayName.format($0)) } :
@@ -635,7 +626,11 @@ open class MessageLayoutModel {
                             logger.error("Something wrong❗️❗️, body: \(text.string) mention: \(mention.string) pos: \(pos.loc), \(pos.len) user: \(pos.id)")
                             continue
                         }
-                        text.safeReplaceCharacters(in: .init(location: pos.loc, length: pos.len), with: mention)
+                        let range = NSRange(location: pos.loc, length: pos.len)
+                        text.safeReplaceCharacters(in: range, with: mention)
+                        if let rangeEx = Range(range, in: replacedContent) {
+                            replacedContent = replacedContent.replacingCharacters(in: rangeEx, with: mention.string)
+                        }
                         lengths += mention.length
                         items.append(.mention(.init(location: pos.loc, length: mention.length), pos.id))
                     }
@@ -688,10 +683,26 @@ open class MessageLayoutModel {
                             let mention = NSAttributedString(string: Config.mentionSymbol + user.displayName,
                                                              attributes: attributes)
                             text.safeReplaceCharacters(in: range, with: mention)
+                            if let rangeEx = Range(range, in: replacedContent) {
+                                replacedContent = replacedContent.replacingCharacters(in: rangeEx, with: mention.string)
+                            }
                             items.append(.mention(.init(location: bodyAttribute.offset, length: mention.length), userId))
                         }
                     }
             }
+            
+            
+            let matches = DataDetector.matches(text: replacedContent)
+            for match in matches {
+                let linkAttributes: [NSAttributedString.Key : Any] = [
+                    NSAttributedString.Key.foregroundColor: linkColor,
+                    NSAttributedString.Key.underlineColor: linkColor,
+                    NSAttributedString.Key.underlineStyle: NSUnderlineStyle.single.rawValue
+                ]
+                text.addAttributes(linkAttributes, range: match.range)
+                items.append(.link(match.range, match.url))
+            }
+            
             return .init(content: text, items: items)
         }
     }

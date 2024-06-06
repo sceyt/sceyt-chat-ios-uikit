@@ -536,14 +536,18 @@ open class MessageCell: CollectionViewCell,
         guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString,
                 let color = appearance.highlightedLinkBackgroundColor
         else { return }
-        text.addAttributes([.backgroundColor: color], range: range)
+        if range.location >= 0 && range.length >= 0 && NSMaxRange(range) <= text.length {
+            text.addAttributes([.backgroundColor: color], range: range)
+        }
         textLabel.attributedText = text
     }
     
     private func deSelectLink(range: NSRange) {
         guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString
         else { return }
-        text.removeAttribute(.backgroundColor, range: range)
+        if range.location >= 0 && range.length >= 0 && NSMaxRange(range) <= text.length {
+            text.removeAttribute(.backgroundColor, range: range)
+        }
         textLabel.attributedText = text
     }
     
