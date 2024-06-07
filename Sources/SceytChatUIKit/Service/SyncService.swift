@@ -162,10 +162,11 @@ public final class SyncService: NSObject {
                 for channel in channels where channel.lastDisplayedMessageId != 0  {
                     let cachedId = channelsResult?[channel.id] ?? 0
                     let minDisplayId = cachedId != 0 ? min(cachedId, channel.lastDisplayedMessageId) : channel.lastDisplayedMessageId
-                    guard minDisplayId != channel.lastMessage?.id
+                    guard minDisplayId != channel.lastMessage?.id,
+                          minDisplayId > 0
                     else { continue }
                     let operation = Operations.syncChannelMessagesOperations(
-                        startMessageId: minDisplayId,
+                        startMessageId: minDisplayId - 1,
                         channelId: channel.id
                     )
                     completionOperator.addDependency(operation)

@@ -372,7 +372,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 if updateOptions.contains(.deliveryStatus) {
                     updateOptions.remove(.deliveryStatus)
                     if !model.message.incoming {
-                        events.append(.updateDeliveryStatus(model, indexPath))
+                        events.append(.updateDeliveryStatus(model: model, indexPath: indexPath))
                     }
                 }
                 isUpdated = updateOptions.rawValue != 0
@@ -477,7 +477,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         
         if let indexPath = indexPathOfLastDisplayedMessageId() {
-            events.append(.didSetUnreadIndexPath(indexPath))
+            events.append(.didSetUnreadIndexPath(indexPath: indexPath))
         }
         if let max = items.inserts.max() {
             let reloadIndexPathBeforeUpdate = IndexPath(item: 0, section: 0)
@@ -536,13 +536,17 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             if let indexPath {
                 updateLastNavigatedIndexPath(indexPath: indexPath)
             }
-            DispatchQueue.main
-                .asyncAfter(deadline: .now() + 1) {[weak self] in
-                    guard let self else { return }
-                    self.scrollToRepliedMessageId = 0
-                    self.isRestartingMessageObserver = .none
-                }
+            resetStateAfterChangeEvent()
         }
+    }
+    
+    private func resetStateAfterChangeEvent() {
+        DispatchQueue.main
+            .asyncAfter(deadline: .now() + 1) {[weak self] in
+                guard let self else { return }
+                self.scrollToRepliedMessageId = 0
+                self.isRestartingMessageObserver = .none
+            }
     }
     
     open func scrollToItemIfNeeded(items: ChangeItem) {
@@ -572,9 +576,18 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                     scrollToItemIfNeeded(items: items)
                 }
             }
-            
             if isInitial {
-                event = .reloadDataAndScrollToBottom
+                let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId : lastDisplayedMessageId
+                if messageId != 0,
+                   let indexPath = items.changeItems
+                    .first(where: {$0.item?.id == messageId})?
+                    .indexPath {
+                    needToScroll = false
+                    event = .reloadDataAndScroll(indexPath: indexPath, animated: scrollToRepliedMessageId != 0)
+                    resetStateAfterChangeEvent()
+                } else {
+                    event = .reloadDataAndScrollToBottom
+                }
                 return
             }
             if numberOfSections == 0 {
@@ -593,7 +606,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             case .reloadSections(let oldSectionsCount):
                 if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
                     needToScroll = false
-                    event = .reloadDataAndSelect(indexPath, mid)
+                    event = .reloadDataAndSelect(indexPath: indexPath, messageId: mid)
                     updateStateAfterChangeEvent(for: indexPath)
                 } else {
                     event = .reloadData
@@ -615,7 +628,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                     }
                 }.first
                 if case .didSetUnreadIndexPath(let indexPath) = unread {
-                    event = .reloadDataAndScroll(indexPath)
+                    event = .reloadDataAndScroll(indexPath: indexPath, animated: false)
                     return
                 }
                 if let max = items.inserts.max(),
@@ -1067,7 +1080,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             guard !filteredMessages.isEmpty,
                     let max = filteredMessages.max(by: { $0.id < $1.id }),
                     let min = filteredMessages.min(by: { $0.id < $1.id })
-            else { return }
+            else {
+                markMessagesTaskStarted = false
+                return
+            }
                         //
             self.messageMarkerProvider.markIfNeeded(
                 after: min.id,
@@ -1094,7 +1110,10 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             }.max(by: { $0.id < $1.id })
             
             guard let message, self.lasMarkDisplayedMessageId != message.id
-            else { return }
+            else {
+                markMessagesTaskStarted = false
+                return
+            }
             let prevLasMarkDisplayedMessageId = self.lasMarkDisplayedMessageId
             self.lasMarkDisplayedMessageId = message.id
             
@@ -1128,6 +1147,17 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if isTyping {
             isTyping = false
         }
+        scrollToRepliedMessageId = 0
+        scrollToMessageIdIfSearching = 0
+        if let lastCacheItem = messageObserver.lastItem,
+            let lastMessageItem = channel.lastMessage,
+            lastCacheItem.id != lastMessageItem.id {
+            let offset = messageObserver.calculateMessageFetchOffset()
+            messageObserver.restartObserver(fetchPredicate: messageObserver.defaultFetchPredicate, offset: offset)
+        } else {
+            messageObserver.update(predicate: messageObserver.defaultFetchPredicate)
+        }
+        
         if case let .edit(message) = userMessage.action,
            message.body == userMessage.text {
             if let oldBodyAttributes = message.bodyAttributes,
@@ -1491,7 +1521,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                             self.channelObserver.refresh(at: .zero)
                         }
                     }
-                    self.event = .changePresence(presence.presence)
+                    self.event = .changePresence(userPresence: presence.presence)
                     self.peerPresence = presence.presence
                 }
             }
@@ -1703,7 +1733,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open func scroll(to indexPath: IndexPath, messageId: MessageId) {
-        event = .scrollAndSelect(indexPath, messageId)
+        event = .scrollAndSelect(indexPath: indexPath, messageId: messageId)
     }
     
     //MARK: Link preview
@@ -1911,14 +1941,14 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
               member.id != me
         else { return }
         
-        event = .typing(true, .init(user: member))
+        event = .typing(isTyping: true, user: .init(user: member))
         peerPresence = member.presence
         schedulers[member.id]?.stop()
         schedulers[member.id] = nil
         schedulers[member.id] = Scheduler.new(deadline: .now() + 3) { [weak self] _ in
             guard let self else { return }
             self.schedulers[member.id] = nil
-            self.event = .typing(false, .init(user: member))
+            self.event = .typing(isTyping: false, user: .init(user: member))
         }
     }
     
@@ -1926,7 +1956,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         guard self.channel.id == channel.id,
               member.id != me
         else { return }
-        event = .typing(false, .init(user: member))
+        event = .typing(isTyping: false, user: .init(user: member))
         peerPresence = member.presence
         schedulers[member.id]?.stop()
         schedulers[member.id] = nil
@@ -1943,7 +1973,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 loadLastMessagesAfterConnect = false
             }
         }
-        event = .connection(state)
+        event = .connection(state: state)
     }
     
     //MARK: private section
@@ -2136,20 +2166,20 @@ public extension ChannelVM {
     
     enum Event {
         case update(paths: CollectionUpdateIndexPaths)
-        case updateDeliveryStatus(MessageLayoutModel, IndexPath)
+        case updateDeliveryStatus(model: MessageLayoutModel, indexPath: IndexPath)
         case reload(IndexPath)
         case reloadData
         case reloadDataAndScrollToBottom
-        case reloadDataAndScroll(IndexPath)
-        case reloadDataAndSelect(IndexPath, MessageId)
+        case reloadDataAndScroll(indexPath: IndexPath, animated: Bool)
+        case reloadDataAndSelect(indexPath: IndexPath, messageId: MessageId)
         case resetSections(IndexSet, IndexSet)
-        case scrollAndSelect(IndexPath, MessageId)
-        case didSetUnreadIndexPath(IndexPath)
-        case typing(Bool, ChatUser)
-        case changePresence(Presence)
+        case scrollAndSelect(indexPath: IndexPath, messageId: MessageId)
+        case didSetUnreadIndexPath(indexPath: IndexPath)
+        case typing(isTyping: Bool, user: ChatUser)
+        case changePresence(userPresence: Presence)
         case updateChannel
         case showNoMessage
-        case connection(ConnectionState)
+        case connection(state: ConnectionState)
         case close
     }
 }

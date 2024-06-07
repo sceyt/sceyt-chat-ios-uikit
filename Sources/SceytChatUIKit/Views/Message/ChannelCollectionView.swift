@@ -100,16 +100,17 @@ open class ChannelCollectionView: CollectionView {
         let afterContentSize = safeContentSize
         
         let newOffset = CGPoint(
-            x: contentOffset.x + (afterContentSize.width - beforeContentSize.width),
-            y: contentOffset.y + (afterContentSize.height - beforeContentSize.height))
+            x: max(0, contentOffset.x + (afterContentSize.width - beforeContentSize.width)),
+            y: max(0, contentOffset.y + (afterContentSize.height - beforeContentSize.height))
+        )
         setContentOffset(newOffset, animated: false)
     }
     
-    open func reloadDataAndScrollToBottom() {
+    open func reloadDataAndScrollToBottom(animated: Bool = false) {
         setContentOffset(contentOffset, animated: false)
         reloadData()
         layoutIfNeeded()
-        scrollToBottom(animated: false)
+        scrollToBottom(animated: animated)
     }
     
     open func reloadDataAndScrollTo(
@@ -117,10 +118,7 @@ open class ChannelCollectionView: CollectionView {
         pos: UICollectionView.ScrollPosition = .top,
         animated: Bool = false
     ) {
-        // stop scrolling
-        setContentOffset(contentOffset, animated: false)
-        reloadData()
-        layoutIfNeeded()
+        reloadDataAndKeepOffset()
         if contains(indexPath: indexPath) {
             scrollToItem(at: indexPath, pos: pos, animated: animated)
         }

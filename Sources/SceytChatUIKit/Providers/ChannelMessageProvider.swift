@@ -211,7 +211,7 @@ open class ChannelMessageProvider: Provider {
         triggerMessage: MessageId? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
-        database.performWriteTask ({
+        database.write ({
             $0.createOrUpdate(
                 messages: messages,
                 channelId: self.channelId
@@ -554,7 +554,7 @@ extension ChannelMessageProvider {
         sortDescriptors: [NSSortDescriptor] = [],
         completion: @escaping ([ChatMessage]?) -> Void) {
 
-            database.performWriteTask(resultQueue: .global()) { context in
+            database.write(resultQueue: .global()) { context in
                 var chatMessages = NSMutableArray()
                 for message in messages {
                     if let m = MessageDTO.fetch(id: message.id, context: context) {

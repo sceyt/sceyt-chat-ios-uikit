@@ -56,7 +56,7 @@ public extension Database {
     }
     
     func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void) {
-        performBgTask(resultQueue: .main, perform, completion: nil)
+        performWriteTask(resultQueue: .main, perform, completion: nil)
     }
     
     func performBgTask<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
@@ -203,6 +203,13 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         return context
     }()
     
+    public func createBackgroundContext() -> NSManagedObjectContext {
+        let context = newBackgroundContext()
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        context.automaticallyMergesChangesFromParent = true
+        return context
+    }
+    
     public final func write(resultQueue: DispatchQueue,
                             _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                             completion: ((Error?) -> Void)? = nil) {
@@ -228,7 +235,8 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func performWriteTask(resultQueue: DispatchQueue,
                                               _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                                               completion: ((Error?) -> Void)? = nil) {
-        performBackgroundTask {[weak self] context in
+        let context = createBackgroundContext()
+        context.perform {[weak self] in
             guard let self = self else { return }
             do {
                 defer { resultQueue.async { completion?(nil) } }
@@ -249,7 +257,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     
     public final func syncWrite(_ perform: @escaping (NSManagedObjectContext) throws -> Void) throws {
         var _error: Error?
-        let startTime = CFAbsoluteTimeGetCurrent()
         backgroundPerformContext.performAndWait {
             do {
                 try perform(self.backgroundPerformContext)
@@ -307,7 +314,8 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func performBgTask<Fetch>(resultQueue: DispatchQueue,
                                            _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
                                            completion: ((Result<Fetch, Error>) -> Void)? = nil) {
-        performBackgroundTask {[weak self] context in
+        let context = createBackgroundContext()
+        context.perform {
             guard self != nil else { return }
             do {
                 let fetch = try perform(context)

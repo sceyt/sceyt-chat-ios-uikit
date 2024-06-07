@@ -56,7 +56,7 @@ open class ChannelMessageMarkerProvider: Provider {
                 }
 
                 if storeBeforeSend {
-                    self.database.performWriteTask {
+                    self.database.write {
                         $0.update(messagePendingMarkers: ids, markerName: markerName)
                     }
                 }

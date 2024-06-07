@@ -123,7 +123,6 @@ open class ChannelVC: ViewController,
     public private(set) var keyboardObserver: KeyboardObserver?
     private lazy var keyboardBgView = UIView()
         .withoutAutoresizingMask
-    private var needToMarkMessageAsDisplayed = false
     private var needToScrollBottom = true
     private var requestMassagesPage = -1
     private var lastScrollDirection = ScrollDirection.none
@@ -1275,15 +1274,14 @@ open class ChannelVC: ViewController,
         guard let cell = cell as? MessageCell
         else { return }
         
+        var repliedMessageId: MessageId {
+            channelViewModel.scrollToRepliedMessageId
+        }
         if selectMessageId != 0, cell.data.message.id == selectMessageId {
             cell.highlightMode = .search
-        } else if channelViewModel.scrollToRepliedMessageId != 0,
-                    cell.data.message.id == channelViewModel.scrollToRepliedMessageId {
-            if userSelectOnRepliedMessage != nil {
-                cell.highlightMode = .reply
-            } else {
-                animateHighlightCell(cell, mode: .reply)
-            }
+        } else if repliedMessageId != 0,
+                    cell.data.message.id == repliedMessageId {
+            animateHighlightCell(cell, mode: .reply)
         } else if cell.highlightMode != .none {
             cell.highlightMode = .none
         }
@@ -1569,6 +1567,7 @@ open class ChannelVC: ViewController,
     }
     
     open func sendMessage(_ message: UserSendMessage, shouldClearText: Bool = true) {
+        userSelectOnRepliedMessage = nil
         logger.debug("[MESSAGE SEND] sendMessage \(message.text)")
         let canShowUnread = canShowUnreadCountView
         canShowUnreadCountView = false
@@ -1743,7 +1742,6 @@ open class ChannelVC: ViewController,
         else { return }
         userSelectOnRepliedMessage = layoutModel.message
         channelViewModel.findReplayedMessage(messageId: parent.id)
-        
     }
     
     open func showRepliedMessage(_ message: ChatMessage) {
@@ -1921,7 +1919,7 @@ open class ChannelVC: ViewController,
             }
         case .reloadData:
             if let selectMessageId, let indexPath = channelViewModel.indexPathOf(messageId: selectMessageId) {
-                onEvent(.reloadDataAndSelect(indexPath, selectMessageId))
+                onEvent(.reloadDataAndSelect(indexPath: indexPath, messageId: selectMessageId))
             } else {
                 collectionView.reloadDataIfNeeded()
             }
@@ -1932,14 +1930,20 @@ open class ChannelVC: ViewController,
                     collectionView.reloadItems(at: [indexPath])
                 }
             }
-            needToMarkMessageAsDisplayed = true
             collectionView.reloadDataIfNeeded()
         case .reloadDataAndScrollToBottom:
-            needToMarkMessageAsDisplayed = true
-            collectionView.reloadDataAndScrollToBottom()
-        case .reloadDataAndScroll(let indexPath):
-            needToMarkMessageAsDisplayed = true
-            collectionView.reloadDataAndScrollTo(indexPath: indexPath)
+            if channelViewModel.isSearching {
+                collectionView.reloadDataAndKeepOffset()
+                collectionView.scrollToBottom(animated: true)
+            } else {
+                collectionView.reloadDataAndScrollToBottom()
+            }
+            
+        case let .reloadDataAndScroll(indexPath, animated):
+            collectionView.reloadDataAndScrollTo(
+                indexPath: indexPath,
+                pos: animated ? .centeredVertically : .top,
+                animated: animated)
             updateUnreadViewVisibility()
         case let .resetSections(old, new):
             UIView.performWithoutAnimation {
@@ -2026,7 +2030,11 @@ open class ChannelVC: ViewController,
             }
             
             NotificationCenter.default.post(name: .selectMessage, object: (messageId, mode))
-            
+            if mode == .reply {
+                UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak self] in
+                    NotificationCenter.default.post(name: .selectMessage, object: (messageId, MessageCell.HighlightMode.none))
+                }
+            }
             let viewIndexPath: IndexPath
             if collectionView.contains(indexPath: indexPath) {
                 viewIndexPath = indexPath

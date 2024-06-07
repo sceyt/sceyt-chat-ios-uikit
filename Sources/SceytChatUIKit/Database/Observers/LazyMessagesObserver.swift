@@ -347,17 +347,12 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         if fetchPredicate != defaultFetchPredicate {
             update(predicate: defaultFetchPredicate)
             if restartObserver {
-                let offset = calculateMessageFetchOffset()
                 self.restartObserver(fetchPredicate: defaultFetchPredicate)
             }
             return true
         }
         return false
     }
-    
-}
-
-fileprivate extension LazyMessagesObserver {
     
     func calculateMessageFetchOffset(
         messageId: MessageId = 0,
@@ -377,6 +372,9 @@ fileprivate extension LazyMessagesObserver {
             }
             return max(fetchOffset, 0)
         }
+}
+
+fileprivate extension LazyMessagesObserver {
     
     func loadRanges(
         for lastMessageId: MessageId,

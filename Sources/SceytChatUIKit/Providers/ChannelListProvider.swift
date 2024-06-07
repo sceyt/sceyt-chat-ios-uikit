@@ -86,7 +86,7 @@ open class ChannelListProvider: Provider {
         completion: ((Error?) -> Void)? = nil
     ) {
         onStoreChannels?(channels)
-        database.performWriteTask {
+        database.write {
             $0.createOrUpdate(channels: channels)
         } completion: { error in
             logger.errorIfNotNil(error, "Unable Store channels")
