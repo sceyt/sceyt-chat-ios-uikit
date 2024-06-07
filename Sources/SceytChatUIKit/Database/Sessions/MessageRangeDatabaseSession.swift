@@ -153,7 +153,10 @@ extension NSManagedObjectContext: MessageRangeDatabaseSession {
         var anyRange: LoadRangeDTO?
         if !ranges.isEmpty {
             anyRange = ranges.removeLast()
-            ranges.forEach { delete($0) }
+            if !ranges.isEmpty {
+                logger.warn("there are \(ranges.count) range for channel \(channelId), will be deleted soon")
+                try? batchDelete(ids: ranges.map { $0.objectID })
+            }
         }
         
         if let anyRange {

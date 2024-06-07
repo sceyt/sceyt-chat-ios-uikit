@@ -1249,7 +1249,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     ) {
         
         @Sendable func send() {
-            logger.debug("[MESSAGE SEND] sendUserMessage messageSender \(message.body)")
+            logger.verbose("[MESSAGE SEND] sendUserMessage messageSender \(message.body)")
             switch action {
             case .send, .reply, .forward:
                 messageSender.sendMessage(message, storeBeforeSend: false) {[weak self] _ in

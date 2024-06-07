@@ -525,7 +525,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
            (currentContext === context) {
             
             func perform() {
-                logger.debug("[MESSAGE SEND] didChangeObjects perform")
+                logger.verbose("[MESSAGE SEND] didChangeObjects perform")
                 readCache {}
                 var sendEvent = false
                 var changeItems = [ChangeItem]()

@@ -581,7 +581,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     //    let links = ["http://www.sceyt.com", "http://www.google.com", "http://www.test.com", "http://www.example.com"]
     @objc
     open func sendButtonAction(_ sender: UIButton) {
-        logger.debug("[MESSAGE SEND] sendButtonAction \(inputTextView.text)")
+        logger.verbose("[MESSAGE SEND] sendButtonAction \(inputTextView.text)")
         if case .reply(let model) = currentState,
             lastDetectedLinkMetadata === model.linkPreviews?.first?.metadata {
             lastDetectedLinkMetadata = nil

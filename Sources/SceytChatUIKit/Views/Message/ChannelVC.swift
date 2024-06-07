@@ -1568,7 +1568,7 @@ open class ChannelVC: ViewController,
     
     open func sendMessage(_ message: UserSendMessage, shouldClearText: Bool = true) {
         userSelectOnRepliedMessage = nil
-        logger.debug("[MESSAGE SEND] sendMessage \(message.text)")
+        logger.verbose("[MESSAGE SEND] sendMessage \(message.text)")
         let canShowUnread = canShowUnreadCountView
         canShowUnreadCountView = false
         channelViewModel.createAndSendUserMessage(message)
