@@ -251,7 +251,7 @@ open class ChannelVC: ViewController,
         }
         searchControlsView.isHidden = true
         searchControlsView.onAction = { [weak self] in
-            guard let self else { return }
+            guard let self, !self.channelViewModel.isSearchResultsLoading else { return }
             switch $0 {
             case .previousResult:
                 channelViewModel.findPreviousSearchedMessage()
@@ -1121,11 +1121,13 @@ open class ChannelVC: ViewController,
     }
     
     open func loadPrevMessages(beforeMessageAt indexPath: IndexPath) {
+        guard !channelViewModel.isSearching else { return }
         channelViewModel.resetScrollState()
         channelViewModel.loadPrevMessages(beforeMessageAt: indexPath)
     }
     
     open func loadNextMessages(afterMessageAt indexPath: IndexPath) {
+        guard !channelViewModel.isSearching else { return }
         channelViewModel.resetScrollState()
         channelViewModel.loadNextMessages(afterMessageAt: indexPath)
     }
@@ -1932,12 +1934,7 @@ open class ChannelVC: ViewController,
             }
             collectionView.reloadDataIfNeeded()
         case .reloadDataAndScrollToBottom:
-            if channelViewModel.isSearching {
-                collectionView.reloadDataAndKeepOffset()
-                collectionView.scrollToBottom(animated: true)
-            } else {
-                collectionView.reloadDataAndScrollToBottom()
-            }
+            collectionView.reloadDataAndScrollToBottom()
             
         case let .reloadDataAndScroll(indexPath, animated):
             collectionView.reloadDataAndScrollTo(

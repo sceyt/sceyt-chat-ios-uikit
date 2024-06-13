@@ -586,7 +586,21 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: scrollToRepliedMessageId != 0)
                     resetStateAfterChangeEvent()
                 } else {
-                    event = .reloadDataAndScrollToBottom
+                    if let (indexPath, messageId) = needsToScrollAtIndexPath(items: items) {
+                        switch searchDirection {
+                        case .next:
+                            event = .reloadDataAndScrollToBottom
+                        case .prev:
+                            event = .reloadData
+                        case .none:
+                            break
+                        }
+                        event = .scrollAndSelect(indexPath: indexPath, messageId: messageId)
+                        resetStateAfterChangeEvent()
+                        needToScroll = false
+                    } else {
+                        event = .reloadDataAndScrollToBottom
+                    }
                 }
                 return
             }
@@ -1591,7 +1605,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open func findPreviousSearchedMessage() {
-        guard let messageId = searchResult.prevItem() else {
+        guard let messageId = searchResult.prevItem() 
+        else {
+            logger.verbose("find prev searched message - message id not find")
             return
         }
         if let indexPath = indexPathOf(messageId: messageId) {
@@ -1600,7 +1616,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         } else if !searchResult.isLoadedNearMessages(for: messageId), chatClient.connectionState == .connected {
             searchDirection = .prev
             scrollToMessageIdIfSearching = messageId
+            isSearchResultsLoading = true
             loadNearMessagesOfSearchMessage(id: messageId) {[weak self] error in
+                self?.isSearchResultsLoading = false
                 if let self, error == nil {
                     self.searchResult.setLoadedNearMessages(messageId: messageId)
                     self.searchResult.prev()
@@ -1610,6 +1628,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             let sectionsCount = numberOfSections
             scrollToMessageIdIfSearching = messageId
             searchDirection = .prev
+            isSearchResultsLoading = true
             messageObserver.restartToNear(at: messageId) {[weak self] isDone in
                 self?.isSearchResultsLoading = false
                 self?.searchResult.prev()
@@ -1621,7 +1640,11 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open func findNextSearchedMessage() {
-        guard let messageId = searchResult.nextItem() else { return }
+        guard let messageId = searchResult.nextItem()
+        else {
+            logger.verbose("find next searched message - message id not find")
+            return
+        }
         if let (index, indexPath) = cachePosition(messageId: messageId) {
             searchResult.next()
             scroll(to: indexPath, messageId: messageId)
@@ -1632,7 +1655,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         } else if !searchResult.isLoadedNearMessages(for: messageId), chatClient.connectionState == .connected {
             scrollToMessageIdIfSearching = messageId
             searchDirection = .next
+            isSearchResultsLoading = true
             loadNearMessagesOfSearchMessage(id: messageId) {[weak self] error in
+                self?.isSearchResultsLoading = false
                 if let self, error == nil {
                     self.searchResult.setLoadedNearMessages(messageId: messageId)
                     self.searchResult.next()
@@ -1642,6 +1667,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             let sectionsCount = numberOfSections
             scrollToMessageIdIfSearching = messageId
             searchDirection = .next
+            isSearchResultsLoading = true
             messageObserver.restartToNear(at: messageId) {[weak self] isDone in
                 self?.isSearchResultsLoading = false
                 if isDone {

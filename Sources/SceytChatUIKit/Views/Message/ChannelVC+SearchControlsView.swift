@@ -25,6 +25,8 @@ extension ChannelVC {
             
             nextResultButton.addTarget(self, action: #selector(onNext), for: .touchUpInside)
             prevResultButton.addTarget(self, action: #selector(onPrevious), for: .touchUpInside)
+            prevResultButton.isEnabled = false
+            nextResultButton.isEnabled = false
         }
         
         open override func setupLayout() {
