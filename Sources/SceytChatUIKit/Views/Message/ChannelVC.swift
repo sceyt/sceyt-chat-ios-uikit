@@ -160,6 +160,7 @@ open class ChannelVC: ViewController,
         showBottomViewIfNeeded()
         updateTitle()
         updateUnreadViewVisibility()
+        collectionView.collectionViewLayout.invalidateLayout()
     }
     
     override open func viewDidAppear(_ animated: Bool) {
@@ -1121,14 +1122,16 @@ open class ChannelVC: ViewController,
     }
     
     open func loadPrevMessages(beforeMessageAt indexPath: IndexPath) {
-        guard !channelViewModel.isSearching else { return }
-        channelViewModel.resetScrollState()
+        if channelViewModel.isSearching {
+            channelViewModel.resetScrollState()
+        }
         channelViewModel.loadPrevMessages(beforeMessageAt: indexPath)
     }
     
     open func loadNextMessages(afterMessageAt indexPath: IndexPath) {
-        guard !channelViewModel.isSearching else { return }
-        channelViewModel.resetScrollState()
+        if channelViewModel.isSearching {
+            channelViewModel.resetScrollState()
+        }
         channelViewModel.loadNextMessages(afterMessageAt: indexPath)
     }
     
@@ -1242,7 +1245,9 @@ open class ChannelVC: ViewController,
     }
     
     open func updateLastNavigatedIndexPath() {
-        if let indexPath = collectionView.lastVisibleIndexPath, channelViewModel.isLastMessage(at: indexPath) {
+        if channelViewModel.lastNavigatedIndexPath != nil,
+            let indexPath = collectionView.lastVisibleIndexPath,
+            channelViewModel.isLastMessage(at: indexPath) {
             channelViewModel.updateLastNavigatedIndexPath(indexPath: nil)
         }
     }
@@ -1480,7 +1485,7 @@ open class ChannelVC: ViewController,
         if let lm = channelViewModel.layoutModel(at: indexPath) {
             return CGSize(width: width, height: lm.measureSize.height)
         }
-        return CGSize(width: width, height: 33)
+        return CGSize(width: width, height: 38)
     }
     
     open func collectionView(
@@ -1834,7 +1839,10 @@ open class ChannelVC: ViewController,
                 return
             }
             
-            if continuesOptions.isEmpty || continuesOptions.contains(.top) || continuesOptions.contains(.middle) {
+            if continuesOptions.isEmpty || 
+                continuesOptions.contains(.top) ||
+                continuesOptions.contains(.middle) ||
+                channelViewModel.isSearching {
                 layout.isInsertingItemsToTop = true
             } else {
                 layout.isInsertingItemsToTop = false
@@ -1859,7 +1867,7 @@ open class ChannelVC: ViewController,
                 animatedScroll = true
             } else if unreadCountView.isHidden {
                 isStartedDragging = true
-                needsToScrollBottom = isInsertLastIndexPath
+                needsToScrollBottom = isInsertLastIndexPath && !channelViewModel.isSearching
                 animatedScroll = isInsertLastIndexPath
             } else {
                 needsToScrollBottom = false
@@ -1932,20 +1940,15 @@ open class ChannelVC: ViewController,
                     collectionView.reloadItems(at: [indexPath])
                 }
             }
-            collectionView.reloadDataIfNeeded()
         case .reloadDataAndScrollToBottom:
             collectionView.reloadDataAndScrollToBottom()
             
-        case let .reloadDataAndScroll(indexPath, animated):
+        case let .reloadDataAndScroll(indexPath, animated, pos):
             collectionView.reloadDataAndScrollTo(
                 indexPath: indexPath,
-                pos: animated ? .centeredVertically : .top,
+                pos: pos,
                 animated: animated)
             updateUnreadViewVisibility()
-        case let .resetSections(old, new):
-            UIView.performWithoutAnimation {
-                collectionView.reloadDataAndScrollToBottom()
-            }
         case .didSetUnreadIndexPath(let indexPath):
             unreadMessageIndexPath = indexPath
         case .typing(let isTyping, let user):
@@ -2013,7 +2016,11 @@ open class ChannelVC: ViewController,
                 break
             }
         case let .scrollAndSelect(indexPath, messageId):
-            selectMessageId = messageId
+            if selectMessageId == messageId,
+                lastAnimatedIndexPath == indexPath,
+               collectionView.visibleAttributes.contains(where: {$0.indexPath == indexPath}) {
+                return
+            }
             var mode = MessageCell.HighlightMode.search
             if channelViewModel.scrollToRepliedMessageId != 0 {
                 if userSelectOnRepliedMessage != nil {

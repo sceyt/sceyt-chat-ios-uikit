@@ -10,17 +10,17 @@ import UIKit
 
 
 open class ChannelCollectionViewLayoutAttributes: UICollectionViewLayoutAttributes {
-
+    
 }
 
 open class ChannelCollectionViewLayout: UICollectionViewFlowLayout {
-
+    
     public var isInsertingItemsToTop = false
-
+    
     public required override init() {
         super.init()
     }
-
+    
     required public init?(coder: NSCoder) {
         super.init(coder: coder)
     }
@@ -28,7 +28,7 @@ open class ChannelCollectionViewLayout: UICollectionViewFlowLayout {
     open override class var layoutAttributesClass: AnyClass {
         ChannelCollectionViewLayoutAttributes.self
     }
-
+    
     open override func prepare() {
         super.prepare()
         if isInsertingItemsToTop == true {
@@ -46,6 +46,10 @@ open class ChannelCollectionViewLayout: UICollectionViewFlowLayout {
     
     open override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
         true
+    }
+    
+    open override func invalidateLayout(with context: UICollectionViewLayoutInvalidationContext) {
+        super.invalidateLayout(with: context)
     }
 }
 

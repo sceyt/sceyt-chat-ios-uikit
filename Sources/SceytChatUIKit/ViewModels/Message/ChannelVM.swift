@@ -583,15 +583,15 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                     .first(where: {$0.item?.id == messageId})?
                     .indexPath {
                     needToScroll = false
-                    event = .reloadDataAndScroll(indexPath: indexPath, animated: scrollToRepliedMessageId != 0)
+                    event = .reloadDataAndScroll(indexPath: indexPath, animated: scrollToRepliedMessageId != 0, pos: .centeredVertically)
                     resetStateAfterChangeEvent()
                 } else {
                     if let (indexPath, messageId) = needsToScrollAtIndexPath(items: items) {
                         switch searchDirection {
                         case .next:
-                            event = .reloadDataAndScrollToBottom
+                            event = .reloadDataAndScroll(indexPath: indexPath, animated: false, pos: .top)
                         case .prev:
-                            event = .reloadData
+                            event = .reloadDataAndScroll(indexPath: indexPath, animated: false, pos: .bottom)
                         case .none:
                             break
                         }
@@ -617,7 +617,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             case .reloadToLatestState:
                 event = .reloadDataAndScrollToBottom
                 return
-            case .reloadSections(let oldSectionsCount):
+            case .reloadAndSelect:
                 if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
                     needToScroll = false
                     event = .reloadDataAndSelect(indexPath: indexPath, messageId: mid)
@@ -642,7 +642,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                     }
                 }.first
                 if case .didSetUnreadIndexPath(let indexPath) = unread {
-                    event = .reloadDataAndScroll(indexPath: indexPath, animated: false)
+                    event = .reloadDataAndScroll(indexPath: indexPath, animated: false, pos: .top)
                     return
                 }
                 if let max = items.inserts.max(),
@@ -979,11 +979,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         id: MessageId,
         completion: ((Error?) -> Void)? = nil
     ) {
-        let sectionsCount = numberOfSections
         if chatClient.connectionState == .connected {
             provider.loadNearMessages(near: id) { [weak self] error in
                 if error == nil {
-                    self?.isRestartingMessageObserver = .reloadSections(sectionsCount)
                     self?.messageObserver.restartToNear(at: id)
                 }
                 completion?(error)
@@ -1000,7 +998,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if chatClient.connectionState == .connected {
             provider.loadNearMessages(near: id) { [weak self] error in
                 if error == nil {
-                    self?.isRestartingMessageObserver = .reload
                     self?.messageObserver.restartToNear(at: id)
                 }
                 completion?(error)
@@ -1044,19 +1041,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     private func resetFetchState() {
         lastLoadPrevMessageId = 0
         isFetchingData = false
-    }
-    
-    private func loadNearFromLocalDB(messageId: MessageId, completion: @escaping (IndexPath?) -> Void) {
-        isRestartingMessageObserver = .reload
-        
-        let offset = calculateMessageFetchOffset(messageId: messageId)
-        let limit = 30
-        messageObserver.load(from: offset, limit: limit) { [weak self] in
-            let indexPath = self?.messageObserver.indexPath { $0.id == messageId }
-            DispatchQueue.main.async {
-                completion(indexPath)
-            }
-        }
     }
     
     open func updateLastNavigatedIndexPath(indexPath: IndexPath?) {
@@ -1613,27 +1597,28 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if let indexPath = indexPathOf(messageId: messageId) {
             searchResult.prev()
             scroll(to: indexPath, messageId: messageId)
-        } else if !searchResult.isLoadedNearMessages(for: messageId), chatClient.connectionState == .connected {
-            searchDirection = .prev
-            scrollToMessageIdIfSearching = messageId
-            isSearchResultsLoading = true
-            loadNearMessagesOfSearchMessage(id: messageId) {[weak self] error in
-                self?.isSearchResultsLoading = false
-                if let self, error == nil {
-                    self.searchResult.setLoadedNearMessages(messageId: messageId)
-                    self.searchResult.prev()
-                }
-            }
         } else {
-            let sectionsCount = numberOfSections
             scrollToMessageIdIfSearching = messageId
             searchDirection = .prev
             isSearchResultsLoading = true
             messageObserver.restartToNear(at: messageId) {[weak self] isDone in
-                self?.isSearchResultsLoading = false
-                self?.searchResult.prev()
+                guard let self else { return }
+                self.isSearchResultsLoading = false
+                self.searchResult.prev()
                 if isDone {
-                    self?.isRestartingMessageObserver = .reloadSections(sectionsCount)
+                    self.isRestartingMessageObserver = .reloadAndSelect
+                } else if !searchResult.isLoadedNearMessages(for: messageId),
+                            chatClient.connectionState == .connected {
+                    searchDirection = .prev
+                    scrollToMessageIdIfSearching = messageId
+                    isSearchResultsLoading = true
+                    loadNearMessagesOfSearchMessage(id: messageId) {[weak self] error in
+                        self?.isSearchResultsLoading = false
+                        if let self, error == nil {
+                            self.searchResult.setLoadedNearMessages(messageId: messageId)
+                            self.searchResult.prev()
+                        }
+                    }
                 }
             }
         }
@@ -1652,30 +1637,33 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             if index < 5 {
                 loadPrevMessages(before: messageId)
             }
-        } else if !searchResult.isLoadedNearMessages(for: messageId), chatClient.connectionState == .connected {
-            scrollToMessageIdIfSearching = messageId
-            searchDirection = .next
-            isSearchResultsLoading = true
-            loadNearMessagesOfSearchMessage(id: messageId) {[weak self] error in
-                self?.isSearchResultsLoading = false
-                if let self, error == nil {
-                    self.searchResult.setLoadedNearMessages(messageId: messageId)
-                    self.searchResult.next()
-                }
-            }
         } else {
             let sectionsCount = numberOfSections
             scrollToMessageIdIfSearching = messageId
             searchDirection = .next
             isSearchResultsLoading = true
             messageObserver.restartToNear(at: messageId) {[weak self] isDone in
-                self?.isSearchResultsLoading = false
+                guard let self else { return }
+                self.isSearchResultsLoading = false
                 if isDone {
-                    self?.searchResult.next()
-                    self?.isRestartingMessageObserver = .reloadSections(sectionsCount)
+                    self.searchResult.next()
+                    self.loadNearMessages(messageId: messageId)
+                } else {
+                    if !searchResult.isLoadedNearMessages(for: messageId),
+                                chatClient.connectionState == .connected {
+                        scrollToMessageIdIfSearching = messageId
+                        searchDirection = .next
+                        isSearchResultsLoading = true
+                        loadNearMessagesOfSearchMessage(id: messageId) {[weak self] error in
+                            self?.isSearchResultsLoading = false
+                            if let self, error == nil {
+                                self.searchResult.setLoadedNearMessages(messageId: messageId)
+                                self.searchResult.next()
+                            }
+                        }
+                    }
                 }
             }
-            return
         }
         
         if !isSearchResultsLoading,
@@ -1717,9 +1705,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 let sectionsCount = self.numberOfSections
                 self.messageObserver.restartToNear(at: messageId) {[weak self] isDone in
                     guard let self else { return }
-                    if isDone {
-                        self.isRestartingMessageObserver = .reloadSections(sectionsCount)
-                    } else {
+                    if !isDone {
                         self.loadNearMessagesOfRepliedMessage(id: messageId)
                     }
                 }
@@ -1727,7 +1713,6 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 self.loadNearMessagesOfRepliedMessage(id: messageId)
             }
         }
-        
     }
     
     open func updateSearchedMessageFromDatabase(
@@ -2196,9 +2181,8 @@ public extension ChannelVM {
         case reload(IndexPath)
         case reloadData
         case reloadDataAndScrollToBottom
-        case reloadDataAndScroll(indexPath: IndexPath, animated: Bool)
+        case reloadDataAndScroll(indexPath: IndexPath, animated: Bool, pos: CollectionView.ScrollPosition)
         case reloadDataAndSelect(indexPath: IndexPath, messageId: MessageId)
-        case resetSections(IndexSet, IndexSet)
         case scrollAndSelect(indexPath: IndexPath, messageId: MessageId)
         case didSetUnreadIndexPath(indexPath: IndexPath)
         case typing(isTyping: Bool, user: ChatUser)
@@ -2212,7 +2196,7 @@ public extension ChannelVM {
 
 private extension ChannelVM {
     enum DataReloadingType {
-        case none, reload, reloadToLatestState, reloadSections(Int)
+        case none, reload, reloadToLatestState, reloadAndSelect
     }
 }
 

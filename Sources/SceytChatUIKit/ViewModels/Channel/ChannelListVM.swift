@@ -171,7 +171,7 @@ open class ChannelListVM: NSObject,
                 self.event = .reloadSearch
             }
         } errorBlock: { error in
-            logger.error("[search] error \(error)")
+            logger.error(" error \(error)")
         }
     }
     
