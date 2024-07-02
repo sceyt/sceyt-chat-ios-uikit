@@ -169,14 +169,21 @@ public extension SCTUIKitConfig {
     
     static var dbFilename = "chatdb"
     
+    static var dbFileDirectory: URL? = {
+        if let path = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first {
+            return URL(fileURLWithPath: path)
+        }
+        return nil
+    }()
+    
     static var database: Database = {
-        if let storageDirectory = storageDirectory {
+        if let directory = dbFileDirectory {
             do {
-                try FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             } catch {
                 
             }
-            let dbUrl = storageDirectory.appendingPathComponent(dbFilename)
+            let dbUrl = directory.appendingPathComponent(dbFilename)
             return PersistentContainer(storeType: .sqLite(databaseFileUrl: dbUrl))
         } else {
             return PersistentContainer(storeType: .inMemory)

@@ -126,7 +126,7 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
                 self.event.send(.reloadSearch)
             }
         } errorBlock: { error in
-            logger.error("[search] error \(error)")
+            logger.error("error \(error)")
         }
     }
 }

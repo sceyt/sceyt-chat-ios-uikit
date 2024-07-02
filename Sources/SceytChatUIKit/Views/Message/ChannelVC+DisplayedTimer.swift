@@ -14,9 +14,15 @@ extension ChannelVC {
     open class DisplayedTimer: NSObject {
         
         public var timeInterval: TimeInterval = 0.1
-        public var timer: Timer?
+        public private(set) var timer: Timer?
+        public private(set) var isStarted = false
+        
+        public init(timeInterval: TimeInterval = 0.1) {
+            self.timeInterval = timeInterval
+        }
         
         open func start(fire: @escaping ((DisplayedTimer) -> Void)) {
+            isStarted = true
             timer?.invalidate()
             timer = Timer(
                 timeInterval: timeInterval,
@@ -30,6 +36,7 @@ extension ChannelVC {
         }
         
         open func stop() {
+            isStarted = false
             if timer?.isValid == true {
                 timer?.invalidate()
                 timer = nil

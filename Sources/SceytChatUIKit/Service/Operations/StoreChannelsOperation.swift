@@ -74,7 +74,7 @@ open class StoreChannelsOperation: AsyncOperation {
     open override func main() {
         guard !channels.isEmpty
         else { return }
-        database.write({
+        database.performWriteTask({
             $0.createOrUpdate(channels: self.channels)
         }, completion: { [weak self] error in
             logger.errorIfNotNil(error, "StoreChannelsOperation completed with ")
@@ -102,7 +102,7 @@ open class DeleteChannelsOperation: AsyncOperation {
     }
     
     open override func main() {
-        database.write({
+        database.performWriteTask({
             let ids = self.channelIds
             let request = NSFetchRequest<NSFetchRequestResult>(entityName: ChannelDTO.entityName)
             request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)

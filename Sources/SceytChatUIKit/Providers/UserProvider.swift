@@ -69,7 +69,7 @@ open class UserProvider: Provider {
         updateChannelsForUsers: Bool = true,
         completion: ((Error?) -> Void)? = nil
     ) {
-        database.write {
+        database.performWriteTask {
             for user in users {
                 var isUpdated = false
                 if updateChannelsForUsers {
@@ -88,6 +88,5 @@ open class UserProvider: Provider {
             completion?(error)
 
         }
-
     }
 }

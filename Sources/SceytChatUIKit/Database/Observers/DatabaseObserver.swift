@@ -181,7 +181,7 @@ open class DatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetchedResu
             guard let indexPath = indexPath, let newIndexPath = newIndexPath else { return }
             changeItems.append(.move(item, indexPath, newIndexPath))
         @unknown default:
-            fatalError()
+            return
         }
         onChange?(changeItems.last!)
     }

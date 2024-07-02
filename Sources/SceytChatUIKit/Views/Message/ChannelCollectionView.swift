@@ -10,6 +10,8 @@ import UIKit
 
 open class ChannelCollectionView: CollectionView {
     
+    private var canReloadDataIndex = 0
+    
     public required init() {
         super.init(
             frame: UIScreen.main.bounds,
@@ -54,6 +56,11 @@ open class ChannelCollectionView: CollectionView {
         return insetBounds
     }
     
+    open var visibleAttributes: [UICollectionViewLayoutAttributes] {
+        let visibleLayoutAttributes = layout.layoutAttributesForElements(in: visibleContentRect) ?? []
+        return visibleLayoutAttributes
+    }
+    
     open var lastVisibleAttributes: UICollectionViewLayoutAttributes? {
         let visibleLayoutAttributes = layout.layoutAttributesForElements(in: visibleContentRect) ?? []
         return visibleLayoutAttributes.max(by: { $0.indexPath < $1.indexPath })
@@ -63,8 +70,24 @@ open class ChannelCollectionView: CollectionView {
         lastVisibleAttributes?.indexPath
     }
 
-    open override func reloadData() {
-        super.reloadData()
+    open func reloadDataIfNeeded() {
+        canReloadDataIndex -= 1
+        if canReloadDataIndex < 0 {
+            canReloadDataIndex = 0
+            super.reloadData()
+        }
+    }
+    
+    open func performUpdates(_ updates: (() -> Void), completion: ((Bool) -> Void)? = nil) {
+        canReloadDataIndex += 1
+        performBatchUpdates {
+            updates()
+        } completion: { [weak self] in
+            if let self {
+                canReloadDataIndex -= 1
+            }
+            completion?($0)
+        }
     }
     
     open func reloadDataAndKeepOffset() {
@@ -77,30 +100,38 @@ open class ChannelCollectionView: CollectionView {
         let afterContentSize = safeContentSize
         
         let newOffset = CGPoint(
-            x: contentOffset.x + (afterContentSize.width - beforeContentSize.width),
-            y: contentOffset.y + (afterContentSize.height - beforeContentSize.height))
+            x: max(0, contentOffset.x + (afterContentSize.width - beforeContentSize.width)),
+            y: max(0, contentOffset.y + (afterContentSize.height - beforeContentSize.height))
+        )
         setContentOffset(newOffset, animated: false)
     }
     
-    open func reloadDataAndScrollToBottom() {
+    open func reloadDataAndScrollToBottom(animated: Bool = false) {
         setContentOffset(contentOffset, animated: false)
         reloadData()
         layoutIfNeeded()
-        scrollToBottom(animated: false)
+        scrollToBottom(animated: animated)
     }
     
-    open func reloadDataAndScrollTo(indexPath: IndexPath) {
-        // stop scrolling
-        setContentOffset(contentOffset, animated: false)
-        reloadData()
-        layoutIfNeeded()
-        if collectionViewLayout.layoutAttributesForItem(at: indexPath) != nil {
-            scrollToItem(at: indexPath, pos: .top, animated: false)
+    open func reloadDataAndScrollTo(
+        indexPath: IndexPath,
+        pos: UICollectionView.ScrollPosition = .top,
+        animated: Bool = false
+    ) {
+        reloadDataAndKeepOffset()
+        if contains(indexPath: indexPath) {
+            scrollToItem(at: indexPath, pos: pos, animated: animated)
         }
     }
     
     open func scrollToItem(at indexPath: IndexPath, pos: UICollectionView.ScrollPosition = .top, animated: Bool = true) {
-        scrollToItem(at: indexPath, at: pos, animated: animated)
+        if contains(indexPath: indexPath) {
+            scrollToItem(at: indexPath, at: pos, animated: animated)
+        } else {
+            #if DEBUG
+//            fatalError("scrollToItem at: \(indexPath) out-of-bounds")
+            #endif
+        }
     }
     
     open func scrollToBottom(animated: Bool, animationDuration: TimeInterval = 0.2, completion: ((Bool) -> Void)? = nil) {
@@ -113,12 +144,15 @@ open class ChannelCollectionView: CollectionView {
             UIView.animate(
                 withDuration: animationDuration
             ){
-                self.contentOffset = CGPoint(x: 0, y: offsetY)
+                super.contentOffset = CGPoint(x: 0, y: offsetY)
+//                super.setContentOffset(CGPoint(x: 0, y: offsetY), animated: false)
             } completion: {
                 completion?($0)
             }
+//            super.setContentOffset(CGPoint(x: 0, y: offsetY), animated: true)
+//            completion?(true)
         } else {
-            self.contentOffset = CGPoint(x: 0, y: offsetY)
+            super.setContentOffset(CGPoint(x: 0, y: offsetY), animated: false)
             completion?(true)
         }
     }
@@ -160,6 +194,14 @@ open class ChannelCollectionView: CollectionView {
             }
         }
         return nil
+    }
+    
+    func contains(indexPath: IndexPath) -> Bool {
+        if indexPath.section < numberOfSections,
+           indexPath.item < numberOfItems(inSection: indexPath.section) {
+            return true
+        }
+        return false
     }
 }
 

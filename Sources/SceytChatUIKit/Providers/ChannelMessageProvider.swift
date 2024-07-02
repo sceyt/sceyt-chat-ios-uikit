@@ -69,6 +69,8 @@ open class ChannelMessageProvider: Provider {
                 )
                 self.sendReceivedMarker(messages: messages)
             }
+        } else {
+            completion?(SceytChatError.queryInProgress)
         }
     }
     
@@ -97,10 +99,13 @@ open class ChannelMessageProvider: Provider {
                     }
                     self.store(
                         messages: messages,
+                        triggerMessage: messageId,
                         completion: completion
                     )
                     self.sendReceivedMarker(messages: messages)
                 }
+            } else {
+                completion?(SceytChatError.queryInProgress)
             }
         }
     
@@ -131,6 +136,8 @@ open class ChannelMessageProvider: Provider {
                 )
                 self.sendReceivedMarker(messages: messages)
             }
+        } else {
+            completion?(SceytChatError.queryInProgress)
         }
     }
     
@@ -159,10 +166,13 @@ open class ChannelMessageProvider: Provider {
                     }
                     self.store(
                         messages: messages,
+                        triggerMessage: messageId,
                         completion: completion
                     )
                     self.sendReceivedMarker(messages: messages)
                 }
+            } else {
+                completion?(SceytChatError.queryInProgress)
             }
         }
     
@@ -198,6 +208,7 @@ open class ChannelMessageProvider: Provider {
     
     open func store(
         messages: [Message],
+        triggerMessage: MessageId? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
         database.write ({
@@ -207,6 +218,20 @@ open class ChannelMessageProvider: Provider {
             )
         }) { error in
             completion?(error)
+        }
+        
+        guard let startMessageId = messages.min(by: { $0.id < $1.id})?.id,
+              let endMessageId = messages.max(by: { $0.id < $1.id})?.id
+        else { return }
+        
+        database.performWriteTask {
+            $0.updateRanges(
+                startMessageId: startMessageId,
+                endMessageId: endMessageId,
+                triggerMessage: triggerMessage,
+                channelId: self.channelId)
+        } completion: { _ in
+            
         }
     }
     
@@ -523,6 +548,34 @@ extension ChannelMessageProvider {
             completion(try? result.get())
         }
     }
+
+    public class func updateFromDatabase(
+        messages: [Message],
+        sortDescriptors: [NSSortDescriptor] = [],
+        completion: @escaping ([ChatMessage]?) -> Void) {
+
+            database.write(resultQueue: .global()) { context in
+                var chatMessages = NSMutableArray()
+                for message in messages {
+                    if let m = MessageDTO.fetch(id: message.id, context: context) {
+                        chatMessages.add(m)
+                    } else {
+                        let dto = context.createOrUpdate(message: message, channelId: message.channelId)
+                        dto.unlisted = true
+                        chatMessages.add(dto)
+                    }
+                }
+                if !sortDescriptors.isEmpty {
+                    chatMessages.sort(using: sortDescriptors)
+                }
+                let converted = chatMessages.compactMap { ChatMessage(dto: $0 as! MessageDTO)}
+                DispatchQueue.main.async {
+                    completion(converted)
+                }
+            } completion: { error in
+                completion(nil)
+            }
+        }
 }
 
 private extension ChannelMessageProvider {
