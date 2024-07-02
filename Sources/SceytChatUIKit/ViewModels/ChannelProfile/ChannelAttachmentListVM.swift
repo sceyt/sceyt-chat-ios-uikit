@@ -96,7 +96,7 @@ open class ChannelAttachmentListVM: NSObject {
     }()
 
     open func startDatabaseObserver() {
-        attachmentObserver.onDidChange = { [weak self] paths, _ in
+        attachmentObserver.onDidChange = { [weak self] _, paths, _ in
             self?.onDidChangeEvent(items: paths)
         }
         do {

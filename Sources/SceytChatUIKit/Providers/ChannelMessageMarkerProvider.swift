@@ -13,6 +13,7 @@ open class ChannelMessageMarkerProvider: Provider {
 
     public let channelId: ChannelId
     public let channelOperator: ChannelOperator
+    private let markQueue = DispatchQueue(label: "com.sceyt.mark.message", qos: .userInitiated)
     
     public static var canMarkMessage: Bool = true {
         didSet {
@@ -36,10 +37,10 @@ open class ChannelMessageMarkerProvider: Provider {
         storeBeforeSend: Bool = true,
         completion: ((Error?) -> Void)? = nil
     ) {
-        database.read {
+        database.performBgTask(resultQueue: markQueue) {
             let messageIds: [MessageId] = MessageDTO.fetch(predicate: .init(format: "channelId == %lld AND id => %lld AND id <= %lld AND incoming = YES", self.channelId, toId, fromId, markerName), context: $0)
                 .compactMap {
-                    return $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == markerName} ) == true ? nil : MessageId($0.id)
+                    return $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == markerName } ) == true ? nil : MessageId($0.id)
                 }
             return messageIds
         } completion: { result in
@@ -93,15 +94,15 @@ open class ChannelMessageMarkerProvider: Provider {
             if let error {
                 if error.sceytChatCode == .notAllowed ||
                     error.sceytChatCode == .markMessageNotfoundMessagesWithIds {
-                    self.database.write {
+                    self.database.performWriteTask {
                         $0.delete(messagePendingMarkers: ids, markerName: markerName)
                     }
                 }
                 completion?(error)
             } else if let markerList {
-                logger.debug("[MARKER CK] receive \(markerList.messageIds.count)")
+                logger.debug("[MARKER CHECK] receive \(markerList.messageIds.count)")
                 logger.debug("[MARKER CHECK] received mark: \(markerList.name) for \(markerList.messageIds) in channelId:\(markerList.channelId)")
-                self.database.write ({
+                self.database.performWriteTask ({
                     $0.update(messageSelfMarkers: markerList)
                 }, completion: completion)
             }
@@ -159,7 +160,7 @@ extension ChannelMessageMarkerProvider {
             completion?(nil)
             return
         }
-        database.write {
+        database.performWriteTask {
             $0.createOrUpdate(markers: markers, messageId: messageId)
             
         } completion: { error in

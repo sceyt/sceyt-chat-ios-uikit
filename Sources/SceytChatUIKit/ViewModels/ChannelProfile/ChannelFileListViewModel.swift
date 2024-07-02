@@ -33,21 +33,6 @@ open class ChannelFileListViewModel: NSObject {
             .build()
     }()
 
-    open func loadFiles(_ completion: @escaping ([Item]) -> Void) {
-        if !fileListQuery.hasNext || fileListQuery.loading {
-            completion([])
-            return
-        }
-        fileListQuery.loadNext {[weak self] (_, messages, _) in
-            if let messages = messages {
-                let items = self?.filter(messages: messages) ?? []
-                completion(items)
-            } else {
-                completion([])
-            }
-        }
-    }
-
     open func filter(messages: [Message]) -> [Item] {
         var files: [Item] = []
         messages.reversed().forEach { message in

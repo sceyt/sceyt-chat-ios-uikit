@@ -66,7 +66,9 @@ public extension UICollectionView {
             withReuseIdentifier: cellType.reuseId,
             for: indexPath)
                 as? T
-        else { fatalError("Failed to dequeue cell \(cellType.self) \(cellType.reuseId)") }
+        else {
+            fatalError("Failed to dequeue cell \(cellType.self) \(cellType.reuseId)")
+        }
         return cell
     }
 
@@ -80,7 +82,9 @@ public extension UICollectionView {
             withReuseIdentifier: cellType.reuseId,
             for: indexPath
         ) as? T
-        else { fatalError("Failed to dequeue cell \(cellType.self) \(cellType.reuseId)") }
+        else {
+            fatalError("Failed to dequeue cell \(cellType.self) \(cellType.reuseId)")
+        }
         return cell
     }
 
