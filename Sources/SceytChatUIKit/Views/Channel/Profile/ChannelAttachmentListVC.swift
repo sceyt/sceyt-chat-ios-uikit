@@ -15,7 +15,7 @@ open class ChannelAttachmentListView: CollectionView, UIScrollViewDelegate, UIGe
     }
     open lazy var noItemsView = NoItemsView()
     open var shouldReceiveTouch: (() -> Bool)?
-    lazy var scrollingDecelerator = ScrollingDecelerator(scrollView: self)
+    public lazy var scrollingDecelerator = ScrollingDecelerator(scrollView: self)
         
     open func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         shouldReceiveTouch?() ?? true

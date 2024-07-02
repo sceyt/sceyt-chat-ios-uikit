@@ -109,7 +109,7 @@ open class SegmentedControlView: View,
         selectedIndex = currentPage
     }
 
-    weak var parentScrollView: UIScrollView?
+    public weak var parentScrollView: UIScrollView?
     open func scrollViewDidScroll(_ scrollView: UIScrollView) {
         scrollView.contentOffset.y = 0
 
@@ -157,6 +157,11 @@ public extension SegmentedControlView {
     struct SectionItem {
         public let content: UIView
         public let title: String
+        
+        public init(content: UIView, title: String) {
+            self.content = content
+            self.title = title
+        }
     }
 }
 
