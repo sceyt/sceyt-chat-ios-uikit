@@ -42,7 +42,7 @@ open class ChannelProfileVideoAttachmentCell: ChannelProfileAttachmentCell {
         timeLabel.textLabel.textColor = appearance.videoTimeTextColor
     }
     
-    open override var data: MessageLayoutModel.AttachmentLayout! {
+    open override var data: MessageLayoutModel.AttachmentLayout? {
         didSet {
             guard let data
             else { return }

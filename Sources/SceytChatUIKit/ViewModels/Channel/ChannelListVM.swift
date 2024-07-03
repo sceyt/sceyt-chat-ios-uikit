@@ -71,17 +71,13 @@ open class ChannelListVM: NSObject,
     }
     
     open func startDatabaseObserver() {
-        channelObserver.onDidChange = { [weak self] items, events in
+        channelObserver.onDidChange = { [weak self] _, items, _ in
             self?.onDidChangeEvent(items: items)
         }
-        do {
-            try channelObserver.startObserver()
-        } catch {
-            logger.errorIfNotNil(error, "startDatabaseObserver")
-        }
+        channelObserver.startObserver()
     }
     open func onDidChangeEvent(items: Paths) {
-        if SyncService.isSyncing {
+        if SyncService.isSyncing || items.numberOfChangedItems > 2 {
             event = .reload
         } else {
             event = .change(items)
@@ -175,7 +171,7 @@ open class ChannelListVM: NSObject,
                 self.event = .reloadSearch
             }
         } errorBlock: { error in
-            logger.error("[search] error \(error)")
+            logger.error(" error \(error)")
         }
     }
     
@@ -334,5 +330,21 @@ public extension ChannelListVM {
         case typing(Bool, ChatChannelMember, ChatChannel)
         case connection(ConnectionState)
         case showChannel(ChatChannel)
+    }
+}
+
+
+extension ChannelListVM {
+    
+    func deleteDataBase(completion: (() -> Void)? = nil) {
+        channelObserver.stopObserver()
+        layoutModels.removeAll(keepingCapacity: true)
+        Components.storage.deleteAll()
+        Provider.database.deleteAll { [weak self] in
+            guard let self else { return }
+            channelObserver.startObserver()
+            completion?()
+            SyncService.syncChannels()
+        }
     }
 }

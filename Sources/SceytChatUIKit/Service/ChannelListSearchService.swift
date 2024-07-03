@@ -60,10 +60,7 @@ open class ChannelListSearchService {
                 provider.loadChannels(query: channelListQuery) { [weak self] error in
                     guard let self,
                           error == nil
-                    else {
-                        logger.debug("[search] loadChannels \(error!)")
-                        return
-                    }
+                    else { return }
                     Task(priority: .userInitiated) {
                         if let channels = try? await self.searchChannels(query: query) {
                             globalBlock(channels)

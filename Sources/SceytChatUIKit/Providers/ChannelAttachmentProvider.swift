@@ -202,7 +202,7 @@ open class ChannelAttachmentProvider: Provider {
         channelOperator.getMessages(
             ids: messageIds)
         { messages, error in
-            self.database.write ({
+            self.database.performWriteTask ({
                 if let users {
                     $0.createOrUpdate(users: users)
                 }

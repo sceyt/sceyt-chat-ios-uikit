@@ -45,6 +45,11 @@ open class ChannelListVC: ViewController,
                                                   target: self,
                                                   action: #selector(newChannelAction(_:)))
         
+//        navigationItem.leftBarButtonItem = .init(
+//            image: ImageBuilder.build(fillColor: .clear, size: .init(width: 36, height: 36)),
+//            style: .plain,
+//            target: self, 
+//            action: #selector(leftButtonAction(_:event:)))
         tableView.delegate = self
         tableView.dataSource = self
                 
@@ -125,6 +130,21 @@ open class ChannelListVC: ViewController,
     @objc
     func newChannelAction(_ sender: UIBarItem) {
         channelListRouter.showNewChannel()
+    }
+    
+    @objc
+    private func leftButtonAction(_ sender: UIBarItem, event: UIEvent) {
+        guard let touch = event.allTouches?.first
+        else { return }
+        guard touch.tapCount == 5
+        else { return }
+        sender.isEnabled = false
+        channelListViewModel.deleteDataBase { [weak self] in
+            DispatchQueue.main.async {
+                self?.tableView.reloadData()
+                sender.isEnabled = true
+            }
+        }
     }
     
     // MARK: ViewModel Event
