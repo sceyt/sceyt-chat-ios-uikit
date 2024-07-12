@@ -252,7 +252,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         
         recordButton.pin(to: sendButton)
         
-        updateMediaButtonAppearance(isHidden: shouldHideMediaButton)
+        updateMediaButtonAppearance(isHidden: shouldHideMediaButton, animated: false)
         inputTextView.trailingAnchor.pin(to: sendButton.leadingAnchor)
         inputTextView.trailingAnchor.pin(to: recordButton.leadingAnchor)
         inputTextView.topAnchor.pin(to: mediaView.bottomAnchor, constant: 8).priority(.defaultLow)
@@ -278,19 +278,30 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         }
     }
     
-    open func updateMediaButtonAppearance(isHidden: Bool) {
-        addMediaButton.alpha = isHidden ? 0 : 1
-        
-        if let inputTextViewLeadingConstraint {
-            view.removeConstraint(inputTextViewLeadingConstraint)
+    open func updateMediaButtonAppearance(isHidden: Bool, animated: Bool = true) {
+        let changes = { [unowned self] in
+            addMediaButton.alpha = isHidden ? 0 : 1
+            
+            if let inputTextViewLeadingConstraint {
+                view.removeConstraint(inputTextViewLeadingConstraint)
+            }
+            
+            if isHidden {
+                inputTextViewLeadingConstraint = inputTextView.leadingAnchor.pin(to: view.leadingAnchor, constant: 8)
+            } else {
+                inputTextViewLeadingConstraint = inputTextView.leadingAnchor.pin(to: addMediaButton.trailingAnchor)
+            }
+            
+            view.layoutIfNeeded()
         }
-        if isHidden {
-            inputTextViewLeadingConstraint = inputTextView.leadingAnchor.pin(to: view.leadingAnchor, constant: 8)
+        
+        if animated {
+            UIView.animate(withDuration: 0.3, animations: changes)
         } else {
-            inputTextViewLeadingConstraint = inputTextView.leadingAnchor.pin(to: addMediaButton.trailingAnchor)
+            changes()
         }
     }
-    
+
     open func update(height: CGFloat) {
         guard view.bounds.height > 0, inputTextView.bounds.height > 0
         else { return }
