@@ -133,7 +133,7 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    private var longPressItem: MessageCell.LongPressItem?
+    public var longPressItem: MessageCell.LongPressItem?
     private var unreadMessageIndexPath: IndexPath?
     
     private var isCollectionViewUpdating = false
@@ -937,7 +937,7 @@ open class ChannelVC: ViewController,
     }
     
     @objc
-    public func handleLongPressGestureRecognizer(_ sender: UILongPressGestureRecognizer) {
+    open func handleLongPressGestureRecognizer(_ sender: UILongPressGestureRecognizer) {
         guard !channelViewModel.isEditing, !composerVC.isRecording
         else { return }
         

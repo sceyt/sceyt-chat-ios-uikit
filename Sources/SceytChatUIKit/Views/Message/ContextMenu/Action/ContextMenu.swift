@@ -151,7 +151,7 @@ public extension ContextMenu {
         case center
         case trailing
         
-        var reversed: HorizontalAlignment {
+        public var reversed: HorizontalAlignment {
             switch self {
             case .leading:
                 return .trailing
