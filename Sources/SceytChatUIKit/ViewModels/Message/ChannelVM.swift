@@ -117,7 +117,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     private var lastLoadNextMessageId: MessageId = 0
     private var lastLoadNearMessageId: MessageId = 0
     private(set) var scrollToMessageIdIfSearching: MessageId = 0
-    private(set) var scrollToRepliedMessageId: MessageId = 0
+    open private(set) var scrollToRepliedMessageId: MessageId = 0
     private(set) var searchDirection: SearchDirection = .none
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
     @Atomic private var markMessagesTaskStarted = false
