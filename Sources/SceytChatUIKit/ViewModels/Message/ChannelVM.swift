@@ -1344,7 +1344,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func deleteMessage(
         layoutModel: MessageLayoutModel,
-        forMeOnly: Bool
+        type: DeleteMessageType
     ) {
         layoutModel.message.attachments?.forEach {
             AttachmentTransfer.default.taskFor(message: layoutModel.message, attachment: $0)?.cancel()
@@ -1352,13 +1352,13 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if layoutModel.message.deliveryStatus == .pending {
             provider.deletePending(message: layoutModel.message.tid)
         } else {
-            messageSender.deleteMessage(id: layoutModel.message.id, forMeOnly: forMeOnly)
+            messageSender.deleteMessage(id: layoutModel.message.id, type: type)
         }
     }
     
-    open func deleteSelectedMessages(forMeOnly: Bool) {
+    open func deleteSelectedMessages(type: DeleteMessageType) {
         selectedMessages.forEach {
-            deleteMessage(layoutModel: $0, forMeOnly: forMeOnly)
+            deleteMessage(layoutModel: $0, type: type)
         }
     }
     

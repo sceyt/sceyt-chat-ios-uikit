@@ -199,7 +199,7 @@ open class ChannelMessageSender: Provider {
                     self.channelOperator.editMessage(sendableMessage, completion: callback(sentMessage:error:))
                 case .deleted:
                      logger.info("Redeleting message with tid \(chatMessage.tid)")
-                    self.channelOperator.deleteMessage(sendableMessage, forMe: true, completion: callback(sentMessage:error:))
+                    self.channelOperator.deleteMessage(sendableMessage, type: .deleteForMe, completion: callback(sentMessage:error:))
                 }
             }
         }
@@ -279,7 +279,7 @@ open class ChannelMessageSender: Provider {
     
     open func deleteMessage(
         id: MessageId,
-        forMeOnly: Bool = false,
+        type: DeleteMessageType = .deleteForMe,
         completion: ((Error?) -> Void)? = nil
     ) {
         guard let id = willDelete(id)
@@ -289,7 +289,7 @@ open class ChannelMessageSender: Provider {
         }
         channelOperator
             .deleteMessage(id: id,
-                           forMe: forMeOnly
+                           type: type
             ) {message, error in
                 self.didDelete(message?.id, error: error)
                 guard let message = message

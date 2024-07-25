@@ -127,7 +127,7 @@ open class ChannelRouter: Router<ChannelVC> {
                     }
                 }
             } else {
-                self.rootVC.channelViewModel.deleteSelectedMessages(forMeOnly: false)
+                self.rootVC.channelViewModel.deleteSelectedMessages(type: SCTUIKitConfig.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
             }
             
             self.rootVC.channelViewModel.isEditing = false
@@ -145,7 +145,7 @@ open class ChannelRouter: Router<ChannelVC> {
                     }
                 }
             } else {
-                self.rootVC.channelViewModel.deleteSelectedMessages(forMeOnly: true)
+                self.rootVC.channelViewModel.deleteSelectedMessages(type: .deleteForMe)
             }
             
             self.rootVC.channelViewModel.isEditing = false
