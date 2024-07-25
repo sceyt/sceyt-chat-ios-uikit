@@ -298,10 +298,16 @@ open class ChannelMessageSender: Provider {
                     return
                 }
                 self.database.write ({
-                    $0.createOrUpdate(
-                        message: message,
-                        channelId: self.channelId
-                    )
+                    switch type {
+                    case .deleteHard:
+                        $0.deleteMessage(id: message.id)
+                    default:
+                        $0.createOrUpdate(
+                            message: message,
+                            channelId: self.channelId
+                        )
+                    }
+                    
                 }, completion: completion)
             }
     }
