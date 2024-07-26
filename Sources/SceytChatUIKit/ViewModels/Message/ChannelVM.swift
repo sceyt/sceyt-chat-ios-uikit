@@ -117,7 +117,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     private var lastLoadNextMessageId: MessageId = 0
     private var lastLoadNearMessageId: MessageId = 0
     private(set) var scrollToMessageIdIfSearching: MessageId = 0
-    private(set) var scrollToRepliedMessageId: MessageId = 0
+    open private(set) var scrollToRepliedMessageId: MessageId = 0
     private(set) var searchDirection: SearchDirection = .none
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
     @Atomic private var markMessagesTaskStarted = false
@@ -1344,7 +1344,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func deleteMessage(
         layoutModel: MessageLayoutModel,
-        forMeOnly: Bool
+        type: DeleteMessageType
     ) {
         layoutModel.message.attachments?.forEach {
             AttachmentTransfer.default.taskFor(message: layoutModel.message, attachment: $0)?.cancel()
@@ -1352,13 +1352,13 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         if layoutModel.message.deliveryStatus == .pending {
             provider.deletePending(message: layoutModel.message.tid)
         } else {
-            messageSender.deleteMessage(id: layoutModel.message.id, forMeOnly: forMeOnly)
+            messageSender.deleteMessage(id: layoutModel.message.id, type: type)
         }
     }
     
-    open func deleteSelectedMessages(forMeOnly: Bool) {
+    open func deleteSelectedMessages(type: DeleteMessageType) {
         selectedMessages.forEach {
-            deleteMessage(layoutModel: $0, forMeOnly: forMeOnly)
+            deleteMessage(layoutModel: $0, type: type)
         }
     }
     
