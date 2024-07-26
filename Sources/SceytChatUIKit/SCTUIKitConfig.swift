@@ -107,6 +107,8 @@ public extension SCTUIKitConfig {
     static var directChannel = "direct"
     
     static var syncChannelsAfterConnect: Bool = true
+    
+    static var shouldHardDeleteMessageForAll: Bool = false
 }
 
 public extension SCTUIKitConfig {

@@ -80,6 +80,12 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         }
     }
     
+    open var shouldHideMediaButton = false {
+        didSet {
+            updateMediaButtonAppearance(isHidden: shouldHideMediaButton)
+        }
+    }
+    
     public var canRunMentionUserLogic = true
     open var mentionUserListVC: (() -> MentioningUserListVC)?
     open weak var presentedMentionUserListVC: MentioningUserListVC?
@@ -98,6 +104,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     private var selectedPhotoAssetIdentifiers = Set<String>()
     public private(set) var lastDetectedLinkMetadata: LinkMetadata?
     private var actionViewHeightLayoutConstraint: NSLayoutConstraint!
+    private var inputTextViewLeadingConstraint: NSLayoutConstraint?
     
     deinit {
         recorderView.stop()
@@ -245,7 +252,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         
         recordButton.pin(to: sendButton)
         
-        inputTextView.leadingAnchor.pin(to: addMediaButton.trailingAnchor)
+        updateMediaButtonAppearance(isHidden: shouldHideMediaButton, animated: false)
         inputTextView.trailingAnchor.pin(to: sendButton.leadingAnchor)
         inputTextView.trailingAnchor.pin(to: recordButton.leadingAnchor)
         inputTextView.topAnchor.pin(to: mediaView.bottomAnchor, constant: 8).priority(.defaultLow)
@@ -258,7 +265,6 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     
     open func updateState() {
         sendButton.isHidden = inputTextView.text.replacingOccurrences(of: "\u{fffc}", with: "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && mediaView.items.isEmpty
-        recordButton.isHidden = !sendButton.isHidden
         style = mediaView.items.count > 0 ? .large : .small
         separatorViewCenter.isHidden = mediaView.items.count == 0
         if sendButton.isHidden {
@@ -272,6 +278,30 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         }
     }
     
+    open func updateMediaButtonAppearance(isHidden: Bool, animated: Bool = true) {
+        let changes = { [unowned self] in
+            addMediaButton.alpha = isHidden ? 0 : 1
+            
+            if let inputTextViewLeadingConstraint {
+                view.removeConstraint(inputTextViewLeadingConstraint)
+            }
+            
+            if isHidden {
+                inputTextViewLeadingConstraint = inputTextView.leadingAnchor.pin(to: view.leadingAnchor, constant: 8)
+            } else {
+                inputTextViewLeadingConstraint = inputTextView.leadingAnchor.pin(to: addMediaButton.trailingAnchor)
+            }
+            
+            view.layoutIfNeeded()
+        }
+        
+        if animated {
+            UIView.animate(withDuration: 0.3, animations: changes)
+        } else {
+            changes()
+        }
+    }
+
     open func update(height: CGFloat) {
         guard view.bounds.height > 0, inputTextView.bounds.height > 0
         else { return }
@@ -586,7 +616,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             lastDetectedLinkMetadata === model.linkPreviews?.first?.metadata {
             lastDetectedLinkMetadata = nil
         }
-        addMediaButton.isHidden = false
+        updateMediaButtonAppearance(isHidden: shouldHideMediaButton)
         selectedPhotoAssetIdentifiers.removeAll()
         action = .send(true)
         currentState = nil
@@ -773,7 +803,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         actionView.iconView.image = .composerEditMessage
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
-        addMediaButton.isHidden = true
+        updateMediaButtonAppearance(isHidden: true)
         actionView.playView.isHidden = !showPlayIcon
 
         actionViewHeightLayoutConstraint.constant = Layouts.actionViewHeight
@@ -850,7 +880,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         guard !actionView.isHidden, !isRemovingActionView else { return }
         lastDetectedLinkMetadata = nil
         isRemovingActionView = true
-        addMediaButton.isHidden = false
+        updateMediaButtonAppearance(isHidden: shouldHideMediaButton)
         selectedPhotoAssetIdentifiers.removeAll()
         guard !actionView.isHidden else { return }
         actionViewHeightLayoutConstraint.constant = 0

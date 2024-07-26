@@ -957,7 +957,7 @@ public extension MessageLayoutModel {
         case link(NSRange, URL?)
         case mention(NSRange, String)
         
-        var range: NSRange {
+        public var range: NSRange {
             switch self {
             case let .link(range, _),
                 let .mention(range, _):

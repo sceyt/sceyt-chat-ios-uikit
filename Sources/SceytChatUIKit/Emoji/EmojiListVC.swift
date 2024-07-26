@@ -169,7 +169,7 @@ open class EmojiViewPresentationController: UIPresentationController, UIGestureR
         return t
     }()
 
-    open private(set) var state: EmojiListVC.State = .small
+    open var state: EmojiListVC.State = .small
     open private(set) var direction: CGFloat = 0
     open private(set) var shouldComplete: Bool = false
     open lazy var topAnchor: CGFloat = presentedView?.window?.windowScene?.statusBarManager?.statusBarFrame.height ?? 64

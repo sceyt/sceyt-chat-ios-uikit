@@ -133,7 +133,7 @@ open class ChannelVC: ViewController,
             }
         }
     }
-    private var longPressItem: MessageCell.LongPressItem?
+    public var longPressItem: MessageCell.LongPressItem?
     private var unreadMessageIndexPath: IndexPath?
     
     private var isCollectionViewUpdating = false
@@ -937,7 +937,7 @@ open class ChannelVC: ViewController,
     }
     
     @objc
-    public func handleLongPressGestureRecognizer(_ sender: UILongPressGestureRecognizer) {
+    open func handleLongPressGestureRecognizer(_ sender: UILongPressGestureRecognizer) {
         guard !channelViewModel.isEditing, !composerVC.isRecording
         else { return }
         
@@ -1641,11 +1641,11 @@ open class ChannelVC: ViewController,
     
     open func delete(
         layoutModel: MessageLayoutModel,
-        forMeOnly: Bool = false
+        type: DeleteMessageType = SCTUIKitConfig.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone
     ) {
         channelViewModel.deleteMessage(
             layoutModel: layoutModel,
-            forMeOnly: forMeOnly
+            type: type
         )
     }
     
@@ -2310,7 +2310,7 @@ open class ChannelVC: ViewController,
                                 action: { [weak self] _ in
 //                                    self?.router.showConfirmationAlertForDeleteMessage {
 //                                        if $0 {
-                                            self?.delete(layoutModel: model, forMeOnly: false)
+                                    self?.delete(layoutModel: model, type: SCTUIKitConfig.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
 //                                        }
 //                                    }
                                 }
@@ -2323,7 +2323,7 @@ open class ChannelVC: ViewController,
                                     action: { [weak self] _ in
 //                                        self?.router.showConfirmationAlertForDeleteMessage {
 //                                            if $0 {
-                                                self?.delete(layoutModel: model, forMeOnly: true)
+                                        self?.delete(layoutModel: model, type: .deleteForMe)
 //                                            }
 //                                        }
                                     }
