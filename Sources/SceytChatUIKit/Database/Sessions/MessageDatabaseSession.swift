@@ -486,7 +486,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(bodyAttributes: [Message.BodyAttribute]?, dto: MessageDTO) -> MessageDTO {
-        guard let bodyAttributes, !bodyAttributes.isEmpty else { return dto }
+        guard let bodyAttributes, !bodyAttributes.isEmpty else {
+            dto.bodyAttributes = []
+            return dto
+        }
         if dto.bodyAttributes == nil {
             dto.bodyAttributes = .init()
         }

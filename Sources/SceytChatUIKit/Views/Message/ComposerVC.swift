@@ -358,7 +358,17 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         else { return false }
         let ms = mentionTextRange(attributedText: attributedText, at: range.upperBound)
         guard ms.exist, ms.id != nil, let replacingRange = ms.idRange
-        else { return false }
+        else {
+            let ms = mentionTextRange(attributedText: attributedText, at: range.upperBound + 1)
+            if ms.exist, ms.id != nil {
+                let mutableAttributed = NSMutableAttributedString(attributedString: attributedText)
+                mutableAttributed.safeReplaceCharacters(in: .init(location: range.upperBound, length: 0), with: " ")
+                let selectedRange = inputTextView.selectedRange
+                inputTextView.attributedText = mutableAttributed
+                inputTextView.selectedRange = selectedRange
+            }
+            return false
+        }
         let mutableAttributed = NSMutableAttributedString(attributedString: attributedText)
         mutableAttributed.safeReplaceCharacters(in: replacingRange, with: "")
         inputTextView.attributedText = mutableAttributed
