@@ -98,7 +98,7 @@ open class CreatePrivateChannelProfileView: View {
         subjectField.attributedPlaceholder = NSAttributedString(
             string: L10n.Channel.Subject.Group.placeholder,
             attributes: [.font: appearance.fieldFont ?? Fonts.regular.withSize(16),
-                         .foregroundColor: appearance.fieldPlaceHolderTextColor ?? Colors.textGray]
+                         .foregroundColor: appearance.fieldPlaceHolderTextColor ?? UIColor.secondaryText]
         )
         
         descriptionField.backgroundColor = .clear

@@ -271,12 +271,12 @@ open class ChannelCell: TableViewCell {
         if data.channel.isGroup {
             message.append(NSAttributedString(
                 string: "\(Components.typingView.display(typer: Formatters.userDisplayName.format(member), split: .firstWord)): ",
-                attributes: [.font: appearance.senderLabelFont ?? Fonts.regular.withSize(15), .foregroundColor: appearance.senderLabelTextColor ?? .textBlack]
+                attributes: [.font: appearance.senderLabelFont ?? Fonts.regular.withSize(15), .foregroundColor: appearance.senderLabelTextColor ?? .primaryText]
             ))
         }
         message.append(NSAttributedString(
             string: "\(L10n.Channel.Member.typing)...",
-            attributes: [.font: appearance.typingFont ?? Fonts.regular.with(traits: .traitItalic).withSize(15), .foregroundColor: appearance.typingTextColor ?? .textGray]
+            attributes: [.font: appearance.typingFont ?? Fonts.regular.with(traits: .traitItalic).withSize(15), .foregroundColor: appearance.typingTextColor ?? .secondaryText]
         ))
         update(messageText: message)
         messageLabel.setNeedsLayout()

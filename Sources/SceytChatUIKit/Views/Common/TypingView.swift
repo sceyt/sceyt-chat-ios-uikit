@@ -61,7 +61,7 @@ open class TypingView: View {
         super.setupAppearance()
         label.lineBreakMode = .byCharWrapping
         label.font = Fonts.regular.withSize(13)
-        label.textColor = .textGray
+        label.textColor = .secondaryText
     }
 
     open override var isHidden: Bool {
@@ -154,9 +154,9 @@ extension TypingView {
             isOpaque = false
         }
 
-        open lazy var colors = [UIColor.textGray.withAlphaComponent(1).cgColor,
-                                UIColor.textGray.withAlphaComponent(0.7).cgColor,
-                                UIColor.textGray.withAlphaComponent(0.5).cgColor]
+        open lazy var colors = [UIColor.secondaryText.withAlphaComponent(1).cgColor,
+                                UIColor.secondaryText.withAlphaComponent(0.7).cgColor,
+                                UIColor.secondaryText.withAlphaComponent(0.5).cgColor]
 
         open var ellipseSize: CGFloat = 4 {
             didSet { setNeedsDisplay() }

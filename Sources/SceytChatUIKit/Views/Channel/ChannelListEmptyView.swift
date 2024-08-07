@@ -53,13 +53,13 @@ open class ChannelListEmptyView: View {
         imageView.image = .emptyChannelList
         
         titleLabel.text = L10n.Channel.Empty.title
-        titleLabel.textColor = .textBlack
+        titleLabel.textColor = .primaryText
         titleLabel.font = Fonts.bold.withSize(17)
         
         descriptionLabel.numberOfLines = 0
         descriptionLabel.textAlignment = .center
         descriptionLabel.text = L10n.Channel.Empty.description
-        descriptionLabel.textColor = .textGray
+        descriptionLabel.textColor = .secondaryText
         descriptionLabel.font = Fonts.regular.withSize(16)
         createButton.isHidden = true
         createButton.setTitleColor(.blue, for: .normal)

@@ -584,11 +584,11 @@ open class MessageLayoutModel {
     ) -> AttributedView {
         
         let deletedStateFont = appearance.deletedMessageFont ?? Fonts.regular.with(traits: .traitItalic).withSize(16)
-        let deletedStateColor = appearance.deletedMessageColor ?? Colors.textGray
+        let deletedStateColor = appearance.deletedMessageColor ?? UIColor.secondaryText
         let bodyFont = appearance.messageFont ?? Fonts.regular.withSize(16)
-        let bodyColor = appearance.messageColor ?? Colors.textBlack
-        let linkColor = appearance.linkColor ?? Colors.kitBlue
-        let mentionColor = appearance.mentionUserColor ?? Colors.kitBlue
+        let bodyColor = appearance.messageColor ?? UIColor.primaryText
+        let linkColor = appearance.linkColor ?? UIColor.primaryAccent
+        let mentionColor = appearance.mentionUserColor ?? UIColor.primaryAccent
         
         switch message.state {
         case .deleted:
@@ -811,7 +811,7 @@ open class MessageLayoutModel {
                 attributedString: NSAttributedString(string: description,
                                                      attributes:
                                                         [.font: font,
-                                                         .foregroundColor: Self.appearance.linkDescriptionColor ?? Appearance.Colors.textBlack
+                                                         .foregroundColor: Self.appearance.linkDescriptionColor ?? UIColor.primaryText
                                                         ])
             )
             
@@ -825,7 +825,7 @@ open class MessageLayoutModel {
             let font = Self.appearance.linkTitleFont ?? Fonts.semiBold.withSize(14)
             let text = NSMutableAttributedString(
                 attributedString: NSAttributedString(string: title,
-                                                     attributes: [.font: font, .foregroundColor: Self.appearance.linkTitleColor ?? Appearance.Colors.textBlack]))
+                                                     attributes: [.font: font, .foregroundColor: Self.appearance.linkTitleColor ?? UIColor.primaryText]))
             preview.titleSize = Self.textSizeMeasure
                 .calculateSize(of: text,
                                config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 12,

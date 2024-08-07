@@ -78,12 +78,12 @@ open class Alert: View {
         titleLabel.edgeInsets = .init(top: 20, left: 16, bottom: 8, right: 16)
         titleLabel.textAlignment = .center
         titleLabel.font = appearance.titleFont
-        titleLabel.textColor = .textBlack
+        titleLabel.textColor = .primaryText
         messageLabel.numberOfLines = 0
         messageLabel.textAlignment = .center
         messageLabel.edgeInsets = .init(top: 0, left: 16, bottom: 20, right: 16)
         messageLabel.font = appearance.messageFont
-        messageLabel.textColor = .textGray
+        messageLabel.textColor = .secondaryText
         separator.backgroundColor = appearance.separatorColor
         buttonsStackView.axis = actions.count <= 2 ? .horizontal : .vertical
         buttonsStackView.distribution = actions.count <= 2 ? .fillEqually : .fill
@@ -108,7 +108,7 @@ open class Alert: View {
         if action.style == .cancel {
             button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
                 .font: (isPrefered ? appearance.preferedButtonFont : appearance.buttonFont) ?? Fonts.regular.withSize(16),
-                .foregroundColor: appearance.cancelTextColor ?? .kitBlue,
+                .foregroundColor: appearance.cancelTextColor ?? .primaryAccent,
             ]), for: .normal)
         } else {
             if action.style == .destructive {

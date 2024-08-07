@@ -305,7 +305,7 @@ open class ChannelProfileVC: ViewController,
             if action.tag == ActionTag.notifications {
                 cell.selectionStyle = .none
                 let sw = UISwitch()
-                sw.onTintColor = .kitBlue
+                sw.onTintColor = .primaryAccent
                 sw.addTarget(self, action: #selector(muteAction), for: .valueChanged)
                 sw.isOn = !profileViewModel.channel.muted
                 cell.accessoryView = sw

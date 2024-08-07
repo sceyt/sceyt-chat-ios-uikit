@@ -176,7 +176,7 @@ open class ChannelMemberListVC: ViewController,
         let displayName = Formatters.userDisplayName.format(member)
         let normalAttributes: [NSAttributedString.Key: Any] = [
             .font: Fonts.regular.withSize(13),
-            .foregroundColor: UIColor.textGray,
+            .foregroundColor: UIColor.secondaryText,
             .paragraphStyle: {
                 $0.alignment = .center
                 return $0
@@ -184,7 +184,7 @@ open class ChannelMemberListVC: ViewController,
         ]
         let hightlightedAttributes: [NSAttributedString.Key: Any] = [
             .font: Fonts.semiBold.withSize(13),
-            .foregroundColor: UIColor.textGray,
+            .foregroundColor: UIColor.secondaryText,
         ]
         let isBroadcast = memberListViewModel.channel.channelType == .broadcast
         let remove = SheetAction(

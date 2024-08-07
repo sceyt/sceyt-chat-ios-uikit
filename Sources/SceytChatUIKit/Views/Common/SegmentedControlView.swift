@@ -267,15 +267,15 @@ open class NativeSegmentedController: UIControl, SegmentedControler {
         layer.cornerRadius = Layouts.cornerRadius
         layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         layer.masksToBounds = true
-        line.backgroundColor = .kitBlue
+        line.backgroundColor = .primaryAccent
         bottomBorder.backgroundColor = .separator
         segmentedControl.setTitleTextAttributes([
             .font: appearance.font ?? Fonts.semiBold.withSize(16),
-            .foregroundColor: appearance.selectedTextColor ?? .textBlack
+            .foregroundColor: appearance.selectedTextColor ?? .primaryText
         ], for: .selected)
         segmentedControl.setTitleTextAttributes([
             .font: appearance.font ?? Fonts.semiBold.withSize(16),
-            .foregroundColor: appearance.textColor ?? .textGray
+            .foregroundColor: appearance.textColor ?? .secondaryText
         ], for: .normal)
 
         segmentedControl.setBackgroundImage(UIImage(), for: .normal, barMetrics: .default)

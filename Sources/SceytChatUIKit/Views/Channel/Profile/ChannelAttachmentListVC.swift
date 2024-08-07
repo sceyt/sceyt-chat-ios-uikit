@@ -166,7 +166,7 @@ open class NoItemsView: View {
     open override func setupAppearance() {
         backgroundColor = .clear
         noItemsLabel.font = Fonts.regular.withSize(14)
-        noItemsLabel.textColor = Colors.textBlack
+        noItemsLabel.textColor = UIColor.primaryText
         noItemsLabel.textAlignment = .center
         noItemsLabel.contentMode = .top
     }

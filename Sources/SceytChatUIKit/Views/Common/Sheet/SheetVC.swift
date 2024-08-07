@@ -225,7 +225,7 @@ open class SheetVC: ViewController {
         doneButton.setAttributedTitle(NSAttributedString(
             string: L10n.Nav.Bar.done,
             attributes: [
-                .foregroundColor: appearance.doneColor ?? .kitBlue,
+                .foregroundColor: appearance.doneColor ?? .primaryAccent,
                 .font: appearance.doneFont ?? Fonts.semiBold.withSize(16)
             ]), for: [])
     }

@@ -39,7 +39,7 @@ open class CreatePublicChannelProfileView: CreatePrivateChannelProfileView, UITe
         subjectField.attributedPlaceholder = NSAttributedString(
             string: L10n.Channel.Subject.Channel.placeholder,
             attributes: [.font: appearance.fieldFont ?? Fonts.regular.withSize(16),
-                         .foregroundColor: appearance.fieldPlaceHolderTextColor ?? Colors.textGray]
+                         .foregroundColor: appearance.fieldPlaceHolderTextColor ?? UIColor.secondaryText]
         )
         
         uriField.markerLabel.font = appearance.fieldFont
@@ -89,7 +89,7 @@ open class CreatePublicChannelProfileView: CreatePrivateChannelProfileView, UITe
     open func showSuccess(_ success: String) {
         errorLabel.edgeInsets.bottom = 8
         errorLabel.text = success
-        errorLabel.textColor = Colors.success
+        errorLabel.textColor = UIColor.stateSuccess
     }
     
     open func hideError() {

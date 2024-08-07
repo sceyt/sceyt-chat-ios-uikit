@@ -14,25 +14,25 @@ public extension Appearance {
     
     struct Colors {
         
-        public static var kitBlue: UIColor = UIColor(light: 0x5159F6, dark: 0x6B72FF)
-        public static var kitRed: UIColor = UIColor(light: 0xF23F51, dark: 0xF23F51)
-        public static var textBlack: UIColor = UIColor(light: 0x111539, dark: 0xE1E3E6)
-        public static var textGray: UIColor = UIColor(light: 0x707388, dark: 0x969A9F)
+//        public static var kitBlue: UIColor = SceytChatUIKitTheme.primaryAccent //UIColor(light: 0x5159F6, dark: 0x6B72FF)
+//        public static var kitRed: UIColor = SceytChatUIKitTheme.stateError //UIColor(light: 0xF23F51, dark: 0xF23F51)
+//        public static var textBlack: UIColor = SceytChatUIKitTheme.primaryText //UIColor(light: 0x111539, dark: 0xE1E3E6)
+//        public static var textGray: UIColor = SceytChatUIKitTheme.secondaryText// UIColor(light: 0x707388, dark: 0x969A9F)
         public static var textGray2: UIColor = UIColor(light: 0x9B9DA8, dark: 0x76787A)
         public static var textGray3: UIColor = UIColor(light: 0xA0A1B0, dark: 0x969A9F)
         public static var textWhite: UIColor = UIColor(light: 0xffffff, dark: 0x969A9F)
         public static var textRed: UIColor = UIColor(light: 0xED4D60, dark: 0xED4D60)
-        public static var background: UIColor = UIColor(light: 0xFFFFFF, dark: 0x19191b)
+//        public static var background: UIColor = SceytChatUIKitTheme.background //UIColor(light: 0xFFFFFF, dark: 0x19191b)
         public static var background2: UIColor = UIColor(light: 0xF1F2F6, dark: 0x232324)
         public static var background3: UIColor = UIColor(light: 0xFFFFFF, dark: 0x232324)
         public static var background4: UIColor = UIColor(light: 0xF1F2F6, dark: 0x19191B)
-        public static var backgroundTransparent: UIColor = UIColor(light: .init(rgb: 0x111539, alpha: 0.4),
-                                                                   dark: .init(rgb: 0x000000, alpha: 0.5))
+//        public static var backgroundTransparent: UIColor = SceytChatUIKitTheme.overlayBackground40//UIColor(light: .init(rgb: 0x111539, alpha: 0.4),
+//                                                                   dark: .init(rgb: 0x000000, alpha: 0.5))
         
-        public static var success: UIColor = UIColor(light: 0x31C48D, dark: 0x31C48D)
-        public static var info: UIColor = UIColor(light: 0x4BBEFD, dark: 0x4BBEFD)
-        public static var warning: UIColor = UIColor(light: 0xF88E69, dark: 0xF88E69)
-        public static var error: UIColor = UIColor(light: 0xF23F51, dark: 0xF23F51)
+//        public static var success: UIColor = SceytChatUIKitTheme.stateSuccess //UIColor(light: 0x31C48D, dark: 0x31C48D)
+// //        public static var info: UIColor = UIColor(light: 0x4BBEFD, dark: 0x4BBEFD)
+//        public static var warning: UIColor = SceytChatUIKitTheme.stateAttention //UIColor(light: 0xF88E69, dark: 0xF88E69)
+//        public static var error: UIColor = SceytChatUIKitTheme.stateError //  UIColor(light: 0xF23F51, dark: 0xF23F51)
         public static var initialColors: [UIColor] = [ UIColor(rgb: 0x4F6AFF),
                                                        UIColor(rgb: 0xFBB019),
                                                        UIColor(rgb: 0x00CC99),
@@ -52,26 +52,24 @@ public extension Appearance {
     }
 }
 
-extension UIColor {
+public extension UIColor {
     private typealias Colors = Appearance.Colors
     
-    static var kitBlue: UIColor { Colors.kitBlue }
-    static var kitRed: UIColor { Colors.kitRed }
-    static var textBlack: UIColor { Colors.textBlack }
-    static var textGray: UIColor { Colors.textGray }
+    static var primaryAccent: UIColor { SceytChatUIKitTheme.primaryAccent }
+    static var stateError: UIColor { SceytChatUIKitTheme.stateError }
+    static var primaryText: UIColor { SceytChatUIKitTheme.primaryText }
+    static var secondaryText: UIColor { SceytChatUIKitTheme.secondaryText }
     static var textGray2: UIColor { Colors.textGray2 }
     static var textGray3: UIColor { Colors.textGray3 }
     static var textWhite: UIColor { Colors.textWhite }
     static var textRed: UIColor { Colors.textRed }
-    static var background: UIColor { Colors.background }
+    static var background: UIColor { SceytChatUIKitTheme.background }
     static var background2: UIColor { Colors.background2 }
     static var background3: UIColor { Colors.background3 }
     static var background4: UIColor { Colors.background4 }
-    static var backgroundTransparent: UIColor { Colors.backgroundTransparent }
-    static var success: UIColor { Colors.success }
-    static var info: UIColor { Colors.info }
-    static var warning: UIColor { Colors.warning }
-    static var error: UIColor { Colors.error }
+    static var overlayBackground40: UIColor { SceytChatUIKitTheme.overlayBackground40 }
+    static var stateSuccess: UIColor { SceytChatUIKitTheme.stateSuccess }
+    static var stateAttention: UIColor { SceytChatUIKitTheme.stateAttention }
     static var separator: UIColor { Colors.separator }
 
     static var initialColors: [UIColor] { Colors.initialColors }

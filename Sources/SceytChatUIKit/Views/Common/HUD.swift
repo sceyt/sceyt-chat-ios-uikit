@@ -68,6 +68,6 @@ open class KitHUD: View, HUD {
         super.setupAppearance()
         
         backgroundColor = .black.withAlphaComponent(0.5)
-        activityIndicator.color = .kitBlue
+        activityIndicator.color = .primaryAccent
     }
 }

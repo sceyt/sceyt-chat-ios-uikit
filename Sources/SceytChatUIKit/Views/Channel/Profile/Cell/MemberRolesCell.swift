@@ -38,7 +38,7 @@ open class MemberRolesCell: TableViewCell, Bindable {
         super.setupAppearance()
         selectionStyle = .none
         titleLabel.font = Fonts.regular.withSize(14)
-        titleLabel.textColor = Appearance.Colors.textBlack
+        titleLabel.textColor = UIColor.primaryText
     }
 
     open override func setupLayout() {

@@ -44,7 +44,7 @@ open class ChannelMemberRoleListVC: ViewController, UITableViewDelegate, UITable
 
     open override func setupAppearance() {
         super.setupAppearance()
-        view.backgroundColor = Appearance.Colors.background
+        view.backgroundColor = UIColor.background
         title = L10n.Channel.Member.Role.title
     }
 

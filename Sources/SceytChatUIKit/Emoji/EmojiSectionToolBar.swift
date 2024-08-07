@@ -76,7 +76,7 @@ open class EmojiSectionToolBar: View {
         separator.backgroundColor = .separator
         for button in buttons {
             button.setImage(button.image(for: .normal)?.withTintColor(appearance.normalColor ?? .textGray3), for: .normal)
-            button.setImage(button.image(for: .selected)?.withTintColor(appearance.selectedColor ?? .kitBlue), for: .selected)
+            button.setImage(button.image(for: .selected)?.withTintColor(appearance.selectedColor ?? .primaryAccent), for: .selected)
         }
     }
 
@@ -88,7 +88,7 @@ open class EmojiSectionToolBar: View {
     open func createSectionButton(icon: UIImage) -> UIButton {
         let button = UIButton()
         let normalImage = icon.withTintColor(appearance.normalColor ?? .textGray3)
-        let selectedImage = icon.withTintColor(appearance.selectedColor ?? .kitBlue)
+        let selectedImage = icon.withTintColor(appearance.selectedColor ?? .primaryAccent)
         button.setImage(normalImage, for: .normal)
         button.setImage(selectedImage, for: .selected)
         button.resize(anchors: [.width(30), .height(30)])

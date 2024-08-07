@@ -123,7 +123,7 @@ open class BottomSheet: View {
         if action.style == .cancel {
             button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
                 .font: appearance.cancelFont ?? Fonts.semiBold.withSize(16),
-                .foregroundColor: appearance.cancelTextColor ?? .kitBlue,
+                .foregroundColor: appearance.cancelTextColor ?? .primaryAccent,
             ]), for: .normal)
         } else {
             if action.style == .destructive {

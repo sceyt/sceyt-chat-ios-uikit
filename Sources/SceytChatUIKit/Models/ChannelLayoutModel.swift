@@ -133,14 +133,14 @@ open class ChannelLayoutModel {
     
     open func attributedBody() -> NSAttributedString {
         let deletedMessageFont = Self.appearance.deletedMessageFont ?? Appearance.Fonts.regular.with(traits: .traitItalic).withSize(15)
-        let deletedMessageColor = Self.appearance.deletedMessageColor ?? Appearance.Colors.textGray
+        let deletedMessageColor = Self.appearance.deletedMessageColor ?? UIColor.secondaryText
         let senderLabelFont = Self.appearance.senderLabelFont ?? Appearance.Fonts.regular.withSize(15)
-        let senderLabelTextColor = Self.appearance.senderLabelTextColor ?? Appearance.Colors.textBlack
+        let senderLabelTextColor = Self.appearance.senderLabelTextColor ?? UIColor.primaryText
         let messageLabelFont = Self.appearance.messageLabelFont ?? Appearance.Fonts.regular.withSize(15)
-        let messageLabelTextColor = Self.appearance.messageLabelTextColor ?? Appearance.Colors.textGray
+        let messageLabelTextColor = Self.appearance.messageLabelTextColor ?? UIColor.secondaryText
         let mentionFont = Self.appearance.mentionFont ?? Appearance.Fonts.bold.withSize(15)
-        let mentionColor = Self.appearance.mentionColor ?? Appearance.Colors.textGray
-        let linkColor = Self.appearance.linkColor ?? Appearance.Colors.textGray
+        let mentionColor = Self.appearance.mentionColor ?? UIColor.secondaryText
+        let linkColor = Self.appearance.linkColor ?? UIColor.secondaryText
         let linkFont = Self.appearance.linkFont ?? Appearance.Fonts.regular.withSize(15)
         
         guard let message = lastMessage

@@ -378,7 +378,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         guard canRunMentionUserLogic else { return }
         func attributedString(_ text: String, key: String) -> NSAttributedString {
             NSAttributedString(string: text, attributes: [.font: inputTextView.font as Any,
-                                                          .foregroundColor: Colors.kitBlue,
+                                                          .foregroundColor: UIColor.primaryAccent,
                                                           .mention: key])
         }
         
@@ -700,14 +700,14 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             string: text,
             attributes: [
                 .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                .foregroundColor: appearance.actionMessageColor ?? .textGray
+                .foregroundColor: appearance.actionMessageColor ?? .secondaryText
             ])
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
                 string: " " + Formatters.videoAssetDuration.format(TimeInterval(duration)),
                 attributes: [
                     .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .kitBlue
+                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .primaryAccent
                 ]))
         }
         actionView.messageLabel.attributedText = messageAttributedString
@@ -784,14 +784,14 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             string: text,
             attributes: [
                 .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                .foregroundColor: appearance.actionMessageColor ?? .textGray
+                .foregroundColor: appearance.actionMessageColor ?? .secondaryText
             ])
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
                 string: " " + Formatters.videoAssetDuration.format(TimeInterval(duration)),
                 attributes: [
                     .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .kitBlue
+                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .primaryAccent
                 ]))
         }
         actionView.messageLabel.attributedText = messageAttributedString
@@ -843,14 +843,14 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         
         let titleAttributedString = NSMutableAttributedString(
             string: linkDetails.url.absoluteString,
-            attributes: [.font: appearance.actionLinkPreviewTitleFont ?? Fonts.regular.withSize(13), .foregroundColor: appearance.actionLinkPreviewTitleColor ?? .kitBlue])
+            attributes: [.font: appearance.actionLinkPreviewTitleFont ?? Fonts.regular.withSize(13), .foregroundColor: appearance.actionLinkPreviewTitleColor ?? .primaryAccent])
         actionView.titleLabel.attributedText = titleAttributedString
         
         let messageAttributedString = NSMutableAttributedString(
             string: message,
             attributes: [
                 .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                .foregroundColor: appearance.actionMessageColor ?? .textGray
+                .foregroundColor: appearance.actionMessageColor ?? .secondaryText
             ])
 
         actionView.messageLabel.attributedText = messageAttributedString

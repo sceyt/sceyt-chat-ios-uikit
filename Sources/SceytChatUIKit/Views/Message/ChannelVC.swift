@@ -2010,7 +2010,7 @@ open class ChannelVC: ViewController,
             case .failed:
                 showConnectionState(
                     text: L10n.Connection.State.failed,
-                    color: Colors.kitRed
+                    color: UIColor.stateError
                 )
             @unknown default:
                 break
