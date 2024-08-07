@@ -100,7 +100,7 @@ open class ChannelMemberCell: TableViewCell {
                 selectionStyle = .default
             }
             
-            roleLabel.text = data.roleName == Config.groupRoleParticipant ? nil : data.roleName?.localizedCapitalized
+            roleLabel.text = data.roleName == SceytChatUIKit.shared.config.groupRoleParticipant ? nil : data.roleName?.localizedCapitalized
             statusLabel.text = Formatters.userPresenceFormatter.format(data.presence)
             
             imageTask = AvatarBuilder

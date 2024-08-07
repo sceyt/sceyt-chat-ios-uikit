@@ -82,7 +82,7 @@ open class CreatePublicChannelVM {
             
             channelCreator
                 .create(
-                    type: Config.broadcastChannel,
+                    type: SceytChatUIKit.shared.config.broadcastChannel,
                     uri: uri,
                     subject: subject,
                     metadata: metadata,
@@ -101,7 +101,7 @@ open class CreatePublicChannelVM {
                 }
         }
         
-        if let image, let jpeg = try? Components.imageBuilder.init(image: image).resize(max: Config.maximumImageSize).jpegData() {
+        if let image, let jpeg = try? Components.imageBuilder.init(image: image).resize(max: SceytChatUIKit.shared.config.maximumImageSize).jpegData() {
             if let fileUrl = Components.storage.storeInTemporaryDirectory(data: jpeg, ext: "jpeg") {
                 
                 ChatClient.shared.upload(fileUrl: fileUrl) { _ in

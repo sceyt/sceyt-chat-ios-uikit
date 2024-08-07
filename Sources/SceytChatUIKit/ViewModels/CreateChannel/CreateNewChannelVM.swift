@@ -73,9 +73,9 @@ open class CreateNewChannelVM: NSObject {
     open func createDirectChannel(peer: ChatUser) {
         
         Components.channelCreator.init()
-            .createLocalChannel(type: Config.directChannel,
-                                members: [ChatChannelMember(user: peer, roleName: Config.chatRoleOwner),
-                                          ChatChannelMember(id: me, roleName: Config.chatRoleOwner)])
+            .createLocalChannel(type: SceytChatUIKit.shared.config.directChannel,
+                                members: [ChatChannelMember(user: peer, roleName: SceytChatUIKit.shared.config.chatRoleOwner),
+                                          ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.chatRoleOwner)])
         { [weak self] channel, error in
             DispatchQueue.main.async {
                 if let error = error {

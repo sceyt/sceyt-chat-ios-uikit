@@ -35,7 +35,7 @@ open class ChannelProfileEditURICell: TableViewCell {
         super.setup()
         
         selectionStyle = .none
-        prefixLabel.text = Config.channelURIPrefix
+        prefixLabel.text = SceytChatUIKit.shared.config.channelURIPrefix
         textField.leftViewMode = .always
         textField.leftView = prefixLabel
     }

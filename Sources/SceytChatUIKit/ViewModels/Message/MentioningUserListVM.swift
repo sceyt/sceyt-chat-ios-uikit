@@ -28,7 +28,7 @@ open class MentioningUserListVM: NSObject {
                     .init(keyPath: \MemberDTO.user?.lastName, ascending: false),
                     .init(keyPath: \MemberDTO.user?.id, ascending: false)
                 ]),
-            context: Config.database.viewContext
+            context: SceytChatUIKit.shared.config.database.viewContext
         ) { $0.convert() }
     }()
 

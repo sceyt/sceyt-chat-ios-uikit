@@ -21,7 +21,7 @@ open class PhotosPickerVC: ViewController,
     private var selectedIdentifiers = Set<String>()
     private var preSelectedIdentifiers = Set<String>()
     private var selectedIndexPaths = [IndexPath]()
-    private var maximumAttachmentsAllowed = SCTUIKitConfig.maximumAttachmentsAllowed
+    private var maximumAttachmentsAllowed = SceytChatUIKit.shared.config.maximumAttachmentsAllowed
     
     open lazy var collectionView = Components.imagePickerCollectionView
         .init()
@@ -290,7 +290,7 @@ open class PhotosPickerVC: ViewController,
     
     var thumbnailSize: CGSize {
         let itemSize = itemSize()
-        return .init(width: itemSize.width * Config.displayScale, height: itemSize.height * Config.displayScale)
+        return .init(width: itemSize.width * SceytChatUIKit.shared.config.displayScale, height: itemSize.height * SceytChatUIKit.shared.config.displayScale)
     }
     
     fileprivate var previousPreheatRect = CGRect.zero

@@ -65,7 +65,7 @@ open class ChannelAttachmentListVM: NSObject {
         }
 
         return LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>(
-            context: Config.database.backgroundReadOnlyObservableContext,
+            context: SceytChatUIKit.shared.config.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \AttachmentDTO.createdAt, ascending: false),
                               .init(keyPath: \AttachmentDTO.id, ascending: false)],
             sectionNameKeyPath: sectionNameKeyPath,
@@ -166,7 +166,7 @@ open class ChannelAttachmentListVM: NSObject {
         downloadQueue.async { [weak self] in
             guard let self,
                   attachment.type != "link",
-                  Config.minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= Config.minAutoDownloadSize,
+                  SceytChatUIKit.shared.config.minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= SceytChatUIKit.shared.config.minAutoDownloadSize,
                   attachment.status != .done,
                   attachment.status != .failedDownloading,
                   attachment.status != .failedUploading

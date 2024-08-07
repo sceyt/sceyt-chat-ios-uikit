@@ -38,7 +38,7 @@ open class ChannelListVM: NSObject,
       
     open lazy var channelObserver: LazyDatabaseObserver<ChannelDTO, ChatChannel> = {
         return LazyDatabaseObserver<ChannelDTO, ChatChannel>(
-            context: Config.database.backgroundReadOnlyObservableContext,
+            context: SceytChatUIKit.shared.config.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)],
             sectionNameKeyPath: #keyPath(ChannelDTO.pinSectionIdentifier),
             fetchPredicate: fetchPredicate,
@@ -278,7 +278,7 @@ open class ChannelListVM: NSObject,
         error: SceytError?
     ) {
         if state == .connected,
-            Config.syncChannelsAfterConnect {
+            SceytChatUIKit.shared.config.syncChannelsAfterConnect {
             SyncService.syncChannels()
         }
         event = .connection(state)

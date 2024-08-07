@@ -29,8 +29,8 @@ public extension AvatarBuildable {
 
 open class AvatarBuilder {
 
-    public static var avatarDefaultSize = CGSize(width: 60 * Config.displayScale,
-                                          height: 60 * Config.displayScale)
+    public static var avatarDefaultSize = CGSize(width: 60 * SceytChatUIKit.shared.config.displayScale,
+                                          height: 60 * SceytChatUIKit.shared.config.displayScale)
     private static var cache = {
         $0.countLimit = 15
         return $0
@@ -242,7 +242,7 @@ extension ChatChannel: AvatarBuildable {
         if !isGroup, let peer = peer {
             return URL(string: peer.avatarUrl)
         } else if let member = members?.first, isSelfChannel {
-            return URL(string: member.avatarUrl ?? Config.currentUser.avatarUrl)
+            return URL(string: member.avatarUrl ?? SceytChatUIKit.shared.currentUser.avatarUrl)
         }
         return URL(string: avatarUrl)
     }
@@ -257,17 +257,17 @@ extension ChatChannel: AvatarBuildable {
         }
         switch channelType {
         case .broadcast:
-            return Config.chatChannelDefaultAvatar.public
+            return SceytChatUIKit.shared.config.chatChannelDefaultAvatar.public
         case .private:
-            return Config.chatChannelDefaultAvatar.private
+            return SceytChatUIKit.shared.config.chatChannelDefaultAvatar.private
         default:
-            return Config.chatChannelDefaultAvatar.direct
+            return SceytChatUIKit.shared.config.chatChannelDefaultAvatar.direct
         }
     }
     
     public var appearance: InitialsBuilderAppearance? {
-        if Config.chatChannelDefaultAvatar.generateFromInitials {
-            return Config.chatChannelDefaultAvatar.initialsBuilderAppearance
+        if SceytChatUIKit.shared.config.chatChannelDefaultAvatar.generateFromInitials {
+            return SceytChatUIKit.shared.config.chatChannelDefaultAvatar.initialsBuilderAppearance
         }
         return nil
     }
@@ -290,17 +290,17 @@ extension ChatUser: AvatarBuildable {
     public var defaultAvatar: UIImage? {
         switch state {
         case .active:
-            return Config.chatUserDefaultAvatar.activeState
+            return SceytChatUIKit.shared.config.chatUserDefaultAvatar.activeState
         case .inactive:
-            return Config.chatUserDefaultAvatar.inactiveState
+            return SceytChatUIKit.shared.config.chatUserDefaultAvatar.inactiveState
         case .deleted:
-            return Config.chatUserDefaultAvatar.deletedState
+            return SceytChatUIKit.shared.config.chatUserDefaultAvatar.deletedState
         }
     }
     
     public var appearance: InitialsBuilderAppearance? {
-        if Config.chatUserDefaultAvatar.generateFromInitials {
-            return Config.chatUserDefaultAvatar.initialsBuilderAppearance
+        if SceytChatUIKit.shared.config.chatUserDefaultAvatar.generateFromInitials {
+            return SceytChatUIKit.shared.config.chatUserDefaultAvatar.initialsBuilderAppearance
         }
         return nil
     }

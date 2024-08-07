@@ -134,7 +134,7 @@ open class SCTSession: NSObject, SCTDataSession {
     }
     
     open func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
-        let scale = SCTUIKitConfig.displayScale
+        let scale = SceytChatUIKit.shared.config.displayScale
         let newSize = CGSize(width: size.width * scale, height: size.height * scale)
         
         func makeThumbnail(file path: String, thumbnailPath: String) -> String? {
@@ -220,7 +220,7 @@ open class SCTUploadOperation: AsyncOperation {
                 if let builder = SCTUIKitComponents.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)) {
                     let imageSize = builder.imageSize
                     if !imageSize.isNan {
-                        if let data = try? builder.resize(max: SCTUIKitConfig.maximumImageAttachmentSize).jpegData(),
+                        if let data = try? builder.resize(max: SceytChatUIKit.shared.config.maximumImageAttachmentSize).jpegData(),
                            let newUrl = FileStorage.storeInTemporaryDirectory(data: data, filename: attachment.name ?? UUID().uuidString)
                         {
                             let path = self.fileStorage.store(transferId: transferId, fileName: attachment.name, file: newUrl.path)

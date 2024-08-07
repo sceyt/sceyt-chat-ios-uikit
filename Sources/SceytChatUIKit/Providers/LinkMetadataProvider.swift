@@ -170,7 +170,7 @@ open class LinkMetadataProvider: Provider {
                 if let image = Components.imageBuilder.image(from: data) {
                     logger.debug("[LOAD LINK] \(log_hv) image of size: \(image.size) from \(imageUrl)")
                     linkMetadata.image = (try? Components.imageBuilder.init(image: image)
-                        .resize(max: SCTUIKitConfig.maximumImageAttachmentSize))?
+                        .resize(max: SceytChatUIKit.shared.config.maximumImageAttachmentSize))?
                         .uiImage ?? image
                     logger.debug("[LOAD LINK] \(log_hv) image of resize: \(linkMetadata.image!.size) from \(imageUrl)")
                 }

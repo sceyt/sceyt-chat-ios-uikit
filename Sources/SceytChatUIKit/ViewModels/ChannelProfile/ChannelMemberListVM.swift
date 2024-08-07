@@ -28,12 +28,12 @@ open class ChannelMemberListVM: NSObject {
     }
     
     public var addRole: String {
-        if filterMembersByRole == Config.chatRoleAdmin {
-            return Config.chatRoleAdmin
+        if filterMembersByRole == SceytChatUIKit.shared.config.chatRoleAdmin {
+            return SceytChatUIKit.shared.config.chatRoleAdmin
         } else if channel.channelType == .broadcast {
-            return Config.channelRoleSubscriber
+            return SceytChatUIKit.shared.config.channelRoleSubscriber
         } else {
-            return Config.groupRoleParticipant
+            return SceytChatUIKit.shared.config.groupRoleParticipant
         }
     }
     
@@ -58,7 +58,7 @@ open class ChannelMemberListVM: NSObject {
                     .init(keyPath: \MemberDTO.user?.lastName, ascending: true),
                     .init(keyPath: \MemberDTO.channelId, ascending: true)
                 ]),
-            context: Config.database.viewContext
+            context: SceytChatUIKit.shared.config.database.viewContext
         ) { $0.convert() }
     }()
 
@@ -77,11 +77,11 @@ open class ChannelMemberListVM: NSObject {
             return false
         case .private:
             if shouldShowOnlyAdmins {
-                return channel.userRole == Config.chatRoleOwner || channel.userRole == Config.chatRoleAdmin
+                return channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner || channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin
             }
             return true
         default:
-            return channel.userRole == Config.chatRoleOwner || channel.userRole == Config.chatRoleAdmin
+            return channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner || channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin
         }
     }
 
@@ -97,7 +97,7 @@ open class ChannelMemberListVM: NSObject {
     }
 
     open var shouldShowOnlyAdmins: Bool {
-        filterMembersByRole == Config.chatRoleAdmin
+        filterMembersByRole == SceytChatUIKit.shared.config.chatRoleAdmin
     }
     
     open func onDidChangeEvent(items: DBChangeItemPaths) {
@@ -192,10 +192,10 @@ open class ChannelMemberListVM: NSObject {
             return
         }
         
-        let members = [ChatChannelMember(user: m, roleName: Config.chatRoleOwner),
-                       ChatChannelMember(id: me, roleName: Config.chatRoleOwner)]
+        let members = [ChatChannelMember(user: m, roleName: SceytChatUIKit.shared.config.chatRoleOwner),
+                       ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.chatRoleOwner)]
         ChannelCreator()
-            .createLocalChannel(type: Config.directChannel,
+            .createLocalChannel(type: SceytChatUIKit.shared.config.directChannel,
                                 members: members) { channel, error in
                 completion?(channel, error)
             }

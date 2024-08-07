@@ -30,7 +30,7 @@ open class ChannelListSearchService {
         Task(priority: .userInitiated) {
             do {
                 var directChannel = try await searchDirectChatsBy(query: query)
-                if let username = Config.currentUser.firstName,
+                if let username = SceytChatUIKit.shared.currentUser.firstName,
                    selfChatKeyword.lowercased().contains(query.lowercased()) || "me".contains(query.lowercased()) {
                     directChannel += try await searchDirectChatsBy(query: username)
                 }
@@ -89,10 +89,10 @@ open class ChannelListSearchService {
     
     private func searchGroupChats(query: String) async throws -> [ChatChannel] {
         return try await withCheckedThrowingContinuation { continuation in
-            Config.database.read { context in
+            SceytChatUIKit.shared.config.database.read { context in
                 let request = NSFetchRequest<ChannelDTO>(entityName: ChannelDTO.entityName)
                 request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
-                request.predicate = .init(format: "type = %@ AND (subject BEGINSWITH[c] %@ OR subject CONTAINS[c] %@)", SCTUIKitConfig.privateChannel, query, " \(query)")
+                request.predicate = .init(format: "type = %@ AND (subject BEGINSWITH[c] %@ OR subject CONTAINS[c] %@)", SceytChatUIKit.shared.config.privateChannel, query, " \(query)")
                 return ChannelDTO.fetch(request: request, context: context)
                     .compactMap { ChatChannel(dto: $0) }
             } completion: { result in
@@ -105,14 +105,14 @@ open class ChannelListSearchService {
         let unjoined = filter.contains(.unjoinedChannels)
         let readOnly = filter.contains(.readOnlyChannels)
         return try await withCheckedThrowingContinuation { continuation in
-            Config.database.read { context in
+            SceytChatUIKit.shared.config.database.read { context in
                 let request = NSFetchRequest<ChannelDTO>(entityName: ChannelDTO.entityName)
                 request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
                 var format = "type = %@ AND (subject BEGINSWITH[c] %@  OR subject CONTAINS[c] %@)"
                 if !unjoined {
                     format += " AND unsubscribed == NO"
                 }
-                request.predicate = .init(format: format, SCTUIKitConfig.broadcastChannel, query, " \(query)")
+                request.predicate = .init(format: format, SceytChatUIKit.shared.config.broadcastChannel, query, " \(query)")
                 return ChannelDTO.fetch(request: request, context: context)
                     .compactMap { ChatChannel(dto: $0) }
             } completion: { result in
@@ -121,8 +121,8 @@ open class ChannelListSearchService {
                         let newList = channels.compactMap { channel in
                             var isReadOnlyChannel: Bool {
                                 channel.channelType == .broadcast &&
-                                !(channel.userRole == Config.chatRoleOwner ||
-                                  channel.userRole == Config.chatRoleAdmin)
+                                !(channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner ||
+                                  channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin)
                             }
                             return isReadOnlyChannel ? nil : channel
                         }

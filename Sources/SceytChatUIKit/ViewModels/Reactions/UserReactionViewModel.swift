@@ -26,7 +26,7 @@ open class UserReactionViewModel: NSObject {
             request: ReactionDTO.fetchRequest()
                 .sort(descriptors: [.init(keyPath: \ReactionDTO.key, ascending: false)])
                 .fetch(predicate: predicate),
-            context: Config.database.viewContext
+            context: SceytChatUIKit.shared.config.database.viewContext
         ) { $0.convert() }
     }()
 

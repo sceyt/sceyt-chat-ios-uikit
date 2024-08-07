@@ -22,8 +22,8 @@ open class ChannelProfileVM: NSObject {
 
     open private(set) var attachments = Attachments()
 
-    public var isOwner: Bool { channel.userRole == Config.chatRoleOwner }
-    public var isAdmin: Bool { channel.userRole == Config.chatRoleAdmin }
+    public var isOwner: Bool { channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner }
+    public var isAdmin: Bool { channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin }
     public var canEdit: Bool { channel.isGroup && (isOwner || isAdmin) }
 
     open lazy var channelObserver: DatabaseObserver<ChannelDTO, ChatChannel> = {
@@ -32,7 +32,7 @@ open class ChannelProfileVM: NSObject {
             request: ChannelDTO.fetchRequest()
                 .fetch(predicate: .init(format: "id == %lld", channel.id))
                 .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)]),
-            context: Config.database.viewContext) { $0.convert() }
+            context: SceytChatUIKit.shared.config.database.viewContext) { $0.convert() }
     }()
 
 

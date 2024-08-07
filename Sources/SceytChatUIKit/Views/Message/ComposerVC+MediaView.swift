@@ -12,7 +12,7 @@ import UIKit
 
 extension ComposerVC {
     open class MediaView: View {
-        public static var scale: CGFloat = Config.displayScale
+        public static var scale: CGFloat = SceytChatUIKit.shared.config.displayScale
         
         public lazy var appearance = ComposerVC.appearance {
             didSet {

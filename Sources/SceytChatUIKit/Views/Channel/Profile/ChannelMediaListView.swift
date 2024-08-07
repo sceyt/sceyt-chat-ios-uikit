@@ -58,7 +58,7 @@ open class ChannelMediaListView: ChannelAttachmentListView,
         super.setupDone()
         let itemSize = calculateItemSize()
         let thumbnailSize = itemSize.isNan ? CGSize(width: 40, height: 40) : itemSize
-        mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: Config.displayScale, y: Config.displayScale))
+        mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: SceytChatUIKit.shared.config.displayScale, y: SceytChatUIKit.shared.config.displayScale))
         layout?.itemSize = itemSize
         reloadData()
         setNeedsLayout()
@@ -77,7 +77,7 @@ open class ChannelMediaListView: ChannelAttachmentListView,
         if let layout, layout.itemSize != itemSize {
             layout.itemSize = itemSize
             let thumbnailSize = itemSize.isNan ? CGSize(width: 40, height: 40) : itemSize
-            mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: Config.displayScale, y: Config.displayScale))
+            mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: SceytChatUIKit.shared.config.displayScale, y: SceytChatUIKit.shared.config.displayScale))
             layout.invalidateLayout()
         }
     }

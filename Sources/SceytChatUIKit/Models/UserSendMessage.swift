@@ -47,11 +47,11 @@ open class UserSendMessage {
         sendText.enumerateAttribute(.mention, in: NSRange(location: 0, length: sendText.length)) { obj, range, _ in
             if let id = obj as? UserId {
                 var displayName = nsString.substring(with: range)
-                if displayName.hasPrefix(Config.mentionSymbol) {
+                if displayName.hasPrefix(SceytChatUIKit.shared.config.mentionSymbol) {
                     displayName.removeFirst()
                 }
                 users.append((id, displayName))
-                mentions.append((range, Config.mentionSymbol + String(id)))
+                mentions.append((range, SceytChatUIKit.shared.config.mentionSymbol + String(id)))
             }
         }
         mentions.sorted(by: { $0.range.location > $1.range.location }).forEach {

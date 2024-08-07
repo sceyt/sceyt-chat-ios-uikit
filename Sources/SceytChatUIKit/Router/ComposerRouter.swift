@@ -49,13 +49,13 @@ open class ComposerRouter: Router<ComposerVC> {
     open func showPhotos(selectedPhotoAssetIdentifiers: Set<String>? = nil,
                          callback: @escaping ([PHAsset], PhotosPickerVC) -> Bool)
     {
-        guard rootVC.mediaView.items.count < SCTUIKitConfig.maximumAttachmentsAllowed else {
+        guard rootVC.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
         let picker = Components.imagePickerVC.init(
             selectedAssetIdentifiers: selectedPhotoAssetIdentifiers,
-            maximumAttachmentsAllowed: SCTUIKitConfig.maximumAttachmentsAllowed - rootVC.mediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
+            maximumAttachmentsAllowed: SceytChatUIKit.shared.config.maximumAttachmentsAllowed - rootVC.mediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
         )
         picker.onSelected = callback
         let nav = Components.navigationController.init()
@@ -64,7 +64,7 @@ open class ComposerRouter: Router<ComposerVC> {
     }
 
     open func showDocuments(callback: @escaping ([URL]) -> Void) {
-        guard rootVC.mediaView.items.count < SCTUIKitConfig.maximumAttachmentsAllowed else {
+        guard rootVC.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
@@ -73,7 +73,7 @@ open class ComposerRouter: Router<ComposerVC> {
     }
 
     open func showCamera(callback: @escaping (AttachmentView?) -> Void) {
-        guard rootVC.mediaView.items.count < SCTUIKitConfig.maximumAttachmentsAllowed else {
+        guard rootVC.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
             showAlert(message: L10n.Error.max20Items)
             return
         }

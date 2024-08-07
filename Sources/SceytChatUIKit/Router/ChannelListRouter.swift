@@ -84,12 +84,12 @@ open class ChannelListRouter: Router<ChannelListVC> {
     }
     
     open func showMuteOptionsAlert(
-        selected: @escaping (SCTUIKitConfig.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKitConfig.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
         rootVC.showBottomSheet(
             title: L10n.Channel.Profile.Mute.title,
-            actions: Config.muteItems.map { item in
+            actions: SceytChatUIKit.shared.config.muteItems.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
             } + [.init(title: L10n.Alert.Button.cancel, style: .cancel) { canceled() }])
     }

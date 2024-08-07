@@ -28,8 +28,8 @@ open class ChannelAvatarVC: ViewController, UIScrollViewDelegate {
         task = Components.avatarBuilder.loadAvatar(
             into: scrollView.imageView,
             for: viewModel.channel,
-            size: CGSize(width: view.width * Config.displayScale,
-                         height: view.height * Config.displayScale),
+            size: CGSize(width: view.width * SceytChatUIKit.shared.config.displayScale,
+                         height: view.height * SceytChatUIKit.shared.config.displayScale),
             preferMemCache: false) { [weak self] _ in
                 DispatchQueue.main.async { [weak self] in
                     self?.layout()

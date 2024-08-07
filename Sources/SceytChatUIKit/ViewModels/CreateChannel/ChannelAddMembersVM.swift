@@ -20,7 +20,7 @@ open class ChannelAddMembersVM: SelectChannelMembersVM {
     
     required public init(channel: ChatChannel,
                          title: String? = nil,
-                         roleName: String = SCTUIKitConfig.channelRoleSubscriber,
+                         roleName: String = SceytChatUIKit.shared.config.channelRoleSubscriber,
                          onlyDismissAfterDone: Bool = false) {
         self.channel = channel
         self.title = title

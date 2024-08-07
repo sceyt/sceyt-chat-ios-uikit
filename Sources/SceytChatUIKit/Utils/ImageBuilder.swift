@@ -14,7 +14,7 @@ open class ImageBuilder {
     open class func build(
         from view: UIView,
         opaque: Bool = false,
-        scale: CGFloat = SCTUIKitConfig.displayScale
+        scale: CGFloat = SceytChatUIKit.shared.config.displayScale
     ) -> UIImage? {
         UIGraphicsBeginImageContextWithOptions(view.frame.size, opaque, scale)
         guard let context = UIGraphicsGetCurrentContext()
@@ -30,7 +30,7 @@ open class ImageBuilder {
     open class func build(size: CGSize = .init(width: 60, height: 60),
                           backgroundColor: UIColor = .white,
                           opaque: Bool = false,
-                          scale: CGFloat = SCTUIKitConfig.displayScale,
+                          scale: CGFloat = SceytChatUIKit.shared.config.displayScale,
                           content: (UILabel) -> Void
     ) -> UIImage? {
         
@@ -206,7 +206,7 @@ open class ImageBuilder {
     }
     
     
-    open func jpegData(compressionQuality: CGFloat = SCTUIKitConfig.jpegDataCompressionQuality) -> Data? {
+    open func jpegData(compressionQuality: CGFloat = SceytChatUIKit.shared.config.jpegDataCompressionQuality) -> Data? {
         uiImage?.jpegData(compressionQuality: compressionQuality)
     }
 //    

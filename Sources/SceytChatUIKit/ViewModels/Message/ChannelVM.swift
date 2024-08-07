@@ -62,7 +62,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             request: ChannelDTO.fetchRequest()
                 .fetch(predicate: .init(format: "id == %lld", channel.id))
                 .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)]),
-            context: Config.database.viewContext
+            context: SceytChatUIKit.shared.config.database.viewContext
         ) { $0.convert() }
     }()
     
@@ -79,8 +79,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open var isReadOnlyChannel: Bool {
         channel.channelType == .broadcast &&
-        !(channel.userRole == Config.chatRoleOwner ||
-          channel.userRole == Config.chatRoleAdmin)
+        !(channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner ||
+          channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin)
     }
     
     open var isDirectChat: Bool {
@@ -1452,17 +1452,17 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open func isReactionLimitReached(identifier: Identifier) -> Bool {
-        guard Config.maxAllowedEmojisCount > 0
+        guard SceytChatUIKit.shared.config.maxAllowedEmojisCount > 0
         else { return true }
         if let model = identifier.value as? MessageLayoutModel {
-            return (model.message.userReactions?.count ?? 0) + (model.message.userPendingReactions?.count ?? 0) >= Config.maxAllowedEmojisCount
+            return (model.message.userReactions?.count ?? 0) + (model.message.userPendingReactions?.count ?? 0) >= SceytChatUIKit.shared.config.maxAllowedEmojisCount
         }
         return false
     }
     
     open func emojis(identifier: Identifier) -> [String] {
-        let emojiMaxCount = Int(Config.maxAllowedEmojisCount)
-        var defaultEmojis = Config.defaultEmojis
+        let emojiMaxCount = Int(SceytChatUIKit.shared.config.maxAllowedEmojisCount)
+        var defaultEmojis = SceytChatUIKit.shared.config.defaultEmojis
         let selectedReactions = selectedEmojis(identifier: identifier)
         guard !selectedReactions.isEmpty else {
             return defaultEmojis
@@ -1487,7 +1487,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func showPlusAfterEmojis(identifier: Identifier) -> Bool {
         let selectedReactions = selectedEmojis(identifier: identifier)
-        return selectedReactions.count < Config.maxAllowedEmojisCount
+        return selectedReactions.count < SceytChatUIKit.shared.config.maxAllowedEmojisCount
     }
     
     //MARK: Join channel
@@ -1858,7 +1858,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     open func canEdit(model: MessageLayoutModel) -> Bool {
         !model.message.incoming &&
         model.message.state != .deleted &&
-        (model.messageDeliveryStatus == .pending || Date().timeIntervalSince1970 - model.message.createdAt.timeIntervalSince1970 < Config.messagePossibleEditIn)
+        (model.messageDeliveryStatus == .pending || Date().timeIntervalSince1970 - model.message.createdAt.timeIntervalSince1970 < SceytChatUIKit.shared.config.messagePossibleEditIn)
     }
     
     open func canReport(model: MessageLayoutModel) -> Bool {
@@ -2074,7 +2074,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         
         channelProvider
             .getLocalChannel(
-                type: Config.directChannel,
+                type: SceytChatUIKit.shared.config.directChannel,
                 userId: userId) { channel in
                     if let channel {
                         completion?(channel, nil)
@@ -2082,7 +2082,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                         self.channelCreator
                             .createLocalChannel(
                                 type: "direct",
-                                members: [userId, me].map { ChatChannelMember(id: $0, roleName: Config.chatRoleOwner)},
+                                members: [userId, me].map { ChatChannelMember(id: $0, roleName: SceytChatUIKit.shared.config.chatRoleOwner)},
                                 completion: completion
                             )
                     }
@@ -2095,19 +2095,19 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         
         channelProvider
             .getLocalChannel(
-                type: Config.directChannel,
+                type: SceytChatUIKit.shared.config.directChannel,
                 userId: user.id) { channel in
                     if let channel {
                         completion?(channel, nil)
                     } else {
                         let member = ChatChannelMember(
                             user: user,
-                            roleName: Config.chatRoleOwner
+                            roleName: SceytChatUIKit.shared.config.chatRoleOwner
                         )
                         self.channelCreator
                             .createLocalChannel(
                                 type: "direct",
-                                members: [ChatChannelMember(id: me, roleName: Config.chatRoleOwner), member],
+                                members: [ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.chatRoleOwner), member],
                                 completion: completion
                             )
                     }
@@ -2127,7 +2127,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         if selectedMessages.contains(model) {
             selectedMessages.remove(model)
-        } else if selectedMessages.count < SCTUIKitConfig.maximumMessagesToSelect {
+        } else if selectedMessages.count < SceytChatUIKit.shared.config.maximumMessagesToSelect {
             selectedMessages.insert(model)
         }
     }

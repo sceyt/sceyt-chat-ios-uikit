@@ -96,7 +96,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     open lazy var router = Components.composerRouter
         .init(rootVC: self)
     
-    open var mentionSymbol: String { Config.mentionSymbol }
+    open var mentionSymbol: String { SceytChatUIKit.shared.config.mentionSymbol }
     open var onContentHeightUpdate: ((CGFloat, (()-> Void)?) -> Void)?
     
     @Published public var action: Action?

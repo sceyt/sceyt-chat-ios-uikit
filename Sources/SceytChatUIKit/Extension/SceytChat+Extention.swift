@@ -17,7 +17,7 @@ var me: UserId {
     if !chatClient.user.id.isEmpty {
         return chatClient.user.id
     } else {
-        return SCTUIKitConfig.currentUserId ?? ""
+        return SceytChatUIKit.shared.currentUserId ?? ""
     }
 }
 

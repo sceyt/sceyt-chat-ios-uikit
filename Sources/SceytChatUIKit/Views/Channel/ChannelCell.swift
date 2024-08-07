@@ -217,7 +217,7 @@ open class ChannelCell: TableViewCell {
         }
         if data.channel.newMentionCount > 0,
             data.channel.newMessageCount > 0 {
-            atView.value = Config.mentionSymbol
+            atView.value = SceytChatUIKit.shared.config.mentionSymbol
         } else {
             atView.value = nil
         }

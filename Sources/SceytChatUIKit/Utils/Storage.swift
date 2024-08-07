@@ -262,7 +262,7 @@ open class Storage: NSObject {
     }
     
     open class func checksum(filePath: String) -> Int {
-        let upToCount = Config.calculateChecksumMaxBytes
+        let upToCount = SceytChatUIKit.shared.config.calculateChecksumMaxBytes
         let fileUrl = URL(fileURLWithPath: filePath)
         let fileSize = sizeOfItem(at: fileUrl)
         guard fileSize > 0
@@ -350,7 +350,7 @@ open class SceytChatStoringKey: StoringKey {
 
     public required init() {}
 
-    open var storageFolderPath: String = Config.storageDirectory?.path ?? NSTemporaryDirectory()
+    open var storageFolderPath: String = SceytChatUIKit.shared.config.storageDirectory?.path ?? NSTemporaryDirectory()
 
     open func storingFilename(url: URL) -> String {
         url.encoded

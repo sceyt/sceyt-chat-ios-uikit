@@ -1641,7 +1641,7 @@ open class ChannelVC: ViewController,
     
     open func delete(
         layoutModel: MessageLayoutModel,
-        type: DeleteMessageType = SCTUIKitConfig.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone
+        type: DeleteMessageType = SceytChatUIKit.shared.config.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone
     ) {
         channelViewModel.deleteMessage(
             layoutModel: layoutModel,
@@ -2093,14 +2093,14 @@ open class ChannelVC: ViewController,
     open func showEmptyViewIfNeeded() {
         noDataView.isHidden = (
             channelViewModel.channel.channelType == .broadcast
-            && channelViewModel.channel.userRole == Config.chatRoleOwner
+            && channelViewModel.channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner
         )
         || channelViewModel.numberOfSections > 0
         || channelViewModel.scrollToMessageIdIfSearching != 0
         || channelViewModel.scrollToRepliedMessageId != 0
         createdView.isHidden = channelViewModel.channel.channelType != .broadcast
         || collectionView.numberOfSections > 0
-        || channelViewModel.channel.userRole != Config.chatRoleOwner
+        || channelViewModel.channel.userRole != SceytChatUIKit.shared.config.chatRoleOwner
     }
     
     open func showBottomViewIfNeeded() {
@@ -2310,7 +2310,7 @@ open class ChannelVC: ViewController,
                                 action: { [weak self] _ in
 //                                    self?.router.showConfirmationAlertForDeleteMessage {
 //                                        if $0 {
-                                    self?.delete(layoutModel: model, type: SCTUIKitConfig.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
+                                    self?.delete(layoutModel: model, type: SceytChatUIKit.shared.config.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
 //                                        }
 //                                    }
                                 }

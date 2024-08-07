@@ -276,7 +276,7 @@ open class MessageCell: CollectionViewCell,
         if showSenderInfo {
             nameLabel.isHidden = false
             avatarView.isHidden = false
-            let scale = Config.displayScale
+            let scale = SceytChatUIKit.shared.config.displayScale
             imageTask = Components.avatarBuilder
                 .loadAvatar(
                     into: avatarView,

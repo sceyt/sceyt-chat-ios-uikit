@@ -13,7 +13,7 @@ open class Provider: NSObject {
     
     public static var chatClient = ChatClient.shared
     
-    public static var database = Config.database
+    public static var database = SceytChatUIKit.shared.config.database
     
     public var chatClient: ChatClient { Self.chatClient }
     

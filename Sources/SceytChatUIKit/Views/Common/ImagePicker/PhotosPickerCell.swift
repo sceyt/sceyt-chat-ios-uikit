@@ -10,7 +10,7 @@ import Photos
 import UIKit
 
 open class PhotosPickerCell: CollectionViewCell {
-    public static var scale: CGFloat = Config.displayScale
+    public static var scale: CGFloat = SceytChatUIKit.shared.config.displayScale
     
     open var data: (manager: PHCachingImageManager, asset: PHAsset, thumbnailSize: CGSize)! {
         didSet {

@@ -127,7 +127,7 @@ open class ChannelRouter: Router<ChannelVC> {
                     }
                 }
             } else {
-                self.rootVC.channelViewModel.deleteSelectedMessages(type: SCTUIKitConfig.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
+                self.rootVC.channelViewModel.deleteSelectedMessages(type: SceytChatUIKit.shared.config.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
             }
             
             self.rootVC.channelViewModel.isEditing = false

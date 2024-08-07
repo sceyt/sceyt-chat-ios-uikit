@@ -53,7 +53,7 @@ open class ChannelProfileURICell: TableViewCell {
     open var data: String? {
         didSet {
             if let data {
-                uriLable.text = Config.channelURIPrefix + data
+                uriLable.text = SceytChatUIKit.shared.config.channelURIPrefix + data
             } else {
                 uriLable.text = nil
             }

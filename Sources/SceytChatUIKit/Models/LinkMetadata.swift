@@ -69,11 +69,11 @@ open class LinkMetadata {
         var hasImage: Bool { image != nil || icon != nil }
         if hasImage, let filename = Crypto.hash(value: url.normalizedURL.absoluteString) {
             logger.debug("[LINK PREVIEV] storeImages \(url), fn: \(filename) isz \(image?.size), icn: isz \(icon?.size)")
-            if let icon = icon, let jpeg = icon.jpegData(compressionQuality: Config.jpegDataCompressionQuality) {
+            if let icon = icon, let jpeg = icon.jpegData(compressionQuality: SceytChatUIKit.shared.config.jpegDataCompressionQuality) {
                 Components.storage.storeData(jpeg, filename: "icon_" + filename)
                 
             }
-            if let image = image, let jpeg = image.jpegData(compressionQuality: Config.jpegDataCompressionQuality) {
+            if let image = image, let jpeg = image.jpegData(compressionQuality: SceytChatUIKit.shared.config.jpegDataCompressionQuality) {
                 Components.storage.storeData(jpeg, filename: "image_" + filename)
             }
         } else {

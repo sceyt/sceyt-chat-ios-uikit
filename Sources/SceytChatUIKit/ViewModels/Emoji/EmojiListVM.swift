@@ -42,7 +42,7 @@ open class EmojiListVM {
 
     open var recentEmojis: Emoji? {
         let decoder = JSONDecoder()
-        if let recentEmojisData = Config.userDefaults.data(forKey: Self.recentReactionsKey),
+        if let recentEmojisData = SceytChatUIKit.shared.config.userDefaults.data(forKey: Self.recentReactionsKey),
            let recentEmojis = try? decoder.decode(Emoji.self, from: recentEmojisData) {
             return recentEmojis
         }
@@ -64,8 +64,8 @@ open class EmojiListVM {
                 recentEmojis.items.remove(at: removeIndex)
             }
             recentEmojis.items.insert(codeItem, at: 0)
-            if recentEmojis.items.count > Config.recentReactionsLimit {
-                recentEmojis.items = Array(recentEmojis.items.prefix(Config.recentReactionsLimit))
+            if recentEmojis.items.count > SceytChatUIKit.shared.config.recentReactionsLimit {
+                recentEmojis.items = Array(recentEmojis.items.prefix(SceytChatUIKit.shared.config.recentReactionsLimit))
             }
             recentEmojisToEncode = recentEmojis
         } else {
@@ -73,7 +73,7 @@ open class EmojiListVM {
         }
         let encoder = JSONEncoder()
         if let encodeData = try? encoder.encode(recentEmojisToEncode) {
-            Config.userDefaults.setValue(encodeData, forKey: Self.recentReactionsKey)
+            SceytChatUIKit.shared.config.userDefaults.setValue(encodeData, forKey: Self.recentReactionsKey)
         }
     }
 }
@@ -138,10 +138,10 @@ fileprivate extension EmojiListVM {
             
             var emojis = [Emoji]()
             
-            if let recentEmojisData = Config.userDefaults.data(forKey: recentReactionsKey) {
+            if let recentEmojisData = SceytChatUIKit.shared.config.userDefaults.data(forKey: recentReactionsKey) {
                 let decoder = JSONDecoder()
                 var recentEmojis = try decoder.decode(Emoji.self, from: recentEmojisData)
-                recentEmojis.items = Array(recentEmojis.items.prefix(numberOfColumnsInRowVisible * Config.recentRowLimit))
+                recentEmojis.items = Array(recentEmojis.items.prefix(numberOfColumnsInRowVisible * SceytChatUIKit.shared.config.recentRowLimit))
                 emojis.append(recentEmojis)
             }
             

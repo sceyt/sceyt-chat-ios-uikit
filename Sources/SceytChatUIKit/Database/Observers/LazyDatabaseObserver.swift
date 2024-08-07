@@ -58,7 +58,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     @Atomic private var isObserverRestarting = false
     
     public var viewContext: NSManagedObjectContext {
-        Config.database.viewContext
+        SceytChatUIKit.shared.config.database.viewContext
     }
     
     private var lockContext: NSManagedObjectContext {

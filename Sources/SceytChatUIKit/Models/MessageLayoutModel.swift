@@ -620,7 +620,7 @@ open class MessageLayoutModel {
                         let attributes: [NSAttributedString.Key : Any] = [.font: bodyFont,
                                                                           .foregroundColor: mentionColor,
                                                                           .mention: pos.id]
-                        let mention = NSAttributedString(string: Config.mentionSymbol + user.displayName,
+                        let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionSymbol + user.displayName,
                                                          attributes: attributes)
                         guard text.length >= pos.loc + pos.len else {
                             logger.error("Something wrong❗️❗️, body: \(text.string) mention: \(mention.string) pos: \(pos.loc), \(pos.len) user: \(pos.id)")
@@ -680,7 +680,7 @@ open class MessageLayoutModel {
                             var attributes = text.attributes(at: range.location, effectiveRange: nil)
                             attributes[.foregroundColor] = mentionColor
                             attributes[.mention] = userId
-                            let mention = NSAttributedString(string: Config.mentionSymbol + user.displayName,
+                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionSymbol + user.displayName,
                                                              attributes: attributes)
                             text.safeReplaceCharacters(in: range, with: mention)
                             if let rangeEx = Range(range, in: replacedContent) {

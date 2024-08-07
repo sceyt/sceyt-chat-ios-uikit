@@ -165,12 +165,12 @@ open class ChannelMemberListVC: ViewController,
         guard let indexPath = self.tableView.indexPathForRow(at: location),
               longPressGesture.state == .began, let member = memberListViewModel.member(at: indexPath),
               member.id != me else { return }
-        if member.roleName == Config.chatRoleOwner {
+        if member.roleName == SceytChatUIKit.shared.config.chatRoleOwner {
             return
         }
         
         if member.roleName == memberListViewModel.channel.userRole,
-           member.roleName == Config.chatRoleAdmin {
+           member.roleName == SceytChatUIKit.shared.config.chatRoleAdmin {
             return
         }
         let displayName = Formatters.userDisplayName.format(member)
@@ -215,9 +215,9 @@ open class ChannelMemberListVC: ViewController,
                     range: (attributedMessage.string as NSString).range(of: displayName))
                 alert.attributedMessage = attributedMessage
             })
-        let isOwner = memberListViewModel.channel.userRole == Config.chatRoleOwner
-        let isAdmin = memberListViewModel.channel.userRole == Config.chatRoleAdmin
-        let memberIsAdmin = memberListViewModel.member(at: indexPath)?.roleName == Config.chatRoleAdmin
+        let isOwner = memberListViewModel.channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner
+        let isAdmin = memberListViewModel.channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin
+        let memberIsAdmin = memberListViewModel.member(at: indexPath)?.roleName == SceytChatUIKit.shared.config.chatRoleAdmin
         var actions = [SheetAction]()
         if isOwner {
             if memberIsAdmin {
@@ -232,7 +232,7 @@ open class ChannelMemberListVC: ViewController,
                             .init(title: L10n.Alert.Button.cancel, style: .cancel),
                             .init(title: L10n.Channel.Profile.Action.RevokeAdmin.action, style: .destructive) { [weak self] in
                                 self?.memberListViewModel
-                                    .setRole(name: isBroadcast ? Config.channelRoleSubscriber : Config.groupRoleParticipant,
+                                    .setRole(name: isBroadcast ? SceytChatUIKit.shared.config.channelRoleSubscriber : SceytChatUIKit.shared.config.groupRoleParticipant,
                                              memberAt: indexPath) { [weak self] error in
                                     if let error {
                                         self?.router.showAlert(error: error)

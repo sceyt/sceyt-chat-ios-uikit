@@ -42,7 +42,7 @@ open class ChannelForwardVM: NSObject, ChannelSearchResultsUpdating {
                                                       #keyPath(ChannelDTO.lastMessage.state),
                                                       #keyPath(ChannelDTO.lastReaction.messageId),
                                                       #keyPath(ChannelDTO.lastReaction.key)]),
-            context: Config.database.viewContext
+            context: SceytChatUIKit.shared.config.database.viewContext
         ) { $0.convert() }
     }()
     

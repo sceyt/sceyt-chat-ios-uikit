@@ -148,7 +148,7 @@ open class ChannelCreator: Provider {
                 avatarUrl: avatarUrl,
                 uri: "",
                 members: newMembers,
-                userRole: Config.chatRoleOwner,
+                userRole: SceytChatUIKit.shared.config.chatRoleOwner,
                 draftMessage: nil
             )
             

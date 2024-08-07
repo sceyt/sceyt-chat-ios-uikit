@@ -44,7 +44,7 @@ open class CreatePrivateChannelVM {
             
             channelCreator
                 .create(
-                    type: Config.privateChannel,
+                    type: SceytChatUIKit.shared.config.privateChannel,
                     subject: subject,
                     metadata: metadataObj,
                     avatarUrl: uploadedAvatarUrl?.absoluteString,
@@ -58,7 +58,7 @@ open class CreatePrivateChannelVM {
                 }
         }
         
-        if let image, let jpeg = try? Components.imageBuilder.init(image: image).resize(max: Config.maximumImageSize).jpegData() {
+        if let image, let jpeg = try? Components.imageBuilder.init(image: image).resize(max: SceytChatUIKit.shared.config.maximumImageSize).jpegData() {
             if let fileUrl = Components.storage.storeInTemporaryDirectory(data: jpeg, ext: "jpeg") {
                 
                 ChatClient.shared.upload(fileUrl: fileUrl) { _ in

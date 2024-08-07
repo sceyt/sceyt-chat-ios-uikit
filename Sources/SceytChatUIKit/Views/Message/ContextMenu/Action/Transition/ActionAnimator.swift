@@ -60,7 +60,7 @@ private extension ActionAnimator {
             toVc.contextView?.frame ?? .zero,
             to: toVc.view
         ) ?? .zero
-        toVc.snapshot?.transform = Config.contextMenuContentViewScale
+        toVc.snapshot?.transform = SceytChatUIKit.shared.config.contextMenuContentViewScale
 
         toVc.view.frame = context.containerView.bounds
         
