@@ -37,7 +37,7 @@ open class UserReactionCell: CollectionViewCell {
     
     open override func setupAppearance() {
         super.setupAppearance()
-        selectedBackgroundView?.backgroundColor = Colors.highlighted
+        selectedBackgroundView?.backgroundColor = UIColor.surface2
         userLabel.font = appearance.userLabelFont
         reactionLabel.font = appearance.reactionLabelFont
         userLabel.textColor = appearance.userLabelColor

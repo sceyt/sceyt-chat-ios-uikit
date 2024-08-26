@@ -182,7 +182,7 @@
 "message.reply.count" = "%d Replies";
 "message.input.placeholder" = "Write a message...";
 "message.list.unread" = "New Messages";
-"message.list.separator-today" = "Today";
+"message.list.borders-today" = "Today";
 "message.deleted" = "Message was deleted.";
 "message.info.edited" = "edited";
 "message.attachment.image" = "Photo";

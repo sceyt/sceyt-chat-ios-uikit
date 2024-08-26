@@ -115,7 +115,7 @@ open class Alert: View {
                 button.tintColor = appearance.destructiveIconColor
                 button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
                     .font: (isPrefered ? appearance.preferedButtonFont : appearance.buttonFont) ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.destructiveTextColor ?? .textRed,
+                    .foregroundColor: appearance.destructiveTextColor ?? .stateError,
                 ]), for: .normal)
             } else {
                 button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [

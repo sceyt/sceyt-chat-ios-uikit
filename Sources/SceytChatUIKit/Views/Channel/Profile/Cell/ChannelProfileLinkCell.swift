@@ -46,7 +46,7 @@ open class ChannelProfileLinkCell: CollectionViewCell {
     override open func setupAppearance() {
         super.setupAppearance()
         
-        selectedBackgroundView?.backgroundColor = Colors.highlighted
+        selectedBackgroundView?.backgroundColor = UIColor.surface2
         
         iconView.layer.cornerRadius = Layouts.cornerRadius
         

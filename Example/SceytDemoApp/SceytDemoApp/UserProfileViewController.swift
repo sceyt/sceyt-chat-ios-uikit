@@ -247,7 +247,7 @@ extension UserProfileViewController {
             separatorView.pin(to: displayNameLabel, anchors: [.bottom(2), .leading, .trailing(-8)])
             separatorView.heightAnchor.pin(constant: 1)
             separatorView.isHidden = true
-            separatorView.backgroundColor = Appearance.Colors.separator
+            separatorView.backgroundColor = UIColor.borders
         }
         
         required init(coder: NSCoder) {

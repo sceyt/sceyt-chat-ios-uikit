@@ -49,10 +49,10 @@ public class SceytChatUIKit {
         chatClient.unregisterDevicePushToken(completion: completion)
     }
     
-    public var channelEventHandler: ChannelEventHandler = {
+    public lazy var channelEventHandler: ChannelEventHandler = {
         Components.channelEventHandler
             .init(
-                database: SceytChatUIKit.shared.config.database,
+                database: config.database,
                 chatClient: ChatClient.shared
             )
     }()

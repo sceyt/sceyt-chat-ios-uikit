@@ -155,7 +155,7 @@ open class ChannelProfileVC: ViewController,
         navigationItem.standardAppearance = NavigationController.appearance.standard
         navigationItem.standardAppearance?.backgroundColor = appearance.cellBackgroundColor
         navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
-        navigationItem.scrollEdgeAppearance?.backgroundColor = .background4
+        navigationItem.scrollEdgeAppearance?.backgroundColor = .surface1
         
         view.backgroundColor = appearance.backgroundColor
         tableView.backgroundColor = .clear        

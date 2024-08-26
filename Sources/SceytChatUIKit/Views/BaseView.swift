@@ -97,7 +97,7 @@ open class Control: UIControl, Configurable {
 }
 
 open class HighlightableControl: Control {
-    open var backgroundColors: (normal: UIColor?, highlighted: UIColor?, selected: UIColor?) = (nil, Colors.highlighted, Colors.highlighted)
+    open var backgroundColors: (normal: UIColor?, highlighted: UIColor?, selected: UIColor?) = (nil, UIColor.surface2, UIColor.surface2)
     
     open override var isSelected: Bool {
         didSet {

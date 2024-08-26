@@ -83,7 +83,7 @@ open class CreatePublicChannelProfileView: CreatePrivateChannelProfileView, UITe
     open func showError(_ error: String) {
         errorLabel.edgeInsets.bottom = 8
         errorLabel.text = error
-        errorLabel.textColor = Colors.textRed
+        errorLabel.textColor = UIColor.stateError
     }
     
     open func showSuccess(_ success: String) {
@@ -95,7 +95,7 @@ open class CreatePublicChannelProfileView: CreatePrivateChannelProfileView, UITe
     open func hideError() {
         errorLabel.edgeInsets.bottom = 0
         errorLabel.text = nil
-        errorLabel.textColor = Colors.textRed
+        errorLabel.textColor = UIColor.stateError
     }
     
     open func textField(

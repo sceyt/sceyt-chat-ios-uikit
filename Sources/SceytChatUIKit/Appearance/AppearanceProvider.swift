@@ -38,7 +38,7 @@ extension ChannelCell: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .background
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
         
         public var unreadCountBackgroundColor: UIColor? = UIColor.primaryAccent
         public var unreadCountMutedBackgroundColor: UIColor? = .init(light: 0xA0A1B0, dark: 0x3B3B3D)
@@ -58,10 +58,10 @@ extension ChannelCell: AppearanceProvider {
         public var deletedMessageColor: UIColor? = UIColor.secondaryText
         
         public var draftMessageTitleFont: UIFont? = Fonts.regular.withSize(15)
-        public var draftMessageTitleColor: UIColor? = Colors.textRed
+        public var draftMessageTitleColor: UIColor? = UIColor.stateError
         
         public var draftMessageContentFont: UIFont? = Fonts.regular.withSize(15)
-        public var draftMessageContentColor: UIColor? = Colors.textGray2
+        public var draftMessageContentColor: UIColor? = UIColor.footnoteText
         
         public var dateLabelFont: UIFont? = Fonts.regular.withSize(14)
         public var dateLabelTextColor: UIColor? = UIColor.secondaryText
@@ -77,7 +77,7 @@ extension ChannelCell: AppearanceProvider {
         
         public var ticksViewTintColor: UIColor? = .init(rgb: 0x6B72FF)
         public var ticksViewDisabledTintColor: UIColor? = UIColor.secondaryText
-        public var ticksViewErrorTintColor: UIColor? = Colors.textRed
+        public var ticksViewErrorTintColor: UIColor? = UIColor.stateError
 
         public init() {}
     }
@@ -89,7 +89,7 @@ extension ChannelSwipeActionsConfiguration: AppearanceProvider {
     public struct Appearance {
         public static var deleteContextualAction = ContextualActionAppearance(
             title: L10n.Channel.List.Action.delete,
-            backgroundColor: .textRed)
+            backgroundColor: .stateError)
         public static var leaveContextualAction = ContextualActionAppearance(
             title: L10n.Channel.List.Action.leave,
             backgroundColor: .init(light: 0xA0A1B0, dark: 0x3B3B3D)
@@ -141,7 +141,7 @@ extension ChannelVC: AppearanceProvider {
         
         public var joinFont: UIFont? = Fonts.semiBold.withSize(16)
         public var joinColor: UIColor? = .primaryAccent
-        public var joinBackgroundColor: UIColor? = .background2
+        public var joinBackgroundColor: UIColor? = .bubbleIncoming
 
         public init() {}
     }
@@ -184,7 +184,7 @@ extension MessageCell: AppearanceProvider {
         public var messageColor: UIColor? = UIColor.primaryText
         public var deletedMessageFont: UIFont? = Fonts.regular.with(traits: .traitItalic).withSize(16)
         public var deletedMessageColor: UIColor? = UIColor.secondaryText
-        public var bubbleColor: (in: UIColor?, out: UIColor?) = (.background2,
+        public var bubbleColor: (in: UIColor?, out: UIColor?) = (.bubbleIncoming,
                                                                  .init(light: 0xE3E7FF, dark: 0x212239))
         public var highlightedBubbleColor: (in: UIColor?, out: UIColor?) = (UIColor.secondaryText.withAlphaComponent(0.4), UIColor.secondaryText.withAlphaComponent(0.4))
         public var highlightedSearchResultColor: (in: UIColor?, out: UIColor?) = (
@@ -200,17 +200,17 @@ extension MessageCell: AppearanceProvider {
         public var linkDescriptionColor: UIColor? = UIColor.secondaryText
         public var linkPreviewBackgroundColor: (in: UIColor?, out: UIColor?) = (.init(light: 0xE4E6EE, dark: 0xC9D1FF),
                                                                                 .init(light: 0xD1D8FF, dark: 0x212239))
-        public var highlightedLinkBackgroundColor: UIColor? = Colors.textGray2
+        public var highlightedLinkBackgroundColor: UIColor? = UIColor.footnoteText
         public var mentionUserColor: UIColor? = UIColor.primaryAccent
         public var dateTickBackgroundViewColor: UIColor? = UIColor.overlayBackground40
         
         public var separatorViewBackgroundColor: UIColor? = .clear
         public var separatorViewTextBackgroundColor: UIColor? = .overlayBackground40
         public var separatorViewFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var separatorViewTextColor: UIColor? = .textWhite
+        public var separatorViewTextColor: UIColor? = .textOnPrimary
         public var separatorViewTextBorderColor: UIColor? = .clear
         
-        public var newMessagesSeparatorViewBackgroundColor: UIColor? = .background2
+        public var newMessagesSeparatorViewBackgroundColor: UIColor? = .bubbleIncoming
         public var newMessagesSeparatorViewFont: UIFont? = Fonts.semiBold.withSize(14)
         public var newMessagesSeparatorViewTextColor: UIColor? = .secondaryText
         
@@ -223,7 +223,7 @@ extension MessageCell: AppearanceProvider {
         
         public var replyCountTextColor: UIColor? = UIColor.primaryAccent
         public var replyCountTextFont: UIFont? = Fonts.semiBold.withSize(12)
-        public var replyArrowStrokeColor: UIColor? = Colors.separator
+        public var replyArrowStrokeColor: UIColor? = UIColor.borders
         public var replyUserTitleColor: UIColor? = UIColor.primaryAccent
         public var replyUserTitleFont: UIFont? = Fonts.semiBold.withSize(13)
         public var replyMessageColor: UIColor? = UIColor.primaryText
@@ -237,7 +237,7 @@ extension MessageCell: AppearanceProvider {
         public var reactionCommonScoreFont: UIFont = Fonts.regular.withSize(13)
         public var reactionFont: UIFont? = Fonts.regular.withSize(13)
         public var reactionColor: UIColor? = UIColor.primaryText
-        public var reactionBackgroundColor: (in: UIColor?, out: UIColor?) = (.background2,
+        public var reactionBackgroundColor: (in: UIColor?, out: UIColor?) = (.bubbleIncoming,
                                                                              .init(light: 0xE3E7FF, dark: 0x212239))
         public var reactionBorderColor: (in: UIColor?, out: UIColor?) = (nil, nil)
         
@@ -256,7 +256,7 @@ extension MessageCell: AppearanceProvider {
         
         public var ticksViewTintColor: UIColor? = .init(rgb: 0x6B72FF)
         public var ticksViewDisabledTintColor: UIColor? = UIColor.secondaryText
-        public var ticksViewErrorTintColor: UIColor? = Colors.textRed
+        public var ticksViewErrorTintColor: UIColor? = UIColor.stateError
         
         public var attachmentFileNameFont: UIFont? = Fonts.semiBold.withSize(16)
         public var attachmentFileNameColor: UIColor? = .primaryText
@@ -279,9 +279,9 @@ extension ComposerVC: AppearanceProvider {
         public var fileAttachmentTitleTextFont: UIFont? = Fonts.semiBold.withSize(16)
         public var fileAttachmentSubtitleTextColor: UIColor? = .secondaryText
         public var fileAttachmentSubtitleTextFont: UIFont? = Fonts.regular.withSize(11)
-        public var fileAttachmentBackgroundColor: UIColor? = .background2
+        public var fileAttachmentBackgroundColor: UIColor? = .bubbleIncoming
         
-        public var actionViewBackgroundColor: UIColor? = .background2
+        public var actionViewBackgroundColor: UIColor? = .bubbleIncoming
         public var actionReplyTitleColor: UIColor? = .primaryAccent
         public var actionReplierTitleColor: UIColor? = .primaryAccent
         public var actionReplyTitleFont: UIFont? = Fonts.semiBold.withSize(13)
@@ -294,10 +294,10 @@ extension ComposerVC: AppearanceProvider {
         
         public var mediaViewBackgroundColor: UIColor? = .background
 
-        public var dividerColor = Colors.separator
+        public var dividerColor = UIColor.borders
         public var backgroundColor: UIColor? = UIColor.background
         public var recorderBackgroundColor: UIColor? = .background
-        public var recorderPlayerBackgroundColor: UIColor? = .background2
+        public var recorderPlayerBackgroundColor: UIColor? = .bubbleIncoming
         public var recorderDurationFont: UIFont? = Fonts.regular.withSize(12)
         public var recorderDurationColor: UIColor? = .init(light: .secondaryText, dark: .white)
         public var recorderTimeFont: UIFont? = Fonts.regular.withSize(12)
@@ -307,7 +307,7 @@ extension ComposerVC: AppearanceProvider {
         public var recorderSlideToCancelFont: UIFont? = Fonts.regular.withSize(16)
         public var recorderSlideToCancelColor: UIColor? = .init(light: .secondaryText, dark: .white)
         public var recorderCancelFont: UIFont? = Fonts.regular.withSize(16)
-        public var recorderCancelColor: UIColor? = .textRed
+        public var recorderCancelColor: UIColor? = .stateError
         public var recorderRecordingDurationFont: UIFont? = Fonts.regular.withSize(16)
         public var recorderRecordingDurationColor: UIColor? = .init(light: .black, dark: .white)
         public var recorderRecordingDotColor: UIColor? = .red
@@ -321,8 +321,8 @@ extension ComposerVC.InputTextView: AppearanceProvider {
     
     public struct Appearance {
         public var borderColor: UIColor? = .clear
-        public var backgroundColor: UIColor? = .background2
-        public var placeholderColor: UIColor? = .textGray2
+        public var backgroundColor: UIColor? = .bubbleIncoming
+        public var placeholderColor: UIColor? = .footnoteText
         public var textFont: UIFont = Fonts.regular.withSize(16)
         public var textColor: UIColor? = .init(light: .darkText, dark: .white)
 
@@ -352,10 +352,10 @@ extension ChannelProfileVC: AppearanceProvider {
         public var detailColor: UIColor? = .secondaryText
         public var detailFont: UIFont? = Fonts.regular.withSize(16)
         
-        public var backgroundColor: UIColor? = .background4
+        public var backgroundColor: UIColor? = .surface1
         
-        public var cellSeparatorColor: UIColor? = Colors.separator
-        public var cellBackgroundColor: UIColor? = .background3
+        public var cellSeparatorColor: UIColor? = UIColor.borders
+        public var cellBackgroundColor: UIColor? = .background
 
         public init() {}
     }
@@ -368,12 +368,12 @@ extension ChannelProfileEditVC: AppearanceProvider {
         public var textFieldColor: UIColor? = .primaryText
         public var textFieldFont: UIFont? = Fonts.regular.withSize(16)
         public var textFieldPlaceholderColor: UIColor? = .secondaryText
-        public var textFieldBackgroundColor: UIColor? = .background3
+        public var textFieldBackgroundColor: UIColor? = .background
         public var successColor: UIColor? = .primaryAccent
-        public var errorColor: UIColor? = .textRed
+        public var errorColor: UIColor? = .stateError
         public var errorFont: UIFont? = Fonts.regular.withSize(13)
-        public var separatorColor: UIColor? = .separator
-        public var backgroundColor: UIColor? = .background4
+        public var separatorColor: UIColor? = .borders
+        public var backgroundColor: UIColor? = .surface1
         
         public init() {}
     }
@@ -394,7 +394,7 @@ extension ChannelMemberCell: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .background
-        public var separatorColor: UIColor? = Colors.separator
+        public var separatorColor: UIColor? = UIColor.borders
         
         public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
         public var titleLabelTextColor: UIColor? = UIColor.primaryText
@@ -415,7 +415,7 @@ extension ChannelUserCell: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .clear
-        public var separatorColor: UIColor? = Colors.separator
+        public var separatorColor: UIColor? = UIColor.borders
         
         public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
         public var titleLabelTextColor: UIColor? = UIColor.primaryText
@@ -434,7 +434,7 @@ extension ChannelMemberAddCell: AppearanceProvider {
         public var backgroundColor: UIColor? = .background
         public var titleLabelFont: UIFont? = Fonts.regular.withSize(16)
         public var titleLabelTextColor: UIColor? = UIColor.primaryText
-        public var separatorColor: UIColor? = Colors.separator
+        public var separatorColor: UIColor? = UIColor.borders
         
         public init() {}
     }
@@ -486,7 +486,7 @@ extension ChannelFileListView: AppearanceProvider {
         public var detailTextColor: UIColor? = .secondaryText
         public var detailFont: UIFont? = Fonts.regular.withSize(13)
         
-        public var downloadBackgroundColor: UIColor? = .background2
+        public var downloadBackgroundColor: UIColor? = .bubbleIncoming
         public var progressColor: UIColor? = .primaryAccent
         public var trackColor: UIColor? = .clear
 
@@ -536,7 +536,7 @@ extension PhotosPickerCell: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor: UIColor? = .background4
+        public var backgroundColor: UIColor? = .surface1
         public var timeTextColor: UIColor? = .white
         public var timeTextFont: UIFont? = Fonts.regular.withSize(12)
         public var timeBackgroundColor: UIColor? = .overlayBackground40
@@ -563,7 +563,7 @@ extension MentioningUserListVC: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .clear
-        public var tableViewBackgroundColor: UIColor? = .background3
+        public var tableViewBackgroundColor: UIColor? = .background
         public var shadowColor: UIColor? = .init(rgb: 0x111539, alpha: 0.16)
 
         public init() {}
@@ -576,7 +576,7 @@ extension MentioningUserViewCell: AppearanceProvider {
     public struct Appearance {
         public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
         public var titleLabelTextColor: UIColor? = UIColor.primaryText
-        public var backgroundColor: UIColor? = .background3
+        public var backgroundColor: UIColor? = .background
 
         public init() {}
     }
@@ -649,8 +649,8 @@ extension EmojiVC: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = UIColor.background
-        public var moreButtonBackgroundColor: UIColor? = Colors.background2
-        public var selectedBackgroundColor: UIColor? = Colors.highlighted
+        public var moreButtonBackgroundColor: UIColor? = UIColor.bubbleIncoming
+        public var selectedBackgroundColor: UIColor? = UIColor.surface2
         
         public init() {}
     }
@@ -660,7 +660,7 @@ extension MenuController: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor: UIColor? = Colors.background2
+        public var backgroundColor: UIColor? = UIColor.bubbleIncoming
         
         public init() {}
     }
@@ -670,14 +670,14 @@ extension MenuCell: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor: UIColor? = .background2
+        public var backgroundColor: UIColor? = .bubbleIncoming
         public var selectedBackgroundColor: UIColor? = .init(light: 0xD9D9DF, dark: 0x303032)
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
         public var imageTintColor: UIColor? = .primaryText
         public var textColor: UIColor? = .primaryText
         public var textFont: UIFont? = Fonts.regular.withSize(16)
-        public var destructiveTextColor: UIColor? = .textRed
-        public var destructiveImageTintColor: UIColor? = .textRed
+        public var destructiveTextColor: UIColor? = .stateError
+        public var destructiveImageTintColor: UIColor? = .stateError
         
         public init() {}
     }
@@ -687,7 +687,7 @@ extension ReactionVC: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor: UIColor? = Colors.background3
+        public var backgroundColor: UIColor? = UIColor.background
         
         public init() {}
     }
@@ -697,9 +697,9 @@ extension ReactionScoreCell: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor: UIColor? = Colors.background3
+        public var backgroundColor: UIColor? = UIColor.background
         public var selectedBackgroundColor: UIColor? = UIColor.primaryAccent
-        public var borderColor: UIColor? = .separator
+        public var borderColor: UIColor? = .borders
         public var selectedBorderColor: UIColor? = .clear
         public var textColor: UIColor? = UIColor.secondaryText
         public var textFont: UIFont? = Fonts.semiBold.withSize(14)
@@ -749,7 +749,7 @@ extension ChannelAvatarVC: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .background
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
 
         public init() {}
     }
@@ -760,7 +760,7 @@ extension ChannelVC.SelectingView: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor = UIColor.background
-        public var dividerColor = Colors.separator
+        public var dividerColor = UIColor.borders
 
         public init() {}
     }
@@ -770,7 +770,7 @@ extension NativeSegmentedController: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor: UIColor? = .background3
+        public var backgroundColor: UIColor? = .background
         public var font: UIFont? = Fonts.semiBold.withSize(16)
         public var selectedTextColor: UIColor? = .primaryText
         public var textColor: UIColor? = .secondaryText
@@ -783,12 +783,12 @@ extension SheetVC: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .black.withAlphaComponent(0.5)
-        public var contentBackgroundColor: UIColor? = .background3
+        public var contentBackgroundColor: UIColor? = .background
         public var titleFont: UIFont? = Fonts.semiBold.withSize(20)
         public var titleColor: UIColor? = .secondaryText
         public var doneFont: UIFont? = Fonts.semiBold.withSize(16)
         public var doneColor: UIColor? = .primaryAccent
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
         
         public init() {}
     }
@@ -798,18 +798,18 @@ extension BottomSheet: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background3,
-                                                                                 Colors.highlighted)
+        public var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background,
+                                                                                 UIColor.surface2)
         public var titleFont: UIFont? = Fonts.semiBold.withSize(14)
         public var titleColor: UIColor? = .secondaryText
         public var buttonFont: UIFont? = Fonts.regular.withSize(16)
         public var normalTextColor: UIColor? = .primaryText
         public var normalIconColor: UIColor? = .primaryAccent
-        public var destructiveTextColor: UIColor? = .textRed
-        public var destructiveIconColor: UIColor? = .textRed
+        public var destructiveTextColor: UIColor? = .stateError
+        public var destructiveIconColor: UIColor? = .stateError
         public var cancelFont: UIFont? = Fonts.semiBold.withSize(18)
         public var cancelTextColor: UIColor? = .primaryAccent
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
         
         public init() {}
     }
@@ -819,7 +819,7 @@ extension Alert: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background3,
+        public var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background,
                                                                                  .init(light: 0xE8E9EE, dark: 0x303032))
         public var titleFont: UIFont? = Fonts.semiBold.withSize(16)
         public var titleColor: UIColor? = .secondaryText
@@ -829,10 +829,10 @@ extension Alert: AppearanceProvider {
         public var preferedButtonFont: UIFont? = Fonts.semiBold.withSize(16)
         public var normalTextColor: UIColor? = .primaryAccent
         public var normalIconColor: UIColor? = .primaryAccent
-        public var destructiveTextColor: UIColor? = .textRed
-        public var destructiveIconColor: UIColor? = .textRed
+        public var destructiveTextColor: UIColor? = .stateError
+        public var destructiveIconColor: UIColor? = .stateError
         public var cancelTextColor: UIColor? = .primaryText
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
         
         public init() {}
     }
@@ -842,7 +842,7 @@ extension CreateChannelHeaderView: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor: UIColor? = .background2
+        public var backgroundColor: UIColor? = .bubbleIncoming
         public var textColor: UIColor? = UIColor.secondaryText
         public var font: UIFont? = Fonts.semiBold.withSize(13)
         public var textAlignment: NSTextAlignment = .left
@@ -886,7 +886,7 @@ extension NavigationController: AppearanceProvider {
                 .foregroundColor: UIColor(light: 0x111539, dark: 0xE1E3E6)
             ]
             $0.backgroundColor = .init(light: 0xFFFFFF, dark: 0x19191B)
-            $0.shadowColor = .separator
+            $0.shadowColor = .borders
             return $0
         }(UINavigationBarAppearance())
         
@@ -900,7 +900,7 @@ extension ChannelProfileFileHeaderView: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var headerBackgroundColor: UIColor? = .background2
+        public var headerBackgroundColor: UIColor? = .bubbleIncoming
         public var headerTextColor: UIColor? = .secondaryText
         public var headerFont: UIFont? = Fonts.semiBold.withSize(13)
         
@@ -947,7 +947,7 @@ extension CreateChatActionsView: AppearanceProvider {
     public struct Appearance {
         public var font: UIFont? = Fonts.regular.withSize(16)
         public var color: UIColor? = .primaryAccent
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
 
         public init() {}
     }
@@ -960,14 +960,14 @@ extension CreatePrivateChannelProfileView: AppearanceProvider {
         public init() {}
         
         public var avatarBackgroundColor: UIColor? = .init(light: 0x979A9A, dark: 0x303032)
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
         public var fieldFont: UIFont? = Fonts.regular.withSize(16)
         public var fieldTextColor: UIColor? = .primaryText
         public var fieldPlaceHolderTextColor: UIColor? = .secondaryText
         public var commentFont: UIFont? = Fonts.regular.withSize(13)
         public var commentTextColor: UIColor? = .secondaryText
         public var errorFont: UIFont? = Fonts.regular.withSize(13)
-        public var errorTextColor: UIColor? = .textRed
+        public var errorTextColor: UIColor? = .stateError
     }
 }
 
@@ -998,7 +998,7 @@ extension UserReactionListVC: AppearanceProvider {
     public struct Appearance {
         public init() {}
 
-        public var backgroundColor: UIColor? = .background3
+        public var backgroundColor: UIColor? = .background
     }
 }
 
@@ -1037,8 +1037,8 @@ extension ChannelCreatedView: AppearanceProvider {
         public var labelBackgroundColor: UIColor? = .overlayBackground40
         public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(13)
         public var messageLabelFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var titleLabelColor: UIColor? = .textWhite
-        public var messageLabelColor: UIColor? = .textWhite
+        public var titleLabelColor: UIColor? = .textOnPrimary
+        public var messageLabelColor: UIColor? = .textOnPrimary
     }
 }
 
@@ -1052,7 +1052,7 @@ extension ChannelVC.BottomView: AppearanceProvider {
         public var labelFont: UIFont? = Fonts.regular.withSize(16)
         public var labelColor: UIColor? = .primaryText
         public var iconColor: UIColor? = .primaryAccent
-        public var separatorColor: UIColor? = .separator
+        public var separatorColor: UIColor? = .borders
     }
 }
 
@@ -1076,8 +1076,8 @@ extension EmojiSectionToolBar: AppearanceProvider {
     public struct Appearance {
         public init() {}
         
-        public var backgroundColor: UIColor? = .background3
-        public var normalColor: UIColor? = .textGray3
+        public var backgroundColor: UIColor? = .background
+        public var normalColor: UIColor? = .footnoteText
         public var selectedColor: UIColor? = .primaryAccent
     }
 }
@@ -1088,8 +1088,8 @@ extension EmojiListVC: AppearanceProvider {
     public struct Appearance {
         public init() {}
         
-        public var backgroundColor: UIColor? = .background3
-        public var normalColor: UIColor? = .textGray3
+        public var backgroundColor: UIColor? = .background
+        public var normalColor: UIColor? = .footnoteText
         public var selectedColor: UIColor? = .primaryAccent
     }
 }
@@ -1100,8 +1100,8 @@ extension MessageInfoVC: AppearanceProvider {
     public struct Appearance {
         public init() {}
         
-        public var backgroundColor: UIColor? = .background4
-        public var cellBackgroundColor: UIColor? = .background3
+        public var backgroundColor: UIColor? = .surface1
+        public var cellBackgroundColor: UIColor? = .background
         
         public var infoFont: UIFont? = Fonts.semiBold.withSize(14)
         public var infoValueFont: UIFont? = Fonts.regular.withSize(14)

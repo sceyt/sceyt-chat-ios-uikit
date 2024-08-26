@@ -76,14 +76,14 @@ public struct SceytChatUIKitConfig {
         return nil
     }()
     
-    public var database: Database = {
-        if let directory = SceytChatUIKit.shared.config.dbFileDirectory {
+    public lazy var database: Database = {
+        if let directory = dbFileDirectory {
             do {
                 try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             } catch {
                 
             }
-            let dbUrl = directory.appendingPathComponent(SceytChatUIKit.shared.config.dbFilename)
+            let dbUrl = directory.appendingPathComponent(dbFilename)
             return PersistentContainer(storeType: .sqLite(databaseFileUrl: dbUrl))
         } else {
             return PersistentContainer(storeType: .inMemory)

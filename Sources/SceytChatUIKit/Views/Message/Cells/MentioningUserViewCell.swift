@@ -71,12 +71,12 @@ open class MentioningUserViewCell: TableViewCell {
     
     open override func setHighlighted(_ highlighted: Bool, animated: Bool) {
         super.setHighlighted(highlighted, animated: animated)
-        contentView.backgroundColor = highlighted ? Colors.highlighted : .clear
+        contentView.backgroundColor = highlighted ? UIColor.surface2 : .clear
     }
     
     open override func setSelected(_ selected: Bool, animated: Bool) {
         super.setSelected(selected, animated: animated)
-        contentView.backgroundColor = selected ? Colors.highlighted : .clear
+        contentView.backgroundColor = selected ? UIColor.surface2 : .clear
     }
 }
 

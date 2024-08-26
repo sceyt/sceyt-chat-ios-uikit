@@ -130,7 +130,7 @@ open class BottomSheet: View {
                 button.tintColor = appearance.destructiveIconColor
                 button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
                     .font: appearance.buttonFont ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.destructiveTextColor ?? .textRed,
+                    .foregroundColor: appearance.destructiveTextColor ?? .stateError,
                 ]), for: .normal)
             } else {
                 button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [

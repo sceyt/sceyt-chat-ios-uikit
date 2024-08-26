@@ -607,7 +607,7 @@ internal enum L10n {
     }
     internal enum List {
       /// Today
-      internal static let separatorToday = L10n.tr("Localizable", "message.list.separator-today", fallback: "Today")
+      internal static let separatorToday = L10n.tr("Localizable", "message.list.borders-today", fallback: "Today")
       /// New Messages
       internal static let unread = L10n.tr("Localizable", "message.list.unread", fallback: "New Messages")
     }
