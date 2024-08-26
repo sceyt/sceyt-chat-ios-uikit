@@ -52,11 +52,11 @@ struct UserDefaultsConfig<T> {
 
 func configureSceytChatUIKit() {
     if let currentUserId = Config.currentUserId {
-        SCTUIKitConfig.currentUserId = currentUserId
+        SceytChatUIKit.shared.currentUserId = currentUserId
     }
-    SCTUIKitConfig.initialize(apiUrl: Config.sceytApiURL, appId: Config.sceytAppId, clientId: Config.clientId!)
-    SCTUIKitConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
-    SCTUIKitConfig.setLogLevel(.verbose)
+    SceytChatUIKit.initialize(apiUrl: Config.sceytApiURL, appId: Config.sceytAppId, clientId: Config.clientId!)
+    SceytChatUIKit.shared.config.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
+    SceytChatUIKit.shared.config.setLogLevel(.verbose)
     
     // Set customized Subclass for formatters
     Formatters.userDisplayName = UserDisplayNameFormatter()

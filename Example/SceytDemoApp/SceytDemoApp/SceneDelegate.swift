@@ -58,7 +58,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard backgroundTaskId == .invalid else { return }
         backgroundTaskId = UIApplication.shared
             .beginBackgroundTask(withName: "Close Chat socket") {
-                SCTUIKitConfig.disconnect()
+                SceytChatUIKit.shared.disconnect()
                 UIApplication.shared.endBackgroundTask(self.backgroundTaskId)
                 self.backgroundTaskId = .invalid
             }

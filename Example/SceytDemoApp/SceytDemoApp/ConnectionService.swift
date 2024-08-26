@@ -31,7 +31,7 @@ final class ConnectionService: NSObject, ChatClientDelegate {
                 return
             }
             Config.chatToken = token
-            SCTUIKitConfig.connect(accessToken: token)
+            SceytChatUIKit.shared.connect(accessToken: token)
             self.callbacks.append(callback)
         }
     }
@@ -91,7 +91,7 @@ final class ConnectionService: NSObject, ChatClientDelegate {
     func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
         if state == .connected {
             Config.currentUserId = chatClient.user.id
-            SCTUIKitConfig.currentUserId = chatClient.user.id
+            SceytChatUIKit.shared.currentUserId = chatClient.user.id
             chatClient.setPresence(state: .online, status: "I'm online")
         }
         switch state {

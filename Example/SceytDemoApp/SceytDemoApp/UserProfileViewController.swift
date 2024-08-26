@@ -143,12 +143,12 @@ class UserProfileViewController: UIViewController {
     }
     
     private func showMuteOptionsAlert(
-        selected: @escaping (SCTUIKitConfig.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKitConfig.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
         showBottomSheet(
             title: "Mute",
-            actions: SCTUIKitConfig.muteItems.map { item in
+            actions: SceytChatUIKit.shared.config.muteItems.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
             } + [.init(title: "Cancel", style: .cancel) { canceled() }])
     }

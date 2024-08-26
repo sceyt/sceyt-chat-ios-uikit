@@ -17,7 +17,7 @@ struct UserProfile {
                        deleteAvatar: Bool = false,
                        completion: ((Error?) -> Void)?) {
         let user = makeNamesFrom(displayName: displayName)
-        if let image = avatarImage, let jpeg = try? ImageBuilder(image: image).resize(max: SCTUIKitConfig.maximumImageSize).jpegData() {
+        if let image = avatarImage, let jpeg = try? ImageBuilder(image: image).resize(max: SceytChatUIKit.shared.config.maximumImageSize).jpegData() {
             if let fileUrl = Storage.storeInTemporaryDirectory(data: jpeg, ext: "jpeg") {
                 
                 ChatClient.shared.upload(fileUrl: fileUrl) { _ in
