@@ -41,7 +41,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             ], for: [])
         UITabBar.appearance().tintColor = UIColor.primaryAccent
         UISwitch.appearance().onTintColor = UIColor.primaryAccent
+        UINavigationBar.appearance().standardAppearance = NavigationController.appearance.standard
+        UINavigationBar.appearance().scrollEdgeAppearance = NavigationController.appearance.standard
     }
-
 }
 

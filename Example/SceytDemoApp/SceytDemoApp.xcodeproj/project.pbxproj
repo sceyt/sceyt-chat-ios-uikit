@@ -3,11 +3,12 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 56;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		5674A3052C7C8E6600C51A07 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5674A3042C7C8E6600C51A07 /* SceytChatUIKit */; };
+		5674A30D2C7CC17E00C51A07 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5674A30C2C7CC17E00C51A07 /* SceytChatUIKit */; };
 		5694FF382C664FBA008DA2DC /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5694FF372C664FBA008DA2DC /* SceytChatUIKit */; };
 		56F88D9E2C00D3890010C3E4 /* UserDisplayNameFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */; };
 		C51C930E2B565C9C0069F9DA /* LoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C930D2B565C9C0069F9DA /* LoginViewController.swift */; };
@@ -16,7 +17,7 @@
 		C54CDD3F2B5554D9005A2432 /* UserProfileViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54CDD3E2B5554D9005A2432 /* UserProfileViewController.swift */; };
 		C54DF6BB2AECF09100767983 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6BA2AECF09100767983 /* AppDelegate.swift */; };
 		C54DF6BD2AECF09100767983 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6BC2AECF09100767983 /* SceneDelegate.swift */; };
-		C54DF6BF2AECF09100767983 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6BE2AECF09100767983 /* ViewController.swift */; };
+		C54DF6BF2AECF09100767983 /* DemoTabBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6BE2AECF09100767983 /* DemoTabBarController.swift */; };
 		C54DF6C22AECF09100767983 /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C54DF6C02AECF09100767983 /* Main.storyboard */; };
 		C54DF6C42AECF09400767983 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C54DF6C32AECF09400767983 /* Assets.xcassets */; };
 		C54DF6C72AECF09400767983 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = C54DF6C52AECF09400767983 /* LaunchScreen.storyboard */; };
@@ -34,7 +35,7 @@
 		C54DF6B72AECF09100767983 /* SceytDemoApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SceytDemoApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C54DF6BA2AECF09100767983 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		C54DF6BC2AECF09100767983 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		C54DF6BE2AECF09100767983 /* ViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewController.swift; sourceTree = "<group>"; };
+		C54DF6BE2AECF09100767983 /* DemoTabBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoTabBarController.swift; sourceTree = "<group>"; };
 		C54DF6C12AECF09100767983 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		C54DF6C32AECF09400767983 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C54DF6C62AECF09400767983 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -48,6 +49,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5674A30D2C7CC17E00C51A07 /* SceytChatUIKit in Frameworks */,
 				5694FF382C664FBA008DA2DC /* SceytChatUIKit in Frameworks */,
 				C5B97EA42B5692070070C913 /* SceytChatUIKit in Frameworks */,
 				5674A3052C7C8E6600C51A07 /* SceytChatUIKit in Frameworks */,
@@ -78,7 +80,7 @@
 			children = (
 				C54DF6BA2AECF09100767983 /* AppDelegate.swift */,
 				C54DF6BC2AECF09100767983 /* SceneDelegate.swift */,
-				C54DF6BE2AECF09100767983 /* ViewController.swift */,
+				C54DF6BE2AECF09100767983 /* DemoTabBarController.swift */,
 				C54CDD3E2B5554D9005A2432 /* UserProfileViewController.swift */,
 				C51C930D2B565C9C0069F9DA /* LoginViewController.swift */,
 				C54DF6CE2AECF19300767983 /* Config.swift */,
@@ -114,6 +116,7 @@
 				C5B97EA32B5692070070C913 /* SceytChatUIKit */,
 				5694FF372C664FBA008DA2DC /* SceytChatUIKit */,
 				5674A3042C7C8E6600C51A07 /* SceytChatUIKit */,
+				5674A30C2C7CC17E00C51A07 /* SceytChatUIKit */,
 			);
 			productName = SceytDemoApp;
 			productReference = C54DF6B72AECF09100767983 /* SceytDemoApp.app */;
@@ -145,7 +148,6 @@
 			);
 			mainGroup = C54DF6AE2AECF09100767983;
 			packageReferences = (
-				5674A3032C7C8E6600C51A07 /* XCLocalSwiftPackageReference "../../../../../Packages/sceyt-chat-ios-uikit" */,
 			);
 			productRefGroup = C54DF6B82AECF09100767983 /* Products */;
 			projectDirPath = "";
@@ -178,7 +180,7 @@
 				C51C93102B5660CB0069F9DA /* ConnectionService.swift in Sources */,
 				56F88D9E2C00D3890010C3E4 /* UserDisplayNameFormatter.swift in Sources */,
 				C51C930E2B565C9C0069F9DA /* LoginViewController.swift in Sources */,
-				C54DF6BF2AECF09100767983 /* ViewController.swift in Sources */,
+				C54DF6BF2AECF09100767983 /* DemoTabBarController.swift in Sources */,
 				C54CDD3F2B5554D9005A2432 /* UserProfileViewController.swift in Sources */,
 				C51C93122B566FF50069F9DA /* UserProfile.swift in Sources */,
 				C54DF6CF2AECF19300767983 /* Config.swift in Sources */,
@@ -407,15 +409,12 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		5674A3032C7C8E6600C51A07 /* XCLocalSwiftPackageReference "../../../../../Packages/sceyt-chat-ios-uikit" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = "../../../../../Packages/sceyt-chat-ios-uikit";
-		};
-/* End XCLocalSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
 		5674A3042C7C8E6600C51A07 /* SceytChatUIKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SceytChatUIKit;
+		};
+		5674A30C2C7CC17E00C51A07 /* SceytChatUIKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SceytChatUIKit;
 		};
