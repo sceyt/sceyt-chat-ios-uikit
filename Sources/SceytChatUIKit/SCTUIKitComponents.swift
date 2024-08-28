@@ -12,6 +12,7 @@ typealias Components = SCTUIKitComponents
 
 public enum SCTUIKitComponents {
     
+    public static var theme: SceytChatUIKitThemeProtocol.Type = SceytChatUIKitTheme.self
     public static var navigationController: NavigationController.Type = NavigationController.self
     public static var channelListVC: ChannelListVC.Type = ChannelListVC.self
     public static var channelListVM: ChannelListVM.Type = ChannelListVM.self

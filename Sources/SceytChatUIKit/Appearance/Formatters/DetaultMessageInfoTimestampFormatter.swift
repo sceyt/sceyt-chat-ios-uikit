@@ -32,7 +32,7 @@ open class DetaultMessageInfoTimestampFormatter: TimestampFormatter {
     
     open func format(_ date: Date) -> String {
         if Calendar.current.isDateInToday(date) {
-            return L10n.Message.List.separatorToday
+            return L10n.Message.List.bordersToday
         }
         
         let calendar = Calendar.current

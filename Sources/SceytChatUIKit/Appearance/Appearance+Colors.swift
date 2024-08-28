@@ -10,36 +10,37 @@ import UIKit
 
 public extension UIColor {
     
-    static var primaryAccent: UIColor { SceytChatUIKitTheme.primaryAccent }
-    static var secondaryAccent: UIColor { SceytChatUIKitTheme.secondaryAccent }
-    static var tertiaryAccent: UIColor { SceytChatUIKitTheme.tertiaryAccent }
-    static var quaternaryAccent: UIColor { SceytChatUIKitTheme.quaternaryAccent }
-    static var quinaryAccent: UIColor { SceytChatUIKitTheme.quinaryAccent }
+    static var primaryAccent: UIColor { Components.theme.primaryAccent }
+    static var secondaryAccent: UIColor { Components.theme.secondaryAccent }
+    static var tertiaryAccent: UIColor { Components.theme.tertiaryAccent }
+    static var quaternaryAccent: UIColor { Components.theme.quaternaryAccent }
+    static var quinaryAccent: UIColor { Components.theme.quinaryAccent }
     
-    static var surface1: UIColor { SceytChatUIKitTheme.surface1 }
-    static var surface2: UIColor { SceytChatUIKitTheme.surface2 }
-    static var surface3: UIColor { SceytChatUIKitTheme.surface3 }
+    static var surface1: UIColor { Components.theme.surface1 }
+    static var surface2: UIColor { Components.theme.surface2 }
+    static var surface3: UIColor { Components.theme.surface3 }
     
-    static var background: UIColor { SceytChatUIKitTheme.background }
-    static var borders: UIColor { SceytChatUIKitTheme.borders }
-    static var iconInactive: UIColor { SceytChatUIKitTheme.iconInactive }
-    static var iconSecondary: UIColor { SceytChatUIKitTheme.iconSecondary }
-    static var overlayBackground50: UIColor { SceytChatUIKitTheme.overlayBackground50 }
-    static var overlayBackground40: UIColor { SceytChatUIKitTheme.overlayBackground40 }
+    static var background: UIColor { Components.theme.background }
+    static var borders: UIColor { Components.theme.borders }
+    static var iconInactive: UIColor { Components.theme.iconInactive }
+    static var iconSecondary: UIColor { Components.theme.iconSecondary }
+    static var overlayBackground50: UIColor { Components.theme.overlayBackground50 }
+    static var overlayBackground40: UIColor { Components.theme.overlayBackground40 }
+    static var overlayBackgroundMixed: UIColor { Components.theme.overlayBackgroundMixed }
     
-    static var primaryText: UIColor { SceytChatUIKitTheme.primaryText }
-    static var secondaryText: UIColor { SceytChatUIKitTheme.secondaryText }
-    static var footnoteText: UIColor { SceytChatUIKitTheme.footnoteText }
-    static var textOnPrimary: UIColor { SceytChatUIKitTheme.textOnPrimary }
+    static var primaryText: UIColor { Components.theme.primaryText }
+    static var secondaryText: UIColor { Components.theme.secondaryText }
+    static var footnoteText: UIColor { Components.theme.footnoteText }
+    static var textOnPrimary: UIColor { Components.theme.textOnPrimary }
     
-    static var bubbleOutgoing: UIColor { SceytChatUIKitTheme.bubbleOutgoing }
-    static var bubbleOutgoingX: UIColor { SceytChatUIKitTheme.bubbleOutgoingX }
-    static var bubbleIncoming: UIColor { SceytChatUIKitTheme.bubbleIncoming }
-    static var bubbleIncomingX: UIColor { SceytChatUIKitTheme.bubbleIncomingX }
+    static var bubbleOutgoing: UIColor { Components.theme.bubbleOutgoing }
+    static var bubbleOutgoingX: UIColor { Components.theme.bubbleOutgoingX }
+    static var bubbleIncoming: UIColor { Components.theme.bubbleIncoming }
+    static var bubbleIncomingX: UIColor { Components.theme.bubbleIncomingX }
     
-    static var stateError: UIColor { SceytChatUIKitTheme.stateError }
-    static var stateSuccess: UIColor { SceytChatUIKitTheme.stateSuccess }
-    static var stateAttention: UIColor { SceytChatUIKitTheme.stateAttention }
+    static var stateError: UIColor { Components.theme.stateError }
+    static var stateSuccess: UIColor { Components.theme.stateSuccess }
+    static var stateAttention: UIColor { Components.theme.stateAttention }
     
     public static var initialColors: [UIColor] = [ .primaryAccent,
                                                    .secondaryAccent,
@@ -74,10 +75,9 @@ public extension UIColor {
         if #available(iOS 13.0, *) {
             self.init { $0.userInterfaceStyle == .dark ? dark : light }
         } else {
-            self.init(red: 0, green: 0, blue: 0, alpha: 0)
+            self.init(cgColor: light.cgColor)
         }
     }
-    
 }
 
 public extension UIColor {

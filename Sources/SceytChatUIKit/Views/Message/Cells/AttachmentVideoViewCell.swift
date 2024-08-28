@@ -24,7 +24,7 @@ extension MessageCell {
         
         override open func setup() {
             super.setup()
-            playButton.image = Images.videoPlayerPlay
+            playButton.image = Images.videoPlay
         }
         
         override open func setupAppearance() {

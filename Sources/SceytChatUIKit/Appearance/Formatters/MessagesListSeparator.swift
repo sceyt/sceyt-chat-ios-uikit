@@ -38,7 +38,7 @@ open class DefaultMessagesListSeparator: MessagesListSeparator {
     open func format(_ date: Date, showYear: Bool = false) -> String {
         let calendar = Calendar.current
         if calendar.isDateInToday(date) {
-            return L10n.Message.List.separatorToday
+            return L10n.Message.List.bordersToday
         }
         var format = "\(monthFormatter.string(from: date)) \(dayFormatter.string(from: date))"
         if showYear {

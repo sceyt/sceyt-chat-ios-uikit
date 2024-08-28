@@ -27,7 +27,7 @@ open class PlayerView: View {
     open override func setup() {
         super.setup()
         playerLayer.videoGravity = .resizeAspectFill
-        playButton.setImage(.messageVideoPlay, for: .normal)
+        playButton.setImage(.videoPlay, for: .normal)
     }
 
     open override func setupLayout() {

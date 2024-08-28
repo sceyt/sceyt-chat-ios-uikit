@@ -669,7 +669,7 @@ extension ComposerVC {
         private let audioPlayerView = MiniAudioPlayerView()
         
         private let sendButton = {
-            $0.setImage(.audioPlayerSend, for: [])
+            $0.setImage(.messageSendAction, for: [])
             $0.imageView?.contentMode = .scaleAspectFit
             $0.setContentHuggingPriority(.required, for: .horizontal)
             $0.setContentCompressionResistancePriority(.required, for: .horizontal)

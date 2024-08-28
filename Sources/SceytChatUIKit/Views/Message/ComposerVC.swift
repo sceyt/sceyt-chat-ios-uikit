@@ -670,7 +670,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 if text.isEmpty {
                     text = L10n.Message.Attachment.voice
                 }
-                image = Images.replyVoice
+                image = .audioPlayerMic
             case "link":
                 if let metadata = layoutModel.linkPreviews?.first?.metadata {
                     addOrUpdateLinkPreview(linkDetails: metadata)
@@ -684,7 +684,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 if text.isEmpty {
                     text = L10n.Message.Attachment.file
                 }
-                image = .replyFile
+                image = .messageFile
             }
         }
         let titleAttributedString = NSMutableAttributedString(
@@ -762,7 +762,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 if text.isEmpty {
                     text = L10n.Message.Attachment.voice
                 }
-                image = Images.replyVoice
+                image = .audioPlayerMic
             case "link":
                 if text.isEmpty {
                     text = L10n.Message.Attachment.link
@@ -772,7 +772,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 if text.isEmpty {
                     text = L10n.Message.Attachment.file
                 }
-                image = .replyFile
+                image = .messageFile
             }
         }
         let titleAttributedString = NSMutableAttributedString(

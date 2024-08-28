@@ -83,6 +83,7 @@ open class CreatePrivateChannelVC: ViewController,
         }
         
         view.backgroundColor = appearance.backgroundColor
+        profileView.avatarButton.setImage(.editAvatar, for: .normal)
     }
     
     @objc

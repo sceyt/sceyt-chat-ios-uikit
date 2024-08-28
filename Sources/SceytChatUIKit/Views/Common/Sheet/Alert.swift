@@ -120,7 +120,7 @@ open class Alert: View {
             } else {
                 button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
                     .font: (isPrefered ? appearance.preferedButtonFont : appearance.buttonFont) ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.normalTextColor ?? .init(light: 0x111539, dark: 0xE1E3E6),
+                    .foregroundColor: appearance.normalTextColor ?? .primaryAccent,
                 ]), for: .normal)
             }
         }

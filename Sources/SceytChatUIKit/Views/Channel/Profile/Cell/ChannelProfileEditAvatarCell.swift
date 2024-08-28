@@ -75,7 +75,7 @@ extension URL: AvatarBuildable {
     }
     
     public var defaultAvatar: UIImage? {
-        Assets.avatar.image
+        .avatar
     }
     
     public var appearance: InitialsBuilderAppearance? {

@@ -590,10 +590,10 @@ internal enum L10n {
       internal static let deliveredTo = L10n.tr("Localizable", "message.info.deliveredTo", fallback: "Delivered to")
       /// edited
       internal static let edited = L10n.tr("Localizable", "message.info.edited", fallback: "edited")
-        /// Played by
-        internal static let playedBy = L10n.tr("Localizable", "message.info.playedBy", fallback: "Played by")
-        /// Seen by
-        internal static let readBy = L10n.tr("Localizable", "message.info.readBy", fallback: "Seen by")
+      /// Played by
+      internal static let playedBy = L10n.tr("Localizable", "message.info.playedBy", fallback: "Played by")
+      /// Seen by
+      internal static let readBy = L10n.tr("Localizable", "message.info.readBy", fallback: "Seen by")
       /// Sent:
       internal static let sent = L10n.tr("Localizable", "message.info.sent", fallback: "Sent:")
       /// Size:
@@ -607,7 +607,7 @@ internal enum L10n {
     }
     internal enum List {
       /// Today
-      internal static let separatorToday = L10n.tr("Localizable", "message.list.borders-today", fallback: "Today")
+      internal static let bordersToday = L10n.tr("Localizable", "message.list.borders-today", fallback: "Today")
       /// New Messages
       internal static let unread = L10n.tr("Localizable", "message.list.unread", fallback: "New Messages")
     }

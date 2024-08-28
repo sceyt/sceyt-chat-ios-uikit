@@ -30,7 +30,7 @@ open class SearchController: UISearchController {
             if let newValue {
                 searchBar.searchTextField.attributedPlaceholder = .init(string: newValue, attributes: [
                     .font: appearance.font ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.placeholderColor ?? .init(light: 0xA0A1B0, dark: 0x76787A)
+                    .foregroundColor: appearance.placeholderColor ?? .footnoteText
                 ])
             } else {
                 searchBar.searchTextField.attributedText = nil
@@ -56,7 +56,6 @@ open class SearchController: UISearchController {
     open func setupAppearance() {
         searchBar.backgroundImage = .init()
         searchBar.backgroundColor = appearance.backgroundColor
-        searchBar.setSearchFieldBackgroundImage(appearance.backgroundImage?.imageAsset?.image(with: .current), for: [])
         searchBar.setImage(.searchIcon, for: .search, state: [])
         searchBar.searchTextField.layer.cornerRadius = Layouts.cornerRadius
         searchBar.searchTextField.clipsToBounds = true

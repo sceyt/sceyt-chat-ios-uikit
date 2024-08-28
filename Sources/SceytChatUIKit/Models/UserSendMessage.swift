@@ -283,7 +283,7 @@ public struct AttachmentView {
                 self.thumbnail = image
                 type = .video
             } else {
-                self.thumbnail = .replyFile
+                self.thumbnail = .messageFile
             }
         }
         
@@ -301,7 +301,7 @@ public struct AttachmentView {
         name = url.lastPathComponent
         isLocalFile = true
         type = .file
-        thumbnail = .replyFile
+        thumbnail = .messageFile
         fileSize = Components.storage.sizeOfItem(at: url)
     }
     
@@ -310,7 +310,7 @@ public struct AttachmentView {
         name = url.lastPathComponent
         isLocalFile = true
         type = .voice
-        thumbnail = .replyFile
+        thumbnail = .messageFile
         duration = metadata.duration
         thumb = metadata.thumbnail
         fileSize = Components.storage.sizeOfItem(at: url)

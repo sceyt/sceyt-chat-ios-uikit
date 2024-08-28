@@ -13,11 +13,6 @@ open class CreatePrivateChannelProfileView: View {
     open lazy var avatarButton = CircleButton(type: .custom)
         .withoutAutoresizingMask
 
-    open lazy var editButton: CircleButton = {
-        $0.setImage(.channelProfileEditAvatar, for: .normal)
-        return $0.withoutAutoresizingMask
-    }(CircleButton(type: .custom))
-
     open lazy var subjectField: UITextField = {
         $0.borderStyle = .none
         $0.layer.sublayerTransform = CATransform3DMakeTranslation(0, 0, 0);
@@ -51,22 +46,13 @@ open class CreatePrivateChannelProfileView: View {
     open lazy var bottomLine1 = UIView().withoutAutoresizingMask
     open lazy var bottomLine2 = UIView().withoutAutoresizingMask
 
-    override open func setup() {
-        super.setup()
-
-        editButton.isUserInteractionEnabled = false
-    }
-
     override open func setupLayout() {
         super.setupLayout()
         addSubview(avatarButton)
-        addSubview(editButton)
         addSubview(mainStackView)
         avatarButton.centerXAnchor.pin(to: centerXAnchor)
         avatarButton.topAnchor.pin(to: topAnchor, constant: 16)
         avatarButton.resize(anchors: [.height(Layouts.avatarSize), .width(Layouts.avatarSize)])
-        editButton.resize(anchors: [.height(Layouts.avatarSize - 32), .width(Layouts.avatarSize - 32)])
-        editButton.pin(to: avatarButton, anchors: [.centerX, .centerY])
 
         mainStackView.topAnchor.pin(to: avatarButton.bottomAnchor, constant: 16)
         mainStackView.pin(to: self,

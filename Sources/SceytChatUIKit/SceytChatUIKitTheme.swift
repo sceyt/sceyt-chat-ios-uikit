@@ -8,7 +8,41 @@
 import UIKit
 import SceytChat
 
-public struct SceytChatUIKitTheme {
+public protocol SceytChatUIKitThemeProtocol {
+    static var primaryAccent: UIColor { get }
+    static var secondaryAccent: UIColor { get }
+    static var tertiaryAccent: UIColor { get }
+    static var quaternaryAccent: UIColor { get }
+    static var quinaryAccent: UIColor { get }
+    
+    static var surface1: UIColor { get }
+    static var surface2: UIColor { get }
+    static var surface3: UIColor { get }
+    
+    static var background: UIColor { get }
+    static var borders: UIColor { get }
+    static var iconInactive: UIColor { get }
+    static var iconSecondary: UIColor { get }
+    static var overlayBackground50: UIColor { get }
+    static var overlayBackground40: UIColor { get }
+    static var overlayBackgroundMixed: UIColor { get }
+    
+    static var primaryText: UIColor { get }
+    static var secondaryText: UIColor { get }
+    static var footnoteText: UIColor { get }
+    static var textOnPrimary: UIColor { get }
+    
+    static var bubbleOutgoing: UIColor { get }
+    static var bubbleOutgoingX: UIColor { get }
+    static var bubbleIncoming: UIColor { get }
+    static var bubbleIncomingX: UIColor { get }
+    
+    static var stateError: UIColor { get }
+    static var stateSuccess: UIColor { get }
+    static var stateAttention: UIColor { get }
+}
+
+public struct SceytChatUIKitTheme: SceytChatUIKitThemeProtocol {
     
     public static var primaryAccent: UIColor = UIColor(light: Light.primaryAccent, dark: Dark.primaryAccent)
     public static var secondaryAccent: UIColor = UIColor(light: Light.secondaryAccent, dark: Dark.secondaryAccent)
@@ -26,6 +60,7 @@ public struct SceytChatUIKitTheme {
     public static var iconSecondary: UIColor = UIColor(light: Light.iconSecondary, dark: Dark.iconSecondary)
     public static var overlayBackground50: UIColor = UIColor(light: Light.overlayBackground50, dark: Dark.overlayBackground50)
     public static var overlayBackground40: UIColor = UIColor(light: Light.overlayBackground40, dark: Dark.overlayBackground40)
+    public static var overlayBackgroundMixed: UIColor = UIColor(light: Light.overlayBackground40, dark: Dark.overlayBackground50)
     
     public static var primaryText: UIColor = UIColor(light: Light.primaryText, dark: Dark.primaryText)
     public static var secondaryText: UIColor = UIColor(light: Light.secondaryText, dark: Dark.secondaryText)

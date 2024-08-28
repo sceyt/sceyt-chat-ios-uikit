@@ -440,9 +440,9 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
             let newStatus = AVPlayer.TimeControlStatus(rawValue: newValue)
             if newStatus != oldStatus {
                 if newStatus == .playing {
-                    playPauseButton.setImage(Images.videoPlayerPause, for: [])
+                    playPauseButton.setImage(.videoPlayerPause, for: [])
                 } else {
-                    playPauseButton.setImage(Images.videoPlayerPlay, for: [])
+                    playPauseButton.setImage(.videoPlayerPlay, for: [])
                 }
             }
         }

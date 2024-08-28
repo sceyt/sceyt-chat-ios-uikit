@@ -1075,7 +1075,7 @@ extension MessageLayoutModel {
             }
             switch type {
             case .voice:
-                thumbnail = .replyVoice
+                thumbnail = .audioPlayerMic
                 voiceWaveform = attachment.voiceDecodedMetadata?.thumbnail.map { Float($0) }
             case .image, .video:
                 if let path = fileProvider.thumbnailFile(for: attachment, preferred: thumbnailSize) {
@@ -1112,7 +1112,7 @@ extension MessageLayoutModel {
                     }
                 }
                 if thumbnail == nil {
-                    thumbnail = .replyFile
+                    thumbnail = .messageFile
                 }
             case .link:
                 if thumbnail == nil {

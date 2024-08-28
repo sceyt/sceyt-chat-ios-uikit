@@ -43,7 +43,7 @@ open class ChannelProfileFileCell: CollectionViewCell {
         super.setup()
         
         selectedBackgroundView = UIView()
-        iconView.image = Appearance.Images.file
+        iconView.image = .file
         titleLabel.lineBreakMode = .byTruncatingMiddle
         iconView.clipsToBounds = true
 

@@ -27,8 +27,8 @@ public struct SceytChatUIKitConfig {
     
     // MARK: - Chat Avatar
     public var chatUserDefaultAvatar = UserDefaultAvatarType(
-        activeState: Assets.avatar.image,
-        inactiveState: Assets.avatar.image,
+        activeState: .avatar,
+        inactiveState: .avatar,
         deletedState: .deletedUser
     )
     public var chatChannelDefaultAvatar = ChannelDefaultAvatarType()

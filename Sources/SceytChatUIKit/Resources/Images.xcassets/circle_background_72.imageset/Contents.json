@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "circle_background_72.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
