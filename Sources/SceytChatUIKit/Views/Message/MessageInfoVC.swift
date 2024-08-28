@@ -42,6 +42,11 @@ open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDele
     override open func setupAppearance() {
         super.setupAppearance()
         
+        navigationItem.standardAppearance = NavigationController.appearance.standard
+        navigationItem.standardAppearance?.backgroundColor = appearance.cellBackgroundColor
+        navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
+        navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
+        
         view.backgroundColor = appearance.backgroundColor
         tableView.backgroundColor = .clear
     }

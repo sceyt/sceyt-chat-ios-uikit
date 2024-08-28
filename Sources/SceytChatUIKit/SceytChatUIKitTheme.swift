@@ -18,8 +18,12 @@ public protocol SceytChatUIKitThemeProtocol {
     static var surface1: UIColor { get }
     static var surface2: UIColor { get }
     static var surface3: UIColor { get }
+    static var surface3Dark: UIColor { get }
     
     static var background: UIColor { get }
+    static var backgroundSecondary: UIColor { get }
+    static var backgroundTertiary: UIColor { get }
+    static var backgroundDark: UIColor { get }
     static var borders: UIColor { get }
     static var iconInactive: UIColor { get }
     static var iconSecondary: UIColor { get }
@@ -53,8 +57,12 @@ public struct SceytChatUIKitTheme: SceytChatUIKitThemeProtocol {
     public static var surface1: UIColor = UIColor(light: Light.surface1, dark: Dark.surface1)
     public static var surface2: UIColor = UIColor(light: Light.surface2, dark: Dark.surface2)
     public static var surface3: UIColor = UIColor(light: Light.surface3, dark: Dark.surface3)
+    public static var surface3Dark: UIColor = Dark.surface3
     
     public static var background: UIColor = UIColor(light: Light.background, dark: Dark.background)
+    public static var backgroundSecondary: UIColor = UIColor(light: Light.background, dark: Dark.surface1)
+    public static var backgroundTertiary: UIColor = UIColor(light: Light.surface1, dark: Dark.background)
+    public static var backgroundDark: UIColor = Dark.background
     public static var borders: UIColor = UIColor(light: Light.borders, dark: Dark.borders)
     public static var iconInactive: UIColor = UIColor(light: Light.iconInactive, dark: Dark.iconInactive)
     public static var iconSecondary: UIColor = UIColor(light: Light.iconSecondary, dark: Dark.iconSecondary)

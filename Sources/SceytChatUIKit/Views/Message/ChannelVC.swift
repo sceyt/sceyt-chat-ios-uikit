@@ -360,6 +360,11 @@ open class ChannelVC: ViewController,
     override open func setupAppearance() {
         super.setupAppearance()
         
+        navigationItem.standardAppearance = NavigationController.appearance.standard
+        navigationItem.standardAppearance?.backgroundColor = .surface1
+        navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
+        navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
+
         view.backgroundColor = appearance.backgroundColor
         coverView.backgroundColor = appearance.coverViewBackgroundColor
         collectionView.backgroundColor = appearance.backgroundColor

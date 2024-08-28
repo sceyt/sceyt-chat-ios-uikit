@@ -36,8 +36,6 @@ open class PhotosPickerCell: CollectionViewCell {
     override open func setup() {
         super.setup()
         checkBoxView.clipsToBounds = true
-        checkBoxView.selectedImage = .galleryAssetSelect
-        checkBoxView.unselectedImage = .galleryAssetUnselect
         checkBoxView.isUserInteractionEnabled = false
         imageView.clipsToBounds = true
         timeLabel.clipsToBounds = true
@@ -48,6 +46,7 @@ open class PhotosPickerCell: CollectionViewCell {
         timeLabel.backgroundColor = appearance.timeBackgroundColor
         timeLabel.textLabel.font = appearance.timeTextFont
         timeLabel.textLabel.textColor = appearance.timeTextColor
+        checkBoxView.selectedImage = .radioSelected
         checkBoxView.unselectedImage = .radioGray
     }
     

@@ -223,17 +223,20 @@ public extension Appearance {
         }()
         
 #warning("check later")
-        public static var radio: UIImage = { Assets.radio.image }()
-        public static var radioGray: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.radioGray.image,
+        public static var radio: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.radioCircle1.image,
                                                      renderingMode: .template(.iconInactive)))!
+        }()
+        public static var radioGray: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground24.image,
+                                                     renderingMode: .template(.overlayBackground50)),
+                                         .init(image: Assets.radioCircle1.image,
+                                                     renderingMode: .template(.textOnPrimary)))!
         }()
         public static var radioSelected: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.radioSelected.image,
                                                      renderingMode: .template(.primaryAccent)))!
         }()
-        public static var galleryAssetSelect: UIImage = { Assets.galleryAssetSelect.image }()
-        public static var galleryAssetUnselect: UIImage = { Assets.galleryAssetUnselect.image }()
         public static var galleryVidepAsset: UIImage = { Assets.galleryVideoAsset.image }()
         public static var editAvatar: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.circleBackground72.image,
@@ -388,8 +391,8 @@ public extension Appearance {
                                                      renderingMode: .template(.primaryAccent)))!
         }()
         public static var channelUnreadBubble: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground56.image,
-                                                     renderingMode: .template(.background)),
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground44.image,
+                                                     renderingMode: .template(.backgroundSecondary)),
                                          .init(image: Assets.channelUnreadBubble1.image,
                                                renderingMode: .template(.secondaryText)))!
         }()
@@ -540,11 +543,8 @@ public extension Appearance {
         }()
         
         public static var avatar: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground72.image,
-                                                     renderingMode: .template(.surface3)),
-                                         .init(image: Assets.avatar1.image,
-                                               renderingMode: .template(.surface1),
-                                               anchor: .bottom(.init(x: 0, y: 1))))!
+            AssetComposer.shared.compose(from: .init(image: Assets.avatar.image,
+                                                     renderingMode: .original))!
         }()
         
         public static var attachmentFile: UIImage = {
@@ -757,8 +757,6 @@ extension UIImage {
     static var radio: UIImage { Images.radio }
     static var radioGray: UIImage { Images.radioGray }
     static var radioSelected: UIImage { Images.radioSelected }
-    static var galleryAssetSelect: UIImage { Images.galleryAssetSelect }
-    static var galleryAssetUnselect: UIImage { Images.galleryAssetUnselect }
     static var galleryVideoAsset: UIImage { Images.galleryVidepAsset }
     static var forwardedMessage: UIImage { Images.forwardedMessage }
     static var editAvatar: UIImage { Images.editAvatar }

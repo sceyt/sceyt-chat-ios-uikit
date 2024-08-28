@@ -155,7 +155,7 @@ open class ChannelProfileVC: ViewController,
         navigationItem.standardAppearance = NavigationController.appearance.standard
         navigationItem.standardAppearance?.backgroundColor = appearance.cellBackgroundColor
         navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
-        navigationItem.scrollEdgeAppearance?.backgroundColor = .surface1
+        navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
         
         view.backgroundColor = appearance.backgroundColor
         tableView.backgroundColor = .clear        
@@ -1049,7 +1049,6 @@ public extension ChannelProfileVC {
         case uri
         case options
         case items
-//        case uri
         case attachment
     }
     

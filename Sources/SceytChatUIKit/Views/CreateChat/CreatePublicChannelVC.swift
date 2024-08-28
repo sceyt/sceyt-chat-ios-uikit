@@ -30,7 +30,7 @@ open class CreatePublicChannelVC: ViewController, UITextViewDelegate {
                                                             target: self,
                                                             action: #selector(nextAction(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
-        
+        profileView.avatarButton.setImage(.editAvatar, for: .normal)
         
         profileView.subjectField.publisher(for: .editingDidEndOnExit).sink { [unowned self] _ in
             profileView.descriptionField.becomeFirstResponder()
