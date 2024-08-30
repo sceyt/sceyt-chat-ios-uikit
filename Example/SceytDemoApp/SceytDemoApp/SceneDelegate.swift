@@ -22,6 +22,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         if let window = windowScene.windows.first {
             window.tintColor = UIColor.primaryAccent
+            self.window = window
         }
     }
 
