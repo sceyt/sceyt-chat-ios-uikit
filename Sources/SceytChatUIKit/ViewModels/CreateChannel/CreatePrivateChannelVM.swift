@@ -35,6 +35,8 @@ open class CreatePrivateChannelVM {
     open func create(subject: String,
                 metadata: String?,
                 image: UIImage?) {
+        let subject = subject.trimmingCharacters(in: .whitespacesAndNewlines)
+        let metadata = metadata?.trimmingCharacters(in: .whitespacesAndNewlines)
         func createChannel(uploadedAvatarUrl: URL?) {
             let members = users.map {
                 Member.Builder(id: $0.id).build()

@@ -78,6 +78,9 @@ open class CreatePublicChannelVM {
                      metadata: String?,
                      image: UIImage?) {
 //        let metadataObj = try? ChannelMetadata(d: metadata).jsonString()
+        let subject = subject.trimmingCharacters(in: .whitespacesAndNewlines)
+        let metadata = metadata?.trimmingCharacters(in: .whitespacesAndNewlines)
+
         func createChannel(uploadedAvatarUrl: URL?) {
             
             channelCreator

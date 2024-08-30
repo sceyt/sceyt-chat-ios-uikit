@@ -643,7 +643,7 @@ extension EmojiVC: AppearanceProvider {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor: UIColor? = UIColor.background
+        public var backgroundColor: UIColor? = UIColor.surface1
         public var moreButtonBackgroundColor: UIColor? = UIColor.bubbleIncoming
         public var selectedBackgroundColor: UIColor? = UIColor.surface2
         

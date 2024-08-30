@@ -13,7 +13,9 @@ open class InitialsBuilder {
     open class func build(
         appearance: InitialsBuilderAppearance = .init(),
         display: String) -> UIImage {
-            
+        
+        let display = display.trimmingCharacters(in: .whitespacesAndNewlines)
+
         return Components.imageBuilder.build(
             size: appearance.size,
             backgroundColor: .initial(title: display)) {
