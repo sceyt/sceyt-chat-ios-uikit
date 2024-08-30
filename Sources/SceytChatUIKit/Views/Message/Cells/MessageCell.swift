@@ -498,6 +498,7 @@ open class MessageCell: CollectionViewCell,
     open func handleLongPress(sender: UILongPressGestureRecognizer) -> LongPressItem? {
         switch sender.state {
         case .began:
+            connectContextMenuIfNeeded(identifier: .init(value: data))
             if textLabel.contains(gestureRecognizer: sender),
                let index = textLabel.indexForGesture(sender: sender),
                let item = data.attributedView.items.first(where: { $0.range.contains(index)}) {
