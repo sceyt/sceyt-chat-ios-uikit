@@ -81,11 +81,9 @@ extension MessageCell {
             stackViewH2.addArrangedSubview(messageLabel)
             stackViewV.addArrangedSubview(stackViewH2)
             stackViewH.setCustomSpacing(8, after: borderView)
-            stackViewH.pin(to: self)
+            stackViewH.pin(to: self, anchors: [.leading(0), .trailing(-8), .top(8), .bottom(-8)])
             borderView.resize(anchors: [.width(2)])
-//            borderView.bottomAnchor.pin(to: messageLabel.bottomAnchor)
-            borderView.heightAnchor.pin(to: stackViewH.heightAnchor)
-//            messageLabel.widthAnchor.pin(to: stackViewV.widthAnchor)
+            borderView.heightAnchor.pin(to: self.heightAnchor)
             stackViewV.heightAnchor.pin(to: stackViewH.heightAnchor)
         }
 
@@ -116,6 +114,10 @@ extension MessageCell {
                     return
                 }
                 isHidden = false
+                backgroundColor = data.byMe ? appearance.replyBackgroundColor.out : appearance.replyBackgroundColor.in
+                layer.cornerRadius = Layouts.cornerRadius
+                layer.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+                layer.masksToBounds = true
                 nameLabel.text = Formatters.userDisplayName.format(data.user)
                 messageLabel.attributedText = data.attributedBody
                 if let image = data.icon {
@@ -203,8 +205,8 @@ extension MessageCell {
             config.maximumNumberOfLines = data.attachment == nil ? 2 : 1
             let messageLabelSize = TextSizeMeasure.calculateSize(of: data.attributedBody, config: config).textSize
             
-            return CGSize(width: thumbnailSize.width + max(nameLabelSize.width, iconSize.width + messageLabelSize.width),
-                          height: max(thumbnailSize.height, nameLabelSize.height + max(iconSize.height, messageLabelSize.height)))
+            return CGSize(width: thumbnailSize.width + max(nameLabelSize.width, iconSize.width + messageLabelSize.width) + 8,
+                          height: max(thumbnailSize.height, nameLabelSize.height + max(iconSize.height, messageLabelSize.height)) + 16)
         }
     }
 }

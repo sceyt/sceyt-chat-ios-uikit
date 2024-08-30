@@ -85,7 +85,7 @@ class UserProfileViewController: UIViewController {
             notificationView.titleView.iconView.image = Appearance.Images.channelProfileUnmute
         } else {
             notificationView.titleView.titleLabel.text = "Mute Notifications"
-            notificationView.titleView.iconView.image = Appearance.Images.channelNotification
+            notificationView.titleView.iconView.image = Appearance.Images.channelProfileMute
         }
         notificationView.switch.isOn = settings.muted
     }

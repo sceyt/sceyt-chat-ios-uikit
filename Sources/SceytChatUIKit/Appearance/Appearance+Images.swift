@@ -51,10 +51,6 @@ public extension Appearance {
                                          .init(image: Assets.link2.image,
                                                renderingMode: .template(.primaryAccent)))!
         }()
-        public static var camera: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.camera.image,
-                                                     renderingMode: .template(.primaryAccent)))!
-        }()
         public static var warning: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.warning.image,
                                                      renderingMode: .template(.primaryAccent)))!
@@ -76,10 +72,8 @@ public extension Appearance {
                                                      renderingMode: .template(.primaryAccent)))!
         }()
         public static var deletedUser: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground36.image,
-                                                     renderingMode: .template(.surface3)),
-                                         .init(image: Assets.deletedUser1.image,
-                                               renderingMode: .template(.textOnPrimary)))!
+            AssetComposer.shared.compose(from: .init(image: Assets.deletedUser.image,
+                                                     renderingMode: .original))!
         }()
         public static var attachment: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.attach.image,
@@ -95,19 +89,13 @@ public extension Appearance {
             AssetComposer.shared.compose(from: .init(image: Assets.memberMore.image,
                                                      renderingMode: .template(.primaryAccent)))!
         }()
-        public static var channelNotification: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.channelNotification.image,
-                                                     renderingMode: .template(.primaryAccent)))!
-        }()
-        
-#warning("check later")
         public static var radio: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.radioCircle1.image,
                                                      renderingMode: .template(.iconInactive)))!
         }()
         public static var radioGray: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.circleBackground24.image,
-                                                     renderingMode: .template(.overlayBackground50)),
+                                                     renderingMode: .template(.overlayBackground1)),
                                          .init(image: Assets.radioCircle1.image,
                                                      renderingMode: .template(.textOnPrimary)))!
         }()
@@ -220,13 +208,13 @@ public extension Appearance {
         
         public static var videoPlay: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.circleBackground56.image,
-                                                     renderingMode: .template(.overlayBackground50)),
+                                                     renderingMode: .template(.overlayBackground2)),
                                          .init(image: Assets.videoPlay1.image,
                                                renderingMode: .template(.textOnPrimary)))!
         }()
         public static var videoPause: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.circleBackground56.image,
-                                                     renderingMode: .template(.overlayBackground50)),
+                                                     renderingMode: .template(.overlayBackground2)),
                                          .init(image: Assets.videoPause1.image,
                                                renderingMode: .template(.textOnPrimary)))!
         }()
@@ -270,7 +258,7 @@ public extension Appearance {
         }()
         public static var channelUnreadBubble: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.circleBackground44.image,
-                                                     renderingMode: .template(.backgroundSecondary)),
+                                                     renderingMode: .template(.backgroundSections)),
                                          .init(image: Assets.channelUnreadBubble1.image,
                                                renderingMode: .template(.secondaryText)))!
         }()
@@ -297,10 +285,6 @@ public extension Appearance {
                                                      renderingMode: .template(.secondaryAccent)),
                                          .init(image: Assets.channelProfileBell1.image,
                                                renderingMode: .template(.textOnPrimary)))!
-        }()
-        public static var channelProfileReport: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.channelProfileReport.image,
-                                                     renderingMode: .template(.primaryAccent)))!
         }()
         public static var channelProfileJoin: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.channelProfileJoin.image,
@@ -358,7 +342,7 @@ public extension Appearance {
         }()
         public static var audioPlayerLock: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.circleBackground42.image,
-                                                     renderingMode: .template(.background)),
+                                                     renderingMode: .template(.backgroundSections)),
                                          .init(image: Assets.audioPlayerLock1.image,
                                                renderingMode: .template(.primaryAccent)))!
         }()
@@ -402,13 +386,13 @@ public extension Appearance {
         }()
         public static var audioPlayerStop: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.circleBackground42.image,
-                                                     renderingMode: .template(.background)),
+                                                     renderingMode: .template(.backgroundSections)),
                                          .init(image: Assets.audioPlayerStop1.image,
                                                renderingMode: .template(.primaryAccent)))!
         }()
         public static var audioPlayerUnlock: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.audioPlayerUnlock1.image,
-                                                     renderingMode: .template(.background)),
+                                                     renderingMode: .template(.backgroundSections)),
                                          .init(image: Assets.audioPlayerUnlock2.image,
                                                renderingMode: .template(.primaryAccent.withAlphaComponent(0.4)),
                                                anchor: .bottom(.init(x: 0, y: -15.5))),
@@ -620,7 +604,6 @@ extension UIImage {
     static var closeCircle: UIImage { Images.closeCircle }
     static var file: UIImage { Images.file }
     static var link: UIImage { Images.link }
-    static var camera: UIImage { Images.camera }
     static var avatar: UIImage { Images.avatar }
     static var warning: UIImage { Images.warning }
     static var eye: UIImage { Images.eye }
@@ -631,7 +614,6 @@ extension UIImage {
     static var attachment: UIImage { Images.attachment }
     static var addMember: UIImage { Images.addMember }
     static var moreMember: UIImage { Images.moreMember }
-    static var channelNotification: UIImage { Images.channelNotification }
     static var radio: UIImage { Images.radio }
     static var radioGray: UIImage { Images.radioGray }
     static var radioSelected: UIImage { Images.radioSelected }
@@ -683,7 +665,6 @@ extension UIImage {
     static var channelProfileMute: UIImage { Images.channelProfileMute }
     static var channelProfileUnmute: UIImage { Images.channelProfileUnmute }
     static var channelProfileBell: UIImage { Images.channelProfileBell }
-    static var channelProfileReport: UIImage { Images.channelProfileReport }
     static var channelProfileJoin: UIImage { Images.channelProfileJoin }
     static var channelProfileMore: UIImage { Images.channelProfileMore }
     static var channelProfileAutoDeleteMessages: UIImage { Images.channelProfileAutoDeleteMessages }

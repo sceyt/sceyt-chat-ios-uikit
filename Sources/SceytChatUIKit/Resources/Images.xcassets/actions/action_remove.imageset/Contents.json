@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "action_remove.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "action_remove@2x.png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "action_remove@3x.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "action_remove.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

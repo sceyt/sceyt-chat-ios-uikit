@@ -278,7 +278,10 @@ open class ChannelLayoutModel {
                     if text.isEmpty {
                         attributedAttachmentMessage.append(NSAttributedString(
                             string: type,
-                            attributes: [.font: font]
+                            attributes: [
+                                .font: font,
+                                .foregroundColor: messageLabelTextColor
+                            ]
                         ))
                         text.append(attributedAttachmentMessage)
                     } else {

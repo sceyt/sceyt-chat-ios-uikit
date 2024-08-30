@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "Channel.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "Channel@2x.png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "Channel@3x.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "create_public_channel.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

@@ -698,7 +698,7 @@ extension ComposerVC {
             
             row.pin(to: self, anchors: [.leading(8), .trailing(-8), .top(8), .bottom(-8)])
             
-            sendButton.resize(anchors: [.height(32), .width(32)])
+            sendButton.resize(anchors: [.height(34), .width(34)])
         }
         
         private var url: URL!

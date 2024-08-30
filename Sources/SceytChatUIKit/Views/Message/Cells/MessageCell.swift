@@ -687,6 +687,7 @@ public extension MessageCell {
         public static var checkBoxPadding: CGFloat = 12
         public static var horizontalPadding: CGFloat = 12
         public static var attachmentIconSize: CGFloat = 40
+        public static var cornerRadius: CGFloat = 8
     }
 }
 

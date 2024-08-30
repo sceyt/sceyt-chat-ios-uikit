@@ -19,18 +19,16 @@ public extension UIColor {
     static var surface1: UIColor { Components.theme.surface1 }
     static var surface2: UIColor { Components.theme.surface2 }
     static var surface3: UIColor { Components.theme.surface3 }
-    static var surface3Dark: UIColor { Components.theme.surface3Dark }
     
     static var background: UIColor { Components.theme.background }
-    static var backgroundSecondary: UIColor { Components.theme.backgroundSecondary }
-    static var backgroundTertiary: UIColor { Components.theme.backgroundTertiary }
+    static var backgroundMuted: UIColor { Components.theme.backgroundMuted }
+    static var backgroundSections: UIColor { Components.theme.backgroundSections }
     static var backgroundDark: UIColor { Components.theme.backgroundDark }
     static var borders: UIColor { Components.theme.borders }
     static var iconInactive: UIColor { Components.theme.iconInactive }
     static var iconSecondary: UIColor { Components.theme.iconSecondary }
-    static var overlayBackground50: UIColor { Components.theme.overlayBackground50 }
-    static var overlayBackground40: UIColor { Components.theme.overlayBackground40 }
-    static var overlayBackgroundMixed: UIColor { Components.theme.overlayBackgroundMixed }
+    static var overlayBackground1: UIColor { Components.theme.overlayBackground1 }
+    static var overlayBackground2: UIColor { Components.theme.overlayBackground2 }
     
     static var primaryText: UIColor { Components.theme.primaryText }
     static var secondaryText: UIColor { Components.theme.secondaryText }

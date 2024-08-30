@@ -158,6 +158,7 @@ open class MessageLayoutModel {
             ).textSize
             replyLayout = .init(
                 message: parent,
+                byMe: message.user.id == me,
                 channel: channel,
                 thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
                 attributedBody: parentAttributedView.content)
@@ -388,7 +389,8 @@ open class MessageLayoutModel {
                 updateOptions.insert(.parentMessageBody)
             }
             replyLayout = .init(
-                message: parent,
+                message: parent, 
+                byMe: message.user.id == me,
                 channel: channel,
                 thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
                 attributedBody: parentAttributedView?.content)
@@ -1253,6 +1255,7 @@ extension MessageLayoutModel {
     open class ReplyLayout {
         
         public let message: ChatMessage
+        public let byMe: Bool
         public let thumbnailSize: CGSize?
         public var attributedBody = NSAttributedString()
         public private(set) var attachment: AttachmentLayout?
@@ -1263,10 +1266,12 @@ extension MessageLayoutModel {
         
         public init(
             message: ChatMessage,
+            byMe: Bool,
             channel: ChatChannel,
             thumbnailSize: CGSize?,
             attributedBody: NSAttributedString? = nil) {
                 self.message = message
+                self.byMe = byMe
                 self.thumbnailSize = thumbnailSize
                 if let attachment = message.attachments?.first {
                     self.attachment = .init(
