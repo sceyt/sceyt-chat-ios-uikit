@@ -9,39 +9,39 @@ import UIKit
 import SceytChat
 
 public protocol SceytChatUIKitThemeProtocol {
-    static var primaryAccent: UIColor { get }
-    static var secondaryAccent: UIColor { get }
-    static var tertiaryAccent: UIColor { get }
-    static var quaternaryAccent: UIColor { get }
-    static var quinaryAccent: UIColor { get }
+    static var primaryAccent: UIColor { get set }
+    static var secondaryAccent: UIColor { get set }
+    static var tertiaryAccent: UIColor { get set }
+    static var quaternaryAccent: UIColor { get set }
+    static var quinaryAccent: UIColor { get set }
     
-    static var surface1: UIColor { get }
-    static var surface2: UIColor { get }
-    static var surface3: UIColor { get }
+    static var surface1: UIColor { get set }
+    static var surface2: UIColor { get set }
+    static var surface3: UIColor { get set }
     
-    static var background: UIColor { get }
-    static var backgroundMuted: UIColor { get }
-    static var backgroundSections: UIColor { get }
-    static var backgroundDark: UIColor { get }
-    static var borders: UIColor { get }
-    static var iconInactive: UIColor { get }
-    static var iconSecondary: UIColor { get }
-    static var overlayBackground1: UIColor { get }
-    static var overlayBackground2: UIColor { get }
+    static var background: UIColor { get set }
+    static var backgroundMuted: UIColor { get set }
+    static var backgroundSections: UIColor { get set }
+    static var backgroundDark: UIColor { get set }
+    static var borders: UIColor { get set }
+    static var iconInactive: UIColor { get set }
+    static var iconSecondary: UIColor { get set }
+    static var overlayBackground1: UIColor { get set }
+    static var overlayBackground2: UIColor { get set }
     
-    static var primaryText: UIColor { get }
-    static var secondaryText: UIColor { get }
-    static var footnoteText: UIColor { get }
-    static var textOnPrimary: UIColor { get }
+    static var primaryText: UIColor { get set }
+    static var secondaryText: UIColor { get set }
+    static var footnoteText: UIColor { get set }
+    static var textOnPrimary: UIColor { get set }
     
-    static var bubbleOutgoing: UIColor { get }
-    static var bubbleOutgoingX: UIColor { get }
-    static var bubbleIncoming: UIColor { get }
-    static var bubbleIncomingX: UIColor { get }
+    static var bubbleOutgoing: UIColor { get set }
+    static var bubbleOutgoingX: UIColor { get set }
+    static var bubbleIncoming: UIColor { get set }
+    static var bubbleIncomingX: UIColor { get set }
     
-    static var stateError: UIColor { get }
-    static var stateSuccess: UIColor { get }
-    static var stateAttention: UIColor { get }
+    static var stateError: UIColor { get set }
+    static var stateSuccess: UIColor { get set }
+    static var stateAttention: UIColor { get set }
 }
 
 public struct SceytChatUIKitTheme: SceytChatUIKitThemeProtocol {
