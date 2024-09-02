@@ -10,39 +10,39 @@ import UIKit
 
 public extension UIColor {
     
-    static var primaryAccent: UIColor { Components.theme.primaryAccent }
-    static var secondaryAccent: UIColor { Components.theme.secondaryAccent }
-    static var tertiaryAccent: UIColor { Components.theme.tertiaryAccent }
-    static var quaternaryAccent: UIColor { Components.theme.quaternaryAccent }
-    static var quinaryAccent: UIColor { Components.theme.quinaryAccent }
+    static var primaryAccent: UIColor { SceytChatUIKit.shared.theme.primaryAccent }
+    static var secondaryAccent: UIColor { SceytChatUIKit.shared.theme.secondaryAccent }
+    static var tertiaryAccent: UIColor { SceytChatUIKit.shared.theme.tertiaryAccent }
+    static var quaternaryAccent: UIColor { SceytChatUIKit.shared.theme.quaternaryAccent }
+    static var quinaryAccent: UIColor { SceytChatUIKit.shared.theme.quinaryAccent }
     
-    static var surface1: UIColor { Components.theme.surface1 }
-    static var surface2: UIColor { Components.theme.surface2 }
-    static var surface3: UIColor { Components.theme.surface3 }
+    static var surface1: UIColor { SceytChatUIKit.shared.theme.surface1 }
+    static var surface2: UIColor { SceytChatUIKit.shared.theme.surface2 }
+    static var surface3: UIColor { SceytChatUIKit.shared.theme.surface3 }
     
-    static var background: UIColor { Components.theme.background }
-    static var backgroundMuted: UIColor { Components.theme.backgroundMuted }
-    static var backgroundSections: UIColor { Components.theme.backgroundSections }
-    static var backgroundDark: UIColor { Components.theme.backgroundDark }
-    static var borders: UIColor { Components.theme.borders }
-    static var iconInactive: UIColor { Components.theme.iconInactive }
-    static var iconSecondary: UIColor { Components.theme.iconSecondary }
-    static var overlayBackground1: UIColor { Components.theme.overlayBackground1 }
-    static var overlayBackground2: UIColor { Components.theme.overlayBackground2 }
+    static var background: UIColor { SceytChatUIKit.shared.theme.background }
+    static var backgroundMuted: UIColor { SceytChatUIKit.shared.theme.backgroundMuted }
+    static var backgroundSections: UIColor { SceytChatUIKit.shared.theme.backgroundSections }
+    static var backgroundDark: UIColor { SceytChatUIKit.shared.theme.backgroundDark }
+    static var borders: UIColor { SceytChatUIKit.shared.theme.borders }
+    static var iconInactive: UIColor { SceytChatUIKit.shared.theme.iconInactive }
+    static var iconSecondary: UIColor { SceytChatUIKit.shared.theme.iconSecondary }
+    static var overlayBackground1: UIColor { SceytChatUIKit.shared.theme.overlayBackground1 }
+    static var overlayBackground2: UIColor { SceytChatUIKit.shared.theme.overlayBackground2 }
     
-    static var primaryText: UIColor { Components.theme.primaryText }
-    static var secondaryText: UIColor { Components.theme.secondaryText }
-    static var footnoteText: UIColor { Components.theme.footnoteText }
-    static var textOnPrimary: UIColor { Components.theme.textOnPrimary }
+    static var primaryText: UIColor { SceytChatUIKit.shared.theme.primaryText }
+    static var secondaryText: UIColor { SceytChatUIKit.shared.theme.secondaryText }
+    static var footnoteText: UIColor { SceytChatUIKit.shared.theme.footnoteText }
+    static var textOnPrimary: UIColor { SceytChatUIKit.shared.theme.textOnPrimary }
     
-    static var bubbleOutgoing: UIColor { Components.theme.bubbleOutgoing }
-    static var bubbleOutgoingX: UIColor { Components.theme.bubbleOutgoingX }
-    static var bubbleIncoming: UIColor { Components.theme.bubbleIncoming }
-    static var bubbleIncomingX: UIColor { Components.theme.bubbleIncomingX }
+    static var bubbleOutgoing: UIColor { SceytChatUIKit.shared.theme.bubbleOutgoing }
+    static var bubbleOutgoingX: UIColor { SceytChatUIKit.shared.theme.bubbleOutgoingX }
+    static var bubbleIncoming: UIColor { SceytChatUIKit.shared.theme.bubbleIncoming }
+    static var bubbleIncomingX: UIColor { SceytChatUIKit.shared.theme.bubbleIncomingX }
     
-    static var stateError: UIColor { Components.theme.stateError }
-    static var stateSuccess: UIColor { Components.theme.stateSuccess }
-    static var stateAttention: UIColor { Components.theme.stateAttention }
+    static var stateError: UIColor { SceytChatUIKit.shared.theme.stateError }
+    static var stateSuccess: UIColor { SceytChatUIKit.shared.theme.stateSuccess }
+    static var stateAttention: UIColor { SceytChatUIKit.shared.theme.stateAttention }
     
     public static var initialColors: [UIColor] = [ .primaryAccent,
                                                    .secondaryAccent,

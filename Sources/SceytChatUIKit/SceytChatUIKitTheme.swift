@@ -9,76 +9,89 @@ import UIKit
 import SceytChat
 
 public protocol SceytChatUIKitThemeProtocol {
-    static var primaryAccent: UIColor { get set }
-    static var secondaryAccent: UIColor { get set }
-    static var tertiaryAccent: UIColor { get set }
-    static var quaternaryAccent: UIColor { get set }
-    static var quinaryAccent: UIColor { get set }
     
-    static var surface1: UIColor { get set }
-    static var surface2: UIColor { get set }
-    static var surface3: UIColor { get set }
+    var primaryAccent: UIColor { get }
+    var secondaryAccent: UIColor { get }
+    var tertiaryAccent: UIColor { get }
+    var quaternaryAccent: UIColor { get }
+    var quinaryAccent: UIColor { get }
     
-    static var background: UIColor { get set }
-    static var backgroundMuted: UIColor { get set }
-    static var backgroundSections: UIColor { get set }
-    static var backgroundDark: UIColor { get set }
-    static var borders: UIColor { get set }
-    static var iconInactive: UIColor { get set }
-    static var iconSecondary: UIColor { get set }
-    static var overlayBackground1: UIColor { get set }
-    static var overlayBackground2: UIColor { get set }
+    var surface1: UIColor { get }
+    var surface2: UIColor { get }
+    var surface3: UIColor { get }
     
-    static var primaryText: UIColor { get set }
-    static var secondaryText: UIColor { get set }
-    static var footnoteText: UIColor { get set }
-    static var textOnPrimary: UIColor { get set }
+    var background: UIColor { get }
+    var backgroundMuted: UIColor { get }
+    var backgroundSections: UIColor { get }
+    var backgroundDark: UIColor { get }
+    var borders: UIColor { get }
+    var iconInactive: UIColor { get }
+    var iconSecondary: UIColor { get }
+    var overlayBackground1: UIColor { get }
+    var overlayBackground2: UIColor { get }
     
-    static var bubbleOutgoing: UIColor { get set }
-    static var bubbleOutgoingX: UIColor { get set }
-    static var bubbleIncoming: UIColor { get set }
-    static var bubbleIncomingX: UIColor { get set }
+    var primaryText: UIColor { get }
+    var secondaryText: UIColor { get }
+    var footnoteText: UIColor { get }
+    var textOnPrimary: UIColor { get }
     
-    static var stateError: UIColor { get set }
-    static var stateSuccess: UIColor { get set }
-    static var stateAttention: UIColor { get set }
+    var bubbleOutgoing: UIColor { get }
+    var bubbleOutgoingX: UIColor { get }
+    var bubbleIncoming: UIColor { get }
+    var bubbleIncomingX: UIColor { get }
+    
+    var stateError: UIColor { get }
+    var stateSuccess: UIColor { get }
+    var stateAttention: UIColor { get }
 }
 
-public struct SceytChatUIKitTheme: SceytChatUIKitThemeProtocol {
+public class SceytChatUIKitTheme: SceytChatUIKitThemeProtocol {
     
-    public static var primaryAccent: UIColor = UIColor(light: Light.primaryAccent, dark: Dark.primaryAccent)
-    public static var secondaryAccent: UIColor = UIColor(light: Light.secondaryAccent, dark: Dark.secondaryAccent)
-    public static var tertiaryAccent: UIColor = UIColor(light: Light.tertiaryAccent, dark: Dark.tertiaryAccent)
-    public static var quaternaryAccent: UIColor = UIColor(light: Light.quaternaryAccent, dark: Dark.quaternaryAccent)
-    public static var quinaryAccent: UIColor = UIColor(light: Light.quinaryAccent, dark: Dark.quinaryAccent)
+    public required init() { }
     
-    public static var surface1: UIColor = UIColor(light: Light.surface1, dark: Dark.surface1)
-    public static var surface2: UIColor = UIColor(light: Light.surface2, dark: Dark.surface2)
-    public static var surface3: UIColor = UIColor(light: Light.surface3, dark: Dark.surface3)
+    public var primaryAccent: UIColor = UIColor(light: Light.primaryAccent, dark: Dark.primaryAccent)
+    public var secondaryAccent: UIColor = UIColor(light: Light.secondaryAccent, dark: Dark.secondaryAccent)
+    public var tertiaryAccent: UIColor = UIColor(light: Light.tertiaryAccent, dark: Dark.tertiaryAccent)
+    public var quaternaryAccent: UIColor = UIColor(light: Light.quaternaryAccent, dark: Dark.quaternaryAccent)
+    public var quinaryAccent: UIColor = UIColor(light: Light.quinaryAccent, dark: Dark.quinaryAccent)
     
-    public static var background: UIColor = UIColor(light: Light.background, dark: Dark.background)
-    public static var backgroundMuted: UIColor = UIColor(light: Light.backgroundMuted, dark: Dark.backgroundMuted)
-    public static var backgroundSections: UIColor = UIColor(light: Light.backgroundSections, dark: Dark.backgroundSections)
-    public static var backgroundDark: UIColor = UIColor(light: Light.backgroundDark, dark: Dark.backgroundDark)
-    public static var borders: UIColor = UIColor(light: Light.borders, dark: Dark.borders)
-    public static var iconInactive: UIColor = UIColor(light: Light.iconInactive, dark: Dark.iconInactive)
-    public static var iconSecondary: UIColor = UIColor(light: Light.iconSecondary, dark: Dark.iconSecondary)
-    public static var overlayBackground1: UIColor = UIColor(light: Light.overlayBackground1, dark: Dark.overlayBackground1)
-    public static var overlayBackground2: UIColor = UIColor(light: Light.overlayBackground2, dark: Dark.overlayBackground2)
+    public var surface1: UIColor = UIColor(light: Light.surface1, dark: Dark.surface1)
+    public var surface2: UIColor = UIColor(light: Light.surface2, dark: Dark.surface2)
+    public var surface3: UIColor = UIColor(light: Light.surface3, dark: Dark.surface3)
     
-    public static var primaryText: UIColor = UIColor(light: Light.primaryText, dark: Dark.primaryText)
-    public static var secondaryText: UIColor = UIColor(light: Light.secondaryText, dark: Dark.secondaryText)
-    public static var footnoteText: UIColor = UIColor(light: Light.footnoteText, dark: Dark.footnoteText)
-    public static var textOnPrimary: UIColor = UIColor(light: Light.textOnPrimary, dark: Dark.textOnPrimary)
+    public var background: UIColor = UIColor(light: Light.background, dark: Dark.background)
+    public var backgroundMuted: UIColor = UIColor(light: Light.backgroundMuted, dark: Dark.backgroundMuted)
+    public var backgroundSections: UIColor = UIColor(light: Light.backgroundSections, dark: Dark.backgroundSections)
+    public var backgroundDark: UIColor = UIColor(light: Light.backgroundDark, dark: Dark.backgroundDark)
+    public var borders: UIColor = UIColor(light: Light.borders, dark: Dark.borders)
+    public var iconInactive: UIColor = UIColor(light: Light.iconInactive, dark: Dark.iconInactive)
+    public var iconSecondary: UIColor = UIColor(light: Light.iconSecondary, dark: Dark.iconSecondary)
+    public var overlayBackground1: UIColor = UIColor(light: Light.overlayBackground1, dark: Dark.overlayBackground1)
+    public var overlayBackground2: UIColor = UIColor(light: Light.overlayBackground2, dark: Dark.overlayBackground2)
     
-    public static var bubbleOutgoing: UIColor = primaryAccent.generateSecondaryColor() // UIColor(light: Light.bubbleOutgoing, dark: Dark.bubbleOutgoing)
-    public static var bubbleOutgoingX: UIColor = primaryAccent.generateTertiaryColor() // UIColor(light: Light.bubbleOutgoingX, dark: Dark.bubbleOutgoingX)
-    public static var bubbleIncoming: UIColor = UIColor(light: Light.bubbleIncoming, dark: Dark.bubbleIncoming)
-    public static var bubbleIncomingX: UIColor = UIColor(light: Light.bubbleIncomingX, dark: Dark.bubbleIncomingX)
+    public var primaryText: UIColor = UIColor(light: Light.primaryText, dark: Dark.primaryText)
+    public var secondaryText: UIColor = UIColor(light: Light.secondaryText, dark: Dark.secondaryText)
+    public var footnoteText: UIColor = UIColor(light: Light.footnoteText, dark: Dark.footnoteText)
+    public var textOnPrimary: UIColor = UIColor(light: Light.textOnPrimary, dark: Dark.textOnPrimary)
     
-    public static var stateError: UIColor = UIColor(light: Light.stateError, dark: Dark.stateError)
-    public static var stateSuccess: UIColor = UIColor(light: Light.stateSuccess, dark: Dark.stateSuccess)
-    public static var stateAttention: UIColor = UIColor(light: Light.stateAttention, dark: Dark.stateAttention)
+    public var bubbleOutgoing: UIColor = UIColor(light: Light.primaryAccent, dark: Dark.primaryAccent).generateSecondaryColor() // UIColor(light: Light.bubbleOutgoing, dark: Dark.bubbleOutgoing)
+    public var bubbleOutgoingX: UIColor = UIColor(light: Light.primaryAccent, dark: Dark.primaryAccent).generateTertiaryColor() // UIColor(light: Light.bubbleOutgoingX, dark: Dark.bubbleOutgoingX)
+    public var bubbleIncoming: UIColor = UIColor(light: Light.bubbleIncoming, dark: Dark.bubbleIncoming)
+    public var bubbleIncomingX: UIColor = UIColor(light: Light.bubbleIncomingX, dark: Dark.bubbleIncomingX)
+    
+    public var stateError: UIColor = UIColor(light: Light.stateError, dark: Dark.stateError)
+    public var stateSuccess: UIColor = UIColor(light: Light.stateSuccess, dark: Dark.stateSuccess)
+    public var stateAttention: UIColor = UIColor(light: Light.stateAttention, dark: Dark.stateAttention)
+}
+
+public extension SceytChatUIKitTheme {
+    public static func with(
+        _ populator: (inout SceytChatUIKitTheme) throws -> ()
+    ) rethrows -> SceytChatUIKitTheme {
+        var message = SceytChatUIKitTheme()
+        try populator(&message)
+        return message
+    }
 }
 
 public extension SceytChatUIKitTheme {
@@ -109,8 +122,8 @@ public extension SceytChatUIKitTheme {
         public static var footnoteText: UIColor = UIColor(rgb: 0xA0A1B0)
         public static var textOnPrimary: UIColor = UIColor(rgb: 0xFFFFFF)
         
-//        public static var bubbleOutgoing: UIColor = UIColor(rgb: 0xE3E7FF)
-//        public static var bubbleOutgoingX: UIColor = UIColor(rgb: 0xD1D8FF)
+//        public var bubbleOutgoing: UIColor = UIColor(rgb: 0xE3E7FF)
+//        public var bubbleOutgoingX: UIColor = UIColor(rgb: 0xD1D8FF)
         public static var bubbleIncoming: UIColor = UIColor(rgb: 0xF1F2F6)
         public static var bubbleIncomingX: UIColor = UIColor(rgb: 0xE4E6EE)
         
@@ -148,8 +161,8 @@ public extension SceytChatUIKitTheme {
         public static var footnoteText: UIColor = UIColor(rgb: 0x76787A)
         public static var textOnPrimary: UIColor = UIColor(rgb: 0xFFFFFF)
         
-//        public static var bubbleOutgoing: UIColor = UIColor(rgb: 0x212239)
-//        public static var bubbleOutgoingX: UIColor = UIColor(rgb: 0x2E3052)
+//        public var bubbleOutgoing: UIColor = UIColor(rgb: 0x212239)
+//        public var bubbleOutgoingX: UIColor = UIColor(rgb: 0x2E3052)
         public static var bubbleIncoming: UIColor = UIColor(rgb: 0x232324)
         public static var bubbleIncomingX: UIColor = UIColor(rgb: 0x303032)
         
