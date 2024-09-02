@@ -682,7 +682,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 image = nil
             default:
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.file
+                    text = layoutModel.attachments.first?.name ?? L10n.Message.Attachment.file
                 }
                 image = .messageFile
             }
@@ -770,7 +770,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 image = nil
             default:
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.file
+                    text = layoutModel.attachments.first?.name ?? L10n.Message.Attachment.file
                 }
                 image = .messageFile
             }

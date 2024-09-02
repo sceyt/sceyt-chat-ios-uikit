@@ -26,7 +26,7 @@ extension ComposerVC {
             textContainerInset = .init(top: 8, left: 12, bottom: 8, right: 12)
             placeholder = L10n.Message.Input.placeholder
             layer.borderWidth = 0.5
-            layer.cornerRadius = 16
+            layer.cornerRadius = 18
             allowsEditingTextAttributes = true
         }
         

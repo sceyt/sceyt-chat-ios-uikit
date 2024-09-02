@@ -62,7 +62,7 @@ extension ComposerVC {
             super.setupAppearance()
             
             backgroundColor = appearance.recorderBackgroundColor
-            layer.cornerRadius = 16
+            layer.cornerRadius = 18
             layer.masksToBounds = true
             
             bg.backgroundColor = appearance.recorderPlayerBackgroundColor
@@ -676,7 +676,8 @@ extension ComposerVC {
             return $0
         }(UIButton())
         
-        private lazy var row = UIStackView(row: cancelButton, audioPlayerView, sendButton, spacing: 8)
+        private lazy var spacerColumn = UIStackView(column: UIView(), audioPlayerView, UIView(), spacing: 0, distribution: .equalSpacing)
+        private lazy var row = UIStackView(row: cancelButton, spacerColumn, sendButton, spacing: 0)
         
         override open func setupAppearance() {
             super.setupAppearance()
@@ -696,9 +697,9 @@ extension ComposerVC {
             
             addSubview(row.withoutAutoresizingMask)
             
-            row.pin(to: self, anchors: [.leading(8), .trailing(-8), .top(8), .bottom(-8)])
-            
-            sendButton.resize(anchors: [.height(34), .width(34)])
+            row.pin(to: self)
+            sendButton.resize(anchors: [.height(52), .width(52)])
+            cancelButton.resize(anchors: [.height(52), .width(52)])
         }
         
         private var url: URL!
