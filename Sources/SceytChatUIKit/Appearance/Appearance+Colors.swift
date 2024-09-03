@@ -35,11 +35,6 @@ public extension UIColor {
     static var footnoteText: UIColor { SceytChatUIKit.shared.theme.footnoteText }
     static var textOnPrimary: UIColor { SceytChatUIKit.shared.theme.textOnPrimary }
     
-    static var bubbleOutgoing: UIColor { SceytChatUIKit.shared.theme.bubbleOutgoing }
-    static var bubbleOutgoingX: UIColor { SceytChatUIKit.shared.theme.bubbleOutgoingX }
-    static var bubbleIncoming: UIColor { SceytChatUIKit.shared.theme.bubbleIncoming }
-    static var bubbleIncomingX: UIColor { SceytChatUIKit.shared.theme.bubbleIncomingX }
-    
     static var stateError: UIColor { SceytChatUIKit.shared.theme.stateError }
     static var stateSuccess: UIColor { SceytChatUIKit.shared.theme.stateSuccess }
     static var stateAttention: UIColor { SceytChatUIKit.shared.theme.stateAttention }

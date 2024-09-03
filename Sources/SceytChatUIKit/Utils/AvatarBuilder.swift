@@ -242,7 +242,7 @@ extension ChatChannel: AvatarBuildable {
         if !isGroup, let peer = peer {
             return URL(string: peer.avatarUrl)
         } else if let member = members?.first, isSelfChannel {
-            return URL(string: member.avatarUrl ?? SceytChatUIKit.shared.currentUser.avatarUrl)
+            return URL(string: member.avatarUrl ?? ChatClient.shared.user.avatarUrl)
         }
         return URL(string: avatarUrl)
     }

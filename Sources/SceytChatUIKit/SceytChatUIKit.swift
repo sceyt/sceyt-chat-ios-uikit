@@ -14,7 +14,7 @@ public class SceytChatUIKit {
     
     public static let shared = SceytChatUIKit()
     
-    public var config = SceytChatUIKitConfig()
+    public lazy var config = SceytChatUIKitConfig()
     public var theme: SceytChatUIKitThemeProtocol = SceytChatUIKitTheme()
     
     public static func initialize(apiUrl: String, appId: String, clientId: String = "") {
@@ -59,8 +59,4 @@ public class SceytChatUIKit {
     }()
     
     public var currentUserId: UserId?
-    
-    public var currentUser: User {
-        ChatClient.shared.user
-    }
 }

@@ -764,6 +764,10 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 }
                 image = .audioPlayerMic
             case "link":
+                if let metadata = layoutModel.linkPreviews?.first?.metadata {
+                    addOrUpdateLinkPreview(linkDetails: metadata)
+                    return
+                }
                 if text.isEmpty {
                     text = L10n.Message.Attachment.link
                 }

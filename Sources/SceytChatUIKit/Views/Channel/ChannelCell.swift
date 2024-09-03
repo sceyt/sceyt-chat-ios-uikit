@@ -198,7 +198,7 @@ open class ChannelCell: TableViewCell {
         update(messageText: data.attributedView)
         dateLabel.text = data.formatedDate
         pinView.isHidden = data.channel.pinnedAt == nil
-        backgroundColor = data.channel.pinnedAt == nil ? .clear : .bubbleIncoming
+        backgroundColor = data.channel.pinnedAt == nil ? .clear : appearance.backgroundColor
         ticksView.tintColor = deliveryStatusColor(message: data.lastMessage)
         ticksView.image = deliveryStatusImage(message: data.lastMessage)?.withRenderingMode(.alwaysTemplate)
         ticksView.isHidden = data.lastMessage?.state == .deleted
