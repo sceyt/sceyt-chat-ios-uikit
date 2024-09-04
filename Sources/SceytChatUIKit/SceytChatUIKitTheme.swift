@@ -44,34 +44,34 @@ public class SceytChatUIKitTheme: SceytChatUIKitThemeProtocol {
     
     public required init() { }
     
-    public var primaryAccent: UIColor = UIColor(light: Colors.Light.primaryAccent, dark: Colors.Dark.primaryAccent)
-    public var secondaryAccent: UIColor = UIColor(light: Colors.Light.secondaryAccent, dark: Colors.Dark.secondaryAccent)
-    public var tertiaryAccent: UIColor = UIColor(light: Colors.Light.tertiaryAccent, dark: Colors.Dark.tertiaryAccent)
-    public var quaternaryAccent: UIColor = UIColor(light: Colors.Light.quaternaryAccent, dark: Colors.Dark.quaternaryAccent)
-    public var quinaryAccent: UIColor = UIColor(light: Colors.Light.quinaryAccent, dark: Colors.Dark.quinaryAccent)
+    public var primaryAccent: UIColor = Colors.primaryAccent
+    public var secondaryAccent: UIColor = Colors.secondaryAccent
+    public var tertiaryAccent: UIColor = Colors.tertiaryAccent
+    public var quaternaryAccent: UIColor = Colors.quaternaryAccent
+    public var quinaryAccent: UIColor = Colors.quinaryAccent
     
-    public var surface1: UIColor = UIColor(light: Colors.Light.surface1, dark: Colors.Dark.surface1)
-    public var surface2: UIColor = UIColor(light: Colors.Light.surface2, dark: Colors.Dark.surface2)
-    public var surface3: UIColor = UIColor(light: Colors.Light.surface3, dark: Colors.Dark.surface3)
+    public var surface1: UIColor = Colors.surface1
+    public var surface2: UIColor = Colors.surface2
+    public var surface3: UIColor = Colors.surface3
     
-    public var background: UIColor = UIColor(light: Colors.Light.background, dark: Colors.Dark.background)
-    public var backgroundMuted: UIColor = UIColor(light: Colors.Light.backgroundMuted, dark: Colors.Dark.backgroundMuted)
-    public var backgroundSections: UIColor = UIColor(light: Colors.Light.backgroundSections, dark: Colors.Dark.backgroundSections)
-    public var backgroundDark: UIColor = UIColor(light: Colors.Light.backgroundDark, dark: Colors.Dark.backgroundDark)
-    public var borders: UIColor = UIColor(light: Colors.Light.borders, dark: Colors.Dark.borders)
-    public var iconInactive: UIColor = UIColor(light: Colors.Light.iconInactive, dark: Colors.Dark.iconInactive)
-    public var iconSecondary: UIColor = UIColor(light: Colors.Light.iconSecondary, dark: Colors.Dark.iconSecondary)
-    public var overlayBackground1: UIColor = UIColor(light: Colors.Light.overlayBackground1, dark: Colors.Dark.overlayBackground1)
-    public var overlayBackground2: UIColor = UIColor(light: Colors.Light.overlayBackground2, dark: Colors.Dark.overlayBackground2)
+    public var background: UIColor = Colors.background
+    public var backgroundMuted: UIColor = Colors.backgroundMuted
+    public var backgroundSections: UIColor = Colors.backgroundSections
+    public var backgroundDark: UIColor = Colors.backgroundDark
+    public var borders: UIColor = Colors.borders
+    public var iconInactive: UIColor = Colors.iconInactive
+    public var iconSecondary: UIColor = Colors.iconSecondary
+    public var overlayBackground1: UIColor = Colors.overlayBackground1
+    public var overlayBackground2: UIColor = Colors.overlayBackground2
     
-    public var primaryText: UIColor = UIColor(light: Colors.Light.primaryText, dark: Colors.Dark.primaryText)
-    public var secondaryText: UIColor = UIColor(light: Colors.Light.secondaryText, dark: Colors.Dark.secondaryText)
-    public var footnoteText: UIColor = UIColor(light: Colors.Light.footnoteText, dark: Colors.Dark.footnoteText)
-    public var textOnPrimary: UIColor = UIColor(light: Colors.Light.textOnPrimary, dark: Colors.Dark.textOnPrimary)
+    public var primaryText: UIColor = Colors.primaryText
+    public var secondaryText: UIColor = Colors.secondaryText
+    public var footnoteText: UIColor = Colors.footnoteText
+    public var textOnPrimary: UIColor = Colors.textOnPrimary
     
-    public var stateError: UIColor = UIColor(light: Colors.Light.stateError, dark: Colors.Dark.stateError)
-    public var stateSuccess: UIColor = UIColor(light: Colors.Light.stateSuccess, dark: Colors.Dark.stateSuccess)
-    public var stateAttention: UIColor = UIColor(light: Colors.Light.stateAttention, dark: Colors.Dark.stateAttention)
+    public var stateError: UIColor = Colors.stateError
+    public var stateSuccess: UIColor = Colors.stateSuccess
+    public var stateAttention: UIColor = Colors.stateAttention
 }
 
 public extension SceytChatUIKitTheme {
