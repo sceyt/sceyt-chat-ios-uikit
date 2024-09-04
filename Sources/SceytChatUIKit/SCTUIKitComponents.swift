@@ -29,6 +29,7 @@ public enum SCTUIKitComponents {
     public static var channelUnreadCountView: ChannelUnreadCountView.Type = ChannelUnreadCountView.self
     public static var channelTitleView: ChannelVC.TitleView.Type = ChannelVC.TitleView.self
     public static var channelBottomView: ChannelVC.BottomView.Type = ChannelVC.BottomView.self
+    public static var channelDisplayedTimer: ChannelVC.DisplayedTimer.Type = ChannelVC.DisplayedTimer.self
     public static var channelSearchControlsView: ChannelVC.SearchControlsView.Type = ChannelVC.SearchControlsView.self
 
     public static var channelProfileVC: ChannelProfileVC.Type = ChannelProfileVC.self
@@ -79,8 +80,12 @@ public enum SCTUIKitComponents {
     public static var composerMediaView: ComposerVC.MediaView.Type = ComposerVC.MediaView.self
     public static var composerInputTextView: ComposerVC.InputTextView.Type = ComposerVC.InputTextView.self
     public static var composerActionView: ComposerVC.ActionView.Type = ComposerVC.ActionView.self
-    
-    public static var composerAttachmentThumbnailView: ComposerVC.ThumbnailView.Type = ComposerVC.ThumbnailView.self
+    public static var composerRecorderView: ComposerVC.RecorderView.Type = ComposerVC.RecorderView.self
+    public static var composerRecordedView: ComposerVC.RecordedView.Type = ComposerVC.RecordedView.self
+    public static var composerThumbnailView: ComposerVC.ThumbnailView.Type = ComposerVC.ThumbnailView.self
+    public static var composerThumbnailViewMediaView: ComposerVC.ThumbnailView.MediaView.Type = ComposerVC.ThumbnailView.MediaView.self
+    public static var composerThumbnailViewFileView: ComposerVC.ThumbnailView.FileView.Type = ComposerVC.ThumbnailView.FileView.self
+    public static var composerThumbnailViewTimeLabel: ComposerVC.ThumbnailView.TimeLabel.Type = ComposerVC.ThumbnailView.TimeLabel.self
     
     public static var mentioningUserListVC: MentioningUserListVC.Type = MentioningUserListVC.self
     public static var mentioningUserListVM: MentioningUserListVM.Type = MentioningUserListVM.self
@@ -100,6 +105,7 @@ public enum SCTUIKitComponents {
     public static var channelForwardVM: ChannelForwardVM.Type = ChannelForwardVM.self
     public static var channelForwardRouter: ChannelForwardRouter.Type = ChannelForwardRouter.self
 
+    public static var channelSearchController: ChannelSearchController.Type = ChannelSearchController.self
     public static var channelSearchResultsVC: ChannelSearchResultsVC.Type = ChannelSearchResultsVC.self
 
     public static var imagePickerVC: PhotosPickerVC.Type = PhotosPickerVC.self
@@ -122,6 +128,8 @@ public enum SCTUIKitComponents {
     public static var previewerVC: PreviewerVC.Type = PreviewerVC.self
     public static var previewerRouter: PreviewerRouter.Type = PreviewerRouter.self
     public static var previewerVM: PreviewerVM.Type = PreviewerVM.self
+    public static var previewerImageView: PreviewerImageView.Type = PreviewerImageView.self
+    public static var previewerScrollView: PreviewerScrollView.Type = PreviewerScrollView.self
     
     public static var emojiListVC: EmojiListVC.Type = EmojiListVC.self
     public static var emojiListVM: EmojiListVM.Type = EmojiListVM.self
@@ -168,6 +176,60 @@ public enum SCTUIKitComponents {
     public static var attachmentTransfer: AttachmentTransfer.Type = AttachmentTransfer.self
     public static var channelListSearchService: ChannelListSearchService.Type = ChannelListSearchService.self
     public static var loadRangeProvider: LoadRangeProvider.Type = LoadRangeProvider.self
+    
+    public static var alert: Alert.Type = Alert.self
+    public static var bottomSheet: BottomSheet.Type = BottomSheet.self
+    public static var sheetButton: SheetButton.Type = SheetButton.self
+    public static var sheetVC: SheetVC.Type = SheetVC.self
+    
+    public static var badgeView: BadgeView.Type = BadgeView.self
+    public static var circleButton: CircleButton.Type = CircleButton.self
+    public static var connectionStateView: ConnectionStateView.Type = ConnectionStateView.self
+    public static var documentPickerController: DocumentPickerController.Type = DocumentPickerController.self
+    public static var filePreviewController: FilePreviewController.Type = FilePreviewController.self
+    public static var imagePickerController: ImagePickerController.Type = ImagePickerController.self
+    public static var markableTextField: MarkableTextField.Type = MarkableTextField.self
+    public static var searchController: SearchController.Type = SearchController.self
+    public static var waveformView: WaveformView.Type = WaveformView.self
+    
+    public static var channelAddMembersVC: ChannelAddMembersVC.Type = ChannelAddMembersVC.self
+    public static var createPrivateChannelProfileView: CreatePrivateChannelProfileView.Type = CreatePrivateChannelProfileView.self
+    public static var createPrivateChannelVC: CreatePrivateChannelVC.Type = CreatePrivateChannelVC.self
+    public static var createPublicChannelProfileView: CreatePublicChannelProfileView.Type = CreatePublicChannelProfileView.self
+    public static var createPublicChannelVC: CreatePublicChannelVC.Type = CreatePublicChannelVC.self
+    public static var selectChannelMembersVC: SelectChannelMembersVC.Type = SelectChannelMembersVC.self
+    public static var selectedUserListView: SelectedUserListView.Type = SelectedUserListView.self
+    public static var selectedChannelListView: SelectedChannelListView.Type = SelectedChannelListView.self
+    
+    
+    public static var messageCell: MessageCell.Type = MessageCell.self
+    public static var messageCellAttachmentAudioView: MessageCell.AttachmentAudioView.Type = MessageCell.AttachmentAudioView.self
+    public static var messageCellAttachmentFileView: MessageCell.AttachmentFileView.Type = MessageCell.AttachmentFileView.self
+    public static var messageCellAttachmentImageView: MessageCell.AttachmentImageView.Type = MessageCell.AttachmentImageView.self
+    public static var messageCellAttachmentVideoView: MessageCell.AttachmentVideoView.Type = MessageCell.AttachmentVideoView.self
+    public static var messageCellAttachmentView: MessageCell.AttachmentView.Type = MessageCell.AttachmentView.self
+    public static var messageCellInfoView: MessageCell.InfoView.Type = MessageCell.InfoView.self
+    public static var messageCellInfoViewBackgroundView: MessageCell.InfoViewBackgroundView.Type = MessageCell.InfoViewBackgroundView.self
+    public static var messageCellForwardView: MessageCell.ForwardView.Type = MessageCell.ForwardView.self
+    public static var messageCellLinkStackView: MessageCell.LinkStackView.Type = MessageCell.LinkStackView.self
+    public static var messageCellLinkView: MessageCell.LinkView.Type = MessageCell.LinkView.self
+    public static var messageCellReactionTotalView: MessageCell.ReactionTotalView.Type = MessageCell.ReactionTotalView.self
+    public static var messageCellReactionLabel: MessageCell.ReactionLabel.Type = MessageCell.ReactionLabel.self
+    public static var messageCellReactionView: MessageCell.ReactionView.Type = MessageCell.ReactionView.self
+    public static var messageCellReactionsView: MessageCell.ReactionsView.Type = MessageCell.ReactionsView.self
+    public static var messageCellReplyView: MessageCell.ReplyView.Type = MessageCell.ReplyView.self
+    public static var messageCellReplyCountView: MessageCell.ReplyCountView.Type = MessageCell.ReplyCountView.self
+    public static var messageCellReplyArrowView: MessageCell.ReplyArrowView.Type = MessageCell.ReplyArrowView.self
+    public static var messageCellUnreadView: MessageCell.UnreadView.Type = MessageCell.UnreadView.self
+    
+    
+    public static var actionController: ActionController.Type = ActionController.self
+    public static var emojiVC: EmojiVC.Type = EmojiVC.self
+    public static var menuCell: MenuCell.Type = MenuCell.self
+    public static var menuController: MenuController.Type = MenuController.self
+    
+    
+    
     
     public static var hud: HUD.Type = KitHUD.self
     

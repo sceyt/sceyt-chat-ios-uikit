@@ -88,7 +88,7 @@ extension ComposerVC {
                 v = mv
             }
             _onUpdate?()
-            let tv = Components.composerAttachmentThumbnailView
+            let tv = Components.composerThumbnailView
                 .init(containerView: v)
                 .withoutAutoresizingMask
             if index != -1, stackView.arrangedSubviews.indices.contains(index) {

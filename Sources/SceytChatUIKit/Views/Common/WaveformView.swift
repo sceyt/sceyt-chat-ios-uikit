@@ -8,18 +8,18 @@
 
 import UIKit
 
-class WaveformView: View {
+open class WaveformView: View {
     public lazy var appearance = ComposerVC.appearance {
         didSet {
             setupAppearance()
         }
     }
     
-    var lineWidth: CGFloat = 1.2 {
+    open var lineWidth: CGFloat = 1.2 {
         didSet { setNeedsDisplay() }
     }
     
-    var data: [Float]? {
+    open var data: [Float]? {
         didSet { setNeedsDisplay() }
     }
     
@@ -27,18 +27,18 @@ class WaveformView: View {
         didSet { setNeedsDisplay() }
     }
     
-    var progress: Double {
+    open var progress: Double {
         set { _progress = min(max(newValue, 0), 1) }
         get { _progress }
     }
     
-    override func setupAppearance() {
+    open override func setupAppearance() {
         super.setupAppearance()
         
         backgroundColor = .clear
     }
     
-    override func draw(_ rect: CGRect) {
+    open override func draw(_ rect: CGRect) {
         super.draw(rect)
         
         let targetCount = Int(rect.width / lineWidth / 2)
