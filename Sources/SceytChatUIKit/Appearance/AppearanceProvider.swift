@@ -175,10 +175,10 @@ extension MessageCell: AppearanceProvider {
                                                    dark: .primaryAccent.darkColor.withAlphaComponent(0.14).blendColors(with: .background.darkColor))
         public static var bubbleOutgoingX: UIColor = UIColor(light: .primaryAccent.lightColor.withAlphaComponent(0.24).blendColors(with: .background.lightColor),
                                                              dark: .primaryAccent.darkColor.withAlphaComponent(0.24).blendColors(with: .background.darkColor))
-        public static var bubbleIncoming: UIColor = UIColor(light: SceytChatUIKitTheme.Light.bubbleIncoming,
-                                                            dark: SceytChatUIKitTheme.Dark.bubbleIncoming)
-        public static var bubbleIncomingX: UIColor = UIColor(light: SceytChatUIKitTheme.Light.bubbleIncomingX,
-                                                             dark: SceytChatUIKitTheme.Dark.bubbleIncomingX)
+        public static var bubbleIncoming: UIColor = UIColor(light: Colors.Light.bubbleIncoming,
+                                                            dark: Colors.Dark.bubbleIncoming)
+        public static var bubbleIncomingX: UIColor = UIColor(light: Colors.Light.bubbleIncomingX,
+                                                             dark: Colors.Dark.bubbleIncomingX)
         
         public var backgroundColor: UIColor? = .clear
         public var titleFont: UIFont? = Fonts.semiBold.withSize(14)
