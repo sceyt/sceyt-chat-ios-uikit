@@ -921,7 +921,7 @@ extension ImageCropperVC: AppearanceProvider {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .background
-        public var buttonBackgroundColor: UIColor? = .background
+        public var buttonBackgroundColor: UIColor? = .backgroundDark
         public var buttonFont: UIFont? = Fonts.semiBold.withSize(16)
         public var buttonColor: UIColor? = .textOnPrimary
         
