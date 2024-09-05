@@ -77,7 +77,7 @@ class LoginViewController: UIViewController {
     
     private func addSeparatorView(to textField: UITextField) {
         let separatorView = UIView().withoutAutoresizingMask
-        separatorView.backgroundColor = .borders
+        separatorView.backgroundColor = .border
         textField.addSubview(separatorView)
         separatorView.pin(to: textField, anchors: [.bottom, .leading, .trailing])
         separatorView.heightAnchor.pin(constant: 1)

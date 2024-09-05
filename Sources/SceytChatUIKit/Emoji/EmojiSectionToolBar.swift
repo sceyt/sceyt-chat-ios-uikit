@@ -73,7 +73,7 @@ open class EmojiSectionToolBar: View {
         
         toolbar.setBackgroundImage(UIImage(), forToolbarPosition: .any, barMetrics: .default)
         backgroundColor = appearance.backgroundColor
-        separator.backgroundColor = .borders
+        separator.backgroundColor = .border
         for button in buttons {
             button.setImage(button.image(for: .normal)?.withTintColor(appearance.normalColor ?? .footnoteText), for: .normal)
             button.setImage(button.image(for: .selected)?.withTintColor(appearance.selectedColor ?? .primaryAccent), for: .selected)

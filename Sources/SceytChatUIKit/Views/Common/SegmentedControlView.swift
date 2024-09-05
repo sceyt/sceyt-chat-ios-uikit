@@ -268,7 +268,7 @@ open class NativeSegmentedController: UIControl, SegmentedControler {
         layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         layer.masksToBounds = true
         line.backgroundColor = .primaryAccent
-        bottomBorder.backgroundColor = .borders
+        bottomBorder.backgroundColor = .border
         segmentedControl.setTitleTextAttributes([
             .font: appearance.font ?? Fonts.semiBold.withSize(16),
             .foregroundColor: appearance.selectedTextColor ?? .primaryText

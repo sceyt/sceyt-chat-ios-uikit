@@ -21,10 +21,10 @@ public extension UIColor {
     static var surface3: UIColor { SceytChatUIKit.shared.theme.surface3 }
     
     static var background: UIColor { SceytChatUIKit.shared.theme.background }
-    static var backgroundMuted: UIColor { SceytChatUIKit.shared.theme.backgroundMuted }
+    static var backgroundSecondary: UIColor { SceytChatUIKit.shared.theme.backgroundSecondary }
     static var backgroundSections: UIColor { SceytChatUIKit.shared.theme.backgroundSections }
     static var backgroundDark: UIColor { SceytChatUIKit.shared.theme.backgroundDark }
-    static var borders: UIColor { SceytChatUIKit.shared.theme.borders }
+    static var border: UIColor { SceytChatUIKit.shared.theme.border }
     static var iconInactive: UIColor { SceytChatUIKit.shared.theme.iconInactive }
     static var iconSecondary: UIColor { SceytChatUIKit.shared.theme.iconSecondary }
     static var overlayBackground1: UIColor { SceytChatUIKit.shared.theme.overlayBackground1 }
@@ -63,10 +63,10 @@ public struct Colors {
     public static let surface3: UIColor = UIColor(light: UIColor(rgb: 0xA0A1B0), dark: UIColor(rgb: 0x3B3B3D))
     
     public static let background: UIColor = UIColor(light: UIColor(rgb: 0xFFFFFF), dark: UIColor(rgb: 0x19191B))
-    public static let backgroundMuted: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x19191B))
+    public static let backgroundSecondary: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x19191B))
     public static let backgroundSections: UIColor = UIColor(light: UIColor(rgb: 0xFFFFFF), dark: UIColor(rgb: 0x232324))
     public static let backgroundDark: UIColor = UIColor(light: UIColor(rgb: 0x19191B), dark: UIColor(rgb: 0x19191B))
-    public static let borders: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
+    public static let border: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
     public static let iconInactive: UIColor = UIColor(light: UIColor(rgb: 0xA0A1B0), dark: UIColor(rgb: 0x76787A))
     public static let iconSecondary: UIColor = UIColor(light: UIColor(rgb: 0x707388), dark: UIColor(rgb: 0x969A9F))
     public static let overlayBackground1: UIColor = UIColor(light: UIColor(rgb: 0x000000, alpha: 0.4), dark: UIColor(rgb: 0x000000, alpha: 0.4))

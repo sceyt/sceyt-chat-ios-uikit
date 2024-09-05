@@ -96,7 +96,7 @@ open class ReactionVC: ViewController,
         collectionView.resize(anchors: [.height(46)])
         
         let separator = UIView().withoutAutoresizingMask
-        separator.backgroundColor = .borders
+        separator.backgroundColor = .border
         view.addSubview(separator)
         separator.pin(to: view, anchors: [.leading, .trailing])
         separator.topAnchor.pin(to: collectionView.bottomAnchor, constant: 4)

@@ -21,10 +21,10 @@ public protocol SceytChatUIKitThemeProtocol {
     var surface3: UIColor { get }
     
     var background: UIColor { get }
-    var backgroundMuted: UIColor { get }
+    var backgroundSecondary: UIColor { get }
     var backgroundSections: UIColor { get }
     var backgroundDark: UIColor { get }
-    var borders: UIColor { get }
+    var border: UIColor { get }
     var iconInactive: UIColor { get }
     var iconSecondary: UIColor { get }
     var overlayBackground1: UIColor { get }
@@ -55,10 +55,10 @@ public class SceytChatUIKitTheme: SceytChatUIKitThemeProtocol {
     public var surface3: UIColor = Colors.surface3
     
     public var background: UIColor = Colors.background
-    public var backgroundMuted: UIColor = Colors.backgroundMuted
+    public var backgroundSecondary: UIColor = Colors.backgroundSecondary
     public var backgroundSections: UIColor = Colors.backgroundSections
     public var backgroundDark: UIColor = Colors.backgroundDark
-    public var borders: UIColor = Colors.borders
+    public var border: UIColor = Colors.border
     public var iconInactive: UIColor = Colors.iconInactive
     public var iconSecondary: UIColor = Colors.iconSecondary
     public var overlayBackground1: UIColor = Colors.overlayBackground1
