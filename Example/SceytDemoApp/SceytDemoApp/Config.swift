@@ -61,5 +61,5 @@ func configureSceytChatUIKit() {
     SceytChatUIKit.shared.config.setLogLevel(.verbose)
     
     // Set customized Subclass for formatters
-    SceytChatUIKit.shared.formatters.userDisplayName = UserDisplayNameFormatter()
+    SceytChatUIKit.shared.formatters.userNameFormatter = UserDisplayNameFormatter()
 }
