@@ -96,7 +96,7 @@ extension ComposerVC {
         
         private var displayDuration: Double = 0 {
             didSet {
-                durationLabel.text = Formatters.videoAssetDuration.format(displayDuration)
+                durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(displayDuration)
             }
         }
         
@@ -506,7 +506,7 @@ extension ComposerVC {
         let onCancel: () -> Void
         var duration: Double = 0.0 {
             didSet {
-                durationLabel.text = Formatters.videoAssetDuration.format(duration)
+                durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)
             }
         }
         

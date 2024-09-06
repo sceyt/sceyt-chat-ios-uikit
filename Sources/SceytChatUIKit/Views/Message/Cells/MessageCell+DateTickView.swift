@@ -79,7 +79,7 @@ extension MessageCell {
                     if data.channel.channelType == .broadcast {
                         eyeView.isHidden = false
                         displayedLabel.isHidden = false
-                        displayedLabel.text = "\(Formatters.number.short(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0)) •"
+                        displayedLabel.text = "\(SceytChatUIKit.shared.formatters.messageViewCountFormatter.format(UInt64(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0))) •"
                         tickView.isHidden = true
                     } else if !message.incoming {
                         eyeView.isHidden = true
@@ -95,7 +95,7 @@ extension MessageCell {
                     displayedLabel.isHidden = true
                     tickView.isHidden = true
                 }
-                dateLabel.text = Formatters.messageTimestamp.format(message.createdAt)
+                dateLabel.text = SceytChatUIKit.shared.formatters.messageDateFormatter.format(message.createdAt)
                 if message.state == .edited {
                     stateLabel.isHidden = false
                     stateLabel.text = L10n.Message.Info.edited
@@ -124,13 +124,13 @@ extension MessageCell {
             config.lastFragmentUsedRect = false
             config.font = appearance.infoViewDateFont
             
-            let createdAt = Formatters.messageTimestamp.format(message.createdAt)
+            let createdAt = SceytChatUIKit.shared.formatters.messageDateFormatter.format(message.createdAt)
             var size = TextSizeMeasure.calculateSize(of: createdAt, config: config).textSize
             size.width += 4
             
             if message.state != .deleted {
                 if channel.channelType == .broadcast {
-                    let displayed = "\(Formatters.number.short(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0)) •"
+                    let displayed = "\(SceytChatUIKit.shared.formatters.messageViewCountFormatter.format(UInt64(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0))) •"
                     let displayedSize = TextSizeMeasure.calculateSize(of: displayed, config: config).textSize
                     size.width += 4 + displayedSize.width
                     size.height = max(size.height, displayedSize.height)

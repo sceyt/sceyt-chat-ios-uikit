@@ -30,7 +30,7 @@ open class ChannelProfileFileHeaderView: CollectionReusableView {
     
     open var date: Date? {
         didSet {
-            headerLabel.text = Formatters.channelProfileFileTimestamp.header(date ?? Date())
+            headerLabel.text = SceytChatUIKit.shared.formatters.channelInfoMediaDateFormatter.format(date ?? Date())
         }
     }
 }

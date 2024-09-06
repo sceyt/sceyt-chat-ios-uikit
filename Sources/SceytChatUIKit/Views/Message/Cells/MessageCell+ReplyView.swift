@@ -118,7 +118,7 @@ extension MessageCell {
                 layer.cornerRadius = Layouts.cornerRadius
                 layer.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
                 layer.masksToBounds = true
-                nameLabel.text = Formatters.userDisplayName.format(data.user)
+                nameLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(data.user)
                 messageLabel.attributedText = data.attributedBody
                 if let image = data.icon {
                     stackViewH2.insertArrangedSubview(iconView, at: 0)
@@ -197,7 +197,7 @@ extension MessageCell {
             var config = TextSizeMeasure.Config(maximumNumberOfLines: 1, lastFragmentUsedRect: false)
             config.font = appearance.replyUserTitleFont
             config.restrictingWidth = MessageLayoutModel.defaults.messageWidth - thumbnailSize.width
-            let user = Formatters.userDisplayName.format(data.user)
+            let user = SceytChatUIKit.shared.formatters.userNameFormatter.format(data.user)
             let nameLabelSize = TextSizeMeasure.calculateSize(of: user, config: config).textSize
             
             config.font = appearance.replyMessageFont

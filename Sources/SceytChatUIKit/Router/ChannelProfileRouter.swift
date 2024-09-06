@@ -10,7 +10,7 @@ import UIKit
 
 open class ChannelProfileRouter: Router<ChannelProfileVC> {
     open func showMuteOptionsAlert(
-        selected: @escaping (SceytChatUIKitConfig.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
         rootVC.showBottomSheet(
@@ -21,7 +21,7 @@ open class ChannelProfileRouter: Router<ChannelProfileVC> {
     }
     
     open func showAutoDeleteOptionsAlert(
-        selected: @escaping (SceytChatUIKitConfig.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
         rootVC.showBottomSheet(

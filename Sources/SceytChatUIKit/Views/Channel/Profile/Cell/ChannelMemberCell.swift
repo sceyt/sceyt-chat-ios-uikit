@@ -96,12 +96,12 @@ open class ChannelMemberCell: TableViewCell {
                 titleLabel.text = L10n.User.current
                 selectionStyle = .none
             } else {
-                titleLabel.text = Formatters.userDisplayName.format(data)
+                titleLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(data)
                 selectionStyle = .default
             }
             
             roleLabel.text = data.roleName == SceytChatUIKit.shared.config.groupRoleParticipant ? nil : data.roleName?.localizedCapitalized
-            statusLabel.text = Formatters.userPresenceFormatter.format(data.presence)
+            statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(data.presence)
             
             imageTask = AvatarBuilder
                 .loadAvatar(into: avatarView,

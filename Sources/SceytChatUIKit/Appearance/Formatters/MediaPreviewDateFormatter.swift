@@ -1,5 +1,5 @@
 //
-//  DefaultAttachmentTimestampFormatter.swift
+//  MediaPreviewDateFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import Foundation
 
-open class DefaultAttachmentTimestampFormatter: TimestampFormatter {
+open class MediaPreviewDateFormatter: DateFormatting {
     
     public init() {}
 

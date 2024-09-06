@@ -105,7 +105,7 @@ open class ChannelProfileFileCell: CollectionViewCell {
             let attachment = data.attachment
             iconView.image = data.thumbnail
             titleLabel.text = attachment.name ?? attachment.originUrl.lastPathComponent
-            detailLabel.text = Formatters.fileSize.format(attachment.uploadedFileSize) + " • " + Formatters.channelProfileFileTimestamp.format(attachment.createdAt)
+            detailLabel.text = SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(attachment.uploadedFileSize)) + " • " + SceytChatUIKit.shared.formatters.channelInfoMediaDateFormatter.format(attachment.createdAt)
             
             updateStatus()
         }

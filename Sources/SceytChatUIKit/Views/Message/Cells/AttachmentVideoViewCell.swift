@@ -64,7 +64,7 @@ extension MessageCell {
                 setupPreviewer()
                 let duration = data.mediaDuration
                 if duration > 0 {
-                    timeLabel.text = Formatters.videoAssetDuration.format(duration)
+                    timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)
                 }
                 if let filePath = data.attachment.filePath,
                    filePath.hasPrefix("/local/"),

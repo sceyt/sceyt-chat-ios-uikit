@@ -256,7 +256,7 @@ open class MessageCell: CollectionViewCell,
         unreadView.isHidden = !data.isLastDisplayedMessage
         textLabel.attributedText = data.attributedView.content
         infoView.data = data
-        nameLabel.text = Formatters.userDisplayName.format(message.user)
+        nameLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
         nameLabel.textColor = appearance.titleColor ?? .initial(title: message.user.id)
         attachmentView.data = data
         linkView.data = data

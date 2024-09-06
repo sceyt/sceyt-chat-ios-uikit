@@ -107,7 +107,7 @@ open class ChannelProfileHeaderCell: TableViewCell {
             }
         case .direct:
             if let presence = data.peer?.presence {
-                subtitleLabel.text = Formatters.userPresenceFormatter.format(presence)
+                subtitleLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(presence)
             } else {
                 subtitleLabel.text = data.peer?.presence.status
             }

@@ -70,7 +70,7 @@ extension MessageInfoVC {
                 } else {
                     setupLayout()
                 }
-                sentValueLabel.text = Formatters.messageInfoTimestamp.format(data.message.createdAt)
+                sentValueLabel.text = SceytChatUIKit.shared.formatters.messageInfoDateFormatter.format(data.message.createdAt)
                 if let fileSize = data.attachments.first?.fileSize {
                     sizeHStack.isHidden = false
                     sizeValueLabel.text = fileSize
@@ -144,7 +144,7 @@ extension MessageInfoVC {
                       let user = data.user else { return }
                 imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: user)
                 nameLabel.text = user.displayName
-                dateTimeLabel.text = Formatters.attachmentTimestamp.format(data.createdAt)
+                dateTimeLabel.text = SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(data.createdAt)
             }
         }
         

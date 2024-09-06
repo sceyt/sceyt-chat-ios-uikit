@@ -274,7 +274,7 @@ extension MessageCell {
                 progressLabel.text = L10n.Upload.preparing
             } else {
                 let downloaded = UInt(progress.progress * Double(total))
-                progressLabel.text = "\(Formatters.fileSize.format(downloaded)) / \(Formatters.fileSize.format(total))"
+                progressLabel.text = "\(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(downloaded))) / \(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(total)))"
             }
             setProgress(progress.progress)
         }
@@ -284,7 +284,7 @@ extension MessageCell {
             else { return }
             let total = completion.attachment.uploadedFileSize
             if total > 0 {
-                progressLabel.text = "\(Formatters.fileSize.format(total)) / \(Formatters.fileSize.format(total))"
+                progressLabel.text = "\(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(total))) / \(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(total)))"
             }
         }
         

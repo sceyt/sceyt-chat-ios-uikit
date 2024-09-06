@@ -649,7 +649,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             nextState = nil
         }
         let message = layoutModel.message
-        let title = Formatters.userDisplayName.format(message.user)
+        let title = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
         var text = layoutModel.attributedView.content.string.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         var image: UIImage?
         var showPlayIcon = false
@@ -704,7 +704,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             ])
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
-                string: " " + Formatters.videoAssetDuration.format(TimeInterval(duration)),
+                string: " " + SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration)),
                 attributes: [
                     .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
                     .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .primaryAccent
@@ -792,7 +792,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             ])
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
-                string: " " + Formatters.videoAssetDuration.format(TimeInterval(duration)),
+                string: " " + SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration)),
                 attributes: [
                     .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
                     .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .primaryAccent
@@ -944,7 +944,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         (parent as? ChannelVC)?.collectionView.isUserInteractionEnabled = false
         vc.view.pin(to: parent.view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
         vc.view.bottomAnchor.pin(to: view.topAnchor)
-        vc.didSelectMember = { callback($0.id, Formatters.userDisplayName.format($0)) }
+        vc.didSelectMember = { callback($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) }
     }
 
     open func dismiss() {
@@ -980,37 +980,37 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             if isBold {
                 font = defaultFont
             } else {
-                font = Formatters.font.toBold(defaultFont)
+                font = defaultFont.bold
             }
             if isItalic {
-                font = Formatters.font.toItalic(font!)
+                font = font?.italic
             }
             if isMonospace {
-                font = Formatters.font.toMonospace(font!)
+                font = font?.monospace
             }
         case .italic:
             if isItalic {
                 font = defaultFont
             } else {
-                font = Formatters.font.toItalic(defaultFont)
+                font = defaultFont.italic
             }
             if isBold {
-                font = Formatters.font.toBold(font!)
+                font = font?.bold
             }
             if isMonospace {
-                font = Formatters.font.toMonospace(font!)
+                font = font?.monospace
             }
         case .monospace:
             if isMonospace {
                 font = defaultFont
             } else {
-                font = Formatters.font.toMonospace(defaultFont)
+                font = defaultFont.monospace
             }
             if isBold {
-                font = Formatters.font.toBold(font!)
+                font = font?.bold
             }
             if isItalic {
-                font = Formatters.font.toItalic(font!)
+                font = font?.italic
             }
         case .strikethrough:
             if attributes[.strikethroughStyle] == nil {

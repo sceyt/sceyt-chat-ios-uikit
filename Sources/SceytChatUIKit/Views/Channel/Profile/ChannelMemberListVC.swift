@@ -178,7 +178,7 @@ open class ChannelMemberListVC: ViewController,
            member.roleName == SceytChatUIKit.shared.config.chatRoleAdmin {
             return
         }
-        let displayName = Formatters.userDisplayName.format(member)
+        let displayName = SceytChatUIKit.shared.formatters.userNameFormatter.format(member)
         let normalAttributes: [NSAttributedString.Key: Any] = [
             .font: Fonts.regular.withSize(13),
             .foregroundColor: UIColor.secondaryText,

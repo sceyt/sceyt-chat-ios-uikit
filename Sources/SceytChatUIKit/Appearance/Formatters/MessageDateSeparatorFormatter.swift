@@ -1,5 +1,5 @@
 //
-//  MessagesListSeparator.swift
+//  MessageDateSeparatorFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,12 +8,7 @@
 
 import Foundation
 
-public protocol MessagesListSeparator {
-
-    func format( _ date: Date, showYear: Bool) -> String
-}
-
-open class DefaultMessagesListSeparator: MessagesListSeparator {
+open class MessageDateSeparatorFormatter: DateFormatting {
 
     public init() {}
     
@@ -35,13 +30,16 @@ open class DefaultMessagesListSeparator: MessagesListSeparator {
         return formatter
     }()
 
-    open func format(_ date: Date, showYear: Bool = false) -> String {
+    open func format(_ date: Date) -> String {
         let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: Date())
+        let dateYear = calendar.component(.year, from: date)
+        
         if calendar.isDateInToday(date) {
             return L10n.Message.List.bordersToday
         }
         var format = "\(monthFormatter.string(from: date)) \(dayFormatter.string(from: date))"
-        if showYear {
+        if dateYear < currentYear {
             format += ", \(yearFormatter.string(from: date))"
         }
         return format

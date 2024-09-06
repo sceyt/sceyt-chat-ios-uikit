@@ -1,5 +1,5 @@
 //
-//  UserDisplayNameFormatter.swift
+//  UserNameFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,12 +9,8 @@
 import Foundation
 import SceytChat
 
-public protocol UserDisplayNameFormatter {
-    func format(_ user: ChatUser) -> String
-    func short(_ user: ChatUser) -> String
-}
-
-open class DefaultUserDisplayNameFormatter: UserDisplayNameFormatter {
+open class UserNameFormatter: UserFormatting {
+    
     public init() {}
 
     open func format(_ user: ChatUser) -> String {

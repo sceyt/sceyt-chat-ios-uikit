@@ -507,7 +507,7 @@ open class ChannelVC: ViewController,
             .receive(on: DispatchQueue.main)
             .removeDuplicates()
             .sink { [weak self] value in
-                self?.unreadCountView.unreadCount.value = Formatters.channelUnreadMessageCount.format(value)
+                self?.unreadCountView.unreadCount.value = SceytChatUIKit.shared.formatters.channelUnreadCountFormatter.format(value)
             }.store(in: &subscriptions)
         
         channelViewModel
@@ -814,7 +814,7 @@ open class ChannelVC: ViewController,
         }
         
         let head = NSMutableAttributedString(
-            string: Formatters.channelDisplayName.format(channelViewModel.channel),
+            string: SceytChatUIKit.shared.formatters.channelNameFormatter.format(channelViewModel.channel),
             attributes: attrs
         )
         titleView.headLabel.attributedText = head
@@ -857,7 +857,7 @@ open class ChannelVC: ViewController,
         }
         
         let head = NSMutableAttributedString(
-            string: Formatters.channelDisplayName.format(channelViewModel.channel),
+            string: SceytChatUIKit.shared.formatters.channelNameFormatter.format(channelViewModel.channel),
             attributes: attrs
         )
         
@@ -1010,7 +1010,7 @@ open class ChannelVC: ViewController,
             else { return }
             let body = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
             if !body.isEmpty {
-                items.append("\(Formatters.userDisplayName.format(user)) [\(Formatters.attachmentTimestamp.format(message.createdAt))]\n\(body)")
+                items.append("\(SceytChatUIKit.shared.formatters.userNameFormatter.format(user)) [\(SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(message.createdAt))]\n\(body)")
             }
             items += message.attachments?.compactMap {
                 if $0.type == "link" {
@@ -1958,14 +1958,14 @@ open class ChannelVC: ViewController,
             unreadMessageIndexPath = indexPath
         case .typing(let isTyping, let user):
             if channelViewModel.channel.isGroup {
-                if showTyping(member: Formatters.userDisplayName.format(user),
+                if showTyping(member: SceytChatUIKit.shared.formatters.userNameFormatter.format(user),
                               isTyping: isTyping) == 0 {
                     updateTitle()
                 }
             } else {
                 if isTyping {
                     _ = showTyping(
-                        member: channelViewModel.channel.channelType == .direct ? "" : Formatters.userDisplayName.format(user),
+                        member: channelViewModel.channel.channelType == .direct ? "" : SceytChatUIKit.shared.formatters.userNameFormatter.format(user),
                         isTyping: isTyping
                     )
                 } else {
@@ -1977,7 +1977,7 @@ open class ChannelVC: ViewController,
                 guard let self
                 else { return }
                 let mode = self.titleView.mode
-                let change = Formatters.userPresenceFormatter.format(presence)
+                let change = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(presence: presence))
                 self.showTitle(title: self.channelViewModel.title, subTitle: change)
                 if mode == .typing {
                     self.titleView.mode = mode

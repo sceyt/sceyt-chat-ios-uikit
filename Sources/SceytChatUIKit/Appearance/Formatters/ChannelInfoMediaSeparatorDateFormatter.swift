@@ -1,5 +1,5 @@
 //
-//  DefaultChannelProfileAttachmentTimestamp.swift
+//  ChannelInfoMediaSeparatorDateFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import Foundation
 
-open class DefaultChannelProfileFileTimestamp: ChannelProfileFileTimestamp {
+open class ChannelInfoMediaSeparatorDateFormatter: DateFormatting {
 
     public init() {}
     

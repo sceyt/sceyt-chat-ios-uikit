@@ -1,5 +1,5 @@
 //
-//  InitialsFormatter.swift
+//  AvatarInitialsFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,12 +8,7 @@
 
 import Foundation
 
-public protocol InitialsFormatter {
-
-    func format(_ initials: String) -> String
-}
-
-open class DefaultInitialsFormatter: InitialsFormatter {
+open class AvatarInitialsFormatter: StringFormatting {
 
     public init() {}
     

@@ -1,5 +1,5 @@
 //
-//  VideoAssetDurationFormatter.swift
+//  MediaDurationFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,8 @@
 
 import Foundation
 
-open class VideoAssetDurationFormatter: TimeIntervalFormatter {
+open class MediaDurationFormatter: TimeIntervalFormatting {
+    
     public init() {}
 
     open func format(_ timeInterval: TimeInterval) -> String {

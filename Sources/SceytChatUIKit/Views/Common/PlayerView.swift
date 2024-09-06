@@ -67,7 +67,7 @@ open class PlayerView: View {
             if #available(iOS 15, *) {
                 do {
                     let duration = try await playerItem.asset.load(.duration)
-                    self.timeLabel.text = Formatters.videoAssetDuration.format(duration.seconds)
+                    self.timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration.seconds)
                 } catch {
                     logger.errorIfNotNil(error, "")
                 }
@@ -76,7 +76,7 @@ open class PlayerView: View {
                 playerItem.asset.loadValuesAsynchronously(forKeys: ["duration"]) { [weak self] in
                     let seconds = playerItem.duration.seconds
                     guard !seconds.isNaN else { return }
-                    self?.timeLabel.text = Formatters.videoAssetDuration.format(playerItem.duration.seconds)
+                    self?.timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(playerItem.duration.seconds)
                 }
             }
         }

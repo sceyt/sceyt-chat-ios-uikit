@@ -92,7 +92,7 @@ open class ChannelUserCell: TableViewCell {
     open var userData: ChatUser! {
         didSet {
             titleLabel.text = userData.displayName
-            statusLabel.text = Formatters.userPresenceFormatter.format(userData.presence)
+            statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(userData.presence)
             imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: userData)
             subscribeForPresence()
         }
@@ -124,7 +124,7 @@ open class ChannelUserCell: TableViewCell {
                 }
             case .direct:
                 if let presence = channelData.peer?.presence {
-                    statusLabel.text = Formatters.userPresenceFormatter.format(presence)
+                    statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(presence)
                 } else {
                     statusLabel.text = channelData.peer?.presence.status
                 }
@@ -148,7 +148,7 @@ open class ChannelUserCell: TableViewCell {
                 PresenceProvider.unsubscribe(userId: contact.id)
                 guard let self, user.userId == self.userData.id
                 else { return }
-                self.statusLabel.text = Formatters.userPresenceFormatter.format(user.presence)
+                self.statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(presence: user.presence))
             }
     }
 }

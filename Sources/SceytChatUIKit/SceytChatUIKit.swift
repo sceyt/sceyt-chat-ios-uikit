@@ -14,8 +14,9 @@ public class SceytChatUIKit {
     
     public static let shared = SceytChatUIKit()
     
-    public lazy var config = SceytChatUIKitConfig()
-    public var theme: SceytChatUIKitThemeProtocol = SceytChatUIKitTheme()
+    public lazy var config = SceytChatUIKit.Config()
+    public var theme: SceytChatUIKit.ThemeProtocol = SceytChatUIKit.Theme()
+    public var formatters = SceytChatUIKit.Formatters()
     
     public static func initialize(apiUrl: String, appId: String, clientId: String = "") {
         ChatClient.initialize(apiUrl: apiUrl, appId: appId, clientId: clientId)

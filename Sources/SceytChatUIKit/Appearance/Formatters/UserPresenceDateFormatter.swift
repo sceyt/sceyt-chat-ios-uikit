@@ -1,5 +1,5 @@
 //
-//  DefaultUserPresenceFormatter.swift
+//  UserPresenceDateFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,12 +9,8 @@
 import Foundation
 import SceytChat
 
-public protocol UserPresenceFormatter {
-    func format(_ presence: ChatUser.Presence) -> String?
-    func format(_ presence: Presence) -> String?
-}
-
-open class DefaultUserPresenceFormatter: UserPresenceFormatter {
+open class UserPresenceDateFormatter: UserPresenceFormatting {
+    
     public init() {}
     
     lazy var weekDayFormatter: DateFormatter = {
@@ -44,7 +40,7 @@ open class DefaultUserPresenceFormatter: UserPresenceFormatter {
         return formatter
     }()
     
-    open func format(_ presence: ChatUser.Presence) -> String? {
+    open func format(_ presence: ChatUser.Presence) -> String {
         switch presence.state {
         case .online:
             return L10n.User.Presence.online
@@ -56,24 +52,8 @@ open class DefaultUserPresenceFormatter: UserPresenceFormatter {
             if let lastActiveAt = presence.lastActiveAt {
                 return dateAgo(lastActiveAt)
             }
+            return ""
         }
-        return nil //L10n.User.Presence.offline
-    }
-    
-    open func format(_ presence: Presence) -> String? {
-        switch presence.state {
-        case .online:
-            return L10n.User.Presence.online
-        case .away:
-            return L10n.User.Presence.away
-        case .DND:
-            return L10n.User.Presence.dnd
-        default:
-            if let lastActiveAt = presence.lastActiveAt {
-                return dateAgo(lastActiveAt)
-            }
-        }
-        return nil //L10n.User.Presence.offline
     }
     
     private func dateAgo(_ date: Date) -> String {

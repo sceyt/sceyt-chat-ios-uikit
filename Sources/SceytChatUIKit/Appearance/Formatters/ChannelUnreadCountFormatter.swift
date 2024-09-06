@@ -1,5 +1,5 @@
 //
-//  ChannelUnreadMessageCount.swift
+//  ChannelUnreadCountFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,13 +8,7 @@
 
 import Foundation
 
-public protocol ChannelUnreadMessageCount {
-
-    func format( _ count: UInt64) -> String
-
-}
-
-open class DefaultChannelUnreadMessageCount: ChannelUnreadMessageCount {
+open class ChannelUnreadCountFormatter: UIntFormatting {
 
     public init() {}
     
@@ -29,4 +23,3 @@ open class DefaultChannelUnreadMessageCount: ChannelUnreadMessageCount {
         }
     }
 }
-

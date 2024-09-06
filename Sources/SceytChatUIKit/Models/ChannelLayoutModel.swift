@@ -124,7 +124,7 @@ open class ChannelLayoutModel {
             currentUser.metadata = user.metadata
             currentUser.presence = user.presence
             currentUser.state = user.state
-            formatedSubject = Formatters.channelDisplayName.format(channel)
+            formatedSubject = SceytChatUIKit.shared.formatters.channelNameFormatter.format(channel)
             if shouldUpdateAvatar {
                 loadAvatar()
             }
@@ -173,7 +173,7 @@ open class ChannelLayoutModel {
                 text.addAttributes(linkAttributes, range: match.range)
             }
             
-            let mentionedUsers = message.mentionedUsers?.map { ($0.id, Formatters.userDisplayName.format($0)) }
+            let mentionedUsers = message.mentionedUsers?.map { ($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) }
             if let mentionedUsers = mentionedUsers, mentionedUsers.count > 0,
                let metadata = message.metadata?.data(using: .utf8),
                let ranges = try? JSONDecoder().decode([MentionUserPos].self, from: metadata) {
@@ -208,13 +208,13 @@ open class ChannelLayoutModel {
                 }.forEach { range, value in
                     var font = messageLabelFont
                     if value.contains(where: { $0.type == .monospace }) {
-                        font = Formatters.font.toMonospace(font)
+                        font = font.monospace
                     }
                     if value.contains(where: { $0.type == .bold }) {
-                        font = Formatters.font.toBold(font)
+                        font = font.bold
                     }
                     if value.contains(where: { $0.type == .italic }) {
-                        font = Formatters.font.toItalic(font)
+                        font = font.italic
                     }
                     if value.contains(where: { $0.type == .strikethrough }) {
                         text.addAttributes([.strikethroughStyle : NSUnderlineStyle.single.rawValue], range: range)
@@ -316,7 +316,7 @@ open class ChannelLayoutModel {
                 } else if (user.id == me) || (user.id.isEmpty && lastMessage?.incoming == false) {
                     sender = "\(L10n.User.current): "
                 } else if channel.isGroup {
-                    sender = "\(Formatters.userDisplayName.short(user)): "
+                    sender = "\(SceytChatUIKit.shared.formatters.userNameFormatter.short(user)): "
                 }
             }
             if let s = sender {
@@ -356,23 +356,23 @@ open class ChannelLayoutModel {
     }
     
     open func createFormattedSubject() -> String {
-        Formatters.channelDisplayName.format(channel)
+        SceytChatUIKit.shared.formatters.channelNameFormatter.format(channel)
     }
     
     open func createFormattedDate() -> String {
         if hasReaction,
            let message = channel.lastReaction?.message {
-            return Formatters.channelTimestamp.format(message.updatedAt ?? message.createdAt )
+            return SceytChatUIKit.shared.formatters.channelDateFormatter.format(message.updatedAt ?? message.createdAt )
         }
         if let message = channel.lastMessage {
-            return Formatters.channelTimestamp.format(message.updatedAt ?? message.createdAt )
+            return SceytChatUIKit.shared.formatters.channelDateFormatter.format(message.updatedAt ?? message.createdAt )
         }
-        return Formatters.channelTimestamp.format(channel.updatedAt ?? channel.createdAt )
+        return SceytChatUIKit.shared.formatters.channelDateFormatter.format(channel.updatedAt ?? channel.createdAt )
     }
     
     open func createFormattedUnreadCount() -> String {
-        Formatters
-            .channelUnreadMessageCount
+        SceytChatUIKit.shared.formatters
+            .channelUnreadCountFormatter
             .format(channel.newMessageCount)
     }
     

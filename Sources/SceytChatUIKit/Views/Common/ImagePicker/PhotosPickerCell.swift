@@ -86,7 +86,7 @@ open class PhotosPickerCell: CollectionViewCell {
         
         if data.asset.duration > 0 {
             timeLabel.isHidden = false
-            timeLabel.text = Formatters.videoAssetDuration.format(data.asset.duration)
+            timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(data.asset.duration)
         } else {
             timeLabel.isHidden = true
         }

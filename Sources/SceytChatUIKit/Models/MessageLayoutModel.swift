@@ -120,7 +120,7 @@ open class MessageLayoutModel {
                 of: attributedView.content,
                 config: .init(restrictingWidth: restrictingTextWidth))
         
-        messageUserTitle = Formatters.userDisplayName.format(message.user)
+        messageUserTitle = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
         if !message.incoming ||
             channel.channelType == .direct ||
             channel.channelType == .broadcast {
@@ -147,7 +147,7 @@ open class MessageLayoutModel {
                     config: .init(restrictingWidth: restrictingTextWidth))
             self.parentAttributedView = parentAttributedView
             parentTextSize = parentSize.textSize
-            parentMessageUserTitle = Formatters.userDisplayName.format(parent.user)
+            parentMessageUserTitle = SceytChatUIKit.shared.formatters.userNameFormatter.format(parent.user)
             parentMessageUserTitleSize = Self.textSizeMeasure.calculateSize(
                 of:
                     NSAttributedString(
@@ -334,7 +334,7 @@ open class MessageLayoutModel {
             }
             updateOptions.insert(.body)
         }
-        let title = Formatters.userDisplayName.format(message.user)
+        let title = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
         if !message.incoming ||
             channel.channelType == .direct ||
             channel.channelType == .broadcast {
@@ -362,9 +362,9 @@ open class MessageLayoutModel {
         }
         
         if let parent = message.parent {
-            let title = Formatters.userDisplayName.format(parent.user)
+            let title = SceytChatUIKit.shared.formatters.userNameFormatter.format(parent.user)
             if title != parentMessageUserTitle {
-                parentMessageUserTitle = Formatters.userDisplayName.format(parent.user)
+                parentMessageUserTitle = SceytChatUIKit.shared.formatters.userNameFormatter.format(parent.user)
                 parentMessageUserTitleSize = Self.textSizeMeasure.calculateSize(
                     of:
                         NSAttributedString(
@@ -462,7 +462,7 @@ open class MessageLayoutModel {
     }
     
     private func createMessageUserTitle() {
-        messageUserTitle = Formatters.userDisplayName.format(message.user)
+        messageUserTitle = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
         if !message.incoming ||
             channel.channelType == .direct ||
             channel.channelType == .broadcast {
@@ -611,7 +611,7 @@ open class MessageLayoutModel {
             var replacedContent = content
             
             let mentionedUsers = message.mentionedUsers != nil ?
-            message.mentionedUsers!.map { ($0.id, Formatters.userDisplayName.format($0)) } :
+            message.mentionedUsers!.map { ($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) } :
             userSendMessage?.mentionUsers
             if let mentionedUsers = mentionedUsers, mentionedUsers.count > 0,
                let metadata = message.metadata?.data(using: .utf8),
@@ -652,13 +652,13 @@ open class MessageLayoutModel {
                 .forEach { range, value in
                     var font = bodyFont
                     if value.contains(where: { $0.type == .monospace }) {
-                        font = Formatters.font.toMonospace(font)
+                        font = font.monospace
                     }
                     if value.contains(where: { $0.type == .bold }) {
-                        font = Formatters.font.toBold(font)
+                        font = font.bold
                     }
                     if value.contains(where: { $0.type == .italic }) {
-                        font = Formatters.font.toItalic(font)
+                        font = font.italic
                     }
                     if value.contains(where: { $0.type == .strikethrough }) {
                         text.addAttributes([.strikethroughStyle : NSUnderlineStyle.single.rawValue], range: range)
@@ -1029,7 +1029,7 @@ extension MessageLayoutModel {
             } else {
                 fileSize = 0
             }
-            return Formatters.fileSize.format(fileSize)
+            return SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(fileSize))
         }
         
         @Atomic private var isLoadedThumbnail: Bool = false
@@ -1324,7 +1324,7 @@ extension MessageLayoutModel {
                             .font: appearance.replyMessageFont as Any,
                             .foregroundColor: appearance.replyMessageColor as Any
                         ])
-                        body.append(.init(string: " \(Formatters.videoAssetDuration.format(Double(attachment.voiceDecodedMetadata?.duration ?? 0)))", attributes: [
+                        body.append(.init(string: " \(SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(Double(attachment.voiceDecodedMetadata?.duration ?? 0)))", attributes: [
                             .font: appearance.replyMessageFont as Any,
                             .foregroundColor: appearance.replyMessageVoiceDurationColor as Any
                         ]))

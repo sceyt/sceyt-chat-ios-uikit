@@ -84,7 +84,7 @@ open class ChannelListRouter: Router<ChannelListVC> {
     }
     
     open func showMuteOptionsAlert(
-        selected: @escaping (SceytChatUIKitConfig.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
         rootVC.showBottomSheet(

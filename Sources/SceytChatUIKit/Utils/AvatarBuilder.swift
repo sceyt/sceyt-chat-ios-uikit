@@ -248,7 +248,7 @@ extension ChatChannel: AvatarBuildable {
     }
 
     public var displayName: String {
-        Formatters.channelDisplayName.format(self)
+        SceytChatUIKit.shared.formatters.channelNameFormatter.format(self)
     }
 
     public var defaultAvatar: UIImage? {
@@ -284,7 +284,7 @@ extension ChatUser: AvatarBuildable {
     }
 
     public var displayName: String {
-        Formatters.userDisplayName.format(self)
+        SceytChatUIKit.shared.formatters.userNameFormatter.format(self)
     }
     
     public var defaultAvatar: UIImage? {

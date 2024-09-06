@@ -159,7 +159,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
         if me == attachment.userId {
             return L10n.User.current
         } else if let user = attachment.user {
-            return Formatters.userDisplayName.format(user)
+            return SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
         } else {
             return ""
         }

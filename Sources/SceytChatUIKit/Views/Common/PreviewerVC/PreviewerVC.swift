@@ -201,7 +201,7 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
         }
         
         carouselVC?.titleLabel.text = viewModel.previewItem.senderTitle
-        carouselVC?.subtitleLabel.text = Formatters.attachmentTimestamp.format(viewModel.previewItem.attachment.createdAt)
+        carouselVC?.subtitleLabel.text = SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(viewModel.previewItem.attachment.createdAt)
     }
     
     override open func viewWillDisappear(_ animated: Bool) {
@@ -311,7 +311,7 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
             { [weak self] _ in
                 guard let self else { return }
                 if self.player?.currentItem?.status == .readyToPlay {
-                    self.currentTimeLabel.text = Formatters.videoAssetDuration.format(self.player!.currentTime().seconds)
+                    self.currentTimeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(self.player!.currentTime().seconds)
                     if !self.isSliderDragging {
                         self.slider.setValue(
                             Float(self.player!.currentTime().seconds / playerItem.duration.seconds),
@@ -340,7 +340,7 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
         playerView.contentMode = imageContentMode
         playerView.layer.insertSublayer(playerLayer!, at: 0)
         playerView.image = viewModel.previewItem.attachment.originalImage
-        durationLabel.text = Formatters.videoAssetDuration.format(player!.currentItem?.duration.seconds ?? 0)
+        durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(player!.currentItem?.duration.seconds ?? 0)
     }
     
     // MARK: Add Gesture Recognizers

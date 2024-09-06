@@ -124,13 +124,13 @@ open class ChannelProfileVoiceCell: CollectionViewCell {
                 if user.id == me {
                     titleLabel.text = L10n.User.current
                 } else {
-                    titleLabel.text = Formatters.userDisplayName.format(user)
+                    titleLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
                 }
             } else {
                 titleLabel.text = attachment.userId
             }
             
-            dateLabel.text = Formatters.attachmentTimestamp.format(attachment.createdAt)
+            dateLabel.text = SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(attachment.createdAt)
             
             reset()
             if let fileUrl = attachment.fileUrl, fileUrl == SimpleSinglePlayer.url, SimpleSinglePlayer.isPlaying {
@@ -145,7 +145,7 @@ open class ChannelProfileVoiceCell: CollectionViewCell {
     }
     
     open func setDuration(duration: TimeInterval, progress: Double) {
-        durationLabel.text = Formatters.videoAssetDuration.format(duration)
+        durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)
     }
     
     @objc
@@ -169,7 +169,7 @@ open class ChannelProfileVoiceCell: CollectionViewCell {
     
     open func reset() {
         if let duration = data?.attachment.voiceDecodedMetadata?.duration, duration > 0 {
-            durationLabel.text = Formatters.videoAssetDuration.format(TimeInterval(duration))
+            durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration))
         } else {
             durationLabel.text = ""
         }

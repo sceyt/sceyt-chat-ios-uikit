@@ -1,5 +1,5 @@
 //
-//  ChannelDisplayNameFormatter.swift
+//  ChannelNameFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,13 +9,7 @@
 import Foundation
 import SceytChat
 
-public protocol ChannelDisplayNameFormatter {
-
-    func format( _ channel: ChatChannel) -> String
-
-}
-
-open class DefaultChannelDisplayNameFormatter: ChannelDisplayNameFormatter {
+open class ChannelNameFormatter: ChannelFormatting {
     
     public init() {}
 
@@ -31,8 +25,7 @@ open class DefaultChannelDisplayNameFormatter: ChannelDisplayNameFormatter {
         case .inactive:
             return L10n.Channel.Member.inactive
         default:
-            return Formatters.userDisplayName.format(peer)
+            return SceytChatUIKit.shared.formatters.userNameFormatter.format(peer)
         }
-
     }
 }

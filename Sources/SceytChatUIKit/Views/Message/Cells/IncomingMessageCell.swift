@@ -353,7 +353,7 @@ open class IncomingMessageCell: MessageCell {
         }
         
         if showName {
-            let text = Formatters.userDisplayName.format(model.message.user)
+            let text = SceytChatUIKit.shared.formatters.userNameFormatter.format(model.message.user)
             
             userNameSize = TextSizeMeasure
                 .calculateSize(

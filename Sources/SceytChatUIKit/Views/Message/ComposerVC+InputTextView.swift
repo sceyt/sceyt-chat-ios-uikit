@@ -93,13 +93,13 @@ extension ComposerVC {
                 if let font = value[.font] as? UIFont {
                     var newFont = InputTextView.appearance.textFont
                     if font.isBold {
-                        newFont = Formatters.font.toBold(newFont)
+                        newFont = newFont.bold
                     }
                     if font.isItalic {
-                        newFont = Formatters.font.toItalic(newFont)
+                        newFont = newFont.italic
                     }
                     if font.isMonospace {
-                        newFont = Formatters.font.toMonospace(newFont)
+                        newFont = newFont.monospace
                     }
                     mPastedAttributedString.addAttribute(.font, value: newFont, range: range)
                 }

@@ -47,7 +47,7 @@ open class ChannelProfileVideoAttachmentCell: ChannelProfileAttachmentCell {
             guard let data
             else { return }
             if let duration = data.attachment.imageDecodedMetadata?.duration, duration > 0 {
-                timeLabel.text = Formatters.videoAssetDuration.format(TimeInterval(duration))
+                timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration))
             } else {
                 timeLabel.text = ""
             }

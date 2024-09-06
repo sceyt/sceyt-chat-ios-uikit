@@ -1,5 +1,5 @@
 //
-//  NumberFormatter.swift
+//  MessageViewsCountFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 20/10/2023.
@@ -8,14 +8,11 @@
 
 import Foundation
 
-public protocol NumberFormatter {
-    func short(_ count: Int) -> String
-}
-
-open class DefaultNumberFormatter: NumberFormatter {
+open class MessageViewsCountFormatter: UIntFormatting {
+    
     public init() {}
 
-    open func short(_ count: Int) -> String {
+    open func format(_ count: UInt64) -> String {
         let suffixes = ["", "k", "m", "b", "t"]
         var idx = 0
         var d = Double(count)

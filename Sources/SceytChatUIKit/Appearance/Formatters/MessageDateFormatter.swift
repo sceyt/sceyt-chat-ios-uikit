@@ -1,5 +1,5 @@
 //
-//  DefaultMessageTimestampFormatter.swift
+//  MessageDateFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import Foundation
 
-open class DefaultMessageTimestampFormatter: TimestampFormatter {
+open class MessageDateFormatter: DateFormatting {
 
     public init() {}
     
@@ -21,5 +21,4 @@ open class DefaultMessageTimestampFormatter: TimestampFormatter {
     open func format(_ date: Date) -> String {
         timeFormatter.string(from: date)
     }
-
 }

@@ -126,7 +126,7 @@ extension ComposerVC {
                         }
                         DispatchQueue.main.async {
                             mv?.timeLabel.isHidden = false
-                            mv?.timeLabel.text = Formatters.videoAssetDuration.format(duration)
+                            mv?.timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)
                         }
                     }
                 }
@@ -145,10 +145,10 @@ extension ComposerVC {
                 ]
             } else if view.duration > 0 {
                 mv?.timeLabel.isHidden = false
-                mv?.timeLabel.text = Formatters.videoAssetDuration.format(Double(view.duration))
+                mv?.timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(Double(view.duration))
             } else if view.type == .file {
                 fv?.titleLabel.text = view.name
-                fv?.subtitleLabel.text = Formatters.fileSize.format(view.fileSize)
+                fv?.subtitleLabel.text = SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(view.fileSize))
             }
         }
 

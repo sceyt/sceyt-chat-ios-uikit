@@ -55,7 +55,7 @@ open class MentioningUserViewCell: TableViewCell {
     open var data: ChatChannelMember! {
         didSet {
             guard let data = data else { return }
-            titleLabel.text = Formatters.userDisplayName.format(data)
+            titleLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(data)
             if me == data.id {
                 titleLabel.text! += " (\(L10n.User.current))"
             }

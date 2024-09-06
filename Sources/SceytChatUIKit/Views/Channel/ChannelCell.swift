@@ -261,8 +261,8 @@ open class ChannelCell: TableViewCell {
     }
 
     open func unreadCount(channel: ChatChannel) -> String? {
-        Formatters
-            .channelUnreadMessageCount
+        SceytChatUIKit.shared.formatters
+            .channelUnreadCountFormatter
             .format(channel.newMessageCount)
     }
     
@@ -270,7 +270,7 @@ open class ChannelCell: TableViewCell {
         let message = NSMutableAttributedString(string: "")
         if data.channel.isGroup {
             message.append(NSAttributedString(
-                string: "\(Components.typingView.display(typer: Formatters.userDisplayName.format(member), split: .firstWord)): ",
+                string: "\(Components.typingView.display(typer: SceytChatUIKit.shared.formatters.userNameFormatter.format(member), split: .firstWord)): ",
                 attributes: [.font: appearance.senderLabelFont ?? Fonts.regular.withSize(15), .foregroundColor: appearance.senderLabelTextColor ?? .primaryText]
             ))
         }

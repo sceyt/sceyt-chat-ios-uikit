@@ -72,7 +72,7 @@ extension MessageCell {
             } else {
                 let total = progress.attachment.uploadedFileSize
                 let downloaded = UInt(progress.progress * Double(total))
-                message = "\(Formatters.fileSize.format(downloaded)) • \(Formatters.fileSize.format(total))"
+                message = "\(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(downloaded))) • \(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(total)))"
             }
             sizeLabel.text = message
         }

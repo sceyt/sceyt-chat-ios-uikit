@@ -83,7 +83,7 @@ class UserProfileViewController: UIViewController {
     
     fileprivate func updateProfile() {
         let user = ChatUser(user: ChatClient.shared.user)
-        profileView.displayNameLabel.text = Formatters.userDisplayName.format(user)
+        profileView.displayNameLabel.text = SceytChatUIKit.shared.formatters.userDisplayName.format(user)
         _ = AvatarBuilder.loadAvatar(into: profileView.imageView, for: user)
     }
     
@@ -207,7 +207,7 @@ class UserProfileViewController: UIViewController {
     }
     
     private func showMuteOptionsAlert(
-        selected: @escaping (SceytChatUIKitConfig.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
         showBottomSheet(

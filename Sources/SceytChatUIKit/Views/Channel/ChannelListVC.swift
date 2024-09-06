@@ -223,7 +223,7 @@ open class ChannelListVC: ViewController,
             else { return }
             self.navigationController?.tabBarItem.badgeValue = count == 0 ?
             nil :
-            Formatters.channelUnreadMessageCount.format(UInt64(count))
+            SceytChatUIKit.shared.formatters.channelUnreadCountFormatter.format(UInt64(count))
         }
         updateApplicationBadgeNumberWithUnreadMessagesCount(count)
     }

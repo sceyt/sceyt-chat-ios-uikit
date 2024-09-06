@@ -34,7 +34,7 @@ class SceytChatUIKitTests: XCTestCase {
     }
 
     func testNumberFormatter() throws {
-        let numberFormatter = DefaultNumberFormatter()
+        let numberFormatter = MessageViewsCountFormatter()
         XCTAssert(numberFormatter.short(1_111_000_000_000) == "1.11t")
         XCTAssert(numberFormatter.short(1_110_000_000_000) == "1.11t")
         XCTAssert(numberFormatter.short(1_100_000_000_000) == "1.1t")

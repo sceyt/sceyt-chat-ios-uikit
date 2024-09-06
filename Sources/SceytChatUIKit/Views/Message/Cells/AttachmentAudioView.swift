@@ -142,7 +142,7 @@ extension MessageCell {
         
         private var displayDuration = 0.0 {
             didSet {
-                durationLabel.text = Formatters.videoAssetDuration.format(displayDuration)
+                durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(displayDuration)
             }
         }
         

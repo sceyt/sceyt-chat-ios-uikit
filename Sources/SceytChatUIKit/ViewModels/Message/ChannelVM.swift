@@ -1812,27 +1812,20 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func separatorDateForMessage(at indexPath: IndexPath) -> String? {
         let firstPath = IndexPath(row: 0, section: indexPath.section)
-        guard let current = message(at: firstPath)
-        else { return nil }
-        let calendar = Calendar.current
-        let currentYear = calendar.component(.year, from: Date())
+        guard let current = message(at: firstPath) else { return nil }
+        
         guard indexPath.section > 0,
               let prev = message(at: .init(row: 0,
-                                           section: indexPath.section - 1))
-        else {
-            let dateYear = calendar.component(.year, from: current.createdAt)
-            return Formatters.messageListSeparator.format(current.createdAt, showYear: dateYear < currentYear)
+                                           section: indexPath.section - 1)) else {
+            return SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter.format(current.createdAt)
         }
         
-        let date = !calendar.isDate(
-            prev.createdAt,
-            equalTo: current.createdAt,
-            toGranularity: .day
-        ) ? current.createdAt : nil
+        let calendar = Calendar.current
+        let date = !calendar.isDate(prev.createdAt,
+                                    equalTo: current.createdAt,
+                                    toGranularity: .day) ? current.createdAt : nil
         if let date {
-            let dateYear = calendar.component(.year, from: date)
-            return Formatters.messageListSeparator.format(date, showYear: dateYear < currentYear)
-            
+            return SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter.format(date)
         }
         return nil
     }
@@ -1882,8 +1875,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
     // MARK: view titles
     open var title: String {
         (isThread ?
-         Formatters.userDisplayName.format(threadMessage!.user) :
-            Formatters.channelDisplayName.format(channel))
+         SceytChatUIKit.shared.formatters.userNameFormatter.format(threadMessage!.user) :
+            SceytChatUIKit.shared.formatters.channelNameFormatter.format(channel))
         .trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
@@ -1910,9 +1903,9 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             }
         default:
             if let presence = peerPresence {
-                subTitle = Formatters.userPresenceFormatter.format(presence)
+                subTitle = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(presence: presence))
             } else if let presence = channel.peer?.presence {
-                subTitle = Formatters.userPresenceFormatter.format(presence)
+                subTitle = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(presence)
             }
         }
         return subTitle
