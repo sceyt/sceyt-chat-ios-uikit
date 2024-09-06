@@ -9,7 +9,7 @@
 import Foundation
 import SceytChatUIKit
 
-class UserDisplayNameFormatter: DefaultUserDisplayNameFormatter {
+class UserDisplayNameFormatter: UserNameFormatter {
     override func format(_ user: ChatUser) -> String {
         switch user.state {
         case .deleted, .inactive:

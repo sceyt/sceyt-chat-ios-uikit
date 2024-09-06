@@ -83,7 +83,7 @@ class UserProfileViewController: UIViewController {
     
     fileprivate func updateProfile() {
         let user = ChatUser(user: ChatClient.shared.user)
-        profileView.displayNameLabel.text = SceytChatUIKit.shared.formatters.userDisplayName.format(user)
+        profileView.displayNameLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
         _ = AvatarBuilder.loadAvatar(into: profileView.imageView, for: user)
     }
     
