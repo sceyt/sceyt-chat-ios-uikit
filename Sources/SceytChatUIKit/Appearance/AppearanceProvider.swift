@@ -730,19 +730,6 @@ extension EmojiListSectionHeaderView: AppearanceProvider {
     }
 }
 
-extension HoldButton: AppearanceProvider {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor = UIColor.background
-        public var highlightedBackgroundColor = UIColor.background
-        public var titleColor = UIColor.primaryText
-        public var titleFont = Fonts.regular.withSize(13)
-        
-        public init() {}
-    }
-}
-
 extension ChannelAvatarVC: AppearanceProvider {
     public static var appearance = Appearance()
     

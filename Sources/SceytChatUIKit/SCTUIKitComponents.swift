@@ -33,11 +33,11 @@ public enum SCTUIKitComponents {
     public static var channelSearchControlsView: ChannelVC.SearchControlsView.Type = ChannelVC.SearchControlsView.self
 
     public static var channelProfileVC: ChannelProfileVC.Type = ChannelProfileVC.self
+    public static var profileTableView: ProfileTableView.Type = ProfileTableView.self
     public static var channelProfileVM: ChannelProfileVM.Type = ChannelProfileVM.self
     public static var channelProfileRouter: ChannelProfileRouter.Type = ChannelProfileRouter.self
     
     public static var channelProfileHeaderCell: ChannelProfileHeaderCell.Type = ChannelProfileHeaderCell.self
-    public static var channelProfileMenuCell: ChannelProfileMenuCell.Type = ChannelProfileMenuCell.self
     public static var channelProfileDescriptionCell: ChannelProfileDescriptionCell.Type = ChannelProfileDescriptionCell.self
     public static var channelProfileItemCell: ChannelProfileItemCell.Type = ChannelProfileItemCell.self
     public static var channelProfileContainerCell: ChannelProfileContainerCell.Type = ChannelProfileContainerCell.self
@@ -56,6 +56,8 @@ public enum SCTUIKitComponents {
     public static var channelMemberAddCell: ChannelMemberAddCell.Type = ChannelMemberAddCell.self
     public static var channelSelectingView: ChannelVC.SelectingView.Type = ChannelVC.SelectingView.self
 
+    
+    public static var channelAttachmentListView: ChannelAttachmentListView.Type = ChannelAttachmentListView.self
     public static var channelMediaListView: ChannelMediaListView.Type = ChannelMediaListView.self
     public static var channelFileListView: ChannelFileListView.Type = ChannelFileListView.self
     public static var channelLinkListView: ChannelLinkListView.Type = ChannelLinkListView.self
@@ -69,7 +71,6 @@ public enum SCTUIKitComponents {
     public static var channelAvatarVC: ChannelAvatarVC.Type = ChannelAvatarVC.self
     public static var channelAvatarVM: ChannelAvatarVM.Type = ChannelAvatarVM.self
 
-    public static var holdButton: HoldButton.Type = HoldButton.self
     
     public static var channelAttachmentListVM: ChannelAttachmentListVM.Type = ChannelAttachmentListVM.self
     
@@ -131,6 +132,7 @@ public enum SCTUIKitComponents {
     public static var previewerImageView: PreviewerImageView.Type = PreviewerImageView.self
     public static var previewerScrollView: PreviewerScrollView.Type = PreviewerScrollView.self
     
+    public static var emojiVC: EmojiVC.Type = EmojiVC.self // reactions popup
     public static var emojiListVC: EmojiListVC.Type = EmojiListVC.self
     public static var emojiListVM: EmojiListVM.Type = EmojiListVM.self
     public static var emojiListCollectionViewCell: EmojiListCollectionViewCell.Type = EmojiListCollectionViewCell.self
@@ -224,7 +226,7 @@ public enum SCTUIKitComponents {
     
     
     public static var actionController: ActionController.Type = ActionController.self
-    public static var emojiVC: EmojiVC.Type = EmojiVC.self
+    
     public static var menuCell: MenuCell.Type = MenuCell.self
     public static var menuController: MenuController.Type = MenuController.self
     

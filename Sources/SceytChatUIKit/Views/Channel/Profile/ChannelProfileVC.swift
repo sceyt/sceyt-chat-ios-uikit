@@ -73,7 +73,6 @@ open class ChannelProfileVC: ViewController,
         linkListVC.linkViewModel = profileViewModel.linkListViewModel
         voiceListVC.voiceViewModel = profileViewModel.voiceListViewModel
         tableView.register(Components.channelProfileHeaderCell.self)
-        tableView.register(Components.channelProfileMenuCell.self)
         tableView.register(Components.channelProfileDescriptionCell.self)
         tableView.register(Components.channelProfileItemCell.self)
         tableView.register(Components.channelProfileContainerCell.self)
@@ -271,11 +270,6 @@ open class ChannelProfileVC: ViewController,
                 guard let self else { return }
                 self.router.goAvatar()
             }.store(in: &cell.subscriptions)
-            _cell = cell
-        case .actionMenu:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileMenuCell.self)
-            cell.selectionStyle = .none
-            cell.data = preferredMenuButtons()
             _cell = cell
         case .description:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileDescriptionCell.self)
@@ -489,70 +483,6 @@ open class ChannelProfileVC: ViewController,
         outerDeceleration = nil
     }
     
-    open func preferredMenuButtons() -> [HoldButton] {
-        func button(item: ActionItem) -> HoldButton {
-            let hb = Components.holdButton.init(image: item.image, title: item.title, tag: item.tag)
-                .withoutAutoresizingMask
-            hb.backgroundColor = .white
-            hb.addTarget(self, action: #selector(profileAction(_:)), for: .touchUpInside)
-            return hb
-        }
-        
-        var mute: HoldButton {
-            profileViewModel.channel.muted ?
-                button(item:
-                    .init(
-                        title: L10n.Channel.Profile.Action.unmute,
-                        image: .channelProfileUnmute,
-                        tag: ActionTag.unmute)
-                ) :
-                button(item:
-                    .init(
-                        title: L10n.Channel.Profile.Action.mute,
-                        image: .channelProfileMute,
-                        tag: ActionTag.mute)
-                )
-        }
-        
-        switch profileViewModel.channelType {
-        case .broadcast:
-            if profileViewModel.isUnsubscribedChannel {
-                return [button(item:
-                    .init(
-                        title: L10n.Channel.Profile.Action.join,
-                        image: .channelProfileJoin,
-                        tag: ActionTag.join))]
-            } else {
-                return [
-                    mute,
-                    button(item:
-                        .init(
-                            title: L10n.Channel.Profile.Action.more,
-                            image: .channelProfileMore,
-                            tag: ActionTag.more))
-                ]
-            }
-        case .private:
-            return [
-                mute,
-                button(item:
-                    .init(
-                        title: L10n.Channel.Profile.Action.more,
-                        image: .channelProfileMore,
-                        tag: ActionTag.more))
-            ]
-        case .direct:
-            return [
-                mute,
-                button(item:
-                    .init(
-                        title: L10n.Channel.Profile.Action.more,
-                        image: .channelProfileMore,
-                        tag: ActionTag.more))
-            ]
-        }
-    }
-    
     open func options() -> [ActionItem] {
         var actions: [ActionItem] = [
             .init(title: L10n.Channel.Profile.notifications, image: .channelProfileBell, tag: ActionTag.notifications)
@@ -593,28 +523,6 @@ open class ChannelProfileVC: ViewController,
         return actions
     }
     
-    @objc
-    open func profileAction(_ sender: HoldButton) {
-        switch sender.tag {
-        case ActionTag.mute:
-            muteAction(sender)
-        case ActionTag.unmute:
-            unmuteAction(sender)
-        case ActionTag.report:
-            reportAction(sender)
-        case ActionTag.join:
-            joinAction(sender)
-        case ActionTag.more:
-            moreAction(sender)
-        case ActionTag.message:
-            messageAction(sender)
-        case ActionTag.messageSearch:
-            searchAction(sender)
-        default:
-            break
-        }
-    }
-    
     open func availableSections() -> [Sections] {
         var sections: [Sections] = [.header]
         switch profileViewModel.channelType {
@@ -648,11 +556,7 @@ open class ChannelProfileVC: ViewController,
     
     @objc
     open func muteAction(_ sender: Any?) {
-        if let sender = sender as? HoldButton {
-            router.showMuteOptionsAlert { [weak self] option in
-                self?.mute(for: option.timeInterval, sender: sender)
-            } canceled: {}
-        } else if let sender = sender as? UISwitch {
+        if let sender = sender as? UISwitch {
             if sender.isOn {
                 unmuteAction(sender)
             } else {
@@ -673,11 +577,7 @@ open class ChannelProfileVC: ViewController,
                 if let sender = sender as? UISwitch {
                     sender.isOn = true
                 }
-            } else if let sender = sender as? HoldButton {
-                sender.imageView.image = .channelProfileUnmute
-                sender.titleLabel.text = L10n.Channel.Profile.Action.unmute
-                sender.tag = ActionTag.unmute
-            }
+            } 
         }
     }
     
@@ -689,11 +589,7 @@ open class ChannelProfileVC: ViewController,
                 if let sender = sender as? UISwitch {
                     sender.isOn = false
                 }
-            } else if let sender = sender as? HoldButton {
-                sender.imageView.image = .channelProfileMute
-                sender.titleLabel.text = L10n.Channel.Profile.Action.mute
-                sender.tag = ActionTag.mute
-            }
+            } 
         }
     }
     
@@ -704,23 +600,7 @@ open class ChannelProfileVC: ViewController,
     open func unpinChat() {
         profileViewModel.channelProvider.unpin()
     }
-    
-    open func reportAction(_ sender: HoldButton) {
-        // TODO: Report User
-        logger.debug("Report User")
-    }
-    
-    open func joinAction(_ sender: HoldButton) {
-        profileViewModel.join { [weak self] error in
-            guard let self else { return }
-            if let error = error {
-                self.showAlert(error: error)
-            } else {
-                self.router.goChannelVC()
-            }
-        }
-    }
-    
+        
     @objc
     open func moreAction(_ sender: Any) {
         var actions = [SheetAction]()
@@ -925,14 +805,6 @@ open class ChannelProfileVC: ViewController,
         showBottomSheet(actions: actions, withCancel: true)
     }
     
-    open func messageAction(_ sender: HoldButton) {
-        ChannelListRouter.findAndShowChannel(id: profileViewModel.channel.id)
-    }
-    
-    open func searchAction(_ sender: HoldButton) {
-        router.goMessageSearch()
-    }
-    
     open func deleteAllMessages(forEveryone: Bool = false) {
         showAlert(title: L10n.Channel.Selecting.clearChat,
                   message: forEveryone ? L10n.Channel.Selecting.ClearChat.Channel.message : L10n.Channel.Selecting.ClearChat.message,
@@ -1044,7 +916,6 @@ open class ChannelProfileVC: ViewController,
 public extension ChannelProfileVC {
     enum Sections: Int, CaseIterable {
         case header
-        case actionMenu
         case description
         case uri
         case options
