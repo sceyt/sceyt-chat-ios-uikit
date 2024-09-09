@@ -1,5 +1,5 @@
 //
-//  AppearanceProvider.swift
+//  AppearanceProviding.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,19 +8,25 @@
 
 import UIKit
 
-public protocol AppearanceProvider {
+public protocol AppearanceProviding {
     associatedtype AppearanceType
     static var appearance: AppearanceType { get set }
     var appearance: AppearanceType { get }
 }
 
-public extension AppearanceProvider {
+public extension AppearanceProviding {
     var appearance: AppearanceType {
         Self.appearance
     }
 }
 
-extension ChannelListVC: AppearanceProvider {
+public struct LabelAppearance {
+    public var foregroundColor: UIColor
+    public var font: UIFont
+    public var backgroundColor: UIColor = .clear
+}
+
+extension ChannelListVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -33,7 +39,7 @@ extension ChannelListVC: AppearanceProvider {
     }
 }
 
-extension ChannelCell: AppearanceProvider {
+extension ChannelCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -83,7 +89,7 @@ extension ChannelCell: AppearanceProvider {
     }
 }
 
-extension ChannelSwipeActionsConfiguration: AppearanceProvider {
+extension ChannelSwipeActionsConfiguration: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -123,7 +129,7 @@ extension ChannelSwipeActionsConfiguration: AppearanceProvider {
     }
 }
 
-extension ChannelVC: AppearanceProvider {
+extension ChannelVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -141,7 +147,7 @@ extension ChannelVC: AppearanceProvider {
     }
 }
 
-extension ChannelVC.TitleView: AppearanceProvider {
+extension ChannelVC.TitleView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -155,7 +161,7 @@ extension ChannelVC.TitleView: AppearanceProvider {
     }
 }
 
-extension ChannelUnreadCountView: AppearanceProvider {
+extension ChannelUnreadCountView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -167,7 +173,7 @@ extension ChannelUnreadCountView: AppearanceProvider {
     }
 }
 
-extension MessageCell: AppearanceProvider {
+extension MessageCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -269,7 +275,7 @@ extension MessageCell: AppearanceProvider {
     }
 }
 
-extension ComposerVC: AppearanceProvider {
+extension ComposerVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -316,7 +322,7 @@ extension ComposerVC: AppearanceProvider {
     }
 }
 
-extension ComposerVC.InputTextView: AppearanceProvider {
+extension ComposerVC.InputTextView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -330,7 +336,7 @@ extension ComposerVC.InputTextView: AppearanceProvider {
     }
 }
 
-extension ChannelProfileVC: AppearanceProvider {
+extension ChannelProfileVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -361,7 +367,7 @@ extension ChannelProfileVC: AppearanceProvider {
     }
 }
 
-extension ChannelProfileEditVC: AppearanceProvider {
+extension ChannelProfileEditVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -379,7 +385,7 @@ extension ChannelProfileEditVC: AppearanceProvider {
     }
 }
 
-extension ChannelMemberListVC: AppearanceProvider {
+extension ChannelMemberListVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -389,7 +395,7 @@ extension ChannelMemberListVC: AppearanceProvider {
     }
 }
 
-extension ChannelMemberCell: AppearanceProvider {
+extension ChannelMemberCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -410,7 +416,7 @@ extension ChannelMemberCell: AppearanceProvider {
     }
 }
 
-extension ChannelUserCell: AppearanceProvider {
+extension ChannelUserCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -427,7 +433,7 @@ extension ChannelUserCell: AppearanceProvider {
     }
 }
 
-extension ChannelMemberAddCell: AppearanceProvider {
+extension ChannelMemberAddCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -440,7 +446,7 @@ extension ChannelMemberAddCell: AppearanceProvider {
     }
 }
 
-extension PhotosPickerVC: AppearanceProvider {
+extension PhotosPickerVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -461,7 +467,7 @@ extension PhotosPickerVC: AppearanceProvider {
     }
 }
 
-extension ChannelMediaListView: AppearanceProvider {
+extension ChannelMediaListView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -475,7 +481,7 @@ extension ChannelMediaListView: AppearanceProvider {
     }
 }
 
-extension ChannelFileListView: AppearanceProvider {
+extension ChannelFileListView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -494,7 +500,7 @@ extension ChannelFileListView: AppearanceProvider {
     }
 }
 
-extension ChannelLinkListView: AppearanceProvider {
+extension ChannelLinkListView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -511,7 +517,7 @@ extension ChannelLinkListView: AppearanceProvider {
     }
 }
 
-extension ChannelVoiceListView: AppearanceProvider {
+extension ChannelVoiceListView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -532,7 +538,7 @@ extension ChannelVoiceListView: AppearanceProvider {
     }
 }
 
-extension PhotosPickerCell: AppearanceProvider {
+extension PhotosPickerCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -545,7 +551,7 @@ extension PhotosPickerCell: AppearanceProvider {
     }
 }
 
-extension CircularProgressView: AppearanceProvider {
+extension CircularProgressView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -558,7 +564,7 @@ extension CircularProgressView: AppearanceProvider {
     }
 }
 
-extension MentioningUserListVC: AppearanceProvider {
+extension MentioningUserListVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -570,7 +576,7 @@ extension MentioningUserListVC: AppearanceProvider {
     }
 }
 
-extension MentioningUserViewCell: AppearanceProvider {
+extension MentioningUserViewCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -628,7 +634,7 @@ public struct InitialsBuilderAppearance {
     }
 }
 
-extension PreviewerVC: AppearanceProvider {
+extension PreviewerVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -644,7 +650,7 @@ extension PreviewerVC: AppearanceProvider {
     }
 }
 
-extension EmojiVC: AppearanceProvider {
+extension EmojiVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -656,7 +662,7 @@ extension EmojiVC: AppearanceProvider {
     }
 }
 
-extension MenuController: AppearanceProvider {
+extension MenuController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -666,7 +672,7 @@ extension MenuController: AppearanceProvider {
     }
 }
 
-extension MenuCell: AppearanceProvider {
+extension MenuCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -683,7 +689,7 @@ extension MenuCell: AppearanceProvider {
     }
 }
 
-extension ReactionVC: AppearanceProvider {
+extension ReactionVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -693,7 +699,7 @@ extension ReactionVC: AppearanceProvider {
     }
 }
 
-extension ReactionScoreCell: AppearanceProvider {
+extension ReactionScoreCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -709,7 +715,7 @@ extension ReactionScoreCell: AppearanceProvider {
     }
 }
 
-extension ActionPresentationController: AppearanceProvider {
+extension ActionPresentationController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -719,7 +725,7 @@ extension ActionPresentationController: AppearanceProvider {
     }
 }
 
-extension EmojiListSectionHeaderView: AppearanceProvider {
+extension EmojiListSectionHeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -730,7 +736,7 @@ extension EmojiListSectionHeaderView: AppearanceProvider {
     }
 }
 
-extension ChannelAvatarVC: AppearanceProvider {
+extension ChannelAvatarVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -741,7 +747,7 @@ extension ChannelAvatarVC: AppearanceProvider {
     }
 }
 
-extension ChannelVC.SelectingView: AppearanceProvider {
+extension ChannelVC.SelectingView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -752,7 +758,7 @@ extension ChannelVC.SelectingView: AppearanceProvider {
     }
 }
 
-extension NativeSegmentedController: AppearanceProvider {
+extension NativeSegmentedController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -764,7 +770,7 @@ extension NativeSegmentedController: AppearanceProvider {
     }
 }
 
-extension SheetVC: AppearanceProvider {
+extension SheetVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -780,7 +786,7 @@ extension SheetVC: AppearanceProvider {
     }
 }
 
-extension BottomSheet: AppearanceProvider {
+extension BottomSheet: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -801,7 +807,7 @@ extension BottomSheet: AppearanceProvider {
     }
 }
 
-extension Alert: AppearanceProvider {
+extension Alert: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -824,7 +830,7 @@ extension Alert: AppearanceProvider {
     }
 }
 
-extension CreateChannelHeaderView: AppearanceProvider {
+extension CreateChannelHeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -837,7 +843,7 @@ extension CreateChannelHeaderView: AppearanceProvider {
     }
 }
 
-extension SelectChannelMembersVC: AppearanceProvider {
+extension SelectChannelMembersVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -847,7 +853,7 @@ extension SelectChannelMembersVC: AppearanceProvider {
     }
 }
 
-extension SearchController: AppearanceProvider {
+extension SearchController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -861,7 +867,7 @@ extension SearchController: AppearanceProvider {
     }
 }
 
-extension NavigationController: AppearanceProvider {
+extension NavigationController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -881,7 +887,7 @@ extension NavigationController: AppearanceProvider {
     }
 }
 
-extension ChannelProfileFileHeaderView: AppearanceProvider {
+extension ChannelProfileFileHeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -893,7 +899,7 @@ extension ChannelProfileFileHeaderView: AppearanceProvider {
     }
 }
 
-extension ChannelProfileEditAvatarCell: AppearanceProvider {
+extension ChannelProfileEditAvatarCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -903,7 +909,7 @@ extension ChannelProfileEditAvatarCell: AppearanceProvider {
     }
 }
 
-extension ImageCropperVC: AppearanceProvider {
+extension ImageCropperVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -916,7 +922,7 @@ extension ImageCropperVC: AppearanceProvider {
     }
 }
 
-extension CreateNewChannelVC: AppearanceProvider {
+extension CreateNewChannelVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -926,7 +932,7 @@ extension CreateNewChannelVC: AppearanceProvider {
     }
 }
 
-extension CreateChatActionsView: AppearanceProvider {
+extension CreateChatActionsView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -938,7 +944,7 @@ extension CreateChatActionsView: AppearanceProvider {
     }
 }
 
-extension CreatePrivateChannelProfileView: AppearanceProvider {
+extension CreatePrivateChannelProfileView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -956,7 +962,7 @@ extension CreatePrivateChannelProfileView: AppearanceProvider {
     }
 }
 
-extension CreatePrivateChannelVC: AppearanceProvider {
+extension CreatePrivateChannelVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -966,7 +972,7 @@ extension CreatePrivateChannelVC: AppearanceProvider {
     }
 }
 
-extension SelectedUserCell: AppearanceProvider {
+extension SelectedUserCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -977,7 +983,7 @@ extension SelectedUserCell: AppearanceProvider {
     }
 }
 
-extension UserReactionListVC: AppearanceProvider {
+extension UserReactionListVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -987,7 +993,7 @@ extension UserReactionListVC: AppearanceProvider {
     }
 }
 
-extension UserReactionCell: AppearanceProvider {
+extension UserReactionCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1000,7 +1006,7 @@ extension UserReactionCell: AppearanceProvider {
     }
 }
 
-extension NoDataView: AppearanceProvider {
+extension NoDataView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1013,7 +1019,7 @@ extension NoDataView: AppearanceProvider {
     }
 }
 
-extension ChannelCreatedView: AppearanceProvider {
+extension ChannelCreatedView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1027,7 +1033,7 @@ extension ChannelCreatedView: AppearanceProvider {
     }
 }
 
-extension ChannelVC.BottomView: AppearanceProvider {
+extension ChannelVC.BottomView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1041,7 +1047,7 @@ extension ChannelVC.BottomView: AppearanceProvider {
     }
 }
 
-extension ChannelVC.SearchControlsView: AppearanceProvider {
+extension ChannelVC.SearchControlsView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1055,7 +1061,7 @@ extension ChannelVC.SearchControlsView: AppearanceProvider {
     }
 }
 
-extension EmojiSectionToolBar: AppearanceProvider {
+extension EmojiSectionToolBar: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1067,7 +1073,7 @@ extension EmojiSectionToolBar: AppearanceProvider {
     }
 }
 
-extension EmojiListVC: AppearanceProvider {
+extension EmojiListVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1079,7 +1085,7 @@ extension EmojiListVC: AppearanceProvider {
     }
 }
 
-extension MessageInfoVC: AppearanceProvider {
+extension MessageInfoVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1104,7 +1110,7 @@ extension MessageInfoVC: AppearanceProvider {
     }
 }
 
-extension ChannelForwardVC: AppearanceProvider {
+extension ChannelForwardVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1114,7 +1120,7 @@ extension ChannelForwardVC: AppearanceProvider {
     }
 }
 
-extension ChannelSearchResultsVC: AppearanceProvider {
+extension ChannelSearchResultsVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {

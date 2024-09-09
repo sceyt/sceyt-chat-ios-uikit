@@ -186,8 +186,10 @@ open class SheetVC: ViewController {
     
     @objc
     open func onBackgroundTapped() {
-        dismiss { [weak self] in
-            self?.onCancel?()
+        if backgroundDismiss {
+            dismiss { [weak self] in
+                self?.onCancel?()
+            }
         }
     }
     

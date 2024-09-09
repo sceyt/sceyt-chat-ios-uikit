@@ -11,7 +11,7 @@ import UIKit
 typealias Fonts = Appearance.Fonts
 
 public extension Appearance {
-    struct Fonts {
+    public struct Fonts {
         public static var defaultSize: CGFloat = 10
         
         public static var regular: UIFont = UIFont.systemFont(ofSize: defaultSize, weight: .regular)
