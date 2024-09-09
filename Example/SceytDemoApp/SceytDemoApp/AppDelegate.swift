@@ -37,10 +37,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         UIBarButtonItem.appearance()
             .setTitleTextAttributes([
                 .font: Appearance.Fonts.bold.withSize(16),
-                .foregroundColor: UIColor.primaryAccent
+                .foregroundColor: UIColor.accent
             ], for: [])
-        UITabBar.appearance().tintColor = UIColor.primaryAccent
-        UISwitch.appearance().onTintColor = UIColor.primaryAccent
+        UITabBar.appearance().tintColor = UIColor.accent
+        UISwitch.appearance().onTintColor = UIColor.accent
         UINavigationBar.appearance().standardAppearance = NavigationController.appearance.standard
         UINavigationBar.appearance().scrollEdgeAppearance = NavigationController.appearance.standard
     }

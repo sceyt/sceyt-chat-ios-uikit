@@ -42,8 +42,8 @@ class LoginViewController: UIViewController {
         $0.setTitle("CONNECT", for: .normal)
         $0.setTitleColor(.white, for: .normal)
         
-        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.primaryAccent), for: .normal)
-        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.primaryAccent.withAlphaComponent(0.5)), for: .disabled)
+        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.accent), for: .normal)
+        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.accent.withAlphaComponent(0.5)), for: .disabled)
         $0.layer.cornerRadius = 8
         $0.layer.masksToBounds = true
         return $0.withoutAutoresizingMask

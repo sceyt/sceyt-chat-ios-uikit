@@ -10,11 +10,11 @@ import UIKit
 
 public extension UIColor {
     
-    static var primaryAccent: UIColor { SceytChatUIKit.shared.theme.primaryAccent }
-    static var secondaryAccent: UIColor { SceytChatUIKit.shared.theme.secondaryAccent }
-    static var tertiaryAccent: UIColor { SceytChatUIKit.shared.theme.tertiaryAccent }
-    static var quaternaryAccent: UIColor { SceytChatUIKit.shared.theme.quaternaryAccent }
-    static var quinaryAccent: UIColor { SceytChatUIKit.shared.theme.quinaryAccent }
+    static var accent: UIColor { SceytChatUIKit.shared.theme.accent }
+    static var accent2: UIColor { SceytChatUIKit.shared.theme.accent2 }
+    static var accent3: UIColor { SceytChatUIKit.shared.theme.accent3 }
+    static var accent4: UIColor { SceytChatUIKit.shared.theme.accent4 }
+    static var accent5: UIColor { SceytChatUIKit.shared.theme.accent5 }
     
     static var surface1: UIColor { SceytChatUIKit.shared.theme.surface1 }
     static var surface2: UIColor { SceytChatUIKit.shared.theme.surface2 }
@@ -33,17 +33,17 @@ public extension UIColor {
     static var primaryText: UIColor { SceytChatUIKit.shared.theme.primaryText }
     static var secondaryText: UIColor { SceytChatUIKit.shared.theme.secondaryText }
     static var footnoteText: UIColor { SceytChatUIKit.shared.theme.footnoteText }
-    static var textOnPrimary: UIColor { SceytChatUIKit.shared.theme.textOnPrimary }
+    static var onPrimary: UIColor { SceytChatUIKit.shared.theme.onPrimary }
     
-    static var stateError: UIColor { SceytChatUIKit.shared.theme.stateError }
+    static var stateWarning: UIColor { SceytChatUIKit.shared.theme.stateWarning }
     static var stateSuccess: UIColor { SceytChatUIKit.shared.theme.stateSuccess }
     static var stateAttention: UIColor { SceytChatUIKit.shared.theme.stateAttention }
     
-    public static var initialColors: [UIColor] = [ .primaryAccent,
-                                                   .secondaryAccent,
-                                                   .tertiaryAccent,
-                                                   .quaternaryAccent,
-                                                   .quinaryAccent ]
+    public static var initialColors: [UIColor] = [ .accent,
+                                                   .accent2,
+                                                   .accent3,
+                                                   .accent4,
+                                                   .accent5 ]
     
     static func initial(title: String) -> UIColor {
         initialColors[abs(title.hash) % initialColors.count]
@@ -52,11 +52,11 @@ public extension UIColor {
 
 public struct Colors {
     // These colors are included into the default theme
-    public static let primaryAccent: UIColor = UIColor(light: UIColor(rgb: 0x5159F6), dark: UIColor(rgb: 0x6B72FF))
-    public static let secondaryAccent: UIColor = UIColor(light: UIColor(rgb: 0xFBB019), dark: UIColor(rgb: 0xFBB019))
-    public static let tertiaryAccent: UIColor = UIColor(light: UIColor(rgb: 0xB463E7), dark: UIColor(rgb: 0xB463E7))
-    public static let quaternaryAccent: UIColor = UIColor(light: UIColor(rgb: 0x63AFFF), dark: UIColor(rgb: 0x63AFFF))
-    public static let quinaryAccent: UIColor = UIColor(light: UIColor(rgb: 0x67D292), dark: UIColor(rgb: 0x67D292))
+    public static let accent: UIColor = UIColor(light: UIColor(rgb: 0x5159F6), dark: UIColor(rgb: 0x6B72FF))
+    public static let accent2: UIColor = UIColor(light: UIColor(rgb: 0xFBB019), dark: UIColor(rgb: 0xFBB019))
+    public static let accent3: UIColor = UIColor(light: UIColor(rgb: 0xB463E7), dark: UIColor(rgb: 0xB463E7))
+    public static let accent4: UIColor = UIColor(light: UIColor(rgb: 0x63AFFF), dark: UIColor(rgb: 0x63AFFF))
+    public static let accent5: UIColor = UIColor(light: UIColor(rgb: 0x67D292), dark: UIColor(rgb: 0x67D292))
     
     public static let surface1: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x232324))
     public static let surface2: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
@@ -69,25 +69,25 @@ public struct Colors {
     public static let border: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
     public static let iconInactive: UIColor = UIColor(light: UIColor(rgb: 0xA0A1B0), dark: UIColor(rgb: 0x76787A))
     public static let iconSecondary: UIColor = UIColor(light: UIColor(rgb: 0x707388), dark: UIColor(rgb: 0x969A9F))
-    public static let overlayBackground1: UIColor = UIColor(light: UIColor(rgb: 0x000000, alpha: 0.4), dark: UIColor(rgb: 0x000000, alpha: 0.4))
-    public static let overlayBackground2: UIColor = UIColor(light: UIColor(rgb: 0x111539, alpha: 0.4), dark: UIColor(rgb: 0x111539, alpha: 0.4))
+    public static let overlayBackground1: UIColor = UIColor(light: UIColor(rgb: 0x000000, alpha: 0.3), dark: UIColor(rgb: 0x000000, alpha: 0.4))
+    public static let overlayBackground2: UIColor = UIColor(light: UIColor(rgb: 0x000000, alpha: 0.3), dark: UIColor(rgb: 0x000000, alpha: 0.3))
     
     public static let primaryText: UIColor = UIColor(light: UIColor(rgb: 0x111539), dark: UIColor(rgb: 0xE1E3E6))
     public static let secondaryText: UIColor = UIColor(light: UIColor(rgb: 0x707388), dark: UIColor(rgb: 0x969A9F))
     public static let footnoteText: UIColor = UIColor(light: UIColor(rgb: 0xA0A1B0), dark: UIColor(rgb: 0x76787A))
-    public static let textOnPrimary: UIColor = UIColor(light: UIColor(rgb: 0xFFFFFF), dark: UIColor(rgb: 0xFFFFFF))
+    public static let onPrimary: UIColor = UIColor(light: UIColor(rgb: 0xFFFFFF), dark: UIColor(rgb: 0xFFFFFF))
     
-    public static let stateError: UIColor = UIColor(light: UIColor(rgb: 0xFA4C56), dark: UIColor(rgb: 0xFA4C56))
+    public static let stateWarning: UIColor = UIColor(light: UIColor(rgb: 0xFA4C56), dark: UIColor(rgb: 0xFA4C56))
     public static let stateSuccess: UIColor = UIColor(light: UIColor(rgb: 0x24C383), dark: UIColor(rgb: 0x24C383))
     public static let stateAttention: UIColor = UIColor(light: UIColor(rgb: 0xFBB019), dark: UIColor(rgb: 0xFBB019))
     
     // These colors are not a part of the theme, but they use theme's values by default
     public static var bubbleIncoming: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x232324))
     public static var bubbleIncomingX: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
-    public static var bubbleOutgoing: UIColor = UIColor(light: .primaryAccent.light.withAlphaComponent(0.14).blendColors(with: .background.light),
-                                                        dark: .primaryAccent.dark.withAlphaComponent(0.14).blendColors(with: .background.dark))
-    public static var bubbleOutgoingX: UIColor = UIColor(light: .primaryAccent.light.withAlphaComponent(0.24).blendColors(with: .background.light),
-                                                         dark: .primaryAccent.dark.withAlphaComponent(0.24).blendColors(with: .background.dark))
+    public static var bubbleOutgoing: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.14).blendColors(with: .background.light),
+                                                        dark: .accent.dark.withAlphaComponent(0.14).blendColors(with: .background.dark))
+    public static var bubbleOutgoingX: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.24).blendColors(with: .background.light),
+                                                         dark: .accent.dark.withAlphaComponent(0.24).blendColors(with: .background.dark))
 }
 
 public extension UIColor {

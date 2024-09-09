@@ -378,7 +378,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         guard canRunMentionUserLogic else { return }
         func attributedString(_ text: String, key: String) -> NSAttributedString {
             NSAttributedString(string: text, attributes: [.font: inputTextView.font as Any,
-                                                          .foregroundColor: UIColor.primaryAccent,
+                                                          .foregroundColor: UIColor.accent,
                                                           .mention: key])
         }
         
@@ -707,7 +707,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 string: " " + SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration)),
                 attributes: [
                     .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .primaryAccent
+                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .accent
                 ]))
         }
         actionView.messageLabel.attributedText = messageAttributedString
@@ -795,7 +795,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
                 string: " " + SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration)),
                 attributes: [
                     .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .primaryAccent
+                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .accent
                 ]))
         }
         actionView.messageLabel.attributedText = messageAttributedString
@@ -847,7 +847,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         
         let titleAttributedString = NSMutableAttributedString(
             string: linkDetails.url.absoluteString,
-            attributes: [.font: appearance.actionLinkPreviewTitleFont ?? Fonts.regular.withSize(13), .foregroundColor: appearance.actionLinkPreviewTitleColor ?? .primaryAccent])
+            attributes: [.font: appearance.actionLinkPreviewTitleFont ?? Fonts.regular.withSize(13), .foregroundColor: appearance.actionLinkPreviewTitleColor ?? .accent])
         actionView.titleLabel.attributedText = titleAttributedString
         
         let messageAttributedString = NSMutableAttributedString(

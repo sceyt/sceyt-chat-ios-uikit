@@ -31,7 +31,7 @@ extension MessageCell {
             sizeLabel.font = appearance.attachmentFileSizeFont
             sizeLabel.textColor = appearance.attachmentFileSizeColor
 
-            progressView.backgroundColor = .primaryAccent
+            progressView.backgroundColor = .accent
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
         }
 

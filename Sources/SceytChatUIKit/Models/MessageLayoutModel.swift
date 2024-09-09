@@ -589,8 +589,8 @@ open class MessageLayoutModel {
         let deletedStateColor = appearance.deletedMessageColor ?? UIColor.secondaryText
         let bodyFont = appearance.messageFont ?? Fonts.regular.withSize(16)
         let bodyColor = appearance.messageColor ?? UIColor.primaryText
-        let linkColor = appearance.linkColor ?? UIColor.primaryAccent
-        let mentionColor = appearance.mentionUserColor ?? UIColor.primaryAccent
+        let linkColor = appearance.linkColor ?? UIColor.accent
+        let mentionColor = appearance.mentionUserColor ?? UIColor.accent
         
         switch message.state {
         case .deleted:

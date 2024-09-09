@@ -11,11 +11,11 @@ import SceytChat
 public extension SceytChatUIKit {
     public protocol ThemeProtocol {
         
-        var primaryAccent: UIColor { get }
-        var secondaryAccent: UIColor { get }
-        var tertiaryAccent: UIColor { get }
-        var quaternaryAccent: UIColor { get }
-        var quinaryAccent: UIColor { get }
+        var accent: UIColor { get }
+        var accent2: UIColor { get }
+        var accent3: UIColor { get }
+        var accent4: UIColor { get }
+        var accent5: UIColor { get }
         
         var surface1: UIColor { get }
         var surface2: UIColor { get }
@@ -34,9 +34,9 @@ public extension SceytChatUIKit {
         var primaryText: UIColor { get }
         var secondaryText: UIColor { get }
         var footnoteText: UIColor { get }
-        var textOnPrimary: UIColor { get }
+        var onPrimary: UIColor { get }
         
-        var stateError: UIColor { get }
+        var stateWarning: UIColor { get }
         var stateSuccess: UIColor { get }
         var stateAttention: UIColor { get }
     }
@@ -47,11 +47,11 @@ public extension SceytChatUIKit {
         
         public required init() { }
         
-        public var primaryAccent: UIColor = Colors.primaryAccent
-        public var secondaryAccent: UIColor = Colors.secondaryAccent
-        public var tertiaryAccent: UIColor = Colors.tertiaryAccent
-        public var quaternaryAccent: UIColor = Colors.quaternaryAccent
-        public var quinaryAccent: UIColor = Colors.quinaryAccent
+        public var accent: UIColor = Colors.accent
+        public var accent2: UIColor = Colors.accent2
+        public var accent3: UIColor = Colors.accent3
+        public var accent4: UIColor = Colors.accent4
+        public var accent5: UIColor = Colors.accent5
         
         public var surface1: UIColor = Colors.surface1
         public var surface2: UIColor = Colors.surface2
@@ -70,9 +70,9 @@ public extension SceytChatUIKit {
         public var primaryText: UIColor = Colors.primaryText
         public var secondaryText: UIColor = Colors.secondaryText
         public var footnoteText: UIColor = Colors.footnoteText
-        public var textOnPrimary: UIColor = Colors.textOnPrimary
+        public var onPrimary: UIColor = Colors.onPrimary
         
-        public var stateError: UIColor = Colors.stateError
+        public var stateWarning: UIColor = Colors.stateWarning
         public var stateSuccess: UIColor = Colors.stateSuccess
         public var stateAttention: UIColor = Colors.stateAttention
     }
