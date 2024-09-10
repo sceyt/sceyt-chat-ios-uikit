@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "hash.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "hash@2x.png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "hash@3x.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "face-happy 9.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

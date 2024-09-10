@@ -715,7 +715,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         actionView.isHidden = false
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
-        actionView.iconView.image = .composerReplyMessage
+        actionView.iconView.image = appearance.actionReplyIcon
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
         actionView.playView.isHidden = !showPlayIcon
@@ -804,7 +804,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         actionView.isHidden = false
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
-        actionView.iconView.image = .composerEditMessage
+        actionView.iconView.image = appearance.actionEditIcon
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
         updateMediaButtonAppearance(isHidden: true)

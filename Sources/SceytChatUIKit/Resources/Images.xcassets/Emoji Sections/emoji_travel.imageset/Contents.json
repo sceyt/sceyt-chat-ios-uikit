@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "plane.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "plane@2x.png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "plane@3x.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "face-happy 6.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

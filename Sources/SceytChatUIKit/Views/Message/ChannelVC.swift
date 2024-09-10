@@ -1085,8 +1085,6 @@ open class ChannelVC: ViewController,
         else { return false }
         guard !(touch.view is MessageCell.ReactionTotalView)
         else { return false }
-        guard !(touch.view is MessageCell.ReactionView)
-        else { return false }
         if channelViewModel.isEditing {
             return false
         }

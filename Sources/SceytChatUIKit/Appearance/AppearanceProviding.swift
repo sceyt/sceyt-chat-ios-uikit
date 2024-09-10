@@ -298,7 +298,8 @@ extension ComposerVC: AppearanceProviding {
         public var actionMessageFont: UIFont? = Fonts.regular.withSize(13)
         public var actionLinkPreviewTitleFont: UIFont? = Fonts.semiBold.withSize(13)
         public var actionLinkPreviewTitleColor: UIColor? = .accent
-        
+        public var actionReplyIcon: UIImage? = nil
+        public var actionEditIcon: UIImage? = nil
         public var mediaViewBackgroundColor: UIColor? = .background
         
         public var dividerColor = UIColor.border
@@ -1024,6 +1025,8 @@ extension ChannelCreatedView: AppearanceProviding {
     public struct Appearance {
         public init() {}
         
+        
+        public var channelCreatedImage: UIImage? = nil
         public var labelBackgroundColor: UIColor? = .overlayBackground1
         public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(13)
         public var messageLabelFont: UIFont? = Fonts.semiBold.withSize(13)

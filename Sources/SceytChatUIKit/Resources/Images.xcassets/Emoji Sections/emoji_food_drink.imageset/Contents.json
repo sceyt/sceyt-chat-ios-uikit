@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "apple.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "apple@2x.png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "apple@3x.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "face-happy 4.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

@@ -217,8 +217,6 @@ public enum SCTUIKitComponents {
     public static var messageCellLinkView: MessageCell.LinkView.Type = MessageCell.LinkView.self
     public static var messageCellReactionTotalView: MessageCell.ReactionTotalView.Type = MessageCell.ReactionTotalView.self
     public static var messageCellReactionLabel: MessageCell.ReactionLabel.Type = MessageCell.ReactionLabel.self
-    public static var messageCellReactionView: MessageCell.ReactionView.Type = MessageCell.ReactionView.self
-    public static var messageCellReactionsView: MessageCell.ReactionsView.Type = MessageCell.ReactionsView.self
     public static var messageCellReplyView: MessageCell.ReplyView.Type = MessageCell.ReplyView.self
     public static var messageCellReplyCountView: MessageCell.ReplyCountView.Type = MessageCell.ReplyCountView.self
     public static var messageCellReplyArrowView: MessageCell.ReplyArrowView.Type = MessageCell.ReplyArrowView.self

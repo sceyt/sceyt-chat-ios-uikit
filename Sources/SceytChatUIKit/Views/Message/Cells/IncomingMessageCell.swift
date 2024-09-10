@@ -266,20 +266,12 @@ open class IncomingMessageCell: MessageCell {
         }
         
         if layout.hasReactions {
-            switch layout.reactionType {
-            case .interactive:
-                layoutConstraint += [
-                    reactionView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 1),
-                    reactionView.topAnchor.pin(to: bubbleView.bottomAnchor, constant: 4)
-                ]
-            case .withTotalScore:
-                layoutConstraint += [
-                    reactionTotalView.leadingAnchor.pin(to: bubbleView.leadingAnchor),
-                    reactionTotalView.topAnchor.pin(to: bubbleView.bottomAnchor, constant: -4),
-                    bubbleView.trailingAnchor.pin(greaterThanOrEqualTo: reactionTotalView.trailingAnchor)
-                ]
-            }
-            let reactionBottomAnchor = layout.reactionType == .interactive ? reactionView.bottomAnchor : reactionTotalView.bottomAnchor
+            layoutConstraint += [
+                reactionTotalView.leadingAnchor.pin(to: bubbleView.leadingAnchor),
+                reactionTotalView.topAnchor.pin(to: bubbleView.bottomAnchor, constant: -4),
+                bubbleView.trailingAnchor.pin(greaterThanOrEqualTo: reactionTotalView.trailingAnchor)
+            ]
+            let reactionBottomAnchor = reactionTotalView.bottomAnchor
             if layout.hasThreadReply {
                 layoutConstraint += [
                     replyCountView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 10),

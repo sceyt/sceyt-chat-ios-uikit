@@ -64,10 +64,6 @@ open class MessageCell: CollectionViewCell,
         .init()
         .withoutAutoresizingMask
     
-    open lazy var reactionView = ReactionsView
-        .init()
-        .withoutAutoresizingMask
-    
     open lazy var reactionTotalView = ReactionTotalView
         .init()
         .withoutAutoresizingMask
@@ -122,17 +118,6 @@ open class MessageCell: CollectionViewCell,
             }
         }
         
-        reactionView.onAction = { [unowned self] action in
-            switch action {
-            case .new:
-                onAction?(.addReaction)
-            case .delete(let key):
-                onAction?(.deleteReaction(key))
-            case .score(let key, let score, let byMe):
-                onAction?(.updateReactionScore(key, score, !byMe))
-            }
-        }
-        
         reactionTotalView.addTarget(
             self,
             action: #selector(reactionTotalViewAction(_:)),
@@ -183,7 +168,6 @@ open class MessageCell: CollectionViewCell,
         bubbleView.addSubview(infoView)
         bubbleView.addSubview(nameLabel)
         containerView.addSubview(avatarView)
-        containerView.addSubview(reactionView)
         containerView.addSubview(reactionTotalView)
         containerView.addSubview(replyCountView)
         contentView.addSubview(unreadView)
@@ -204,7 +188,6 @@ open class MessageCell: CollectionViewCell,
         replyView.appearance = appearance
         replyArrowView.appearance = appearance
         replyCountView.appearance = appearance
-        reactionView.appearance = appearance
         backgroundColor = .clear
         contentView.backgroundColor = .clear
         containerView.backgroundColor = .clear
@@ -260,16 +243,8 @@ open class MessageCell: CollectionViewCell,
         nameLabel.textColor = appearance.titleColor ?? .initial(title: message.user.id)
         attachmentView.data = data
         linkView.data = data
-        switch data.reactionType {
-        case .interactive:
-            reactionView.data = data
-            reactionView.isHidden = (data.reactions?.isEmpty ?? true)
-            reactionTotalView.isHidden = true
-        case .withTotalScore:
-            reactionTotalView.data = data
-            reactionView.isHidden = true
-            reactionTotalView.isHidden = (data.reactions?.isEmpty ?? true)
-        }
+        reactionTotalView.data = data
+        reactionTotalView.isHidden = (data.reactions?.isEmpty ?? true)
         replyView.data = message.repliedInThread ? nil : data.replyLayout
         replyCountView.count = data.replyCount
         deliveryStatus = message.deliveryStatus
