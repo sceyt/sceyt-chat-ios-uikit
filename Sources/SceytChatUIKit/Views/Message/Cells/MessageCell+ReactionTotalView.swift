@@ -83,7 +83,7 @@ extension MessageCell {
                     }
                     
                     for reaction in reactions {
-                        let rLabel = ReactionLabel(key: reaction.key, isScore: reaction.isCommonScoreNumber)
+                        let rLabel = ReactionLabel(key: reaction.key)
                             .withoutAutoresizingMask
                         hv.addArrangedSubview(rLabel)
                         
@@ -133,7 +133,6 @@ extension MessageCell {
         private var isConfigured = false
 
         public let key: String
-        public let isScore: Bool
 
         public lazy var appearance = MessageCell.appearance {
             didSet {
@@ -141,9 +140,8 @@ extension MessageCell {
             }
         }
 
-        public required init(key: String, isScore: Bool) {
+        public required init(key: String) {
             self.key = key
-            self.isScore = isScore
             super.init(frame: .zero)
             setup()
             setupAppearance()
@@ -151,7 +149,6 @@ extension MessageCell {
 
         public required init?(coder: NSCoder) {
             key = ""
-            isScore = false
             super.init(coder: coder)
             setup()
             setupAppearance()
@@ -174,7 +171,7 @@ extension MessageCell {
         }
         
         open func setupAppearance() {
-            font = isScore ? appearance.reactionCommonScoreFont : appearance.reactionFont
+            font = appearance.reactionFont
             textColor = appearance.reactionColor
         }
         

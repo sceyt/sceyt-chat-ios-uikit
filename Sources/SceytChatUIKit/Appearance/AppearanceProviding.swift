@@ -190,13 +190,15 @@ extension MessageCell: AppearanceProviding {
         public var deletedMessageColor: UIColor? = UIColor.secondaryText
         public var bubbleColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncoming,
                                                                  Appearance.bubbleOutgoing)
-        public var highlightedBubbleColor: (in: UIColor?, out: UIColor?) = (UIColor.secondaryText.withAlphaComponent(0.4), UIColor.secondaryText.withAlphaComponent(0.4))
+        public var highlightedBubbleColor: (in: UIColor?, out: UIColor?) = (UIColor.secondaryText.withAlphaComponent(0.4), 
+                                                                            UIColor.secondaryText.withAlphaComponent(0.4))
         
         public var highlightedSearchResultColor: (in: UIColor?, out: UIColor?) = (
             Appearance.bubbleIncomingX,
             Appearance.bubbleOutgoingX
         )
-        public var highlightedOverlayColor: (in: UIColor?, out: UIColor?) = (UIColor(hex: "#17191C", alpha: 0.4), UIColor(hex: "#17191C", alpha: 0.4))
+        public var highlightedOverlayColor: (in: UIColor?, out: UIColor?) = (UIColor(hex: "#17191C", alpha: 0.4), 
+                                                                             UIColor(hex: "#17191C", alpha: 0.4))
         public var linkColor: UIColor? = UIColor.accent
         public var linkFont: UIFont? = Fonts.regular.withSize(16)
         public var linkTitleFont: UIFont? = Fonts.semiBold.withSize(14)
@@ -244,9 +246,6 @@ extension MessageCell: AppearanceProviding {
         public var reactionCommonScoreFont: UIFont = Fonts.regular.withSize(13)
         public var reactionFont: UIFont? = Fonts.regular.withSize(13)
         public var reactionColor: UIColor? = UIColor.primaryText
-        public var reactionBackgroundColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncoming,
-                                                                             Appearance.bubbleOutgoing)
-        public var reactionBorderColor: (in: UIColor?, out: UIColor?) = (nil, nil)
         
         public var videoTimeTextColor: UIColor? = .onPrimary
         public var videoTimeTextFont: UIFont? = Fonts.regular.withSize(12)

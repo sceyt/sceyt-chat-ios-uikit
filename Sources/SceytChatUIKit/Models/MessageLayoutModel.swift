@@ -502,7 +502,7 @@ open class MessageLayoutModel {
             if reactionType == .withTotalScore, commonScore > 1 {
                 let key = "\(commonScore)"
                 let width = key.size(withAttributes: [.font: Self.appearance.reactionCommonScoreFont]).width
-                reactions.append(.init(key: key, score: 0, byMe: false, isCommonScoreNumber: true, width: ceil(width)))
+                reactions.append(.init(key: key, score: 0, byMe: false, width: ceil(width)))
             }
         } else {
             estimatedReactionsNumberPerRow = 0
@@ -946,7 +946,6 @@ public extension MessageLayoutModel {
         public let key: String
         public let score: UInt
         public let byMe: Bool
-        public var isCommonScoreNumber = false
         public let width: CGFloat
     }
     
