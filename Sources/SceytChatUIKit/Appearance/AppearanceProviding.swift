@@ -415,7 +415,7 @@ extension ChannelMemberCell: AppearanceProviding {
     }
 }
 
-extension ChannelUserCell: AppearanceProviding {
+extension BaseChannelUserCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
