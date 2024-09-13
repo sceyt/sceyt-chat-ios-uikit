@@ -37,7 +37,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         .init(channelId: channel.id)
     
     public var chatClient: ChatClient {
-        ChatClient.shared
+        SceytChatUIKit.shared.chatClient
     }
     
     public let presenceProvider = PresenceProvider.default
@@ -157,11 +157,11 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
             lastDisplayedMessageId = 0
         }
         super.init()
-        chatClient.add(
+        SceytChatUIKit.shared.chatClient.add(
             channelDelegate: self,
             identifier: channelDelegateIdentifier
         )
-        chatClient.add(
+        SceytChatUIKit.shared.chatClient.add(
             delegate: self,
             identifier: clientDelegateIdentifier
         )
@@ -199,8 +199,8 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
         channelObserver.stopObserver()
         messageObserver.stopObserver()
         //        unsubscribeToPeerPresence()
-        chatClient.removeDelegate(identifier: clientDelegateIdentifier)
-        chatClient.removeChannelDelegate(identifier: channelDelegateIdentifier)
+        SceytChatUIKit.shared.chatClient.removeDelegate(identifier: clientDelegateIdentifier)
+        SceytChatUIKit.shared.chatClient.removeChannelDelegate(identifier: channelDelegateIdentifier)
         if isTyping {
             provider.channelOperator.stopTyping()
         }
@@ -1608,7 +1608,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                 if isDone {
                     self.isRestartingMessageObserver = .reloadAndSelect
                 } else if !searchResult.isLoadedNearMessages(for: messageId),
-                            chatClient.connectionState == .connected {
+                            SceytChatUIKit.shared.chatClient.connectionState == .connected {
                     searchDirection = .prev
                     scrollToMessageIdIfSearching = messageId
                     isSearchResultsLoading = true
@@ -1650,7 +1650,7 @@ open class ChannelVM: NSObject, ChatClientDelegate, ChannelDelegate {
                     self.loadNearMessages(messageId: messageId)
                 } else {
                     if !searchResult.isLoadedNearMessages(for: messageId),
-                                chatClient.connectionState == .connected {
+                                SceytChatUIKit.shared.chatClient.connectionState == .connected {
                         scrollToMessageIdIfSearching = messageId
                         searchDirection = .next
                         isSearchResultsLoading = true

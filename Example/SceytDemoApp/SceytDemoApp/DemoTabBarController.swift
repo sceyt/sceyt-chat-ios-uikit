@@ -46,7 +46,7 @@ class DemoTabBarController: UITabBarController {
     
     @objc
     func didBecomeActiveNotification(_ notification: Notification) {
-        guard ChatClient.shared.connectionState == .disconnected
+        guard SceytChatUIKit.shared.chatClient.connectionState == .disconnected
         else { return }
         connect()
     }

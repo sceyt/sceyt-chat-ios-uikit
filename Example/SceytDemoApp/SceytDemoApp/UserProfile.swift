@@ -20,7 +20,7 @@ struct UserProfile {
         if let image = avatarImage, let jpeg = try? ImageBuilder(image: image).resize(max: SceytChatUIKit.shared.config.maximumImageSize).jpegData() {
             if let fileUrl = Storage.storeInTemporaryDirectory(data: jpeg, ext: "jpeg") {
                 
-                ChatClient.shared.upload(fileUrl: fileUrl) { _ in
+                SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { _ in
                     
                 } completion: { url, _ in
                     if let url = url {
@@ -41,7 +41,7 @@ struct UserProfile {
             update(
                 firstName: user.firstName,
                 lastName: user.lastName,
-                uploadedAvatarUrl: deleteAvatar ? nil : ChatClient.shared.user.avatarUrl,
+                uploadedAvatarUrl: deleteAvatar ? nil : SceytChatUIKit.shared.chatClient.user.avatarUrl,
                 completion: completion
             )
         }
@@ -51,12 +51,12 @@ struct UserProfile {
                         lastName: String?,
                         uploadedAvatarUrl: String?,
                                completion: ((Error?) -> Void)?) {
-        ChatClient.shared
+        SceytChatUIKit.shared.chatClient
             .setProfile(
                 firstName: firstName,
                 lastName: lastName,
                 avatarUrl: uploadedAvatarUrl,
-                metadata: ChatClient.shared.user.metadata)
+                metadata: SceytChatUIKit.shared.chatClient.user.metadata)
         { _, error in
             completion?(error)
         }

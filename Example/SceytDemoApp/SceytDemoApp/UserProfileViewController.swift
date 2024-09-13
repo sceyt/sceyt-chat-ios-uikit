@@ -46,7 +46,7 @@ class UserProfileViewController: UIViewController {
 
         title = "My Profile"
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .edit, target: self, action: #selector(edit(_:)))
-        ChatClient.shared.add(delegate: self, identifier: String(reflecting: self))
+        SceytChatUIKit.shared.chatClient.add(delegate: self, identifier: String(reflecting: self))
         
         view.addSubview(stackView)
         
@@ -82,13 +82,13 @@ class UserProfileViewController: UIViewController {
     }
     
     fileprivate func updateProfile() {
-        let user = ChatUser(user: ChatClient.shared.user)
+        let user = ChatUser(user: SceytChatUIKit.shared.chatClient.user)
         profileView.displayNameLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
         _ = AvatarBuilder.loadAvatar(into: profileView.imageView, for: user)
     }
     
     fileprivate func updateNotification() {
-        let settings = ChatClient.shared.settings
+        let settings = SceytChatUIKit.shared.chatClient.settings
         if settings.muted {
             notificationView.titleView.titleLabel.text = "Unmute Notifications"
             notificationView.titleView.iconView.image = UIImage(systemName: "speaker.fill")
@@ -175,7 +175,7 @@ class UserProfileViewController: UIViewController {
     @objc
     private func onSignOut(_ sender: UIButton) {
         Config.currentUserId = nil
-        ChatClient.shared.disconnect()
+        SceytChatUIKit.shared.chatClient.disconnect()
         Provider.database.deleteAll()
         let lvc = LoginViewController()
         lvc.modalPresentationStyle = .fullScreen
@@ -218,7 +218,7 @@ class UserProfileViewController: UIViewController {
     }
     
     open func mute(for timeInterval: TimeInterval) {
-        ChatClient.shared.mute(timeInterval: timeInterval) {[weak self] error in
+        SceytChatUIKit.shared.chatClient.mute(timeInterval: timeInterval) {[weak self] error in
             guard let self else { return }
             if let error {
                 self.showAlert(error: error)
@@ -228,7 +228,7 @@ class UserProfileViewController: UIViewController {
     }
     
     open func unmute() {
-        ChatClient.shared.unmute {[weak self] error in
+        SceytChatUIKit.shared.chatClient.unmute {[weak self] error in
             guard let self else { return }
             if let error {
                 self.showAlert(error: error)
@@ -238,15 +238,15 @@ class UserProfileViewController: UIViewController {
     }
     
     private func updateSettings() {
-        if ChatClient.shared.connectionState == .connected {
-            ChatClient.shared.getUserSettings {[weak self] _, _ in
+        if SceytChatUIKit.shared.chatClient.connectionState == .connected {
+            SceytChatUIKit.shared.chatClient.getUserSettings {[weak self] _, _ in
                 self?.updateNotification()
             }
         }
     }
     
     deinit {
-        ChatClient.shared.removeDelegate(identifier: String(reflecting: self))
+        SceytChatUIKit.shared.chatClient.removeDelegate(identifier: String(reflecting: self))
     }
 }
 
@@ -255,7 +255,7 @@ extension UserProfileViewController: ChatClientDelegate {
     func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
         if state == .connected {
             updateProfile()
-            chatClient.getUserSettings {[weak self] _, _ in
+            SceytChatUIKit.shared.chatClient.getUserSettings {[weak self] _, _ in
                 self?.updateNotification()
             }
         }

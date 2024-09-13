@@ -14,7 +14,7 @@ open class ChannelListVM: NSObject,
                           ChannelDelegate, ChatClientDelegate,
                           ChannelSearchResultsUpdating {
     private var chatClient: ChatClient {
-        ChatClient.shared
+        SceytChatUIKit.shared.chatClient
     }
     
     public typealias Paths = LazyDatabaseObserver<ChannelDTO, ChatChannel>.ChangeItemPaths
@@ -61,13 +61,13 @@ open class ChannelListVM: NSObject,
         provider = Components.channelListProvider.init()
         searchService = .init(provider: provider, filter: .all)
         super.init()
-        chatClient.add(delegate: self, identifier: clientDelegateIdentifier)
-        chatClient.add(channelDelegate: self, identifier: channelDelegateIdentifier)
+        SceytChatUIKit.shared.chatClient.add(delegate: self, identifier: clientDelegateIdentifier)
+        SceytChatUIKit.shared.chatClient.add(channelDelegate: self, identifier: channelDelegateIdentifier)
     }
     
     deinit {
-        chatClient.removeDelegate(identifier: clientDelegateIdentifier)
-        chatClient.removeChannelDelegate(identifier: channelDelegateIdentifier)
+        SceytChatUIKit.shared.chatClient.removeDelegate(identifier: clientDelegateIdentifier)
+        SceytChatUIKit.shared.chatClient.removeChannelDelegate(identifier: channelDelegateIdentifier)
     }
     
     open func startDatabaseObserver() {

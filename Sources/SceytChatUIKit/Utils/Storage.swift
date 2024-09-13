@@ -343,7 +343,7 @@ extension Storage {
 open class SceytChatStoringKey: StoringKey {
 
     public static var sceytChatStorageHost: String {
-        ChatClient.shared.apiUrl?.host ?? ""
+        SceytChatUIKit.shared.chatClient.apiUrl?.host ?? ""
     }
 
     public static let storageFolder = "SceytChatFiles"

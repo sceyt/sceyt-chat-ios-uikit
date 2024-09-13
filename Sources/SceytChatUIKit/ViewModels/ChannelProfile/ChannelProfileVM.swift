@@ -192,7 +192,7 @@ open class ChannelProfileVM: NSObject {
         }
 
         if let avatarUrl = avatarUrl {
-            chatClient.upload(fileUrl: avatarUrl) { _ in
+            SceytChatUIKit.shared.chatClient.upload(fileUrl: avatarUrl) { _ in
 
             } completion: { url, _ in
                 if let url = url {

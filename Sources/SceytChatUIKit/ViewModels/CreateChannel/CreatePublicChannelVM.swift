@@ -107,7 +107,7 @@ open class CreatePublicChannelVM {
         if let image, let jpeg = try? Components.imageBuilder.init(image: image).resize(max: SceytChatUIKit.shared.config.maximumImageSize).jpegData() {
             if let fileUrl = Components.storage.storeInTemporaryDirectory(data: jpeg, ext: "jpeg") {
                 
-                ChatClient.shared.upload(fileUrl: fileUrl) { _ in
+                SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { _ in
                     
                 } completion: { url, _ in
                     if let url = url {

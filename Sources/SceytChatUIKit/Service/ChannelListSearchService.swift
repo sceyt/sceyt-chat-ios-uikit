@@ -30,7 +30,7 @@ open class ChannelListSearchService {
         Task(priority: .userInitiated) {
             do {
                 var directChannel = try await searchDirectChatsBy(query: query)
-                if let username = ChatClient.shared.user.firstName,
+                if let username = SceytChatUIKit.shared.chatClient.user.firstName,
                    selfChatKeyword.lowercased().contains(query.lowercased()) || "me".contains(query.lowercased()) {
                     directChannel += try await searchDirectChatsBy(query: username)
                 }

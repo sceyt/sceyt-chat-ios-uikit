@@ -69,7 +69,7 @@ open class ChannelProvider: Provider {
     open func loadChannel(
         param: ChannelQueryParam = defaultQueryParam,
         completion: ((Error?) -> Void)? = nil) {
-            chatClient.getChannel(
+            SceytChatUIKit.shared.chatClient.getChannel(
                 id: channelId,
                 param: param)
             { channel, error in

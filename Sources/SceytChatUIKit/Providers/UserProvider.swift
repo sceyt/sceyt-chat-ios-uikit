@@ -19,7 +19,7 @@ open class UserProvider: Provider {
         ids: [UserId],
         completion: ((Error?) -> Void)? = nil) {
             logger.verbose("Request to block users \(ids)")
-            chatClient.blockUsers(ids: ids) { users, error in
+            SceytChatUIKit.shared.chatClient.blockUsers(ids: ids) { users, error in
                 if let users = users {
                     self.store(users: users) { error in
                         logger.errorIfNotNil(error, "Store users")
@@ -36,7 +36,7 @@ open class UserProvider: Provider {
         ids: [UserId],
         completion: ((Error?) -> Void)? = nil) {
             logger.verbose("Request to unblock users \(ids)")
-            chatClient.unblockUsers(ids: ids) { users, error in
+            SceytChatUIKit.shared.chatClient.unblockUsers(ids: ids) { users, error in
                 if let users = users {
                     self.store(users: users) { error in
                         logger.errorIfNotNil(error, "Store users")

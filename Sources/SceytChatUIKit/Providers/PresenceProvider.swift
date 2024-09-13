@@ -181,7 +181,7 @@ public final class PresenceProvider: Provider, NSCopying {
                 completion([])
                 return
             }
-            chatClient.getUsers(ids: ids) {[weak self] users, error in
+            SceytChatUIKit.shared.chatClient.getUsers(ids: ids) {[weak self] users, error in
                 self?.store(users: users ?? [])
                 DispatchQueue.main.async {
                     completion(users ?? [])

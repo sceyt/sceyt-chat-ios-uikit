@@ -18,6 +18,10 @@ public class SceytChatUIKit {
     public var theme = SceytChatUIKit.Theme()
     public var formatters = SceytChatUIKit.Formatters()
     
+    public var chatClient: ChatClient {
+        ChatClient.shared
+    }
+
     public static func initialize(apiUrl: String, appId: String, clientId: String = "") {
         ChatClient.initialize(apiUrl: apiUrl, appId: appId, clientId: clientId)
         ChatClient.connectionTimeout = 10
@@ -55,7 +59,7 @@ public class SceytChatUIKit {
         Components.channelEventHandler
             .init(
                 database: config.database,
-                chatClient: ChatClient.shared
+                chatClient: chatClient
             )
     }()
     

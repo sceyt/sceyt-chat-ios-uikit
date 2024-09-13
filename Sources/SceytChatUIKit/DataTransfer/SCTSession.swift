@@ -243,7 +243,7 @@ open class SCTUploadOperation: AsyncOperation {
     
     open func startUploading(filePath: String) {
         let fileUrl = URL(fileURLWithPath: filePath)
-        ChatClient.shared.upload(fileUrl: fileUrl) { [weak self] pct in
+        SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { [weak self] pct in
             self?.taskInfo.updateProgress(pct)
         } completion: { [weak self] url, error in
             guard let self else { return }

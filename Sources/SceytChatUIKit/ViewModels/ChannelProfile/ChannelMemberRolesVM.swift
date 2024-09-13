@@ -17,7 +17,7 @@ open class ChannelMemberRolesVM {
     open var roles = [Role]()
 
     open func loadRoles(completion: @escaping (Error?) -> Void) {
-        chatClient.getRoles { [weak self] (roles, error) in
+        SceytChatUIKit.shared.chatClient.getRoles { [weak self] (roles, error) in
             self?.roles = roles ?? []
             completion(error)
         }

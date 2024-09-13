@@ -30,14 +30,14 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
     }
     
     open func startEventHandler() {
-        chatClient.add(
+        SceytChatUIKit.shared.chatClient.add(
             channelDelegate: self,
             identifier: Self.channelDelegateIdentifier
         )
     }
     
     open func stopEventHandler() {
-        chatClient.removeChannelDelegate(identifier: Self.channelDelegateIdentifier)
+        SceytChatUIKit.shared.chatClient.removeChannelDelegate(identifier: Self.channelDelegateIdentifier)
     }
     
     // MARK: ChannelsDelegate

@@ -9,13 +9,9 @@
 import UIKit
 import SceytChat
 
-var chatClient: ChatClient {
-    ChatClient.shared
-}
-
 var me: UserId {
-    if !chatClient.user.id.isEmpty {
-        return chatClient.user.id
+    if !SceytChatUIKit.shared.chatClient.user.id.isEmpty {
+        return SceytChatUIKit.shared.chatClient.user.id
     } else {
         return SceytChatUIKit.shared.currentUserId ?? ""
     }

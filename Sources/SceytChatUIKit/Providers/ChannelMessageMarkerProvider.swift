@@ -60,7 +60,7 @@ open class ChannelMessageMarkerProvider: Provider {
                         $0.update(messagePendingMarkers: ids, markerName: markerName)
                     }
                 }
-                guard ChatClient.shared.connectionState == .connected,
+                guard SceytChatUIKit.shared.chatClient.connectionState == .connected,
                         Self.canMarkMessage
                 else {
                     completion?(nil)

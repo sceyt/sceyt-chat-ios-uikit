@@ -117,7 +117,7 @@ open class ChannelProfileEditVM: NSObject {
             if avatarUrl.isFileURL,
                FileManager.default.fileExists(atPath: avatarUrl.path)
             {
-                chatClient.upload(fileUrl: avatarUrl) { _ in
+                SceytChatUIKit.shared.chatClient.upload(fileUrl: avatarUrl) { _ in
                     
                 } completion: { url, _ in
                     if let url = url {

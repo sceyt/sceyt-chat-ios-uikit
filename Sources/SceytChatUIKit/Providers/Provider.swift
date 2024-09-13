@@ -11,7 +11,7 @@ import SceytChat
 
 open class Provider: NSObject {
     
-    public static var chatClient = ChatClient.shared
+    public static var chatClient = SceytChatUIKit.shared.chatClient
     
     public static var database = SceytChatUIKit.shared.config.database
     
