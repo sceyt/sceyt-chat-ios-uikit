@@ -10,34 +10,34 @@ import UIKit
 
 public extension UIColor {
     
-    static var accent: UIColor { SceytChatUIKit.shared.theme.accent }
-    static var accent2: UIColor { SceytChatUIKit.shared.theme.accent2 }
-    static var accent3: UIColor { SceytChatUIKit.shared.theme.accent3 }
-    static var accent4: UIColor { SceytChatUIKit.shared.theme.accent4 }
-    static var accent5: UIColor { SceytChatUIKit.shared.theme.accent5 }
+    static var accent: UIColor { SceytChatUIKit.shared.theme.colors.accent }
+    static var accent2: UIColor { SceytChatUIKit.shared.theme.colors.accent2 }
+    static var accent3: UIColor { SceytChatUIKit.shared.theme.colors.accent3 }
+    static var accent4: UIColor { SceytChatUIKit.shared.theme.colors.accent4 }
+    static var accent5: UIColor { SceytChatUIKit.shared.theme.colors.accent5 }
     
-    static var surface1: UIColor { SceytChatUIKit.shared.theme.surface1 }
-    static var surface2: UIColor { SceytChatUIKit.shared.theme.surface2 }
-    static var surface3: UIColor { SceytChatUIKit.shared.theme.surface3 }
+    static var surface1: UIColor { SceytChatUIKit.shared.theme.colors.surface1 }
+    static var surface2: UIColor { SceytChatUIKit.shared.theme.colors.surface2 }
+    static var surface3: UIColor { SceytChatUIKit.shared.theme.colors.surface3 }
     
-    static var background: UIColor { SceytChatUIKit.shared.theme.background }
-    static var backgroundSecondary: UIColor { SceytChatUIKit.shared.theme.backgroundSecondary }
-    static var backgroundSections: UIColor { SceytChatUIKit.shared.theme.backgroundSections }
-    static var backgroundDark: UIColor { SceytChatUIKit.shared.theme.backgroundDark }
-    static var border: UIColor { SceytChatUIKit.shared.theme.border }
-    static var iconInactive: UIColor { SceytChatUIKit.shared.theme.iconInactive }
-    static var iconSecondary: UIColor { SceytChatUIKit.shared.theme.iconSecondary }
-    static var overlayBackground1: UIColor { SceytChatUIKit.shared.theme.overlayBackground1 }
-    static var overlayBackground2: UIColor { SceytChatUIKit.shared.theme.overlayBackground2 }
+    static var background: UIColor { SceytChatUIKit.shared.theme.colors.background }
+    static var backgroundSecondary: UIColor { SceytChatUIKit.shared.theme.colors.backgroundSecondary }
+    static var backgroundSections: UIColor { SceytChatUIKit.shared.theme.colors.backgroundSections }
+    static var backgroundDark: UIColor { SceytChatUIKit.shared.theme.colors.backgroundDark }
+    static var border: UIColor { SceytChatUIKit.shared.theme.colors.border }
+    static var iconInactive: UIColor { SceytChatUIKit.shared.theme.colors.iconInactive }
+    static var iconSecondary: UIColor { SceytChatUIKit.shared.theme.colors.iconSecondary }
+    static var overlayBackground1: UIColor { SceytChatUIKit.shared.theme.colors.overlayBackground1 }
+    static var overlayBackground2: UIColor { SceytChatUIKit.shared.theme.colors.overlayBackground2 }
     
-    static var primaryText: UIColor { SceytChatUIKit.shared.theme.primaryText }
-    static var secondaryText: UIColor { SceytChatUIKit.shared.theme.secondaryText }
-    static var footnoteText: UIColor { SceytChatUIKit.shared.theme.footnoteText }
-    static var onPrimary: UIColor { SceytChatUIKit.shared.theme.onPrimary }
+    static var primaryText: UIColor { SceytChatUIKit.shared.theme.colors.primaryText }
+    static var secondaryText: UIColor { SceytChatUIKit.shared.theme.colors.secondaryText }
+    static var footnoteText: UIColor { SceytChatUIKit.shared.theme.colors.footnoteText }
+    static var onPrimary: UIColor { SceytChatUIKit.shared.theme.colors.onPrimary }
     
-    static var stateWarning: UIColor { SceytChatUIKit.shared.theme.stateWarning }
-    static var stateSuccess: UIColor { SceytChatUIKit.shared.theme.stateSuccess }
-    static var stateAttention: UIColor { SceytChatUIKit.shared.theme.stateAttention }
+    static var stateWarning: UIColor { SceytChatUIKit.shared.theme.colors.stateWarning }
+    static var stateSuccess: UIColor { SceytChatUIKit.shared.theme.colors.stateSuccess }
+    static var stateAttention: UIColor { SceytChatUIKit.shared.theme.colors.stateAttention }
     
     public static var initialColors: [UIColor] = [ .accent,
                                                    .accent2,
@@ -50,7 +50,7 @@ public extension UIColor {
     }
 }
 
-public struct Colors {
+public struct DefaultColors {
     // These colors are included into the default theme
     public static let accent: UIColor = UIColor(light: UIColor(rgb: 0x5159F6), dark: UIColor(rgb: 0x6B72FF))
     public static let accent2: UIColor = UIColor(light: UIColor(rgb: 0xFBB019), dark: UIColor(rgb: 0xFBB019))
@@ -82,12 +82,12 @@ public struct Colors {
     public static let stateAttention: UIColor = UIColor(light: UIColor(rgb: 0xFBB019), dark: UIColor(rgb: 0xFBB019))
     
     // These colors are not a part of the theme, but they use theme's values by default
-    public static var bubbleIncoming: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x232324))
-    public static var bubbleIncomingX: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
+    public static var bubbleIncomingSecondary: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x232324))
+    public static var bubbleIncomingSecondarySecondary: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
     public static var bubbleOutgoing: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.14).blendColors(with: .background.light),
                                                         dark: .accent.dark.withAlphaComponent(0.14).blendColors(with: .background.dark))
-    public static var bubbleOutgoingX: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.24).blendColors(with: .background.light),
-                                                         dark: .accent.dark.withAlphaComponent(0.24).blendColors(with: .background.dark))
+    public static var bubbleOutgoingSecondary: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.24).blendColors(with: .background.light),
+                                                                 dark: .accent.dark.withAlphaComponent(0.24).blendColors(with: .background.dark))
 }
 
 public extension UIColor {

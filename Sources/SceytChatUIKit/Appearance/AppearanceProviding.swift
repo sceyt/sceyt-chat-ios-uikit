@@ -176,10 +176,10 @@ extension MessageCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public static var bubbleOutgoing: UIColor = Colors.bubbleOutgoing
-        public static var bubbleOutgoingX: UIColor = Colors.bubbleOutgoingX
-        public static var bubbleIncoming: UIColor = Colors.bubbleIncoming
-        public static var bubbleIncomingX: UIColor = Colors.bubbleIncomingX
+        public static var bubbleOutgoing: UIColor = DefaultColors.bubbleOutgoing
+        public static var bubbleOutgoingSecondary: UIColor = DefaultColors.bubbleOutgoingSecondary
+        public static var bubbleIncomingSecondary: UIColor = DefaultColors.bubbleIncomingSecondary
+        public static var bubbleIncomingSecondaryX: UIColor = DefaultColors.bubbleIncomingSecondarySecondary
         
         public var backgroundColor: UIColor? = .clear
         public var titleFont: UIFont? = Fonts.semiBold.withSize(14)
@@ -188,16 +188,16 @@ extension MessageCell: AppearanceProviding {
         public var messageColor: UIColor? = UIColor.primaryText
         public var deletedMessageFont: UIFont? = Fonts.regular.with(traits: .traitItalic).withSize(16)
         public var deletedMessageColor: UIColor? = UIColor.secondaryText
-        public var bubbleColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncoming,
+        public var bubbleColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncomingSecondary,
                                                                  Appearance.bubbleOutgoing)
-        public var highlightedBubbleColor: (in: UIColor?, out: UIColor?) = (UIColor.secondaryText.withAlphaComponent(0.4), 
+        public var highlightedBubbleColor: (in: UIColor?, out: UIColor?) = (UIColor.secondaryText.withAlphaComponent(0.4),
                                                                             UIColor.secondaryText.withAlphaComponent(0.4))
         
         public var highlightedSearchResultColor: (in: UIColor?, out: UIColor?) = (
-            Appearance.bubbleIncomingX,
-            Appearance.bubbleOutgoingX
+            Appearance.bubbleIncomingSecondaryX,
+            Appearance.bubbleOutgoingSecondary
         )
-        public var highlightedOverlayColor: (in: UIColor?, out: UIColor?) = (UIColor(hex: "#17191C", alpha: 0.4), 
+        public var highlightedOverlayColor: (in: UIColor?, out: UIColor?) = (UIColor(hex: "#17191C", alpha: 0.4),
                                                                              UIColor(hex: "#17191C", alpha: 0.4))
         public var linkColor: UIColor? = UIColor.accent
         public var linkFont: UIFont? = Fonts.regular.withSize(16)
@@ -205,8 +205,8 @@ extension MessageCell: AppearanceProviding {
         public var linkTitleColor: UIColor? = UIColor.primaryText
         public var linkDescriptionFont: UIFont? = Fonts.regular.withSize(13)
         public var linkDescriptionColor: UIColor? = UIColor.secondaryText
-        public var linkPreviewBackgroundColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncomingX,
-                                                                                Appearance.bubbleOutgoingX)
+        public var linkPreviewBackgroundColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncomingSecondaryX,
+                                                                                Appearance.bubbleOutgoingSecondary)
         public var highlightedLinkBackgroundColor: UIColor? = UIColor.footnoteText
         public var mentionUserColor: UIColor? = UIColor.accent
         public var dateTickBackgroundViewColor: UIColor? = .overlayBackground2
@@ -217,7 +217,7 @@ extension MessageCell: AppearanceProviding {
         public var separatorViewTextColor: UIColor? = .onPrimary
         public var separatorViewTextBorderColor: UIColor? = .clear
         
-        public var newMessagesSeparatorViewBackgroundColor: UIColor? = Appearance.bubbleIncoming
+        public var newMessagesSeparatorViewBackgroundColor: UIColor? = Appearance.bubbleIncomingSecondary
         public var newMessagesSeparatorViewFont: UIFont? = Fonts.semiBold.withSize(14)
         public var newMessagesSeparatorViewTextColor: UIColor? = .secondaryText
         
@@ -237,8 +237,8 @@ extension MessageCell: AppearanceProviding {
         public var replyMessageVoiceDurationColor: UIColor? = UIColor.accent
         public var replyMessageFont: UIFont? = Fonts.regular.withSize(14)
         public var replyMessageBorderColor: UIColor? = UIColor.accent
-        public var replyBackgroundColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncomingX,
-                                                                          Appearance.bubbleOutgoingX)
+        public var replyBackgroundColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncomingSecondaryX,
+                                                                          Appearance.bubbleOutgoingSecondary)
         public var forwardTitleColor: UIColor? = UIColor.accent
         public var forwardTitleFont: UIFont? = Fonts.semiBold.withSize(13)
         
@@ -315,7 +315,7 @@ extension ComposerVC: AppearanceProviding {
         public var recorderCancelColor: UIColor? = .stateWarning
         public var recorderRecordingDurationFont: UIFont? = Fonts.regular.withSize(16)
         public var recorderRecordingDurationColor: UIColor? = .primaryText
-        public var recorderRecordingDotColor: UIColor? = Colors.stateWarning
+        public var recorderRecordingDotColor: UIColor? = DefaultColors.stateWarning
         
         public init() {}
     }
