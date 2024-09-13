@@ -82,8 +82,8 @@ public struct DefaultColors {
     public static let stateAttention: UIColor = UIColor(light: UIColor(rgb: 0xFBB019), dark: UIColor(rgb: 0xFBB019))
     
     // These colors are not a part of the theme, but they use theme's values by default
-    public static var bubbleIncomingSecondary: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x232324))
-    public static var bubbleIncomingSecondarySecondary: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
+    public static var bubbleIncoming: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x232324))
+    public static var bubbleIncomingSecondary: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
     public static var bubbleOutgoing: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.14).blendColors(with: .background.light),
                                                         dark: .accent.dark.withAlphaComponent(0.14).blendColors(with: .background.dark))
     public static var bubbleOutgoingSecondary: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.24).blendColors(with: .background.light),
