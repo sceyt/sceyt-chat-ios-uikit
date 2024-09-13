@@ -158,16 +158,3 @@ extension MessageCell {
         }
     }
 }
-
-extension MessageCell {
-    open class InfoViewBackgroundView: View {
-        override open func setup() {
-            clipsToBounds = true
-        }
-        
-        override open func layoutSubviews() {
-            super.layoutSubviews()
-            layer.cornerRadius = bounds.height / 2
-        }
-    }
-}

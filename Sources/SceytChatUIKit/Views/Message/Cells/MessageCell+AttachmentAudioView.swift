@@ -1,5 +1,5 @@
 //
-//  AttachmentAudioView.swift
+//  MessageCell+AttachmentAudioView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 25.12.22.

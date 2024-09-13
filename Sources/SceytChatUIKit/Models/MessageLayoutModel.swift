@@ -515,9 +515,9 @@ open class MessageLayoutModel {
     
     open func estimateReactionsNumberPerRow() -> Int {
         let width = Self.defaults.messageWidth
-        let emojiItemWidth = MessageCell.ReactionTotalView.Measure.emojiWidth
-        let insets = MessageCell.ReactionTotalView.Measure.contentInsets
-        let interItemSpacing = MessageCell.ReactionTotalView.Measure.itemSpacingH
+        let emojiItemWidth = Components.messageCellReactionTotalView.Measure.emojiWidth
+        let insets = Components.messageCellReactionTotalView.Measure.contentInsets
+        let interItemSpacing = Components.messageCellReactionTotalView.Measure.itemSpacingH
         let fitWidth = width - insets.left - insets.right
         var accumWidth: CGFloat = .zero
         
@@ -855,7 +855,7 @@ open class MessageLayoutModel {
     
     open func measure() -> CGSize {
         infoViewMeasure = MessageCell.InfoView.measure(model: self, appearance: Self.appearance)
-        linkViewMeasure = MessageCell.LinkStackView.measure(model: self, appearance: Self.appearance)
+        linkViewMeasure = Components.messageCellLinkStackView.measure(model: self, appearance: Self.appearance)
         if message.incoming {
             return Components.incomingMessageCell.measure(model: self, appearance: Self.appearance)
         } else {
@@ -1277,7 +1277,7 @@ extension MessageLayoutModel {
                         attachment: attachment,
                         ownerMessage: message,
                         ownerChannel: channel,
-                        thumbnailSize: thumbnailSize ?? MessageCell.ReplyView.Measure.imageSize)
+                        thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize)
                 }
                 if let attributedBody, attributedBody.length > 0 {
                     let attributedBody = attributedBody.mutableCopy() as! NSMutableAttributedString
@@ -1301,7 +1301,7 @@ extension MessageLayoutModel {
                     attachment: attachment,
                     ownerMessage: message,
                     ownerChannel: self.attachment?.ownerChannel,
-                    thumbnailSize: thumbnailSize ?? MessageCell.ReplyView.Measure.imageSize)
+                    thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize)
             }
         }
         

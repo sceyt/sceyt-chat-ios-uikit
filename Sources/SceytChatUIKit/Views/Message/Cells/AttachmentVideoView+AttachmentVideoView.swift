@@ -1,5 +1,5 @@
 //
-//  AttachmentVideoViewCell.swift
+//  AttachmentVideoView+AttachmentVideoView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.

@@ -20,12 +20,12 @@ open class ChannelListVC: ViewController,
     open lazy var channelListRouter = Components.channelListRouter
         .init(rootVC: self)
     
-    open lazy var tableView = Components.channelTableView
+    open lazy var tableView = TableView
         .init()
         .withoutAutoresizingMask
         .rowAutomaticDimension
     
-    open lazy var emptyView = Components.channelListEmptyView
+    open lazy var emptyView = Components.channelListEmptyStateView
         .init()
         .withoutAutoresizingMask
     
@@ -50,6 +50,10 @@ open class ChannelListVC: ViewController,
 //            style: .plain,
 //            target: self, 
 //            action: #selector(leftButtonAction(_:event:)))
+        tableView.register(Components.channelCell)
+        tableView.contentInsetAdjustmentBehavior = .automatic
+        tableView.tableFooterView = UIView()
+        tableView.separatorStyle = .none
         tableView.delegate = self
         tableView.dataSource = self
                 

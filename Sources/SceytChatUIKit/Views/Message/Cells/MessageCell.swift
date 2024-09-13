@@ -24,7 +24,7 @@ open class MessageCell: CollectionViewCell,
     open lazy var containerView = UIView()
         .withoutAutoresizingMask
     
-    open lazy var unreadView = UnreadView
+    open lazy var unreadView = Components.messageCellUnreadView
         .init()
         .withoutAutoresizingMask
     
@@ -35,11 +35,12 @@ open class MessageCell: CollectionViewCell,
         .init()
         .withoutAutoresizingMask
     
-    open lazy var infoView = InfoView
+    open lazy var infoView = Components.messageCellInfoView
         .init()
         .withoutAutoresizingMask
 
-    open lazy var dateTickBackgroundView = InfoViewBackgroundView()
+    open lazy var dateTickBackgroundView = Components.messageCellInfoViewBackgroundView
+        .init()
         .withoutAutoresizingMask
     
     open lazy var nameLabel = UILabel()
@@ -60,27 +61,27 @@ open class MessageCell: CollectionViewCell,
         return $0
     }(UIView().withoutAutoresizingMask)
     
-    open lazy var linkView = LinkStackView
+    open lazy var linkView = Components.messageCellLinkStackView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var reactionTotalView = ReactionTotalView
+    open lazy var reactionTotalView = Components.messageCellReactionTotalView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var replyView = ReplyView
+    open lazy var replyView = Components.messageCellReplyView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var forwardView = ForwardView
+    open lazy var forwardView = Components.messageCellForwardView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var replyCountView = ReplyCountView
+    open lazy var replyCountView = Components.messageCellReplyCountView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var replyArrowView = ReplyArrowView
+    open lazy var replyArrowView = Components.messageCellReplyArrowView
         .init()
         .withoutAutoresizingMask
     

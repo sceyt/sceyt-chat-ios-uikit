@@ -1,5 +1,5 @@
 //
-//  MessageCell+Measurable.swift
+//  MessageCellMeasurable.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.05.23.

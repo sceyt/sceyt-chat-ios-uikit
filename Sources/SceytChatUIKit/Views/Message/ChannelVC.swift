@@ -25,11 +25,11 @@ open class ChannelVC: ViewController,
     open lazy var router = Components.channelRouter
         .init(rootVC: self)
     
-    open lazy var collectionView = Components.channelCollectionView
+    open lazy var collectionView = Components.channelMessagesCollectionView
         .init()
         .withoutAutoresizingMask
     
-    public var layout: ChannelCollectionViewLayout {
+    open var layout: ChannelVC.MessagesCollectionViewLayout {
         collectionView.layout
     }
     
@@ -1477,7 +1477,7 @@ open class ChannelVC: ViewController,
         return cell
     }
     
-    // MARK: ChannelCollectionViewLayoutDelegate
+    // MARK: ChannelVC.MessagesCollectionViewLayoutDelegate
     
     open func collectionView(
         _ collectionView: UICollectionView,

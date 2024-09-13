@@ -50,7 +50,7 @@ open class IncomingMessageCell: MessageCell {
         let bubbleViewTopAnchor: NSLayoutYAxisAnchor
         let contentTopAnchor: NSLayoutYAxisAnchor
         if layout.isForwarded {
-            let anchors = ForwardView.Anchors.self
+            let anchors = Components.messageCellForwardView.Anchors.self
             let topAnchor = showSenderInfo ? nameLabel.bottomAnchor : containerView.topAnchor
             layoutConstraint += [
                 forwardView.topAnchor.pin(to: topAnchor, constant: anchors.top),
@@ -62,7 +62,7 @@ open class IncomingMessageCell: MessageCell {
             contentTopAnchor = forwardView.bottomAnchor
         } else if layout.hasReply {
             let topAnchor = showSenderInfo ? nameLabel.bottomAnchor : containerView.topAnchor
-            let anchors = ReplyView.Anchors.self
+            let anchors = Components.messageCellReplyView.Anchors.self
             layoutConstraint += [
                 replyView.topAnchor.pin(to: topAnchor, constant: anchors.top),
                 replyView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: anchors.leading),
@@ -326,8 +326,8 @@ open class IncomingMessageCell: MessageCell {
         let showName = hasName && model.showUserInfo
         
         if model.isForwarded {
-            let anchors = ForwardView.Anchors.self
-            forwardSize = ForwardView.measure(model: model, appearance: appearance)
+            let anchors = Components.messageCellForwardView.Anchors.self
+            forwardSize = Components.messageCellForwardView.measure(model: model, appearance: appearance)
             forwardSize.width += anchors.leading + -anchors.trailing
             forwardSize.height += anchors.top
             forwardSize.width = min(forwardSize.width, anchors.width)
@@ -336,8 +336,8 @@ open class IncomingMessageCell: MessageCell {
         }
         
         if !model.isForwarded, model.hasReply {
-            let anchors = ReplyView.Anchors.self
-            replySize = ReplyView.measure(model: model, appearance: appearance)
+            let anchors = Components.messageCellReplyView.Anchors.self
+            replySize = Components.messageCellReplyView.measure(model: model, appearance: appearance)
             replySize.width += anchors.leading + -anchors.trailing
             replySize.height += anchors.top
         } else {
@@ -447,14 +447,14 @@ open class IncomingMessageCell: MessageCell {
             case .interactive:
                 logger.debug("not implemented yet")
             case .withTotalScore:
-                let size = ReactionTotalView.measure(model: model, appearance: appearance)
+                let size = Components.messageCellReactionTotalView.measure(model: model, appearance: appearance)
                 bubbleSize.height += size.height - 4
                 bubbleSize.width = max(bubbleSize.width, size.width)
             }
         }
         
         if model.isLastDisplayedMessage {
-            bubbleSize.height += UnreadView.measure(model: model, appearance: appearance).height
+            bubbleSize.height += Components.messageCellUnreadView.measure(model: model, appearance: appearance).height
         }
         logger.debug("IncomingMessageCell: measure messageId: \(model.message.id), measure: \(bubbleSize) body: \(model.message.body)")
         return bubbleSize
