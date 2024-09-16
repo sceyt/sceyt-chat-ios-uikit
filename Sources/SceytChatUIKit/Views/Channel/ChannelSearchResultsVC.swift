@@ -37,7 +37,7 @@ open class ChannelSearchResultsVC: ViewController,
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
         tableView.register(Components.channelUserCell.self)
-        tableView.register(Components.createChannelHeaderView.self)
+        tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
         tableView.estimatedRowHeight = 56
@@ -127,14 +127,14 @@ open class ChannelSearchResultsVC: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        resultsUpdater.searchResults.header(for: section) != nil ? Components.createChannelHeaderView.Layouts.height : 0
+        resultsUpdater.searchResults.header(for: section) != nil ? Components.separatorHeaderView.Layouts.height : 0
     }
     
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         guard let header = resultsUpdater.searchResults.header(for: section)
             else { return nil }
         
-        let headerView = tableView.dequeueReusableHeaderFooterView(Components.createChannelHeaderView.self)
+        let headerView = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
         headerView.titleLabel.text = header
         return headerView
     }

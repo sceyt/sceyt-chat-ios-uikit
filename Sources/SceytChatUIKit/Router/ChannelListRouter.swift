@@ -65,7 +65,7 @@ open class ChannelListRouter: Router<ChannelListVC> {
     }
     
     open func showNewChannel() {
-        let vc = Components.createNewChannelVC.init()
+        let vc = Components.startChatVC.init()
         vc.viewModel = Components.createNewChannelVM.init()
         let nav = Components.navigationController.init()
         nav.viewControllers = [vc]

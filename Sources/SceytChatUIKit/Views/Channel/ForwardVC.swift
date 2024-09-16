@@ -1,5 +1,5 @@
 //
-//  ChannelForwardVC.swift
+//  ForwardVC.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 24/10/2023.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ChannelForwardVC: ViewController,
+open class ForwardVC: ViewController,
     UITableViewDelegate, UITableViewDataSource,
     UISearchResultsUpdating
 {
@@ -43,7 +43,7 @@ open class ChannelForwardVC: ViewController,
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
         tableView.register(Components.channelUserCell.self)
-        tableView.register(Components.createChannelHeaderView.self)
+        tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
         tableView.estimatedRowHeight = 56
@@ -183,14 +183,14 @@ open class ChannelForwardVC: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        viewModel.searchResults.header(for: section) != nil ? Components.createChannelHeaderView.Layouts.height : 0
+        viewModel.searchResults.header(for: section) != nil ? Components.separatorHeaderView.Layouts.height : 0
     }
     
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
         guard let header = viewModel.searchResults.header(for: section)
         else { return nil }
         
-        let headerView = tableView.dequeueReusableHeaderFooterView(Components.createChannelHeaderView.self)
+        let headerView = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
         headerView.titleLabel.text = header
         return headerView
     }
@@ -220,7 +220,7 @@ open class ChannelForwardVC: ViewController,
     }
 }
 
-public extension ChannelForwardVC {
+public extension ForwardVC {
     enum Layouts {
         public static var selectedViewHeight: CGFloat = 96
     }

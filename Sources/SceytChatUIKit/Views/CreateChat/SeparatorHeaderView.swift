@@ -1,5 +1,5 @@
 //
-//  CreateChatHeaderView.swift
+//  SeparatorHeaderView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class CreateChannelHeaderView: TableViewHeaderFooterView {
+open class SeparatorHeaderView: TableViewHeaderFooterView {
     open lazy var titleLabel = UILabel().withoutAutoresizingMask
 
     override open func setup() {
@@ -35,7 +35,7 @@ open class CreateChannelHeaderView: TableViewHeaderFooterView {
     }
 }
 
-public extension CreateChannelHeaderView {
+public extension SeparatorHeaderView {
     enum Layouts {
         public static var height: CGFloat = 32
         public static var horizontalPadding: CGFloat = 16

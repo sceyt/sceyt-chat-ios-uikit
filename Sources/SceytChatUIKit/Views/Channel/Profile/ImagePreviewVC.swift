@@ -1,5 +1,5 @@
 //
-//  ChannelAvatarVC.swift
+//  ImagePreviewVC.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 24/08/2023.
@@ -8,10 +8,10 @@
 
 import UIKit
 
-open class ChannelAvatarVC: ViewController, UIScrollViewDelegate {
+open class ImagePreviewVC: ViewController, UIScrollViewDelegate {
     open var viewModel: ChannelAvatarVM!
     
-    public lazy var appearance = ChannelAvatarVC.appearance {
+    public lazy var appearance = Components.imagePreviewVC.appearance {
         didSet {
             setupAppearance()
         }
@@ -19,7 +19,7 @@ open class ChannelAvatarVC: ViewController, UIScrollViewDelegate {
     
     private var task: Cancellable?
     
-    private lazy var scrollView = PreviewerScrollView(contentMode: .scaleAspectFit)
+    private lazy var scrollView = MediaPreviewerScrollView(contentMode: .scaleAspectFit)
         .withoutAutoresizingMask
     
     override open func setup() {

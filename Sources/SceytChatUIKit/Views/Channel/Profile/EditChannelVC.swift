@@ -1,5 +1,5 @@
 //
-//  ChannelProfileEditVC.swift
+//  EditChannelVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ChannelProfileEditVC: ViewController,
+open class EditChannelVC: ViewController,
     UITableViewDelegate,
     UITableViewDataSource
 {
@@ -29,9 +29,9 @@ open class ChannelProfileEditVC: ViewController,
         if #available(iOS 15.0, *) {
             tableView.sectionHeaderTopPadding = 0
         }
-        tableView.register(Components.channelProfileEditAvatarCell.self)
-        tableView.register(Components.channelProfileEditFieldCell.self)
-        tableView.register(Components.channelProfileEditURICell.self)
+        tableView.register(Components.editChannelAvatarCell.self)
+        tableView.register(Components.editChannelTextFieldCell.self)
+        tableView.register(Components.editChannelURICell.self)
         tableView.separatorStyle = .none
         tableView.delegate = self
         tableView.dataSource = self
@@ -141,7 +141,7 @@ open class ChannelProfileEditVC: ViewController,
         let _cell: UITableViewCell
         switch Sections(rawValue: indexPath.section) {
         case .avatar:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileEditAvatarCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.editChannelAvatarCell.self)
             cell.selectionStyle = .none
             profileViewModel.$avatarUrl.receive(on: DispatchQueue.main).sink {
                 cell.data = URL(string: $0 ?? "")
@@ -151,7 +151,7 @@ open class ChannelProfileEditVC: ViewController,
             }.store(in: &cell.subscriptions)
             _cell = cell
         case .fields:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileEditFieldCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.editChannelTextFieldCell.self)
             cell.selectionStyle = .none
             cell.onTextChanged = { [weak self] in
                 self?.onTextChanged(text: $0, row: indexPath.row)
@@ -173,7 +173,7 @@ open class ChannelProfileEditVC: ViewController,
             
             _cell = cell
         case .uri:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileEditURICell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.editChannelURICell.self)
             cell.textField.text = profileViewModel.channel.uri
             cell.onTextChanged = { [weak self] in guard let self else { return }
                 let uri = $0?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -251,7 +251,7 @@ open class ChannelProfileEditVC: ViewController,
     }
 }
 
-public extension ChannelProfileEditVC {
+public extension EditChannelVC {
     enum Sections: Int, CaseIterable {
         case avatar
         case fields

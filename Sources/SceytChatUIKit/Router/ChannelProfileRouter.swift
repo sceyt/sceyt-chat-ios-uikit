@@ -66,7 +66,7 @@ open class ChannelProfileRouter: Router<ChannelInfoVC> {
     }
     
     open func showEditChannel() {
-        let vc = Components.channelProfileEditVC.init()
+        let vc = Components.editChannelVC.init()
         vc.profileViewModel = Components.channelProfileEditVM.init(channel: rootVC.profileViewModel.channel)
         rootVC.show(vc, sender: self)
     }
@@ -81,7 +81,7 @@ open class ChannelProfileRouter: Router<ChannelInfoVC> {
     
     open func goAvatar() {
         guard rootVC.profileViewModel.channel.imageUrl != nil else { return }
-        let vc = Components.channelAvatarVC.init()
+        let vc = Components.imagePreviewVC.init()
         vc.viewModel = Components.channelAvatarVM.init(channel: rootVC.profileViewModel.channel)
         rootVC.show(vc, sender: self)
     }

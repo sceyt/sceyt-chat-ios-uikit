@@ -47,13 +47,13 @@ open class InputRouter: Router<InputVC> {
     }
 
     open func showPhotos(selectedPhotoAssetIdentifiers: Set<String>? = nil,
-                         callback: @escaping ([PHAsset], PhotosPickerVC) -> Bool)
+                         callback: @escaping ([PHAsset], MediaPickerVC) -> Bool)
     {
         guard rootVC.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
-        let picker = Components.imagePickerVC.init(
+        let picker = Components.mediaPickerVC.init(
             selectedAssetIdentifiers: selectedPhotoAssetIdentifiers,
             maximumAttachmentsAllowed: SceytChatUIKit.shared.config.maximumAttachmentsAllowed - rootVC.mediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
         )

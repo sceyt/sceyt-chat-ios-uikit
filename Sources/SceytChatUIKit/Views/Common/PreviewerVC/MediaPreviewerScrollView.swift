@@ -1,5 +1,5 @@
 //
-//  PreviewerScrollView.swift
+//  MediaPreviewerScrollView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 07/10/2023.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class PreviewerScrollView: UIScrollView, Configurable, UIScrollViewDelegate {
+open class MediaPreviewerScrollView: UIScrollView, Configurable, UIScrollViewDelegate {
     open lazy var imageView = {
         $0.contentMode = .scaleAspectFit
         return $0.withoutAutoresizingMask

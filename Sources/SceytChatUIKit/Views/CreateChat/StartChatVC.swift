@@ -1,5 +1,5 @@
 //
-//  CreateNewChannelVC.swift
+//  StartChatVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class CreateNewChannelVC: ViewController,
+open class StartChatVC: ViewController,
     UITableViewDelegate, UITableViewDataSource,
     UISearchControllerDelegate, UISearchBarDelegate
 {
@@ -20,9 +20,9 @@ open class CreateNewChannelVC: ViewController,
     open lazy var tableView = TableView()
         .withoutAutoresizingMask
        
-    lazy var createChatActionsView = {
+    lazy var startChatActionsView = {
         $0.withoutAutoresizingMask
-    }(Components.createChatActionsView.init())
+    }(Components.startChatActionsView.init())
     
     override open func setup() {
         super.setup()
@@ -40,7 +40,7 @@ open class CreateNewChannelVC: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.register(Components.createChannelUserCell.self)
-        tableView.register(Components.createChannelHeaderView.self)
+        tableView.register(Components.separatorHeaderView.self)
         
         navigationItem.hidesSearchBarWhenScrolling = false
         KeyboardObserver()
@@ -55,24 +55,24 @@ open class CreateNewChannelVC: ViewController,
                 self?.onEvent(event)
             }.store(in: &subscriptions)
         
-        createChatActionsView.groupView.publisher(for: .touchUpInside).sink { [unowned self] _ in
+        startChatActionsView.groupView.publisher(for: .touchUpInside).sink { [unowned self] _ in
             router.showCreatePrivateChannel()
         }.store(in: &subscriptions)
         
-        createChatActionsView.channelView.publisher(for: .touchUpInside).sink { [unowned self] _ in
+        startChatActionsView.channelView.publisher(for: .touchUpInside).sink { [unowned self] _ in
             router.showCreatePublicChannel()
         }.store(in: &subscriptions)
     }
     
     override open func setupLayout() {
         super.setupLayout()
-        view.addSubview(createChatActionsView)
+        view.addSubview(startChatActionsView)
         view.addSubview(tableView)
         
-        createChatActionsView.resize(anchors: [.height(96)])
-        createChatActionsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading(), .top(), .trailing()])
+        startChatActionsView.resize(anchors: [.height(96)])
+        startChatActionsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading(), .top(), .trailing()])
         tableView.pin(to: view, anchors: [.leading(), .bottom(), .trailing()])
-        tableView.topAnchor.pin(to: createChatActionsView.bottomAnchor)
+        tableView.topAnchor.pin(to: startChatActionsView.bottomAnchor)
     }
     
     override open func setupAppearance() {
@@ -141,11 +141,11 @@ open class CreateNewChannelVC: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        Components.createChannelHeaderView.Layouts.height
+        Components.separatorHeaderView.Layouts.height
     }
     
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        tableView.dequeueReusableHeaderFooterView(Components.createChannelHeaderView.self)
+        tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
     }
     
     open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -191,7 +191,7 @@ open class CreateNewChannelVC: ViewController,
     }
 }
 
-extension CreateNewChannelVC {
+extension StartChatVC {
     enum Sections: Int, CaseIterable {
         case user
     }

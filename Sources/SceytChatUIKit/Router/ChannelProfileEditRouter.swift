@@ -8,5 +8,5 @@
 
 import Foundation
 
-open class ChannelProfileEditRouter: Router<ChannelProfileEditVC> {
+open class ChannelProfileEditRouter: Router<EditChannelVC> {
 }

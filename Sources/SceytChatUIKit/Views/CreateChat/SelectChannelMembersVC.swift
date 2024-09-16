@@ -41,7 +41,7 @@ open class SelectChannelMembersVC: ViewController,
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
         tableView.register(Components.createChannelUserCell.self)
-        tableView.register(Components.createChannelHeaderView.self)
+        tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
         tableView.estimatedRowHeight = 56
@@ -196,11 +196,11 @@ open class SelectChannelMembersVC: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        Components.createChannelHeaderView.Layouts.height
+        Components.separatorHeaderView.Layouts.height
     }
     
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        tableView.dequeueReusableHeaderFooterView(Components.createChannelHeaderView.self)
+        tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
     }
     
     open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

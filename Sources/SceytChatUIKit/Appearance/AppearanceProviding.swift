@@ -366,7 +366,7 @@ extension ChannelInfoVC: AppearanceProviding {
     }
 }
 
-extension ChannelProfileEditVC: AppearanceProviding {
+extension EditChannelVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -445,7 +445,7 @@ extension ChannelMemberAddCell: AppearanceProviding {
     }
 }
 
-extension PhotosPickerVC: AppearanceProviding {
+extension MediaPickerVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -538,7 +538,7 @@ extension ChannelInfoVC.VoiceCollectionView: AppearanceProviding {
     }
 }
 
-extension PhotosPickerCell: AppearanceProviding {
+extension MediaPickerVC.MediaCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -634,7 +634,7 @@ public struct InitialsBuilderAppearance {
     }
 }
 
-extension PreviewerVC: AppearanceProviding {
+extension MediaPreviewerVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -736,7 +736,7 @@ extension EmojiListSectionHeaderView: AppearanceProviding {
     }
 }
 
-extension ChannelAvatarVC: AppearanceProviding {
+extension ImagePreviewVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -830,7 +830,7 @@ extension Alert: AppearanceProviding {
     }
 }
 
-extension CreateChannelHeaderView: AppearanceProviding {
+extension SeparatorHeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -899,7 +899,7 @@ extension ChannelInfoVC.AttachmentHeaderView: AppearanceProviding {
     }
 }
 
-extension ChannelProfileEditAvatarCell: AppearanceProviding {
+extension EditChannelVC.AvatarCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -922,7 +922,7 @@ extension ImageCropperVC: AppearanceProviding {
     }
 }
 
-extension CreateNewChannelVC: AppearanceProviding {
+extension StartChatVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -932,7 +932,7 @@ extension CreateNewChannelVC: AppearanceProviding {
     }
 }
 
-extension CreateChatActionsView: AppearanceProviding {
+extension StartChatVC.ActionsView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -944,7 +944,7 @@ extension CreateChatActionsView: AppearanceProviding {
     }
 }
 
-extension CreatePrivateChannelProfileView: AppearanceProviding {
+extension CreateGroupVC.ProfileView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -962,7 +962,7 @@ extension CreatePrivateChannelProfileView: AppearanceProviding {
     }
 }
 
-extension CreatePrivateChannelVC: AppearanceProviding {
+extension CreateGroupVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1112,7 +1112,7 @@ extension MessageInfoVC: AppearanceProviding {
     }
 }
 
-extension ChannelForwardVC: AppearanceProviding {
+extension ForwardVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {

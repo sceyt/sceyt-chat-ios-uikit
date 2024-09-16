@@ -57,13 +57,13 @@ public extension UIImageView {
             initialIndex = idx
         }
         
-        let imageCarousel = Components.previewerCarouselVC
+        let imageCarousel = Components.mediaPreviewerCarouselVC
             .init(
                 sourceView: sourceView,
                 previewDataSource: previewer,
                 initialIndex: initialIndex)
         UIApplication.shared.sendAction(#selector(resignFirstResponder), to: nil, from: nil, for: nil)
         let presentFromVC = sender.from ?? vc
-        presentFromVC?.present(Components.previewerNavigationController.init(imageCarousel), animated: true)
+        presentFromVC?.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
     }
 }

@@ -1,5 +1,5 @@
 //
-//  PhotosPickerVC.swift
+//  MediaPickerVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -10,28 +10,28 @@ import Photos
 import PhotosUI
 import UIKit
 
-open class PhotosPickerVC: ViewController,
+open class MediaPickerVC: ViewController,
     UICollectionViewDataSource,
     UICollectionViewDelegate
 {
     private let imageManager = PHCachingImageManager()
     public static let pageSize = 100
     
-    public var onSelected: (([PHAsset], PhotosPickerVC) -> Bool)?
+    public var onSelected: (([PHAsset], MediaPickerVC) -> Bool)?
     private var selectedIdentifiers = Set<String>()
     private var preSelectedIdentifiers = Set<String>()
     private var selectedIndexPaths = [IndexPath]()
     private var maximumAttachmentsAllowed = SceytChatUIKit.shared.config.maximumAttachmentsAllowed
     
-    open lazy var collectionView = Components.imagePickerCollectionView
+    open lazy var collectionView = Components.mediaPickerCollectionView
         .init()
         .withoutAutoresizingMask
  
-    open lazy var bottomToolbar = BottomToolbar()
+    open lazy var footerView = Components.mediaPickerFooterView.init()
         .withoutAutoresizingMask
     
-    open var collectionViewLayout: PhotosPickerCollectionViewLayout? {
-        collectionView.collectionViewLayout as? PhotosPickerCollectionViewLayout
+    open var collectionViewLayout: MediaPickerCollectionViewLayout? {
+        collectionView.collectionViewLayout as? MediaPickerCollectionViewLayout
     }
 
     public var allowsMultipleSelection = true {
@@ -74,7 +74,7 @@ open class PhotosPickerVC: ViewController,
             self.maximumAttachmentsAllowed = maximumAttachmentsAllowed
             preSelectedIdentifiers = selectedAssetIdentifiers
             selectedIdentifiers = selectedAssetIdentifiers
-            bottomToolbar.selectedCount = selectedAssetIdentifiers.count
+            footerView.selectedCount = selectedAssetIdentifiers.count
         }
     }
     
@@ -94,7 +94,7 @@ open class PhotosPickerVC: ViewController,
         collectionView.delegate = self
         collectionViewLayout?.minimumInteritemSpacing = 2
         collectionViewLayout?.minimumLineSpacing = 2
-        collectionView.register(PhotosPickerCell.self)
+        collectionView.register(Components.mediaPickerCell.self)
         
         navigationItem.leftBarButtonItem =
             UIBarButtonItem(
@@ -103,7 +103,7 @@ open class PhotosPickerVC: ViewController,
                 target: self,
                 action: #selector(cancelAction(_:))
             )
-        bottomToolbar.attachButton.addTarget(self, action: #selector(attachButtonAction(_:)), for: .touchUpInside)
+        footerView.attachButton.addTarget(self, action: #selector(attachButtonAction(_:)), for: .touchUpInside)
         
         resetCachedAssets()
         PHPhotoLibrary.shared().register(self)
@@ -120,13 +120,13 @@ open class PhotosPickerVC: ViewController,
         super.setupLayout()
         
         view.addSubview(collectionView)
-        view.addSubview(bottomToolbar)
+        view.addSubview(footerView)
         
         collectionView.pin(to: view, anchors: [.leading, .trailing])
         collectionView.topAnchor.pin(to: view.safeAreaLayoutGuide.topAnchor)
-        collectionView.bottomAnchor.pin(to: bottomToolbar.topAnchor)
-        bottomToolbar.pin(to: view, anchors: [.leading, .trailing])
-        bottomToolbar.bottomAnchor.pin(to: view.safeAreaLayoutGuide.bottomAnchor)
+        collectionView.bottomAnchor.pin(to: footerView.topAnchor)
+        footerView.pin(to: view, anchors: [.leading, .trailing])
+        footerView.bottomAnchor.pin(to: view.safeAreaLayoutGuide.bottomAnchor)
     }
     
     override open func setupDone() {
@@ -265,7 +265,7 @@ open class PhotosPickerVC: ViewController,
         fetchNextPageIfNeeded(indexPath: indexPath)
         let cell = collectionView.dequeueReusableCell(
             for: indexPath,
-            cellType: PhotosPickerCell.self
+            cellType: Components.mediaPickerCell.self
         )
         cell.data = (imageManager, assets.object(at: indexPath.item), thumbnailSize)
         return cell
@@ -303,7 +303,7 @@ open class PhotosPickerVC: ViewController,
         _ collectionView: UICollectionView,
         shouldSelectItemAt indexPath: IndexPath
     ) -> Bool {
-        guard let cell = collectionView.cell(for: indexPath, cellType: PhotosPickerCell.self),
+        guard let cell = collectionView.cell(for: indexPath, cellType: Components.mediaPickerCell.self),
               cell.imageView.image != nil
         else { return false }
         guard maximumAttachmentsAllowed > 0
@@ -330,7 +330,7 @@ open class PhotosPickerVC: ViewController,
             selectedIdentifiers.insert(assets[indexPath.item].localIdentifier)
             selectedIndexPaths.append(indexPath)
         }
-        bottomToolbar.selectedCount = selectedIdentifiers.count
+        footerView.selectedCount = selectedIdentifiers.count
     }
     
     open func collectionView(
@@ -341,7 +341,7 @@ open class PhotosPickerVC: ViewController,
             selectedIdentifiers.remove(assets[indexPath.item].localIdentifier)
             selectedIndexPaths.removeAll(where: { $0 == indexPath })
         }
-        bottomToolbar.selectedCount = selectedIdentifiers.count
+        footerView.selectedCount = selectedIdentifiers.count
     }
     
     open func collectionView(
@@ -376,7 +376,7 @@ open class PhotosPickerVC: ViewController,
     }
 }
 
-private extension PhotosPickerVC {
+private extension MediaPickerVC {
     var photoAuthorizationStatus: PHAuthorizationStatus {
         if #available(iOS 14, *) {
             return PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -469,112 +469,10 @@ private extension PhotosPickerVC {
     }
 }
 
-extension PhotosPickerVC: PHPhotoLibraryChangeObserver {
+extension MediaPickerVC: PHPhotoLibraryChangeObserver {
     public func photoLibraryDidChange(_ changeInstance: PHChange) {
         DispatchQueue.main.async { [weak self] in
             self?.fetchAssets()
-        }
-    }
-}
-
-extension PhotosPickerVC {
-    open class BottomToolbar: View {
-        public lazy var appearance = PhotosPickerVC.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
-        open lazy var attachButton = AttachButton()
-            .withoutAutoresizingMask
-        
-        private var heightContraint: NSLayoutConstraint?
-        
-        public var selectedCount: Int {
-            get { Int(attachButton.selectedCountLabel.value ?? "0") ?? 0 }
-            set {
-                attachButton.selectedCountLabel.value = String(newValue)
-                if newValue == 0 {
-                    heightContraint?.constant = 0
-                } else {
-                    heightContraint?.constant = 80
-                }
-            }
-        }
-        
-        override open func setup() {
-            super.setup()
-            attachButton.layer.cornerRadius = 8
-        }
-        
-        override open func setupAppearance() {
-            super.setupAppearance()
-            backgroundColor = appearance.toolbarBackgroundColor
-        }
-        
-        override open func setupLayout() {
-            super.setupLayout()
-            addSubview(attachButton)
-            attachButton.pin(to: self,
-                             anchors: [
-                                 .leading(16),
-                                 .trailing(-16),
-                                 .centerY(),
-                                 .top(0, .greaterThanOrEqual),
-                                 .bottom(0, .lessThanOrEqual),
-                             ])
-            attachButton.heightAnchor.pin(constant: 48)
-            heightContraint = resize(anchors: [.height(selectedCount == 0 ? 0 : 80)])[0]
-        }
-    }
-    
-    open class AttachButton: Control {
-        public lazy var appearance = PhotosPickerVC.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
-        lazy var titleLabel = UILabel()
-            .withoutAutoresizingMask
-        
-        lazy var selectedCountLabel = BadgeView()
-            .withoutAutoresizingMask
-        
-        override open func setup() {
-            super.setup()
-            selectedCountLabel.isUserInteractionEnabled = false
-            titleLabel.textAlignment = .right
-            selectedCountLabel.clipsToBounds = true
-            titleLabel.text = L10n.ImagePicker.Attach.Button.title
-            selectedCountLabel.value = "0"
-        }
-        
-        override open func setupLayout() {
-            super.setupLayout()
-            addSubview(titleLabel)
-            addSubview(selectedCountLabel)
-            titleLabel.pin(to: self, anchors: [.top(12), .bottom(-12), .leading(0, .greaterThanOrEqual)])
-            selectedCountLabel.pin(to: self, anchors: [.top(12), .bottom(-12), .trailing(0, .lessThanOrEqual)])
-            titleLabel.trailingAnchor.pin(to: centerXAnchor, constant: -4)
-            selectedCountLabel.leadingAnchor.pin(to: centerXAnchor, constant: 4)
-        }
-        
-        override open func setupAppearance() {
-            super.setupAppearance()
-            backgroundColor = appearance.attachButtonBackgroundColor
-            titleLabel.textColor = appearance.attachTitleColor
-            titleLabel.font = appearance.attachTitleFont
-            titleLabel.backgroundColor = appearance.attachTitleBackgroundColor
-            selectedCountLabel.textColor = appearance.attachCountTextColor
-            selectedCountLabel.font = appearance.attachCountTextFont
-            selectedCountLabel.backgroundColor = appearance.attachCountBackgroundColor
-            selectedCountLabel.widthAnchor.pin(greaterThanOrEqualTo: selectedCountLabel.heightAnchor)
-        }
-        
-        override open func layoutSubviews() {
-            super.layoutSubviews()
-            selectedCountLabel.layer.cornerRadius = selectedCountLabel.bounds.height / 2
         }
     }
 }

@@ -1,5 +1,5 @@
 //
-//  PreviewerImageView.swift
+//  MediaPreviewerImageView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import UIKit
 
 @objc
-open class PreviewerImageView: UIView {
+open class MediaPreviewerImageView: UIView {
     
     open var image: UIImage? {
         get { return imageView.image }

@@ -66,9 +66,9 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
     }
     
     private func createDummyImageView(frame: CGRect, image: UIImage? = nil)
-        -> PreviewerImageView
+        -> MediaPreviewerImageView
     {
-        let dummyImageView = PreviewerImageView(image: image)
+        let dummyImageView = MediaPreviewerImageView(image: image)
         dummyImageView.clipsToBounds = true
         dummyImageView.contentMode = imageContentMode
         dummyImageView.alpha = 1.0

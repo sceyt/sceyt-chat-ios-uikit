@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class NewChannelRouter: Router<CreateNewChannelVC> {
+open class NewChannelRouter: Router<StartChatVC> {
     open func showChannel(_ channel: ChatChannel) {
         ChannelListRouter.showChannel(channel)
         rootVC.dismiss(animated: true)
@@ -21,7 +21,7 @@ open class NewChannelRouter: Router<CreateNewChannelVC> {
     }
 
     func showCreatePublicChannel() {
-        let vc = CreatePublicChannelVC()
+        let vc = Components.createChannelVC.init()
         vc.viewModel = .init()
         rootVC.show(vc, sender: self)
     }
@@ -29,20 +29,20 @@ open class NewChannelRouter: Router<CreateNewChannelVC> {
 
 open class SelectChannelMembersRouter: Router<SelectChannelMembersVC> {
     open func showCreatePrivateChannel() {
-        let vc = CreatePrivateChannelVC()
+        let vc = Components.createGroupVC.init()
         vc.viewModel = .init(users: rootVC.selectMemberViewModel.selectedUsers)
         rootVC.show(vc, sender: self)
     }
 }
 
-open class CreatePrivateChannelRouter: Router<CreatePrivateChannelVC> {
+open class CreatePrivateChannelRouter: Router<CreateGroupVC> {
     open func showChannel(_ channel: ChatChannel) {
         ChannelListRouter.showChannel(channel)
         rootVC.dismiss(animated: true)
     }
 }
 
-open class CreatePublicChannelRouter: Router<CreatePublicChannelVC> {
+open class CreatePublicChannelRouter: Router<CreateChannelVC> {
     func showAddMember(channel: ChatChannel) {
         let vc = ChannelAddMembersVC()
         vc.addMembersViewModel = ChannelAddMembersVM(channel: channel)

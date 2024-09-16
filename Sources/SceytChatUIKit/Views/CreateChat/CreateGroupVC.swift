@@ -1,5 +1,5 @@
 //
-//  CreatePrivateChannelVC.swift
+//  CreateGroupVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class CreatePrivateChannelVC: ViewController,
+open class CreateGroupVC: ViewController,
     UITableViewDelegate, UITableViewDataSource,
     UITextViewDelegate
 {
@@ -25,7 +25,7 @@ open class CreatePrivateChannelVC: ViewController,
         return $0.withoutAutoresizingMask
     }(UITableView())
     
-    lazy var profileView = CreatePrivateChannelProfileView()
+    lazy var profileView = Components.createGroupProfileView.init()
         .withoutAutoresizingMask
     
     var textViewHeightConstraint: NSLayoutConstraint?
@@ -39,7 +39,7 @@ open class CreatePrivateChannelVC: ViewController,
                                                             action: #selector(createAction(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
         tableView.register(Components.createChannelUserCell.self)
-        tableView.register(Components.createChannelHeaderView.self)
+        tableView.register(Components.separatorHeaderView.self)
         
         profileView.subjectField.publisher(for: .editingDidEndOnExit).sink { [unowned self] _ in
             profileView.descriptionField.becomeFirstResponder()
@@ -186,11 +186,11 @@ open class CreatePrivateChannelVC: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        Components.createChannelHeaderView.Layouts.height
+        Components.separatorHeaderView.Layouts.height
     }
     
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        tableView.dequeueReusableHeaderFooterView(Components.createChannelHeaderView.self)
+        tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
     }
     
     open func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -224,7 +224,7 @@ open class CreatePrivateChannelVC: ViewController,
     }
 }
 
-extension CreatePrivateChannelVC {
+extension CreateGroupVC {
     enum Sections: Int, CaseIterable {
         case user
     }

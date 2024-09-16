@@ -1,5 +1,5 @@
 //
-//  CreatePublicChannelVC.swift
+//  CreateChannelVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,14 +8,15 @@
 
 import UIKit
 
-open class CreatePublicChannelVC: ViewController, UITextViewDelegate {
+
+open class CreateChannelVC: ViewController, UITextViewDelegate {
     
     open var viewModel: CreatePublicChannelVM!
     open lazy var router = CreatePublicChannelRouter(rootVC: self)
     
     open var channelAvatarImage: UIImage?
     
-    open lazy var profileView = CreatePublicChannelProfileView()
+    open lazy var profileView = Components.createChannelProfileView.init()
         .withoutAutoresizingMask
     
     private var textViewHeightConstraint: NSLayoutConstraint?

@@ -41,10 +41,10 @@ public enum SCTUIKitComponents {
     public static var channelInfoOptionCell: ChannelInfoVC.OptionCell.Type = ChannelInfoVC.OptionCell.self
     public static var channelInfoContainerCell: ChannelInfoVC.ContainerCell.Type = ChannelInfoVC.ContainerCell.self
     
-    public static var channelProfileEditVC: ChannelProfileEditVC.Type = ChannelProfileEditVC.self
-    public static var channelProfileEditAvatarCell: ChannelProfileEditAvatarCell.Type = ChannelProfileEditAvatarCell.self
-    public static var channelProfileEditFieldCell: ChannelProfileEditFieldCell.Type = ChannelProfileEditFieldCell.self
-    public static var channelProfileEditURICell: ChannelProfileEditURICell.Type = ChannelProfileEditURICell.self
+    public static var editChannelVC: EditChannelVC.Type = EditChannelVC.self
+    public static var editChannelAvatarCell: EditChannelVC.AvatarCell.Type = EditChannelVC.AvatarCell.self
+    public static var editChannelTextFieldCell: EditChannelVC.TextFieldCell.Type = EditChannelVC.TextFieldCell.self
+    public static var editChannelURICell: EditChannelVC.URICell.Type = EditChannelVC.URICell.self
 
     public static var channelProfileEditVM: ChannelProfileEditVM.Type = ChannelProfileEditVM.self
 
@@ -65,7 +65,7 @@ public enum SCTUIKitComponents {
     public static var channelInfoFileCell: ChannelInfoVC.FileCell.Type = ChannelInfoVC.FileCell.self
     public static var channelInfoLinkCell: ChannelInfoVC.LinkCell.Type = ChannelInfoVC.LinkCell.self
     public static var channelInfoVoiceCell: ChannelInfoVC.VoiceCell.Type = ChannelInfoVC.VoiceCell.self
-    public static var channelAvatarVC: ChannelAvatarVC.Type = ChannelAvatarVC.self
+    public static var imagePreviewVC: ImagePreviewVC.Type = ImagePreviewVC.self
     public static var channelAvatarVM: ChannelAvatarVM.Type = ChannelAvatarVM.self
 
     
@@ -100,17 +100,20 @@ public enum SCTUIKitComponents {
     public static var messageInfoMessageCell: MessageInfoVC.MessageCell.Type = MessageInfoVC.MessageCell.self
     public static var messageInfoMarkerCell: MessageInfoVC.MarkerCell.Type = MessageInfoVC.MarkerCell.self
     
-    public static var channelForwardVC: ChannelForwardVC.Type = ChannelForwardVC.self
+    public static var forwardVC: ForwardVC.Type = ForwardVC.self
     public static var channelForwardVM: ChannelForwardVM.Type = ChannelForwardVM.self
     public static var channelForwardRouter: ChannelForwardRouter.Type = ChannelForwardRouter.self
 
     public static var channelSearchController: ChannelSearchController.Type = ChannelSearchController.self
     public static var channelSearchResultsVC: ChannelSearchResultsVC.Type = ChannelSearchResultsVC.self
 
-    public static var imagePickerVC: PhotosPickerVC.Type = PhotosPickerVC.self
-    public static var imagePickerCell: PhotosPickerCell.Type = PhotosPickerCell.self
-    public static var imagePickerCollectionView: PhotosPickerCollectionView.Type = PhotosPickerCollectionView.self
-    public static var imagePickerCollectionViewLayout: PhotosPickerCollectionViewLayout.Type = PhotosPickerCollectionViewLayout.self
+    public static var mediaPickerVC: MediaPickerVC.Type = MediaPickerVC.self
+    public static var mediaPickerFooterView: MediaPickerVC.FooterView.Type = MediaPickerVC.FooterView.self
+    public static var mediaPickerAttachButton: MediaPickerVC.AttachButton.Type = MediaPickerVC.AttachButton.self
+    
+    public static var mediaPickerCell: MediaPickerVC.MediaCell.Type = MediaPickerVC.MediaCell.self
+    public static var mediaPickerCollectionView: MediaPickerVC.MediaPickerCollectionView.Type = MediaPickerVC.MediaPickerCollectionView.self
+    public static var mediaPickerCollectionViewLayout: MediaPickerVC.MediaPickerCollectionViewLayout.Type = MediaPickerVC.MediaPickerCollectionViewLayout.self
     
     public static var imageCropperVC: ImageCropperVC.Type = ImageCropperVC.self
     public static var imageCropperVM: ImageCropperVM.Type = ImageCropperVM.self
@@ -122,13 +125,14 @@ public enum SCTUIKitComponents {
     public static var checkBoxView: CheckBoxView.Type = CheckBoxView.self
     public static var circleImageView: CircleImageView.Type = CircleImageView.self
     
-    public static var previewerNavigationController: PreviewerNavigationController.Type = PreviewerNavigationController.self
-    public static var previewerCarouselVC: PreviewerCarouselVC.Type = PreviewerCarouselVC.self
-    public static var previewerVC: PreviewerVC.Type = PreviewerVC.self
+    public static var mediaPreviewerNavigationController: MediaPreviewerNavigationController.Type = MediaPreviewerNavigationController.self
+    public static var mediaPreviewerCarouselVC: MediaPreviewerCarouselVC.Type = MediaPreviewerCarouselVC.self
+    
+    public static var mediaPreviewerVC: MediaPreviewerVC.Type = MediaPreviewerVC.self
     public static var previewerRouter: PreviewerRouter.Type = PreviewerRouter.self
     public static var previewerVM: PreviewerVM.Type = PreviewerVM.self
-    public static var previewerImageView: PreviewerImageView.Type = PreviewerImageView.self
-    public static var previewerScrollView: PreviewerScrollView.Type = PreviewerScrollView.self
+    public static var mediaPreviewerImageView: MediaPreviewerImageView.Type = MediaPreviewerImageView.self
+    public static var mediaPreviewerScrollView: MediaPreviewerScrollView.Type = MediaPreviewerScrollView.self
     
     public static var emojiVC: EmojiVC.Type = EmojiVC.self // reactions popup
     public static var emojiListVC: EmojiListVC.Type = EmojiListVC.self
@@ -141,12 +145,12 @@ public enum SCTUIKitComponents {
     public static var reactionPageVC: ReactionVC.Type = ReactionVC.self
     public static var reactionScoreCell: ReactionScoreCell.Type = ReactionScoreCell.self
     
-    public static var createNewChannelVC: CreateNewChannelVC.Type = CreateNewChannelVC.self
+    public static var startChatVC: StartChatVC.Type = StartChatVC.self
     public static var createNewChannelVM: CreateNewChannelVM.Type = CreateNewChannelVM.self
-    public static var createChatActionsView: CreateChatActionsView.Type = CreateChatActionsView.self
+    public static var startChatActionsView: StartChatVC.ActionsView.Type = StartChatVC.ActionsView.self
     public static var channelUserCell: ChannelUserCell.Type = ChannelUserCell.self
     public static var createChannelUserCell: CreateChannelUserCell.Type = CreateChannelUserCell.self
-    public static var createChannelHeaderView: CreateChannelHeaderView.Type = CreateChannelHeaderView.self
+    public static var separatorHeaderView: SeparatorHeaderView.Type = SeparatorHeaderView.self
 
     public static var textLabel: TextLabel.Type = TextLabel.self
     
@@ -193,10 +197,10 @@ public enum SCTUIKitComponents {
     public static var waveformView: WaveformView.Type = WaveformView.self
     
     public static var channelAddMembersVC: ChannelAddMembersVC.Type = ChannelAddMembersVC.self
-    public static var createPrivateChannelProfileView: CreatePrivateChannelProfileView.Type = CreatePrivateChannelProfileView.self
-    public static var createPrivateChannelVC: CreatePrivateChannelVC.Type = CreatePrivateChannelVC.self
-    public static var createPublicChannelProfileView: CreatePublicChannelProfileView.Type = CreatePublicChannelProfileView.self
-    public static var createPublicChannelVC: CreatePublicChannelVC.Type = CreatePublicChannelVC.self
+    public static var createGroupProfileView: CreateGroupVC.ProfileView.Type = CreateGroupVC.ProfileView.self
+    public static var createGroupVC: CreateGroupVC.Type = CreateGroupVC.self
+    public static var createChannelProfileView: CreateChannelVC.ProfileView.Type = CreateChannelVC.ProfileView.self
+    public static var createChannelVC: CreateChannelVC.Type = CreateChannelVC.self
     public static var selectChannelMembersVC: SelectChannelMembersVC.Type = SelectChannelMembersVC.self
     public static var selectedUserListView: SelectedUserListView.Type = SelectedUserListView.self
     public static var selectedChannelListView: SelectedChannelListView.Type = SelectedChannelListView.self

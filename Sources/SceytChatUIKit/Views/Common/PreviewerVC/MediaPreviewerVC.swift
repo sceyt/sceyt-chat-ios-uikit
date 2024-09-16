@@ -1,5 +1,5 @@
 //
-//  PreviewerVC.swift
+//  MediaPreviewerVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -10,7 +10,7 @@ import AVFoundation
 import SceytChat
 import UIKit
 
-open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
+open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
     open lazy var router = Components.previewerRouter
         .init(rootVC: self)
     
@@ -43,7 +43,7 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
     open lazy var playPauseButton = UIButton()
         .withoutAutoresizingMask
     
-    open lazy var scrollView = PreviewerScrollView(contentMode: imageContentMode)
+    open lazy var scrollView = MediaPreviewerScrollView(contentMode: imageContentMode)
         .withoutAutoresizingMask
     
     public var imageView: UIImageView { scrollView.imageView }
@@ -74,8 +74,8 @@ open class PreviewerVC: ViewController, UIGestureRecognizerDelegate {
         return carouselVC?.backgroundView
     }
     
-    open var carouselVC: PreviewerCarouselVC? {
-        super.parent as? PreviewerCarouselVC
+    open var carouselVC: MediaPreviewerCarouselVC? {
+        super.parent as? MediaPreviewerCarouselVC
     }
     
     // MARK: Layout Constraints

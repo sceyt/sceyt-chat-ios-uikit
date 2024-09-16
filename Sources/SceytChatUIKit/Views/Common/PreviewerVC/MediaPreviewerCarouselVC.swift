@@ -1,5 +1,5 @@
 //
-//  PreviewerCarouselVC.swift
+//  MediaPreviewerCarouselVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,14 +8,14 @@
 
 import UIKit
 
-open class PreviewerCarouselVC: UIPageViewController,
+open class MediaPreviewerCarouselVC: UIPageViewController,
     UIPageViewControllerDataSource,
     UIPageViewControllerDelegate
 {
     public weak var initialSourceView: UIImageView?
     
     open var sourceView: UIImageView? {
-        guard let vc = viewControllers?.first as? PreviewerVC else {
+        guard let vc = viewControllers?.first as? MediaPreviewerVC else {
             return nil
         }
         return initialIndex == vc.viewModel.index ? initialSourceView : nil
@@ -24,7 +24,7 @@ open class PreviewerCarouselVC: UIPageViewController,
     public var sourceFrameRelativeToWindow: CGRect?
     
     open var targetView: UIImageView? {
-        guard let vc = viewControllers?.first as? PreviewerVC else {
+        guard let vc = viewControllers?.first as? MediaPreviewerVC else {
             return nil
         }
         return vc.targetView
@@ -90,7 +90,7 @@ open class PreviewerCarouselVC: UIPageViewController,
         target: self,
         action: #selector(shareButtonAction(_:)))
     
-    public let appearance = Components.previewerVC.appearance
+    public let appearance = Components.mediaPreviewerVC.appearance
     
     open func setup() {
         navigationItem.leftBarButtonItem = backButton
@@ -138,7 +138,7 @@ open class PreviewerCarouselVC: UIPageViewController,
         if let previewDataSource = previewDataSource,
            let previewItem = previewDataSource.previewItem(at: initialIndex)
         {
-            let initialVC = Components.previewerVC.init()
+            let initialVC = Components.mediaPreviewerVC.init()
             initialVC.imageContentMode = imageContentMode
             initialVC.viewModel = Components.previewerVM
                 .init(
@@ -154,7 +154,7 @@ open class PreviewerCarouselVC: UIPageViewController,
     override open func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         if isBeingDismissed,
-           let vc = viewControllers?.first as? PreviewerVC,
+           let vc = viewControllers?.first as? MediaPreviewerVC,
            initialIndex != vc.viewModel.index
         {
             initialSourceView?.alpha = 1.0
@@ -168,7 +168,7 @@ open class PreviewerCarouselVC: UIPageViewController,
     
     @objc
     open func shareButtonAction(_ sender: UIBarButtonItem) {
-        (viewControllers?.first as? PreviewerVC)?.shareButtonAction(sender)
+        (viewControllers?.first as? MediaPreviewerVC)?.shareButtonAction(sender)
     }
     
     override open var preferredStatusBarStyle: UIStatusBarStyle {
@@ -179,7 +179,7 @@ open class PreviewerCarouselVC: UIPageViewController,
         _ pageViewController: UIPageViewController,
         viewControllerBefore viewController: UIViewController) -> UIViewController?
     {
-        guard let vc = viewController as? PreviewerVC else { return nil }
+        guard let vc = viewController as? MediaPreviewerVC else { return nil }
         guard let previewDataSource = previewDataSource else { return nil }
         let index = vc.viewModel.index
         guard index <= (previewDataSource.numberOfImages - 2)
@@ -194,7 +194,7 @@ open class PreviewerCarouselVC: UIPageViewController,
         _ pageViewController: UIPageViewController,
         viewControllerAfter viewController: UIViewController) -> UIViewController?
     {
-        guard let vc = viewController as? PreviewerVC else { return nil }
+        guard let vc = viewController as? MediaPreviewerVC else { return nil }
         let index = vc.viewModel.index
         guard index > 0
         else {
@@ -204,10 +204,10 @@ open class PreviewerCarouselVC: UIPageViewController,
         return previewVC(for: index - 1)
     }
     
-    open func previewVC(for index: Int) -> PreviewerVC? {
+    open func previewVC(for index: Int) -> MediaPreviewerVC? {
         guard let previewItem = previewDataSource?.previewItem(at: index)
         else { return nil }
-        let vc = Components.previewerVC.init()
+        let vc = Components.mediaPreviewerVC.init()
         vc.viewModel = Components.previewerVM
             .init(
                 index: index,
@@ -233,7 +233,7 @@ open class PreviewerCarouselVC: UIPageViewController,
     
     private func resetPreviewVCs() {
         _ = viewControllers?
-            .compactMap { $0 as? PreviewerVC }
+            .compactMap { $0 as? MediaPreviewerVC }
             .map {
                 let item = $0.viewModel.previewItem
                 if let index = previewDataSource?.indexOfItem(item) {
