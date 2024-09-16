@@ -1,5 +1,5 @@
 //
-//  ComposerVC.swift
+//  InputVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,7 +10,7 @@ import Combine
 import UIKit
 import CoreText
 
-open class ComposerVC: ViewController, UITextViewDelegate {
+open class InputVC: ViewController, UITextViewDelegate {
     open lazy var addMediaButton = UIButton()
         .withoutAutoresizingMask
     
@@ -27,15 +27,15 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     open lazy var separatorViewCenter = UIView()
         .withoutAutoresizingMask
     
-    open lazy var mediaView = Components.composerMediaView
+    open lazy var mediaView = Components.inputMediaView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var inputTextView = Components.composerInputTextView
+    open lazy var inputTextView = Components.inputTextView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var actionView = Components.composerActionView
+    open lazy var actionView = Components.inputMessageActionsView
         .init()
         .withoutAutoresizingMask
     
@@ -51,7 +51,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     }
     public private(set) var nextState: State?
     
-    open lazy var recorderView = RecorderView { [weak self] in
+    open lazy var recorderView = VoiceRecorderView { [weak self] in
         guard let self else { return }
         switch $0 {
         case .noPermission:
@@ -71,7 +71,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         }
     }
     
-    open lazy var recordedView = RecordedView()
+    open lazy var recordedView = Components.inputVoiceRecordPlaybackView.init()
         .withoutAutoresizingMask
     
     open var shouldHideRecordButton = false {
@@ -87,13 +87,13 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     }
     
     public var canRunMentionUserLogic = true
-    open var mentionUserListVC: (() -> MentioningUserListVC)?
-    open weak var presentedMentionUserListVC: MentioningUserListVC?
+    open var mentionUserListVC: (() -> InputVC.MentionUsersListVC)?
+    open weak var presentedMentionUserListVC: InputVC.MentionUsersListVC?
     public var isPresentedMentionUserListVC: Bool {
         presentedMentionUserListVC != nil
     }
     
-    open lazy var router = Components.composerRouter
+    open lazy var router = Components.inputRouter
         .init(rootVC: self)
     
     open var mentionSymbol: String { SceytChatUIKit.shared.config.mentionSymbol }
@@ -178,7 +178,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
         addMediaButton.addTarget(self, action: #selector(addMediaButtonAction(_:)), for: .touchUpInside)
         sendButton.addTarget(self, action: #selector(sendButtonAction(_:)), for: .touchUpInside)
         
-        let longPress = UILongPressGestureRecognizer(target: recorderView, action: #selector(RecorderView.onLongPress))
+        let longPress = UILongPressGestureRecognizer(target: recorderView, action: #selector(Components.inputVoiceRecorderView.onLongPress))
         longPress.minimumPressDuration = 0.05
         recordButton.isUserInteractionEnabled = true
         recordButton.addGestureRecognizer(longPress)
@@ -688,7 +688,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             }
         }
         let titleAttributedString = NSMutableAttributedString(
-            string: L10n.Composer.reply + ": ",
+            string: L10n.Input.reply + ": ",
             attributes: [.font: appearance.actionReplyTitleFont ?? Fonts.regular.withSize(13)])
         titleAttributedString.append(
             .init(
@@ -780,7 +780,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
             }
         }
         let titleAttributedString = NSMutableAttributedString(
-            string: L10n.Composer.edit + ": ",
+            string: L10n.Input.edit + ": ",
             attributes: [.font: appearance.actionReplyTitleFont ?? Fonts.regular.withSize(12)])
         actionView.titleLabel.attributedText = titleAttributedString
         
@@ -1136,7 +1136,7 @@ open class ComposerVC: ViewController, UITextViewDelegate {
     }
 }
 
-public extension ComposerVC {
+public extension InputVC {
     enum Style {
         case small
         case large
@@ -1206,7 +1206,7 @@ public extension ComposerVC {
     
 }
 
-public extension ComposerVC {
+public extension InputVC {
     enum Layouts {
         public static var actionViewHeight: CGFloat = 56
         public static var recorderShadowBlur: CGFloat = 24

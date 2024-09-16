@@ -1,5 +1,5 @@
 //
-//  ComposerRouter.swift
+//  InputRouter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -15,7 +15,7 @@ public enum AttachmentPickerSource {
     case file
 }
 
-open class ComposerRouter: Router<ComposerVC> {
+open class InputRouter: Router<InputVC> {
     func showAttachmentAlert(sources: [AttachmentPickerSource], sourceView: UIView?, callback: @escaping (AttachmentPickerSource?) -> Void) {
         var actions = [SheetAction]()
         if sources.contains(.camera) {

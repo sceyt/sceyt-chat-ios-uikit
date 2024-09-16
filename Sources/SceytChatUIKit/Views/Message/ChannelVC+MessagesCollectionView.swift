@@ -33,9 +33,9 @@ public extension ChannelVC {
             clipsToBounds = true
             contentInsetAdjustmentBehavior = .always
             
-            register(Components.outgoingMessageCell)
-            register(Components.incomingMessageCell)
-            register(Components.messageSectionSeparatorView, kind: .header)
+            register(Components.channelOutgoingMessageCell)
+            register(Components.channelIncomingMessageCell)
+            register(Components.channelDateSeparatorView, kind: .header)
         }
         
         open var layout: ChannelVC.MessagesCollectionViewLayout {

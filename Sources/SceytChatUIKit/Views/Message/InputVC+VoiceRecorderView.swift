@@ -1,5 +1,5 @@
 //
-//  ComposerVC+RecorderView.swift
+//  InputVC+VoiceRecorderView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 19/03/2023.
@@ -9,148 +9,9 @@
 import AVFoundation
 import UIKit
 
-extension ComposerVC {
-    class MiniAudioPlayerView: View {
-        public lazy var appearance = ComposerVC.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
-        enum State {
-            case playing, stopped, paused
-        }
-        
-        var state = State.stopped {
-            didSet {
-                switch state {
-                case .stopped:
-                    button.setImage(.audioPlayerPlayGrey, for: [])
-                    waveformView.progress = 0
-                    displayDuration = 0
-                case .paused:
-                    button.setImage(.audioPlayerPlayGrey, for: [])
-                case .playing:
-                    button.setImage(.audioPlayerPauseGrey, for: [])
-                }
-            }
-        }
-                
-        private let button = {
-            $0.setContentHuggingPriority(.required, for: .horizontal)
-            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
-            return $0
-        }(UIButton())
-        
-        private let waveformView = WaveformView()
-        
-        private lazy var durationLabel = {
-            $0.setContentHuggingPriority(.required, for: .horizontal)
-            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
-            $0.textAlignment = .right
-            return $0
-        }(UILabel())
-        
-        private lazy var row = {
-            $0.setCustomSpacing(12, after: button)
-            return $0
-        }(UIStackView(row: button, waveformView, durationLabel))
-        
-        private let bg = UIView()
-        
-        override func setupAppearance() {
-            super.setupAppearance()
-            
-            backgroundColor = appearance.recorderBackgroundColor
-            layer.cornerRadius = 18
-            layer.masksToBounds = true
-            
-            bg.backgroundColor = appearance.recorderPlayerBackgroundColor
-            bg.layer.cornerRadius = 18
-            bg.layer.masksToBounds = true
-            
-            durationLabel.font = appearance.recorderDurationFont
-            durationLabel.textColor = appearance.recorderDurationColor
-            
-            button.setImage(.audioPlayerPlayGrey, for: [])
-        }
-        
-        override func setup() {
-            super.setup()
-            
-            button.addTarget(self, action: #selector(onTapPlay), for: .touchUpInside)
-        }
-        
-        override func setupLayout() {
-            super.setupLayout()
-            
-            addSubview(bg.withoutAutoresizingMask)
-            bg.pin(to: self)
-            
-            addSubview(row.withoutAutoresizingMask)
-            row.pin(to: self, anchors: [.leading(12), .trailing(-12), .top(8), .bottom(-8)])
-            
-            waveformView.resize(anchors: [.height(20)])
-            durationLabel.resize(anchors: [.width(38)])
-        }
-        
-        private var displayDuration: Double = 0 {
-            didSet {
-                durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(displayDuration)
-            }
-        }
-        
-        private var url: URL?
-        @discardableResult
-        func setup(url: URL, metadata: ChatMessage.Attachment.Metadata<[Int]>) -> Self {
-            self.url = url
-            
-            waveformView.progress = 0
-            waveformView.data = metadata.thumbnail.map { Float($0) }
-            displayDuration = CMTimeGetSeconds(AVPlayerItem(url: url).asset.duration)
-            return self
-        }
-        
-        func setDuration(duration: Double, progress: Double) {
-            displayDuration = duration
-            waveformView.progress = progress
-        }
-        
-        @objc
-        private func onTapPlay() {
-            switch state {
-            case .stopped:
-                displayDuration = 0
-                play()
-            case .playing:
-                pause()
-            case .paused:
-                play()
-            }
-        }
-        
-        func play() {
-            guard let url
-            else { return stop() }
-            
-            state = .playing
-            SimpleSinglePlayer.play(url, durationBlock: setDuration, stopBlock: stop)
-        }
-        
-        func pause() {
-            state = .paused
-            SimpleSinglePlayer.pause()
-        }
-        
-        func stop() {
-            state = .stopped
-            displayDuration = 0
-            waveformView.progress = 0
-        }
-    }
-    
-    open class RecorderView: View {
-        public lazy var appearance = ComposerVC.appearance {
+extension InputVC {
+    open class VoiceRecorderView: View {
+        public lazy var appearance = InputVC.appearance {
             didSet {
                 setupAppearance()
             }
@@ -186,22 +47,22 @@ extension ComposerVC {
                 switch state {
                 case .unlock:
                     var lockImage = UIImage.audioPlayerUnlock
-                    if ComposerVC.Layouts.recorderShadowBlur > 0 {
-                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: ComposerVC.Layouts.recorderShadowBlur)
+                    if InputVC.Layouts.recorderShadowBlur > 0 {
+                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputVC.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
                     self.micButton.setImage(.audioPlayerMicGreen, for: [])
                 case .lock:
                     var lockImage = UIImage.audioPlayerLock
-                    if ComposerVC.Layouts.recorderShadowBlur > 0 {
-                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: ComposerVC.Layouts.recorderShadowBlur)
+                    if InputVC.Layouts.recorderShadowBlur > 0 {
+                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputVC.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
                     self.micButton.setImage(.audioPlayerMicGreen, for: [])
                 case .locked:
                     var lockImage = UIImage.audioPlayerStop
-                    if ComposerVC.Layouts.recorderShadowBlur > 0 {
-                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: ComposerVC.Layouts.recorderShadowBlur)
+                    if InputVC.Layouts.recorderShadowBlur > 0 {
+                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputVC.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
                     self.micButton.setImage(.audioPlayerSendLarge, for: [])
@@ -210,8 +71,8 @@ extension ComposerVC {
                     self.micButton.setImage(.audioPlayerDelete, for: [])
                 case .recorded:
                     var lockImage = UIImage.audioPlayerUnlock
-                    if ComposerVC.Layouts.recorderShadowBlur > 0 {
-                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: ComposerVC.Layouts.recorderShadowBlur)
+                    if InputVC.Layouts.recorderShadowBlur > 0 {
+                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputVC.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
                     self.micButton.setImage(.audioPlayerMicGreen, for: [])
@@ -361,7 +222,7 @@ extension ComposerVC {
                 setState(.unlock, animated: false)
                 slidingView.state = .unlock
                 
-                lockButton.bottomAnchor.pin(to: micButton.topAnchor, constant: -8 + ComposerVC.Layouts.recorderShadowBlur)
+                lockButton.bottomAnchor.pin(to: micButton.topAnchor, constant: -8 + InputVC.Layouts.recorderShadowBlur)
                 lockButton.centerXAnchor.pin(to: micButton.centerXAnchor)
                 micButton.pin(to: self, anchors: [.trailing(9)])
                 micButton.centerYAnchor.pin(to: gestureView.centerYAnchor)
@@ -445,7 +306,7 @@ extension ComposerVC {
             guard let currentCenter
             else { return }
             micButton.center = currentCenter
-            lockButton.bottom = micButton.top - 8 + ComposerVC.Layouts.recorderShadowBlur
+            lockButton.bottom = micButton.top - 8 + InputVC.Layouts.recorderShadowBlur
         }
         
         private func reset(animated: Bool = true) {
@@ -495,9 +356,11 @@ extension ComposerVC {
             state = .recorded
         }
     }
-    
+}
+
+extension InputVC.VoiceRecorderView {
     private class SlidingView: View {
-        public lazy var appearance = ComposerVC.appearance {
+        public lazy var appearance = InputVC.appearance {
             didSet {
                 setupAppearance()
             }
@@ -610,9 +473,11 @@ extension ComposerVC {
             dotView.startAnimating()
         }
     }
-    
+}
+
+extension InputVC.VoiceRecorderView {
     private class DotView: View {
-        public lazy var appearance = ComposerVC.appearance {
+        public lazy var appearance = InputVC.appearance {
             didSet {
                 setupAppearance()
             }
@@ -643,87 +508,6 @@ extension ComposerVC {
             animation.repeatCount = .infinity
             animation.isRemovedOnCompletion = false
             layer.add(animation, forKey: "pulsating")
-        }
-    }
-    
-    open class RecordedView: View {
-        public lazy var appearance = ComposerVC.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
-        enum Event {
-            case send(url: URL, metadata: ChatMessage.Attachment.Metadata<[Int]>), cancel
-        }
-        
-        var onEvent: ((Event) -> Void)?
-        
-        private let cancelButton = {
-            $0.setImage(.audioPlayerCancel, for: [])
-            $0.setContentHuggingPriority(.required, for: .horizontal)
-            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
-            return $0
-        }(UIButton())
-        
-        private let audioPlayerView = MiniAudioPlayerView()
-        
-        private let sendButton = {
-            $0.setImage(.messageSendAction, for: [])
-            $0.imageView?.contentMode = .scaleAspectFit
-            $0.setContentHuggingPriority(.required, for: .horizontal)
-            $0.setContentCompressionResistancePriority(.required, for: .horizontal)
-            return $0
-        }(UIButton())
-        
-        private lazy var spacerColumn = UIStackView(column: UIView(), audioPlayerView, UIView(), spacing: 0, distribution: .equalSpacing)
-        private lazy var row = UIStackView(row: cancelButton, spacerColumn, sendButton, spacing: 0)
-        
-        override open func setupAppearance() {
-            super.setupAppearance()
-            
-            backgroundColor = appearance.recorderBackgroundColor
-        }
-        
-        override open func setup() {
-            super.setup()
-            
-            cancelButton.addTarget(self, action: #selector(onTapCancel), for: .touchUpInside)
-            sendButton.addTarget(self, action: #selector(onTapSend), for: .touchUpInside)
-        }
-        
-        override open func setupLayout() {
-            super.setupLayout()
-            
-            addSubview(row.withoutAutoresizingMask)
-            
-            row.pin(to: self)
-            sendButton.resize(anchors: [.height(52), .width(52)])
-            cancelButton.resize(anchors: [.height(52), .width(52)])
-        }
-        
-        private var url: URL!
-        private var metadata: ChatMessage.Attachment.Metadata<[Int]>!
-        
-        open func setup(url: URL, metadata: ChatMessage.Attachment.Metadata<[Int]>) {
-            self.url = url
-            self.metadata = metadata
-            audioPlayerView.setup(url: url, metadata: metadata)
-        }
-        
-        @objc
-        private func onTapCancel() {
-            SimpleSinglePlayer.stop()
-            onEvent?(.cancel)
-        }
-        
-        @objc
-        private func onTapSend() {
-            onEvent?(.send(url: url, metadata: metadata))
-        }
-        
-        open func pause() {
-            audioPlayerView.pause()
         }
     }
 }

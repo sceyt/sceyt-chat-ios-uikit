@@ -1,5 +1,5 @@
 //
-//  ChannelVC+SelectingView.swift
+//  InputVC+SelectedMessagesActionsView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 02/09/2023.
@@ -8,8 +8,8 @@
 
 import UIKit
 
-extension ChannelVC {
-    open class SelectingView: View {
+extension InputVC {
+    open class SelectedMessagesActionsView: View {
         private let buttonDelete = {
             $0.setImage(.chatDelete, for: [])
             $0.contentEdgeInsets = .init(top: 14, left: 16, bottom: 14, right: 16)

@@ -1,5 +1,5 @@
 //
-//  ChannelVC+BottomView.swift
+//  InputVC+CoverView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 20/10/2023.
@@ -8,8 +8,8 @@
 
 import UIKit
 
-extension ChannelVC {
-    open class BottomView: View {
+extension InputVC {
+    open class CoverView: View {
         open var icon: UIImage? {
             set {
                 iconView.image = newValue?.withRenderingMode(.alwaysTemplate)

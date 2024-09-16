@@ -464,12 +464,6 @@ internal enum L10n {
     ///   Copyright © 2022 Sceyt LLC. All rights reserved.
     internal static let on = L10n.tr("Localizable", "common.on", fallback: "On")
   }
-  internal enum Composer {
-    /// Edit message
-    internal static let edit = L10n.tr("Localizable", "composer.edit", fallback: "Edit message")
-    /// Reply
-    internal static let reply = L10n.tr("Localizable", "composer.reply", fallback: "Reply")
-  }
   internal enum Connection {
     internal enum State {
       /// Connected
@@ -517,6 +511,12 @@ internal enum L10n {
       /// Select More
       internal static let more = L10n.tr("Localizable", "imagePicker.manageAccess.more", fallback: "Select More")
     }
+  }
+  internal enum Input {
+    /// Edit message
+    internal static let edit = L10n.tr("Localizable", "input.edit", fallback: "Edit message")
+    /// Reply
+    internal static let reply = L10n.tr("Localizable", "input.reply", fallback: "Reply")
   }
   internal enum Link {
     /// Copy link

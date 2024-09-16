@@ -146,7 +146,7 @@ extension ChannelVC: AppearanceProviding {
     }
 }
 
-extension ChannelVC.TitleView: AppearanceProviding {
+extension ChannelVC.HeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -160,7 +160,7 @@ extension ChannelVC.TitleView: AppearanceProviding {
     }
 }
 
-extension ChannelUnreadCountView: AppearanceProviding {
+extension ChannelVC.ScrollDownView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -273,7 +273,7 @@ extension MessageCell: AppearanceProviding {
     }
 }
 
-extension ComposerVC: AppearanceProviding {
+extension InputVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -321,7 +321,7 @@ extension ComposerVC: AppearanceProviding {
     }
 }
 
-extension ComposerVC.InputTextView: AppearanceProviding {
+extension InputVC.InputTextView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -563,7 +563,7 @@ extension CircularProgressView: AppearanceProviding {
     }
 }
 
-extension MentioningUserListVC: AppearanceProviding {
+extension InputVC.MentionUsersListVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -575,7 +575,7 @@ extension MentioningUserListVC: AppearanceProviding {
     }
 }
 
-extension MentioningUserViewCell: AppearanceProviding {
+extension InputVC.MentionUsersListVC.MentionUserCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -746,7 +746,7 @@ extension ChannelAvatarVC: AppearanceProviding {
     }
 }
 
-extension ChannelVC.SelectingView: AppearanceProviding {
+extension InputVC.SelectedMessagesActionsView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1034,7 +1034,7 @@ extension ChannelCreatedView: AppearanceProviding {
     }
 }
 
-extension ChannelVC.BottomView: AppearanceProviding {
+extension InputVC.CoverView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1048,7 +1048,7 @@ extension ChannelVC.BottomView: AppearanceProviding {
     }
 }
 
-extension ChannelVC.SearchControlsView: AppearanceProviding {
+extension InputVC.MessageSearchControlsView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {

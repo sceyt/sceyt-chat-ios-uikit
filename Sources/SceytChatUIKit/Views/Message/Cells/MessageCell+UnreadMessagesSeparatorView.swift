@@ -1,5 +1,5 @@
 //
-//  MessageCell+UnreadView.swift
+//  MessageCell+UnreadMessagesSeparatorView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,7 +10,7 @@ import UIKit
 
 extension MessageCell {
 
-    open class UnreadView: View, MessageCellMeasurable {
+    open class UnreadMessagesSeparatorView: View, MessageCellMeasurable {
         enum Layouts {
             static public var textHeight: CGFloat = 24
             static public var verticalPadding: CGFloat = 8

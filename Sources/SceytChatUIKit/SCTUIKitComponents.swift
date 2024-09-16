@@ -25,11 +25,11 @@ public enum SCTUIKitComponents {
     public static var channelRouter: ChannelRouter.Type = ChannelRouter.self
     public static var channelMessagesCollectionView: ChannelVC.MessagesCollectionView.Type = ChannelVC.MessagesCollectionView.self
     public static var channelMessagesCollectionViewLayout: ChannelVC.MessagesCollectionViewLayout.Type = ChannelVC.MessagesCollectionViewLayout.self
-    public static var channelUnreadCountView: ChannelUnreadCountView.Type = ChannelUnreadCountView.self
-    public static var channelTitleView: ChannelVC.TitleView.Type = ChannelVC.TitleView.self
-    public static var channelBottomView: ChannelVC.BottomView.Type = ChannelVC.BottomView.self
+    public static var channelScrollDownView: ChannelVC.ScrollDownView.Type = ChannelVC.ScrollDownView.self
+    public static var channelHeaderView: ChannelVC.HeaderView.Type = ChannelVC.HeaderView.self
+    public static var inputCoverView: InputVC.CoverView.Type = InputVC.CoverView.self
     public static var channelDisplayedTimer: ChannelVC.DisplayedTimer.Type = ChannelVC.DisplayedTimer.self
-    public static var channelSearchControlsView: ChannelVC.SearchControlsView.Type = ChannelVC.SearchControlsView.self
+    public static var inputMessageSearchControlsView: InputVC.MessageSearchControlsView.Type = InputVC.MessageSearchControlsView.self
 
     public static var channelProfileVC: ChannelProfileVC.Type = ChannelProfileVC.self
     public static var profileTableView: ProfileTableView.Type = ProfileTableView.self
@@ -53,7 +53,7 @@ public enum SCTUIKitComponents {
     public static var channelMemberListRouter: ChannelMemberListRouter.Type = ChannelMemberListRouter.self
     public static var channelMemberCell: ChannelMemberCell.Type = ChannelMemberCell.self
     public static var channelMemberAddCell: ChannelMemberAddCell.Type = ChannelMemberAddCell.self
-    public static var channelSelectingView: ChannelVC.SelectingView.Type = ChannelVC.SelectingView.self
+    public static var inputSelectedMessagesActionsView: InputVC.SelectedMessagesActionsView.Type = InputVC.SelectedMessagesActionsView.self
 
     
     public static var channelAttachmentListView: ChannelAttachmentListView.Type = ChannelAttachmentListView.self
@@ -75,25 +75,26 @@ public enum SCTUIKitComponents {
     
     public static var segmentedControlView: SegmentedControlView.Type = SegmentedControlView.self
     
-    public static var composerVC: ComposerVC.Type = ComposerVC.self
-    public static var composerRouter: ComposerRouter.Type = ComposerRouter.self
-    public static var composerMediaView: ComposerVC.MediaView.Type = ComposerVC.MediaView.self
-    public static var composerInputTextView: ComposerVC.InputTextView.Type = ComposerVC.InputTextView.self
-    public static var composerActionView: ComposerVC.ActionView.Type = ComposerVC.ActionView.self
-    public static var composerRecorderView: ComposerVC.RecorderView.Type = ComposerVC.RecorderView.self
-    public static var composerRecordedView: ComposerVC.RecordedView.Type = ComposerVC.RecordedView.self
-    public static var composerThumbnailView: ComposerVC.ThumbnailView.Type = ComposerVC.ThumbnailView.self
-    public static var composerThumbnailViewMediaView: ComposerVC.ThumbnailView.MediaView.Type = ComposerVC.ThumbnailView.MediaView.self
-    public static var composerThumbnailViewFileView: ComposerVC.ThumbnailView.FileView.Type = ComposerVC.ThumbnailView.FileView.self
-    public static var composerThumbnailViewTimeLabel: ComposerVC.ThumbnailView.TimeLabel.Type = ComposerVC.ThumbnailView.TimeLabel.self
+    public static var inputVC: InputVC.Type = InputVC.self
+    public static var inputRouter: InputRouter.Type = InputRouter.self
+    public static var inputMediaView: InputVC.MediaView.Type = InputVC.MediaView.self
+    public static var inputTextView: InputVC.InputTextView.Type = InputVC.InputTextView.self
+    public static var inputMessageActionsView: InputVC.MessageActionsView.Type = InputVC.MessageActionsView.self
+    public static var inputVoiceRecorderView: InputVC.VoiceRecorderView.Type = InputVC.VoiceRecorderView.self
+    public static var inputVoiceRecordPlaybackView: InputVC.VoiceRecordPlaybackView.Type = InputVC.VoiceRecordPlaybackView.self
+    public static var inputVoiceRecordPlaybackPlayerView: InputVC.VoiceRecordPlaybackView.PlayerView.Type = InputVC.VoiceRecordPlaybackView.PlayerView.self
+    public static var inputThumbnailView: InputVC.ThumbnailView.Type = InputVC.ThumbnailView.self
+    public static var inputThumbnailViewMediaView: InputVC.ThumbnailView.MediaView.Type = InputVC.ThumbnailView.MediaView.self
+    public static var inputThumbnailViewFileView: InputVC.ThumbnailView.FileView.Type = InputVC.ThumbnailView.FileView.self
+    public static var inputThumbnailViewTimeLabel: InputVC.ThumbnailView.TimeLabel.Type = InputVC.ThumbnailView.TimeLabel.self
     
-    public static var mentioningUserListVC: MentioningUserListVC.Type = MentioningUserListVC.self
+    public static var inputMentionUsersListVC: InputVC.MentionUsersListVC.Type = InputVC.MentionUsersListVC.self
     public static var mentioningUserListVM: MentioningUserListVM.Type = MentioningUserListVM.self
-    public static var mentioningUserViewCell: MentioningUserViewCell.Type = MentioningUserViewCell.self
+    public static var inputMentionUsersCell: InputVC.MentionUsersListVC.MentionUserCell.Type = InputVC.MentionUsersListVC.MentionUserCell.self
     
-    public static var outgoingMessageCell: OutgoingMessageCell.Type = OutgoingMessageCell.self
-    public static var incomingMessageCell: IncomingMessageCell.Type = IncomingMessageCell.self
-    public static var messageSectionSeparatorView: MessageSectionSeparatorView.Type = MessageSectionSeparatorView.self
+    public static var channelOutgoingMessageCell: ChannelVC.OutgoingMessageCell.Type = ChannelVC.OutgoingMessageCell.self
+    public static var channelIncomingMessageCell: ChannelVC.IncomingMessageCell.Type = ChannelVC.IncomingMessageCell.self
+    public static var channelDateSeparatorView: ChannelVC.DateSeparatorView.Type = ChannelVC.DateSeparatorView.self
     
     public static var messageInfoVC: MessageInfoVC.Type = MessageInfoVC.self
     public static var messageInfoVM: MessageInfoVM.Type = MessageInfoVM.self
@@ -209,6 +210,7 @@ public enum SCTUIKitComponents {
     public static var messageCellAttachmentImageView: MessageCell.AttachmentImageView.Type = MessageCell.AttachmentImageView.self
     public static var messageCellAttachmentVideoView: MessageCell.AttachmentVideoView.Type = MessageCell.AttachmentVideoView.self
     public static var messageCellAttachmentView: MessageCell.AttachmentView.Type = MessageCell.AttachmentView.self
+    public static var messageCellAttachmentStackView: MessageCell.AttachmentStackView.Type = MessageCell.AttachmentStackView.self
     public static var messageCellInfoView: MessageCell.InfoView.Type = MessageCell.InfoView.self
     public static var messageCellInfoViewBackgroundView: MessageCell.InfoViewBackgroundView.Type = MessageCell.InfoViewBackgroundView.self
     public static var messageCellForwardView: MessageCell.ForwardView.Type = MessageCell.ForwardView.self
@@ -219,7 +221,7 @@ public enum SCTUIKitComponents {
     public static var messageCellReplyView: MessageCell.ReplyView.Type = MessageCell.ReplyView.self
     public static var messageCellReplyCountView: MessageCell.ReplyCountView.Type = MessageCell.ReplyCountView.self
     public static var messageCellReplyArrowView: MessageCell.ReplyArrowView.Type = MessageCell.ReplyArrowView.self
-    public static var messageCellUnreadView: MessageCell.UnreadView.Type = MessageCell.UnreadView.self
+    public static var messageCellUnreadMessagesSeparatorView: MessageCell.UnreadMessagesSeparatorView.Type = MessageCell.UnreadMessagesSeparatorView.self
     
     
     public static var actionController: ActionController.Type = ActionController.self

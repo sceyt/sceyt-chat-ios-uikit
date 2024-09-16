@@ -24,7 +24,7 @@ open class MessageCell: CollectionViewCell,
     open lazy var containerView = UIView()
         .withoutAutoresizingMask
     
-    open lazy var unreadView = Components.messageCellUnreadView
+    open lazy var unreadMessagesSeparatorView = Components.messageCellUnreadMessagesSeparatorView
         .init()
         .withoutAutoresizingMask
     
@@ -50,7 +50,7 @@ open class MessageCell: CollectionViewCell,
         .withoutAutoresizingMask
         .contentMode(.scaleAspectFill)
     
-    open lazy var attachmentView = AttachmentStackView
+    open lazy var attachmentView = Components.messageCellAttachmentStackView
         .init()
         .withoutAutoresizingMask
     
@@ -97,7 +97,7 @@ open class MessageCell: CollectionViewCell,
     open override func setup() {
         super.setup()
         
-        unreadView.isHidden = true
+        unreadMessagesSeparatorView.isHidden = true
         replyCountView.addTarget(
             self,
             action: #selector(replyCountAction(_:)),
@@ -171,7 +171,7 @@ open class MessageCell: CollectionViewCell,
         containerView.addSubview(avatarView)
         containerView.addSubview(reactionTotalView)
         containerView.addSubview(replyCountView)
-        contentView.addSubview(unreadView)
+        contentView.addSubview(unreadMessagesSeparatorView)
         contentView.addSubview(replyIcon)
         contentView.addSubview(checkBoxView)
         if data != nil {
@@ -237,7 +237,7 @@ open class MessageCell: CollectionViewCell,
         guard let data = data else { return }
         let message = data.message
         showSenderInfo = data.showUserInfo
-        unreadView.isHidden = !data.isLastDisplayedMessage
+        unreadMessagesSeparatorView.isHidden = !data.isLastDisplayedMessage
         textLabel.attributedText = data.attributedView.content
         infoView.data = data
         nameLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
@@ -275,9 +275,9 @@ open class MessageCell: CollectionViewCell,
                                                     .trailing(-data.contentInsets.right),
                                                     .top(data.contentInsets.top)
                                                    ])
-            contentConstraints! += [containerView.bottomAnchor.pin(to: unreadView.topAnchor)]
-            contentConstraints! += unreadView.pin(to: contentView, anchors: [.leading(data.contentInsets.left), .trailing(-data.contentInsets.right)])
-            contentConstraints! += unreadView.pin(to: contentView, anchors: [.bottom(-data.contentInsets.bottom)])
+            contentConstraints! += [containerView.bottomAnchor.pin(to: unreadMessagesSeparatorView.topAnchor)]
+            contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.leading(data.contentInsets.left), .trailing(-data.contentInsets.right)])
+            contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.bottom(-data.contentInsets.bottom)])
             contentConstraints! += layoutConstraints(layout: data)
             contentConstraints! += [replyIcon.trailingAnchor.pin(to: contentView.trailingAnchor, constant: 44)]
             contentConstraints! += [replyIcon.bottomAnchor.pin(to: bubbleView.bottomAnchor)]

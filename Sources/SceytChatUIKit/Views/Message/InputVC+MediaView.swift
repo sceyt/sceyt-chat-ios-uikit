@@ -1,5 +1,5 @@
 //
-//  ComposerVC+MediaView.swift
+//  InputVC+MediaView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,11 +10,11 @@ import CoreServices
 import Photos
 import UIKit
 
-extension ComposerVC {
+extension InputVC {
     open class MediaView: View {
         public static var scale: CGFloat = SceytChatUIKit.shared.config.displayScale
         
-        public lazy var appearance = ComposerVC.appearance {
+        public lazy var appearance = InputVC.appearance {
             didSet {
                 setupAppearance()
             }
@@ -77,18 +77,18 @@ extension ComposerVC {
             let v: View!
             switch view.type {
             case .file:
-                let fv = ThumbnailView.FileView()
+                let fv = Components.inputThumbnailViewFileView.init()
                     .withoutAutoresizingMask
                 fv.imageView.image = view.thumbnail
                 v = fv
             default:
-                let mv = ThumbnailView.MediaView()
+                let mv = Components.inputThumbnailViewMediaView.init()
                     .withoutAutoresizingMask
                 mv.imageView.image = view.thumbnail
                 v = mv
             }
             _onUpdate?()
-            let tv = Components.composerThumbnailView
+            let tv = Components.inputThumbnailView
                 .init(containerView: v)
                 .withoutAutoresizingMask
             if index != -1, stackView.arrangedSubviews.indices.contains(index) {
@@ -165,174 +165,6 @@ extension ComposerVC {
             imageRequestIDs.forEach {
                 imageManager.cancelImageRequest($0)
             }
-        }
-    }
-}
-
-extension ComposerVC {
-    open class ThumbnailView: View {
-        public lazy var appearance = ComposerVC.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-
-        open lazy var closeButton = UIButton()
-            .withoutAutoresizingMask
-                
-        public let containerView: View
-        
-        public required init(containerView: View) {
-            self.containerView = containerView
-            super.init(frame: .zero)
-        }
-        
-        @available(*, unavailable)
-        public required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-        
-        override open func setup() {
-            super.setup()
-            closeButton.setImage(Images.closeCircle, for: .normal)
-            closeButton.addTarget(self, action: #selector(deleteAction), for: .touchUpInside)
-        }
-
-        override open func setupAppearance() {
-            super.setupAppearance()
-        }
-
-        override open func setupLayout() {
-            super.setupLayout()
-            addSubview(containerView)
-            addSubview(closeButton)
-            containerView.pin(to: self, anchors: [.leading(0), .top(6), .trailing(-6), .bottom()])
-            closeButton.pin(to: self, anchors: [.top(), .trailing()])
-        }
-
-        open var onDelete: ((ThumbnailView) -> Void)?
-
-        @objc
-        open func deleteAction() {
-            onDelete?(self)
-        }
-    }
-}
-
-extension ComposerVC.ThumbnailView {
-    open class MediaView: View {
-        open lazy var imageView = UIImageView()
-            .withoutAutoresizingMask
-            .contentMode(.scaleAspectFill)
-        
-        open lazy var timeLabel = TimeLabel()
-            .withoutAutoresizingMask
-        
-        override open func setup() {
-            super.setup()
-            imageView.clipsToBounds = true
-            imageView.layer.cornerRadius = 8
-            timeLabel.isHidden = true
-        }
-        
-        override open func setupLayout() {
-            super.setupLayout()
-            addSubview(imageView)
-            addSubview(timeLabel)
-            imageView.pin(to: self)
-            timeLabel.pin(to: self, anchors: [.leading(0, .greaterThanOrEqual), .bottom(-4), .trailing(-4)])
-            imageView.heightAnchor.pin(to: imageView.widthAnchor)
-        }
-    }
-}
-
-extension ComposerVC.ThumbnailView {
-    open class FileView: View {
-        public lazy var appearance = ComposerVC.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
-        open lazy var imageView = UIImageView()
-            .withoutAutoresizingMask
-            .contentMode(.scaleAspectFit)
-        
-        open lazy var titleLabel = UILabel()
-            .withoutAutoresizingMask
-        
-        open lazy var subtitleLabel = UILabel()
-            .withoutAutoresizingMask
-        
-        override open func setup() {
-            super.setup()
-            clipsToBounds = true
-            layer.cornerRadius = 8
-            titleLabel.lineBreakMode = .byTruncatingMiddle
-        }
-        
-        override open func setupAppearance() {
-            super.setupAppearance()
-            backgroundColor = appearance.fileAttachmentBackgroundColor
-            titleLabel.textColor = appearance.fileAttachmentTitleTextColor
-            titleLabel.font = appearance.fileAttachmentTitleTextFont
-            subtitleLabel.textColor = appearance.fileAttachmentSubtitleTextColor
-            subtitleLabel.font = appearance.fileAttachmentSubtitleTextFont
-        }
-        
-        override open func setupLayout() {
-            super.setupLayout()
-            addSubview(imageView)
-            addSubview(titleLabel)
-            addSubview(subtitleLabel)
-            imageView.pin(to: self, anchors: [.top(12, .greaterThanOrEqual), .bottom(-12, .lessThanOrEqual), .leading(12)])
-            imageView.heightAnchor.pin(to: imageView.widthAnchor)
-            imageView.heightAnchor.pin(constant: 46)
-            titleLabel.leadingAnchor.pin(to: imageView.trailingAnchor, constant: 12)
-            titleLabel.pin(to: self, anchors: [.top(12, .greaterThanOrEqual), .trailing(-21, .lessThanOrEqual)])
-            titleLabel.bottomAnchor.pin(to: imageView.centerYAnchor)
-            titleLabel.widthAnchor.pin(lessThanOrEqualToConstant: 120)
-            subtitleLabel.leadingAnchor.pin(to: imageView.trailingAnchor, constant: 12)
-            subtitleLabel.pin(to: self, anchors: [.bottom(-12, .lessThanOrEqual), .trailing(-21, .lessThanOrEqual)])
-            subtitleLabel.topAnchor.pin(to: imageView.centerYAnchor, constant: 4)
-        }
-    }
-}
-
-extension ComposerVC.ThumbnailView {
-    open class TimeLabel: View {
-        public lazy var appearance = ComposerVC.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
-        open lazy var timeLabel: UILabel = {
-            $0.font = Fonts.regular.withSize(12)
-            return $0.withoutAutoresizingMask
-        }(UILabel())
-        
-        override open func setupAppearance() {
-            super.setupAppearance()
-            backgroundColor = appearance.videoAttachmentTimeBackgroundColor
-            timeLabel.font = appearance.videoAttachmentTimeTextFont
-            timeLabel.textColor = appearance.videoAttachmentTimeTextColor
-        }
-        
-        override open func setupLayout() {
-            super.setupLayout()
-            addSubview(timeLabel)
-            timeLabel.pin(to: self, anchors: [.leading(6), .top(3), .bottom(-3), .trailing(-6)])
-        }
-        
-        var text: String? {
-            set { timeLabel.text = newValue }
-            get { timeLabel.text }
-        }
-        
-        override open func layoutSubviews() {
-            super.layoutSubviews()
-            layer.cornerRadius = bounds.height / 2
         }
     }
 }

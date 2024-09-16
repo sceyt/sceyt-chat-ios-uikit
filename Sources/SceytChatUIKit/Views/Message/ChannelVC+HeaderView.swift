@@ -1,5 +1,5 @@
 //
-//  ChannelVC+TitleView.swift
+//  ChannelVC+HeaderView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,7 +10,7 @@ import UIKit
 
 extension ChannelVC {
 
-    open class TitleView: View {
+    open class HeaderView: View {
 
         public enum Mode {
             case `default`

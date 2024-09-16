@@ -38,7 +38,7 @@ extension MessageInfoVC {
     open class MessageCell: TableViewCell {
         open lazy var appearance = MessageInfoVC.appearance
         
-        open lazy var bubbleView = OutgoingMessageCell().withoutAutoresizingMask
+        open lazy var bubbleView = Components.channelOutgoingMessageCell.init().withoutAutoresizingMask
         
         open lazy var sentLabel = UILabel()
         open lazy var sizeLabel = UILabel()

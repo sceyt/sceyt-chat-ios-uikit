@@ -36,37 +36,37 @@ open class ChannelVC: ViewController,
     open lazy var coverView = BarCoverView()
         .withoutAutoresizingMask
     
-    open lazy var composerVC = Components.composerVC
+    open lazy var inputVC = Components.inputVC
         .init()
     
-    open var inputTextView: ComposerVC.InputTextView {
-        composerVC.inputTextView
+    open var inputTextView: InputVC.InputTextView {
+        inputVC.inputTextView
     }
     
-    open var mediaView: ComposerVC.MediaView {
-        composerVC.mediaView
+    open var mediaView: InputVC.MediaView {
+        inputVC.mediaView
     }
     
-    open var titleView = Components.channelTitleView
+    open var titleView = Components.channelHeaderView
         .init()
         .withoutAutoresizingMask
     
-    open var unreadCountView = Components.channelUnreadCountView
+    open var unreadCountView = Components.channelScrollDownView
         .init()
         .withoutAutoresizingMask
     
-    open var bottomView = Components.channelBottomView
+    open var bottomView = Components.inputCoverView
         .init()
         .withoutAutoresizingMask
     
-    open var searchControlsView = Components.channelSearchControlsView
+    open var searchControlsView = Components.inputMessageSearchControlsView
         .init()
         .withoutAutoresizingMask
     
     open lazy var joinGlobalChannelButton = UIButton()
         .withoutAutoresizingMask
     
-    open lazy var selectingView = Components.channelSelectingView
+    open lazy var selectingView = Components.inputSelectedMessagesActionsView
         .init()
         .withoutAutoresizingMask
     
@@ -109,9 +109,9 @@ open class ChannelVC: ViewController,
     public var avatarTask: Cancellable?
     public var canShowUnreadCountView = true
     
-    public var messageComposerViewBottomConstraint: NSLayoutConstraint!
+    public var messageInputViewBottomConstraint: NSLayoutConstraint!
     public var searchControlsViewBottomConstraint: NSLayoutConstraint!
-    public var messageComposerViewHeightConstraint: NSLayoutConstraint!
+    public var messageInputViewHeightConstraint: NSLayoutConstraint!
     
     override open var disablesAutomaticKeyboardDismissal: Bool {
         return true
@@ -232,8 +232,8 @@ open class ChannelVC: ViewController,
         contextMenu.delegate = self
         contextMenu.snapshotDelegate = self
         
-        composerVC.mentionUserListVC = { [unowned self] in
-            let vc = Components.mentioningUserListVC.init()
+        inputVC.mentionUserListVC = { [unowned self] in
+            let vc = Components.inputMentionUsersListVC.init()
             vc.viewModel = Components.mentioningUserListVM
                 .init(channelId: channelViewModel.channel.id)
             return vc
@@ -315,13 +315,13 @@ open class ChannelVC: ViewController,
         view.addSubview(createdView)
         view.addSubview(coverView)
         view.addSubview(searchControlsView)
-        addChild(composerVC)
-        coverView.addSubview(composerVC.view)
+        addChild(inputVC)
+        coverView.addSubview(inputVC.view)
         coverView.addSubview(unreadCountView)
         view.addSubview(joinGlobalChannelButton)
         
-        messageComposerViewBottomConstraint = composerVC.view.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
-        messageComposerViewHeightConstraint = composerVC.view.resize(anchors: [.height(52)]).first!
+        messageInputViewBottomConstraint = inputVC.view.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
+        messageInputViewHeightConstraint = inputVC.view.resize(anchors: [.height(52)]).first!
         
         searchControlsViewBottomConstraint = searchControlsView.bottomAnchor.pin(to: view.safeAreaLayoutGuide.bottomAnchor)
         searchControlsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing])
@@ -332,23 +332,23 @@ open class ChannelVC: ViewController,
         collectionView.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
         noDataView.pin(to: view, anchors: [.leading, .trailing])
         noDataView.topAnchor.pin(to: view.safeAreaLayoutGuide.topAnchor)
-        noDataView.bottomAnchor.pin(to: composerVC.view.topAnchor)
+        noDataView.bottomAnchor.pin(to: inputVC.view.topAnchor)
         createdView.pin(to: view, anchors: [.leading, .trailing])
-        createdView.bottomAnchor.pin(to: composerVC.view.topAnchor)
-        composerVC.view.pin(to: coverView.safeAreaLayoutGuide, anchors: [.leading, .trailing])
-        unreadCountView.trailingAnchor.pin(to: composerVC.view.trailingAnchor, constant: -10)
-        unreadCountView.bottomAnchor.pin(to: composerVC.view.topAnchor, constant: -10)
+        createdView.bottomAnchor.pin(to: inputVC.view.topAnchor)
+        inputVC.view.pin(to: coverView.safeAreaLayoutGuide, anchors: [.leading, .trailing])
+        unreadCountView.trailingAnchor.pin(to: inputVC.view.trailingAnchor, constant: -10)
+        unreadCountView.bottomAnchor.pin(to: inputVC.view.topAnchor, constant: -10)
         unreadCountView.resize(anchors: [.width(44), .height(48)])
         joinGlobalChannelButton.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .bottom])
         joinGlobalChannelButton.resize(anchors: [.height(52)])
         
         view.addSubview(keyboardBgView)
         keyboardBgView.pin(to: view, anchors: [.leading, .trailing, .bottom])
-        keyboardBgView.topAnchor.pin(to: composerVC.view.bottomAnchor)
+        keyboardBgView.topAnchor.pin(to: inputVC.view.bottomAnchor)
         
         view.addSubview(selectingView)
         selectingView.pin(to: view, anchors: [.leading, .trailing])
-        selectingView.bottomAnchor.pin(to: composerVC.view.bottomAnchor)
+        selectingView.bottomAnchor.pin(to: inputVC.view.bottomAnchor)
         
         
         if let view = searchBar.searchTextField.leftView {
@@ -390,22 +390,22 @@ open class ChannelVC: ViewController,
                 self?.channelViewModel.isTyping = isTyping
             }.store(in: &subscriptions)
         
-        composerVC.onContentHeightUpdate = { [weak self] height, completion in
+        inputVC.onContentHeightUpdate = { [weak self] height, completion in
             guard let self else { return }
-            if height != self.messageComposerViewHeightConstraint.constant {
+            if height != self.messageInputViewHeightConstraint.constant {
                 UIView.animate(withDuration: 0.25) { [weak self] in
                     guard let self else { return }
                     let bottom = self.collectionView.contentInset.bottom
                     var contentOffsetY = self.collectionView.contentOffset.y
-                    let diff = self.messageComposerViewHeightConstraint.constant - height
-                    self.messageComposerViewHeightConstraint.constant = height
+                    let diff = self.messageInputViewHeightConstraint.constant - height
+                    self.messageInputViewHeightConstraint.constant = height
                     self.updateCollectionViewInsets()
                     let newBottom = self.collectionView.contentInset.bottom
                     if newBottom != bottom {
                         contentOffsetY += newBottom - bottom
                     }
                     contentOffsetY = min(contentOffsetY, collectionView.contentSize.height)
-                    let needsToScroll = (self.collectionView.lastVisibleAttributes?.frame.maxY ?? 0) > self.composerVC.view.frameRelativeTo(view: self.collectionView).minY + diff
+                    let needsToScroll = (self.collectionView.lastVisibleAttributes?.frame.maxY ?? 0) > self.inputVC.view.frameRelativeTo(view: self.collectionView).minY + diff
                     self.coverView.layoutIfNeeded()
                     guard needsToScroll else { return }
                     self.collectionView.layoutIfNeeded()
@@ -420,7 +420,7 @@ open class ChannelVC: ViewController,
             }
         }
         
-        composerVC.$action
+        inputVC.$action
             .compactMap { $0 }
             .sink { [unowned self] in
                 switch $0 {
@@ -432,7 +432,7 @@ open class ChannelVC: ViewController,
                 case .cancel:
                     channelViewModel.removeSelectedMessage()
                 case .deleteMedia:
-                    if composerVC.mediaView.items.count == 0 {
+                    if inputVC.mediaView.items.count == 0 {
                         UIView.animate(withDuration: 0.25) { [weak self] in
                             self?.view.layoutIfNeeded()
                         }
@@ -516,7 +516,7 @@ open class ChannelVC: ViewController,
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isSearching in
                 self?.updateNavigationItems()
-                self?.composerVC.view.isHidden = isSearching
+                self?.inputVC.view.isHidden = isSearching
                 self?.searchControlsView.isHidden = !isSearching
             }
             .store(in: &subscriptions)
@@ -566,10 +566,10 @@ open class ChannelVC: ViewController,
     
     private func updateCollectionViewInsets() {
         let bottomConstraint = searchControlsView.isHidden
-        ? messageComposerViewBottomConstraint.constant
+        ? messageInputViewBottomConstraint.constant
         : searchControlsViewBottomConstraint.constant
         let controlHeight = searchControlsView.isHidden
-        ? messageComposerViewHeightConstraint.constant
+        ? messageInputViewHeightConstraint.constant
         : searchControlsView.frame.height
         
         collectionView.contentInset.bottom =
@@ -590,11 +590,11 @@ open class ChannelVC: ViewController,
             self?.collectionView.visibleCells.forEach {
                 if let self, let cell = ($0 as? MessageCell),
                    cell.data.message.id != messageId,
-                   !cell.unreadView.isHidden {
+                   !cell.unreadMessagesSeparatorView.isHidden {
                     if let indexPath = self.collectionView.indexPath(for: cell) {
                         self.collectionView.reloadItems(at: [indexPath])
                     } else {
-                        cell.unreadView.isHidden = true
+                        cell.unreadMessagesSeparatorView.isHidden = true
                     }
                 }
             }
@@ -637,7 +637,7 @@ open class ChannelVC: ViewController,
                 )
             )
         )
-        messageComposerViewBottomConstraint.constant = shift
+        messageInputViewBottomConstraint.constant = shift
         searchControlsViewBottomConstraint.constant = shift
         updateCollectionViewInsets()
         let newBottom = collectionView.contentInset.bottom
@@ -667,7 +667,7 @@ open class ChannelVC: ViewController,
         setSectionHeadersPinToVisibleBounds(false)
         let bottom = collectionView.contentInset.bottom
         var contentOffsetY = collectionView.contentOffset.y
-        messageComposerViewBottomConstraint.constant = 0
+        messageInputViewBottomConstraint.constant = 0
         searchControlsViewBottomConstraint.constant = 0
         updateCollectionViewInsets()
         let newBottom = collectionView.contentInset.bottom
@@ -681,7 +681,7 @@ open class ChannelVC: ViewController,
             delay: 0,
             options: .init(rawValue: animation ?? 0)
         ) {
-            self.composerVC.view.layoutIfNeeded()
+            self.inputVC.view.layoutIfNeeded()
             if self.channelViewModel.selectedMessageForAction == nil {
                 self.collectionView.setContentOffset(.init(x: 0, y: contentOffsetY), animated: false)
             }
@@ -690,7 +690,7 @@ open class ChannelVC: ViewController,
     
     open func updateNavigationItems() {
         if channelViewModel.isEditing {
-            composerVC.actionViewCancelAction()
+            inputVC.actionViewCancelAction()
             view.endEditing(true)
             navigationItem.setHidesBackButton(false, animated: false)
             navigationItem.leftItemsSupplementBackButton = false
@@ -839,7 +839,7 @@ open class ChannelVC: ViewController,
         member: String,
         isTyping: Bool
     ) -> Int {
-        if let titleView = navigationItem.titleView as? TitleView,
+        if let titleView = navigationItem.titleView as? HeaderView,
            titleView.mode == .typing {
             titleView.typingView.update(typer: member, typing: isTyping)
             navigationController?.navigationBar.setNeedsLayout()
@@ -888,7 +888,7 @@ open class ChannelVC: ViewController,
     }
     
     @objc
-    open func unreadButtonAction(_ sender: ChannelUnreadCountView) {
+    open func unreadButtonAction(_ sender: ChannelVC.ScrollDownView) {
         if let userSelectOnRepliedMessage {
             showRepliedMessage(userSelectOnRepliedMessage)
             self.userSelectOnRepliedMessage = nil
@@ -919,8 +919,8 @@ open class ChannelVC: ViewController,
             vc.view.bounds.contains(gesture.location(in: vc.view))
         }
         guard
-            !composerVC.isRecording,
-            !composerVC.view.bounds.contains(gesture.location(in: composerVC.view)),
+            !inputVC.isRecording,
+            !inputVC.view.bounds.contains(gesture.location(in: inputVC.view)),
             !unreadCountView.bounds.contains(gesture.location(in: unreadCountView)),
             child == nil
         else { return }
@@ -943,7 +943,7 @@ open class ChannelVC: ViewController,
     
     @objc
     open func handleLongPressGestureRecognizer(_ sender: UILongPressGestureRecognizer) {
-        guard !channelViewModel.isEditing, !composerVC.isRecording
+        guard !channelViewModel.isEditing, !inputVC.isRecording
         else { return }
         
         func reset() {
@@ -1031,7 +1031,7 @@ open class ChannelVC: ViewController,
     }
     
     open func forward(messages: [ChatMessage]) {
-        guard !composerVC.isRecording else {
+        guard !inputVC.isRecording else {
             return showRecordDiscardAlertIfNeeded()
         }
         router.showForward { [weak self] channels in
@@ -1075,7 +1075,7 @@ open class ChannelVC: ViewController,
         {
             return true
         }
-        guard !(touch.view is ChannelUnreadCountView)
+        guard !(touch.view is ChannelVC.ScrollDownView)
         else { return false }
         guard !(touch.view?.tag == 999)
         else { return false }
@@ -1088,7 +1088,7 @@ open class ChannelVC: ViewController,
         if channelViewModel.isEditing {
             return false
         }
-        return composerVC.presentedMentionUserListVC?.parent == nil
+        return inputVC.presentedMentionUserListVC?.parent == nil
     }
     
     @discardableResult
@@ -1332,7 +1332,7 @@ open class ChannelVC: ViewController,
         else {
             logger.error("[MEESS] not found \(indexPath), lm: \(channelViewModel.layoutModel(at: indexPath)), ms: \(channelViewModel.message(at: indexPath)), lms: \(channelViewModel.createLayoutModels(at: [indexPath]))")
             let cell = collectionView.dequeueReusableCell(
-                withReuseIdentifier: Components.incomingMessageCell.reuseId,
+                withReuseIdentifier: Components.channelIncomingMessageCell.reuseId,
                 for: indexPath
             )
             cell.contentView.subviews.forEach({ $0.isHidden = true })
@@ -1353,8 +1353,8 @@ open class ChannelVC: ViewController,
         let message = model.message
         let type: MessageCell.Type =
         model.message.incoming ?
-        Components.incomingMessageCell :
-        Components.outgoingMessageCell
+        Components.channelIncomingMessageCell :
+        Components.channelOutgoingMessageCell
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: type)
         cell.isEditing = channelViewModel.isEditing
         if cell.isEditing {
@@ -1470,7 +1470,7 @@ open class ChannelVC: ViewController,
     ) -> UICollectionReusableView {
         let cell = collectionView.dequeueReusableSupplementaryView(
             for: indexPath,
-            cellType: Components.messageSectionSeparatorView.self,
+            cellType: Components.channelDateSeparatorView.self,
             kind: .header
         )
         cell.date = channelViewModel.separatorDateForMessage(at: indexPath)
@@ -1561,7 +1561,7 @@ open class ChannelVC: ViewController,
         let m = UserSendMessage(
             sendText: shouldClearText ? inputTextView.attributedText : .init(),
             attachments: mediaView.items,
-            linkMetadata: composerVC.lastDetectedLinkMetadata
+            linkMetadata: inputVC.lastDetectedLinkMetadata
         )
         if let ma = channelViewModel.selectedMessageForAction {
             switch ma {
@@ -1585,7 +1585,7 @@ open class ChannelVC: ViewController,
         if shouldClearText {
             inputTextView.text = nil
         }
-        composerVC.mediaView.removeAll()
+        inputVC.mediaView.removeAll()
         if channelViewModel.selectedMessageForAction == nil ||
             channelViewModel.selectedMessageForAction?.1 == .reply {
             UIView.animate(withDuration: 0.25) { [weak self] in
@@ -1603,7 +1603,7 @@ open class ChannelVC: ViewController,
                 self?.canShowUnreadCountView = canShowUnread
             }
         }
-        composerVC.removeActionView()
+        inputVC.removeActionView()
         channelViewModel.removeSelectedMessage()
     }
     
@@ -1616,7 +1616,7 @@ open class ChannelVC: ViewController,
     }
     
     open func edit(layoutModel: MessageLayoutModel) {
-        composerVC.addEdit(layoutModel: layoutModel)
+        inputVC.addEdit(layoutModel: layoutModel)
         inputTextView.attributedText = layoutModel.attributedView.content
         UIView.animate(withDuration: 0.25) { [weak self] in
             self?.inputTextView.becomeFirstResponder()
@@ -1635,7 +1635,7 @@ open class ChannelVC: ViewController,
                 self.view.layoutIfNeeded()
             } completion: { [weak self] _ in
                 guard let self else { return }
-                self.composerVC.addReply(layoutModel: layoutModel)
+                self.inputVC.addReply(layoutModel: layoutModel)
             }
         } else {
             showThreadForMessage(layoutModel.message)
@@ -2123,20 +2123,20 @@ open class ChannelVC: ViewController,
         if let icon, let message {
             view.endEditing(true)
             coverView.addSubview(bottomView)
-            bottomView.pin(to: composerVC.view, anchors: [.leading, .top, .trailing, .bottom])
+            bottomView.pin(to: inputVC.view, anchors: [.leading, .top, .trailing, .bottom])
             bottomView.icon = icon
             bottomView.message = message
-            composerVC.shouldHideRecordButton = true
-            composerVC.addMediaButton.isHidden = true
-            composerVC.sendButton.isHidden = true
-            composerVC.recordButton.isHidden = true
-            composerVC.mediaView.isHidden = true
-            composerVC.actionView.isHidden = true
+            inputVC.shouldHideRecordButton = true
+            inputVC.addMediaButton.isHidden = true
+            inputVC.sendButton.isHidden = true
+            inputVC.recordButton.isHidden = true
+            inputVC.mediaView.isHidden = true
+            inputVC.actionView.isHidden = true
         } else {
             bottomView.removeFromSuperview()
-            composerVC.shouldHideRecordButton = false
-            composerVC.addMediaButton.isHidden = false
-            composerVC.updateState()
+            inputVC.shouldHideRecordButton = false
+            inputVC.addMediaButton.isHidden = false
+            inputVC.updateState()
         }
     }
     
@@ -2157,7 +2157,7 @@ open class ChannelVC: ViewController,
     
     private var isShowingRecordDiscardAlert = false
     open func showRecordDiscardAlertIfNeeded() {
-        guard composerVC.isRecording,
+        guard inputVC.isRecording,
               !isShowingRecordDiscardAlert
         else { return }
         
@@ -2169,7 +2169,7 @@ open class ChannelVC: ViewController,
                     self?.isShowingRecordDiscardAlert = false
                 },
                 .init(title: L10n.Alert.Button.discard, style: .default) { [weak self] in
-                    self?.composerVC.recorderView.stopAndPreview()
+                    self?.inputVC.recorderView.stopAndPreview()
                     self?.isShowingRecordDiscardAlert = false
                 }
             ],
@@ -2399,7 +2399,7 @@ open class ChannelVC: ViewController,
     }
     
     override open var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        if composerVC.isRecording {
+        if inputVC.isRecording {
             if view.window?.windowScene?.interfaceOrientation.isLandscape == true {
                 return [.landscapeLeft, .landscapeRight]
             } else {
@@ -2411,7 +2411,7 @@ open class ChannelVC: ViewController,
     
     @objc
     open func canShowPreviewer() -> Bool {
-        if composerVC.isRecording {
+        if inputVC.isRecording {
             showRecordDiscardAlertIfNeeded()
             return false
         } else {

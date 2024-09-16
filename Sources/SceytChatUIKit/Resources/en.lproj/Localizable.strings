@@ -199,8 +199,8 @@
 "message.info.size" = "Size:";
 "message.info.title" = "Message Info";
 
-"composer.reply" = "Reply";
-"composer.edit" = "Edit message";
+"input.reply" = "Reply";
+"input.edit" = "Edit message";
 
 "imagePicker.manageAccess.action" = "Manage";
 "imagePicker.manageAccess.more" = "Select More";

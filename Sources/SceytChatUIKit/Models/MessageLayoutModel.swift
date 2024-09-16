@@ -857,9 +857,9 @@ open class MessageLayoutModel {
         infoViewMeasure = MessageCell.InfoView.measure(model: self, appearance: Self.appearance)
         linkViewMeasure = Components.messageCellLinkStackView.measure(model: self, appearance: Self.appearance)
         if message.incoming {
-            return Components.incomingMessageCell.measure(model: self, appearance: Self.appearance)
+            return Components.channelIncomingMessageCell.measure(model: self, appearance: Self.appearance)
         } else {
-            return Components.outgoingMessageCell.measure(model: self, appearance: Self.appearance)
+            return Components.channelOutgoingMessageCell.measure(model: self, appearance: Self.appearance)
         }
     }
     

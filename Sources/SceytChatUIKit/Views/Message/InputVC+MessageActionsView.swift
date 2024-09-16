@@ -1,5 +1,5 @@
 //
-//  ComposerVC+ActionView.swift
+//  InputVC+MessageActionsView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,11 +8,11 @@
 
 import UIKit
 
-extension ComposerVC {
+extension InputVC {
     
-    open class ActionView: View {
+    open class MessageActionsView: View {
         
-        public lazy var appearance = ComposerVC.appearance {
+        public lazy var appearance = InputVC.appearance {
             didSet {
                 setupAppearance()
             }
@@ -37,7 +37,7 @@ extension ComposerVC {
             .withoutAutoresizingMask
             .contentMode(.scaleAspectFill)
         
-        open lazy var mediaTimestampLabel = ComposerVC.ThumbnailView.TimeLabel()
+        open lazy var mediaTimestampLabel = Components.inputThumbnailViewTimeLabel.init()
             .withoutAutoresizingMask
 
         open lazy var cancelButton = UIButton()
