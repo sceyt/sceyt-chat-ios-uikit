@@ -156,7 +156,7 @@ open class ChannelMemberListVC: ViewController,
             memberListViewModel.createChannel(userAt: indexPath) { [weak self] channel, error in
                 guard let self else { return }
                 if let channel {
-                    self.router.showChannelProfileVC(channel: channel)
+                    self.router.showChannelInfoVC(channel: channel)
                 } else if let error {
                     self.showAlert(error: error)
                 }

@@ -31,8 +31,8 @@ open class ChannelMemberListRouter: Router<ChannelMemberListVC> {
         rootVC.present(nav, animated: true)
     }
     
-    open func showChannelProfileVC(channel: ChatChannel) {
-        let vc = Components.channelProfileVC.init()
+    open func showChannelInfoVC(channel: ChatChannel) {
+        let vc = Components.channelInfoVC.init()
         vc.profileViewModel = Components.channelProfileVM.init(channel: channel)
         rootVC.show(vc, sender: self)
     }

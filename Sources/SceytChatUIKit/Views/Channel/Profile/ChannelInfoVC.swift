@@ -1,5 +1,5 @@
 //
-//  ChannelProfileVC.swift
+//  ChannelInfoVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import Photos
 import UIKit
 
-open class ChannelProfileVC: ViewController,
+open class ChannelInfoVC: ViewController,
     UITableViewDelegate,
     UITableViewDataSource,
     UIGestureRecognizerDelegate
@@ -19,20 +19,20 @@ open class ChannelProfileVC: ViewController,
     open lazy var router = Components.channelProfileRouter
         .init(rootVC: self)
     
-    open lazy var tableView = ProfileTableView(frame: .zero, style: .grouped)
+    open lazy var tableView = Components.simultaneousGestureTableView.init(frame: .zero, style: .grouped)
         .withoutAutoresizingMask
         .rowAutomaticDimension
     
-    open lazy var mediaListVC = Components.channelMediaListView
+    open lazy var mediaListVC = Components.channelInfoMediaCollectionView
         .init()
     
-    open lazy var fileListVC = Components.channelFileListView
+    open lazy var fileListVC = Components.channelInfoFileCollectionView
         .init()
     
-    open lazy var linkListVC = Components.channelLinkListView
+    open lazy var linkListVC = Components.channelInfoLinkCollectionView
         .init()
     
-    open lazy var voiceListVC = Components.channelVoiceListView
+    open lazy var voiceListVC = Components.channelInfoVoiceCollectionView
         .init()
     
     open lazy var segmentVC = Components.segmentedControlView
@@ -72,10 +72,10 @@ open class ChannelProfileVC: ViewController,
         fileListVC.fileViewModel = profileViewModel.fileListViewModel
         linkListVC.linkViewModel = profileViewModel.linkListViewModel
         voiceListVC.voiceViewModel = profileViewModel.voiceListViewModel
-        tableView.register(Components.channelProfileHeaderCell.self)
-        tableView.register(Components.channelProfileDescriptionCell.self)
-        tableView.register(Components.channelProfileItemCell.self)
-        tableView.register(Components.channelProfileContainerCell.self)
+        tableView.register(Components.channelInfoDetailsCell.self)
+        tableView.register(Components.channelInfoDescriptionCell.self)
+        tableView.register(Components.channelInfoOptionCell.self)
+        tableView.register(Components.channelInfoContainerCell.self)
         tableView.showsVerticalScrollIndicator = false
         tableView.separatorStyle = .none
         tableView.delegate = self
@@ -95,7 +95,7 @@ open class ChannelProfileVC: ViewController,
         
         segmentVC.parentScrollView = tableView
         segmentVC.items
-            .compactMap { $0.content as? ChannelAttachmentListView }
+            .compactMap { $0.content as? ChannelInfoVC.AttachmentCollectionView }
             .forEach {
                 $0.shouldReceiveTouch = { [weak self] in
                     guard let self else { return false }
@@ -109,7 +109,7 @@ open class ChannelProfileVC: ViewController,
         tableView.shouldSimultaneous = { [weak self] in
             guard let self else { return false }
             
-            (self.currentPage as? ChannelAttachmentListView)?.scrollingDecelerator.invalidateIfNeeded()
+            (self.currentPage as? ChannelInfoVC.AttachmentCollectionView)?.scrollingDecelerator.invalidateIfNeeded()
             
             let contentOffsetY = ceil($0.contentOffset.y)
             let shouldSimultaneous = contentOffsetY < floor(self.headerHeight - $0.contentInset.top) || (self.currentPage?.contentOffset.y ?? 0) == 0
@@ -176,12 +176,12 @@ open class ChannelProfileVC: ViewController,
                 return
             }
             var indexPaths = [IndexPath]()
-            if let cell = tableView.visibleCells.first(where: { $0 is ChannelProfileHeaderCell }) as? ChannelProfileHeaderCell,
+            if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoVC.DetailsCell }) as? ChannelInfoVC.DetailsCell,
                let indexPath = tableView.indexPath(for: cell)
             {
                 indexPaths.append(indexPath)
             }
-            if let cell = tableView.visibleCells.first(where: { $0 is ChannelProfileDescriptionCell }) as? ChannelProfileDescriptionCell,
+            if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoVC.DescriptionCell }) as? ChannelInfoVC.DescriptionCell,
                let indexPath = tableView.indexPath(for: cell)
             {
                 indexPaths.append(indexPath)
@@ -263,7 +263,7 @@ open class ChannelProfileVC: ViewController,
         let _cell: UITableViewCell
         switch sections[indexPath.section] {
         case .header:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileHeaderCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoDetailsCell.self)
             cell.selectionStyle = .none
             cell.data = profileViewModel.channel
             cell.avatarButton.publisher(for: .touchUpInside).sink { [weak self] _ in
@@ -272,7 +272,7 @@ open class ChannelProfileVC: ViewController,
             }.store(in: &cell.subscriptions)
             _cell = cell
         case .description:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileDescriptionCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoDescriptionCell.self)
             cell.selectionStyle = .none
             if !profileViewModel.channel.isGroup {
                 cell.data = profileViewModel.channel.peer?.presence.status
@@ -281,13 +281,13 @@ open class ChannelProfileVC: ViewController,
             }
             _cell = cell
         case .uri:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileItemCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoOptionCell.self)
             cell.iconView.image = .channelProfileURI
-            cell.titleLabel.text = "@" + (profileViewModel.channel.uri)
+            cell.titleLabel.text = SceytChatUIKit.shared.config.channelURIPrefix + (profileViewModel.channel.uri)
             cell.selectionStyle = .none
             _cell = cell
         case .options, .items:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileItemCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoOptionCell.self)
             let action = (sections[indexPath.section] == .options ? options() : items())[indexPath.row]
             cell.iconView.image = action.image
             cell.titleLabel.text = action.title
@@ -312,7 +312,7 @@ open class ChannelProfileVC: ViewController,
             }
             _cell = cell
         case .attachment:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelProfileContainerCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoContainerCell.self)
             if !cell.contentView.subviews.contains(segmentVC) {
                 cell.contentView.addSubview(segmentVC.withoutAutoresizingMask)
                 segmentVC.pin(to: cell.contentView)
@@ -375,16 +375,16 @@ open class ChannelProfileVC: ViewController,
                 cell.layer.addSublayer(layer)
             }
             layer.borderColor = appearance.cellSeparatorColor?.cgColor
-            layer.borderWidth = ChannelProfileVC.Layouts.cellSeparatorWidth
+            layer.borderWidth = Components.channelInfoVC.Layouts.cellSeparatorWidth
             layer.frame = CGRect(x: 0, y: cell.height - layer.borderWidth, width: cell.width, height: layer.borderWidth)
         }
         
-        if !cell.isKind(of: Components.channelProfileContainerCell.self) {
+        if !cell.isKind(of: Components.channelInfoContainerCell.self) {
             let maskLayer = CAShapeLayer()
             var rect = cell.bounds
             if sections[indexPath.section] != .attachment {
-                rect.origin.x = ChannelProfileVC.Layouts.cellHorizontalPadding
-                rect.size.width -= ChannelProfileVC.Layouts.cellHorizontalPadding * 2
+                rect.origin.x = Components.channelInfoVC.Layouts.cellHorizontalPadding
+                rect.size.width -= Components.channelInfoVC.Layouts.cellHorizontalPadding * 2
             }
             maskLayer.path = UIBezierPath(roundedRect: rect,
                                           byRoundingCorners: corners,
@@ -403,21 +403,21 @@ open class ChannelProfileVC: ViewController,
     var segmentTop: CGFloat { floor(tableView.contentSize.height - tableView.height - 18) }
     
     open var titleLabel = {
-        $0.font = ChannelProfileVC.appearance.titleFont?.withSize(16)
-        $0.textColor = ChannelProfileVC.appearance.titleColor
+        $0.font = Components.channelInfoVC.appearance.titleFont?.withSize(16)
+        $0.textColor = Components.channelInfoVC.appearance.titleColor
         return $0
     }(UILabel())
     
     open var subTitleLabel = {
-        $0.font = ChannelProfileVC.appearance.subtitleFont?.withSize(13)
-        $0.textColor = ChannelProfileVC.appearance.subtitleColor
+        $0.font = Components.channelInfoVC.appearance.subtitleFont?.withSize(13)
+        $0.textColor = Components.channelInfoVC.appearance.subtitleColor
         return $0
     }(UILabel())
     
     open lazy var titleView = UIStackView(column: [titleLabel, subTitleLabel], alignment: .center)
     
     open var headerHeight: CGFloat {
-        tableView.visibleCells.first(where: { $0.isKind(of: Components.channelProfileContainerCell.self) })?.top ?? 0
+        tableView.visibleCells.first(where: { $0.isKind(of: Components.channelInfoContainerCell.self) })?.top ?? 0
     }
     
     private var attachmentHeight: CGFloat {
@@ -447,7 +447,7 @@ open class ChannelProfileVC: ViewController,
                 }
         }
         
-        if let cell = tableView.visibleCells.first(where: { $0 is ChannelProfileHeaderCell }) as? ChannelProfileHeaderCell {
+        if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoVC.DetailsCell }) as? ChannelInfoVC.DetailsCell {
             let point = cell.subtitleLabel.convert(.init(x: 0, y: cell.subtitleLabel.height), to: view)
             if point.y <= scrollView.contentInset.top {
                 titleLabel.text = cell.titleLabel.text
@@ -460,7 +460,7 @@ open class ChannelProfileVC: ViewController,
     }
     
     open func scrollViewShouldScrollToTop(_ scrollView: UIScrollView) -> Bool {
-        (currentPage as? ChannelAttachmentListView)?.scrollingDecelerator.invalidateIfNeeded()
+        (currentPage as? ChannelInfoVC.AttachmentCollectionView)?.scrollingDecelerator.invalidateIfNeeded()
         return true
     }
     
@@ -470,7 +470,7 @@ open class ChannelProfileVC: ViewController,
 
     open func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         if scrollView.contentOffset.y >= headerHeight - scrollView.contentInset.top {
-            (currentPage as? ChannelAttachmentListView)?.scrollingDecelerator.decelerate(by: outerDeceleration!)
+            (currentPage as? ChannelInfoVC.AttachmentCollectionView)?.scrollingDecelerator.decelerate(by: outerDeceleration!)
         }
     }
 
@@ -530,14 +530,14 @@ open class ChannelProfileVC: ViewController,
             if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
             } else {
-                logger.debug("[ChannelProfileVC] decoded metadata description is missing")
+                logger.debug("[ChannelInfoVC] decoded metadata description is missing")
             }     
             sections.append(.uri)
         case .private:
             if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
             } else {
-                logger.debug("[ChannelProfileVC] decoded metadata description is missing")
+                logger.debug("[ChannelInfoVC] decoded metadata description is missing")
             }
         case .direct:
             if !(profileViewModel.channel.peer?.presence.status ?? "").isEmpty {
@@ -913,7 +913,7 @@ open class ChannelProfileVC: ViewController,
     }
 }
 
-public extension ChannelProfileVC {
+public extension ChannelInfoVC {
     enum Sections: Int, CaseIterable {
         case header
         case description
@@ -960,7 +960,7 @@ public extension ChannelProfileVC {
     }
 }
 
-public extension ChannelProfileVC {
+public extension ChannelInfoVC {
     enum Layouts {
         public static var itemIconSize: CGFloat = 32
         public static var itemVerticalPadding: CGFloat = 12

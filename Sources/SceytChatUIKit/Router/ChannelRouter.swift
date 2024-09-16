@@ -23,7 +23,7 @@ open class ChannelRouter: Router<ChannelVC> {
     }
 
     open func showChannelProfile() {
-        let profileVC = Components.channelProfileVC.init()
+        let profileVC = Components.channelInfoVC.init()
         profileVC.profileViewModel = Components.channelProfileVM
             .init(
                 channel: rootVC.channelViewModel.channel
@@ -105,8 +105,8 @@ open class ChannelRouter: Router<ChannelVC> {
         return reactionPageVC
     }
     
-    open func showChannelProfileVC(channel: ChatChannel) {
-        let vc = Components.channelProfileVC.init()
+    open func showChannelInfoVC(channel: ChatChannel) {
+        let vc = Components.channelInfoVC.init()
         vc.hidesBottomBarWhenPushed = true
         vc.profileViewModel = Components.channelProfileVM.init(channel: channel)
         self.rootVC.show(vc, sender: self)

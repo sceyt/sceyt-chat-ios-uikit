@@ -1732,7 +1732,7 @@ open class ChannelVC: ViewController,
         channelViewModel.directChannel(user: user) { [weak self] channel, error in
             guard let self else { return }
             if let channel {
-                self.router.showChannelProfileVC(channel: channel)
+                self.router.showChannelInfoVC(channel: channel)
             } else if let error {
                 self.showAlert(error: error)
             }

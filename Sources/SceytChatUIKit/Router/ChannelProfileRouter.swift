@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ChannelProfileRouter: Router<ChannelProfileVC> {
+open class ChannelProfileRouter: Router<ChannelInfoVC> {
     open func showMuteOptionsAlert(
         selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
         canceled: @escaping () -> Void

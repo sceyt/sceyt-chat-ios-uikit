@@ -1,5 +1,5 @@
 //
-//  ChannelAttachmentListVC.swift
+//  ChannelInfoVC+AttachmentCollectionView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,86 +8,88 @@
 
 import UIKit
 
-open class ChannelAttachmentListView: CollectionView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
-    open var noItemsMessage: String? {
-        set { noItemsView.noItemsLabel.text = newValue }
-        get { noItemsView.noItemsLabel.text }
-    }
-    open lazy var noItemsView = NoItemsView()
-    open var shouldReceiveTouch: (() -> Bool)?
-    public lazy var scrollingDecelerator = ScrollingDecelerator(scrollView: self)
-        
-    open func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-        shouldReceiveTouch?() ?? true
-    }
-
-    open override func setup() {
-        super.setup()
-        
-        isPrefetchingEnabled = false
-        bounces = true
-    }
-    
-    open override func setupAppearance() {
-        super.setupAppearance()
-    }
-    
-    open override func setupDone() {
-        super.setupDone()
-        
-        updateNoItems()
-    }
-    
-    open override func layoutSubviews() {
-        super.layoutSubviews()
-        
-        if (collectionViewLayout as? UICollectionViewFlowLayout)?.itemSize.width == 0 {
-            collectionViewLayout.invalidateLayout()
+extension ChannelInfoVC {
+    open class AttachmentCollectionView: CollectionView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
+        open var noItemsMessage: String? {
+            set { noItemsView.noItemsLabel.text = newValue }
+            get { noItemsView.noItemsLabel.text }
         }
-    }
-    
-    open func updateCollectionView(paths: ChannelAttachmentListVM.ChangeItemPaths) {
-        if superview == nil || visibleCells.isEmpty {
-            reloadData()
-        } else if !paths.isEmpty {
-            UIView.performWithoutAnimation {
-                performBatchUpdates {
-                    if !paths.sectionInserts.isEmpty {
-                        insertSections(paths.sectionInserts)
-                    }
-                    if !paths.sectionDeletes.isEmpty {
-                        deleteSections(paths.sectionDeletes)
-                    }
-                    self.insertItems(at: paths.inserts + paths.moves.map { $0.to })
-                    self.reloadItems(at: paths.updates)
-                    self.deleteItems(at: paths.deletes + paths.moves.map { $0.from })
-                }
+        open lazy var noItemsView = NoItemsView()
+        open var shouldReceiveTouch: (() -> Bool)?
+        public lazy var scrollingDecelerator = ScrollingDecelerator(scrollView: self)
+        
+        open func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            shouldReceiveTouch?() ?? true
+        }
+        
+        open override func setup() {
+            super.setup()
+            
+            isPrefetchingEnabled = false
+            bounces = true
+        }
+        
+        open override func setupAppearance() {
+            super.setupAppearance()
+        }
+        
+        open override func setupDone() {
+            super.setupDone()
+            
+            updateNoItems()
+        }
+        
+        open override func layoutSubviews() {
+            super.layoutSubviews()
+            
+            if (collectionViewLayout as? UICollectionViewFlowLayout)?.itemSize.width == 0 {
+                collectionViewLayout.invalidateLayout()
             }
         }
         
-        updateNoItems()
-    }
-    
-    open func updateNoItems() {
-        if totalNumberOfItems <= 0 {
-            backgroundView = noItemsView
-        } else {
-            backgroundView = nil
+        open func updateCollectionView(paths: ChannelAttachmentListVM.ChangeItemPaths) {
+            if superview == nil || visibleCells.isEmpty {
+                reloadData()
+            } else if !paths.isEmpty {
+                UIView.performWithoutAnimation {
+                    performBatchUpdates {
+                        if !paths.sectionInserts.isEmpty {
+                            insertSections(paths.sectionInserts)
+                        }
+                        if !paths.sectionDeletes.isEmpty {
+                            deleteSections(paths.sectionDeletes)
+                        }
+                        self.insertItems(at: paths.inserts + paths.moves.map { $0.to })
+                        self.reloadItems(at: paths.updates)
+                        self.deleteItems(at: paths.deletes + paths.moves.map { $0.from })
+                    }
+                }
+            }
+            
+            updateNoItems()
         }
-    }
-    
-    open var onScrollViewDidScroll: ((UIScrollView) -> Void)?
-    
-    public func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        onScrollViewDidScroll?(scrollView)
         
-        if scrollView.contentOffset.y < 0 {
-            scrollView.contentOffset.y = 0
+        open func updateNoItems() {
+            if totalNumberOfItems <= 0 {
+                backgroundView = noItemsView
+            } else {
+                backgroundView = nil
+            }
+        }
+        
+        open var onScrollViewDidScroll: ((UIScrollView) -> Void)?
+        
+        public func scrollViewDidScroll(_ scrollView: UIScrollView) {
+            onScrollViewDidScroll?(scrollView)
+            
+            if scrollView.contentOffset.y < 0 {
+                scrollView.contentOffset.y = 0
+            }
         }
     }
 }
 
-extension ChannelAttachmentListView {
+extension ChannelInfoVC.AttachmentCollectionView {
 
     open class Layout: UICollectionViewFlowLayout {
         public let settings: Settings
@@ -126,7 +128,7 @@ extension ChannelAttachmentListView {
     }
 }
 
-public extension ChannelAttachmentListView.Layout {
+public extension ChannelInfoVC.AttachmentCollectionView.Layout {
 
     struct Settings {
         public let sectionInset: UIEdgeInsets

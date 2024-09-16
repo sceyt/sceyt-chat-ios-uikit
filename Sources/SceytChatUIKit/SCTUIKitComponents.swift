@@ -31,15 +31,15 @@ public enum SCTUIKitComponents {
     public static var channelDisplayedTimer: ChannelVC.DisplayedTimer.Type = ChannelVC.DisplayedTimer.self
     public static var inputMessageSearchControlsView: InputVC.MessageSearchControlsView.Type = InputVC.MessageSearchControlsView.self
 
-    public static var channelProfileVC: ChannelProfileVC.Type = ChannelProfileVC.self
-    public static var profileTableView: ProfileTableView.Type = ProfileTableView.self
+    public static var channelInfoVC: ChannelInfoVC.Type = ChannelInfoVC.self
+    public static var simultaneousGestureTableView: SimultaneousGestureTableView.Type = SimultaneousGestureTableView.self
     public static var channelProfileVM: ChannelProfileVM.Type = ChannelProfileVM.self
     public static var channelProfileRouter: ChannelProfileRouter.Type = ChannelProfileRouter.self
     
-    public static var channelProfileHeaderCell: ChannelProfileHeaderCell.Type = ChannelProfileHeaderCell.self
-    public static var channelProfileDescriptionCell: ChannelProfileDescriptionCell.Type = ChannelProfileDescriptionCell.self
-    public static var channelProfileItemCell: ChannelProfileItemCell.Type = ChannelProfileItemCell.self
-    public static var channelProfileContainerCell: ChannelProfileContainerCell.Type = ChannelProfileContainerCell.self
+    public static var channelInfoDetailsCell: ChannelInfoVC.DetailsCell.Type = ChannelInfoVC.DetailsCell.self
+    public static var channelInfoDescriptionCell: ChannelInfoVC.DescriptionCell.Type = ChannelInfoVC.DescriptionCell.self
+    public static var channelInfoOptionCell: ChannelInfoVC.OptionCell.Type = ChannelInfoVC.OptionCell.self
+    public static var channelInfoContainerCell: ChannelInfoVC.ContainerCell.Type = ChannelInfoVC.ContainerCell.self
     
     public static var channelProfileEditVC: ChannelProfileEditVC.Type = ChannelProfileEditVC.self
     public static var channelProfileEditAvatarCell: ChannelProfileEditAvatarCell.Type = ChannelProfileEditAvatarCell.self
@@ -54,19 +54,17 @@ public enum SCTUIKitComponents {
     public static var channelMemberCell: ChannelMemberCell.Type = ChannelMemberCell.self
     public static var channelMemberAddCell: ChannelMemberAddCell.Type = ChannelMemberAddCell.self
     public static var inputSelectedMessagesActionsView: InputVC.SelectedMessagesActionsView.Type = InputVC.SelectedMessagesActionsView.self
-
     
-    public static var channelAttachmentListView: ChannelAttachmentListView.Type = ChannelAttachmentListView.self
-    public static var channelMediaListView: ChannelMediaListView.Type = ChannelMediaListView.self
-    public static var channelFileListView: ChannelFileListView.Type = ChannelFileListView.self
-    public static var channelLinkListView: ChannelLinkListView.Type = ChannelLinkListView.self
-    public static var channelVoiceListView: ChannelVoiceListView.Type = ChannelVoiceListView.self
-    public static var channelProfileImageAttachmentCell: ChannelProfileImageAttachmentCell.Type = ChannelProfileImageAttachmentCell.self
-    public static var channelProfileVideoAttachmentCell: ChannelProfileVideoAttachmentCell.Type = ChannelProfileVideoAttachmentCell.self
-    public static var channelProfileFileHeaderView: ChannelProfileFileHeaderView.Type = ChannelProfileFileHeaderView.self
-    public static var channelProfileFileCell: ChannelProfileFileCell.Type = ChannelProfileFileCell.self
-    public static var channelProfileLinkCell: ChannelProfileLinkCell.Type = ChannelProfileLinkCell.self
-    public static var channelProfileVoiceCell: ChannelProfileVoiceCell.Type = ChannelProfileVoiceCell.self
+    public static var channelInfoMediaCollectionView: ChannelInfoVC.MediaCollectionView.Type = ChannelInfoVC.MediaCollectionView.self
+    public static var channelInfoFileCollectionView: ChannelInfoVC.FileCollectionView.Type = ChannelInfoVC.FileCollectionView.self
+    public static var channelInfoLinkCollectionView: ChannelInfoVC.LinkCollectionView.Type = ChannelInfoVC.LinkCollectionView.self
+    public static var channelInfoVoiceCollectionView: ChannelInfoVC.VoiceCollectionView.Type = ChannelInfoVC.VoiceCollectionView.self
+    public static var channelInfoImageAttachmentCell: ChannelInfoVC.ImageAttachmentCell.Type = ChannelInfoVC.ImageAttachmentCell.self
+    public static var channelInfoVideoAttachmentCell: ChannelInfoVC.VideoAttachmentCell.Type = ChannelInfoVC.VideoAttachmentCell.self
+    public static var channelInfoAttachmentHeaderView: ChannelInfoVC.AttachmentHeaderView.Type = ChannelInfoVC.AttachmentHeaderView.self
+    public static var channelInfoFileCell: ChannelInfoVC.FileCell.Type = ChannelInfoVC.FileCell.self
+    public static var channelInfoLinkCell: ChannelInfoVC.LinkCell.Type = ChannelInfoVC.LinkCell.self
+    public static var channelInfoVoiceCell: ChannelInfoVC.VoiceCell.Type = ChannelInfoVC.VoiceCell.self
     public static var channelAvatarVC: ChannelAvatarVC.Type = ChannelAvatarVC.self
     public static var channelAvatarVM: ChannelAvatarVM.Type = ChannelAvatarVM.self
 

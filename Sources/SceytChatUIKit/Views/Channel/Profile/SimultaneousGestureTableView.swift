@@ -1,5 +1,5 @@
 //
-//  ProfileTableView.swift
+//  SimultaneousGestureTableView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,8 +8,16 @@
 
 import UIKit
 
-open class ProfileTableView: UITableView, UIGestureRecognizerDelegate {
+open class SimultaneousGestureTableView: UITableView, UIGestureRecognizerDelegate {
     open var shouldSimultaneous: ((UITableView) -> Bool)?
+    
+    public required override init(frame: CGRect, style: UITableView.Style) {
+        super.init(frame: frame, style: style)
+    }
+    
+    required public init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
     
     public func gestureRecognizer(
         _ gestureRecognizer: UIGestureRecognizer,
@@ -18,4 +26,3 @@ open class ProfileTableView: UITableView, UIGestureRecognizerDelegate {
        shouldSimultaneous?(self) ?? false
     }
 }
-

@@ -335,7 +335,7 @@ extension InputVC.InputTextView: AppearanceProviding {
     }
 }
 
-extension ChannelProfileVC: AppearanceProviding {
+extension ChannelInfoVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -466,7 +466,7 @@ extension PhotosPickerVC: AppearanceProviding {
     }
 }
 
-extension ChannelMediaListView: AppearanceProviding {
+extension ChannelInfoVC.MediaCollectionView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -480,7 +480,7 @@ extension ChannelMediaListView: AppearanceProviding {
     }
 }
 
-extension ChannelFileListView: AppearanceProviding {
+extension ChannelInfoVC.FileCollectionView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -499,7 +499,7 @@ extension ChannelFileListView: AppearanceProviding {
     }
 }
 
-extension ChannelLinkListView: AppearanceProviding {
+extension ChannelInfoVC.LinkCollectionView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -511,12 +511,13 @@ extension ChannelLinkListView: AppearanceProviding {
         public var linkLabelFont: UIFont? = Fonts.regular.withSize(14)
         public var detailLabelTextColor: UIColor? = .secondaryText
         public var detailLabelFont: UIFont? = Fonts.regular.withSize(13)
-        
+        public var linkIcon: UIImage = .link
+
         public init() {}
     }
 }
 
-extension ChannelVoiceListView: AppearanceProviding {
+extension ChannelInfoVC.VoiceCollectionView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -886,7 +887,7 @@ extension NavigationController: AppearanceProviding {
     }
 }
 
-extension ChannelProfileFileHeaderView: AppearanceProviding {
+extension ChannelInfoVC.AttachmentHeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
