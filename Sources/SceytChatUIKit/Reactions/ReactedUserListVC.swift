@@ -1,5 +1,5 @@
 //
-//  UserReactionListVC.swift
+//  ReactedUserListVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class UserReactionListVC: ViewController,
+open class ReactedUserListVC: ViewController,
                            UICollectionViewDataSource,
                            UICollectionViewDelegateFlowLayout {
 
@@ -29,7 +29,7 @@ open class UserReactionListVC: ViewController,
         super.setup()
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.register(Components.userReactionCell)
+        collectionView.register(Components.reactedUserReactionCell)
         collectionView.alwaysBounceVertical = true
     }
 
@@ -78,7 +78,7 @@ open class UserReactionListVC: ViewController,
     }
 
     open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.userReactionCell)
+        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.reactedUserReactionCell)
         if let cellModel = viewModel.cellModel(at: indexPath) {
             cell.data = cellModel.0
             cell.reactionLabel.text = cellModel.1
@@ -102,7 +102,7 @@ open class UserReactionListVC: ViewController,
     }
 
 }
-public extension UserReactionListVC {
+public extension ReactedUserListVC {
 
     enum Event {
         case onSelect(ChatMessage.Reaction)

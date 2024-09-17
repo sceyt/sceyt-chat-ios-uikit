@@ -1,5 +1,5 @@
 //
-//  ReactionVC.swift
+//  ReactionsInfoVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ReactionVC: ViewController,
+open class ReactionsInfoVC: ViewController,
                         UIPageViewControllerDataSource,
                         UIPageViewControllerDelegate,
                         UICollectionViewDataSource,
@@ -21,7 +21,7 @@ open class ReactionVC: ViewController,
     open var userReactionsViewModel: [UserReactionViewModel] = [] {
         didSet {
             viewControllers = userReactionsViewModel.map {
-                let vc = UserReactionListVC()
+                let vc = Components.reactedUserListVC.init()
                 vc.viewModel = $0
                 vc.onEvent = { [weak self] event in
                     switch event {
@@ -43,7 +43,7 @@ open class ReactionVC: ViewController,
         .withoutAutoresizingMask
     private var transition: ReactionTransition!
 
-    public init() {
+    public required init() {
         super.init(nibName: nil, bundle: nil)
         transition = .init()
         transitioningDelegate = transition
@@ -66,7 +66,7 @@ open class ReactionVC: ViewController,
         view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.register(Components.reactionScoreCell)
+        collectionView.register(Components.reactionsInfoScoreCell)
         collectionViewLayout.scrollDirection = .horizontal
         collectionViewLayout.minimumLineSpacing = .zero
         collectionViewLayout.minimumInteritemSpacing = .zero
@@ -116,7 +116,7 @@ open class ReactionVC: ViewController,
     }
 
     open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.reactionScoreCell)
+        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.reactionsInfoScoreCell)
         cell.data = reactionScoreViewModel.value(at: indexPath)
         return cell
     }
@@ -189,10 +189,9 @@ open class ReactionVC: ViewController,
     }
 
 }
-public extension ReactionVC {
 
+public extension ReactionsInfoVC {
     enum Event {
         case removeReaction(ChatMessage.Reaction)
     }
-
 }

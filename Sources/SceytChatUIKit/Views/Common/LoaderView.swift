@@ -1,5 +1,5 @@
 //
-//  HUD.swift
+//  LoaderView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 12/10/2023.
@@ -8,15 +8,15 @@
 
 import UIKit
 
-public let hud = SCTUIKitComponents.hud
+public let loader = SCTUIKitComponents.loader
 
-public protocol HUD {
+public protocol LoaderRepresentable {
     static func show()
     static func hide()
     static var isLoading: Bool { get set }
 }
 
-open class KitHUD: View, HUD {
+open class LoaderView: View, LoaderRepresentable {
     public static var isLoading: Bool = false {
         didSet {
             if isLoading {
@@ -29,22 +29,22 @@ open class KitHUD: View, HUD {
     
     static var window: UIWindow { UIApplication.shared.windows.first ?? UIWindow() }
     
-    static var hud: KitHUD? { window.subviews.first(where: { $0 is KitHUD }) as? KitHUD }
+    static var loader: LoaderView? { window.subviews.first(where: { $0 is LoaderView }) as? LoaderView }
     
     public static func show() {
         DispatchQueue.main.async {
-            var hud = hud
-            if hud == nil {
-                hud = KitHUD().withoutAutoresizingMask
+            var loader = loader
+            if loader == nil {
+                loader = LoaderView().withoutAutoresizingMask
             }
-            window.addSubview(hud!)
-            hud?.pin(to: window)
+            window.addSubview(loader!)
+            loader?.pin(to: window)
         }
     }
     
     public static func hide() {
         DispatchQueue.main.async {
-            hud?.removeFromSuperview()
+            loader?.removeFromSuperview()
         }
     }
     

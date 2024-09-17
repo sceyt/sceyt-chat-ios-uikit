@@ -64,14 +64,13 @@ open class ChannelRouter: Router<ChannelVC> {
                 }])
     }
 
-    open func showEmojis() -> EmojiListVC {
-        let emojiListVC = Components.emojiListVC
-            .init()
-        emojiListVC.viewModel = Components.emojiListVM.init()
+    open func showEmojis() -> EmojiPickerVC {
+        let emojiPickerVC = Components.emojiPickerVC.init()
+        emojiPickerVC.viewModel = Components.emojiListVM.init()
         let nav = EmojiViewInteractiveTransitionNavigationController
-            .init(rootViewController: emojiListVC)
+            .init(rootViewController: emojiPickerVC)
         rootVC.present(nav, animated: true)
-        return emojiListVC
+        return emojiPickerVC
     }
 
     open func playFrom(url: URL) {
@@ -87,9 +86,8 @@ open class ChannelRouter: Router<ChannelVC> {
     @discardableResult
     open func showReactions(
         message: ChatMessage
-    ) -> ReactionVC {
-        let reactionPageVC = ReactionVC
-            .init()
+    ) -> ReactionsInfoVC {
+        let reactionPageVC = Components.reactionsInfoVC.init()
         let reactionScores = message.reactionScores?.sorted(by: { $0.key > $1.key && $0.value > $1.value }) ?? []
         let reactionScoreViewModel = ReactionScoreViewModel(reactionScores: reactionScores)
         var userReactionViewModels: [UserReactionViewModel] = .init()

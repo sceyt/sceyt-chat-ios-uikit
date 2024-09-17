@@ -874,9 +874,9 @@ open class ChannelVC: ViewController,
     
     @objc
     open func joinButtonAction(_ sender: UIButton) {
-        hud.isLoading = true
+        loader.isLoading = true
         channelViewModel.join { [weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self = self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -1036,7 +1036,7 @@ open class ChannelVC: ViewController,
         }
         router.showForward { [weak self] channels in
             guard let self else { return }
-            hud.show()
+            loader.show()
             self.channelViewModel.share(messages: messages, to: channels.map { $0.id }) { [weak self] in
                 guard let self else { return }
                 if channels.contains(self.channelViewModel.channel) {
@@ -1045,7 +1045,7 @@ open class ChannelVC: ViewController,
                     ChannelListRouter.showChannel(channels[0])
                 }
                 self.router.dismiss()
-                hud.hide()
+                loader.hide()
             }
         }
     }

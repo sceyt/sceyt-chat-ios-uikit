@@ -826,9 +826,9 @@ open class ChannelInfoVC: ViewController,
     }
     
     open func block() {
-        hud.isLoading = true
+        loader.isLoading = true
         profileViewModel.block { [weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -840,9 +840,9 @@ open class ChannelInfoVC: ViewController,
     }
     
     open func unblock() {
-        hud.isLoading = true
+        loader.isLoading = true
         profileViewModel.unblock { [weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -853,9 +853,9 @@ open class ChannelInfoVC: ViewController,
     }
     
     open func leave() {
-        hud.isLoading = true
+        loader.isLoading = true
         profileViewModel.leave { [weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -866,9 +866,9 @@ open class ChannelInfoVC: ViewController,
     }
     
     open func blockAndLeave() {
-        hud.isLoading = true
+        loader.isLoading = true
         profileViewModel.blockAndLeave { [weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self else { return }
             if let error = error {
                 self.showAlert(error: error)
@@ -897,9 +897,9 @@ open class ChannelInfoVC: ViewController,
                   actions: [
                     .init(title: L10n.Alert.Button.cancel, style: .cancel),
                     .init(title: L10n.Alert.Button.delete, style: .destructive) { [weak self] in
-                        hud.isLoading = true
+                        loader.isLoading = true
                         self?.profileViewModel.delete { [weak self] error in
-                            hud.isLoading = false
+                            loader.isLoading = false
                             guard let self else { return }
                             if let error = error {
                                 self.showAlert(error: error)

@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class EmojiListVC: ViewController,
+open class EmojiPickerVC: ViewController,
     UICollectionViewDataSource,
     UICollectionViewDelegate,
     EmojiSectionToolBarDelegate
@@ -34,10 +34,10 @@ open class EmojiListVC: ViewController,
         headerToolBar.delegate = self
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.register(Components.emojiListCollectionViewCell.self)
-        collectionView.register(Components.emojiListSectionHeaderView.self,
+        collectionView.register(Components.emojiPickerCell.self)
+        collectionView.register(Components.emojiPickerSectionHeaderView.self,
                                 forSupplementaryViewOfKind: UICollectionView.elementKindSectionHeader,
-                                withReuseIdentifier: Components.emojiListSectionHeaderView.reuseId)
+                                withReuseIdentifier: Components.emojiPickerSectionHeaderView.reuseId)
     }
 
     override open func setupAppearance() {
@@ -75,7 +75,7 @@ open class EmojiListVC: ViewController,
     }
 
     open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.emojiListCollectionViewCell.self)
+        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.emojiPickerCell.self)
         cell.label.text = viewModel.code(at: indexPath)
         return cell
     }
@@ -85,8 +85,8 @@ open class EmojiListVC: ViewController,
     open func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
         if kind == UICollectionView.elementKindSectionHeader {
             let sectionHeader = collectionView.dequeueReusableSupplementaryView(ofKind: kind,
-                                                                                withReuseIdentifier: Components.emojiListSectionHeaderView.reuseId,
-                                                                                for: indexPath) as! EmojiListSectionHeaderView
+                                                                                withReuseIdentifier: Components.emojiPickerSectionHeaderView.reuseId,
+                                                                                for: indexPath) as! EmojiPickerVC.SectionHeaderView
             sectionHeader.bind(viewModel.groupTitle(at: indexPath.section))
             return sectionHeader
         } else {
@@ -139,7 +139,7 @@ open class EmojiListVC: ViewController,
     }
 }
 
-public extension EmojiListVC {
+public extension EmojiPickerVC {
     enum Event {
         case selectEmoji(String)
 
@@ -169,7 +169,7 @@ open class EmojiViewPresentationController: UIPresentationController, UIGestureR
         return t
     }()
 
-    open var state: EmojiListVC.State = .small
+    open var state: EmojiPickerVC.State = .small
     open private(set) var direction: CGFloat = 0
     open private(set) var shouldComplete: Bool = false
     open lazy var topAnchor: CGFloat = presentedView?.window?.windowScene?.statusBarManager?.statusBarFrame.height ?? 64
@@ -220,7 +220,7 @@ open class EmojiViewPresentationController: UIPresentationController, UIGestureR
         }
     }
 
-    open func frameFor(state: EmojiListVC.State) -> CGRect {
+    open func frameFor(state: EmojiPickerVC.State) -> CGRect {
         guard let containerView = containerView else { return .zero }
         switch state {
         case .large:
@@ -230,7 +230,7 @@ open class EmojiViewPresentationController: UIPresentationController, UIGestureR
         }
     }
 
-    open func changeState(to state: EmojiListVC.State) {
+    open func changeState(to state: EmojiPickerVC.State) {
         let frame = frameFor(state: state)
         guard frame != .zero else { return }
         if let presentedView = presentedView {

@@ -51,20 +51,20 @@ open class ChannelAddMembersVC: SelectChannelMembersVC {
     
     @objc
     open func doneAction(_ sender: UIBarButtonItem) {
-        hud.isLoading = true
+        loader.isLoading = true
         addMembersViewModel.addMembers()
     }
     
     open func onEvent( _ event: ChannelAddMembersVM.Event) {
         switch event {
         case .success:
-            hud.isLoading = false
+            loader.isLoading = false
             router.dismiss(animated: true)
             if !addMembersViewModel.onlyDismissAfterDone {
                 ChannelListRouter.showChannel(addMembersViewModel.channel)
             }
         case .error(let error):
-            hud.isLoading = false
+            loader.isLoading = false
             router.showAlert(error: error)
         }
     }

@@ -115,13 +115,13 @@ open class ImageCropperVC: ViewController {
     }
   
     @objc func onConfirmTapped(_ sender: UIButton) {
-        hud.isLoading = true
+        loader.isLoading = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self else { return }
             let image = self.viewModel.crop()
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                hud.isLoading = false
+                loader.isLoading = false
                 self.onComplete?(image)
             }
         }

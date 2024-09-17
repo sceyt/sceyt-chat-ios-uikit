@@ -175,7 +175,7 @@ open class MediaPickerVC: ViewController,
     
     @objc
     open func attachButtonAction(_ sender: AttachButton) {
-        hud.isLoading = true
+        loader.isLoading = true
         var selectedAssets: [PHAsset] = []
         for indexPath in selectedIndexPaths {
             guard indexPath.item < assets.count else { continue }
@@ -188,7 +188,7 @@ open class MediaPickerVC: ViewController,
     }
     
     open override func dismiss(animated flag: Bool, completion: (() -> Void)? = nil) {
-        hud.isLoading = false
+        loader.isLoading = false
         super.dismiss(animated: flag, completion: completion)
     }
     

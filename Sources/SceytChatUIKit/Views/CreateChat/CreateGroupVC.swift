@@ -97,7 +97,7 @@ open class CreateGroupVC: ViewController,
     }
     
     private func create() {
-        hud.isLoading = true
+        loader.isLoading = true
         viewModel
             .create(subject: profileView.subjectField.text ?? "",
                     metadata: profileView.descriptionField.text,
@@ -107,10 +107,10 @@ open class CreateGroupVC: ViewController,
     func onEvent(_ event: CreatePrivateChannelVM.Event) {
         switch event {
         case .createdChannel(let channel):
-            hud.isLoading = false
+            loader.isLoading = false
             router.showChannel(channel)
         case .createChannelError(let error):
-            hud.isLoading = false
+            loader.isLoading = false
             router.showAlert(error: error)
         }
     }

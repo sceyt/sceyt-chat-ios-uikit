@@ -650,7 +650,7 @@ extension MediaPreviewerVC: AppearanceProviding {
     }
 }
 
-extension EmojiVC: AppearanceProviding {
+extension ReactionPickerVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -689,7 +689,7 @@ extension MenuCell: AppearanceProviding {
     }
 }
 
-extension ReactionVC: AppearanceProviding {
+extension ReactionsInfoVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -699,7 +699,7 @@ extension ReactionVC: AppearanceProviding {
     }
 }
 
-extension ReactionScoreCell: AppearanceProviding {
+extension ReactionsInfoVC.ReactionScoreCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -725,7 +725,7 @@ extension ActionPresentationController: AppearanceProviding {
     }
 }
 
-extension EmojiListSectionHeaderView: AppearanceProviding {
+extension EmojiPickerVC.SectionHeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -983,7 +983,7 @@ extension SelectedUserCell: AppearanceProviding {
     }
 }
 
-extension UserReactionListVC: AppearanceProviding {
+extension ReactedUserListVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -993,7 +993,7 @@ extension UserReactionListVC: AppearanceProviding {
     }
 }
 
-extension UserReactionCell: AppearanceProviding {
+extension ReactedUserListVC.UserReactionCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1075,7 +1075,7 @@ extension EmojiSectionToolBar: AppearanceProviding {
     }
 }
 
-extension EmojiListVC: AppearanceProviding {
+extension EmojiPickerVC: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {

@@ -101,9 +101,9 @@ open class EditChannelVC: ViewController,
     }
     
     func onDone() {
-        hud.isLoading = true
+        loader.isLoading = true
         profileViewModel.update { [weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self else { return }
             if let error {
                 self.showAlert(error: error)

@@ -1,5 +1,5 @@
 //
-//  EmojiVC.swift
+//  ReactionPickerVC.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 16.02.23.
@@ -8,21 +8,21 @@
 
 import UIKit
 
-public protocol EmojiVCDataSource: AnyObject {
+public protocol ReactionPickerVCDataSource: AnyObject {
     
     var emojis: [String] { get }
     var selectedEmojis: [String] { get }
     var showPlusAfterEmojis: Bool { get }
 }
 
-public protocol EmojiVCDelegate: AnyObject {
+public protocol ReactionPickerVCDelegate: AnyObject {
     
     func didSelect(emoji: String)
     func didDeselect(emoji: String)
     func didSelectMoreAction()
 }
 
-open class EmojiVC: ViewController {
+open class ReactionPickerVC: ViewController {
    
     open lazy var containerView = UIView()
         .withoutAutoresizingMask
@@ -33,13 +33,13 @@ open class EmojiVC: ViewController {
     open lazy var backedStackView = UIStackView()
         .withoutAutoresizingMask
             
-    open weak var dataSource: EmojiVCDataSource? {
+    open weak var dataSource: ReactionPickerVCDataSource? {
         didSet {
             containerStackView.removeArrangedSubviews()
             setupData()
         }
     }
-    open weak var delegate: EmojiVCDelegate?
+    open weak var delegate: ReactionPickerVCDelegate?
     
     override open func setup() {
         super.setup()
@@ -152,7 +152,7 @@ open class EmojiVC: ViewController {
 
 }
 
-public extension EmojiVC {
+public extension ReactionPickerVC {
     enum Layouts {
         public static let containerHeight: CGFloat = 48
         public static let emojiSize: CGFloat = 40
@@ -160,7 +160,7 @@ public extension EmojiVC {
     }
 }
 
-private extension EmojiVC {
+private extension ReactionPickerVC {
     
     func setupData() {
         func backgroundView() -> UIView {
@@ -227,7 +227,7 @@ private extension EmojiVC {
         }
     }
 }
-private extension EmojiVC {
+private extension ReactionPickerVC {
     
     @objc
     func didSelectEmoji(sender: UIButton) {

@@ -134,16 +134,16 @@ public enum SCTUIKitComponents {
     public static var mediaPreviewerImageView: MediaPreviewerImageView.Type = MediaPreviewerImageView.self
     public static var mediaPreviewerScrollView: MediaPreviewerScrollView.Type = MediaPreviewerScrollView.self
     
-    public static var emojiVC: EmojiVC.Type = EmojiVC.self // reactions popup
-    public static var emojiListVC: EmojiListVC.Type = EmojiListVC.self
+    public static var reactionPickerVC: ReactionPickerVC.Type = ReactionPickerVC.self // reactions popup
+    public static var emojiPickerVC: EmojiPickerVC.Type = EmojiPickerVC.self
     public static var emojiListVM: EmojiListVM.Type = EmojiListVM.self
-    public static var emojiListCollectionViewCell: EmojiListCollectionViewCell.Type = EmojiListCollectionViewCell.self
-    public static var emojiListSectionHeaderView: EmojiListSectionHeaderView.Type = EmojiListSectionHeaderView.self
+    public static var emojiPickerCell: EmojiPickerVC.EmojiCell.Type = EmojiPickerVC.EmojiCell.self
+    public static var emojiPickerSectionHeaderView: EmojiPickerVC.SectionHeaderView.Type = EmojiPickerVC.SectionHeaderView.self
     
-    public static var userReactionListVC: UserReactionListVC.Type = UserReactionListVC.self
-    public static var userReactionCell: UserReactionCell.Type = UserReactionCell.self
-    public static var reactionPageVC: ReactionVC.Type = ReactionVC.self
-    public static var reactionScoreCell: ReactionScoreCell.Type = ReactionScoreCell.self
+    public static var reactedUserListVC: ReactedUserListVC.Type = ReactedUserListVC.self
+    public static var reactedUserReactionCell: ReactedUserListVC.UserReactionCell.Type = ReactedUserListVC.UserReactionCell.self
+    public static var reactionsInfoVC: ReactionsInfoVC.Type = ReactionsInfoVC.self
+    public static var reactionsInfoScoreCell: ReactionsInfoVC.ReactionScoreCell.Type = ReactionsInfoVC.ReactionScoreCell.self
     
     public static var startChatVC: StartChatVC.Type = StartChatVC.self
     public static var createNewChannelVM: CreateNewChannelVM.Type = CreateNewChannelVM.self
@@ -234,7 +234,7 @@ public enum SCTUIKitComponents {
     
     
     
-    public static var hud: HUD.Type = KitHUD.self
+    public static var loader: LoaderRepresentable.Type = LoaderView.self
     
     public static var logger: SCTUIKitLog.Type = SCTUIKitLog.self
 }

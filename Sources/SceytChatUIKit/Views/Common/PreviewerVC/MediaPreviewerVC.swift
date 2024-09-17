@@ -486,11 +486,11 @@ open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
             case .saveGallery:
                 viewModel.save()
             case let .forward(channelIds):
-                hud.show()
+                loader.show()
                 viewModel.forward(channelIds: channelIds) { [weak self] in
                     guard let self else { return }
                     router.dismiss()
-                    hud.hide()
+                    loader.hide()
                 }
             case .share:
                 router.share([previewItem.attachment.fileUrl ?? previewItem.attachment.originUrl], from: sender)

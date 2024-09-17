@@ -74,10 +74,10 @@ open class CreateChannelVC: ViewController, UITextViewDelegate {
         profileView.hideError()
         switch event {
         case .createdChannel(let channel):
-            hud.isLoading = false
+            loader.isLoading = false
             router.showAddMember(channel: channel)
         case .error(let error):
-            hud.isLoading = false
+            loader.isLoading = false
             router.showAlert(error: error)
         case let .invalidURI(error):
             profileView.showError(error.localizedDescription)
@@ -93,7 +93,7 @@ open class CreateChannelVC: ViewController, UITextViewDelegate {
         guard let subject = profileView.subjectField.text,
               let uri = profileView.uriField.text
         else { return}
-        hud.isLoading = true
+        loader.isLoading = true
         viewModel
             .create(
                 uri: uri,
