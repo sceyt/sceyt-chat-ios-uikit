@@ -88,9 +88,9 @@ class LoginViewController: UIViewController {
         guard let username = usernameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
                 !username.isEmpty
         else { return }
-        hud.isLoading = true
+        loader.isLoading = true
         ConnectionService.shared.connect(username: username) { [weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self
             else { return }
             self.dismissSheet()
@@ -98,9 +98,9 @@ class LoginViewController: UIViewController {
                 self.showAlert(error: error)
                 return
             }
-            hud.isLoading = true
+            loader.isLoading = true
             self.updateProfile {[weak self] in
-                hud.isLoading = false
+                loader.isLoading = false
                 self?.dismiss(animated: true)
             }
             

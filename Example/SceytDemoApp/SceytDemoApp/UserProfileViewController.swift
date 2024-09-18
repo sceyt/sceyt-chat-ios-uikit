@@ -192,9 +192,9 @@ class UserProfileViewController: UIViewController {
     @objc
     private func save(_ sender: UIBarButtonItem) {
         let displayName = profileView.displayNameLabel.text
-        hud.isLoading = true
+        loader.isLoading = true
         UserProfile.update(displayName: displayName) {[weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self
             else { return }
             if let error {
