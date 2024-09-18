@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+AttachmentCell.swift
+//  ChannelInfoViewController+AttachmentCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 10.07.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class AttachmentCell: CollectionViewCell {
         
         open lazy var imageView = UIImageView()

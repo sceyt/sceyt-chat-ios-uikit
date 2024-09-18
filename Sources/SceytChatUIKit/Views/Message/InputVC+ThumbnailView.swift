@@ -1,5 +1,5 @@
 //
-//  InputVC+ThumbnailView.swift
+//  InputViewController+ThumbnailView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,9 +8,9 @@
 
 import UIKit
 
-extension InputVC {
+extension InputViewController {
     open class ThumbnailView: View {
-        public lazy var appearance = Components.inputVC.appearance {
+        public lazy var appearance = Components.inputViewController.appearance {
             didSet {
                 setupAppearance()
             }

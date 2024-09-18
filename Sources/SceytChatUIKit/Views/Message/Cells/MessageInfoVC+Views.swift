@@ -1,5 +1,5 @@
 //
-//  MessageInfoVC+Views.swift
+//  MessageInfoViewController+Views.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 21/10/2023.
@@ -8,9 +8,9 @@
 
 import UIKit
 
-extension MessageInfoVC {
+extension MessageInfoViewController {
     open class HeaderView: TableViewHeaderFooterView {
-        open lazy var appearance = MessageInfoVC.appearance
+        open lazy var appearance = MessageInfoViewController.appearance
         
         open lazy var label = ContentInsetLabel().withoutAutoresizingMask
         
@@ -36,7 +36,7 @@ extension MessageInfoVC {
     }
 
     open class MessageCell: TableViewCell {
-        open lazy var appearance = MessageInfoVC.appearance
+        open lazy var appearance = MessageInfoViewController.appearance
         
         open lazy var bubbleView = Components.channelOutgoingMessageCell.init().withoutAutoresizingMask
         
@@ -121,7 +121,7 @@ extension MessageInfoVC {
     }
     
     open class MarkerCell: TableViewCell {
-        open lazy var appearance = MessageInfoVC.appearance
+        open lazy var appearance = MessageInfoViewController.appearance
         
         open lazy var avatarView = Components.circleImageView.init()
             .contentMode(.scaleAspectFill)

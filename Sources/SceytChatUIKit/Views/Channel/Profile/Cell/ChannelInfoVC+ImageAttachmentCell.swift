@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+ImageAttachmentCell.swift
+//  ChannelInfoViewController+ImageAttachmentCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,8 +8,8 @@
 
 import UIKit
 
-extension ChannelInfoVC {
-    open class ImageAttachmentCell: ChannelInfoVC.AttachmentCell {
+extension ChannelInfoViewController {
+    open class ImageAttachmentCell: ChannelInfoViewController.AttachmentCell {
         
         open override var data: MessageLayoutModel.AttachmentLayout! {
             didSet {

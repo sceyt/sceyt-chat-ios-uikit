@@ -1,5 +1,5 @@
 //
-//  ChannelVC.swift
+//  ChannelViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -9,7 +9,7 @@
 import SceytChat
 import UIKit
 
-open class ChannelVC: ViewController,
+open class ChannelViewController: ViewController,
                       UIGestureRecognizerDelegate,
                       UICollectionViewDelegateFlowLayout,
                       UICollectionViewDataSource,
@@ -23,28 +23,28 @@ open class ChannelVC: ViewController,
     open var channelViewModel: ChannelVM!
     
     open lazy var router = Components.channelRouter
-        .init(rootVC: self)
+        .init(rootViewController: self)
     
     open lazy var collectionView = Components.channelMessagesCollectionView
         .init()
         .withoutAutoresizingMask
     
-    open var layout: ChannelVC.MessagesCollectionViewLayout {
+    open var layout: ChannelViewController.MessagesCollectionViewLayout {
         collectionView.layout
     }
     
     open lazy var coverView = BarCoverView()
         .withoutAutoresizingMask
     
-    open lazy var inputVC = Components.inputVC
+    open lazy var customInputViewController = Components.inputViewController
         .init()
     
-    open var inputTextView: InputVC.InputTextView {
-        inputVC.inputTextView
+    open var inputTextView: InputViewController.InputTextView {
+        customInputViewController.inputTextView
     }
     
-    open var mediaView: InputVC.MediaView {
-        inputVC.mediaView
+    open var mediaView: InputViewController.MediaView {
+        customInputViewController.mediaView
     }
     
     open var titleView = Components.channelHeaderView
@@ -232,8 +232,8 @@ open class ChannelVC: ViewController,
         contextMenu.delegate = self
         contextMenu.snapshotDelegate = self
         
-        inputVC.mentionUserListVC = { [unowned self] in
-            let viewController = Components.inputMentionUsersListVC.init()
+        customInputViewController.mentionUserListViewController = { [unowned self] in
+            let viewController = Components.inputMentionUsersListViewController.init()
             viewController.viewModel = Components.mentioningUserListVM
                 .init(channelId: channelViewModel.channel.id)
             return viewController
@@ -315,13 +315,13 @@ open class ChannelVC: ViewController,
         view.addSubview(createdView)
         view.addSubview(coverView)
         view.addSubview(searchControlsView)
-        addChild(inputVC)
-        coverView.addSubview(inputVC.view)
+        addChild(customInputViewController)
+        coverView.addSubview(customInputViewController.view)
         coverView.addSubview(unreadCountView)
         view.addSubview(joinGlobalChannelButton)
         
-        messageInputViewBottomConstraint = inputVC.view.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
-        messageInputViewHeightConstraint = inputVC.view.resize(anchors: [.height(52)]).first!
+        messageInputViewBottomConstraint = customInputViewController.view.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
+        messageInputViewHeightConstraint = customInputViewController.view.resize(anchors: [.height(52)]).first!
         
         searchControlsViewBottomConstraint = searchControlsView.bottomAnchor.pin(to: view.safeAreaLayoutGuide.bottomAnchor)
         searchControlsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing])
@@ -332,23 +332,23 @@ open class ChannelVC: ViewController,
         collectionView.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
         noDataView.pin(to: view, anchors: [.leading, .trailing])
         noDataView.topAnchor.pin(to: view.safeAreaLayoutGuide.topAnchor)
-        noDataView.bottomAnchor.pin(to: inputVC.view.topAnchor)
+        noDataView.bottomAnchor.pin(to: customInputViewController.view.topAnchor)
         createdView.pin(to: view, anchors: [.leading, .trailing])
-        createdView.bottomAnchor.pin(to: inputVC.view.topAnchor)
-        inputVC.view.pin(to: coverView.safeAreaLayoutGuide, anchors: [.leading, .trailing])
-        unreadCountView.trailingAnchor.pin(to: inputVC.view.trailingAnchor, constant: -10)
-        unreadCountView.bottomAnchor.pin(to: inputVC.view.topAnchor, constant: -10)
+        createdView.bottomAnchor.pin(to: customInputViewController.view.topAnchor)
+        customInputViewController.view.pin(to: coverView.safeAreaLayoutGuide, anchors: [.leading, .trailing])
+        unreadCountView.trailingAnchor.pin(to: customInputViewController.view.trailingAnchor, constant: -10)
+        unreadCountView.bottomAnchor.pin(to: customInputViewController.view.topAnchor, constant: -10)
         unreadCountView.resize(anchors: [.width(44), .height(48)])
         joinGlobalChannelButton.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .bottom])
         joinGlobalChannelButton.resize(anchors: [.height(52)])
         
         view.addSubview(keyboardBgView)
         keyboardBgView.pin(to: view, anchors: [.leading, .trailing, .bottom])
-        keyboardBgView.topAnchor.pin(to: inputVC.view.bottomAnchor)
+        keyboardBgView.topAnchor.pin(to: customInputViewController.view.bottomAnchor)
         
         view.addSubview(selectingView)
         selectingView.pin(to: view, anchors: [.leading, .trailing])
-        selectingView.bottomAnchor.pin(to: inputVC.view.bottomAnchor)
+        selectingView.bottomAnchor.pin(to: customInputViewController.view.bottomAnchor)
         
         
         if let view = searchBar.searchTextField.leftView {
@@ -390,7 +390,7 @@ open class ChannelVC: ViewController,
                 self?.channelViewModel.isTyping = isTyping
             }.store(in: &subscriptions)
         
-        inputVC.onContentHeightUpdate = { [weak self] height, completion in
+        customInputViewController.onContentHeightUpdate = { [weak self] height, completion in
             guard let self else { return }
             if height != self.messageInputViewHeightConstraint.constant {
                 UIView.animate(withDuration: 0.25) { [weak self] in
@@ -405,7 +405,7 @@ open class ChannelVC: ViewController,
                         contentOffsetY += newBottom - bottom
                     }
                     contentOffsetY = min(contentOffsetY, collectionView.contentSize.height)
-                    let needsToScroll = (self.collectionView.lastVisibleAttributes?.frame.maxY ?? 0) > self.inputVC.view.frameRelativeTo(view: self.collectionView).minY + diff
+                    let needsToScroll = (self.collectionView.lastVisibleAttributes?.frame.maxY ?? 0) > self.customInputViewController.view.frameRelativeTo(view: self.collectionView).minY + diff
                     self.coverView.layoutIfNeeded()
                     guard needsToScroll else { return }
                     self.collectionView.layoutIfNeeded()
@@ -420,7 +420,7 @@ open class ChannelVC: ViewController,
             }
         }
         
-        inputVC.$action
+        customInputViewController.$action
             .compactMap { $0 }
             .sink { [unowned self] in
                 switch $0 {
@@ -432,7 +432,7 @@ open class ChannelVC: ViewController,
                 case .cancel:
                     channelViewModel.removeSelectedMessage()
                 case .deleteMedia:
-                    if inputVC.mediaView.items.count == 0 {
+                    if customInputViewController.mediaView.items.count == 0 {
                         UIView.animate(withDuration: 0.25) { [weak self] in
                             self?.view.layoutIfNeeded()
                         }
@@ -516,7 +516,7 @@ open class ChannelVC: ViewController,
             .receive(on: DispatchQueue.main)
             .sink { [weak self] isSearching in
                 self?.updateNavigationItems()
-                self?.inputVC.view.isHidden = isSearching
+                self?.customInputViewController.view.isHidden = isSearching
                 self?.searchControlsView.isHidden = !isSearching
             }
             .store(in: &subscriptions)
@@ -681,7 +681,7 @@ open class ChannelVC: ViewController,
             delay: 0,
             options: .init(rawValue: animation ?? 0)
         ) {
-            self.inputVC.view.layoutIfNeeded()
+            self.customInputViewController.view.layoutIfNeeded()
             if self.channelViewModel.selectedMessageForAction == nil {
                 self.collectionView.setContentOffset(.init(x: 0, y: contentOffsetY), animated: false)
             }
@@ -690,7 +690,7 @@ open class ChannelVC: ViewController,
     
     open func updateNavigationItems() {
         if channelViewModel.isEditing {
-            inputVC.actionViewCancelAction()
+            customInputViewController.actionViewCancelAction()
             view.endEditing(true)
             navigationItem.setHidesBackButton(false, animated: false)
             navigationItem.leftItemsSupplementBackButton = false
@@ -888,7 +888,7 @@ open class ChannelVC: ViewController,
     }
     
     @objc
-    open func unreadButtonAction(_ sender: ChannelVC.ScrollDownView) {
+    open func unreadButtonAction(_ sender: ChannelViewController.ScrollDownView) {
         if let userSelectOnRepliedMessage {
             showRepliedMessage(userSelectOnRepliedMessage)
             self.userSelectOnRepliedMessage = nil
@@ -919,8 +919,8 @@ open class ChannelVC: ViewController,
             viewController.view.bounds.contains(gesture.location(in: viewController.view))
         }
         guard
-            !inputVC.isRecording,
-            !inputVC.view.bounds.contains(gesture.location(in: inputVC.view)),
+            !customInputViewController.isRecording,
+            !customInputViewController.view.bounds.contains(gesture.location(in: customInputViewController.view)),
             !unreadCountView.bounds.contains(gesture.location(in: unreadCountView)),
             child == nil
         else { return }
@@ -943,7 +943,7 @@ open class ChannelVC: ViewController,
     
     @objc
     open func handleLongPressGestureRecognizer(_ sender: UILongPressGestureRecognizer) {
-        guard !channelViewModel.isEditing, !inputVC.isRecording
+        guard !channelViewModel.isEditing, !customInputViewController.isRecording
         else { return }
         
         func reset() {
@@ -1031,7 +1031,7 @@ open class ChannelVC: ViewController,
     }
     
     open func forward(messages: [ChatMessage]) {
-        guard !inputVC.isRecording else {
+        guard !customInputViewController.isRecording else {
             return showRecordDiscardAlertIfNeeded()
         }
         router.showForward { [weak self] channels in
@@ -1075,7 +1075,7 @@ open class ChannelVC: ViewController,
         {
             return true
         }
-        guard !(touch.view is ChannelVC.ScrollDownView)
+        guard !(touch.view is ChannelViewController.ScrollDownView)
         else { return false }
         guard !(touch.view?.tag == 999)
         else { return false }
@@ -1088,7 +1088,7 @@ open class ChannelVC: ViewController,
         if channelViewModel.isEditing {
             return false
         }
-        return inputVC.presentedMentionUserListVC?.parent == nil
+        return customInputViewController.presentedMentionUserListViewController?.parent == nil
     }
     
     @discardableResult
@@ -1243,7 +1243,7 @@ open class ChannelVC: ViewController,
 //        if channelViewModel.isLastMessage(at: lastIndexPath) {
 //            unreadCountView.isHidden = true
 //        } else {
-//            unreadCountView.isHidden = composerVC.isRecording
+//            unreadCountView.isHidden = composerViewController.isRecording
 //        }
     }
     
@@ -1477,7 +1477,7 @@ open class ChannelVC: ViewController,
         return cell
     }
     
-    // MARK: ChannelVC.MessagesCollectionViewLayoutDelegate
+    // MARK: ChannelViewController.MessagesCollectionViewLayoutDelegate
     
     open func collectionView(
         _ collectionView: UICollectionView,
@@ -1561,7 +1561,7 @@ open class ChannelVC: ViewController,
         let m = UserSendMessage(
             sendText: shouldClearText ? inputTextView.attributedText : .init(),
             attachments: mediaView.items,
-            linkMetadata: inputVC.lastDetectedLinkMetadata
+            linkMetadata: customInputViewController.lastDetectedLinkMetadata
         )
         if let ma = channelViewModel.selectedMessageForAction {
             switch ma {
@@ -1585,7 +1585,7 @@ open class ChannelVC: ViewController,
         if shouldClearText {
             inputTextView.text = nil
         }
-        inputVC.mediaView.removeAll()
+        customInputViewController.mediaView.removeAll()
         if channelViewModel.selectedMessageForAction == nil ||
             channelViewModel.selectedMessageForAction?.1 == .reply {
             UIView.animate(withDuration: 0.25) { [weak self] in
@@ -1603,7 +1603,7 @@ open class ChannelVC: ViewController,
                 self?.canShowUnreadCountView = canShowUnread
             }
         }
-        inputVC.removeActionView()
+        customInputViewController.removeActionView()
         channelViewModel.removeSelectedMessage()
     }
     
@@ -1616,7 +1616,7 @@ open class ChannelVC: ViewController,
     }
     
     open func edit(layoutModel: MessageLayoutModel) {
-        inputVC.addEdit(layoutModel: layoutModel)
+        customInputViewController.addEdit(layoutModel: layoutModel)
         inputTextView.attributedText = layoutModel.attributedView.content
         UIView.animate(withDuration: 0.25) { [weak self] in
             self?.inputTextView.becomeFirstResponder()
@@ -1635,7 +1635,7 @@ open class ChannelVC: ViewController,
                 self.view.layoutIfNeeded()
             } completion: { [weak self] _ in
                 guard let self else { return }
-                self.inputVC.addReply(layoutModel: layoutModel)
+                self.customInputViewController.addReply(layoutModel: layoutModel)
             }
         } else {
             showThreadForMessage(layoutModel.message)
@@ -1732,7 +1732,7 @@ open class ChannelVC: ViewController,
         channelViewModel.directChannel(user: user) { [weak self] channel, error in
             guard let self else { return }
             if let channel {
-                self.router.showChannelInfoVC(channel: channel)
+                self.router.showChannelInfoViewController(channel: channel)
             } else if let error {
                 self.showAlert(error: error)
             }
@@ -2123,20 +2123,20 @@ open class ChannelVC: ViewController,
         if let icon, let message {
             view.endEditing(true)
             coverView.addSubview(bottomView)
-            bottomView.pin(to: inputVC.view, anchors: [.leading, .top, .trailing, .bottom])
+            bottomView.pin(to: customInputViewController.view, anchors: [.leading, .top, .trailing, .bottom])
             bottomView.icon = icon
             bottomView.message = message
-            inputVC.shouldHideRecordButton = true
-            inputVC.addMediaButton.isHidden = true
-            inputVC.sendButton.isHidden = true
-            inputVC.recordButton.isHidden = true
-            inputVC.mediaView.isHidden = true
-            inputVC.actionView.isHidden = true
+            customInputViewController.shouldHideRecordButton = true
+            customInputViewController.addMediaButton.isHidden = true
+            customInputViewController.sendButton.isHidden = true
+            customInputViewController.recordButton.isHidden = true
+            customInputViewController.mediaView.isHidden = true
+            customInputViewController.actionView.isHidden = true
         } else {
             bottomView.removeFromSuperview()
-            inputVC.shouldHideRecordButton = false
-            inputVC.addMediaButton.isHidden = false
-            inputVC.updateState()
+            customInputViewController.shouldHideRecordButton = false
+            customInputViewController.addMediaButton.isHidden = false
+            customInputViewController.updateState()
         }
     }
     
@@ -2157,7 +2157,7 @@ open class ChannelVC: ViewController,
     
     private var isShowingRecordDiscardAlert = false
     open func showRecordDiscardAlertIfNeeded() {
-        guard inputVC.isRecording,
+        guard customInputViewController.isRecording,
               !isShowingRecordDiscardAlert
         else { return }
         
@@ -2169,7 +2169,7 @@ open class ChannelVC: ViewController,
                     self?.isShowingRecordDiscardAlert = false
                 },
                 .init(title: L10n.Alert.Button.discard, style: .default) { [weak self] in
-                    self?.inputVC.recorderView.stopAndPreview()
+                    self?.customInputViewController.recorderView.stopAndPreview()
                     self?.isShowingRecordDiscardAlert = false
                 }
             ],
@@ -2399,7 +2399,7 @@ open class ChannelVC: ViewController,
     }
     
     override open var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        if inputVC.isRecording {
+        if customInputViewController.isRecording {
             if view.window?.windowScene?.interfaceOrientation.isLandscape == true {
                 return [.landscapeLeft, .landscapeRight]
             } else {
@@ -2411,7 +2411,7 @@ open class ChannelVC: ViewController,
     
     @objc
     open func canShowPreviewer() -> Bool {
-        if inputVC.isRecording {
+        if customInputViewController.isRecording {
             showRecordDiscardAlertIfNeeded()
             return false
         } else {
@@ -2434,7 +2434,7 @@ open class ChannelVC: ViewController,
     }
 }
 
-extension ChannelVC {
+extension ChannelViewController {
     
     open class BarCoverView: UIView {
         override open func point(inside point: CGPoint, with event: UIEvent?) -> Bool {

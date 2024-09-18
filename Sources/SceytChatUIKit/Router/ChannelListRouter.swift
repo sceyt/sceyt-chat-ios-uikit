@@ -9,71 +9,71 @@
 import SceytChat
 import UIKit
 
-open class ChannelListRouter: Router<ChannelListVC> {
-    open func showChannelVC(at indexPath: IndexPath) {
-        guard let chatChannel = rootVC.channelListViewModel.channel(at: indexPath)
+open class ChannelListRouter: Router<ChannelListViewController> {
+    open func showChannelViewController(at indexPath: IndexPath) {
+        guard let chatChannel = rootViewController.channelListViewModel.channel(at: indexPath)
         else { return }
-        showChannelVC(channel: chatChannel)
+        showChannelViewController(channel: chatChannel)
     }
     
-    open func showChannelVC(channelId: ChannelId) {
-        if let chatChannel = rootVC.channelListViewModel.channel(id: channelId) {
-            showChannelVC(channel: chatChannel)
+    open func showChannelViewController(channelId: ChannelId) {
+        if let chatChannel = rootViewController.channelListViewModel.channel(id: channelId) {
+            showChannelViewController(channel: chatChannel)
         } else {
-            rootVC.channelListViewModel.fetchChannel(id: channelId) { [weak self] chatChannel in
+            rootViewController.channelListViewModel.fetchChannel(id: channelId) { [weak self] chatChannel in
                 if let chatChannel {
-                    self?.showChannelVC(channel: chatChannel)
+                    self?.showChannelViewController(channel: chatChannel)
                 }
             }
         }
     }
     
-    open func showChannelVC(channel: ChatChannel, animated: Bool = true) {
-        if let opened = rootVC.navigationController?.viewControllers.last(where: { $0 is ChannelVC }) as? ChannelVC,
+    open func showChannelViewController(channel: ChatChannel, animated: Bool = true) {
+        if let opened = rootViewController.navigationController?.viewControllers.last(where: { $0 is ChannelViewController }) as? ChannelViewController,
            opened.channelViewModel.channel.id == channel.id
         {
             popTo(opened, animated: animated)
             return
         }
-        let viewController = Components.channelVC.init()
+        let viewController = Components.channelViewController.init()
         viewController.hidesBottomBarWhenPushed = true
         viewController.channelViewModel = Components.channelVM
             .init(channel: channel)
-        setViewControllers([rootVC, viewController], animated: animated)
+        setViewControllers([rootViewController, viewController], animated: animated)
     }
     
     open class func findAndShowChannel(id: ChannelId) {
-        if let mainVC = UIApplication.shared.windows
+        if let mainViewController = UIApplication.shared.windows
             .compactMap({ $0.rootViewController as? UITabBarController })
             .first,
-            let navVC = mainVC.viewControllers?.first as? UINavigationController,
-            let channelListVC = navVC.viewControllers.first as? ChannelListVC
+            let navViewController = mainViewController.viewControllers?.first as? UINavigationController,
+            let channelListViewController = navViewController.viewControllers.first as? ChannelListViewController
         {
-            channelListVC.channelListRouter.showChannelVC(channelId: id)
+            channelListViewController.channelListRouter.showChannelViewController(channelId: id)
         }
     }
     
     open class func showChannel(_ channel: ChatChannel) {
-        if let mainVC = UIApplication.shared.windows
+        if let mainViewController = UIApplication.shared.windows
             .compactMap({ $0.rootViewController as? UITabBarController })
             .first,
-            let navVC = mainVC.viewControllers?.first as? UINavigationController,
-            let channelListVC = navVC.viewControllers.first as? ChannelListVC
+            let navViewController = mainViewController.viewControllers?.first as? UINavigationController,
+            let channelListViewController = navViewController.viewControllers.first as? ChannelListViewController
         {
-            channelListVC.channelListRouter.showChannelVC(channel: channel)
+            channelListViewController.channelListRouter.showChannelViewController(channel: channel)
         }
     }
     
     open func showNewChannel() {
-        let viewController = Components.startChatVC.init()
+        let viewController = Components.startChatViewController.init()
         viewController.viewModel = Components.createNewChannelVM.init()
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
-        rootVC.present(nav, animated: true)
+        rootViewController.present(nav, animated: true)
     }
     
     func showAskForDelete(completion: @escaping (Bool) -> Void) {
-        rootVC.showBottomSheet(title: L10n.Alert.Ask.delete, actions: [
+        rootViewController.showBottomSheet(title: L10n.Alert.Ask.delete, actions: [
             .init(title: L10n.Alert.Button.delete, style: .destructive) {
                 completion(true)
             },
@@ -87,7 +87,7 @@ open class ChannelListRouter: Router<ChannelListVC> {
         selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
-        rootVC.showBottomSheet(
+        rootViewController.showBottomSheet(
             title: L10n.Channel.Profile.Mute.title,
             actions: SceytChatUIKit.shared.config.muteItems.map { item in
                     .init(title: item.title, style: .default) { selected(item) }

@@ -15,7 +15,7 @@ public enum AttachmentPickerSource {
     case file
 }
 
-open class InputRouter: Router<InputVC> {
+open class InputRouter: Router<InputViewController> {
     func showAttachmentAlert(sources: [AttachmentPickerSource], sourceView: UIView?, callback: @escaping (AttachmentPickerSource?) -> Void) {
         var actions = [SheetAction]()
         if sources.contains(.camera) {
@@ -43,41 +43,41 @@ open class InputRouter: Router<InputVC> {
             title: L10n.Alert.Button.cancel,
             style: .cancel
         ) { callback(nil) })
-        rootVC.showBottomSheet(actions: actions)
+        rootViewController.showBottomSheet(actions: actions)
     }
 
     open func showPhotos(selectedPhotoAssetIdentifiers: Set<String>? = nil,
-                         callback: @escaping ([PHAsset], MediaPickerVC) -> Bool)
+                         callback: @escaping ([PHAsset], MediaPickerViewController) -> Bool)
     {
-        guard rootVC.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
+        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
-        let picker = Components.mediaPickerVC.init(
+        let picker = Components.mediaPickerViewController.init(
             selectedAssetIdentifiers: selectedPhotoAssetIdentifiers,
-            maximumAttachmentsAllowed: SceytChatUIKit.shared.config.maximumAttachmentsAllowed - rootVC.mediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
+            maximumAttachmentsAllowed: SceytChatUIKit.shared.config.maximumAttachmentsAllowed - rootViewController.mediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
         )
         picker.onSelected = callback
         let nav = Components.navigationController.init()
         nav.viewControllers = [picker]
-        rootVC.present(nav, animated: true)
+        rootViewController.present(nav, animated: true)
     }
 
     open func showDocuments(callback: @escaping ([URL]) -> Void) {
-        guard rootVC.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
+        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
-        DocumentPickerController(presenter: self.rootVC)
+        DocumentPickerController(presenter: self.rootViewController)
             .showPicker(callback: callback)
     }
 
     open func showCamera(callback: @escaping (AttachmentView?) -> Void) {
-        guard rootVC.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
+        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
-        ImagePickerController(presenter: self.rootVC)
+        ImagePickerController(presenter: self.rootViewController)
             .showCamera(callback: callback)
     }
 }

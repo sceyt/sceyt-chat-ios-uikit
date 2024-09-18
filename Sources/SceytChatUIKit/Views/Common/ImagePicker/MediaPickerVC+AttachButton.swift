@@ -1,5 +1,5 @@
 //
-//  MediaPickerVC+AttachButton.swift
+//  MediaPickerViewController+AttachButton.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,9 +8,9 @@
 
 import UIKit
 
-extension MediaPickerVC {
+extension MediaPickerViewController {
     open class AttachButton: Control {
-        public lazy var appearance = Components.mediaPickerVC.appearance {
+        public lazy var appearance = Components.mediaPickerViewController.appearance {
             didSet {
                 setupAppearance()
             }

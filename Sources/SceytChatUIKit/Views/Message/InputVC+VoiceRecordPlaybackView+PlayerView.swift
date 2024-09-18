@@ -1,5 +1,5 @@
 //
-//  InputVC+VoiceRecordPlaybackView+PlayerView.swift
+//  InputViewController+VoiceRecordPlaybackView+PlayerView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 19/03/2023.
@@ -9,9 +9,9 @@
 import AVFoundation
 import UIKit
 
-extension InputVC.VoiceRecordPlaybackView {
+extension InputViewController.VoiceRecordPlaybackView {
     open class PlayerView: View {
-        public lazy var appearance = Components.inputVC.appearance {
+        public lazy var appearance = Components.inputViewController.appearance {
             didSet {
                 setupAppearance()
             }

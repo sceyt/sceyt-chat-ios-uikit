@@ -1,5 +1,5 @@
 //
-//  EditChannelVC+URICell.swift
+//  EditChannelViewController+URICell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension EditChannelVC {
+extension EditChannelViewController {
     open class URICell: TableViewCell {
         open lazy var prefixLabel = UILabel()
         
@@ -26,7 +26,7 @@ extension EditChannelVC {
             }
         }
         
-        public lazy var appearance = EditChannelVC.appearance {
+        public lazy var appearance = EditChannelViewController.appearance {
             didSet {
                 setupAppearance()
             }

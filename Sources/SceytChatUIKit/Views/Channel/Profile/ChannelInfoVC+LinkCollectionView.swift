@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+LinkCollectionView.swift
+//  ChannelInfoViewController+LinkCollectionView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,8 +9,8 @@
 import UIKit
 import LinkPresentation
 
-extension ChannelInfoVC {
-    open class LinkCollectionView: ChannelInfoVC.AttachmentCollectionView,
+extension ChannelInfoViewController {
+    open class LinkCollectionView: ChannelInfoViewController.AttachmentCollectionView,
                                    UICollectionViewDelegate,
                                    UICollectionViewDataSource,
                                    UICollectionViewDelegateFlowLayout {
@@ -138,8 +138,8 @@ extension ChannelInfoVC {
     }
 }
 
-extension ChannelInfoVC.LinkCollectionView {
-    open class Layout: ChannelInfoVC.AttachmentCollectionView.Layout {
+extension ChannelInfoViewController.LinkCollectionView {
+    open class Layout: ChannelInfoViewController.AttachmentCollectionView.Layout {
         open var cellHeights: [URL: CGFloat] = [:]
         
         open func calculateLinkHeight(_ metadata: LinkMetadata, attachment: ChatMessage.Attachment?) {
@@ -165,7 +165,7 @@ extension ChannelInfoVC.LinkCollectionView {
     }
 }
 
-public extension ChannelInfoVC.LinkCollectionView {
+public extension ChannelInfoViewController.LinkCollectionView {
     enum Layouts {
         public static var horizontalPadding: CGFloat = 16
         public static var verticalPadding: CGFloat = 8

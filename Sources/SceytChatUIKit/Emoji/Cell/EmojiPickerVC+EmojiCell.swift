@@ -1,5 +1,5 @@
 //
-//  EmojiPickerVC+EmojiCell.swift
+//  EmojiPickerViewController+EmojiCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension EmojiPickerVC {
+extension EmojiPickerViewController {
     open class EmojiCell: CollectionViewCell {
         open lazy var label = UILabel()
             .withoutAutoresizingMask

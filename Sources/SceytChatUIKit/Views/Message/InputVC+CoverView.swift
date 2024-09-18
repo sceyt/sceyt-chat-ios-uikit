@@ -1,5 +1,5 @@
 //
-//  InputVC+CoverView.swift
+//  InputViewController+CoverView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 20/10/2023.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension InputVC {
+extension InputViewController {
     open class CoverView: View {
         open var icon: UIImage? {
             set {

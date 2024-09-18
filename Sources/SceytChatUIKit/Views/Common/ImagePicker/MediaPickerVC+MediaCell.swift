@@ -1,5 +1,5 @@
 //
-//  MediaPickerVC+MediaCell.swift
+//  MediaPickerViewController+MediaCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import Photos
 import UIKit
 
-extension MediaPickerVC {
+extension MediaPickerViewController {
     open class MediaCell: CollectionViewCell {
         public static var scale: CGFloat = SceytChatUIKit.shared.config.displayScale
         

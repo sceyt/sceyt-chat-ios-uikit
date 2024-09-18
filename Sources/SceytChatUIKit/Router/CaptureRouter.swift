@@ -61,21 +61,21 @@ public extension Router {
             title: L10n.Alert.Button.cancel,
             style: .cancel
         ) { action(.none) })
-        rootVC.showBottomSheet(actions: actions)
+        rootViewController.showBottomSheet(actions: actions)
     }
     
     func showCamera(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentView?) -> Void) {
-        ImagePickerController(presenter: rootVC)
+        ImagePickerController(presenter: rootViewController)
             .showCamera(mediaTypes: mediaTypes.map { $0.rawValue }, callback: done)
     }
     
     func selectPhoto(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentView?) -> Void) {
-        ImagePickerController(presenter: rootVC)
+        ImagePickerController(presenter: rootViewController)
             .showPhotoLibrary(mediaTypes: mediaTypes.map { $0.rawValue }, callback: done)
     }
     
     func editImage(_ image: UIImage, done: @escaping (UIImage) -> Void) {
-        let viewController = Components.imageCropperVC.init(
+        let viewController = Components.imageCropperViewController.init(
             onComplete: { [weak self] edited in
                 guard let self else { return }
                 done(edited)
@@ -89,6 +89,6 @@ public extension Router {
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
         nav.modalPresentationStyle = .fullScreen
-        rootVC.present(nav, animated: true)
+        rootViewController.present(nav, animated: true)
     }
 }

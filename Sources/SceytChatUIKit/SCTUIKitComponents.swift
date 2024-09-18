@@ -13,59 +13,59 @@ typealias Components = SCTUIKitComponents
 public enum SCTUIKitComponents {
     
     public static var navigationController: NavigationController.Type = NavigationController.self
-    public static var channelListVC: ChannelListVC.Type = ChannelListVC.self
+    public static var channelListViewController: ChannelListViewController.Type = ChannelListViewController.self
     public static var channelListVM: ChannelListVM.Type = ChannelListVM.self
     public static var channelListRouter: ChannelListRouter.Type = ChannelListRouter.self
     public static var channelCell: ChannelCell.Type = ChannelCell.self
-    public static var channelListEmptyStateView: ChannelListVC.EmptyStateView.Type = ChannelListVC.EmptyStateView.self
+    public static var channelListEmptyStateView: ChannelListViewController.EmptyStateView.Type = ChannelListViewController.EmptyStateView.self
     public static var noDataView: NoDataView.Type = NoDataView.self
     public static var channelCreatedView: ChannelCreatedView.Type = ChannelCreatedView.self
-    public static var channelVC: ChannelVC.Type = ChannelVC.self
+    public static var channelViewController: ChannelViewController.Type = ChannelViewController.self
     public static var channelVM: ChannelVM.Type = ChannelVM.self
     public static var channelRouter: ChannelRouter.Type = ChannelRouter.self
-    public static var channelMessagesCollectionView: ChannelVC.MessagesCollectionView.Type = ChannelVC.MessagesCollectionView.self
-    public static var channelMessagesCollectionViewLayout: ChannelVC.MessagesCollectionViewLayout.Type = ChannelVC.MessagesCollectionViewLayout.self
-    public static var channelScrollDownView: ChannelVC.ScrollDownView.Type = ChannelVC.ScrollDownView.self
-    public static var channelHeaderView: ChannelVC.HeaderView.Type = ChannelVC.HeaderView.self
-    public static var inputCoverView: InputVC.CoverView.Type = InputVC.CoverView.self
-    public static var channelDisplayedTimer: ChannelVC.DisplayedTimer.Type = ChannelVC.DisplayedTimer.self
-    public static var inputMessageSearchControlsView: InputVC.MessageSearchControlsView.Type = InputVC.MessageSearchControlsView.self
+    public static var channelMessagesCollectionView: ChannelViewController.MessagesCollectionView.Type = ChannelViewController.MessagesCollectionView.self
+    public static var channelMessagesCollectionViewLayout: ChannelViewController.MessagesCollectionViewLayout.Type = ChannelViewController.MessagesCollectionViewLayout.self
+    public static var channelScrollDownView: ChannelViewController.ScrollDownView.Type = ChannelViewController.ScrollDownView.self
+    public static var channelHeaderView: ChannelViewController.HeaderView.Type = ChannelViewController.HeaderView.self
+    public static var inputCoverView: InputViewController.CoverView.Type = InputViewController.CoverView.self
+    public static var channelDisplayedTimer: ChannelViewController.DisplayedTimer.Type = ChannelViewController.DisplayedTimer.self
+    public static var inputMessageSearchControlsView: InputViewController.MessageSearchControlsView.Type = InputViewController.MessageSearchControlsView.self
 
-    public static var channelInfoVC: ChannelInfoVC.Type = ChannelInfoVC.self
+    public static var channelInfoViewController: ChannelInfoViewController.Type = ChannelInfoViewController.self
     public static var simultaneousGestureTableView: SimultaneousGestureTableView.Type = SimultaneousGestureTableView.self
     public static var channelProfileVM: ChannelProfileVM.Type = ChannelProfileVM.self
     public static var channelProfileRouter: ChannelProfileRouter.Type = ChannelProfileRouter.self
     
-    public static var channelInfoDetailsCell: ChannelInfoVC.DetailsCell.Type = ChannelInfoVC.DetailsCell.self
-    public static var channelInfoDescriptionCell: ChannelInfoVC.DescriptionCell.Type = ChannelInfoVC.DescriptionCell.self
-    public static var channelInfoOptionCell: ChannelInfoVC.OptionCell.Type = ChannelInfoVC.OptionCell.self
-    public static var channelInfoContainerCell: ChannelInfoVC.ContainerCell.Type = ChannelInfoVC.ContainerCell.self
+    public static var channelInfoDetailsCell: ChannelInfoViewController.DetailsCell.Type = ChannelInfoViewController.DetailsCell.self
+    public static var channelInfoDescriptionCell: ChannelInfoViewController.DescriptionCell.Type = ChannelInfoViewController.DescriptionCell.self
+    public static var channelInfoOptionCell: ChannelInfoViewController.OptionCell.Type = ChannelInfoViewController.OptionCell.self
+    public static var channelInfoContainerCell: ChannelInfoViewController.ContainerCell.Type = ChannelInfoViewController.ContainerCell.self
     
-    public static var editChannelVC: EditChannelVC.Type = EditChannelVC.self
-    public static var editChannelAvatarCell: EditChannelVC.AvatarCell.Type = EditChannelVC.AvatarCell.self
-    public static var editChannelTextFieldCell: EditChannelVC.TextFieldCell.Type = EditChannelVC.TextFieldCell.self
-    public static var editChannelURICell: EditChannelVC.URICell.Type = EditChannelVC.URICell.self
+    public static var editChannelViewController: EditChannelViewController.Type = EditChannelViewController.self
+    public static var editChannelAvatarCell: EditChannelViewController.AvatarCell.Type = EditChannelViewController.AvatarCell.self
+    public static var editChannelTextFieldCell: EditChannelViewController.TextFieldCell.Type = EditChannelViewController.TextFieldCell.self
+    public static var editChannelURICell: EditChannelViewController.URICell.Type = EditChannelViewController.URICell.self
 
     public static var channelProfileEditVM: ChannelProfileEditVM.Type = ChannelProfileEditVM.self
 
-    public static var channelMemberListVC: ChannelMemberListVC.Type = ChannelMemberListVC.self
+    public static var channelMemberListViewController: ChannelMemberListViewController.Type = ChannelMemberListViewController.self
     public static var channelMemberListVM: ChannelMemberListVM.Type = ChannelMemberListVM.self
     public static var channelMemberListRouter: ChannelMemberListRouter.Type = ChannelMemberListRouter.self
     public static var channelMemberCell: ChannelMemberCell.Type = ChannelMemberCell.self
     public static var channelMemberAddCell: ChannelMemberAddCell.Type = ChannelMemberAddCell.self
-    public static var inputSelectedMessagesActionsView: InputVC.SelectedMessagesActionsView.Type = InputVC.SelectedMessagesActionsView.self
+    public static var inputSelectedMessagesActionsView: InputViewController.SelectedMessagesActionsView.Type = InputViewController.SelectedMessagesActionsView.self
     
-    public static var channelInfoMediaCollectionView: ChannelInfoVC.MediaCollectionView.Type = ChannelInfoVC.MediaCollectionView.self
-    public static var channelInfoFileCollectionView: ChannelInfoVC.FileCollectionView.Type = ChannelInfoVC.FileCollectionView.self
-    public static var channelInfoLinkCollectionView: ChannelInfoVC.LinkCollectionView.Type = ChannelInfoVC.LinkCollectionView.self
-    public static var channelInfoVoiceCollectionView: ChannelInfoVC.VoiceCollectionView.Type = ChannelInfoVC.VoiceCollectionView.self
-    public static var channelInfoImageAttachmentCell: ChannelInfoVC.ImageAttachmentCell.Type = ChannelInfoVC.ImageAttachmentCell.self
-    public static var channelInfoVideoAttachmentCell: ChannelInfoVC.VideoAttachmentCell.Type = ChannelInfoVC.VideoAttachmentCell.self
-    public static var channelInfoAttachmentHeaderView: ChannelInfoVC.AttachmentHeaderView.Type = ChannelInfoVC.AttachmentHeaderView.self
-    public static var channelInfoFileCell: ChannelInfoVC.FileCell.Type = ChannelInfoVC.FileCell.self
-    public static var channelInfoLinkCell: ChannelInfoVC.LinkCell.Type = ChannelInfoVC.LinkCell.self
-    public static var channelInfoVoiceCell: ChannelInfoVC.VoiceCell.Type = ChannelInfoVC.VoiceCell.self
-    public static var imagePreviewVC: ImagePreviewVC.Type = ImagePreviewVC.self
+    public static var channelInfoMediaCollectionView: ChannelInfoViewController.MediaCollectionView.Type = ChannelInfoViewController.MediaCollectionView.self
+    public static var channelInfoFileCollectionView: ChannelInfoViewController.FileCollectionView.Type = ChannelInfoViewController.FileCollectionView.self
+    public static var channelInfoLinkCollectionView: ChannelInfoViewController.LinkCollectionView.Type = ChannelInfoViewController.LinkCollectionView.self
+    public static var channelInfoVoiceCollectionView: ChannelInfoViewController.VoiceCollectionView.Type = ChannelInfoViewController.VoiceCollectionView.self
+    public static var channelInfoImageAttachmentCell: ChannelInfoViewController.ImageAttachmentCell.Type = ChannelInfoViewController.ImageAttachmentCell.self
+    public static var channelInfoVideoAttachmentCell: ChannelInfoViewController.VideoAttachmentCell.Type = ChannelInfoViewController.VideoAttachmentCell.self
+    public static var channelInfoAttachmentHeaderView: ChannelInfoViewController.AttachmentHeaderView.Type = ChannelInfoViewController.AttachmentHeaderView.self
+    public static var channelInfoFileCell: ChannelInfoViewController.FileCell.Type = ChannelInfoViewController.FileCell.self
+    public static var channelInfoLinkCell: ChannelInfoViewController.LinkCell.Type = ChannelInfoViewController.LinkCell.self
+    public static var channelInfoVoiceCell: ChannelInfoViewController.VoiceCell.Type = ChannelInfoViewController.VoiceCell.self
+    public static var imagePreviewViewController: ImagePreviewViewController.Type = ImagePreviewViewController.self
     public static var channelAvatarVM: ChannelAvatarVM.Type = ChannelAvatarVM.self
 
     
@@ -73,49 +73,49 @@ public enum SCTUIKitComponents {
     
     public static var segmentedControlView: SegmentedControlView.Type = SegmentedControlView.self
     
-    public static var inputVC: InputVC.Type = InputVC.self
+    public static var inputViewController: InputViewController.Type = InputViewController.self
     public static var inputRouter: InputRouter.Type = InputRouter.self
-    public static var inputMediaView: InputVC.MediaView.Type = InputVC.MediaView.self
-    public static var inputTextView: InputVC.InputTextView.Type = InputVC.InputTextView.self
-    public static var inputMessageActionsView: InputVC.MessageActionsView.Type = InputVC.MessageActionsView.self
-    public static var inputVoiceRecorderView: InputVC.VoiceRecorderView.Type = InputVC.VoiceRecorderView.self
-    public static var inputVoiceRecordPlaybackView: InputVC.VoiceRecordPlaybackView.Type = InputVC.VoiceRecordPlaybackView.self
-    public static var inputVoiceRecordPlaybackPlayerView: InputVC.VoiceRecordPlaybackView.PlayerView.Type = InputVC.VoiceRecordPlaybackView.PlayerView.self
-    public static var inputThumbnailView: InputVC.ThumbnailView.Type = InputVC.ThumbnailView.self
-    public static var inputThumbnailViewMediaView: InputVC.ThumbnailView.MediaView.Type = InputVC.ThumbnailView.MediaView.self
-    public static var inputThumbnailViewFileView: InputVC.ThumbnailView.FileView.Type = InputVC.ThumbnailView.FileView.self
-    public static var inputThumbnailViewTimeLabel: InputVC.ThumbnailView.TimeLabel.Type = InputVC.ThumbnailView.TimeLabel.self
+    public static var inputMediaView: InputViewController.MediaView.Type = InputViewController.MediaView.self
+    public static var inputTextView: InputViewController.InputTextView.Type = InputViewController.InputTextView.self
+    public static var inputMessageActionsView: InputViewController.MessageActionsView.Type = InputViewController.MessageActionsView.self
+    public static var inputVoiceRecorderView: InputViewController.VoiceRecorderView.Type = InputViewController.VoiceRecorderView.self
+    public static var inputVoiceRecordPlaybackView: InputViewController.VoiceRecordPlaybackView.Type = InputViewController.VoiceRecordPlaybackView.self
+    public static var inputVoiceRecordPlaybackPlayerView: InputViewController.VoiceRecordPlaybackView.PlayerView.Type = InputViewController.VoiceRecordPlaybackView.PlayerView.self
+    public static var inputThumbnailView: InputViewController.ThumbnailView.Type = InputViewController.ThumbnailView.self
+    public static var inputThumbnailViewMediaView: InputViewController.ThumbnailView.MediaView.Type = InputViewController.ThumbnailView.MediaView.self
+    public static var inputThumbnailViewFileView: InputViewController.ThumbnailView.FileView.Type = InputViewController.ThumbnailView.FileView.self
+    public static var inputThumbnailViewTimeLabel: InputViewController.ThumbnailView.TimeLabel.Type = InputViewController.ThumbnailView.TimeLabel.self
     
-    public static var inputMentionUsersListVC: InputVC.MentionUsersListVC.Type = InputVC.MentionUsersListVC.self
+    public static var inputMentionUsersListViewController: InputViewController.MentionUsersListViewController.Type = InputViewController.MentionUsersListViewController.self
     public static var mentioningUserListVM: MentioningUserListVM.Type = MentioningUserListVM.self
-    public static var inputMentionUsersCell: InputVC.MentionUsersListVC.MentionUserCell.Type = InputVC.MentionUsersListVC.MentionUserCell.self
+    public static var inputMentionUsersCell: InputViewController.MentionUsersListViewController.MentionUserCell.Type = InputViewController.MentionUsersListViewController.MentionUserCell.self
     
-    public static var channelOutgoingMessageCell: ChannelVC.OutgoingMessageCell.Type = ChannelVC.OutgoingMessageCell.self
-    public static var channelIncomingMessageCell: ChannelVC.IncomingMessageCell.Type = ChannelVC.IncomingMessageCell.self
-    public static var channelDateSeparatorView: ChannelVC.DateSeparatorView.Type = ChannelVC.DateSeparatorView.self
+    public static var channelOutgoingMessageCell: ChannelViewController.OutgoingMessageCell.Type = ChannelViewController.OutgoingMessageCell.self
+    public static var channelIncomingMessageCell: ChannelViewController.IncomingMessageCell.Type = ChannelViewController.IncomingMessageCell.self
+    public static var channelDateSeparatorView: ChannelViewController.DateSeparatorView.Type = ChannelViewController.DateSeparatorView.self
     
-    public static var messageInfoVC: MessageInfoVC.Type = MessageInfoVC.self
+    public static var messageInfoViewController: MessageInfoViewController.Type = MessageInfoViewController.self
     public static var messageInfoVM: MessageInfoVM.Type = MessageInfoVM.self
-    public static var messageInfoHeaderView: MessageInfoVC.HeaderView.Type = MessageInfoVC.HeaderView.self
-    public static var messageInfoMessageCell: MessageInfoVC.MessageCell.Type = MessageInfoVC.MessageCell.self
-    public static var messageInfoMarkerCell: MessageInfoVC.MarkerCell.Type = MessageInfoVC.MarkerCell.self
+    public static var messageInfoHeaderView: MessageInfoViewController.HeaderView.Type = MessageInfoViewController.HeaderView.self
+    public static var messageInfoMessageCell: MessageInfoViewController.MessageCell.Type = MessageInfoViewController.MessageCell.self
+    public static var messageInfoMarkerCell: MessageInfoViewController.MarkerCell.Type = MessageInfoViewController.MarkerCell.self
     
-    public static var forwardVC: ForwardVC.Type = ForwardVC.self
+    public static var forwardViewController: ForwardViewController.Type = ForwardViewController.self
     public static var channelForwardVM: ChannelForwardVM.Type = ChannelForwardVM.self
     public static var channelForwardRouter: ChannelForwardRouter.Type = ChannelForwardRouter.self
 
     public static var channelSearchController: ChannelSearchController.Type = ChannelSearchController.self
-    public static var channelSearchResultsVC: ChannelSearchResultsVC.Type = ChannelSearchResultsVC.self
+    public static var channelSearchResultsViewController: ChannelSearchResultsViewController.Type = ChannelSearchResultsViewController.self
 
-    public static var mediaPickerVC: MediaPickerVC.Type = MediaPickerVC.self
-    public static var mediaPickerFooterView: MediaPickerVC.FooterView.Type = MediaPickerVC.FooterView.self
-    public static var mediaPickerAttachButton: MediaPickerVC.AttachButton.Type = MediaPickerVC.AttachButton.self
+    public static var mediaPickerViewController: MediaPickerViewController.Type = MediaPickerViewController.self
+    public static var mediaPickerFooterView: MediaPickerViewController.FooterView.Type = MediaPickerViewController.FooterView.self
+    public static var mediaPickerAttachButton: MediaPickerViewController.AttachButton.Type = MediaPickerViewController.AttachButton.self
     
-    public static var mediaPickerCell: MediaPickerVC.MediaCell.Type = MediaPickerVC.MediaCell.self
-    public static var mediaPickerCollectionView: MediaPickerVC.MediaPickerCollectionView.Type = MediaPickerVC.MediaPickerCollectionView.self
-    public static var mediaPickerCollectionViewLayout: MediaPickerVC.MediaPickerCollectionViewLayout.Type = MediaPickerVC.MediaPickerCollectionViewLayout.self
+    public static var mediaPickerCell: MediaPickerViewController.MediaCell.Type = MediaPickerViewController.MediaCell.self
+    public static var mediaPickerCollectionView: MediaPickerViewController.MediaPickerCollectionView.Type = MediaPickerViewController.MediaPickerCollectionView.self
+    public static var mediaPickerCollectionViewLayout: MediaPickerViewController.MediaPickerCollectionViewLayout.Type = MediaPickerViewController.MediaPickerCollectionViewLayout.self
     
-    public static var imageCropperVC: ImageCropperVC.Type = ImageCropperVC.self
+    public static var imageCropperViewController: ImageCropperViewController.Type = ImageCropperViewController.self
     public static var imageCropperVM: ImageCropperVM.Type = ImageCropperVM.self
 
     public static var circularProgressView: CircularProgressView.Type = CircularProgressView.self
@@ -126,28 +126,28 @@ public enum SCTUIKitComponents {
     public static var circleImageView: CircleImageView.Type = CircleImageView.self
     
     public static var mediaPreviewerNavigationController: MediaPreviewerNavigationController.Type = MediaPreviewerNavigationController.self
-    public static var mediaPreviewerCarouselVC: MediaPreviewerCarouselVC.Type = MediaPreviewerCarouselVC.self
+    public static var mediaPreviewerCarouselViewController: MediaPreviewerCarouselViewController.Type = MediaPreviewerCarouselViewController.self
     
-    public static var mediaPreviewerVC: MediaPreviewerVC.Type = MediaPreviewerVC.self
+    public static var mediaPreviewerViewController: MediaPreviewerViewController.Type = MediaPreviewerViewController.self
     public static var previewerRouter: PreviewerRouter.Type = PreviewerRouter.self
     public static var previewerVM: PreviewerVM.Type = PreviewerVM.self
     public static var mediaPreviewerImageView: MediaPreviewerImageView.Type = MediaPreviewerImageView.self
     public static var mediaPreviewerScrollView: MediaPreviewerScrollView.Type = MediaPreviewerScrollView.self
     
-    public static var reactionPickerVC: ReactionPickerVC.Type = ReactionPickerVC.self // reactions popup
-    public static var emojiPickerVC: EmojiPickerVC.Type = EmojiPickerVC.self
+    public static var reactionPickerViewController: ReactionPickerViewController.Type = ReactionPickerViewController.self // reactions popup
+    public static var emojiPickerViewController: EmojiPickerViewController.Type = EmojiPickerViewController.self
     public static var emojiListVM: EmojiListVM.Type = EmojiListVM.self
-    public static var emojiPickerCell: EmojiPickerVC.EmojiCell.Type = EmojiPickerVC.EmojiCell.self
-    public static var emojiPickerSectionHeaderView: EmojiPickerVC.SectionHeaderView.Type = EmojiPickerVC.SectionHeaderView.self
+    public static var emojiPickerCell: EmojiPickerViewController.EmojiCell.Type = EmojiPickerViewController.EmojiCell.self
+    public static var emojiPickerSectionHeaderView: EmojiPickerViewController.SectionHeaderView.Type = EmojiPickerViewController.SectionHeaderView.self
     
-    public static var reactedUserListVC: ReactedUserListVC.Type = ReactedUserListVC.self
-    public static var reactedUserReactionCell: ReactedUserListVC.UserReactionCell.Type = ReactedUserListVC.UserReactionCell.self
-    public static var reactionsInfoVC: ReactionsInfoVC.Type = ReactionsInfoVC.self
-    public static var reactionsInfoScoreCell: ReactionsInfoVC.ReactionScoreCell.Type = ReactionsInfoVC.ReactionScoreCell.self
+    public static var reactedUserListViewController: ReactedUserListViewController.Type = ReactedUserListViewController.self
+    public static var reactedUserReactionCell: ReactedUserListViewController.UserReactionCell.Type = ReactedUserListViewController.UserReactionCell.self
+    public static var reactionsInfoViewController: ReactionsInfoViewController.Type = ReactionsInfoViewController.self
+    public static var reactionsInfoScoreCell: ReactionsInfoViewController.ReactionScoreCell.Type = ReactionsInfoViewController.ReactionScoreCell.self
     
-    public static var startChatVC: StartChatVC.Type = StartChatVC.self
+    public static var startChatViewController: StartChatViewController.Type = StartChatViewController.self
     public static var createNewChannelVM: CreateNewChannelVM.Type = CreateNewChannelVM.self
-    public static var startChatActionsView: StartChatVC.ActionsView.Type = StartChatVC.ActionsView.self
+    public static var startChatActionsView: StartChatViewController.ActionsView.Type = StartChatViewController.ActionsView.self
     public static var channelUserCell: ChannelUserCell.Type = ChannelUserCell.self
     public static var createChannelUserCell: CreateChannelUserCell.Type = CreateChannelUserCell.self
     public static var separatorHeaderView: SeparatorHeaderView.Type = SeparatorHeaderView.self
@@ -184,7 +184,7 @@ public enum SCTUIKitComponents {
     public static var alert: Alert.Type = Alert.self
     public static var bottomSheet: BottomSheet.Type = BottomSheet.self
     public static var sheetButton: SheetButton.Type = SheetButton.self
-    public static var sheetVC: SheetVC.Type = SheetVC.self
+    public static var sheetViewController: SheetViewController.Type = SheetViewController.self
     
     public static var badgeView: BadgeView.Type = BadgeView.self
     public static var circleButton: CircleButton.Type = CircleButton.self
@@ -196,12 +196,12 @@ public enum SCTUIKitComponents {
     public static var searchController: SearchController.Type = SearchController.self
     public static var waveformView: WaveformView.Type = WaveformView.self
     
-    public static var channelAddMembersVC: ChannelAddMembersVC.Type = ChannelAddMembersVC.self
-    public static var createGroupProfileView: CreateGroupVC.ProfileView.Type = CreateGroupVC.ProfileView.self
-    public static var createGroupVC: CreateGroupVC.Type = CreateGroupVC.self
-    public static var createChannelProfileView: CreateChannelVC.ProfileView.Type = CreateChannelVC.ProfileView.self
-    public static var createChannelVC: CreateChannelVC.Type = CreateChannelVC.self
-    public static var selectChannelMembersVC: SelectChannelMembersVC.Type = SelectChannelMembersVC.self
+    public static var channelAddMembersViewController: ChannelAddMembersViewController.Type = ChannelAddMembersViewController.self
+    public static var createGroupProfileView: CreateGroupViewController.ProfileView.Type = CreateGroupViewController.ProfileView.self
+    public static var createGroupViewController: CreateGroupViewController.Type = CreateGroupViewController.self
+    public static var createChannelProfileView: CreateChannelViewController.ProfileView.Type = CreateChannelViewController.ProfileView.self
+    public static var createChannelViewController: CreateChannelViewController.Type = CreateChannelViewController.self
+    public static var selectChannelMembersViewController: SelectChannelMembersViewController.Type = SelectChannelMembersViewController.self
     public static var selectedUserListView: SelectedUserListView.Type = SelectedUserListView.self
     public static var selectedChannelListView: SelectedChannelListView.Type = SelectedChannelListView.self
     

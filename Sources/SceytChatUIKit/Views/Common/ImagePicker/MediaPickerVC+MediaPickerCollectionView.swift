@@ -1,5 +1,5 @@
 //
-//  MediaPickerVC+MediaPickerCollectionView.swift
+//  MediaPickerViewController+MediaPickerCollectionView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension MediaPickerVC {
+extension MediaPickerViewController {
     open class MediaPickerCollectionView: CollectionView {
         
         public required init() {

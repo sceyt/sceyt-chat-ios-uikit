@@ -1,5 +1,5 @@
 //
-//  CreateChannelVC.swift
+//  CreateChannelViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,10 +9,10 @@
 import UIKit
 
 
-open class CreateChannelVC: ViewController, UITextViewDelegate {
+open class CreateChannelViewController: ViewController, UITextViewDelegate {
     
     open var viewModel: CreatePublicChannelVM!
-    open lazy var router = CreatePublicChannelRouter(rootVC: self)
+    open lazy var router = CreatePublicChannelRouter(rootViewController: self)
     
     open var channelAvatarImage: UIImage?
     

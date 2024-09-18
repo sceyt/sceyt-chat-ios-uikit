@@ -1,5 +1,5 @@
 //
-//  ImagePreviewVC.swift
+//  ImagePreviewViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 24/08/2023.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ImagePreviewVC: ViewController, UIScrollViewDelegate {
+open class ImagePreviewViewController: ViewController, UIScrollViewDelegate {
     open var viewModel: ChannelAvatarVM!
     
     private var task: Cancellable?

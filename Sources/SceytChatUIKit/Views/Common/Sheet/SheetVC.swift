@@ -12,15 +12,15 @@ import UIKit
 public extension UIViewController {
     @discardableResult
     func showSheet(_ child: UIView,
-                   style: SheetVC.Style = .bottom,
+                   style: SheetViewController.Style = .bottom,
                    backgroundDismiss: Bool = true,
                    cornerRadius: CGFloat? = nil,
                    title: String? = nil,
                    onShow: (() -> Void)? = nil,
                    onDone: (() -> Void)? = nil,
-                   animated: Bool = true) -> SheetVC
+                   animated: Bool = true) -> SheetViewController
     {
-        let viewController = SheetVC(child: child,
+        let viewController = SheetViewController(child: child,
                          style: style,
                          backgroundDismiss: backgroundDismiss,
                          cornerRadius: cornerRadius,
@@ -43,8 +43,8 @@ public extension UIViewController {
     }
     
     @discardableResult
-    func showBottomSheet(title: String? = nil, actions: [SheetAction], withCancel: Bool = false) -> SheetVC {
-        let viewController = SheetVC(child: BottomSheet(title: title,
+    func showBottomSheet(title: String? = nil, actions: [SheetAction], withCancel: Bool = false) -> SheetViewController {
+        let viewController = SheetViewController(child: BottomSheet(title: title,
                                             actions: actions + (withCancel ? [.init(title: L10n.Alert.Button.cancel, style: .cancel)] : [])),
                          style: .floating(),
                          cornerRadius: 0,
@@ -66,14 +66,14 @@ public extension UIViewController {
     }
     
     func dismissSheet(animated: Bool = true, completion: (() -> Void)? = nil) {
-        var sheetVC: SheetVC?
-        if let viewController = self as? SheetVC {
-            sheetVC = viewController
-        } else if let viewController = presentedViewController as? SheetVC {
-            sheetVC = viewController
+        var sheetViewController: SheetViewController?
+        if let viewController = self as? SheetViewController {
+            sheetViewController = viewController
+        } else if let viewController = presentedViewController as? SheetViewController {
+            sheetViewController = viewController
         }
-        if let sheetVC {
-            sheetVC.dismiss(animated: animated) {
+        if let sheetViewController {
+            sheetViewController.dismiss(animated: animated) {
                 completion?()
             }
         } else {
@@ -82,7 +82,7 @@ public extension UIViewController {
     }
 }
 
-open class SheetVC: ViewController {
+open class SheetViewController: ViewController {
     public enum Style {
         case bottom, floating(CGFloat? = nil), center
     }
@@ -360,15 +360,15 @@ extension BottomSheet: SheetProvider {}
 extension Alert: SheetProvider {}
 
 public protocol SheetProvider: UIResponder {
-    var sheet: SheetVC? { get }
+    var sheet: SheetViewController? { get }
 }
 
 public extension SheetProvider {
-    var sheet: SheetVC? {
+    var sheet: SheetViewController? {
         var parentResponder: UIResponder? = next
         while parentResponder != nil {
-            if let sheetVC = parentResponder as? SheetVC {
-                return sheetVC
+            if let sheetViewController = parentResponder as? SheetViewController {
+                return sheetViewController
             }
             parentResponder = parentResponder?.next
         }
@@ -376,7 +376,7 @@ public extension SheetProvider {
     }
 }
 
-public extension SheetVC {
+public extension SheetViewController {
     enum Layouts {
         public static var cornerRadius: CGFloat = 10
         public static var floatingPadding: CGFloat = 8

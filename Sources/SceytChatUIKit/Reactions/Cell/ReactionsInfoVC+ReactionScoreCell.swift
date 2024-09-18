@@ -1,5 +1,5 @@
 //
-//  ReactionsInfoVC+ReactionScoreCell.swift
+//  ReactionsInfoViewController+ReactionScoreCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ReactionsInfoVC {
+extension ReactionsInfoViewController {
     open class ReactionScoreCell: CollectionViewCell {
         
         public static var textInsets: UIEdgeInsets? = .init(top: 6, left: 12, bottom: 6, right: 12)

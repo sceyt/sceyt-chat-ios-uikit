@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+DetailsCell.swift
+//  ChannelInfoViewController+DetailsCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class DetailsCell: TableViewCell {
         
         open lazy var avatarButton = CircleButton()
@@ -26,7 +26,7 @@ extension ChannelInfoVC {
         open lazy var column = UIStackView(column: [titleLabel, subtitleLabel])
             .withoutAutoresizingMask
         
-        public lazy var appearance = Components.channelInfoVC.appearance {
+        public lazy var appearance = Components.channelInfoViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -57,7 +57,7 @@ extension ChannelInfoVC {
         }
         
         open override var safeAreaInsets: UIEdgeInsets {
-            .init(top: 0, left: Components.channelInfoVC.Layouts.cellHorizontalPadding, bottom: 0, right: Components.channelInfoVC.Layouts.cellHorizontalPadding)
+            .init(top: 0, left: Components.channelInfoViewController.Layouts.cellHorizontalPadding, bottom: 0, right: Components.channelInfoViewController.Layouts.cellHorizontalPadding)
         }
         
         public var imageTask: Cancellable?

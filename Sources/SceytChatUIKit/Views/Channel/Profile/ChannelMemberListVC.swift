@@ -1,5 +1,5 @@
 //
-//  ChannelMemberListVC.swift
+//  ChannelMemberListViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import UIKit
 import SceytChat
 
-open class ChannelMemberListVC: ViewController,
+open class ChannelMemberListViewController: ViewController,
                                 UITableViewDelegate,
                                 UITableViewDataSource,
                                 UISearchControllerDelegate,
@@ -17,7 +17,7 @@ open class ChannelMemberListVC: ViewController,
     
     open var memberListViewModel: ChannelMemberListVM!
     open lazy var router = Components.channelMemberListRouter
-        .init(rootVC: self)
+        .init(rootViewController: self)
     
     open lazy var searchController = SearchController(searchResultsController: nil)
     
@@ -156,7 +156,7 @@ open class ChannelMemberListVC: ViewController,
             memberListViewModel.createChannel(userAt: indexPath) { [weak self] channel, error in
                 guard let self else { return }
                 if let channel {
-                    self.router.showChannelInfoVC(channel: channel)
+                    self.router.showChannelInfoViewController(channel: channel)
                 } else if let error {
                     self.showAlert(error: error)
                 }

@@ -1,5 +1,5 @@
 //
-//  SelectChannelMembersVC.swift
+//  SelectChannelMembersViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,12 +8,12 @@
 
 import UIKit
 
-open class SelectChannelMembersVC: ViewController,
+open class SelectChannelMembersViewController: ViewController,
     UITableViewDelegate, UITableViewDataSource,
     UISearchControllerDelegate, UISearchBarDelegate
 {
     open var selectMemberViewModel: SelectChannelMembersVM!
-    open lazy var router = SelectChannelMembersRouter(rootVC: self)
+    open lazy var router = SelectChannelMembersRouter(rootViewController: self)
     
     open lazy var tableView = UITableView()
         .withoutAutoresizingMask
@@ -258,7 +258,7 @@ open class SelectChannelMembersVC: ViewController,
     }
 }
 
-private extension SelectChannelMembersVC {
+private extension SelectChannelMembersViewController {
     func deselectRowFor(user: ChatUser) {
         for indexPath in tableView.indexPathsForVisibleRows ?? [] {
             if let cell = tableView.cell(for: indexPath, cellType: Components.createChannelUserCell.self),
@@ -276,13 +276,13 @@ private extension SelectChannelMembersVC {
     }
 }
 
-extension SelectChannelMembersVC {
+extension SelectChannelMembersViewController {
     enum Sections: Int, CaseIterable {
         case user
     }
 }
 
-public extension SelectChannelMembersVC {
+public extension SelectChannelMembersViewController {
     enum Layouts {
         public static var selectedViewHeight: CGFloat = 96
     }

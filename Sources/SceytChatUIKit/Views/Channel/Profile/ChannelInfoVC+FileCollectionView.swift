@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+FileCollectionView.swift
+//  ChannelInfoViewController+FileCollectionView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,8 +9,8 @@
 import UIKit
 import SceytChat
 
-extension ChannelInfoVC {
-    open class FileCollectionView: ChannelInfoVC.AttachmentCollectionView,
+extension ChannelInfoViewController {
+    open class FileCollectionView: ChannelInfoViewController.AttachmentCollectionView,
                                           UICollectionViewDelegate,
                                           UICollectionViewDataSource,
                                           UICollectionViewDelegateFlowLayout {
@@ -139,7 +139,7 @@ extension ChannelInfoVC {
     }
 }
 
-public extension ChannelInfoVC.FileCollectionView {
+public extension ChannelInfoViewController.FileCollectionView {
     enum Layouts {
         public static var horizontalPadding: CGFloat = 16
         public static var verticalPadding: CGFloat = 8

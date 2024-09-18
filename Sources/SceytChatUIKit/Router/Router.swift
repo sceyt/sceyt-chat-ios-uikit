@@ -8,40 +8,40 @@
 
 import UIKit
 
-open class Router<VC: UIViewController>: NSObject {
+open class Router<ViewController: UIViewController>: NSObject {
 
-    public unowned var rootVC: VC
+    public unowned var rootViewController: ViewController
 
-    public required init(rootVC: VC) {
-        self.rootVC = rootVC
+    public required init(rootViewController: ViewController) {
+        self.rootViewController = rootViewController
     }
     
     @objc
     func pop(animated: Bool = true) {
-        rootVC.navigationController?.popViewController(animated: animated)
+        rootViewController.navigationController?.popViewController(animated: animated)
     }
     
     @objc
     func popToRoot(animated: Bool = true) {
-        rootVC.navigationController?.popToRootViewController(animated: animated)
+        rootViewController.navigationController?.popToRootViewController(animated: animated)
     }
     
     @objc
     func popTo(_ viewController: UIViewController, animated: Bool = true) {
-        rootVC.navigationController?.popToViewController(viewController, animated: animated)
+        rootViewController.navigationController?.popToViewController(viewController, animated: animated)
     }
     
     @objc
     func setViewControllers(_ viewControllers: [UIViewController], animated: Bool = true) {
-        rootVC.navigationController?.setViewControllers(viewControllers, animated: animated)
+        rootViewController.navigationController?.setViewControllers(viewControllers, animated: animated)
     }
     
     @objc
     func dismiss(animated: Bool = true, completion: (() -> Void)? = nil) {
-        if let nav = rootVC.navigationController {
+        if let nav = rootViewController.navigationController {
             nav.dismiss(animated: animated, completion: completion)
         } else {
-            rootVC.dismiss(animated: animated, completion: completion)
+            rootViewController.dismiss(animated: animated, completion: completion)
         }
     }
     
@@ -59,8 +59,8 @@ open class Router<VC: UIViewController>: NSObject {
         _ link: URL,
         actions: [(String, SheetAction.Style)],
         completion: ((String) -> Void)? = nil) {
-            rootVC.view.endEditing(true)
-            rootVC.showBottomSheet(
+            rootViewController.view.endEditing(true)
+            rootViewController.showBottomSheet(
                 title: link.absoluteString,
                 actions: actions.map { action in
                         .init(
@@ -75,8 +75,8 @@ public extension Router {
     
     func share(_ items: [Any], from sourceView: Any?) {
         // FIX: https://stackoverflow.com/questions/59413850/uiactivityviewcontroller-dismissing-current-view-controller-after-sharing-file
-        let tmpVC = UIViewController()
-        tmpVC.modalPresentationStyle = .overFullScreen
+        let tmpViewController = UIViewController()
+        tmpViewController.modalPresentationStyle = .overFullScreen
         
         let activityViewController = UIActivityViewController(activityItems: items, applicationActivities: nil)
         if let sourceView = sourceView as? UIView {
@@ -86,22 +86,22 @@ public extension Router {
             activityViewController.popoverPresentationController?.barButtonItem = sourceView
             activityViewController.popoverPresentationController?.permittedArrowDirections = .up
         }
-        activityViewController.completionWithItemsHandler = { [weak tmpVC] _, _, _, _ in
-            if let presentingViewController = tmpVC?.presentingViewController {
+        activityViewController.completionWithItemsHandler = { [weak tmpViewController] _, _, _, _ in
+            if let presentingViewController = tmpViewController?.presentingViewController {
                 presentingViewController.dismiss(animated: false, completion: nil)
             } else {
-                tmpVC?.dismiss(animated: false, completion: nil)
+                tmpViewController?.dismiss(animated: false, completion: nil)
             }
         }
         
         let presenter: UIViewController
-        if let presentedVC = rootVC.presentedViewController {
-            presenter = presentedVC
+        if let presentedViewController = rootViewController.presentedViewController {
+            presenter = presentedViewController
         } else {
-            presenter = rootVC
+            presenter = rootViewController
         }
-        presenter.present(tmpVC, animated: false) { [weak tmpVC] in
-            tmpVC?.present(activityViewController, animated: true, completion: nil)
+        presenter.present(tmpViewController, animated: false) { [weak tmpViewController] in
+            tmpViewController?.present(activityViewController, animated: true, completion: nil)
         }
     }
 }

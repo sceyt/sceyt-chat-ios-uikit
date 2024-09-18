@@ -9,7 +9,7 @@
 import UIKit
 
 open class WaveformView: View {
-    public lazy var appearance = InputVC.appearance {
+    public lazy var appearance = InputViewController.appearance {
         didSet {
             setupAppearance()
         }

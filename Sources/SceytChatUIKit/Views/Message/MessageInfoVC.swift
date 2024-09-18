@@ -1,5 +1,5 @@
 //
-//  MessageInfoVC.swift
+//  MessageInfoViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 21/10/2023.
@@ -8,10 +8,10 @@
 
 import UIKit
 
-open class MessageInfoVC: ViewController, UITableViewDataSource, UITableViewDelegate {
+open class MessageInfoViewController: ViewController, UITableViewDataSource, UITableViewDelegate {
     
     open var viewModel: MessageInfoVM!
-    open lazy var router = MessageInfoRouter(rootVC: self)
+    open lazy var router = MessageInfoRouter(rootViewController: self)
 
     open lazy var tableView = TableView(frame: .zero, style: .insetGrouped)
         .withoutAutoresizingMask
@@ -144,7 +144,7 @@ private extension UITableView {
     }
 }
 
-public extension MessageInfoVC {
+public extension MessageInfoViewController {
     enum Layouts {
         public static var cellHeight: CGFloat = 48
     }

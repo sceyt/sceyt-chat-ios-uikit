@@ -1,5 +1,5 @@
 //
-//  ReactionsInfoVC.swift
+//  ReactionsInfoViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ReactionsInfoVC: ViewController,
+open class ReactionsInfoViewController: ViewController,
                         UIPageViewControllerDataSource,
                         UIPageViewControllerDelegate,
                         UICollectionViewDataSource,
@@ -21,7 +21,7 @@ open class ReactionsInfoVC: ViewController,
     open var userReactionsViewModel: [UserReactionViewModel] = [] {
         didSet {
             viewControllers = userReactionsViewModel.map {
-                let viewController = Components.reactedUserListVC.init()
+                let viewController = Components.reactedUserListViewController.init()
                 viewController.viewModel = $0
                 viewController.onEvent = { [weak self] event in
                     switch event {
@@ -77,8 +77,8 @@ open class ReactionsInfoVC: ViewController,
         collectionView.selectItem(at: .init(item: .zero, section: .zero), animated: false, scrollPosition: .top)
         pageController.dataSource = self
         pageController.delegate = self
-        if let firstVC = viewControllers.first {
-            pageController.setViewControllers([firstVC], direction: .forward, animated: false)
+        if let firstViewController = viewControllers.first {
+            pageController.setViewControllers([firstViewController], direction: .forward, animated: false)
         }
     }
     
@@ -123,11 +123,11 @@ open class ReactionsInfoVC: ViewController,
 
     // MARK: UICollectionViewDelegate
     open func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        if let currentVC = pageController.viewControllers?.first,
-           let currentIndex = viewControllers.firstIndex(of: currentVC) {
-            let vcToSelect = viewControllers[indexPath.item]
+        if let currentViewController = pageController.viewControllers?.first,
+           let currentIndex = viewControllers.firstIndex(of: currentViewController) {
+            let viewControllerToSelect = viewControllers[indexPath.item]
             pageController.setViewControllers(
-                [vcToSelect],
+                [viewControllerToSelect],
                 direction: currentIndex > indexPath.item ? .reverse : .forward,
                 animated: true
             )
@@ -190,7 +190,7 @@ open class ReactionsInfoVC: ViewController,
 
 }
 
-public extension ReactionsInfoVC {
+public extension ReactionsInfoViewController {
     enum Event {
         case removeReaction(ChatMessage.Reaction)
     }

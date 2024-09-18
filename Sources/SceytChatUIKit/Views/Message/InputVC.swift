@@ -1,5 +1,5 @@
 //
-//  InputVC.swift
+//  InputViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,7 +10,7 @@ import Combine
 import UIKit
 import CoreText
 
-open class InputVC: ViewController, UITextViewDelegate {
+open class InputViewController: ViewController, UITextViewDelegate {
     open lazy var addMediaButton = UIButton()
         .withoutAutoresizingMask
     
@@ -87,14 +87,14 @@ open class InputVC: ViewController, UITextViewDelegate {
     }
     
     public var canRunMentionUserLogic = true
-    open var mentionUserListVC: (() -> InputVC.MentionUsersListVC)?
-    open weak var presentedMentionUserListVC: InputVC.MentionUsersListVC?
-    public var isPresentedMentionUserListVC: Bool {
-        presentedMentionUserListVC != nil
+    open var mentionUserListViewController: (() -> InputViewController.MentionUsersListViewController)?
+    open weak var presentedMentionUserListViewController: InputViewController.MentionUsersListViewController?
+    public var isPresentedMentionUserListViewController: Bool {
+        presentedMentionUserListViewController != nil
     }
     
     open lazy var router = Components.inputRouter
-        .init(rootVC: self)
+        .init(rootViewController: self)
     
     open var mentionSymbol: String { SceytChatUIKit.shared.config.mentionSymbol }
     open var onContentHeightUpdate: ((CGFloat, (()-> Void)?) -> Void)?
@@ -341,7 +341,7 @@ open class InputVC: ViewController, UITextViewDelegate {
         let searchText = text.substring(with: range)
         var effectiveRange = NSRange()
         let userId = attributedText.attributes(at: location - 1, effectiveRange: &effectiveRange)[.mention] as? String
-        let nextWord = isPresentedMentionUserListVC ? true : !searchText.contains(" ")
+        let nextWord = isPresentedMentionUserListViewController ? true : !searchText.contains(" ")
         guard nextWord || userId != nil else {
             return ms
         }
@@ -415,7 +415,7 @@ open class InputVC: ViewController, UITextViewDelegate {
         }
         
         lastMentionQueryRange = ms.queryRange
-        if let viewController = presentedMentionUserListVC {
+        if let viewController = presentedMentionUserListViewController {
             viewController.filter(text: ms.query)
             return
         }
@@ -434,7 +434,7 @@ open class InputVC: ViewController, UITextViewDelegate {
             self.inputTextView.selectedRange = .init(location: replacingRange.location + mentionText.length + 1, length: 0)
         }
         if ms.exist, let query = ms.query {
-            presentedMentionUserListVC?.filter(text: query)
+            presentedMentionUserListViewController?.filter(text: query)
         }
     }
     
@@ -564,16 +564,16 @@ open class InputVC: ViewController, UITextViewDelegate {
                 }
                 semaphore.wait()
                 logger.verbose("[ATTACHMENT] did finish create attachments from assets")
-                logger.verbose("[ATTACHMENT] dismiss PhotoVC ")
+                logger.verbose("[ATTACHMENT] dismiss PhotoViewController ")
                 DispatchQueue.main.async { [weak self, weak picker] in
                     guard let self, let picker else {
-                        logger.verbose("[ATTACHMENT] dismiss PhotoVC failed")
+                        logger.verbose("[ATTACHMENT] dismiss PhotoViewController failed")
                         semaphore.signal()
                         return
                     }
                     inputTextView.becomeFirstResponder()
                     picker.dismiss(animated: true) {
-                        logger.verbose("[ATTACHMENT] did dismiss PhotoVC")
+                        logger.verbose("[ATTACHMENT] did dismiss PhotoViewController")
                         semaphore.signal()
                     }
                 }
@@ -934,14 +934,14 @@ open class InputVC: ViewController, UITextViewDelegate {
 
     open func present(_ callback: @escaping (String, String) -> Void) {
         guard let parent = parent else { return }
-        guard let viewController = mentionUserListVC?() else {
+        guard let viewController = mentionUserListViewController?() else {
             return
         }
-        presentedMentionUserListVC = viewController
+        presentedMentionUserListViewController = viewController
         parent.addChild(viewController)
         parent.view.addSubview(viewController.view)
         _ = viewController.view.withoutAutoresizingMask
-        (parent as? ChannelVC)?.collectionView.isUserInteractionEnabled = false
+        (parent as? ChannelViewController)?.collectionView.isUserInteractionEnabled = false
         viewController.view.pin(to: parent.view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
         viewController.view.bottomAnchor.pin(to: view.topAnchor)
         viewController.didSelectMember = { callback($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) }
@@ -949,13 +949,13 @@ open class InputVC: ViewController, UITextViewDelegate {
 
     open func dismiss() {
         guard let parent = parent else { return }
-        guard let viewController = presentedMentionUserListVC, viewController.parent != nil else { return }
+        guard let viewController = presentedMentionUserListViewController, viewController.parent != nil else { return }
         viewController.didSelectMember = nil
-        (parent as? ChannelVC)?.collectionView.isUserInteractionEnabled = true
+        (parent as? ChannelViewController)?.collectionView.isUserInteractionEnabled = true
         viewController.view.removeConstraints(viewController.view.constraints)
         viewController.removeFromParent()
         viewController.view.removeFromSuperview()
-        presentedMentionUserListVC = nil
+        presentedMentionUserListViewController = nil
     }
     
     open func toggleAttribute(component: ChatMessage.BodyAttribute.AttributeType, range: NSRange, textView: UITextView) {
@@ -1136,7 +1136,7 @@ open class InputVC: ViewController, UITextViewDelegate {
     }
 }
 
-public extension InputVC {
+public extension InputViewController {
     enum Style {
         case small
         case large
@@ -1206,7 +1206,7 @@ public extension InputVC {
     
 }
 
-public extension InputVC {
+public extension InputViewController {
     enum Layouts {
         public static var actionViewHeight: CGFloat = 56
         public static var recorderShadowBlur: CGFloat = 24

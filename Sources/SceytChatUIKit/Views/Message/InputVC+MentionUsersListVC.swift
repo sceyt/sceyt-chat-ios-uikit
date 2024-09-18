@@ -1,5 +1,5 @@
 //
-//  InputVC+MentionUsersListVC.swift
+//  InputViewController+MentionUsersListViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -9,8 +9,8 @@
 import UIKit
 import SceytChat
 
-extension InputVC {
-    open class MentionUsersListVC: ViewController,
+extension InputViewController {
+    open class MentionUsersListViewController: ViewController,
                                    UITableViewDelegate,
                                    UITableViewDataSource {
         
@@ -257,7 +257,7 @@ private extension UITableView {
     }
 }
 
-public extension InputVC.MentionUsersListVC {
+public extension InputViewController.MentionUsersListViewController {
     enum Layouts {
         public static var horizontalPadding: CGFloat = 8
         public static var bottomPadding: CGFloat = 8

@@ -1,5 +1,5 @@
 //
-//  ChannelListVC.swift
+//  ChannelListViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import UIKit
 import SceytChat
 
-open class ChannelListVC: ViewController,
+open class ChannelListViewController: ViewController,
                           UITableViewDelegate, UITableViewDataSource,
                           UITextFieldDelegate,
                           UISearchResultsUpdating {
@@ -18,7 +18,7 @@ open class ChannelListVC: ViewController,
         .init()
     
     open lazy var channelListRouter = Components.channelListRouter
-        .init(rootVC: self)
+        .init(rootViewController: self)
     
     open lazy var tableView = TableView
         .init()
@@ -29,9 +29,9 @@ open class ChannelListVC: ViewController,
         .init()
         .withoutAutoresizingMask
     
-    open lazy var searchController = ChannelSearchController(searchResultsController: searchResultsVC)
+    open lazy var searchController = ChannelSearchController(searchResultsController: searchResultsViewController)
 
-    open lazy var searchResultsVC = Components.channelSearchResultsVC.init()
+    open lazy var searchResultsViewController = Components.channelSearchResultsViewController.init()
 
     private var isViewDidAppear = false
     
@@ -58,7 +58,7 @@ open class ChannelListVC: ViewController,
         tableView.dataSource = self
                 
         navigationItem.hidesSearchBarWhenScrolling = true
-        searchResultsVC.resultsUpdater = channelListViewModel
+        searchResultsViewController.resultsUpdater = channelListViewModel
         navigationItem.searchController = searchController
         searchController.searchResultsUpdater = self
         
@@ -168,7 +168,7 @@ open class ChannelListVC: ViewController,
             tableView.reloadData()
             showEmptyViewIfNeeded()
         case .reloadSearch:
-            searchResultsVC.reloadData()
+            searchResultsViewController.reloadData()
         case let .unreadMessagesCount(count):
             updateUnreadMessages(count: count)
         case let .connection(state):
@@ -186,7 +186,7 @@ open class ChannelListVC: ViewController,
                 }
             }
         case .showChannel(let channel):
-            channelListRouter.showChannelVC(channel: channel)
+            channelListRouter.showChannelViewController(channel: channel)
         }
     }
     
@@ -308,7 +308,7 @@ open class ChannelListVC: ViewController,
     open func tableView(
         _ tableView: UITableView,
         didSelectRowAt indexPath: IndexPath) {
-            channelListRouter.showChannelVC(at: indexPath)
+            channelListRouter.showChannelViewController(at: indexPath)
             channelListViewModel.selectChannel(at: indexPath)
         }
     

@@ -1,5 +1,5 @@
 //
-//  MediaPreviewerVC.swift
+//  MediaPreviewerViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -10,9 +10,9 @@ import AVFoundation
 import SceytChat
 import UIKit
 
-open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
+open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDelegate {
     open lazy var router = Components.previewerRouter
-        .init(rootVC: self)
+        .init(rootViewController: self)
     
     open var viewModel: PreviewerVM!
     
@@ -71,11 +71,11 @@ open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
     private var isPreparingToPlay = false
     
     public var backgroundView: UIView? {
-        return carouselVC?.backgroundView
+        return carouselViewController?.backgroundView
     }
     
-    open var carouselVC: MediaPreviewerCarouselVC? {
-        super.parent as? MediaPreviewerCarouselVC
+    open var carouselViewController: MediaPreviewerCarouselViewController? {
+        super.parent as? MediaPreviewerCarouselViewController
     }
     
     // MARK: Layout Constraints
@@ -89,7 +89,7 @@ open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
     private var timeObserver: Any?
 
     deinit {
-        logger.debug("[PreviewerVC] deinit")
+        logger.debug("[PreviewerViewController] deinit")
     
         removeObservers()
         player?.pause()
@@ -184,7 +184,7 @@ open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
         
         UIView.animate(withDuration: animated ? 0.3 : 0) { [weak self] in
             guard let self else { return }
-            self.carouselVC?.navigationController?.navigationBar.alpha = 1.0
+            self.carouselViewController?.navigationController?.navigationBar.alpha = 1.0
             self.playerControlContainerView.alpha = 1.0
         }
     }
@@ -200,8 +200,8 @@ open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
             }
         }
         
-        carouselVC?.titleLabel.text = viewModel.previewItem.senderTitle
-        carouselVC?.subtitleLabel.text = SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(viewModel.previewItem.attachment.createdAt)
+        carouselViewController?.titleLabel.text = viewModel.previewItem.senderTitle
+        carouselViewController?.subtitleLabel.text = SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(viewModel.previewItem.attachment.createdAt)
     }
     
     override open func viewWillDisappear(_ animated: Bool) {
@@ -384,7 +384,7 @@ open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
         
         let diffY = view.center.y - targetView.center.y
         backgroundView?.alpha = 1.0 - abs(diffY / view.center.y)
-        carouselVC?.navigationController?.navigationBar.alpha = 1.0 - abs(diffY / view.center.y)
+        carouselViewController?.navigationController?.navigationBar.alpha = 1.0 - abs(diffY / view.center.y)
         playerControlContainerView.alpha = 1.0 - abs(diffY / view.center.y)
         if gestureRecognizer.state == .ended {
             if abs(diffY) > 60 {
@@ -397,10 +397,10 @@ open class MediaPreviewerVC: ViewController, UIGestureRecognizerDelegate {
     
     @objc
     open func onTap(_ recognizer: UITapGestureRecognizer) {
-        let currentNavAlpha = carouselVC?.navigationController?.navigationBar.alpha ?? 0.0
+        let currentNavAlpha = carouselViewController?.navigationController?.navigationBar.alpha ?? 0.0
         UIView.animate(withDuration: 0.3) { [weak self] in
             guard let self else { return }
-            self.carouselVC?.navigationController?.navigationBar.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
+            self.carouselViewController?.navigationController?.navigationBar.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
             self.playerControlContainerView.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
         }
     }

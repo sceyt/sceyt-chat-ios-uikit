@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+ContainerCell.swift
+//  ChannelInfoViewController+ContainerCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class ContainerCell: TableViewCell {
         open override func setup() {
             super.setup()

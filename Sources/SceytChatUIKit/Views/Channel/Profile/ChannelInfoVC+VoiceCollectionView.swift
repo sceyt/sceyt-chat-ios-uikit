@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+VoiceCollectionView.swift
+//  ChannelInfoViewController+VoiceCollectionView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,8 +8,8 @@
 
 import UIKit
 
-extension ChannelInfoVC {
-    open class VoiceCollectionView: ChannelInfoVC.AttachmentCollectionView,
+extension ChannelInfoViewController {
+    open class VoiceCollectionView: ChannelInfoViewController.AttachmentCollectionView,
                                            UICollectionViewDelegate,
                                            UICollectionViewDataSource,
                                            UICollectionViewDelegateFlowLayout  {
@@ -131,7 +131,7 @@ extension ChannelInfoVC {
     }
 }
 
-public extension ChannelInfoVC.VoiceCollectionView {
+public extension ChannelInfoViewController.VoiceCollectionView {
     enum Layouts {
         public static var horizontalPadding: CGFloat = 16
         public static var verticalPadding: CGFloat = 8

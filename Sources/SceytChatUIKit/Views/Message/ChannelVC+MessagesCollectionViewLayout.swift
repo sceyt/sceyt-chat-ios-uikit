@@ -1,5 +1,5 @@
 //
-//  ChannelVC+MessagesCollectionViewLayout.swift
+//  ChannelViewController+MessagesCollectionViewLayout.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-public extension ChannelVC {
+public extension ChannelViewController {
     open class MessagesCollectionViewLayout: UICollectionViewFlowLayout {
         
         public var isInsertingItemsToTop = false

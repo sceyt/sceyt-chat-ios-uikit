@@ -1,5 +1,5 @@
 //
-//  EmojiPickerVC+SectionHeaderView.swift
+//  EmojiPickerViewController+SectionHeaderView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension EmojiPickerVC {
+extension EmojiPickerViewController {
     open class SectionHeaderView: CollectionReusableView, Bindable {
         
         private var isConfigured = false

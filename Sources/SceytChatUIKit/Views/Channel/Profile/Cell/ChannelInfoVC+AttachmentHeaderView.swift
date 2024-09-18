@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+AttachmentHeaderView.swift
+//  ChannelInfoViewController+AttachmentHeaderView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 29/09/2023.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class AttachmentHeaderView: CollectionReusableView {
         open lazy var headerLabel = UILabel()
             .withoutAutoresizingMask
@@ -37,7 +37,7 @@ extension ChannelInfoVC {
     }
 }
 
-public extension ChannelInfoVC.AttachmentHeaderView {
+public extension ChannelInfoViewController.AttachmentHeaderView {
     enum Layouts {
         public static var horizontalPadding: CGFloat = 16
         public static var verticalPadding: CGFloat = 8

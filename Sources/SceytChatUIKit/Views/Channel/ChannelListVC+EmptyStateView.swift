@@ -1,5 +1,5 @@
 //
-//  ChannelListVC+EmptyStateView.swift
+//  ChannelListViewController+EmptyStateView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-public extension ChannelListVC {
+public extension ChannelListViewController {
     open class EmptyStateView: View {
         open private(set) lazy var imageView = UIImageView()
             .withoutAutoresizingMask

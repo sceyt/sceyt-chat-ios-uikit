@@ -1,5 +1,5 @@
 //
-//  InputVC+MediaView.swift
+//  InputViewController+MediaView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,11 +10,11 @@ import CoreServices
 import Photos
 import UIKit
 
-extension InputVC {
+extension InputViewController {
     open class MediaView: View {
         public static var scale: CGFloat = SceytChatUIKit.shared.config.displayScale
         
-        public lazy var appearance = InputVC.appearance {
+        public lazy var appearance = InputViewController.appearance {
             didSet {
                 setupAppearance()
             }

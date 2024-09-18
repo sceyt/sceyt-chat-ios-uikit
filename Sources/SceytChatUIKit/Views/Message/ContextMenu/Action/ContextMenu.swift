@@ -221,7 +221,7 @@ private extension ContextMenu {
     
 }
 
-extension ContextMenu: ReactionPickerVCDataSource {
+extension ContextMenu: ReactionPickerViewControllerDataSource {
     public var showPlusAfterEmojis: Bool {
         if let identifier = actionController?.identifier,
            let showPlus = dataSource?.showPlusAfterEmojis(contextMenu: self, identifier: identifier) {
@@ -246,7 +246,7 @@ extension ContextMenu: ReactionPickerVCDataSource {
     }
 }
 
-extension ContextMenu: ReactionPickerVCDelegate {
+extension ContextMenu: ReactionPickerViewControllerDelegate {
     public func didSelect(emoji: String) {
         if let identifier = actionController?.identifier {
             actionController?.dismiss(animated: true, completion: { [weak self] in

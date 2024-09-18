@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+DescriptionCell.swift
+//  ChannelInfoViewController+DescriptionCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class DescriptionCell: TableViewCell {
         open lazy var label = UILabel()
             .withoutAutoresizingMask
@@ -16,7 +16,7 @@ extension ChannelInfoVC {
         open lazy var textView = UITextView()
             .withoutAutoresizingMask
         
-        public lazy var appearance = Components.channelInfoVC.appearance {
+        public lazy var appearance = Components.channelInfoViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -61,8 +61,8 @@ extension ChannelInfoVC {
         }
         
         open override var safeAreaInsets: UIEdgeInsets {
-            .init(top: 0, left: 2 * Components.channelInfoVC.Layouts.cellHorizontalPadding,
-                  bottom: 0, right: 2 * Components.channelInfoVC.Layouts.cellHorizontalPadding)
+            .init(top: 0, left: 2 * Components.channelInfoViewController.Layouts.cellHorizontalPadding,
+                  bottom: 0, right: 2 * Components.channelInfoViewController.Layouts.cellHorizontalPadding)
         }
     }
 }

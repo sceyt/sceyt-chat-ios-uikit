@@ -1,5 +1,5 @@
 //
-//  CreateGroupVC.swift
+//  CreateGroupViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,12 +8,12 @@
 
 import UIKit
 
-open class CreateGroupVC: ViewController,
+open class CreateGroupViewController: ViewController,
     UITableViewDelegate, UITableViewDataSource,
     UITextViewDelegate
 {
     open var viewModel: CreatePrivateChannelVM!
-    open lazy var router = CreatePrivateChannelRouter(rootVC: self)
+    open lazy var router = CreatePrivateChannelRouter(rootViewController: self)
     
     open var channelAvatarImage: UIImage?
     
@@ -224,7 +224,7 @@ open class CreateGroupVC: ViewController,
     }
 }
 
-extension CreateGroupVC {
+extension CreateGroupViewController {
     enum Sections: Int, CaseIterable {
         case user
     }

@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC.swift
+//  ChannelInfoViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import Photos
 import UIKit
 
-open class ChannelInfoVC: ViewController,
+open class ChannelInfoViewController: ViewController,
     UITableViewDelegate,
     UITableViewDataSource,
     UIGestureRecognizerDelegate
@@ -17,33 +17,33 @@ open class ChannelInfoVC: ViewController,
     open var profileViewModel: ChannelProfileVM!
     
     open lazy var router = Components.channelProfileRouter
-        .init(rootVC: self)
+        .init(rootViewController: self)
     
     open lazy var tableView = Components.simultaneousGestureTableView.init(frame: .zero, style: .grouped)
         .withoutAutoresizingMask
         .rowAutomaticDimension
     
-    open lazy var mediaListVC = Components.channelInfoMediaCollectionView
+    open lazy var mediaListViewController = Components.channelInfoMediaCollectionView
         .init()
     
-    open lazy var fileListVC = Components.channelInfoFileCollectionView
+    open lazy var fileListViewController = Components.channelInfoFileCollectionView
         .init()
     
-    open lazy var linkListVC = Components.channelInfoLinkCollectionView
+    open lazy var linkListViewController = Components.channelInfoLinkCollectionView
         .init()
     
-    open lazy var voiceListVC = Components.channelInfoVoiceCollectionView
+    open lazy var voiceListViewController = Components.channelInfoVoiceCollectionView
         .init()
     
-    open lazy var segmentVC = Components.segmentedControlView
+    open lazy var segmentViewController = Components.segmentedControlView
         .init(items: [
-            SegmentedControlView.SectionItem(content: mediaListVC,
+            SegmentedControlView.SectionItem(content: mediaListViewController,
                                              title: L10n.Channel.Profile.Segment.medias),
-            SegmentedControlView.SectionItem(content: fileListVC,
+            SegmentedControlView.SectionItem(content: fileListViewController,
                                              title: L10n.Channel.Profile.Segment.files),
-            SegmentedControlView.SectionItem(content: voiceListVC,
+            SegmentedControlView.SectionItem(content: voiceListViewController,
                                              title: L10n.Channel.Profile.Segment.voice),
-            SegmentedControlView.SectionItem(content: linkListVC,
+            SegmentedControlView.SectionItem(content: linkListViewController,
                                              title: L10n.Channel.Profile.Segment.links)
         ]).withoutAutoresizingMask
     
@@ -65,13 +65,13 @@ open class ChannelInfoVC: ViewController,
             target: self,
             action: #selector(moreAction(_:)))
         
-        mediaListVC.mediaViewModel = profileViewModel.mediaListViewModel
-        mediaListVC.previewer = { [weak self] in
+        mediaListViewController.mediaViewModel = profileViewModel.mediaListViewModel
+        mediaListViewController.previewer = { [weak self] in
             self?.profileViewModel.previewer
         }
-        fileListVC.fileViewModel = profileViewModel.fileListViewModel
-        linkListVC.linkViewModel = profileViewModel.linkListViewModel
-        voiceListVC.voiceViewModel = profileViewModel.voiceListViewModel
+        fileListViewController.fileViewModel = profileViewModel.fileListViewModel
+        linkListViewController.linkViewModel = profileViewModel.linkListViewModel
+        voiceListViewController.voiceViewModel = profileViewModel.voiceListViewModel
         tableView.register(Components.channelInfoDetailsCell.self)
         tableView.register(Components.channelInfoDescriptionCell.self)
         tableView.register(Components.channelInfoOptionCell.self)
@@ -87,15 +87,15 @@ open class ChannelInfoVC: ViewController,
         footer.frame.size.height = .leastNormalMagnitude
         tableView.tableFooterView = footer
         
-        fileListVC.onSelect = { [unowned self] indexPath in
-            if let attachment = fileListVC.fileViewModel.attachmentLayout(at: indexPath)?.attachment {
+        fileListViewController.onSelect = { [unowned self] indexPath in
+            if let attachment = fileListViewController.fileViewModel.attachmentLayout(at: indexPath)?.attachment {
                 router.showAttachment(attachment)
             }
         }
         
-        segmentVC.parentScrollView = tableView
-        segmentVC.items
-            .compactMap { $0.content as? ChannelInfoVC.AttachmentCollectionView }
+        segmentViewController.parentScrollView = tableView
+        segmentViewController.items
+            .compactMap { $0.content as? ChannelInfoViewController.AttachmentCollectionView }
             .forEach {
                 $0.shouldReceiveTouch = { [weak self] in
                     guard let self else { return false }
@@ -109,7 +109,7 @@ open class ChannelInfoVC: ViewController,
         tableView.shouldSimultaneous = { [weak self] in
             guard let self else { return false }
             
-            (self.currentPage as? ChannelInfoVC.AttachmentCollectionView)?.scrollingDecelerator.invalidateIfNeeded()
+            (self.currentPage as? ChannelInfoViewController.AttachmentCollectionView)?.scrollingDecelerator.invalidateIfNeeded()
             
             let contentOffsetY = ceil($0.contentOffset.y)
             let shouldSimultaneous = contentOffsetY < floor(self.headerHeight - $0.contentInset.top) || (self.currentPage?.contentOffset.y ?? 0) == 0
@@ -162,26 +162,26 @@ open class ChannelInfoVC: ViewController,
     
     override open func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        mediaListVC.contentInset.bottom = view.safeAreaInsets.bottom
-        fileListVC.contentInset.bottom = view.safeAreaInsets.bottom
-        linkListVC.contentInset.bottom = view.safeAreaInsets.bottom
-        voiceListVC.contentInset.bottom = view.safeAreaInsets.bottom
+        mediaListViewController.contentInset.bottom = view.safeAreaInsets.bottom
+        fileListViewController.contentInset.bottom = view.safeAreaInsets.bottom
+        linkListViewController.contentInset.bottom = view.safeAreaInsets.bottom
+        voiceListViewController.contentInset.bottom = view.safeAreaInsets.bottom
     }
     
     open func onEvent(_ event: ChannelProfileVM.Event) {
         switch event {
         case .update:
             if !profileViewModel.isActive {
-                router.goChannelListVC()
+                router.goChannelListViewController()
                 return
             }
             var indexPaths = [IndexPath]()
-            if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoVC.DetailsCell }) as? ChannelInfoVC.DetailsCell,
+            if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoViewController.DetailsCell }) as? ChannelInfoViewController.DetailsCell,
                let indexPath = tableView.indexPath(for: cell)
             {
                 indexPaths.append(indexPath)
             }
-            if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoVC.DescriptionCell }) as? ChannelInfoVC.DescriptionCell,
+            if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoViewController.DescriptionCell }) as? ChannelInfoViewController.DescriptionCell,
                let indexPath = tableView.indexPath(for: cell)
             {
                 indexPaths.append(indexPath)
@@ -198,12 +198,12 @@ open class ChannelInfoVC: ViewController,
     override open func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
         super.viewWillTransition(to: size, with: coordinator)
         
-        let currentPage = segmentVC.currentPage
+        let currentPage = segmentViewController.currentPage
         coordinator.animate { [weak self] _ in
             guard let self else { return }
             self.tableView.reloadData()
-            self.segmentVC.currentPage = currentPage
-            self.segmentVC.stackView.arrangedSubviews.forEach {
+            self.segmentViewController.currentPage = currentPage
+            self.segmentViewController.stackView.arrangedSubviews.forEach {
                 if let collectionView = $0 as? UICollectionView {
                     collectionView.collectionViewLayout.invalidateLayout()
                 }
@@ -313,9 +313,9 @@ open class ChannelInfoVC: ViewController,
             _cell = cell
         case .attachment:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoContainerCell.self)
-            if !cell.contentView.subviews.contains(segmentVC) {
-                cell.contentView.addSubview(segmentVC.withoutAutoresizingMask)
-                segmentVC.pin(to: cell.contentView)
+            if !cell.contentView.subviews.contains(segmentViewController) {
+                cell.contentView.addSubview(segmentViewController.withoutAutoresizingMask)
+                segmentViewController.pin(to: cell.contentView)
             }
             _cell = cell
         }
@@ -375,7 +375,7 @@ open class ChannelInfoVC: ViewController,
                 cell.layer.addSublayer(layer)
             }
             layer.borderColor = appearance.cellSeparatorColor?.cgColor
-            layer.borderWidth = Components.channelInfoVC.Layouts.cellSeparatorWidth
+            layer.borderWidth = Components.channelInfoViewController.Layouts.cellSeparatorWidth
             layer.frame = CGRect(x: 0, y: cell.height - layer.borderWidth, width: cell.width, height: layer.borderWidth)
         }
         
@@ -383,8 +383,8 @@ open class ChannelInfoVC: ViewController,
             let maskLayer = CAShapeLayer()
             var rect = cell.bounds
             if sections[indexPath.section] != .attachment {
-                rect.origin.x = Components.channelInfoVC.Layouts.cellHorizontalPadding
-                rect.size.width -= Components.channelInfoVC.Layouts.cellHorizontalPadding * 2
+                rect.origin.x = Components.channelInfoViewController.Layouts.cellHorizontalPadding
+                rect.size.width -= Components.channelInfoViewController.Layouts.cellHorizontalPadding * 2
             }
             maskLayer.path = UIBezierPath(roundedRect: rect,
                                           byRoundingCorners: corners,
@@ -403,14 +403,14 @@ open class ChannelInfoVC: ViewController,
     var segmentTop: CGFloat { floor(tableView.contentSize.height - tableView.height - 18) }
     
     open var titleLabel = {
-        $0.font = Components.channelInfoVC.appearance.titleFont?.withSize(16)
-        $0.textColor = Components.channelInfoVC.appearance.titleColor
+        $0.font = Components.channelInfoViewController.appearance.titleFont?.withSize(16)
+        $0.textColor = Components.channelInfoViewController.appearance.titleColor
         return $0
     }(UILabel())
     
     open var subTitleLabel = {
-        $0.font = Components.channelInfoVC.appearance.subtitleFont?.withSize(13)
-        $0.textColor = Components.channelInfoVC.appearance.subtitleColor
+        $0.font = Components.channelInfoViewController.appearance.subtitleFont?.withSize(13)
+        $0.textColor = Components.channelInfoViewController.appearance.subtitleColor
         return $0
     }(UILabel())
     
@@ -425,7 +425,7 @@ open class ChannelInfoVC: ViewController,
     }
     
     private var currentPage: UIScrollView? {
-        segmentVC.items[segmentVC.currentPage].content as? UIScrollView
+        segmentViewController.items[segmentViewController.currentPage].content as? UIScrollView
     }
     
     open func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -433,12 +433,12 @@ open class ChannelInfoVC: ViewController,
 
         scrollView.bounces = contentOffsetY <= -scrollView.contentInset.top
         
-        segmentVC.segmentController.showCornerRadius = contentOffsetY < headerHeight - scrollView.contentInset.top
+        segmentViewController.segmentController.showCornerRadius = contentOffsetY < headerHeight - scrollView.contentInset.top
 
         if contentOffsetY > -scrollView.contentInset.top,
            contentOffsetY < headerHeight - scrollView.contentInset.top
         {
-            segmentVC.items
+            segmentViewController.items
                 .compactMap { $0.content as? UIScrollView }
                 .forEach {
                     if $0.contentOffset.y > 0 {
@@ -447,7 +447,7 @@ open class ChannelInfoVC: ViewController,
                 }
         }
         
-        if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoVC.DetailsCell }) as? ChannelInfoVC.DetailsCell {
+        if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoViewController.DetailsCell }) as? ChannelInfoViewController.DetailsCell {
             let point = cell.subtitleLabel.convert(.init(x: 0, y: cell.subtitleLabel.height), to: view)
             if point.y <= scrollView.contentInset.top {
                 titleLabel.text = cell.titleLabel.text
@@ -460,7 +460,7 @@ open class ChannelInfoVC: ViewController,
     }
     
     open func scrollViewShouldScrollToTop(_ scrollView: UIScrollView) -> Bool {
-        (currentPage as? ChannelInfoVC.AttachmentCollectionView)?.scrollingDecelerator.invalidateIfNeeded()
+        (currentPage as? ChannelInfoViewController.AttachmentCollectionView)?.scrollingDecelerator.invalidateIfNeeded()
         return true
     }
     
@@ -470,16 +470,16 @@ open class ChannelInfoVC: ViewController,
 
     open func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
         if scrollView.contentOffset.y >= headerHeight - scrollView.contentInset.top {
-            (currentPage as? ChannelInfoVC.AttachmentCollectionView)?.scrollingDecelerator.decelerate(by: outerDeceleration!)
+            (currentPage as? ChannelInfoViewController.AttachmentCollectionView)?.scrollingDecelerator.decelerate(by: outerDeceleration!)
         }
     }
 
     open func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        segmentVC.scrollView.isScrollEnabled = true
+        segmentViewController.scrollView.isScrollEnabled = true
     }
     
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
-        segmentVC.scrollView.isScrollEnabled = false
+        segmentViewController.scrollView.isScrollEnabled = false
         outerDeceleration = nil
     }
     
@@ -530,14 +530,14 @@ open class ChannelInfoVC: ViewController,
             if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
             } else {
-                logger.debug("[ChannelInfoVC] decoded metadata description is missing")
+                logger.debug("[ChannelInfoViewController] decoded metadata description is missing")
             }     
             sections.append(.uri)
         case .private:
             if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
             } else {
-                logger.debug("[ChannelInfoVC] decoded metadata description is missing")
+                logger.debug("[ChannelInfoViewController] decoded metadata description is missing")
             }
         case .direct:
             if !(profileViewModel.channel.peer?.presence.status ?? "").isEmpty {
@@ -817,7 +817,7 @@ open class ChannelInfoVC: ViewController,
                                 if let error = error {
                                     self.showAlert(error: error)
                                 } else {
-                                    self.router.goChannelListVC()
+                                    self.router.goChannelListViewController()
                                 }
                             }
                     }
@@ -833,8 +833,8 @@ open class ChannelInfoVC: ViewController,
             if let error = error {
                 self.showAlert(error: error)
             } else {
-                self.router.channelVC?.channelViewModel.refreshChannel()
-//                self.router.goChannelListVC()
+                self.router.channelViewController?.channelViewModel.refreshChannel()
+//                self.router.goChannelListViewController()
             }
         }
     }
@@ -847,7 +847,7 @@ open class ChannelInfoVC: ViewController,
             if let error = error {
                 self.showAlert(error: error)
             } else {
-                self.router.channelVC?.channelViewModel.refreshChannel()
+                self.router.channelViewController?.channelViewModel.refreshChannel()
             }
         }
     }
@@ -860,7 +860,7 @@ open class ChannelInfoVC: ViewController,
             if let error = error {
                 self.showAlert(error: error)
             } else {
-                self.router.goChannelListVC()
+                self.router.goChannelListViewController()
             }
         }
     }
@@ -873,7 +873,7 @@ open class ChannelInfoVC: ViewController,
             if let error = error {
                 self.showAlert(error: error)
             } else {
-                self.router.goChannelListVC()
+                self.router.goChannelListViewController()
             }
         }
     }
@@ -904,7 +904,7 @@ open class ChannelInfoVC: ViewController,
                             if let error = error {
                                 self.showAlert(error: error)
                             } else {
-                                self.router.goChannelListVC()
+                                self.router.goChannelListViewController()
                             }
                         }
                     }
@@ -913,7 +913,7 @@ open class ChannelInfoVC: ViewController,
     }
 }
 
-public extension ChannelInfoVC {
+public extension ChannelInfoViewController {
     enum Sections: Int, CaseIterable {
         case header
         case description
@@ -960,7 +960,7 @@ public extension ChannelInfoVC {
     }
 }
 
-public extension ChannelInfoVC {
+public extension ChannelInfoViewController {
     enum Layouts {
         public static var itemIconSize: CGFloat = 32
         public static var itemVerticalPadding: CGFloat = 12

@@ -1,5 +1,5 @@
 //
-//  ChannelSearchResultsVC.swift
+//  ChannelSearchResultsViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 24/10/2023.
@@ -15,7 +15,7 @@ public protocol ChannelSearchResultsUpdating: AnyObject {
     var showCheckBox: Bool { get }
 }
 
-open class ChannelSearchResultsVC: ViewController,
+open class ChannelSearchResultsViewController: ViewController,
     UITableViewDelegate, UITableViewDataSource
 {
     open weak var resultsUpdater: ChannelSearchResultsUpdating!

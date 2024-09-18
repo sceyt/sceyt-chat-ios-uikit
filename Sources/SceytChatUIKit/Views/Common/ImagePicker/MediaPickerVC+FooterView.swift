@@ -1,5 +1,5 @@
 //
-//  MediaPickerVC+FooterView.swift
+//  MediaPickerViewController+FooterView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -10,9 +10,9 @@ import Photos
 import PhotosUI
 import UIKit
 
-extension MediaPickerVC {
+extension MediaPickerViewController {
     open class FooterView: View {
-        public lazy var appearance = Components.mediaPickerVC.appearance {
+        public lazy var appearance = Components.mediaPickerViewController.appearance {
             didSet {
                 setupAppearance()
             }

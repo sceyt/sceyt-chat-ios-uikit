@@ -8,12 +8,12 @@
 
 import UIKit
 
-open class ChannelProfileRouter: Router<ChannelInfoVC> {
+open class ChannelProfileRouter: Router<ChannelInfoViewController> {
     open func showMuteOptionsAlert(
         selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
-        rootVC.showBottomSheet(
+        rootViewController.showBottomSheet(
             title: L10n.Channel.Profile.Mute.title,
             actions: SceytChatUIKit.shared.config.muteItems.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
@@ -24,7 +24,7 @@ open class ChannelProfileRouter: Router<ChannelInfoVC> {
         selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
         canceled: @escaping () -> Void
     ) {
-        rootVC.showBottomSheet(
+        rootViewController.showBottomSheet(
             title: L10n.Channel.Profile.AutoDelete.title,
             actions: SceytChatUIKit.shared.config.autoDeleteItems.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
@@ -39,55 +39,55 @@ open class ChannelProfileRouter: Router<ChannelInfoVC> {
                 .map { .init(title: $0.name, url: $0.url) }
         )
         
-        preview.present(on: rootVC)
+        preview.present(on: rootViewController)
     }
 
-    open func goChannelVC() {
-        guard let viewController = channelVC else { return }
-        rootVC.navigationController?.popToViewController(viewController, animated: true)
+    open func goChannelViewController() {
+        guard let viewController = channelViewController else { return }
+        rootViewController.navigationController?.popToViewController(viewController, animated: true)
     }
     
-    open func goChannelListVC() {
-        guard let viewController = channelListVC else { return }
-        rootVC.navigationController?.popToViewController(viewController, animated: true)
+    open func goChannelListViewController() {
+        guard let viewController = channelListViewController else { return }
+        rootViewController.navigationController?.popToViewController(viewController, animated: true)
     }
     
     open func showMemberList() {
-        let viewController = Components.channelMemberListVC.init()
-        viewController.memberListViewModel = Components.channelMemberListVM.init(channel: rootVC.profileViewModel.channel)
-        rootVC.show(viewController, sender: self)
+        let viewController = Components.channelMemberListViewController.init()
+        viewController.memberListViewModel = Components.channelMemberListVM.init(channel: rootViewController.profileViewModel.channel)
+        rootViewController.show(viewController, sender: self)
     }
     
     open func showAdminsList() {
-        let viewController = Components.channelMemberListVC.init()
-        viewController.memberListViewModel = Components.channelMemberListVM.init(channel: rootVC.profileViewModel.channel,
+        let viewController = Components.channelMemberListViewController.init()
+        viewController.memberListViewModel = Components.channelMemberListVM.init(channel: rootViewController.profileViewModel.channel,
                                                                      filterMembersByRole: SceytChatUIKit.shared.config.chatRoleAdmin)
-        rootVC.show(viewController, sender: self)
+        rootViewController.show(viewController, sender: self)
     }
     
     open func showEditChannel() {
-        let viewController = Components.editChannelVC.init()
-        viewController.profileViewModel = Components.channelProfileEditVM.init(channel: rootVC.profileViewModel.channel)
-        rootVC.show(viewController, sender: self)
+        let viewController = Components.editChannelViewController.init()
+        viewController.profileViewModel = Components.channelProfileEditVM.init(channel: rootViewController.profileViewModel.channel)
+        rootViewController.show(viewController, sender: self)
     }
 
-    public var channelListVC: ChannelListVC? {
-        rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelListVC }) as? ChannelListVC
+    public var channelListViewController: ChannelListViewController? {
+        rootViewController.navigationController?.viewControllers.first(where: { $0 is ChannelListViewController }) as? ChannelListViewController
     }
 
-    public var channelVC: ChannelVC? {
-        rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelVC }) as? ChannelVC
+    public var channelViewController: ChannelViewController? {
+        rootViewController.navigationController?.viewControllers.first(where: { $0 is ChannelViewController }) as? ChannelViewController
     }
     
     open func goAvatar() {
-        guard rootVC.profileViewModel.channel.imageUrl != nil else { return }
-        let viewController = Components.imagePreviewVC.init()
-        viewController.viewModel = Components.channelAvatarVM.init(channel: rootVC.profileViewModel.channel)
-        rootVC.show(viewController, sender: self)
+        guard rootViewController.profileViewModel.channel.imageUrl != nil else { return }
+        let viewController = Components.imagePreviewViewController.init()
+        viewController.viewModel = Components.channelAvatarVM.init(channel: rootViewController.profileViewModel.channel)
+        rootViewController.show(viewController, sender: self)
     }
     
     open func goMessageSearch() {
-        channelVC?.channelViewModel.startMessagesSearch()
-        goChannelVC()
+        channelViewController?.channelViewModel.startMessagesSearch()
+        goChannelViewController()
     }
 }

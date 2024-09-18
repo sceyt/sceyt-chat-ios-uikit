@@ -64,8 +64,8 @@ open class ReactionAnimator: NSObject, UIViewControllerAnimatedTransitioning {
     }
 
     private func dismissAnimation(transitionContext: UIViewControllerContextTransitioning) -> UIViewImplicitlyAnimating {
-        let fromVC = transitionContext.viewController(forKey: .from)!
-        let initialFrame = transitionContext.initialFrame(for: fromVC)
+        let fromViewController = transitionContext.viewController(forKey: .from)!
+        let initialFrame = transitionContext.initialFrame(for: fromViewController)
         let fromView = transitionContext.view(forKey: .from)
         let duration = transitionDuration(using: transitionContext)
         let animator = UIViewPropertyAnimator(duration: duration, curve: .easeOut) {

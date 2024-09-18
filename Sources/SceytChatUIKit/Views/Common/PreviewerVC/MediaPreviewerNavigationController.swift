@@ -9,17 +9,17 @@
 import UIKit
 
 open class MediaPreviewerNavigationController: NavigationController, PreviewerTransitionViewControllerConvertible {
-    private let mediaPreviewerCarouselVC: MediaPreviewerCarouselVC
-    var sourceView: UIImageView? { mediaPreviewerCarouselVC.sourceView }
-    var sourceFrameRelativeToWindow: CGRect? { mediaPreviewerCarouselVC.sourceFrameRelativeToWindow }
-    var targetView: UIImageView? { mediaPreviewerCarouselVC.targetView }
+    private let mediaPreviewerCarouselViewController: MediaPreviewerCarouselViewController
+    var sourceView: UIImageView? { mediaPreviewerCarouselViewController.sourceView }
+    var sourceFrameRelativeToWindow: CGRect? { mediaPreviewerCarouselViewController.sourceFrameRelativeToWindow }
+    var targetView: UIImageView? { mediaPreviewerCarouselViewController.targetView }
     
     private let imageViewerPresentationDelegate: ImageViewerTransitionPresentationManager
     
-    required public init(_ mediaPreviewerCarouselVC: MediaPreviewerCarouselVC) {
-        self.imageViewerPresentationDelegate = ImageViewerTransitionPresentationManager(imageContentMode: mediaPreviewerCarouselVC.imageContentMode)
-        self.mediaPreviewerCarouselVC = mediaPreviewerCarouselVC
-        super.init(rootViewController: mediaPreviewerCarouselVC)
+    required public init(_ mediaPreviewerCarouselViewController: MediaPreviewerCarouselViewController) {
+        self.imageViewerPresentationDelegate = ImageViewerTransitionPresentationManager(imageContentMode: mediaPreviewerCarouselViewController.imageContentMode)
+        self.mediaPreviewerCarouselViewController = mediaPreviewerCarouselViewController
+        super.init(rootViewController: mediaPreviewerCarouselViewController)
         transitioningDelegate = imageViewerPresentationDelegate
         modalPresentationStyle = .custom
         modalPresentationCapturesStatusBarAppearance = true

@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+LinkCell.swift
+//  ChannelInfoViewController+LinkCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,9 +8,9 @@
 
 import UIKit
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class LinkCell: CollectionViewCell {
-        typealias Layouts = ChannelInfoVC.LinkCollectionView.Layouts
+        typealias Layouts = ChannelInfoViewController.LinkCollectionView.Layouts
         
         open lazy var iconView = UIImageView()
             .withoutAutoresizingMask

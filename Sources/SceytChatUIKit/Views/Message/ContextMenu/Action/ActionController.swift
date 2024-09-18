@@ -18,7 +18,7 @@ open class ActionController: ViewController {
     
     public private(set) var snapshot: UIView?
     
-    public lazy var emojiController = Components.reactionPickerVC.init()
+    public lazy var emojiController = Components.reactionPickerViewController.init()
     public lazy var menuController = MenuController()
     
     public let horizontalAlignment: ContextMenu.HorizontalAlignment

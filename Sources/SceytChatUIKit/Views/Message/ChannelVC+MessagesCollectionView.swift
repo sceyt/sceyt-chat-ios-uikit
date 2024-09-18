@@ -1,5 +1,5 @@
 //
-//  ChannelVC+MessagesCollectionView.swift
+//  ChannelViewController+MessagesCollectionView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-public extension ChannelVC {
+public extension ChannelViewController {
     open class MessagesCollectionView: CollectionView {
         
         private var canReloadDataIndex = 0
@@ -38,8 +38,8 @@ public extension ChannelVC {
             register(Components.channelDateSeparatorView, kind: .header)
         }
         
-        open var layout: ChannelVC.MessagesCollectionViewLayout {
-            guard let layout = collectionViewLayout as? ChannelVC.MessagesCollectionViewLayout else {
+        open var layout: ChannelViewController.MessagesCollectionViewLayout {
+            guard let layout = collectionViewLayout as? ChannelViewController.MessagesCollectionViewLayout else {
                 fatalError("Invalid ChatCollectionViewLayout type")
             }
             return layout
@@ -207,7 +207,7 @@ public extension ChannelVC {
     }
 }
 
-public extension ChannelVC.MessagesCollectionView {
+public extension ChannelViewController.MessagesCollectionView {
     
     func findCell(forGesture sender: UIGestureRecognizer) -> UICollectionViewCell? {
         // Collection view is a scroll view; we want to ignore

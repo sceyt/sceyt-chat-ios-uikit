@@ -1,5 +1,5 @@
 //
-//  InputVC+MessageActionsView.swift
+//  InputViewController+MessageActionsView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,11 +8,11 @@
 
 import UIKit
 
-extension InputVC {
+extension InputViewController {
     
     open class MessageActionsView: View {
         
-        public lazy var appearance = InputVC.appearance {
+        public lazy var appearance = InputViewController.appearance {
             didSet {
                 setupAppearance()
             }

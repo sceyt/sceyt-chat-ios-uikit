@@ -1,5 +1,5 @@
 //
-//  StartChatVC+ActionsView.swift
+//  StartChatViewController+ActionsView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension StartChatVC {
+extension StartChatViewController {
     open class ActionsView: View {
         open lazy var groupView = HighlightableControl()
             .withoutAutoresizingMask

@@ -1,5 +1,5 @@
 //
-//  ChannelVC+DateSeparatorView.swift
+//  ChannelViewController+DateSeparatorView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -13,7 +13,7 @@ public protocol ChannelDateSeparator {
     associatedtype Appearance = MessageCell.Appearance
 }
 
-extension ChannelVC {
+extension ChannelViewController {
     open class DateSeparatorView: CollectionReusableView, ChannelDateSeparator {
         
         open lazy var titleLabel = ContentInsetLabel

@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class EmojiPickerVC: ViewController,
+open class EmojiPickerViewController: ViewController,
     UICollectionViewDataSource,
     UICollectionViewDelegate,
     EmojiSectionToolBarDelegate
@@ -86,7 +86,7 @@ open class EmojiPickerVC: ViewController,
         if kind == UICollectionView.elementKindSectionHeader {
             let sectionHeader = collectionView.dequeueReusableSupplementaryView(ofKind: kind,
                                                                                 withReuseIdentifier: Components.emojiPickerSectionHeaderView.reuseId,
-                                                                                for: indexPath) as! EmojiPickerVC.SectionHeaderView
+                                                                                for: indexPath) as! EmojiPickerViewController.SectionHeaderView
             sectionHeader.bind(viewModel.groupTitle(at: indexPath.section))
             return sectionHeader
         } else {
@@ -139,7 +139,7 @@ open class EmojiPickerVC: ViewController,
     }
 }
 
-public extension EmojiPickerVC {
+public extension EmojiPickerViewController {
     enum Event {
         case selectEmoji(String)
 
@@ -169,7 +169,7 @@ open class EmojiViewPresentationController: UIPresentationController, UIGestureR
         return t
     }()
 
-    open var state: EmojiPickerVC.State = .small
+    open var state: EmojiPickerViewController.State = .small
     open private(set) var direction: CGFloat = 0
     open private(set) var shouldComplete: Bool = false
     open lazy var topAnchor: CGFloat = presentedView?.window?.windowScene?.statusBarManager?.statusBarFrame.height ?? 64
@@ -220,7 +220,7 @@ open class EmojiViewPresentationController: UIPresentationController, UIGestureR
         }
     }
 
-    open func frameFor(state: EmojiPickerVC.State) -> CGRect {
+    open func frameFor(state: EmojiPickerViewController.State) -> CGRect {
         guard let containerView = containerView else { return .zero }
         switch state {
         case .large:
@@ -230,7 +230,7 @@ open class EmojiViewPresentationController: UIPresentationController, UIGestureR
         }
     }
 
-    open func changeState(to state: EmojiPickerVC.State) {
+    open func changeState(to state: EmojiPickerViewController.State) {
         let frame = frameFor(state: state)
         guard frame != .zero else { return }
         if let presentedView = presentedView {

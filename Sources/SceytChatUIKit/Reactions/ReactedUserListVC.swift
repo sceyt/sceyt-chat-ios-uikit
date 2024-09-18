@@ -1,5 +1,5 @@
 //
-//  ReactedUserListVC.swift
+//  ReactedUserListViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ReactedUserListVC: ViewController,
+open class ReactedUserListViewController: ViewController,
                            UICollectionViewDataSource,
                            UICollectionViewDelegateFlowLayout {
 
@@ -102,7 +102,7 @@ open class ReactedUserListVC: ViewController,
     }
 
 }
-public extension ReactedUserListVC {
+public extension ReactedUserListViewController {
 
     enum Event {
         case onSelect(ChatMessage.Reaction)

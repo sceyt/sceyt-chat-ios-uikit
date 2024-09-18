@@ -1,5 +1,5 @@
 //
-//  InputVC+MessageSearchControlsView.swift
+//  InputViewController+MessageSearchControlsView.swift
 //  SceytChatUIKit
 //
 //  Created by Arthur Avagayn on 16.09.24.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension InputVC {
+extension InputViewController {
     
     open class MessageSearchControlsView: View {
         open lazy var separatorView = UIView()
@@ -115,7 +115,7 @@ extension InputVC {
     }
 }
 
-public extension InputVC.MessageSearchControlsView {
+public extension InputViewController.MessageSearchControlsView {
     enum Action {
         case previousResult
         case nextResult

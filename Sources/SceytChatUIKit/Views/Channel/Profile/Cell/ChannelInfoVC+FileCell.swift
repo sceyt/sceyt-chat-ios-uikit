@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+FileCell.swift
+//  ChannelInfoViewController+FileCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import UIKit
 import Combine
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class FileCell: CollectionViewCell {
         let event = PassthroughSubject<Event, Never>()
         
@@ -210,7 +210,7 @@ extension ChannelInfoVC {
     }
 }
 
-public extension ChannelInfoVC.FileCell {
+public extension ChannelInfoViewController.FileCell {
     enum Event {
         case pause(MessageLayoutModel.AttachmentLayout), resume(MessageLayoutModel.AttachmentLayout)
     }

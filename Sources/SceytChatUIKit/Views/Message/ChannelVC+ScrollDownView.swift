@@ -1,5 +1,5 @@
 //
-//  ChannelVC+ScrollDownView.swift
+//  ChannelViewController+ScrollDownView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelVC {
+extension ChannelViewController {
     open class ScrollDownView: Control {
         open lazy var bubbleView = UIImageView()
             .withoutAutoresizingMask

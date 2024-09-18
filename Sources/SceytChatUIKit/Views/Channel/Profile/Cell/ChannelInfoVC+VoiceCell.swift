@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+VoiceCell.swift
+//  ChannelInfoViewController+VoiceCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,9 +9,9 @@
 import UIKit
 import Combine
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class VoiceCell: CollectionViewCell {
-        typealias Layouts = ChannelInfoVC.VoiceCollectionView.Layouts
+        typealias Layouts = ChannelInfoViewController.VoiceCollectionView.Layouts
         
         let event = PassthroughSubject<Event, Never>()
         
@@ -277,7 +277,7 @@ extension ChannelInfoVC {
     }
 }
 
-public extension ChannelInfoVC.VoiceCell {
+public extension ChannelInfoViewController.VoiceCell {
     enum Event {
         case pause(MessageLayoutModel.AttachmentLayout), resume(MessageLayoutModel.AttachmentLayout)
     }

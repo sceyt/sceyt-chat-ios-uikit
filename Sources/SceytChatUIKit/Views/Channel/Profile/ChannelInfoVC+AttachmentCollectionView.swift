@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+AttachmentCollectionView.swift
+//  ChannelInfoViewController+AttachmentCollectionView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class AttachmentCollectionView: CollectionView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
         open var noItemsMessage: String? {
             set { noItemsView.noItemsLabel.text = newValue }
@@ -89,7 +89,7 @@ extension ChannelInfoVC {
     }
 }
 
-extension ChannelInfoVC.AttachmentCollectionView {
+extension ChannelInfoViewController.AttachmentCollectionView {
 
     open class Layout: UICollectionViewFlowLayout {
         public let settings: Settings
@@ -128,7 +128,7 @@ extension ChannelInfoVC.AttachmentCollectionView {
     }
 }
 
-public extension ChannelInfoVC.AttachmentCollectionView.Layout {
+public extension ChannelInfoViewController.AttachmentCollectionView.Layout {
 
     struct Settings {
         public let sectionInset: UIEdgeInsets

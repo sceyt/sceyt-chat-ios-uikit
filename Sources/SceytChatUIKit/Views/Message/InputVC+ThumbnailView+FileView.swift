@@ -1,5 +1,5 @@
 //
-//  InputVC+ThumbnailView+FileView.swift
+//  InputViewController+ThumbnailView+FileView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,9 +8,9 @@
 
 import UIKit
 
-extension InputVC.ThumbnailView {
+extension InputViewController.ThumbnailView {
     open class FileView: View {
-        public lazy var appearance = Components.inputVC.appearance {
+        public lazy var appearance = Components.inputViewController.appearance {
             didSet {
                 setupAppearance()
             }

@@ -1,5 +1,5 @@
 //
-//  EditChannelVC.swift
+//  EditChannelViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,12 +8,12 @@
 
 import UIKit
 
-open class EditChannelVC: ViewController,
+open class EditChannelViewController: ViewController,
     UITableViewDelegate,
     UITableViewDataSource
 {
     open var profileViewModel: ChannelProfileEditVM!
-    open lazy var router = ChannelProfileEditRouter(rootVC: self)
+    open lazy var router = ChannelProfileEditRouter(rootViewController: self)
     
     open lazy var tableView = UITableView(frame: .zero, style: .insetGrouped)
         .withoutAutoresizingMask
@@ -251,7 +251,7 @@ open class EditChannelVC: ViewController,
     }
 }
 
-public extension EditChannelVC {
+public extension EditChannelViewController {
     enum Sections: Int, CaseIterable {
         case avatar
         case fields

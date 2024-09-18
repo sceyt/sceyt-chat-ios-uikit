@@ -1,5 +1,5 @@
 //
-//  StartChatVC.swift
+//  StartChatViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,12 +8,12 @@
 
 import UIKit
 
-open class StartChatVC: ViewController,
+open class StartChatViewController: ViewController,
     UITableViewDelegate, UITableViewDataSource,
     UISearchControllerDelegate, UISearchBarDelegate
 {
     open var viewModel: CreateNewChannelVM!
-    open lazy var router = NewChannelRouter(rootVC: self)
+    open lazy var router = NewChannelRouter(rootViewController: self)
 
     open lazy var searchController = SearchController(searchResultsController: nil)
 
@@ -191,7 +191,7 @@ open class StartChatVC: ViewController,
     }
 }
 
-extension StartChatVC {
+extension StartChatViewController {
     enum Sections: Int, CaseIterable {
         case user
     }

@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+VideoAttachmentCell.swift
+//  ChannelInfoViewController+VideoAttachmentCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,8 +8,8 @@
 
 import UIKit
 
-extension ChannelInfoVC {
-    open class VideoAttachmentCell: ChannelInfoVC.AttachmentCell {
+extension ChannelInfoViewController {
+    open class VideoAttachmentCell: ChannelInfoViewController.AttachmentCell {
         
         open lazy var timeLabel = Components.timeLabel
             .init()

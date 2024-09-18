@@ -1,5 +1,5 @@
 //
-//  ChannelVC+DisplayedTimer.swift
+//  ChannelViewController+DisplayedTimer.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 20.06.23.
@@ -9,7 +9,7 @@
 
 import UIKit
 
-extension ChannelVC {
+extension ChannelViewController {
     
     open class DisplayedTimer: NSObject {
         

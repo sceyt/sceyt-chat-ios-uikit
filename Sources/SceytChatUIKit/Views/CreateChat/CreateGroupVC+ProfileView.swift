@@ -1,5 +1,5 @@
 //
-//  CreateGroupVC+ProfileView.swift
+//  CreateGroupViewController+ProfileView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension CreateGroupVC {
+extension CreateGroupViewController {
     open class ProfileView: View {
         
         open lazy var avatarButton = CircleButton(type: .custom)
@@ -111,7 +111,7 @@ extension CreateGroupVC {
     }
 }
 
-public extension CreateGroupVC.ProfileView {
+public extension CreateGroupViewController.ProfileView {
     enum Layouts {
         public static var avatarSize: CGFloat = 72
     }

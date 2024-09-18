@@ -1,5 +1,5 @@
 //
-//  InputVC+ThumbnailView+MediaView.swift
+//  InputViewController+ThumbnailView+MediaView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension InputVC.ThumbnailView {
+extension InputViewController.ThumbnailView {
     open class MediaView: View {
         open lazy var imageView = UIImageView()
             .withoutAutoresizingMask

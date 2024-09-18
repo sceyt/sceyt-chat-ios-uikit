@@ -8,32 +8,32 @@
 
 import UIKit
 
-open class ChannelMemberListRouter: Router<ChannelMemberListVC> {
+open class ChannelMemberListRouter: Router<ChannelMemberListViewController> {
     
-    open func goChannelVC() {
-        guard let viewController = channelVC else { return }
-        rootVC.navigationController?.popToViewController(viewController, animated: true)
+    open func goChannelViewController() {
+        guard let viewController = channelViewController else { return }
+        rootViewController.navigationController?.popToViewController(viewController, animated: true)
     }
     
-    private var channelVC: ChannelVC? {
-        rootVC.navigationController?.viewControllers.first(where: { $0 is ChannelVC }) as? ChannelVC
+    private var channelViewController: ChannelViewController? {
+        rootViewController.navigationController?.viewControllers.first(where: { $0 is ChannelViewController }) as? ChannelViewController
     }
     
     open func showAddMembers() {
-        let viewController = ChannelAddMembersVC()
-        let vm = rootVC.memberListViewModel!
+        let viewController = ChannelAddMembersViewController()
+        let vm = rootViewController.memberListViewModel!
         viewController.addMembersViewModel = ChannelAddMembersVM(channel: vm.channel,
                                                      title: vm.addTitle,
                                                      roleName: vm.addRole,
                                                      onlyDismissAfterDone: true)
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
-        rootVC.present(nav, animated: true)
+        rootViewController.present(nav, animated: true)
     }
     
-    open func showChannelInfoVC(channel: ChatChannel) {
-        let viewController = Components.channelInfoVC.init()
+    open func showChannelInfoViewController(channel: ChatChannel) {
+        let viewController = Components.channelInfoViewController.init()
         viewController.profileViewModel = Components.channelProfileVM.init(channel: channel)
-        rootVC.show(viewController, sender: self)
+        rootViewController.show(viewController, sender: self)
     }
 }

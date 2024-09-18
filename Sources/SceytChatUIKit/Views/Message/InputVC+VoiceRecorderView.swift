@@ -1,5 +1,5 @@
 //
-//  InputVC+VoiceRecorderView.swift
+//  InputViewController+VoiceRecorderView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 19/03/2023.
@@ -9,9 +9,9 @@
 import AVFoundation
 import UIKit
 
-extension InputVC {
+extension InputViewController {
     open class VoiceRecorderView: View {
-        public lazy var appearance = InputVC.appearance {
+        public lazy var appearance = InputViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -47,22 +47,22 @@ extension InputVC {
                 switch state {
                 case .unlock:
                     var lockImage = UIImage.audioPlayerUnlock
-                    if InputVC.Layouts.recorderShadowBlur > 0 {
-                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputVC.Layouts.recorderShadowBlur)
+                    if InputViewController.Layouts.recorderShadowBlur > 0 {
+                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputViewController.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
                     self.micButton.setImage(.audioPlayerMicGreen, for: [])
                 case .lock:
                     var lockImage = UIImage.audioPlayerLock
-                    if InputVC.Layouts.recorderShadowBlur > 0 {
-                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputVC.Layouts.recorderShadowBlur)
+                    if InputViewController.Layouts.recorderShadowBlur > 0 {
+                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputViewController.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
                     self.micButton.setImage(.audioPlayerMicGreen, for: [])
                 case .locked:
                     var lockImage = UIImage.audioPlayerStop
-                    if InputVC.Layouts.recorderShadowBlur > 0 {
-                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputVC.Layouts.recorderShadowBlur)
+                    if InputViewController.Layouts.recorderShadowBlur > 0 {
+                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputViewController.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
                     self.micButton.setImage(.audioPlayerSendLarge, for: [])
@@ -71,8 +71,8 @@ extension InputVC {
                     self.micButton.setImage(.audioPlayerDelete, for: [])
                 case .recorded:
                     var lockImage = UIImage.audioPlayerUnlock
-                    if InputVC.Layouts.recorderShadowBlur > 0 {
-                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputVC.Layouts.recorderShadowBlur)
+                    if InputViewController.Layouts.recorderShadowBlur > 0 {
+                        lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: InputViewController.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
                     self.micButton.setImage(.audioPlayerMicGreen, for: [])
@@ -222,7 +222,7 @@ extension InputVC {
                 setState(.unlock, animated: false)
                 slidingView.state = .unlock
                 
-                lockButton.bottomAnchor.pin(to: micButton.topAnchor, constant: -8 + InputVC.Layouts.recorderShadowBlur)
+                lockButton.bottomAnchor.pin(to: micButton.topAnchor, constant: -8 + InputViewController.Layouts.recorderShadowBlur)
                 lockButton.centerXAnchor.pin(to: micButton.centerXAnchor)
                 micButton.pin(to: self, anchors: [.trailing(9)])
                 micButton.centerYAnchor.pin(to: gestureView.centerYAnchor)
@@ -306,7 +306,7 @@ extension InputVC {
             guard let currentCenter
             else { return }
             micButton.center = currentCenter
-            lockButton.bottom = micButton.top - 8 + InputVC.Layouts.recorderShadowBlur
+            lockButton.bottom = micButton.top - 8 + InputViewController.Layouts.recorderShadowBlur
         }
         
         private func reset(animated: Bool = true) {
@@ -358,9 +358,9 @@ extension InputVC {
     }
 }
 
-extension InputVC.VoiceRecorderView {
+extension InputViewController.VoiceRecorderView {
     private class SlidingView: View {
-        public lazy var appearance = InputVC.appearance {
+        public lazy var appearance = InputViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -475,9 +475,9 @@ extension InputVC.VoiceRecorderView {
     }
 }
 
-extension InputVC.VoiceRecorderView {
+extension InputViewController.VoiceRecorderView {
     private class DotView: View {
-        public lazy var appearance = InputVC.appearance {
+        public lazy var appearance = InputViewController.appearance {
             didSet {
                 setupAppearance()
             }

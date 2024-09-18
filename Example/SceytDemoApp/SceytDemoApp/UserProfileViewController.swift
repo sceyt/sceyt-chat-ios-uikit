@@ -28,7 +28,7 @@ class UserProfileViewController: UIViewController {
     lazy var signOutButton = UIButton()
         .withoutAutoresizingMask
     
-    lazy var router = Router(rootVC: self)
+    lazy var router = Router(rootViewController: self)
     
     fileprivate var userAvatarImage: UIImage?
     fileprivate var isDeleted = false
@@ -177,9 +177,9 @@ class UserProfileViewController: UIViewController {
         Config.currentUserId = nil
         SceytChatUIKit.shared.chatClient.disconnect()
         Provider.database.deleteAll()
-        let lvc = LoginViewController()
-        lvc.modalPresentationStyle = .fullScreen
-        present(lvc, animated: true)
+        let loginViewController = LoginViewController()
+        loginViewController.modalPresentationStyle = .fullScreen
+        present(loginViewController, animated: true)
         needsToUpdateProfileAfterViewAppear = true
     }
     

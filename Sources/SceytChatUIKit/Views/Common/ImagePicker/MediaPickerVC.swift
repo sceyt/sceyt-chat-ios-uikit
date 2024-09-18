@@ -1,5 +1,5 @@
 //
-//  MediaPickerVC.swift
+//  MediaPickerViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -10,14 +10,14 @@ import Photos
 import PhotosUI
 import UIKit
 
-open class MediaPickerVC: ViewController,
+open class MediaPickerViewController: ViewController,
     UICollectionViewDataSource,
     UICollectionViewDelegate
 {
     private let imageManager = PHCachingImageManager()
     public static let pageSize = 100
     
-    public var onSelected: (([PHAsset], MediaPickerVC) -> Bool)?
+    public var onSelected: (([PHAsset], MediaPickerViewController) -> Bool)?
     private var selectedIdentifiers = Set<String>()
     private var preSelectedIdentifiers = Set<String>()
     private var selectedIndexPaths = [IndexPath]()
@@ -376,7 +376,7 @@ open class MediaPickerVC: ViewController,
     }
 }
 
-private extension MediaPickerVC {
+private extension MediaPickerViewController {
     var photoAuthorizationStatus: PHAuthorizationStatus {
         if #available(iOS 14, *) {
             return PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -469,7 +469,7 @@ private extension MediaPickerVC {
     }
 }
 
-extension MediaPickerVC: PHPhotoLibraryChangeObserver {
+extension MediaPickerViewController: PHPhotoLibraryChangeObserver {
     public func photoLibraryDidChange(_ changeInstance: PHChange) {
         DispatchQueue.main.async { [weak self] in
             self?.fetchAssets()

@@ -1,5 +1,5 @@
 //
-//  ForwardVC.swift
+//  ForwardViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 24/10/2023.
@@ -8,19 +8,19 @@
 
 import UIKit
 
-open class ForwardVC: ViewController,
+open class ForwardViewController: ViewController,
     UITableViewDelegate, UITableViewDataSource,
     UISearchResultsUpdating
 {
     open var viewModel: ChannelForwardVM!
-    open lazy var router = Components.channelForwardRouter.init(rootVC: self)
+    open lazy var router = Components.channelForwardRouter.init(rootViewController: self)
     
     open lazy var tableView = UITableView()
         .withoutAutoresizingMask
     
-    open lazy var searchController = SearchController(searchResultsController: searchResultsVC)
+    open lazy var searchController = SearchController(searchResultsController: searchResultsViewController)
     
-    open lazy var searchResultsVC = Components.channelSearchResultsVC.init()
+    open lazy var searchResultsViewController = Components.channelSearchResultsViewController.init()
     
     open lazy var selectedChannelListView = SelectedChannelListView()
         .withoutAutoresizingMask
@@ -34,7 +34,7 @@ open class ForwardVC: ViewController,
         title = L10n.Channel.Forward.title
         
         navigationItem.hidesSearchBarWhenScrolling = false
-        searchResultsVC.resultsUpdater = viewModel
+        searchResultsViewController.resultsUpdater = viewModel
         navigationItem.searchController = searchController
         searchController.searchResultsUpdater = self
         
@@ -124,7 +124,7 @@ open class ForwardVC: ViewController,
         case .reload:
             tableView.reloadData()
         case .reloadSearch:
-            searchResultsVC.reloadData()
+            searchResultsViewController.reloadData()
         case let .update(channel, isSelected: isSelected):
             if isSelected {
                 selectedChannelListView.add(item: channel)
@@ -220,7 +220,7 @@ open class ForwardVC: ViewController,
     }
 }
 
-public extension ForwardVC {
+public extension ForwardViewController {
     enum Layouts {
         public static var selectedViewHeight: CGFloat = 96
     }

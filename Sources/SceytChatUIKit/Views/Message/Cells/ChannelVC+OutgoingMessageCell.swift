@@ -1,5 +1,5 @@
 //
-//  ChannelVC+OutgoingMessageCell.swift
+//  ChannelViewController+OutgoingMessageCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelVC {
+extension ChannelViewController {
     open class OutgoingMessageCell: MessageCell {
         
         open override var highlightMode: MessageCell.HighlightMode {

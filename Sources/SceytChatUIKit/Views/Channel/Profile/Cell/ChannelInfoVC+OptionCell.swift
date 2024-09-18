@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+OptionCell.swift
+//  ChannelInfoViewController+OptionCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelInfoVC {
+extension ChannelInfoViewController {
     open class OptionCell: TableViewCell {
         
         open lazy var iconView = UIImageView()
@@ -20,7 +20,7 @@ extension ChannelInfoVC {
         open lazy var row = UIStackView(row: [iconView, titleLabel, detailLabel], spacing: 16, alignment: .center)
             .withoutAutoresizingMask
         
-        public lazy var appearance = Components.channelInfoVC.appearance {
+        public lazy var appearance = Components.channelInfoViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -40,13 +40,13 @@ extension ChannelInfoVC {
             super.setupLayout()
             contentView.addSubview(row)
             
-            row.pin(to: contentView, anchors: [.leading, .trailing, .top(Components.channelInfoVC.Layouts.itemVerticalPadding), .bottom(-Components.channelInfoVC.Layouts.itemVerticalPadding)])
-            iconView.resize(anchors: [.height(Components.channelInfoVC.Layouts.itemIconSize), .width(Components.channelInfoVC.Layouts.itemIconSize)])
+            row.pin(to: contentView, anchors: [.leading, .trailing, .top(Components.channelInfoViewController.Layouts.itemVerticalPadding), .bottom(-Components.channelInfoViewController.Layouts.itemVerticalPadding)])
+            iconView.resize(anchors: [.height(Components.channelInfoViewController.Layouts.itemIconSize), .width(Components.channelInfoViewController.Layouts.itemIconSize)])
         }
         
         open override var safeAreaInsets: UIEdgeInsets {
-            .init(top: 0, left: 2 * Components.channelInfoVC.Layouts.cellHorizontalPadding,
-                  bottom: 0, right:  2 * Components.channelInfoVC.Layouts.cellHorizontalPadding)
+            .init(top: 0, left: 2 * Components.channelInfoViewController.Layouts.cellHorizontalPadding,
+                  bottom: 0, right:  2 * Components.channelInfoViewController.Layouts.cellHorizontalPadding)
         }
     }
 }

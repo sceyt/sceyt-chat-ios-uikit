@@ -1,5 +1,5 @@
 //
-//  ChannelAddMembersVC.swift
+//  ChannelAddMembersViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ChannelAddMembersVC: SelectChannelMembersVC {
+open class ChannelAddMembersViewController: SelectChannelMembersViewController {
  
     open var addMembersViewModel: ChannelAddMembersVM! {
         set {

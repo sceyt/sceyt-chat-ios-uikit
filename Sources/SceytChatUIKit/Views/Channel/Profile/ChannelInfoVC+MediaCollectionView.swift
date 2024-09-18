@@ -1,5 +1,5 @@
 //
-//  ChannelInfoVC+MediaCollectionView.swift
+//  ChannelInfoViewController+MediaCollectionView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,8 +9,8 @@
 import UIKit
 import AVKit
 
-extension ChannelInfoVC {
-    open class MediaCollectionView: ChannelInfoVC.AttachmentCollectionView,
+extension ChannelInfoViewController {
+    open class MediaCollectionView: ChannelInfoViewController.AttachmentCollectionView,
                                     UICollectionViewDelegate,
                                     UICollectionViewDataSource,
                                     UICollectionViewDelegateFlowLayout {
@@ -105,7 +105,7 @@ extension ChannelInfoVC {
             if indexPath.row > mediaViewModel.numberOfAttachments(in: indexPath.section) - 3 {
                 mediaViewModel.loadAttachments()
             }
-            let cell: ChannelInfoVC.AttachmentCell
+            let cell: ChannelInfoViewController.AttachmentCell
             
             switch model?.attachment.type {
             case "video":
@@ -151,9 +151,9 @@ extension ChannelInfoVC {
     }
 }
 
-extension ChannelInfoVC.MediaCollectionView {
+extension ChannelInfoViewController.MediaCollectionView {
 
-    open class Layout: ChannelInfoVC.AttachmentCollectionView.Layout {
+    open class Layout: ChannelInfoViewController.AttachmentCollectionView.Layout {
 
     }
 }

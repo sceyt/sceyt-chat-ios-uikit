@@ -1,5 +1,5 @@
 //
-//  InputVC+MentionUsersListVC+MentionUserCell.swift
+//  InputViewController+MentionUsersListViewController+MentionUserCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -9,7 +9,7 @@
 import UIKit
 import SceytChat
 
-extension InputVC.MentionUsersListVC {
+extension InputViewController.MentionUsersListViewController {
     open class MentionUserCell: TableViewCell {
         
         open lazy var avatarView = CircleImageView()
@@ -49,7 +49,7 @@ extension InputVC.MentionUsersListVC {
             titleLabel.trailingAnchor.pin(to: contentView.trailingAnchor, constant: -10)
             onlineStatusView.pin(to: avatarView, anchors: [.trailing(), .bottom()])
             
-            layer.cornerRadius = Components.inputMentionUsersListVC.Layouts.cornerRadius
+            layer.cornerRadius = Components.inputMentionUsersListViewController.Layouts.cornerRadius
             layer.masksToBounds = true
         }
         
@@ -82,7 +82,7 @@ extension InputVC.MentionUsersListVC {
     }
 }
 
-public extension InputVC.MentionUsersListVC.MentionUserCell {
+public extension InputViewController.MentionUsersListViewController.MentionUserCell {
     enum Layouts {
         public static var avatarSize: CGFloat = 40
         public static var avatarLeftPaddding: CGFloat = 16

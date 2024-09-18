@@ -1,5 +1,5 @@
 //
-//  ImageCropperVC.swift
+//  ImageCropperViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 08.10.2023.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ImageCropperVC: ViewController {
+open class ImageCropperViewController: ViewController {
     public required convenience init(
         onComplete: ((UIImage) -> Void)? = nil,
         onCancel: (() -> Void)? = nil)
@@ -202,7 +202,7 @@ open class ImageCropperVC: ViewController {
     }
 }
 
-public extension ImageCropperVC {
+public extension ImageCropperViewController {
     enum Layouts {
         public static var maskPadding: CGFloat = 8
         public static var buttonPadding: CGFloat = 16

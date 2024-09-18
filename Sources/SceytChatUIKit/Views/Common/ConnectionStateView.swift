@@ -32,7 +32,7 @@ public class ConnectionStateView: View {
         label.pin(to: self, anchors: [.centerX(10), .centerY()])
         
         let indicator = UIActivityIndicatorView(style: .medium).withoutAutoresizingMask
-        indicator.color = ChannelListVC.appearance.connectionIndicatorColor
+        indicator.color = ChannelListViewController.appearance.connectionIndicatorColor
         indicator.hidesWhenStopped = true
         indicator.startAnimating()
         addSubview(indicator)
