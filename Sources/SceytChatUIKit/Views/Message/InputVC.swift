@@ -415,8 +415,8 @@ open class InputVC: ViewController, UITextViewDelegate {
         }
         
         lastMentionQueryRange = ms.queryRange
-        if let vc = presentedMentionUserListVC {
-            vc.filter(text: ms.query)
+        if let viewController = presentedMentionUserListVC {
+            viewController.filter(text: ms.query)
             return
         }
         present { [weak self] id, displayName in
@@ -934,27 +934,27 @@ open class InputVC: ViewController, UITextViewDelegate {
 
     open func present(_ callback: @escaping (String, String) -> Void) {
         guard let parent = parent else { return }
-        guard let vc = mentionUserListVC?() else {
+        guard let viewController = mentionUserListVC?() else {
             return
         }
-        presentedMentionUserListVC = vc
-        parent.addChild(vc)
-        parent.view.addSubview(vc.view)
-        _ = vc.view.withoutAutoresizingMask
+        presentedMentionUserListVC = viewController
+        parent.addChild(viewController)
+        parent.view.addSubview(viewController.view)
+        _ = viewController.view.withoutAutoresizingMask
         (parent as? ChannelVC)?.collectionView.isUserInteractionEnabled = false
-        vc.view.pin(to: parent.view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
-        vc.view.bottomAnchor.pin(to: view.topAnchor)
-        vc.didSelectMember = { callback($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) }
+        viewController.view.pin(to: parent.view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
+        viewController.view.bottomAnchor.pin(to: view.topAnchor)
+        viewController.didSelectMember = { callback($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) }
     }
 
     open func dismiss() {
         guard let parent = parent else { return }
-        guard let vc = presentedMentionUserListVC, vc.parent != nil else { return }
-        vc.didSelectMember = nil
+        guard let viewController = presentedMentionUserListVC, viewController.parent != nil else { return }
+        viewController.didSelectMember = nil
         (parent as? ChannelVC)?.collectionView.isUserInteractionEnabled = true
-        vc.view.removeConstraints(vc.view.constraints)
-        vc.removeFromParent()
-        vc.view.removeFromSuperview()
+        viewController.view.removeConstraints(viewController.view.constraints)
+        viewController.removeFromParent()
+        viewController.view.removeFromSuperview()
         presentedMentionUserListVC = nil
     }
     

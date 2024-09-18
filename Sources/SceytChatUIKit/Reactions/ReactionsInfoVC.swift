@@ -21,15 +21,15 @@ open class ReactionsInfoVC: ViewController,
     open var userReactionsViewModel: [UserReactionViewModel] = [] {
         didSet {
             viewControllers = userReactionsViewModel.map {
-                let vc = Components.reactedUserListVC.init()
-                vc.viewModel = $0
-                vc.onEvent = { [weak self] event in
+                let viewController = Components.reactedUserListVC.init()
+                viewController.viewModel = $0
+                viewController.onEvent = { [weak self] event in
                     switch event {
                     case .onSelect(let reaction):
                         self?.onEvent?(.removeReaction(reaction))
                     }
                 }
-                return vc
+                return viewController
             }
         }
     }

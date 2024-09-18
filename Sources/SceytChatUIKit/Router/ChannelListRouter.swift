@@ -35,11 +35,11 @@ open class ChannelListRouter: Router<ChannelListVC> {
             popTo(opened, animated: animated)
             return
         }
-        let vc = Components.channelVC.init()
-        vc.hidesBottomBarWhenPushed = true
-        vc.channelViewModel = Components.channelVM
+        let viewController = Components.channelVC.init()
+        viewController.hidesBottomBarWhenPushed = true
+        viewController.channelViewModel = Components.channelVM
             .init(channel: channel)
-        setViewControllers([rootVC, vc], animated: animated)
+        setViewControllers([rootVC, viewController], animated: animated)
     }
     
     open class func findAndShowChannel(id: ChannelId) {
@@ -65,10 +65,10 @@ open class ChannelListRouter: Router<ChannelListVC> {
     }
     
     open func showNewChannel() {
-        let vc = Components.startChatVC.init()
-        vc.viewModel = Components.createNewChannelVM.init()
+        let viewController = Components.startChatVC.init()
+        viewController.viewModel = Components.createNewChannelVM.init()
         let nav = Components.navigationController.init()
-        nav.viewControllers = [vc]
+        nav.viewControllers = [viewController]
         rootVC.present(nav, animated: true)
     }
     

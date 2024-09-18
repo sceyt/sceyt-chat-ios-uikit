@@ -15,19 +15,19 @@ open class MediaPreviewerCarouselVC: UIPageViewController,
     public weak var initialSourceView: UIImageView?
     
     open var sourceView: UIImageView? {
-        guard let vc = viewControllers?.first as? MediaPreviewerVC else {
+        guard let viewController = viewControllers?.first as? MediaPreviewerVC else {
             return nil
         }
-        return initialIndex == vc.viewModel.index ? initialSourceView : nil
+        return initialIndex == viewController.viewModel.index ? initialSourceView : nil
     }
     
     public var sourceFrameRelativeToWindow: CGRect?
     
     open var targetView: UIImageView? {
-        guard let vc = viewControllers?.first as? MediaPreviewerVC else {
+        guard let viewController = viewControllers?.first as? MediaPreviewerVC else {
             return nil
         }
-        return vc.targetView
+        return viewController.targetView
     }
     
     public var previewDataSource: PreviewDataSource?
@@ -154,8 +154,8 @@ open class MediaPreviewerCarouselVC: UIPageViewController,
     override open func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         if isBeingDismissed,
-           let vc = viewControllers?.first as? MediaPreviewerVC,
-           initialIndex != vc.viewModel.index
+           let viewController = viewControllers?.first as? MediaPreviewerVC,
+           initialIndex != viewController.viewModel.index
         {
             initialSourceView?.alpha = 1.0
         }
@@ -179,9 +179,9 @@ open class MediaPreviewerCarouselVC: UIPageViewController,
         _ pageViewController: UIPageViewController,
         viewControllerBefore viewController: UIViewController) -> UIViewController?
     {
-        guard let vc = viewController as? MediaPreviewerVC else { return nil }
+        guard let viewController = viewController as? MediaPreviewerVC else { return nil }
         guard let previewDataSource = previewDataSource else { return nil }
-        let index = vc.viewModel.index
+        let index = viewController.viewModel.index
         guard index <= (previewDataSource.numberOfImages - 2)
         else {
             resetPreviewVCIfNeeded(currentIndex: index)
@@ -194,8 +194,8 @@ open class MediaPreviewerCarouselVC: UIPageViewController,
         _ pageViewController: UIPageViewController,
         viewControllerAfter viewController: UIViewController) -> UIViewController?
     {
-        guard let vc = viewController as? MediaPreviewerVC else { return nil }
-        let index = vc.viewModel.index
+        guard let viewController = viewController as? MediaPreviewerVC else { return nil }
+        let index = viewController.viewModel.index
         guard index > 0
         else {
             resetPreviewVCIfNeeded(currentIndex: index)
@@ -207,13 +207,13 @@ open class MediaPreviewerCarouselVC: UIPageViewController,
     open func previewVC(for index: Int) -> MediaPreviewerVC? {
         guard let previewItem = previewDataSource?.previewItem(at: index)
         else { return nil }
-        let vc = Components.mediaPreviewerVC.init()
-        vc.viewModel = Components.previewerVM
+        let viewController = Components.mediaPreviewerVC.init()
+        viewController.viewModel = Components.previewerVM
             .init(
                 index: index,
                 previewItem: previewItem)
-        previewDataSource?.observe(vc.viewModel)
-        return vc
+        previewDataSource?.observe(viewController.viewModel)
+        return viewController
     }
     
     open func resetPreviewVCIfNeeded(currentIndex: Int) {

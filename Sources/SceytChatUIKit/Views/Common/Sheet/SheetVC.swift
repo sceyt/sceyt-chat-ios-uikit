@@ -20,7 +20,7 @@ public extension UIViewController {
                    onDone: (() -> Void)? = nil,
                    animated: Bool = true) -> SheetVC
     {
-        let vc = SheetVC(child: child,
+        let viewController = SheetVC(child: child,
                          style: style,
                          backgroundDismiss: backgroundDismiss,
                          cornerRadius: cornerRadius,
@@ -36,15 +36,15 @@ public extension UIViewController {
         } else {
             presenter = self
         }
-        presenter.present(vc, animated: false) { [weak vc] in
-            vc?.show(animated: animated)
+        presenter.present(viewController, animated: false) { [weak viewController] in
+            viewController?.show(animated: animated)
         }
-        return vc
+        return viewController
     }
     
     @discardableResult
     func showBottomSheet(title: String? = nil, actions: [SheetAction], withCancel: Bool = false) -> SheetVC {
-        let vc = SheetVC(child: BottomSheet(title: title,
+        let viewController = SheetVC(child: BottomSheet(title: title,
                                             actions: actions + (withCancel ? [.init(title: L10n.Alert.Button.cancel, style: .cancel)] : [])),
                          style: .floating(),
                          cornerRadius: 0,
@@ -59,18 +59,18 @@ public extension UIViewController {
         } else {
             presenter = self
         }
-        presenter.present(vc, animated: false) { [weak vc] in
-            vc?.show()
+        presenter.present(viewController, animated: false) { [weak viewController] in
+            viewController?.show()
         }
-        return vc
+        return viewController
     }
     
     func dismissSheet(animated: Bool = true, completion: (() -> Void)? = nil) {
         var sheetVC: SheetVC?
-        if let vc = self as? SheetVC {
-            sheetVC = vc
-        } else if let vc = presentedViewController as? SheetVC {
-            sheetVC = vc
+        if let viewController = self as? SheetVC {
+            sheetVC = viewController
+        } else if let viewController = presentedViewController as? SheetVC {
+            sheetVC = viewController
         }
         if let sheetVC {
             sheetVC.dismiss(animated: animated) {

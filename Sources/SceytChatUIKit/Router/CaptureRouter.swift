@@ -75,7 +75,7 @@ public extension Router {
     }
     
     func editImage(_ image: UIImage, done: @escaping (UIImage) -> Void) {
-        let vc = Components.imageCropperVC.init(
+        let viewController = Components.imageCropperVC.init(
             onComplete: { [weak self] edited in
                 guard let self else { return }
                 done(edited)
@@ -85,9 +85,9 @@ public extension Router {
                 self?.dismiss()
             }
         )
-        vc.viewModel = Components.imageCropperVM.init(image: image)
+        viewController.viewModel = Components.imageCropperVM.init(image: image)
         let nav = Components.navigationController.init()
-        nav.viewControllers = [vc]
+        nav.viewControllers = [viewController]
         nav.modalPresentationStyle = .fullScreen
         rootVC.present(nav, animated: true)
     }

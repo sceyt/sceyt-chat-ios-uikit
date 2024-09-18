@@ -75,11 +75,11 @@ open class ChannelRouter: Router<ChannelVC> {
 
     open func playFrom(url: URL) {
         let player = AVPlayer(url: url)
-        let vc = AVPlayerViewController()
-        vc.player = player
+        let viewController = AVPlayerViewController()
+        viewController.player = player
 
-        rootVC.present(vc, animated: true) {
-            vc.player?.play()
+        rootVC.present(viewController, animated: true) {
+            viewController.player?.play()
         }
     }
 
@@ -104,10 +104,10 @@ open class ChannelRouter: Router<ChannelVC> {
     }
     
     open func showChannelInfoVC(channel: ChatChannel) {
-        let vc = Components.channelInfoVC.init()
-        vc.hidesBottomBarWhenPushed = true
-        vc.profileViewModel = Components.channelProfileVM.init(channel: channel)
-        self.rootVC.show(vc, sender: self)
+        let viewController = Components.channelInfoVC.init()
+        viewController.hidesBottomBarWhenPushed = true
+        viewController.profileViewModel = Components.channelProfileVM.init(channel: channel)
+        self.rootVC.show(viewController, sender: self)
     }
     
     open func showDeleteOptions(clear: Bool) {
@@ -171,18 +171,18 @@ open class ChannelRouter: Router<ChannelVC> {
     }
     
     open func showMessageInfo(layoutModel: MessageLayoutModel) {
-        let vc = Components.messageInfoVC.init()
-        vc.viewModel = Components.messageInfoVM.init(messageMarkerProvider: rootVC.channelViewModel.messageMarkerProvider, data: layoutModel)
+        let viewController = Components.messageInfoVC.init()
+        viewController.viewModel = Components.messageInfoVM.init(messageMarkerProvider: rootVC.channelViewModel.messageMarkerProvider, data: layoutModel)
         let nav = Components.navigationController.init()
-        nav.viewControllers = [vc]
+        nav.viewControllers = [viewController]
         rootVC.present(nav, animated: true)
     }
     
     open func showForward(_ handler: @escaping (([ChatChannel]) -> Void)) {
-        let vc = Components.forwardVC.init()
-        vc.viewModel = Components.channelForwardVM.init(handler: handler)
+        let viewController = Components.forwardVC.init()
+        viewController.viewModel = Components.channelForwardVM.init(handler: handler)
         let nav = Components.navigationController.init()
-        nav.viewControllers = [vc]
+        nav.viewControllers = [viewController]
         rootVC.present(nav, animated: true)
     }
 }

@@ -233,10 +233,10 @@ open class ChannelVC: ViewController,
         contextMenu.snapshotDelegate = self
         
         inputVC.mentionUserListVC = { [unowned self] in
-            let vc = Components.inputMentionUsersListVC.init()
-            vc.viewModel = Components.mentioningUserListVM
+            let viewController = Components.inputMentionUsersListVC.init()
+            viewController.viewModel = Components.mentioningUserListVM
                 .init(channelId: channelViewModel.channel.id)
-            return vc
+            return viewController
         }
         
         selectingView.onAction = { [weak self] in
@@ -915,8 +915,8 @@ open class ChannelVC: ViewController,
     //MARK: Gesture actions
     @objc
     open func viewTapped(gesture: UITapGestureRecognizer) {
-        let child = children.first { vc in
-            vc.view.bounds.contains(gesture.location(in: vc.view))
+        let child = children.first { viewController in
+            viewController.view.bounds.contains(gesture.location(in: viewController.view))
         }
         guard
             !inputVC.isRecording,

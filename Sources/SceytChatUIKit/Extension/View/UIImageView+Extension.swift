@@ -16,7 +16,7 @@ public extension UIImageView {
         var item: PreviewItem?
     }
     
-    private var vc: UIViewController? {
+    private var viewController: UIViewController? {
         guard let rootVC = window?.rootViewController
         else { return nil }
         return rootVC.presentedViewController != nil ? rootVC.presentedViewController : rootVC
@@ -63,7 +63,7 @@ public extension UIImageView {
                 previewDataSource: previewer,
                 initialIndex: initialIndex)
         UIApplication.shared.sendAction(#selector(resignFirstResponder), to: nil, from: nil, for: nil)
-        let presentFromVC = sender.from ?? vc
+        let presentFromVC = sender.from ?? viewController
         presentFromVC?.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
     }
 }

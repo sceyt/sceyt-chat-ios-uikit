@@ -15,23 +15,23 @@ open class NewChannelRouter: Router<StartChatVC> {
     }
 
     func showCreatePrivateChannel() {
-        let vc = SelectChannelMembersVC()
-        vc.selectMemberViewModel = .init()
-        rootVC.show(vc, sender: self)
+        let viewController = SelectChannelMembersVC()
+        viewController.selectMemberViewModel = .init()
+        rootVC.show(viewController, sender: self)
     }
 
     func showCreatePublicChannel() {
-        let vc = Components.createChannelVC.init()
-        vc.viewModel = .init()
-        rootVC.show(vc, sender: self)
+        let viewController = Components.createChannelVC.init()
+        viewController.viewModel = .init()
+        rootVC.show(viewController, sender: self)
     }
 }
 
 open class SelectChannelMembersRouter: Router<SelectChannelMembersVC> {
     open func showCreatePrivateChannel() {
-        let vc = Components.createGroupVC.init()
-        vc.viewModel = .init(users: rootVC.selectMemberViewModel.selectedUsers)
-        rootVC.show(vc, sender: self)
+        let viewController = Components.createGroupVC.init()
+        viewController.viewModel = .init(users: rootVC.selectMemberViewModel.selectedUsers)
+        rootVC.show(viewController, sender: self)
     }
 }
 
@@ -44,8 +44,8 @@ open class CreatePrivateChannelRouter: Router<CreateGroupVC> {
 
 open class CreatePublicChannelRouter: Router<CreateChannelVC> {
     func showAddMember(channel: ChatChannel) {
-        let vc = ChannelAddMembersVC()
-        vc.addMembersViewModel = ChannelAddMembersVM(channel: channel)
-        rootVC.show(vc, sender: self)
+        let viewController = ChannelAddMembersVC()
+        viewController.addMembersViewModel = ChannelAddMembersVM(channel: channel)
+        rootVC.show(viewController, sender: self)
     }
 }
