@@ -11,12 +11,6 @@ import UIKit
 open class ImagePreviewVC: ViewController, UIScrollViewDelegate {
     open var viewModel: ChannelAvatarVM!
     
-    public lazy var appearance = Components.imagePreviewVC.appearance {
-        didSet {
-            setupAppearance()
-        }
-    }
-    
     private var task: Cancellable?
     
     private lazy var scrollView = MediaPreviewerScrollView(contentMode: .scaleAspectFit)
