@@ -33,6 +33,8 @@ public extension StoringKey {
 
 open class Storage: NSObject {
 
+    public static var calculateChecksumMaxBytes = 3_000_000
+    
     public static var storingKey: StoringKey = SceytChatStoringKey()
 
     open class func fileUrl(for originalUrl: URL) -> URL? {
@@ -262,7 +264,7 @@ open class Storage: NSObject {
     }
     
     open class func checksum(filePath: String) -> Int {
-        let upToCount = SceytChatUIKit.shared.config.calculateChecksumMaxBytes
+        let upToCount = calculateChecksumMaxBytes
         let fileUrl = URL(fileURLWithPath: filePath)
         let fileSize = sizeOfItem(at: fileUrl)
         guard fileSize > 0

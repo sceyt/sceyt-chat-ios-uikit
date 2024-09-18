@@ -117,7 +117,6 @@ extension SceytChatUIKit {
         public var maximumMessagesToSelect = 30
         public var minAutoDownloadSize = 3_000_000
         public var calculateFileChecksum: Bool = true
-        public var calculateChecksumMaxBytes = 3_000_000
         public var displayScale = UIScreen.main.traitCollection.displayScale
         
         public var userDefaults = UserDefaults.standard
@@ -125,6 +124,7 @@ extension SceytChatUIKit {
         public var recentRowLimit = 2
     }
 }
+
 // MARK: - Avatar Types
 public extension SceytChatUIKit.Config {
     
