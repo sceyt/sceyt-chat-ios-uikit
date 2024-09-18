@@ -85,7 +85,7 @@ public extension Router {
                 self?.dismiss()
             }
         )
-        viewController.viewModel = Components.imageCropperVM.init(image: image)
+        viewController.viewModel = Components.imageCropperViewModel.init(image: image)
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
         nav.modalPresentationStyle = .fullScreen

@@ -13,7 +13,7 @@ import SceytChat
 open class ChannelRouter: Router<ChannelViewController> {
     open func showThreadForMessage(_ message: ChatMessage) {
         let chatViewController = Components.channelViewController.init()
-        chatViewController.channelViewModel = Components.channelVM
+        chatViewController.channelViewModel = Components.channelViewModel
             .init(
                 channel: rootViewController.channelViewModel.channel,
                 threadMessage: message
@@ -24,7 +24,7 @@ open class ChannelRouter: Router<ChannelViewController> {
 
     open func showChannelProfile() {
         let profileViewController = Components.channelInfoViewController.init()
-        profileViewController.profileViewModel = Components.channelProfileVM
+        profileViewController.profileViewModel = Components.channelProfileViewModel
             .init(
                 channel: rootViewController.channelViewModel.channel
             )
@@ -66,7 +66,7 @@ open class ChannelRouter: Router<ChannelViewController> {
 
     open func showEmojis() -> EmojiPickerViewController {
         let emojiPickerViewController = Components.emojiPickerViewController.init()
-        emojiPickerViewController.viewModel = Components.emojiListVM.init()
+        emojiPickerViewController.viewModel = Components.emojiListViewModel.init()
         let nav = EmojiViewInteractiveTransitionNavigationController
             .init(rootViewController: emojiPickerViewController)
         rootViewController.present(nav, animated: true)
@@ -106,7 +106,7 @@ open class ChannelRouter: Router<ChannelViewController> {
     open func showChannelInfoViewController(channel: ChatChannel) {
         let viewController = Components.channelInfoViewController.init()
         viewController.hidesBottomBarWhenPushed = true
-        viewController.profileViewModel = Components.channelProfileVM.init(channel: channel)
+        viewController.profileViewModel = Components.channelProfileViewModel.init(channel: channel)
         self.rootViewController.show(viewController, sender: self)
     }
     
@@ -172,7 +172,7 @@ open class ChannelRouter: Router<ChannelViewController> {
     
     open func showMessageInfo(layoutModel: MessageLayoutModel) {
         let viewController = Components.messageInfoViewController.init()
-        viewController.viewModel = Components.messageInfoVM.init(messageMarkerProvider: rootViewController.channelViewModel.messageMarkerProvider, data: layoutModel)
+        viewController.viewModel = Components.messageInfoViewModel.init(messageMarkerProvider: rootViewController.channelViewModel.messageMarkerProvider, data: layoutModel)
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
         rootViewController.present(nav, animated: true)
@@ -180,7 +180,7 @@ open class ChannelRouter: Router<ChannelViewController> {
     
     open func showForward(_ handler: @escaping (([ChatChannel]) -> Void)) {
         let viewController = Components.forwardViewController.init()
-        viewController.viewModel = Components.channelForwardVM.init(handler: handler)
+        viewController.viewModel = Components.channelForwardViewModel.init(handler: handler)
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
         rootViewController.present(nav, animated: true)

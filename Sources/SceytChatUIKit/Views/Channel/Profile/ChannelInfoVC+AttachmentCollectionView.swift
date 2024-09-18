@@ -47,7 +47,7 @@ extension ChannelInfoViewController {
             }
         }
         
-        open func updateCollectionView(paths: ChannelAttachmentListVM.ChangeItemPaths) {
+        open func updateCollectionView(paths: ChannelAttachmentListViewModel.ChangeItemPaths) {
             if superview == nil || visibleCells.isEmpty {
                 reloadData()
             } else if !paths.isEmpty {

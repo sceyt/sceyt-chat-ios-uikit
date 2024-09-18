@@ -37,7 +37,7 @@ open class ChannelListRouter: Router<ChannelListViewController> {
         }
         let viewController = Components.channelViewController.init()
         viewController.hidesBottomBarWhenPushed = true
-        viewController.channelViewModel = Components.channelVM
+        viewController.channelViewModel = Components.channelViewModel
             .init(channel: channel)
         setViewControllers([rootViewController, viewController], animated: animated)
     }
@@ -66,7 +66,7 @@ open class ChannelListRouter: Router<ChannelListViewController> {
     
     open func showNewChannel() {
         let viewController = Components.startChatViewController.init()
-        viewController.viewModel = Components.createNewChannelVM.init()
+        viewController.viewModel = Components.createNewChannelViewModel.init()
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
         rootViewController.present(nav, animated: true)

@@ -21,10 +21,10 @@ open class ChannelMemberListRouter: Router<ChannelMemberListViewController> {
     
     open func showAddMembers() {
         let viewController = ChannelAddMembersViewController()
-        let vm = rootViewController.memberListViewModel!
-        viewController.addMembersViewModel = ChannelAddMembersVM(channel: vm.channel,
-                                                     title: vm.addTitle,
-                                                     roleName: vm.addRole,
+        let viewModel = rootViewController.memberListViewModel!
+        viewController.addMembersViewModel = ChannelAddMembersViewModel(channel: viewModel.channel,
+                                                     title: viewModel.addTitle,
+                                                     roleName: viewModel.addRole,
                                                      onlyDismissAfterDone: true)
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
@@ -33,7 +33,7 @@ open class ChannelMemberListRouter: Router<ChannelMemberListViewController> {
     
     open func showChannelInfoViewController(channel: ChatChannel) {
         let viewController = Components.channelInfoViewController.init()
-        viewController.profileViewModel = Components.channelProfileVM.init(channel: channel)
+        viewController.profileViewModel = Components.channelProfileViewModel.init(channel: channel)
         rootViewController.show(viewController, sender: self)
     }
 }

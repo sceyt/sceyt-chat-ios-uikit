@@ -54,20 +54,20 @@ open class ChannelProfileRouter: Router<ChannelInfoViewController> {
     
     open func showMemberList() {
         let viewController = Components.channelMemberListViewController.init()
-        viewController.memberListViewModel = Components.channelMemberListVM.init(channel: rootViewController.profileViewModel.channel)
+        viewController.memberListViewModel = Components.channelMemberListViewModel.init(channel: rootViewController.profileViewModel.channel)
         rootViewController.show(viewController, sender: self)
     }
     
     open func showAdminsList() {
         let viewController = Components.channelMemberListViewController.init()
-        viewController.memberListViewModel = Components.channelMemberListVM.init(channel: rootViewController.profileViewModel.channel,
+        viewController.memberListViewModel = Components.channelMemberListViewModel.init(channel: rootViewController.profileViewModel.channel,
                                                                      filterMembersByRole: SceytChatUIKit.shared.config.chatRoleAdmin)
         rootViewController.show(viewController, sender: self)
     }
     
     open func showEditChannel() {
         let viewController = Components.editChannelViewController.init()
-        viewController.profileViewModel = Components.channelProfileEditVM.init(channel: rootViewController.profileViewModel.channel)
+        viewController.profileViewModel = Components.channelProfileEditViewModel.init(channel: rootViewController.profileViewModel.channel)
         rootViewController.show(viewController, sender: self)
     }
 
@@ -82,7 +82,7 @@ open class ChannelProfileRouter: Router<ChannelInfoViewController> {
     open func goAvatar() {
         guard rootViewController.profileViewModel.channel.imageUrl != nil else { return }
         let viewController = Components.imagePreviewViewController.init()
-        viewController.viewModel = Components.channelAvatarVM.init(channel: rootViewController.profileViewModel.channel)
+        viewController.viewModel = Components.channelAvatarViewModel.init(channel: rootViewController.profileViewModel.channel)
         rootViewController.show(viewController, sender: self)
     }
     

@@ -20,7 +20,7 @@ extension ChannelInfoViewController {
                                                      lineSpacing: 0,
                                                      sectionHeadersPinToVisibleBounds: true)
         
-        open var linkViewModel: ChannelAttachmentListVM!
+        open var linkViewModel: ChannelAttachmentListViewModel!
         
         open var layout: Layout { collectionViewLayout as! Layout }
         
@@ -60,7 +60,7 @@ extension ChannelInfoViewController {
             linkViewModel.loadAttachments()
         }
         
-        open func onEvent(_ event: ChannelAttachmentListVM.Event) {
+        open func onEvent(_ event: ChannelAttachmentListViewModel.Event) {
             switch event {
             case .change(let paths):
                 updateCollectionView(paths: paths)

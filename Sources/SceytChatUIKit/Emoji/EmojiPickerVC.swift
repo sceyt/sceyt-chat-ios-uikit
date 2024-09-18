@@ -13,7 +13,7 @@ open class EmojiPickerViewController: ViewController,
     UICollectionViewDelegate,
     EmojiSectionToolBarDelegate
 {
-    open var viewModel: EmojiListVM!
+    open var viewModel: EmojiListViewModel!
 
     open var onEvent: ((Event) -> Void)?
 
@@ -42,11 +42,11 @@ open class EmojiPickerViewController: ViewController,
 
     override open func setupAppearance() {
         super.setupAppearance()
-        collectionViewLayout.itemSize = Components.emojiListVM.itemSize
+        collectionViewLayout.itemSize = Components.emojiListViewModel.itemSize
         collectionViewLayout.headerReferenceSize = CGSize(width: view.width, height: 30)
         collectionViewLayout.scrollDirection = .vertical
-        collectionViewLayout.minimumInteritemSpacing = Components.emojiListVM.interItemSpacing
-        collectionViewLayout.sectionInset = Components.emojiListVM.sectionInset
+        collectionViewLayout.minimumInteritemSpacing = Components.emojiListViewModel.interItemSpacing
+        collectionViewLayout.sectionInset = Components.emojiListViewModel.sectionInset
         collectionView.contentInset = .init(top: 8, left: 0, bottom: 0, right: 0)
         collectionView.backgroundColor = .clear
         view.layer.cornerRadius = 14

@@ -45,7 +45,7 @@ open class CreatePrivateChannelRouter: Router<CreateGroupViewController> {
 open class CreatePublicChannelRouter: Router<CreateChannelViewController> {
     func showAddMember(channel: ChatChannel) {
         let viewController = ChannelAddMembersViewController()
-        viewController.addMembersViewModel = ChannelAddMembersVM(channel: channel)
+        viewController.addMembersViewModel = ChannelAddMembersViewModel(channel: channel)
         rootViewController.show(viewController, sender: self)
     }
 }

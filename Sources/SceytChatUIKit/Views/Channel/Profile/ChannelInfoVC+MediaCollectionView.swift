@@ -20,7 +20,7 @@ extension ChannelInfoViewController {
                                               lineSpacing: 2,
                                               sectionHeadersPinToVisibleBounds: true)
         
-        open var mediaViewModel: ChannelAttachmentListVM!
+        open var mediaViewModel: ChannelAttachmentListViewModel!
         
         open var layout: Layout? { collectionViewLayout as? Layout }
         
@@ -83,7 +83,7 @@ extension ChannelInfoViewController {
             }
         }
         
-        open func onEvent(_ event: ChannelAttachmentListVM.Event) {
+        open func onEvent(_ event: ChannelAttachmentListViewModel.Event) {
             switch event {
             case .change(let paths):
                 var indexes = paths

@@ -24,7 +24,7 @@ open class UserSendMessage {
     open var metadata: String?
     open var bodyAttributes: [ChatMessage.BodyAttribute]?
     open var attachments: [AttachmentView]?
-    open var type = ChannelVM.MessageType.text
+    open var type = ChannelViewModel.MessageType.text
     open var linkMetadata: LinkMetadata?
     
     open var linkAttachments: [AttachmentView] {
