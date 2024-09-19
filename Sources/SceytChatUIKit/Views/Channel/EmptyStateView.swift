@@ -8,28 +8,28 @@
 
 import UIKit
 
-open class NoDataView: View {
+open class EmptyStateView: View {
     open lazy var iconView = UIImageView().withoutAutoresizingMask
     open lazy var titleLabel = UILabel().withoutAutoresizingMask
     open lazy var messageLabel = UILabel().withoutAutoresizingMask
     open lazy var vStack = UIStackView(column: [iconView, titleLabel, messageLabel], alignment: .center)
         .withoutAutoresizingMask
     
-    open lazy var icon: UIImage? = Images.noResultsSearch {
+    open lazy var icon: UIImage? = nil {
         didSet {
             iconView.isHidden = icon == nil
             iconView.image = icon
         }
     }
     
-    open lazy var title: String? = L10n.Search.NoResults.title {
+    open lazy var title: String? = nil {
         didSet {
             titleLabel.isHidden = title == nil
             titleLabel.text = title
         }
     }
     
-    open lazy var message: String? = L10n.Search.NoResults.message {
+    open lazy var message: String? = nil {
         didSet {
             messageLabel.isHidden = message == nil
             messageLabel.text = message
@@ -60,6 +60,9 @@ open class NoDataView: View {
         super.setupAppearance()
         
         backgroundColor = .clear
+        iconView.isHidden = true
+        titleLabel.isHidden = true
+        messageLabel.isHidden = true
         titleLabel.font = appearance.titleLabelFont
         messageLabel.font = appearance.messageLabelFont
         titleLabel.textColor = appearance.titleLabelColor

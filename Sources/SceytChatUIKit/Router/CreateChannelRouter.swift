@@ -15,7 +15,7 @@ open class NewChannelRouter: Router<StartChatViewController> {
     }
 
     func showCreatePrivateChannel() {
-        let viewController = SelectChannelMembersViewController()
+        let viewController = Components.selectUsersViewController.init()
         viewController.selectMemberViewModel = .init()
         rootViewController.show(viewController, sender: self)
     }
@@ -27,7 +27,7 @@ open class NewChannelRouter: Router<StartChatViewController> {
     }
 }
 
-open class SelectChannelMembersRouter: Router<SelectChannelMembersViewController> {
+open class SelectChannelMembersRouter: Router<SelectUsersViewController> {
     open func showCreatePrivateChannel() {
         let viewController = Components.createGroupViewController.init()
         viewController.viewModel = .init(users: rootViewController.selectMemberViewModel.selectedUsers)
@@ -44,7 +44,7 @@ open class CreatePrivateChannelRouter: Router<CreateGroupViewController> {
 
 open class CreatePublicChannelRouter: Router<CreateChannelViewController> {
     func showAddMember(channel: ChatChannel) {
-        let viewController = ChannelAddMembersViewController()
+        let viewController = Components.addMembersViewController.init()
         viewController.addMembersViewModel = ChannelAddMembersViewModel(channel: channel)
         rootViewController.show(viewController, sender: self)
     }

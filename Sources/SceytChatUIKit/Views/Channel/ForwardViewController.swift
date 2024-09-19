@@ -18,11 +18,11 @@ open class ForwardViewController: ViewController,
     open lazy var tableView = UITableView()
         .withoutAutoresizingMask
     
-    open lazy var searchController = SearchController(searchResultsController: searchResultsViewController)
+    open lazy var searchController = Components.searchController.init(searchResultsController: searchResultsViewController)
     
     open lazy var searchResultsViewController = Components.channelSearchResultsViewController.init()
     
-    open lazy var selectedChannelListView = SelectedChannelListView()
+    open lazy var selectedChannelListView = Components.selectedChannelListView.init()
         .withoutAutoresizingMask
     
     open var selectedChannelListViewHeight: NSLayoutConstraint!
@@ -42,7 +42,7 @@ open class ForwardViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
-        tableView.register(Components.channelUserCell.self)
+        tableView.register(Components.searchResultChannelCell.self)
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -172,7 +172,7 @@ open class ForwardViewController: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelUserCell.self)
+        let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.searchResultChannelCell.self)
         cell.selectionStyle = .none
         cell.showCheckBox = true
         if let channel = viewModel.channel(at: indexPath) {
@@ -199,7 +199,7 @@ open class ForwardViewController: ViewController,
         tableView.deselectRow(at: indexPath, animated: true)
         if let channel = viewModel.channel(at: indexPath) {
             viewModel.select(channel)
-            tableView.cell(for: indexPath, cellType: Components.channelUserCell.self)?.checkBoxView.isSelected = viewModel.isSelected(channel)
+            tableView.cell(for: indexPath, cellType: Components.searchResultChannelCell.self)?.checkBoxView.isSelected = viewModel.isSelected(channel)
         }
     }
     

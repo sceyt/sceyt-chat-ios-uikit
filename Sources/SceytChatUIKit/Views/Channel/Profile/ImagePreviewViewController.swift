@@ -13,7 +13,7 @@ open class ImagePreviewViewController: ViewController, UIScrollViewDelegate {
     
     private var task: Cancellable?
     
-    private lazy var scrollView = MediaPreviewerScrollView(contentMode: .scaleAspectFit)
+    private lazy var scrollView = Components.mediaPreviewerScrollView.init(contentMode: .scaleAspectFit)
         .withoutAutoresizingMask
     
     override open func setup() {

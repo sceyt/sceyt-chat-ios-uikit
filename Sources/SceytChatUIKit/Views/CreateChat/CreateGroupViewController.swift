@@ -38,7 +38,7 @@ open class CreateGroupViewController: ViewController,
                                                             target: self,
                                                             action: #selector(createAction(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
-        tableView.register(Components.createChannelUserCell.self)
+        tableView.register(Components.userCell.self)
         tableView.register(Components.separatorHeaderView.self)
         
         profileView.subjectField.publisher(for: .editingDidEndOnExit).sink { [unowned self] _ in
@@ -174,7 +174,7 @@ open class CreateGroupViewController: ViewController,
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch Sections(rawValue: indexPath.section) {
         case .user:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.createChannelUserCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.userCell.self)
             cell.selectionStyle = .none
             if let user = viewModel.user(at: indexPath) {
                 cell.userData = user

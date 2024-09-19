@@ -38,10 +38,6 @@ open class MessageCell: CollectionViewCell,
     open lazy var infoView = Components.messageCellInfoView
         .init()
         .withoutAutoresizingMask
-
-    open lazy var dateTickBackgroundView = Components.messageCellInfoViewBackgroundView
-        .init()
-        .withoutAutoresizingMask
     
     open lazy var nameLabel = UILabel()
         .withoutAutoresizingMask
@@ -165,7 +161,6 @@ open class MessageCell: CollectionViewCell,
         bubbleView.addSubview(textLabel)
         bubbleView.addSubview(attachmentView)
         bubbleView.addSubview(linkView)
-        bubbleView.addSubview(dateTickBackgroundView)
         bubbleView.addSubview(infoView)
         bubbleView.addSubview(nameLabel)
         containerView.addSubview(avatarView)
@@ -197,12 +192,7 @@ open class MessageCell: CollectionViewCell,
         
         bubbleView.layer.cornerRadius = 16
         bubbleView.isUserInteractionEnabled = true
-        
-        dateTickBackgroundView.clipsToBounds = true
-        dateTickBackgroundView.backgroundColor = appearance.dateTickBackgroundViewColor
-        dateTickBackgroundView.layer.cornerRadius = 12
-        dateTickBackgroundView.isHidden = true
-        
+                
         nameLabel.font = appearance.titleFont
         
         avatarView.clipsToBounds = true

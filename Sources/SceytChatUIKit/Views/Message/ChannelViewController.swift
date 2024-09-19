@@ -70,7 +70,7 @@ open class ChannelViewController: ViewController,
         .init()
         .withoutAutoresizingMask
     
-    open lazy var noDataView = Components.noDataView
+    open lazy var emptyStateView = Components.emptyStateView
         .init()
         .withoutAutoresizingMask
     
@@ -274,10 +274,10 @@ open class ChannelViewController: ViewController,
         collectionView.delegate = self
         collectionView.dataSource = self
         
-        noDataView.icon = Images.noMessages
-        noDataView.title = L10n.Channel.NoMessages.title
-        noDataView.message = L10n.Channel.NoMessages.message
-        noDataView.isHidden = true
+        emptyStateView.icon = Images.noMessages
+        emptyStateView.title = L10n.Channel.NoMessages.title
+        emptyStateView.message = L10n.Channel.NoMessages.message
+        emptyStateView.isHidden = true
         createdView.isHidden = true
         updateUnreadViewVisibility()
         updateTitle()
@@ -311,7 +311,7 @@ open class ChannelViewController: ViewController,
         super.setupLayout()
         
         view.addSubview(collectionView)
-        view.addSubview(noDataView)
+        view.addSubview(emptyStateView)
         view.addSubview(createdView)
         view.addSubview(coverView)
         view.addSubview(searchControlsView)
@@ -330,9 +330,9 @@ open class ChannelViewController: ViewController,
         coverView.pin(to: view.safeAreaLayoutGuide)
         collectionView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
         collectionView.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
-        noDataView.pin(to: view, anchors: [.leading, .trailing])
-        noDataView.topAnchor.pin(to: view.safeAreaLayoutGuide.topAnchor)
-        noDataView.bottomAnchor.pin(to: customInputViewController.view.topAnchor)
+        emptyStateView.pin(to: view, anchors: [.leading, .trailing])
+        emptyStateView.topAnchor.pin(to: view.safeAreaLayoutGuide.topAnchor)
+        emptyStateView.bottomAnchor.pin(to: customInputViewController.view.topAnchor)
         createdView.pin(to: view, anchors: [.leading, .trailing])
         createdView.bottomAnchor.pin(to: customInputViewController.view.topAnchor)
         customInputViewController.view.pin(to: coverView.safeAreaLayoutGuide, anchors: [.leading, .trailing])
@@ -1820,7 +1820,7 @@ open class ChannelViewController: ViewController,
             let sectionDeletes = paths.sectionDeletes
             let continuesOptions = paths.continuesOptions
             var needsToScrollBottom = false
-            if !noDataView.isHidden {
+            if !emptyStateView.isHidden {
                 showEmptyViewIfNeeded()
             }
             if let unreadMessageIndexPath, checkOnlyFirstTimeReceivedMessagesFromArchive {
@@ -2094,7 +2094,7 @@ open class ChannelViewController: ViewController,
     }
     
     open func showEmptyViewIfNeeded() {
-        noDataView.isHidden = (
+        emptyStateView.isHidden = (
             channelViewModel.channel.channelType == .broadcast
             && channelViewModel.channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner
         )

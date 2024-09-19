@@ -43,7 +43,7 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     open lazy var playPauseButton = UIButton()
         .withoutAutoresizingMask
     
-    open lazy var scrollView = MediaPreviewerScrollView(contentMode: imageContentMode)
+    open lazy var scrollView = Components.mediaPreviewerScrollView.init(contentMode: imageContentMode)
         .withoutAutoresizingMask
     
     public var imageView: UIImageView { scrollView.imageView }

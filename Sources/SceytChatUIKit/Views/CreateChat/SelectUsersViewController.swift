@@ -1,5 +1,5 @@
 //
-//  SelectChannelMembersViewController.swift
+//  SelectUsersViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class SelectChannelMembersViewController: ViewController,
+open class SelectUsersViewController: ViewController,
     UITableViewDelegate, UITableViewDataSource,
     UISearchControllerDelegate, UISearchBarDelegate
 {
@@ -18,9 +18,9 @@ open class SelectChannelMembersViewController: ViewController,
     open lazy var tableView = UITableView()
         .withoutAutoresizingMask
 
-    open lazy var searchController = SearchController(searchResultsController: nil)
+    open lazy var searchController = Components.searchController.init(searchResultsController: nil)
     
-    open lazy var selectedUserListView = SelectedUserListView()
+    open lazy var selectedUserListView = Components.selectedUserListView.init()
         .withoutAutoresizingMask
     
     open var selectedUserListViewHeight: NSLayoutConstraint!
@@ -40,7 +40,7 @@ open class SelectChannelMembersViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
-        tableView.register(Components.createChannelUserCell.self)
+        tableView.register(Components.userCell.self)
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -169,7 +169,7 @@ open class SelectChannelMembersViewController: ViewController,
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch Sections(rawValue: indexPath.section) {
         case .user:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.createChannelUserCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.userCell.self)
             cell.showCheckBox = true
             cell.selectionStyle = .none
             cell.userData = selectMemberViewModel.user(at: indexPath)
@@ -258,10 +258,10 @@ open class SelectChannelMembersViewController: ViewController,
     }
 }
 
-private extension SelectChannelMembersViewController {
+private extension SelectUsersViewController {
     func deselectRowFor(user: ChatUser) {
         for indexPath in tableView.indexPathsForVisibleRows ?? [] {
-            if let cell = tableView.cell(for: indexPath, cellType: Components.createChannelUserCell.self),
+            if let cell = tableView.cell(for: indexPath, cellType: Components.userCell.self),
                cell.userData?.id == user.id
             {
                 if let indexPathsForSelectedRows = tableView.indexPathsForSelectedRows,
@@ -276,13 +276,13 @@ private extension SelectChannelMembersViewController {
     }
 }
 
-extension SelectChannelMembersViewController {
+extension SelectUsersViewController {
     enum Sections: Int, CaseIterable {
         case user
     }
 }
 
-public extension SelectChannelMembersViewController {
+public extension SelectUsersViewController {
     enum Layouts {
         public static var selectedViewHeight: CGFloat = 96
     }

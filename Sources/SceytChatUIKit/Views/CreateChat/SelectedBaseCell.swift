@@ -1,5 +1,5 @@
 //
-//  SelectedUserCell.swift
+//  SelectedBaseCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,32 @@
 
 import UIKit
 
-open class SelectedUserCell: CollectionViewCell {
+open class SelectedUserCell: SelectedBaseCell {
+    open var userData: ChatUser! {
+        didSet {
+            label.text = SceytChatUIKit.shared.formatters.userNameFormatter.short(userData)
+            presenceView.isHidden = userData.presence.state != .online
+            avatarView.imageView.image = .deletedUser
+            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView, for: userData)
+        }
+    }
+}
+
+open class SelectedChannelCell: SelectedBaseCell {
+    open var channelData: ChatChannel! {
+        didSet {
+            if let peer = channelData.peer {
+                label.text = SceytChatUIKit.shared.formatters.userNameFormatter.short(peer)
+            } else {
+                label.text = channelData.subject
+            }
+            presenceView.isHidden = channelData.peer?.presence.state != .online
+            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView, for: channelData)
+        }
+    }
+}
+
+open class SelectedBaseCell: CollectionViewCell {
     open lazy var avatarView = CircleImageView()
         .withoutAutoresizingMask
     
@@ -27,7 +52,7 @@ open class SelectedUserCell: CollectionViewCell {
         return $0
     }(UILabel().withoutAutoresizingMask)
     
-    open var onDelete: ((SelectedUserCell) -> Void)?
+    open var onDelete: ((SelectedBaseCell) -> Void)?
     
     override open func setup() {
         super.setup()
@@ -60,27 +85,6 @@ open class SelectedUserCell: CollectionViewCell {
     
     open var imageTask: Cancellable?
     
-    open var userData: ChatUser! {
-        didSet {
-            label.text = SceytChatUIKit.shared.formatters.userNameFormatter.short(userData)
-            presenceView.isHidden = userData.presence.state != .online
-            avatarView.imageView.image = .deletedUser
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView, for: userData)
-        }
-    }
-    
-    open var channelData: ChatChannel! {
-        didSet {
-            if let peer = channelData.peer {
-                label.text = SceytChatUIKit.shared.formatters.userNameFormatter.short(peer)
-            } else {
-                label.text = channelData.subject
-            }
-            presenceView.isHidden = channelData.peer?.presence.state != .online
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView, for: channelData)
-        }
-    }
-    
     override open func prepareForReuse() {
         super.prepareForReuse()
         imageTask?.cancel()
@@ -92,7 +96,7 @@ open class SelectedUserCell: CollectionViewCell {
     }
 }
 
-public extension SelectedUserCell {
+public extension SelectedBaseCell {
     enum Layouts {
         public static var avatarSize: CGFloat = 56
     }

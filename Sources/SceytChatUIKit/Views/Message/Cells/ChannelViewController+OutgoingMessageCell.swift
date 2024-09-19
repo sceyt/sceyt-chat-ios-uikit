@@ -112,7 +112,7 @@ extension ChannelViewController {
                 infoView.displayedLabel.textColor = infoView.dateLabel.textColor
                 infoView.eyeView.tintColor = infoView.dateLabel.textColor
                 //            infoView.tickView.tintColor = appearance.infoViewRevertColorOnBackgroundView
-                dateTickBackgroundView.isHidden = false
+                infoView.backgroundView.isHidden = false
                 layoutConstraint += [
                     textLabel.leadingAnchor.pin(to: bubbleView.leadingAnchor),
                     textLabel.topAnchor.pin(to: bubbleViewTopAnchor),
@@ -164,8 +164,8 @@ extension ChannelViewController {
                 
                 layoutConstraint += [ linkView.bottomAnchor.pin(to: infoView.topAnchor, constant: -4) ]
             } else {
-                dateTickBackgroundView.isHidden = layout.contentOptions.contains(.file)
-                if !dateTickBackgroundView.isHidden {
+                infoView.backgroundView.isHidden = layout.contentOptions.contains(.file)
+                if !infoView.backgroundView.isHidden {
                     infoView.dateLabel.textColor = appearance.infoViewRevertColorOnBackgroundView
                     //                infoView.tickView.tintColor = appearance.infoViewRevertColorOnBackgroundView
                 } else {
@@ -202,17 +202,17 @@ extension ChannelViewController {
                 ]
             }
             
-            if dateTickBackgroundView.isHidden {
+            if infoView.backgroundView.isHidden {
                 layoutConstraint += [
                     infoView.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -10),
                     infoView.bottomAnchor.pin(to: bubbleView.bottomAnchor, constant: -8)
                 ]
             } else {
                 layoutConstraint += [
-                    dateTickBackgroundView.leadingAnchor.pin(to: infoView.leadingAnchor, constant: -6),
-                    dateTickBackgroundView.topAnchor.pin(to: infoView.topAnchor, constant: -3),
-                    dateTickBackgroundView.trailingAnchor.pin(to: infoView.trailingAnchor, constant: 6),
-                    dateTickBackgroundView.bottomAnchor.pin(to: infoView.bottomAnchor, constant: 3),
+                    infoView.backgroundView.leadingAnchor.pin(to: infoView.leadingAnchor, constant: -6),
+                    infoView.backgroundView.topAnchor.pin(to: infoView.topAnchor, constant: -3),
+                    infoView.backgroundView.trailingAnchor.pin(to: infoView.trailingAnchor, constant: 6),
+                    infoView.backgroundView.bottomAnchor.pin(to: infoView.bottomAnchor, constant: 3),
                     infoView.trailingAnchor.pin(to: attachmentView.trailingAnchor, constant: -12),
                     infoView.bottomAnchor.pin(to: attachmentView.bottomAnchor, constant: -9)
                 ]
@@ -272,7 +272,7 @@ extension ChannelViewController {
         
         open override func prepareForReuse() {
             super.prepareForReuse()
-            dateTickBackgroundView.isHidden = true
+            infoView.backgroundView.isHidden = true
             infoView.dateLabel.textColor = appearance.infoViewDateTextColor
             infoView.displayedLabel.textColor = infoView.dateLabel.textColor
             infoView.eyeView.tintColor = infoView.dateLabel.textColor

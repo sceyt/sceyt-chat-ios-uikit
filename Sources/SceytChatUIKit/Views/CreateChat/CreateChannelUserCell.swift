@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class CreateChannelUserCell: BaseChannelUserCell {
+open class UserCell: BaseChannelUserCell {
     override open func setSelected(_ selected: Bool, animated: Bool) {
         super.setSelected(selected, animated: animated)
         checkBoxView.isSelected = selected
@@ -35,7 +35,7 @@ open class CreateChannelUserCell: BaseChannelUserCell {
     }
 }
 
-open class ChannelUserCell: BaseChannelUserCell {
+open class SearchResultChannelCell: BaseChannelUserCell {
     
     open var channelData: ChatChannel! {
         didSet {
@@ -146,61 +146,6 @@ open class BaseChannelUserCell: TableViewCell {
     
     open var imageTask: Cancellable?
  
-//    open var userData: ChatUser! {
-//        didSet {
-//            titleLabel.text = userData.displayName
-//            statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(userData.presence)
-//            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: userData)
-//            subscribeForPresence()
-//        }
-//    }
-//    open func subscribeForPresence() {
-//        guard let contact = userData
-//        else { return }
-//        Components.presenceProvider
-//            .subscribe(userId: contact.id) { [weak self] user in
-//                PresenceProvider.unsubscribe(userId: contact.id)
-//                guard let self, user.userId == self.userData.id
-//                else { return }
-//                self.statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(presence: user.presence))
-//            }
-//    }
-
-    
-//    open var channelData: ChatChannel! {
-//        didSet {
-//            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: channelData)
-//            titleLabel.text = channelData.displayName
-//            let memberCount = Int(channelData.memberCount)
-//            switch channelData.channelType {
-//            case .broadcast:
-//                switch channelData.memberCount {
-//                case 1:
-//                    statusLabel.text = L10n.Channel.SubscriberCount.one
-//                case 2...:
-//                    statusLabel.text = L10n.Channel.SubscriberCount.more(memberCount)
-//                default:
-//                    statusLabel.text = ""
-//                }
-//            case .private:
-//                switch channelData.memberCount {
-//                case 1:
-//                    statusLabel.text = L10n.Channel.MembersCount.one
-//                case 2...:
-//                    statusLabel.text = L10n.Channel.MembersCount.more(memberCount)
-//                default:
-//                    statusLabel.text = ""
-//                }
-//            case .direct:
-//                if let presence = channelData.peer?.presence {
-//                    statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(presence)
-//                } else {
-//                    statusLabel.text = channelData.peer?.presence.status
-//                }
-//            }
-//        }
-//    }
-//    
     override open func prepareForReuse() {
         super.prepareForReuse()
         
@@ -208,18 +153,6 @@ open class BaseChannelUserCell: TableViewCell {
         statusLabel.text = nil
         imageTask?.cancel()
     }
-    
-//    open func subscribeForPresence() {
-//        guard let contact = userData
-//        else { return }
-//        Components.presenceProvider
-//            .subscribe(userId: contact.id) { [weak self] user in
-//                PresenceProvider.unsubscribe(userId: contact.id)
-//                guard let self, user.userId == self.userData.id
-//                else { return }
-//                self.statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(presence: user.presence))
-//            }
-//    }
 }
 
 public extension BaseChannelUserCell {

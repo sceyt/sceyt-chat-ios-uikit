@@ -10,6 +10,10 @@ import UIKit
 
 extension MessageCell {
     open class InfoView: View, MessageCellMeasurable {
+        
+        open lazy var backgroundView = UIView()
+            .withoutAutoresizingMask
+
         open lazy var eyeView = UIImageView()
             .contentMode(.center)
             .contentHuggingPriorityH(.required)
@@ -53,6 +57,12 @@ extension MessageCell {
         
         override open func setupAppearance() {
             super.setupAppearance()
+            
+            backgroundView.clipsToBounds = true
+            backgroundView.backgroundColor = appearance.dateTickBackgroundViewColor
+            backgroundView.layer.cornerRadius = 12
+            backgroundView.isHidden = true
+
             stateLabel.font = appearance.infoViewStateFont
             stateLabel.textColor = appearance.infoViewStateTextColor
             dateLabel.font = appearance.infoViewDateFont
@@ -64,10 +74,12 @@ extension MessageCell {
 
         override open func setupLayout() {
             super.setupLayout()
+            addSubview(backgroundView)
             addSubview(hStack)
             displayedLabel.textAlignment = .right
             dateLabel.textAlignment = .right
             stateLabel.textAlignment = .right
+            backgroundView.pin(to: self, anchors: [.top(-3), .bottom(3), .trailing(6), .leading(-6)])
             hStack.pin(to: self, anchors: [.top, .bottom, .trailing, .leading(0, .greaterThanOrEqual)])
         }
         

@@ -19,7 +19,7 @@ open class ChannelMemberListViewController: ViewController,
     open lazy var router = Components.channelMemberListRouter
         .init(rootViewController: self)
     
-    open lazy var searchController = SearchController(searchResultsController: nil)
+    open lazy var searchController = Components.searchController.init(searchResultsController: nil)
     
     open lazy var tableView = UITableView()
         .withoutAutoresizingMask
@@ -39,7 +39,7 @@ open class ChannelMemberListViewController: ViewController,
         searchController.searchBar.delegate = self
         
         tableView.register(Components.channelMemberCell.self)
-        tableView.register(Components.channelMemberAddCell.self)
+        tableView.register(Components.channelAddMemberCell.self)
         tableView.delegate = self
         tableView.dataSource = self
         tableView.separatorStyle = .none
@@ -131,7 +131,7 @@ open class ChannelMemberListViewController: ViewController,
         }
         
         if indexPath.section == 0, memberListViewModel.canAddMembers {
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelMemberAddCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelAddMemberCell.self)
             cell.titleLabel.text = memberListViewModel.addTitle
             return cell
         }

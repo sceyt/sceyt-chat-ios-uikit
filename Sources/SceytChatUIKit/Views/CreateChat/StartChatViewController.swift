@@ -15,7 +15,7 @@ open class StartChatViewController: ViewController,
     open var viewModel: CreateNewChannelViewModel!
     open lazy var router = NewChannelRouter(rootViewController: self)
 
-    open lazy var searchController = SearchController(searchResultsController: nil)
+    open lazy var searchController = Components.searchController.init(searchResultsController: nil)
 
     open lazy var tableView = TableView()
         .withoutAutoresizingMask
@@ -39,7 +39,7 @@ open class StartChatViewController: ViewController,
         tableView.delegate = self
         tableView.dataSource = self
         tableView.separatorStyle = .none
-        tableView.register(Components.createChannelUserCell.self)
+        tableView.register(Components.userCell.self)
         tableView.register(Components.separatorHeaderView.self)
         
         navigationItem.hidesSearchBarWhenScrolling = false
@@ -130,7 +130,7 @@ open class StartChatViewController: ViewController,
         }
         switch Sections(rawValue: indexPath.section) {
         case .user:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.createChannelUserCell.self)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.userCell.self)
             if let user = viewModel.user(at: indexPath) {
                 cell.userData = user
             }

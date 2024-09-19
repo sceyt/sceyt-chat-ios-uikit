@@ -23,7 +23,7 @@ open class ChannelSearchResultsViewController: ViewController,
     open lazy var tableView = UITableView()
         .withoutAutoresizingMask
     
-    open lazy var noDataView = Components.noDataView
+    open lazy var emptyStateView = Components.emptyStateView
         .init()
         .withoutAutoresizingMask
     
@@ -36,7 +36,7 @@ open class ChannelSearchResultsViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
-        tableView.register(Components.channelUserCell.self)
+        tableView.register(Components.searchResultChannelCell.self)
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -57,9 +57,9 @@ open class ChannelSearchResultsViewController: ViewController,
         super.setupLayout()
         
         view.addSubview(tableView)
-        view.addSubview(noDataView)
+        view.addSubview(emptyStateView)
         tableView.pin(to: view)
-        noDataViewBottom = noDataView.pin(to: view.safeAreaLayoutGuide, anchors: [.bottom, .top, .leading, .trailing])[0]
+        noDataViewBottom = emptyStateView.pin(to: view.safeAreaLayoutGuide, anchors: [.bottom, .top, .leading, .trailing])[0]
     }
     
     open override func setupAppearance() {
@@ -83,7 +83,7 @@ open class ChannelSearchResultsViewController: ViewController,
     }
     
     open func showEmptyViewIfNeeded() {
-        noDataView.isHidden = !resultsUpdater.searchResults.isEmpty
+        emptyStateView.isHidden = !resultsUpdater.searchResults.isEmpty
     }
     
     func adjustTableViewToKeyboard(notification: Notification) {
@@ -116,7 +116,7 @@ open class ChannelSearchResultsViewController: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelUserCell.self)
+        let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.searchResultChannelCell.self)
         cell.separatorView.isHidden = indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1
         cell.showCheckBox = resultsUpdater.showCheckBox
         if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
@@ -143,7 +143,7 @@ open class ChannelSearchResultsViewController: ViewController,
         tableView.deselectRow(at: indexPath, animated: true)
         if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
             resultsUpdater.select(channel)
-            tableView.cell(for: indexPath, cellType: Components.channelUserCell.self)?.checkBoxView.isSelected = resultsUpdater.isSelected(channel)
+            tableView.cell(for: indexPath, cellType: Components.searchResultChannelCell.self)?.checkBoxView.isSelected = resultsUpdater.isSelected(channel)
         }
     }
 }

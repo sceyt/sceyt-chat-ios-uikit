@@ -366,7 +366,7 @@ extension ChannelInfoViewController: AppearanceProviding {
     }
 }
 
-extension EditChannelViewController: AppearanceProviding {
+extension ChannelEditViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -394,7 +394,7 @@ extension ChannelMemberListViewController: AppearanceProviding {
     }
 }
 
-extension ChannelMemberCell: AppearanceProviding {
+extension ChannelMemberListViewController.MemberCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -432,7 +432,7 @@ extension BaseChannelUserCell: AppearanceProviding {
     }
 }
 
-extension ChannelMemberAddCell: AppearanceProviding {
+extension ChannelMemberListViewController.AddMemberCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -843,7 +843,7 @@ extension SeparatorHeaderView: AppearanceProviding {
     }
 }
 
-extension SelectChannelMembersViewController: AppearanceProviding {
+extension SelectUsersViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -899,7 +899,7 @@ extension ChannelInfoViewController.AttachmentHeaderView: AppearanceProviding {
     }
 }
 
-extension EditChannelViewController.AvatarCell: AppearanceProviding {
+extension ChannelEditViewController.AvatarCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -972,7 +972,7 @@ extension CreateGroupViewController: AppearanceProviding {
     }
 }
 
-extension SelectedUserCell: AppearanceProviding {
+extension SelectedBaseCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1006,7 +1006,7 @@ extension ReactedUserListViewController.UserReactionCell: AppearanceProviding {
     }
 }
 
-extension NoDataView: AppearanceProviding {
+extension EmptyStateView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {

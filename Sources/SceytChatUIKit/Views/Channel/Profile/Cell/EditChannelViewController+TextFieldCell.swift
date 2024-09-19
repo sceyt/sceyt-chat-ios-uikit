@@ -1,5 +1,5 @@
 //
-//  EditChannelViewController+TextFieldCell.swift
+//  ChannelEditViewController+TextFieldCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension EditChannelViewController {
+extension ChannelEditViewController {
     open class TextFieldCell: TableViewCell, UITextViewDelegate {
         
         open lazy var textView = PlaceholderTextView()
@@ -21,7 +21,7 @@ extension EditChannelViewController {
         
         open var onTextChanged: ((String) -> Void)?
         
-        public lazy var appearance = Components.editChannelViewController.appearance {
+        public lazy var appearance = Components.channelEditViewController.appearance {
             didSet {
                 setupAppearance()
             }

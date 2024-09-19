@@ -65,13 +65,13 @@ open class MediaPreviewerImageView: UIView {
 
     private let imageView: UIImageView
     
-    public init(image: UIImage?) {
+    public required init(image: UIImage?) {
         imageView = UIImageView(image: image)
         super.init(frame: .zero)
         addSubview(imageView)
     }
     
-    public init(image: UIImage?, highlightedImage: UIImage?) {
+    public required init(image: UIImage?, highlightedImage: UIImage?) {
         imageView = UIImageView(image: image, highlightedImage: highlightedImage)
         super.init(frame: .zero)
         addSubview(imageView)

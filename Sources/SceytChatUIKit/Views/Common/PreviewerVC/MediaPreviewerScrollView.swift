@@ -38,7 +38,7 @@ open class MediaPreviewerScrollView: UIScrollView, Configurable, UIScrollViewDel
         }
     }
     
-    public init(contentMode: UIView.ContentMode) {
+    public required init(contentMode: UIView.ContentMode) {
         super.init(frame: .zero)
         imageView.contentMode = contentMode
         

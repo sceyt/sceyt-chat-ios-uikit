@@ -11,10 +11,10 @@ import UIKit
 extension ChannelInfoViewController {
     open class AttachmentCollectionView: CollectionView, UIScrollViewDelegate, UIGestureRecognizerDelegate {
         open var noItemsMessage: String? {
-            set { noItemsView.noItemsLabel.text = newValue }
-            get { noItemsView.noItemsLabel.text }
+            set { emptyStatView.titleLabel.text = newValue }
+            get { emptyStatView.titleLabel.text }
         }
-        open lazy var noItemsView = NoItemsView()
+        open lazy var emptyStatView = EmptyStateView()
         open var shouldReceiveTouch: (() -> Bool)?
         public lazy var scrollingDecelerator = ScrollingDecelerator(scrollView: self)
         
@@ -71,7 +71,7 @@ extension ChannelInfoViewController {
         
         open func updateNoItems() {
             if totalNumberOfItems <= 0 {
-                backgroundView = noItemsView
+                backgroundView = emptyStatView
             } else {
                 backgroundView = nil
             }
@@ -152,24 +152,5 @@ public extension ChannelInfoViewController.AttachmentCollectionView.Layout {
             self.itemSize = itemSize
             self.sectionHeadersPinToVisibleBounds = sectionHeadersPinToVisibleBounds
         }
-    }
-}
-
-open class NoItemsView: View {
-    open lazy var noItemsLabel = UILabel().withoutAutoresizingMask
-    
-    open override func setupLayout() {
-        super.setupLayout()
-        
-        addSubview(noItemsLabel)
-        noItemsLabel.pin(to: self, anchors: [.top(64), .leading(8), .trailing(-8)])
-    }
-
-    open override func setupAppearance() {
-        backgroundColor = .clear
-        noItemsLabel.font = Fonts.regular.withSize(14)
-        noItemsLabel.textColor = UIColor.primaryText
-        noItemsLabel.textAlignment = .center
-        noItemsLabel.contentMode = .top
     }
 }

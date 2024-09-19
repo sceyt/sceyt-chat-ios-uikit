@@ -57,8 +57,7 @@ public extension UIImageView {
             initialIndex = idx
         }
         
-        let imageCarousel = Components.mediaPreviewerCarouselViewController
-            .init(
+        let imageCarousel = Components.mediaPreviewerCarouselViewController.init(
                 sourceView: sourceView,
                 previewDataSource: previewer,
                 initialIndex: initialIndex)

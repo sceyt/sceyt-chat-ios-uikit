@@ -9,7 +9,8 @@
 import UIKit
 
 open class ChannelSearchController: SearchController {
-    override init(searchResultsController: UIViewController?) {
+    
+    public override required init(searchResultsController: UIViewController?) {
         super.init(searchResultsController: searchResultsController)
         hidesNavigationBarDuringPresentation = true
         isActive = true

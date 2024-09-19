@@ -9,7 +9,8 @@
 import UIKit
 
 open class SearchController: UISearchController {
-    public override init(searchResultsController: UIViewController?) {
+    
+    public override required init(searchResultsController: UIViewController?) {
         super.init(searchResultsController: searchResultsController)
         setupAppearance()
     }

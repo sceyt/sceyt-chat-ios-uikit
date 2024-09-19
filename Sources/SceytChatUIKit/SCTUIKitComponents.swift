@@ -17,8 +17,7 @@ public enum SCTUIKitComponents {
     public static var channelListViewModel: ChannelListViewModel.Type = ChannelListViewModel.self
     public static var channelListRouter: ChannelListRouter.Type = ChannelListRouter.self
     public static var channelCell: ChannelCell.Type = ChannelCell.self
-    public static var channelListEmptyStateView: ChannelListViewController.EmptyStateView.Type = ChannelListViewController.EmptyStateView.self
-    public static var noDataView: NoDataView.Type = NoDataView.self
+    public static var emptyStateView: EmptyStateView.Type = EmptyStateView.self
     public static var channelCreatedView: ChannelCreatedView.Type = ChannelCreatedView.self
     public static var channelViewController: ChannelViewController.Type = ChannelViewController.self
     public static var channelViewModel: ChannelViewModel.Type = ChannelViewModel.self
@@ -41,18 +40,18 @@ public enum SCTUIKitComponents {
     public static var channelInfoOptionCell: ChannelInfoViewController.OptionCell.Type = ChannelInfoViewController.OptionCell.self
     public static var channelInfoContainerCell: ChannelInfoViewController.ContainerCell.Type = ChannelInfoViewController.ContainerCell.self
     
-    public static var editChannelViewController: EditChannelViewController.Type = EditChannelViewController.self
-    public static var editChannelAvatarCell: EditChannelViewController.AvatarCell.Type = EditChannelViewController.AvatarCell.self
-    public static var editChannelTextFieldCell: EditChannelViewController.TextFieldCell.Type = EditChannelViewController.TextFieldCell.self
-    public static var editChannelURICell: EditChannelViewController.URICell.Type = EditChannelViewController.URICell.self
+    public static var channelEditViewController: ChannelEditViewController.Type = ChannelEditViewController.self
+    public static var channelEditAvatarCell: ChannelEditViewController.AvatarCell.Type = ChannelEditViewController.AvatarCell.self
+    public static var channelEditTextFieldCell: ChannelEditViewController.TextFieldCell.Type = ChannelEditViewController.TextFieldCell.self
+    public static var channelEditURICell: ChannelEditViewController.URICell.Type = ChannelEditViewController.URICell.self
 
     public static var channelProfileEditViewModel: ChannelProfileEditViewModel.Type = ChannelProfileEditViewModel.self
 
     public static var channelMemberListViewController: ChannelMemberListViewController.Type = ChannelMemberListViewController.self
     public static var channelMemberListViewModel: ChannelMemberListViewModel.Type = ChannelMemberListViewModel.self
     public static var channelMemberListRouter: ChannelMemberListRouter.Type = ChannelMemberListRouter.self
-    public static var channelMemberCell: ChannelMemberCell.Type = ChannelMemberCell.self
-    public static var channelMemberAddCell: ChannelMemberAddCell.Type = ChannelMemberAddCell.self
+    public static var channelMemberCell: ChannelMemberListViewController.MemberCell.Type = ChannelMemberListViewController.MemberCell.self
+    public static var channelAddMemberCell: ChannelMemberListViewController.AddMemberCell.Type = ChannelMemberListViewController.AddMemberCell.self
     public static var inputSelectedMessagesActionsView: InputViewController.SelectedMessagesActionsView.Type = InputViewController.SelectedMessagesActionsView.self
     
     public static var channelInfoMediaCollectionView: ChannelInfoViewController.MediaCollectionView.Type = ChannelInfoViewController.MediaCollectionView.self
@@ -148,8 +147,8 @@ public enum SCTUIKitComponents {
     public static var startChatViewController: StartChatViewController.Type = StartChatViewController.self
     public static var createNewChannelViewModel: CreateNewChannelViewModel.Type = CreateNewChannelViewModel.self
     public static var startChatActionsView: StartChatViewController.ActionsView.Type = StartChatViewController.ActionsView.self
-    public static var channelUserCell: ChannelUserCell.Type = ChannelUserCell.self
-    public static var createChannelUserCell: CreateChannelUserCell.Type = CreateChannelUserCell.self
+    public static var searchResultChannelCell: SearchResultChannelCell.Type = SearchResultChannelCell.self
+    public static var userCell: UserCell.Type = UserCell.self
     public static var separatorHeaderView: SeparatorHeaderView.Type = SeparatorHeaderView.self
 
     public static var textLabel: TextLabel.Type = TextLabel.self
@@ -196,15 +195,18 @@ public enum SCTUIKitComponents {
     public static var searchController: SearchController.Type = SearchController.self
     public static var waveformView: WaveformView.Type = WaveformView.self
     
-    public static var channelAddMembersViewController: ChannelAddMembersViewController.Type = ChannelAddMembersViewController.self
+    public static var addMembersViewController: AddMembersViewController.Type = AddMembersViewController.self
     public static var createGroupProfileView: CreateGroupViewController.ProfileView.Type = CreateGroupViewController.ProfileView.self
     public static var createGroupViewController: CreateGroupViewController.Type = CreateGroupViewController.self
     public static var createChannelProfileView: CreateChannelViewController.ProfileView.Type = CreateChannelViewController.ProfileView.self
     public static var createChannelViewController: CreateChannelViewController.Type = CreateChannelViewController.self
-    public static var selectChannelMembersViewController: SelectChannelMembersViewController.Type = SelectChannelMembersViewController.self
+    public static var selectUsersViewController: SelectUsersViewController.Type = SelectUsersViewController.self
     public static var selectedUserListView: SelectedUserListView.Type = SelectedUserListView.self
     public static var selectedChannelListView: SelectedChannelListView.Type = SelectedChannelListView.self
-    
+    public static var selectedBaseCell: SelectedBaseCell.Type = SelectedBaseCell.self
+    public static var selectedChannelCell: SelectedChannelCell.Type = SelectedChannelCell.self
+    public static var selectedUserCell: SelectedUserCell.Type = SelectedUserCell.self
+
     
     public static var messageCell: MessageCell.Type = MessageCell.self
     public static var messageCellAttachmentAudioView: MessageCell.AttachmentAudioView.Type = MessageCell.AttachmentAudioView.self
@@ -214,7 +216,6 @@ public enum SCTUIKitComponents {
     public static var messageCellAttachmentView: MessageCell.AttachmentView.Type = MessageCell.AttachmentView.self
     public static var messageCellAttachmentStackView: MessageCell.AttachmentStackView.Type = MessageCell.AttachmentStackView.self
     public static var messageCellInfoView: MessageCell.InfoView.Type = MessageCell.InfoView.self
-    public static var messageCellInfoViewBackgroundView: MessageCell.InfoViewBackgroundView.Type = MessageCell.InfoViewBackgroundView.self
     public static var messageCellForwardView: MessageCell.ForwardView.Type = MessageCell.ForwardView.self
     public static var messageCellLinkStackView: MessageCell.LinkStackView.Type = MessageCell.LinkStackView.self
     public static var messageCellLinkView: MessageCell.LinkView.Type = MessageCell.LinkView.self

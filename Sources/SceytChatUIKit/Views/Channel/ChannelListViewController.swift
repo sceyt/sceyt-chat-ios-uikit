@@ -25,11 +25,11 @@ open class ChannelListViewController: ViewController,
         .withoutAutoresizingMask
         .rowAutomaticDimension
     
-    open lazy var emptyView = Components.channelListEmptyStateView
+    open lazy var emptyView = Components.emptyStateView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var searchController = ChannelSearchController(searchResultsController: searchResultsViewController)
+    open lazy var searchController = Components.channelSearchController.init(searchResultsController: searchResultsViewController)
 
     open lazy var searchResultsViewController = Components.channelSearchResultsViewController.init()
 

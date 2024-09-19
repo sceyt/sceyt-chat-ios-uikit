@@ -8,5 +8,5 @@
 
 import Foundation
 
-open class ChannelProfileEditRouter: Router<EditChannelViewController> {
+open class ChannelProfileEditRouter: Router<ChannelEditViewController> {
 }

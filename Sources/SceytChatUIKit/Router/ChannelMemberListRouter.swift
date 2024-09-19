@@ -20,7 +20,7 @@ open class ChannelMemberListRouter: Router<ChannelMemberListViewController> {
     }
     
     open func showAddMembers() {
-        let viewController = ChannelAddMembersViewController()
+        let viewController = Components.addMembersViewController.init()
         let viewModel = rootViewController.memberListViewModel!
         viewController.addMembersViewModel = ChannelAddMembersViewModel(channel: viewModel.channel,
                                                      title: viewModel.addTitle,
