@@ -1566,6 +1566,8 @@ open class ChannelVC: ViewController,
                 m.action = .reply(message)
             case (let message, .edit):
                 m.action = .edit(message)
+                m.type = message.type
+                m.metadata = message.metadata
             default:
                 break
             }

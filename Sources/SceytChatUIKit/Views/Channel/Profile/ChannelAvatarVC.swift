@@ -11,12 +11,6 @@ import UIKit
 open class ChannelAvatarVC: ViewController, UIScrollViewDelegate {
     open var viewModel: ChannelAvatarVM!
     
-    public lazy var appearance = ChannelAvatarVC.appearance {
-        didSet {
-            setupAppearance()
-        }
-    }
-    
     private var task: Cancellable?
     
     private lazy var scrollView = PreviewerScrollView(contentMode: .scaleAspectFit)
