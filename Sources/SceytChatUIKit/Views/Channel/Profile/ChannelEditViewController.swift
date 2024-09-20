@@ -225,7 +225,7 @@ open class ChannelEditViewController: ViewController,
                     guard let self, let picked else { return }
                     self.router.editImage(picked.thumbnail) { [weak self] edited in
                         guard let self,
-                              let jpeg = Components.imageBuilder.init(image: edited).jpegData(),
+                              let jpeg = Components.imageBuilder.init(image: edited).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
                               let url = Components.storage.storeData(jpeg, filePath: picked.url.path)
                         else { return }
                         self.profileViewModel.avatarUrl = url.absoluteString
@@ -236,7 +236,7 @@ open class ChannelEditViewController: ViewController,
                     guard let self, let picked else { return }
                     self.router.editImage(picked.thumbnail) { [weak self] edited in
                         guard let self,
-                              let jpeg = Components.imageBuilder.init(image: edited).jpegData(),
+                              let jpeg = Components.imageBuilder.init(image: edited).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
                               let url = Components.storage.storeData(jpeg, filePath: picked.url.path)
                         else { return }
                         self.profileViewModel.avatarUrl = url.absoluteString

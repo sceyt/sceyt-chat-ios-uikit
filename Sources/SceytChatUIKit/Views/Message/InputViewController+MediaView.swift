@@ -12,7 +12,7 @@ import UIKit
 
 extension InputViewController {
     open class MediaView: View {
-        public static var scale: CGFloat = SceytChatUIKit.shared.config.displayScale
+        public static var scale: CGFloat = UIScreen.main.traitCollection.displayScale
         
         public lazy var appearance = InputViewController.appearance {
             didSet {

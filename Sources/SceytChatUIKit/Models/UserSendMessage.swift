@@ -47,11 +47,11 @@ open class UserSendMessage {
         sendText.enumerateAttribute(.mention, in: NSRange(location: 0, length: sendText.length)) { obj, range, _ in
             if let id = obj as? UserId {
                 var displayName = nsString.substring(with: range)
-                if displayName.hasPrefix(SceytChatUIKit.shared.config.mentionSymbol) {
+                if displayName.hasPrefix(SceytChatUIKit.shared.config.mentionTriggerPrefix) {
                     displayName.removeFirst()
                 }
                 users.append((id, displayName))
-                mentions.append((range, SceytChatUIKit.shared.config.mentionSymbol + String(id)))
+                mentions.append((range, SceytChatUIKit.shared.config.mentionTriggerPrefix + String(id)))
             }
         }
         mentions.sorted(by: { $0.range.location > $1.range.location }).forEach {
@@ -343,7 +343,7 @@ public struct AttachmentView {
                         if let value = contentEditingInput, let fullSizeImageURL = value.fullSizeImageURL {
                             let fileUrl = Components.storage.copyFile(fullSizeImageURL) ?? fullSizeImageURL
                             var imageUrl: URL?
-                            if let jpeg = Components.imageBuilder.init(imageUrl: fileUrl)?.jpegData() {
+                            if let jpeg = Components.imageBuilder.init(imageUrl: fileUrl)?.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality) {
                                 let fileName = fileUrl
                                     .deletingPathExtension()
                                     .appendingPathExtension("jpg")

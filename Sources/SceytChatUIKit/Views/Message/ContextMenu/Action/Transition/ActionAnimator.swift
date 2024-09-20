@@ -60,7 +60,7 @@ private extension ActionAnimator {
             toViewController.contextView?.frame ?? .zero,
             to: toViewController.view
         ) ?? .zero
-        toViewController.snapshot?.transform = SceytChatUIKit.shared.config.contextMenuContentViewScale
+        toViewController.snapshot?.transform = SceytChatUIKit.shared.config.messageBubbleTransformScale
 
         toViewController.view.frame = context.containerView.bounds
         

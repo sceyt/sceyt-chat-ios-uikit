@@ -20,6 +20,8 @@ open class ChannelAttachmentListViewModel: NSObject {
     private let downloadQueue = DispatchQueue(label: "com.sceytchat.uikit.attachments", qos: .userInitiated)
 
     public var thumbnailSize: CGSize = .init(width: 40, height: 40)
+    public var minAutoDownloadSize = 3_000_000
+    
     private let thumbnailCache = {
         $0.countLimit = 20
         return $0
@@ -65,7 +67,7 @@ open class ChannelAttachmentListViewModel: NSObject {
         }
 
         return LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>(
-            context: SceytChatUIKit.shared.config.database.backgroundReadOnlyObservableContext,
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \AttachmentDTO.createdAt, ascending: false),
                               .init(keyPath: \AttachmentDTO.id, ascending: false)],
             sectionNameKeyPath: sectionNameKeyPath,
@@ -166,7 +168,7 @@ open class ChannelAttachmentListViewModel: NSObject {
         downloadQueue.async { [weak self] in
             guard let self,
                   attachment.type != "link",
-                  SceytChatUIKit.shared.config.minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= SceytChatUIKit.shared.config.minAutoDownloadSize,
+                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
                   attachment.status != .done,
                   attachment.status != .failedDownloading,
                   attachment.status != .failedUploading

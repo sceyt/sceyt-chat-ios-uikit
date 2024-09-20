@@ -9,13 +9,6 @@
 import UIKit
 import SceytChat
 
-extension Double {
-    var hours: Double { self * 3600 }
-    var days: Double { self * 24.hours }
-    var weeks: Double { self * 7.days }
-    var months: Double { self * 30.days }
-}
-
 extension SceytChatUIKit {
     public class Config {
         
@@ -44,6 +37,7 @@ extension SceytChatUIKit {
             IntervalOption(title: L10n.Channel.Info.Mute.forever, timeInterval: 0)
         ]
 
+        
         // MARK: - Channel Configuration
         public var channelTypesConfig: ChannelTypesConfig = ChannelTypesConfig(direct: "direct",
                                                                                group: "group",
@@ -71,10 +65,6 @@ extension SceytChatUIKit {
         
         
         // MARK: - Database Configuration
-        public var database: Database {
-            return _database
-        }
-        
         public var storageConfig: StorageConfig = StorageConfig(storageDirectory: {
             if let path = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first {
                 return URL(fileURLWithPath: path)
@@ -90,30 +80,27 @@ extension SceytChatUIKit {
             return nil
         }(),
                                                                 userDefaults: UserDefaults.standard)
+
         
-        private lazy var _database: Database = {
-            if let directory = storageConfig.databaseFileDirectory {
-                do {
-                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                } catch {
-                    print("Error creating directory: \(error.localizedDescription)")
-                }
-                let dbUrl = directory.appendingPathComponent(storageConfig.databaseFilename)
-                return PersistentContainer(storeType: .sqLite(databaseFileUrl: dbUrl))
-            } else {
-                return PersistentContainer(storeType: .inMemory)
-            }
-        }()
-        
-        // MARK: - Chat Constants
-        
+        // MARK: - Chat Configuration
         public var messageEditTimeout: TimeInterval = 1.hours
         public var avatarResizeConfig: ResizeConfig = .low
         public var imageAttachmentResizeConfig: ResizeConfig = .medium
         public var videoAttachmentResizeConfig: VideoResizeConfig = .medium
-        
-        
-        
+        public var attachmentSelectionLimit: Int = 20
+        public var messageMultiselectLimit: Int = 30
+        public var messageReactionPerUserLimit: UInt = 6 {
+            didSet {
+                if messageReactionPerUserLimit < 1 || messageReactionPerUserLimit > 6 {
+                    fatalError("Invalid value for messageReactionPerUserLimit: \(messageReactionPerUserLimit). It must be between 1 and 6.")
+                }
+            }
+        }
+        public var mentionTriggerPrefix: String = "@"
+        public var preventDuplicateAttachmentUpload: Bool = false
+        public var messageBubbleTransformScale = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        public var defaultReactions = ["👍", "😍", "❤️", "🤝", "😂", "😏"]
+
         
         
         
@@ -144,28 +131,6 @@ extension SceytChatUIKit {
             deletedState: .deletedUser
         )
         public var chatChannelDefaultAvatar = ChannelDefaultAvatarType()
-        
-                
-        // MARK: - Chat Configuration
-        public var mentionSymbol = "@"
-        public var mentionUserURI = "sceyt://" // "sceyt://userid"
-        
-        public var jpegDataCompressionQuality = CGFloat(0.8)
-        
-        
-        public var defaultEmojis = ["👍", "😍", "❤️", "🤝", "😂", "😏"]
-        public var maxAllowedEmojisCount: UInt = 6
-        public var contextMenuContentViewScale = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        
-        // MARK: - Chat Constants
-        public var maximumAttachmentsAllowed = 20
-        public var maximumMessagesToSelect = 30
-        public var minAutoDownloadSize = 3_000_000
-        public var calculateFileChecksum: Bool = true
-        public var displayScale = UIScreen.main.traitCollection.displayScale
-        
-        public var recentReactionsLimit = 30
-        public var recentRowLimit = 2
     }
 }
 

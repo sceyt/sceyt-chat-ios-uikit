@@ -172,7 +172,7 @@ private extension ContextMenu {
             delay: 0,
             options: [.curveEaseInOut, .beginFromCurrentState],
             animations: {
-                view.transform = SceytChatUIKit.shared.config.contextMenuContentViewScale
+                view.transform = SceytChatUIKit.shared.config.messageBubbleTransformScale
             },
             completion: { finished in
                 UIView.animate(

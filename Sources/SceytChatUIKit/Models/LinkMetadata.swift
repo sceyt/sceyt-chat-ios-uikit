@@ -23,6 +23,8 @@ open class LinkMetadata {
     open var iconOriginalSize: CGSize?
     open var thumbnail: UIImage?
     
+    public var jpegDataCompressionQuality = CGFloat(0.8)
+    
     public required init(isThumbnailData: Bool = false, url: URL) {
         self.isThumbnailData = isThumbnailData
         self.url = url
@@ -69,11 +71,11 @@ open class LinkMetadata {
         var hasImage: Bool { image != nil || icon != nil }
         if hasImage, let filename = Crypto.hash(value: url.normalizedURL.absoluteString) {
             logger.debug("[LINK PREVIEV] storeImages \(url), fn: \(filename) isz \(image?.size), icn: isz \(icon?.size)")
-            if let icon = icon, let jpeg = icon.jpegData(compressionQuality: SceytChatUIKit.shared.config.jpegDataCompressionQuality) {
+            if let icon = icon, let jpeg = icon.jpegData(compressionQuality: jpegDataCompressionQuality) {
                 Components.storage.storeData(jpeg, filename: "icon_" + filename)
                 
             }
-            if let image = image, let jpeg = image.jpegData(compressionQuality: SceytChatUIKit.shared.config.jpegDataCompressionQuality) {
+            if let image = image, let jpeg = image.jpegData(compressionQuality: jpegDataCompressionQuality) {
                 Components.storage.storeData(jpeg, filename: "image_" + filename)
             }
         } else {
@@ -115,7 +117,7 @@ open class LinkMetadata {
                 thumbnail = UIImage(contentsOfFile: path)
             } else {
                 if let ib = try? Components.imageBuilder.init(image: image).resize(max: size.maxSide),
-                   let data = ib.jpegData() {
+                   let data = ib.jpegData(compressionQuality: jpegDataCompressionQuality) {
                     Components.storage.storeData(data, filePath: filePath)
                     thumbnail = ib.uiImage
                     

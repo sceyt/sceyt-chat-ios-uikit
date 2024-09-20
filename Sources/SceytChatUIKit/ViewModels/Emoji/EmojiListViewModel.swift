@@ -18,6 +18,8 @@ open class EmojiListViewModel {
     }
     
     public static let recentReactionsKey = "recent-reactions"
+    public static var recentReactionsLimit = 30
+    public static var recentRowLimit = 2
 
     open func code(at indexPath: IndexPath) -> String? {
         guard emojis.indices.contains(indexPath.section),
@@ -64,8 +66,8 @@ open class EmojiListViewModel {
                 recentEmojis.items.remove(at: removeIndex)
             }
             recentEmojis.items.insert(codeItem, at: 0)
-            if recentEmojis.items.count > SceytChatUIKit.shared.config.recentReactionsLimit {
-                recentEmojis.items = Array(recentEmojis.items.prefix(SceytChatUIKit.shared.config.recentReactionsLimit))
+            if recentEmojis.items.count > Self.recentReactionsLimit {
+                recentEmojis.items = Array(recentEmojis.items.prefix(Self.recentReactionsLimit))
             }
             recentEmojisToEncode = recentEmojis
         } else {
@@ -141,7 +143,7 @@ fileprivate extension EmojiListViewModel {
             if let recentEmojisData = SceytChatUIKit.shared.config.storageConfig.userDefaults.data(forKey: recentReactionsKey) {
                 let decoder = JSONDecoder()
                 var recentEmojis = try decoder.decode(Emoji.self, from: recentEmojisData)
-                recentEmojis.items = Array(recentEmojis.items.prefix(numberOfColumnsInRowVisible * SceytChatUIKit.shared.config.recentRowLimit))
+                recentEmojis.items = Array(recentEmojis.items.prefix(numberOfColumnsInRowVisible * recentRowLimit))
                 emojis.append(recentEmojis)
             }
             

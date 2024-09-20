@@ -58,7 +58,7 @@ open class ChannelMemberListViewModel: NSObject {
                     .init(keyPath: \MemberDTO.user?.lastName, ascending: true),
                     .init(keyPath: \MemberDTO.channelId, ascending: true)
                 ]),
-            context: SceytChatUIKit.shared.config.database.viewContext
+            context: SceytChatUIKit.shared.database.viewContext
         ) { $0.convert() }
     }()
 

@@ -96,7 +96,7 @@ open class InputViewController: ViewController, UITextViewDelegate {
     open lazy var router = Components.inputRouter
         .init(rootViewController: self)
     
-    open var mentionSymbol: String { SceytChatUIKit.shared.config.mentionSymbol }
+    open var mentionTriggerPrefix: String { SceytChatUIKit.shared.config.mentionTriggerPrefix }
     open var onContentHeightUpdate: ((CGFloat, (()-> Void)?) -> Void)?
     
     @Published public var action: Action?
@@ -189,7 +189,7 @@ open class InputViewController: ViewController, UITextViewDelegate {
     
     override open func paste(_ sender: Any?) {
         if let image = UIPasteboard.general.image,
-           let jpeg = Components.imageBuilder.init(image: image).jpegData(),
+           let jpeg = Components.imageBuilder.init(image: image).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
            let url = Components.storage.storeData(jpeg, filename: UUID().uuidString + ".jpg")
         {
             mediaView.insert(view: .init(mediaUrl: url, thumbnail: image))
@@ -320,13 +320,13 @@ open class InputViewController: ViewController, UITextViewDelegate {
         var ms = MentionString(queryRange: NSRange(location: location, length: 0))
         let text = inputTextView.text as NSString
         if attributedText.length == location,
-           attributedText.string == mentionSymbol || attributedText.string.hasSuffix(" " + mentionSymbol) || attributedText.string.hasSuffix("\n" + mentionSymbol)
+           attributedText.string == mentionTriggerPrefix || attributedText.string.hasSuffix(" " + mentionTriggerPrefix) || attributedText.string.hasSuffix("\n" + mentionTriggerPrefix)
         {
             ms.exist = true
             ms.queryRange = NSRange(location: location - 1, length: 1)
             return ms
         }
-        let lastRange = text.rangeOfCharacter(from: CharacterSet(charactersIn: mentionSymbol),
+        let lastRange = text.rangeOfCharacter(from: CharacterSet(charactersIn: mentionTriggerPrefix),
                                               options: .backwards,
                                               range: NSRange(location: 0, length: location))
         guard lastRange.location != NSNotFound else { return ms }
@@ -425,7 +425,7 @@ open class InputViewController: ViewController, UITextViewDelegate {
                   let replacingRange = self.lastMentionQueryRange
                     //                  !isExist(attributedText: attributedText, userId: id)
             else { return }
-            let mentionText = attributedString(self.mentionSymbol + displayName, key: id)
+            let mentionText = attributedString(self.mentionTriggerPrefix + displayName, key: id)
             let mutableAttributed = NSMutableAttributedString(attributedString: self.inputTextView.attributedText)
             mutableAttributed.insert(attributedSpace(), at: replacingRange.upperBound)
             mutableAttributed.safeReplaceCharacters(in: replacingRange, with: mentionText)
@@ -1062,7 +1062,7 @@ open class InputViewController: ViewController, UITextViewDelegate {
     public func textViewDidChangeSelection(_ textView: UITextView) {
         var selectedRange = textView.selectedRange
         if selectedRange.length > 0 {
-            if textView.text[selectedRange.location] == mentionSymbol {
+            if textView.text[selectedRange.location] == mentionTriggerPrefix {
                 selectedRange = .init(location: selectedRange.location + 1, length: selectedRange.length - 1)
             }
             let mentionRange = mentionTextRange(attributedText: textView.attributedText, at: selectedRange.location)

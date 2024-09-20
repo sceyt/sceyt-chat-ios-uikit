@@ -21,6 +21,25 @@ public class SceytChatUIKit {
     public var chatClient: ChatClient {
         ChatClient.shared
     }
+    
+    public var database: Database {
+        return _database
+    }
+    
+    private lazy var _database: Database = {
+        if let directory = config.storageConfig.databaseFileDirectory {
+            do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            } catch {
+                print("Error creating directory: \(error.localizedDescription)")
+            }
+            let dbUrl = directory.appendingPathComponent(config.storageConfig.databaseFilename)
+            return PersistentContainer(storeType: .sqLite(databaseFileUrl: dbUrl))
+        } else {
+            return PersistentContainer(storeType: .inMemory)
+        }
+    }()
+    
 
     public static func initialize(apiUrl: String, appId: String, clientId: String = "") {
         ChatClient.initialize(apiUrl: apiUrl, appId: appId, clientId: clientId)
@@ -35,8 +54,8 @@ public class SceytChatUIKit {
         chatClient.connectionState == .connected
     }
     
-    public func connect(accessToken: String) {
-        chatClient.connect(token: accessToken)
+    public func connect(token: String) {
+        chatClient.connect(token: token)
     }
     
     public func reconnect() -> Bool {
@@ -58,7 +77,7 @@ public class SceytChatUIKit {
     public lazy var channelEventHandler: ChannelEventHandler = {
         Components.channelEventHandler
             .init(
-                database: config.database,
+                database: database,
                 chatClient: chatClient
             )
     }()

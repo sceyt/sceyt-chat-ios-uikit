@@ -23,7 +23,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         self.loadRangeProvider = loadRangeProvider
         self.channelId = channelId
         super.init(
-            context: SceytChatUIKit.shared.config.database.backgroundReadOnlyObservableContext,
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [
                 .init(keyPath: \MessageDTO.createdAt, ascending: true),
                 .init(keyPath: \MessageDTO.id, ascending: true)

@@ -183,7 +183,7 @@ open class ChannelLayoutModel {
                         let attributes: [NSAttributedString.Key : Any] = [.font: mentionFont,
                                                                           .foregroundColor: mentionColor,
                                                                           .mention: pos.id]
-                        let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionSymbol + user.1,
+                        let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + user.1,
                                                          attributes: attributes)
                         guard text.length >= pos.loc + pos.len else {
                             logger.debug("Something wrong❗️❗️❗️body: \(text.string) mention: \(mention.string) pos: \(pos.loc) \(pos.len) user: \(pos.id)")
@@ -239,7 +239,7 @@ open class ChannelLayoutModel {
                             attributes[.font] = mentionFont
                             attributes[.foregroundColor] = mentionColor
                             attributes[.mention] = userId
-                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionSymbol + user.displayName,
+                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + user.displayName,
                                                              attributes: attributes)
                             text.safeReplaceCharacters(in: range, with: mention)
                         }

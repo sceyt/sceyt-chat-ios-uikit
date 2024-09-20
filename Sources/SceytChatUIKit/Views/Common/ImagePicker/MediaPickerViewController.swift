@@ -21,7 +21,7 @@ open class MediaPickerViewController: ViewController,
     private var selectedIdentifiers = Set<String>()
     private var preSelectedIdentifiers = Set<String>()
     private var selectedIndexPaths = [IndexPath]()
-    private var maximumAttachmentsAllowed = SceytChatUIKit.shared.config.maximumAttachmentsAllowed
+    private var attachmentSelectionLimit = SceytChatUIKit.shared.config.attachmentSelectionLimit
     
     open lazy var collectionView = Components.mediaPickerCollectionView
         .init()
@@ -68,10 +68,10 @@ open class MediaPickerViewController: ViewController,
         }
     }
     
-    public required init(selectedAssetIdentifiers: Set<String>? = nil, maximumAttachmentsAllowed: Int) {
+    public required init(selectedAssetIdentifiers: Set<String>? = nil, attachmentSelectionLimit: Int) {
         super.init(nibName: nil, bundle: nil)
         if let selectedAssetIdentifiers {
-            self.maximumAttachmentsAllowed = maximumAttachmentsAllowed
+            self.attachmentSelectionLimit = attachmentSelectionLimit
             preSelectedIdentifiers = selectedAssetIdentifiers
             selectedIdentifiers = selectedAssetIdentifiers
             footerView.selectedCount = selectedAssetIdentifiers.count
@@ -290,7 +290,7 @@ open class MediaPickerViewController: ViewController,
     
     var thumbnailSize: CGSize {
         let itemSize = itemSize()
-        return .init(width: itemSize.width * SceytChatUIKit.shared.config.displayScale, height: itemSize.height * SceytChatUIKit.shared.config.displayScale)
+        return .init(width: itemSize.width * UIScreen.main.traitCollection.displayScale, height: itemSize.height * UIScreen.main.traitCollection.displayScale)
     }
     
     fileprivate var previousPreheatRect = CGRect.zero
@@ -306,11 +306,11 @@ open class MediaPickerViewController: ViewController,
         guard let cell = collectionView.cell(for: indexPath, cellType: Components.mediaPickerCell.self),
               cell.imageView.image != nil
         else { return false }
-        guard maximumAttachmentsAllowed > 0
+        guard attachmentSelectionLimit > 0
         else { return true }
-        guard maximumAttachmentsAllowed > selectedIdentifiers.count
+        guard attachmentSelectionLimit > selectedIdentifiers.count
         else {
-            showAlert(message: L10n.Error.maxValueItems(maximumAttachmentsAllowed))
+            showAlert(message: L10n.Error.maxValueItems(attachmentSelectionLimit))
             return false
         }
         if indexPath.item < assets.count,

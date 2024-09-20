@@ -49,13 +49,13 @@ open class InputRouter: Router<InputViewController> {
     open func showPhotos(selectedPhotoAssetIdentifiers: Set<String>? = nil,
                          callback: @escaping ([PHAsset], MediaPickerViewController) -> Bool)
     {
-        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
+        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
         let picker = Components.mediaPickerViewController.init(
             selectedAssetIdentifiers: selectedPhotoAssetIdentifiers,
-            maximumAttachmentsAllowed: SceytChatUIKit.shared.config.maximumAttachmentsAllowed - rootViewController.mediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
+            attachmentSelectionLimit: SceytChatUIKit.shared.config.attachmentSelectionLimit - rootViewController.mediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
         )
         picker.onSelected = callback
         let nav = Components.navigationController.init()
@@ -64,7 +64,7 @@ open class InputRouter: Router<InputViewController> {
     }
 
     open func showDocuments(callback: @escaping ([URL]) -> Void) {
-        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
+        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
@@ -73,7 +73,7 @@ open class InputRouter: Router<InputViewController> {
     }
 
     open func showCamera(callback: @escaping (AttachmentView?) -> Void) {
-        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.maximumAttachmentsAllowed else {
+        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
             showAlert(message: L10n.Error.max20Items)
             return
         }

@@ -59,7 +59,7 @@ extension ChannelInfoViewController {
             super.setupDone()
             let itemSize = calculateItemSize()
             let thumbnailSize = itemSize.isNan ? CGSize(width: 40, height: 40) : itemSize
-            mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: SceytChatUIKit.shared.config.displayScale, y: SceytChatUIKit.shared.config.displayScale))
+            mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: UIScreen.main.traitCollection.displayScale, y: UIScreen.main.traitCollection.displayScale))
             layout?.itemSize = itemSize
             reloadData()
             setNeedsLayout()
@@ -78,7 +78,7 @@ extension ChannelInfoViewController {
             if let layout, layout.itemSize != itemSize {
                 layout.itemSize = itemSize
                 let thumbnailSize = itemSize.isNan ? CGSize(width: 40, height: 40) : itemSize
-                mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: SceytChatUIKit.shared.config.displayScale, y: SceytChatUIKit.shared.config.displayScale))
+                mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: UIScreen.main.traitCollection.displayScale, y: UIScreen.main.traitCollection.displayScale))
                 layout.invalidateLayout()
             }
         }

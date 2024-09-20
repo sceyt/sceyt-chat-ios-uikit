@@ -58,7 +58,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
                     .init(keyPath: \AttachmentDTO.id, ascending: ascending)])
                 .fetch(predicate: predicate)
                 .fetch(batchSize: 10),
-            context: SceytChatUIKit.shared.config.database.viewContext
+            context: SceytChatUIKit.shared.database.viewContext
         ) { $0.convert() }
     }()
 

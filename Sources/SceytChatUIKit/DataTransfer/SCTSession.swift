@@ -134,7 +134,7 @@ open class SCTSession: NSObject, SCTDataSession {
     }
     
     open func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
-        let scale = SceytChatUIKit.shared.config.displayScale
+        let scale = UIScreen.main.traitCollection.displayScale
         let newSize = CGSize(width: size.width * scale, height: size.height * scale)
         
         func makeThumbnail(file path: String, thumbnailPath: String) -> String? {
@@ -148,7 +148,7 @@ open class SCTSession: NSObject, SCTDataSession {
             }
             if let image,
                let ib = try? SCTUIKitComponents.imageBuilder.init(image: image).resize(max: newSize.maxSide),
-               let data = ib.jpegData()
+               let data = ib.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality)
             {
                 logger.debug("[thumbnail] 3 stored \(thumbnailPath)")
                 return Storage.storeData(data, filePath: thumbnailPath)?.path
@@ -188,6 +188,10 @@ open class SCTUploadOperation: AsyncOperation {
     }
     
     override open func main() {
+        guard SceytChatUIKit.shared.config.preventDuplicateAttachmentUpload else {
+            self.startPreparing()
+            return
+        }
         taskInfo.startChecksum { [weak self] stored in
             guard let self else { return }
             if stored {

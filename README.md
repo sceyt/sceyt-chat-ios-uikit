@@ -95,7 +95,7 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
         // The user's access token for the Sceyt Chat API.
         let accessToken = "USER_ACCESS_TOKEN"
 
-        SCTUIKitConfig.connect(accessToken: accessToken)
+        SCTUIKitConfig.connect(token: accessToken)
 
         return true
     }

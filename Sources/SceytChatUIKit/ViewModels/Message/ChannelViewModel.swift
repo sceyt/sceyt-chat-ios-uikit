@@ -62,7 +62,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             request: ChannelDTO.fetchRequest()
                 .fetch(predicate: .init(format: "id == %lld", channel.id))
                 .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)]),
-            context: SceytChatUIKit.shared.config.database.viewContext
+            context: SceytChatUIKit.shared.database.viewContext
         ) { $0.convert() }
     }()
     
@@ -1452,20 +1452,20 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     open func isReactionLimitReached(identifier: Identifier) -> Bool {
-        guard SceytChatUIKit.shared.config.maxAllowedEmojisCount > 0
+        guard SceytChatUIKit.shared.config.messageReactionPerUserLimit > 0
         else { return true }
         if let model = identifier.value as? MessageLayoutModel {
-            return (model.message.userReactions?.count ?? 0) + (model.message.userPendingReactions?.count ?? 0) >= SceytChatUIKit.shared.config.maxAllowedEmojisCount
+            return (model.message.userReactions?.count ?? 0) + (model.message.userPendingReactions?.count ?? 0) >= SceytChatUIKit.shared.config.messageReactionPerUserLimit
         }
         return false
     }
     
     open func emojis(identifier: Identifier) -> [String] {
-        let emojiMaxCount = Int(SceytChatUIKit.shared.config.maxAllowedEmojisCount)
-        var defaultEmojis = SceytChatUIKit.shared.config.defaultEmojis
+        let emojiMaxCount = Int(SceytChatUIKit.shared.config.messageReactionPerUserLimit)
+        var defaultReactions = SceytChatUIKit.shared.config.defaultReactions
         let selectedReactions = selectedEmojis(identifier: identifier)
         guard !selectedReactions.isEmpty else {
-            return defaultEmojis
+            return defaultReactions
         }
         var emojis = [String]()
         emojis.reserveCapacity(emojiMaxCount)
@@ -1475,19 +1475,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             return emojis
         }
         if !selectedReactions.isEmpty {
-            defaultEmojis.removeAll(where: {
+            defaultReactions.removeAll(where: {
                 selectedReactions.contains($0)
             })
-            emojis.append(contentsOf: defaultEmojis.prefix(emojiMaxCount - selectedReactions.count))
+            emojis.append(contentsOf: defaultReactions.prefix(emojiMaxCount - selectedReactions.count))
             return emojis
         }
-        return defaultEmojis
+        return defaultReactions
         
     }
     
     open func showPlusAfterEmojis(identifier: Identifier) -> Bool {
         let selectedReactions = selectedEmojis(identifier: identifier)
-        return selectedReactions.count < SceytChatUIKit.shared.config.maxAllowedEmojisCount
+        return selectedReactions.count < SceytChatUIKit.shared.config.messageReactionPerUserLimit
     }
     
     //MARK: Join channel
@@ -2120,7 +2120,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         if selectedMessages.contains(model) {
             selectedMessages.remove(model)
-        } else if selectedMessages.count < SceytChatUIKit.shared.config.maximumMessagesToSelect {
+        } else if selectedMessages.count < SceytChatUIKit.shared.config.messageMultiselectLimit {
             selectedMessages.insert(model)
         }
     }

@@ -89,7 +89,7 @@ open class ChannelListSearchService {
     
     private func searchGroupChats(query: String) async throws -> [ChatChannel] {
         return try await withCheckedThrowingContinuation { continuation in
-            SceytChatUIKit.shared.config.database.read { context in
+            SceytChatUIKit.shared.database.read { context in
                 let request = NSFetchRequest<ChannelDTO>(entityName: ChannelDTO.entityName)
                 request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
                 request.predicate = .init(format: "type = %@ AND (subject BEGINSWITH[c] %@ OR subject CONTAINS[c] %@)", SceytChatUIKit.shared.config.channelTypesConfig.group, query, " \(query)")
@@ -105,7 +105,7 @@ open class ChannelListSearchService {
         let unjoined = filter.contains(.unjoinedChannels)
         let readOnly = filter.contains(.readOnlyChannels)
         return try await withCheckedThrowingContinuation { continuation in
-            SceytChatUIKit.shared.config.database.read { context in
+            SceytChatUIKit.shared.database.read { context in
                 let request = NSFetchRequest<ChannelDTO>(entityName: ChannelDTO.entityName)
                 request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
                 var format = "type = %@ AND (subject BEGINSWITH[c] %@  OR subject CONTAINS[c] %@)"

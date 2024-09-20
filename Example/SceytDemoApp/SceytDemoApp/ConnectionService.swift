@@ -31,7 +31,7 @@ final class ConnectionService: NSObject, ChatClientDelegate {
                 return
             }
             Config.chatToken = token
-            SceytChatUIKit.shared.connect(accessToken: token)
+            SceytChatUIKit.shared.connect(token: token)
             self.callbacks.append(callback)
         }
     }

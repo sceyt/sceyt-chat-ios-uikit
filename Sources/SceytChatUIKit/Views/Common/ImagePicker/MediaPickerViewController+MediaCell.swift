@@ -11,7 +11,7 @@ import UIKit
 
 extension MediaPickerViewController {
     open class MediaCell: CollectionViewCell {
-        public static var scale: CGFloat = SceytChatUIKit.shared.config.displayScale
+        public static var scale: CGFloat = UIScreen.main.traitCollection.displayScale
         
         open var data: (manager: PHCachingImageManager, asset: PHAsset, thumbnailSize: CGSize)! {
             didSet {

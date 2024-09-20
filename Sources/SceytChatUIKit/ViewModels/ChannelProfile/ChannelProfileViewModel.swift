@@ -32,7 +32,7 @@ open class ChannelProfileViewModel: NSObject {
             request: ChannelDTO.fetchRequest()
                 .fetch(predicate: .init(format: "id == %lld", channel.id))
                 .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)]),
-            context: SceytChatUIKit.shared.config.database.viewContext) { $0.convert() }
+            context: SceytChatUIKit.shared.database.viewContext) { $0.convert() }
     }()
 
 

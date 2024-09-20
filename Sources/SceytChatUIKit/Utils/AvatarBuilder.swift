@@ -29,8 +29,8 @@ public extension AvatarBuildable {
 
 open class AvatarBuilder {
 
-    public static var avatarDefaultSize = CGSize(width: 60 * SceytChatUIKit.shared.config.displayScale,
-                                          height: 60 * SceytChatUIKit.shared.config.displayScale)
+    public static var avatarDefaultSize = CGSize(width: 60 * UIScreen.main.traitCollection.displayScale,
+                                          height: 60 * UIScreen.main.traitCollection.displayScale)
     private static var cache = {
         $0.countLimit = 15
         return $0
@@ -97,7 +97,7 @@ open class AvatarBuilder {
             let image = storedImage(for: url),
             let resized = try? Components.imageBuilder.init(image: image).resize(max: size.maxSide) {
                 setImage(resized.uiImage)
-                if let jpeg = resized.jpegData() {
+            if let jpeg = resized.jpegData(compressionQuality: SceytChatUIKit.shared.config.avatarResizeConfig.compressionQuality) {
                     store(image: jpeg, fileUrl: thumbnailUrl)
                 }
             foundThumbnail = true
@@ -169,7 +169,7 @@ open class AvatarBuilder {
                     if let img = image,
                        let resized = try? Components.imageBuilder.init(image: img).resize(max: size.maxSide) {
                         image = resized.uiImage
-                        if let jpeg = resized.jpegData() {
+                        if let jpeg = resized.jpegData(compressionQuality: SceytChatUIKit.shared.config.avatarResizeConfig.compressionQuality) {
                             let thumbnailUrl = thumbnailUrl(builder: builder, size: size)
                             store(image: jpeg, fileUrl: thumbnailUrl)
                         }

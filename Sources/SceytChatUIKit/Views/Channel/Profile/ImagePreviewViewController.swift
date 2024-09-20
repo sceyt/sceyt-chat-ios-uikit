@@ -22,8 +22,8 @@ open class ImagePreviewViewController: ViewController, UIScrollViewDelegate {
         task = Components.avatarBuilder.loadAvatar(
             into: scrollView.imageView,
             for: viewModel.channel,
-            size: CGSize(width: view.width * SceytChatUIKit.shared.config.displayScale,
-                         height: view.height * SceytChatUIKit.shared.config.displayScale),
+            size: CGSize(width: view.width * UIScreen.main.traitCollection.displayScale,
+                         height: view.height * UIScreen.main.traitCollection.displayScale),
             preferMemCache: false) { [weak self] _ in
                 DispatchQueue.main.async { [weak self] in
                     self?.layout()

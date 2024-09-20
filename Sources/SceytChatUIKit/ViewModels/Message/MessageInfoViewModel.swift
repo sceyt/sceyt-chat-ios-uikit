@@ -79,7 +79,7 @@ open class MessageInfoViewModel: NSObject {
 			request: MarkerDTO.fetchRequest()
 				.sort(descriptors: [.init(keyPath: \MarkerDTO.createdAt, ascending: false)])
 				.fetch(predicate: predicate),
-			context: SceytChatUIKit.shared.config.database.viewContext)
+			context: SceytChatUIKit.shared.database.viewContext)
 		{ $0.convert() }
 	}()
 	

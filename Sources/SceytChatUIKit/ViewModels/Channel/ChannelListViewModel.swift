@@ -38,7 +38,7 @@ open class ChannelListViewModel: NSObject,
       
     open lazy var channelObserver: LazyDatabaseObserver<ChannelDTO, ChatChannel> = {
         return LazyDatabaseObserver<ChannelDTO, ChatChannel>(
-            context: SceytChatUIKit.shared.config.database.backgroundReadOnlyObservableContext,
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)],
             sectionNameKeyPath: #keyPath(ChannelDTO.pinSectionIdentifier),
             fetchPredicate: fetchPredicate,

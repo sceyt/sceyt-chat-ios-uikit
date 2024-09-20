@@ -100,7 +100,7 @@ private extension AttachmentView {
         switch mediaType {
         case "public.image":
             if let thumbnail = (info[.editedImage] ?? info[.originalImage]) as? UIImage,
-               let jpeg = Components.imageBuilder.init(image: thumbnail).jpegData(),
+               let jpeg = Components.imageBuilder.init(image: thumbnail).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
                let url = Components.storage.storeData(jpeg, filename: UUID().uuidString + ".jpg")
             {
                 self.init(mediaUrl: url, thumbnail: thumbnail)
