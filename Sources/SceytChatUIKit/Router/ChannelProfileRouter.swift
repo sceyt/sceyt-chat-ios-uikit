@@ -10,23 +10,23 @@ import UIKit
 
 open class ChannelProfileRouter: Router<ChannelInfoViewController> {
     open func showMuteOptionsAlert(
-        selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.IntervalOption) -> Void,
         canceled: @escaping () -> Void
     ) {
         rootViewController.showBottomSheet(
-            title: L10n.Channel.Profile.Mute.title,
-            actions: SceytChatUIKit.shared.config.muteItems.map { item in
+            title: L10n.Channel.Info.Mute.title,
+            actions: SceytChatUIKit.shared.config.muteChannelNotificationOptions.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
             } + [.init(title: L10n.Alert.Button.cancel, style: .cancel) { canceled() }])
     }
     
     open func showAutoDeleteOptionsAlert(
-        selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.IntervalOption) -> Void,
         canceled: @escaping () -> Void
     ) {
         rootViewController.showBottomSheet(
-            title: L10n.Channel.Profile.AutoDelete.title,
-            actions: SceytChatUIKit.shared.config.autoDeleteItems.map { item in
+            title: L10n.Channel.Info.AutoDelete.title,
+            actions: SceytChatUIKit.shared.config.messageAutoDeleteOptions.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
             } + [.init(title: L10n.Alert.Button.cancel, style: .cancel) { canceled() }])
     }
@@ -61,7 +61,7 @@ open class ChannelProfileRouter: Router<ChannelInfoViewController> {
     open func showAdminsList() {
         let viewController = Components.channelMemberListViewController.init()
         viewController.memberListViewModel = Components.channelMemberListViewModel.init(channel: rootViewController.profileViewModel.channel,
-                                                                     filterMembersByRole: SceytChatUIKit.shared.config.chatRoleAdmin)
+                                                                                        filterMembersByRole: SceytChatUIKit.shared.config.memberRolesConfig.admin)
         rootViewController.show(viewController, sender: self)
     }
     

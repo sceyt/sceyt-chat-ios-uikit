@@ -44,8 +44,8 @@ struct UserDefaultsConfig<T> {
     }
     
     var wrappedValue: T? {
-        get { return UserDefaults.standard.object(forKey: key) as? T ?? defaultValue }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
+        get { return SceytChatUIKit.shared.config.storageConfig.userDefaults.object(forKey: key) as? T ?? defaultValue }
+        set { SceytChatUIKit.shared.config.storageConfig.userDefaults.set(newValue, forKey: key) }
     }
 }
 
@@ -57,7 +57,7 @@ func configureSceytChatUIKit() {
     SceytChatUIKit.initialize(apiUrl: Config.sceytApiURL,
                               appId: Config.sceytAppId,
                               clientId: Config.clientId!)
-    SceytChatUIKit.shared.config.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
+    SceytChatUIKit.shared.config.storageConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
     SceytChatUIKit.shared.config.setLogLevel(.verbose)
     
     // Set customized Subclass for formatters

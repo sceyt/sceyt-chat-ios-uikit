@@ -51,10 +51,10 @@ open class ChannelListSearchService {
                 localBlock(allChats, channels)
                 let channelListQuery = ChannelListQuery
                     .Builder()
-                    .order(.lastMessage)
+                    .order(SceytChatUIKit.shared.config.channelListOrder)
                     .filterKey(.subject)
                     .search(.contains)
-                    .limit(20)
+                    .limit(SceytChatUIKit.shared.config.queryLimits.channelListQueryLimit)
                     .query(query)
                     .build()
                 provider.loadChannels(query: channelListQuery) { [weak self] error in
@@ -92,7 +92,7 @@ open class ChannelListSearchService {
             SceytChatUIKit.shared.config.database.read { context in
                 let request = NSFetchRequest<ChannelDTO>(entityName: ChannelDTO.entityName)
                 request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
-                request.predicate = .init(format: "type = %@ AND (subject BEGINSWITH[c] %@ OR subject CONTAINS[c] %@)", SceytChatUIKit.shared.config.privateChannel, query, " \(query)")
+                request.predicate = .init(format: "type = %@ AND (subject BEGINSWITH[c] %@ OR subject CONTAINS[c] %@)", SceytChatUIKit.shared.config.channelTypesConfig.group, query, " \(query)")
                 return ChannelDTO.fetch(request: request, context: context)
                     .compactMap { ChatChannel(dto: $0) }
             } completion: { result in
@@ -112,7 +112,7 @@ open class ChannelListSearchService {
                 if !unjoined {
                     format += " AND unsubscribed == NO"
                 }
-                request.predicate = .init(format: format, SceytChatUIKit.shared.config.broadcastChannel, query, " \(query)")
+                request.predicate = .init(format: format, SceytChatUIKit.shared.config.channelTypesConfig.broadcast, query, " \(query)")
                 return ChannelDTO.fetch(request: request, context: context)
                     .compactMap { ChatChannel(dto: $0) }
             } completion: { result in
@@ -121,8 +121,8 @@ open class ChannelListSearchService {
                         let newList = channels.compactMap { channel in
                             var isReadOnlyChannel: Bool {
                                 channel.channelType == .broadcast &&
-                                !(channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner ||
-                                  channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin)
+                                !(channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.owner ||
+                                  channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.admin)
                             }
                             return isReadOnlyChannel ? nil : channel
                         }

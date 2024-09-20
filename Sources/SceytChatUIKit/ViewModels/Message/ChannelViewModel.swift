@@ -79,8 +79,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open var isReadOnlyChannel: Bool {
         channel.channelType == .broadcast &&
-        !(channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner ||
-          channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin)
+        !(channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.owner ||
+          channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.admin)
     }
     
     open var isDirectChat: Bool {
@@ -1667,7 +1667,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         
         if !isSearchResultsLoading,
-           searchResult.currentIndex == searchResult.cacheCount - searchResult.searchQueryLimit / 2 {
+           searchResult.currentIndex == searchResult.cacheCount - Int(searchResult.searchQueryLimit) / 2 {
             isSearchResultsLoading = true
             searchResult.loadNextMessages({ [weak self] messages, _ in
                 self?.isSearchResultsLoading = false
@@ -1851,7 +1851,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     open func canEdit(model: MessageLayoutModel) -> Bool {
         !model.message.incoming &&
         model.message.state != .deleted &&
-        (model.messageDeliveryStatus == .pending || Date().timeIntervalSince1970 - model.message.createdAt.timeIntervalSince1970 < SceytChatUIKit.shared.config.messagePossibleEditIn)
+        (model.messageDeliveryStatus == .pending || Date().timeIntervalSince1970 - model.message.createdAt.timeIntervalSince1970 < SceytChatUIKit.shared.config.messageEditTimeout)
     }
     
     open func canReport(model: MessageLayoutModel) -> Bool {
@@ -2067,15 +2067,15 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         
         channelProvider
             .getLocalChannel(
-                type: SceytChatUIKit.shared.config.directChannel,
+                type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
                 userId: userId) { channel in
                     if let channel {
                         completion?(channel, nil)
                     } else {
                         self.channelCreator
                             .createLocalChannel(
-                                type: "direct",
-                                members: [userId, me].map { ChatChannelMember(id: $0, roleName: SceytChatUIKit.shared.config.chatRoleOwner)},
+                                type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
+                                members: [userId, me].map { ChatChannelMember(id: $0, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner)},
                                 completion: completion
                             )
                     }
@@ -2088,19 +2088,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         
         channelProvider
             .getLocalChannel(
-                type: SceytChatUIKit.shared.config.directChannel,
+                type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
                 userId: user.id) { channel in
                     if let channel {
                         completion?(channel, nil)
                     } else {
                         let member = ChatChannelMember(
                             user: user,
-                            roleName: SceytChatUIKit.shared.config.chatRoleOwner
+                            roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner
                         )
                         self.channelCreator
                             .createLocalChannel(
-                                type: "direct",
-                                members: [ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.chatRoleOwner), member],
+                                type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
+                                members: [ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner), member],
                                 completion: completion
                             )
                     }

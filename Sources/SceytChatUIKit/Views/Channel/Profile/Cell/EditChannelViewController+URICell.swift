@@ -36,7 +36,7 @@ extension ChannelEditViewController {
             super.setup()
             
             selectionStyle = .none
-            prefixLabel.text = SceytChatUIKit.shared.config.channelURIPrefix
+            prefixLabel.text = SceytChatUIKit.shared.config.channelURIConfig.prefix
             textField.leftViewMode = .always
             textField.leftView = prefixLabel
         }

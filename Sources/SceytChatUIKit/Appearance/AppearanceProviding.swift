@@ -199,7 +199,7 @@ extension MessageCell: AppearanceProviding {
         )
         public var highlightedOverlayColor: (in: UIColor?, out: UIColor?) = (UIColor(hex: "#17191C", alpha: 0.4),
                                                                              UIColor(hex: "#17191C", alpha: 0.4))
-        public var linkColor: UIColor? = UIColor.accent
+        public var linkColor: UIColor? = UIColor.systemBlue
         public var linkFont: UIFont? = Fonts.regular.withSize(16)
         public var linkTitleFont: UIFont? = Fonts.semiBold.withSize(14)
         public var linkTitleColor: UIColor? = UIColor.primaryText
@@ -507,7 +507,7 @@ extension ChannelInfoViewController.LinkCollectionView: AppearanceProviding {
         
         public var titleLabelTextColor: UIColor? = .primaryText
         public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var linkLabelTextColor: UIColor? = .accent
+        public var linkLabelTextColor: UIColor? = .systemBlue
         public var linkLabelFont: UIFont? = Fonts.regular.withSize(14)
         public var detailLabelTextColor: UIColor? = .secondaryText
         public var detailLabelFont: UIFont? = Fonts.regular.withSize(13)

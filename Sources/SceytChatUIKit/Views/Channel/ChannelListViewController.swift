@@ -76,7 +76,7 @@ open class ChannelListViewController: ViewController,
     
     open override func setupLayout() {
         super.setupLayout()
-        UserDefaults.standard.set(false, forKey: "_UIConstraintBasedLayoutLogUnsatisfiable")
+        SceytChatUIKit.shared.config.storageConfig.userDefaults.set(false, forKey: "_UIConstraintBasedLayoutLogUnsatisfiable")
         view.addSubview(tableView)
         view.addSubview(emptyView)
         tableView.pin(to: view)
@@ -242,104 +242,97 @@ open class ChannelListViewController: ViewController,
         navigationItem.titleView = ConnectionStateView(state: state)
     }
     
-    open func onSwipeAction(
-        actions: ChannelSwipeActionsConfiguration.Actions,
-        indexPath: IndexPath) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                switchAction()
-            }
-            
-            func switchAction() {
-                switch actions {
-                case .delete:
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    channelListRouter.showAskForDelete { [weak self] in
-                        if $0 {
-                            self?.channelListViewModel.delete(at: indexPath)
-                        }
-                    }
-                case .leave:
-                    channelListViewModel.leave(at: indexPath)
-                case .read:
-                    channelListViewModel.markAs(read: true, at: indexPath)
-                case .unread:
-                    channelListViewModel.markAs(read: false, at: indexPath)
-                case .mute:
-                    channelListRouter.showMuteOptionsAlert { [weak self] item in
-                        self?.channelListViewModel.mute(item.timeInterval, at: indexPath)
-                    } canceled: {}
-                case .unmute:
-                    channelListViewModel.unmute(at: indexPath)
-                case .pin:
-                    channelListViewModel.pin(at: indexPath)
-                case .unpin:
-                    channelListViewModel.unpin(at: indexPath)
-                }
-            }
-            
+    open func onSwipeAction(actions: ChannelSwipeActionsConfiguration.Actions,
+                            indexPath: IndexPath) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
+            switchAction()
         }
-    
+        
+        func switchAction() {
+            switch actions {
+            case .delete:
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                channelListRouter.showAskForDelete { [weak self] in
+                    if $0 {
+                        self?.channelListViewModel.delete(at: indexPath)
+                    }
+                }
+            case .leave:
+                channelListViewModel.leave(at: indexPath)
+            case .read:
+                channelListViewModel.markAs(read: true, at: indexPath)
+            case .unread:
+                channelListViewModel.markAs(read: false, at: indexPath)
+            case .mute:
+                channelListRouter.showMuteOptionsAlert { [weak self] item in
+                    self?.channelListViewModel.mute(item.timeInterval, at: indexPath)
+                } canceled: {}
+            case .unmute:
+                channelListViewModel.unmute(at: indexPath)
+            case .pin:
+                channelListViewModel.pin(at: indexPath)
+            case .unpin:
+                channelListViewModel.unpin(at: indexPath)
+            }
+        }
+    }
+
     // MARK: UITableViewDelegate
     
-    open func tableView(
-        _ tableView: UITableView,
-        trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-            guard let channel = channelListViewModel.channel(at: indexPath)
-            else { return nil }
-            return ChannelSwipeActionsConfiguration
-                .trailingSwipeActionsConfiguration(for: channel) { [weak self] _,_, actions, handler in
-                    self?.onSwipeAction(actions: actions, indexPath: indexPath)
-                    handler(true)
-                }
-        }
-    
-    open func tableView(
-        _ tableView: UITableView,
-        leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-            guard let channel = channelListViewModel.channel(at: indexPath)
-            else { return nil }
-            return ChannelSwipeActionsConfiguration
-                .leadingSwipeActionsConfiguration(for: channel) { [weak self] _,_, actions, handler in
-                    self?.onSwipeAction(actions: actions, indexPath: indexPath)
-                    handler(true)
-                }
-        }
-    
-    open func tableView(
-        _ tableView: UITableView,
-        didSelectRowAt indexPath: IndexPath) {
-            channelListRouter.showChannelViewController(at: indexPath)
-            channelListViewModel.selectChannel(at: indexPath)
-        }
-    
+    open func tableView(_ tableView: UITableView,
+                        trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        guard let channel = channelListViewModel.channel(at: indexPath)
+        else { return nil }
+        return ChannelSwipeActionsConfiguration
+            .trailingSwipeActionsConfiguration(for: channel) { [weak self] _,_, actions, handler in
+                self?.onSwipeAction(actions: actions, indexPath: indexPath)
+                handler(true)
+            }
+    }
+
+    open func tableView(_ tableView: UITableView,
+                        leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
+        guard let channel = channelListViewModel.channel(at: indexPath)
+        else { return nil }
+        return ChannelSwipeActionsConfiguration
+            .leadingSwipeActionsConfiguration(for: channel) { [weak self] _,_, actions, handler in
+                self?.onSwipeAction(actions: actions, indexPath: indexPath)
+                handler(true)
+            }
+    }
+
+    open func tableView(_ tableView: UITableView,
+                        didSelectRowAt indexPath: IndexPath) {
+        channelListRouter.showChannelViewController(at: indexPath)
+        channelListViewModel.selectChannel(at: indexPath)
+    }
+
     open func numberOfSections(in tableView: UITableView) -> Int {
         channelListViewModel.numberOfSections
     }
     
-    open func tableView(
-        _ tableView: UITableView,
-        numberOfRowsInSection section: Int) -> Int {
-            channelListViewModel.numberOfChannel(at: section)
+    open func tableView(_ tableView: UITableView,
+                        numberOfRowsInSection section: Int) -> Int {
+        channelListViewModel.numberOfChannel(at: section)
+    }
+
+    open  func tableView(_ tableView: UITableView,
+                         cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if indexPath.row > channelListViewModel.numberOfChannel(at: indexPath.section) - 3 {
+            channelListViewModel.loadChannels()
         }
-    
-    open  func tableView(
-        _ tableView: UITableView,
-        cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-            if indexPath.row > channelListViewModel.numberOfChannel(at: indexPath.section) - 3 {
-                channelListViewModel.loadChannels()
+        let cell = tableView.dequeueReusableCell(for: indexPath,
+                                                 cellType: Components.channelCell)
+        if let item = channelListViewModel.layoutModel(at: indexPath) {
+            cell.data = item
+            if channelListViewModel.isSelected(item.channel) {
+                tableView.selectRow(at: indexPath, animated: false, scrollPosition: .none)
             }
-            let cell = tableView.dequeueReusableCell(for: indexPath,
-                                                     cellType: Components.channelCell)
-            if let item = channelListViewModel.layoutModel(at: indexPath) {
-                cell.data = item
-                if channelListViewModel.isSelected(item.channel) {
-                    tableView.selectRow(at: indexPath, animated: false, scrollPosition: .none)
-                }
-            }
-            
-            return cell
         }
-    
+        
+        return cell
+    }
+
     open override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
         

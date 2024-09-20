@@ -220,7 +220,7 @@ open class SCTUploadOperation: AsyncOperation {
                 if let builder = SCTUIKitComponents.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)) {
                     let imageSize = builder.imageSize
                     if !imageSize.isNan {
-                        if let data = try? builder.resize(max: SceytChatUIKit.shared.config.maximumImageAttachmentSize).jpegData(),
+                        if let data = try? builder.resize(max: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.dimensionThreshold).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
                            let newUrl = FileStorage.storeInTemporaryDirectory(data: data, filename: attachment.name ?? UUID().uuidString)
                         {
                             let path = self.fileStorage.store(transferId: transferId, fileName: attachment.name, file: newUrl.path)

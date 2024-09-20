@@ -46,7 +46,7 @@ open class CreatePrivateChannelViewModel {
             
             channelCreator
                 .create(
-                    type: SceytChatUIKit.shared.config.privateChannel,
+                    type: SceytChatUIKit.shared.config.channelTypesConfig.group,
                     subject: subject,
                     metadata: metadataObj,
                     avatarUrl: uploadedAvatarUrl?.absoluteString,
@@ -60,7 +60,7 @@ open class CreatePrivateChannelViewModel {
                 }
         }
         
-        if let image, let jpeg = try? Components.imageBuilder.init(image: image).resize(max: SceytChatUIKit.shared.config.maximumImageSize).jpegData() {
+        if let image, let jpeg = try? Components.imageBuilder.init(image: image).resize(max: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.dimensionThreshold).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality) {
             if let fileUrl = Components.storage.storeInTemporaryDirectory(data: jpeg, ext: "jpeg") {
                 
                 SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { _ in

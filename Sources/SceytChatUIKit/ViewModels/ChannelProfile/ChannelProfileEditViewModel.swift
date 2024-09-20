@@ -44,7 +44,7 @@ open class ChannelProfileEditViewModel: NSObject {
     }
     
     var aboutPlaceholder: String? {
-        L10n.Channel.Profile.about
+        L10n.Channel.Info.about
     }
     
     func checkDoneButton() {

@@ -207,7 +207,7 @@ class UserProfileViewController: UIViewController {
     }
     
     private func showMuteOptionsAlert(
-        selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.IntervalOption) -> Void,
         canceled: @escaping () -> Void
     ) {
         showBottomSheet(

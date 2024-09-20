@@ -11,7 +11,7 @@ import SceytChat
 
 open class ChannelMessageProvider: Provider {
     
-    public var queryLimit = UInt(30)
+    public var queryLimit = SceytChatUIKit.shared.config.queryLimits.messageListQueryLimit
     
     public let channelId: ChannelId
     public let channelOperator: ChannelOperator

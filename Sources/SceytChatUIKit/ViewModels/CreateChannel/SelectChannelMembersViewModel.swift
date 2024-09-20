@@ -20,7 +20,7 @@ open class SelectChannelMembersViewModel: NSObject {
     private func userListQuery(_ query: String? = nil) -> UserListQuery {
         return UserListQuery
             .Builder()
-            .limit(100)
+            .limit(SceytChatUIKit.shared.config.queryLimits.userListQueryLimit)
             .query(query)
             .build()
     }

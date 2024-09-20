@@ -11,8 +11,8 @@ import SceytChat
 
 open class ChannelListProvider: Provider {
 
-    public var queryLimit = UInt(20)
-    public var queryListOrder = ChannelListOrder.lastMessage
+    public var queryLimit = SceytChatUIKit.shared.config.queryLimits.channelListQueryLimit
+    public var queryListOrder = SceytChatUIKit.shared.config.channelListOrder
 
     open private(set) var defaultQuery: ChannelListQuery!
     open var defaultParams: ChannelQueryParam
@@ -159,7 +159,7 @@ extension ChannelListProvider {
             let channelIds = MemberDTO.fetch(request: memberRequest, context: context).map { $0.channelId }
             
             let channelRequest = ChannelDTO.fetchRequest()
-            channelRequest.predicate = NSPredicate(format: "type == %@ AND unsynched == NO AND id IN %@", "direct", Set(channelIds))
+            channelRequest.predicate = NSPredicate(format: "type == %@ AND unsynched == NO AND id IN %@", SceytChatUIKit.shared.config.channelTypesConfig.direct, Set(channelIds))
             return ChannelDTO.fetch(request: channelRequest, context: context).map { $0.convert() }
         } completion: { result in
             switch result {

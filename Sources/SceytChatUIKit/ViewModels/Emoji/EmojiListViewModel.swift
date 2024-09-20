@@ -42,7 +42,7 @@ open class EmojiListViewModel {
 
     open var recentEmojis: Emoji? {
         let decoder = JSONDecoder()
-        if let recentEmojisData = SceytChatUIKit.shared.config.userDefaults.data(forKey: Self.recentReactionsKey),
+        if let recentEmojisData = SceytChatUIKit.shared.config.storageConfig.userDefaults.data(forKey: Self.recentReactionsKey),
            let recentEmojis = try? decoder.decode(Emoji.self, from: recentEmojisData) {
             return recentEmojis
         }
@@ -73,7 +73,7 @@ open class EmojiListViewModel {
         }
         let encoder = JSONEncoder()
         if let encodeData = try? encoder.encode(recentEmojisToEncode) {
-            SceytChatUIKit.shared.config.userDefaults.setValue(encodeData, forKey: Self.recentReactionsKey)
+            SceytChatUIKit.shared.config.storageConfig.userDefaults.setValue(encodeData, forKey: Self.recentReactionsKey)
         }
     }
 }
@@ -138,7 +138,7 @@ fileprivate extension EmojiListViewModel {
             
             var emojis = [Emoji]()
             
-            if let recentEmojisData = SceytChatUIKit.shared.config.userDefaults.data(forKey: recentReactionsKey) {
+            if let recentEmojisData = SceytChatUIKit.shared.config.storageConfig.userDefaults.data(forKey: recentReactionsKey) {
                 let decoder = JSONDecoder()
                 var recentEmojis = try decoder.decode(Emoji.self, from: recentEmojisData)
                 recentEmojis.items = Array(recentEmojis.items.prefix(numberOfColumnsInRowVisible * SceytChatUIKit.shared.config.recentRowLimit))

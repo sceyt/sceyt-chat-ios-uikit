@@ -1644,7 +1644,7 @@ open class ChannelViewController: ViewController,
     
     open func delete(
         layoutModel: MessageLayoutModel,
-        type: DeleteMessageType = SceytChatUIKit.shared.config.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone
+        type: DeleteMessageType = SceytChatUIKit.shared.config.hardDeleteMessageForAll ? .deleteHard : .deleteForEveryone
     ) {
         channelViewModel.deleteMessage(
             layoutModel: layoutModel,
@@ -2096,14 +2096,14 @@ open class ChannelViewController: ViewController,
     open func showEmptyViewIfNeeded() {
         emptyStateView.isHidden = (
             channelViewModel.channel.channelType == .broadcast
-            && channelViewModel.channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner
+            && channelViewModel.channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.owner
         )
         || channelViewModel.numberOfSections > 0
         || channelViewModel.scrollToMessageIdIfSearching != 0
         || channelViewModel.scrollToRepliedMessageId != 0
         createdView.isHidden = channelViewModel.channel.channelType != .broadcast
         || collectionView.numberOfSections > 0
-        || channelViewModel.channel.userRole != SceytChatUIKit.shared.config.chatRoleOwner
+        || channelViewModel.channel.userRole != SceytChatUIKit.shared.config.memberRolesConfig.owner
     }
     
     open func showBottomViewIfNeeded() {
@@ -2313,7 +2313,7 @@ open class ChannelViewController: ViewController,
                                 action: { [weak self] _ in
 //                                    self?.router.showConfirmationAlertForDeleteMessage {
 //                                        if $0 {
-                                    self?.delete(layoutModel: model, type: SceytChatUIKit.shared.config.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
+                                    self?.delete(layoutModel: model, type: SceytChatUIKit.shared.config.hardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
 //                                        }
 //                                    }
                                 }

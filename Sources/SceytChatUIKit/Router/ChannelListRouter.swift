@@ -84,12 +84,12 @@ open class ChannelListRouter: Router<ChannelListViewController> {
     }
     
     open func showMuteOptionsAlert(
-        selected: @escaping (SceytChatUIKit.Config.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.IntervalOption) -> Void,
         canceled: @escaping () -> Void
     ) {
         rootViewController.showBottomSheet(
-            title: L10n.Channel.Profile.Mute.title,
-            actions: SceytChatUIKit.shared.config.muteItems.map { item in
+            title: L10n.Channel.Info.Mute.title,
+            actions: SceytChatUIKit.shared.config.muteChannelNotificationOptions.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
             } + [.init(title: L10n.Alert.Button.cancel, style: .cancel) { canceled() }])
     }

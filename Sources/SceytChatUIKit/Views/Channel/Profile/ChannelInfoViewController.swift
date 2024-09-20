@@ -38,13 +38,13 @@ open class ChannelInfoViewController: ViewController,
     open lazy var segmentViewController = Components.segmentedControlView
         .init(items: [
             SegmentedControlView.SectionItem(content: mediaListViewController,
-                                             title: L10n.Channel.Profile.Segment.medias),
+                                             title: L10n.Channel.Info.Segment.medias),
             SegmentedControlView.SectionItem(content: fileListViewController,
-                                             title: L10n.Channel.Profile.Segment.files),
+                                             title: L10n.Channel.Info.Segment.files),
             SegmentedControlView.SectionItem(content: voiceListViewController,
-                                             title: L10n.Channel.Profile.Segment.voice),
+                                             title: L10n.Channel.Info.Segment.voice),
             SegmentedControlView.SectionItem(content: linkListViewController,
-                                             title: L10n.Channel.Profile.Segment.links)
+                                             title: L10n.Channel.Info.Segment.links)
         ]).withoutAutoresizingMask
     
     public var sections = [Sections]()
@@ -57,7 +57,7 @@ open class ChannelInfoViewController: ViewController,
             tableView.sectionHeaderTopPadding = 0
         }
         
-        navigationItem.title = L10n.Channel.Profile.title
+        navigationItem.title = L10n.Channel.Info.title
         
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             image: .channelProfileMore,
@@ -283,7 +283,7 @@ open class ChannelInfoViewController: ViewController,
         case .uri:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoOptionCell.self)
             cell.iconView.image = .channelProfileURI
-            cell.titleLabel.text = SceytChatUIKit.shared.config.channelURIPrefix + (profileViewModel.channel.uri)
+            cell.titleLabel.text = SceytChatUIKit.shared.config.channelURIConfig.prefix + (profileViewModel.channel.uri)
             cell.selectionStyle = .none
             _cell = cell
         case .options, .items:
@@ -485,11 +485,11 @@ open class ChannelInfoViewController: ViewController,
     
     open func options() -> [ActionItem] {
         var actions: [ActionItem] = [
-            .init(title: L10n.Channel.Profile.notifications, image: .channelProfileBell, tag: ActionTag.notifications)
+            .init(title: L10n.Channel.Info.notifications, image: .channelProfileBell, tag: ActionTag.notifications)
         ]
         if profileViewModel.isOwner || profileViewModel.isAdmin {
             actions += [
-                .init(title: L10n.Channel.Profile.Item.Title.autoDeleteMessages, image: .channelProfileAutoDeleteMessages, tag: ActionTag.autoDeleteMessages, toggle: profileViewModel.autoDelete > 0)
+                .init(title: L10n.Channel.Info.Item.Title.autoDeleteMessages, image: .channelProfileAutoDeleteMessages, tag: ActionTag.autoDeleteMessages, toggle: profileViewModel.autoDelete > 0)
             ]
         }
         return actions
@@ -501,21 +501,21 @@ open class ChannelInfoViewController: ViewController,
             switch profileViewModel.channelType {
             case .broadcast where profileViewModel.isOwner || profileViewModel.isAdmin:
                 actions += [
-                    .init(title: L10n.Channel.Profile.Item.Title.subscribers, image: .channelProfileMembers, tag: ActionTag.members)
+                    .init(title: L10n.Channel.Info.Item.Title.subscribers, image: .channelProfileMembers, tag: ActionTag.members)
                 ]
             case .private:
                 actions += [
-                    .init(title: L10n.Channel.Profile.Item.Title.members, image: .channelProfileMembers, tag: ActionTag.members)
+                    .init(title: L10n.Channel.Info.Item.Title.members, image: .channelProfileMembers, tag: ActionTag.members)
                 ]
             default:
                 break
             }
             if profileViewModel.isOwner {
-                actions += [.init(title: L10n.Channel.Profile.Item.Title.admins, image: .channelProfileAdmins, tag: ActionTag.admins)]
+                actions += [.init(title: L10n.Channel.Info.Item.Title.admins, image: .channelProfileAdmins, tag: ActionTag.admins)]
             }
         }
         actions.append(.init(
-            title: L10n.Channel.Profile.Item.Title.messageSearch,
+            title: L10n.Channel.Info.Item.Title.messageSearch,
             image: .searchFill,
             tag: ActionTag.messageSearch,
             displayArrow: false
@@ -610,7 +610,7 @@ open class ChannelInfoViewController: ViewController,
             if profileViewModel.channel.pinnedAt == nil {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Chat.pin,
+                        title: L10n.Channel.Info.Action.Chat.pin,
                         icon: .chatPin,
                         handler: { [unowned self] in
                             pinChat()
@@ -619,7 +619,7 @@ open class ChannelInfoViewController: ViewController,
             } else {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Chat.unpin,
+                        title: L10n.Channel.Info.Action.Chat.unpin,
                         icon: .chatUnpin,
                         handler: { [unowned self] in
                             unpinChat()
@@ -629,7 +629,7 @@ open class ChannelInfoViewController: ViewController,
             
             actions += [
                 .init(
-                    title: L10n.Channel.Profile.Action.clearHistory,
+                    title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
                     handler: { [unowned self] in
                         deleteAllMessages()
@@ -639,7 +639,7 @@ open class ChannelInfoViewController: ViewController,
             if profileViewModel.channel.peer?.blocked == true {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.unblock,
+                        title: L10n.Channel.Info.Action.unblock,
                         icon: .chatUnBlock,
                         handler: { [unowned self] in
                             unblock()
@@ -648,7 +648,7 @@ open class ChannelInfoViewController: ViewController,
             } else {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.block,
+                        title: L10n.Channel.Info.Action.block,
                         icon: .chatBlock,
                         handler: { [unowned self] in
                             block()
@@ -658,7 +658,7 @@ open class ChannelInfoViewController: ViewController,
             
             actions += [
                 .init(
-                    title: L10n.Channel.Profile.Action.Chat.delete,
+                    title: L10n.Channel.Info.Action.Chat.delete,
                     icon: .chatDelete,
                     style: .destructive,
                     handler: { [unowned self] in
@@ -670,7 +670,7 @@ open class ChannelInfoViewController: ViewController,
             if profileViewModel.canEdit {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Group.edit,
+                        title: L10n.Channel.Info.Action.Group.edit,
                         icon: .chatEdit,
                         handler: { [unowned self] in
                             editAction(nil)
@@ -681,7 +681,7 @@ open class ChannelInfoViewController: ViewController,
             if profileViewModel.channel.pinnedAt == nil {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Group.pin,
+                        title: L10n.Channel.Info.Action.Group.pin,
                         icon: .chatPin,
                         handler: { [unowned self] in
                             pinChat()
@@ -690,7 +690,7 @@ open class ChannelInfoViewController: ViewController,
             } else {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Group.unpin,
+                        title: L10n.Channel.Info.Action.Group.unpin,
                         icon: .chatUnpin,
                         handler: { [unowned self] in
                             unpinChat()
@@ -700,20 +700,20 @@ open class ChannelInfoViewController: ViewController,
             
             actions += [
                 .init(
-                    title: L10n.Channel.Profile.Action.clearHistory,
+                    title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
                     handler: { [unowned self] in
                         deleteAllMessages()
                     }),
                 .init(
-                    title: L10n.Channel.Profile.Action.Group.blockAndLeave,
+                    title: L10n.Channel.Info.Action.Group.blockAndLeave,
                     icon: .chatBlock,
                     style: .destructive,
                     handler: { [unowned self] in
                         blockAndLeave()
                     }),
                 .init(
-                    title: L10n.Channel.Profile.Action.Group.leave,
+                    title: L10n.Channel.Info.Action.Group.leave,
                     icon: .chatLeave,
                     style: .destructive,
                     handler: { [unowned self] in
@@ -724,7 +724,7 @@ open class ChannelInfoViewController: ViewController,
             if profileViewModel.isOwner {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Group.delete,
+                        title: L10n.Channel.Info.Action.Group.delete,
                         icon: .chatDelete,
                         style: .destructive,
                         handler: { [unowned self] in
@@ -737,7 +737,7 @@ open class ChannelInfoViewController: ViewController,
             if profileViewModel.canEdit {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Channel.edit,
+                        title: L10n.Channel.Info.Action.Channel.edit,
                         icon: .chatEdit,
                         handler: { [unowned self] in
                             editAction(nil)
@@ -748,7 +748,7 @@ open class ChannelInfoViewController: ViewController,
             if profileViewModel.channel.pinnedAt == nil {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Channel.pin,
+                        title: L10n.Channel.Info.Action.Channel.pin,
                         icon: .chatPin,
                         handler: { [unowned self] in
                             pinChat()
@@ -757,7 +757,7 @@ open class ChannelInfoViewController: ViewController,
             } else {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Channel.unpin,
+                        title: L10n.Channel.Info.Action.Channel.unpin,
                         icon: .chatUnpin,
                         handler: { [unowned self] in
                             unpinChat()
@@ -767,20 +767,20 @@ open class ChannelInfoViewController: ViewController,
             
             actions += [
                 .init(
-                    title: L10n.Channel.Profile.Action.clearHistory,
+                    title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
                     handler: { [unowned self] in
                         deleteAllMessages(forEveryone: true)
                     }),
                 .init(
-                    title: L10n.Channel.Profile.Action.Channel.blockAndLeave,
+                    title: L10n.Channel.Info.Action.Channel.blockAndLeave,
                     icon: .chatBlock,
                     style: .destructive,
                     handler: { [unowned self] in
                         blockAndLeave()
                     }),
                 .init(
-                    title: L10n.Channel.Profile.Action.Channel.leave,
+                    title: L10n.Channel.Info.Action.Channel.leave,
                     icon: .chatLeave,
                     style: .destructive,
                     handler: { [unowned self] in
@@ -791,7 +791,7 @@ open class ChannelInfoViewController: ViewController,
             if profileViewModel.isOwner {
                 actions += [
                     .init(
-                        title: L10n.Channel.Profile.Action.Channel.delete,
+                        title: L10n.Channel.Info.Action.Channel.delete,
                         icon: .chatDelete,
                         style: .destructive,
                         handler: { [unowned self] in
@@ -883,14 +883,14 @@ open class ChannelInfoViewController: ViewController,
         let message: String
         switch profileViewModel.channel.channelType {
         case .direct:
-            title = L10n.Channel.Profile.Action.Chat.delete
-            message = L10n.Channel.Profile.Action.Chat.deleteMessage
+            title = L10n.Channel.Info.Action.Chat.delete
+            message = L10n.Channel.Info.Action.Chat.deleteMessage
         case .private:
-            title = L10n.Channel.Profile.Action.Group.delete
-            message = L10n.Channel.Profile.Action.Group.deleteMessage
+            title = L10n.Channel.Info.Action.Group.delete
+            message = L10n.Channel.Info.Action.Group.deleteMessage
         case .broadcast:
-            title = L10n.Channel.Profile.Action.Channel.delete
-            message = L10n.Channel.Profile.Action.Channel.deleteMessage
+            title = L10n.Channel.Info.Action.Channel.delete
+            message = L10n.Channel.Info.Action.Channel.deleteMessage
         }
         showAlert(title: title,
                   message: message,

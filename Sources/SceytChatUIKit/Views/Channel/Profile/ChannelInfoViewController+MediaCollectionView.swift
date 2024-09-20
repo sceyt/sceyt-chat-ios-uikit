@@ -42,7 +42,7 @@ extension ChannelInfoViewController {
         
         open override func setup() {
             super.setup()
-            noItemsMessage = L10n.Channel.Profile.Segment.Medias.noItems
+            noItemsMessage = L10n.Channel.Info.Segment.Medias.noItems
             register(Components.channelInfoImageAttachmentCell.self)
             register(Components.channelInfoVideoAttachmentCell.self)
             register(Components.channelInfoAttachmentHeaderView.self, kind: .header)

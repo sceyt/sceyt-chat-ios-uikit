@@ -35,7 +35,7 @@ open class UserReactionViewModel: NSObject {
         self.reactionKey = reactionKey
         var queryBuilder = ReactionListQuery
             .Builder(messageId: messageId)
-            .limit(30)
+            .limit(SceytChatUIKit.shared.config.queryLimits.reactionListQueryLimit)
         if let key = reactionKey {
             queryBuilder = queryBuilder.key(key)
         }

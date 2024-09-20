@@ -22,8 +22,8 @@ open class ChannelProfileViewModel: NSObject {
 
     open private(set) var attachments = Attachments()
 
-    public var isOwner: Bool { channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner }
-    public var isAdmin: Bool { channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin }
+    public var isOwner: Bool { channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.owner }
+    public var isAdmin: Bool { channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.admin }
     public var canEdit: Bool { channel.isGroup && (isOwner || isAdmin) }
 
     open lazy var channelObserver: DatabaseObserver<ChannelDTO, ChatChannel> = {

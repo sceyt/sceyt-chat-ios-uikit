@@ -251,7 +251,7 @@ public struct Operations {
     public static func syncChannelMessagesOperations(startMessageId: MessageId, channelId: ChannelId) -> Operation {
         let query = MessageListQuery
             .Builder(channelId: channelId)
-            .limit(30)
+            .limit(SceytChatUIKit.shared.config.queryLimits.messageListQueryLimit)
             .build()
         let messageOperation = FetchChannelMessagesOperation(query: query)
         messageOperation.startMessageId = startMessageId

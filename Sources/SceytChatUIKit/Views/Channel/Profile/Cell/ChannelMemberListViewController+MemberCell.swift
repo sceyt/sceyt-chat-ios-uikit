@@ -101,7 +101,7 @@ extension ChannelMemberListViewController {
                     selectionStyle = .default
                 }
                 
-                roleLabel.text = data.roleName == SceytChatUIKit.shared.config.groupRoleParticipant ? nil : data.roleName?.localizedCapitalized
+                roleLabel.text = data.roleName == SceytChatUIKit.shared.config.memberRolesConfig.participant ? nil : data.roleName?.localizedCapitalized
                 statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(data.presence)
                 
                 imageTask = AvatarBuilder

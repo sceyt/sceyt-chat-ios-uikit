@@ -11,7 +11,7 @@ import SceytChat
 
 open class ChannelMemberListProvider: Provider {
 
-    public var queryLimit = UInt(30)
+    public var queryLimit = SceytChatUIKit.shared.config.queryLimits.channelMemberListQueryLimit
     public var queryOrder = MemberListOrder.username
     public var queryType = MemberListQueryType.all
 

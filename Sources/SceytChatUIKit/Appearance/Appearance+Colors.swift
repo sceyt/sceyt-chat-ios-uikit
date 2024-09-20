@@ -38,15 +38,10 @@ public extension UIColor {
     static var stateWarning: UIColor { SceytChatUIKit.shared.theme.colors.stateWarning }
     static var stateSuccess: UIColor { SceytChatUIKit.shared.theme.colors.stateSuccess }
     static var stateAttention: UIColor { SceytChatUIKit.shared.theme.colors.stateAttention }
-    
-    public static var initialColors: [UIColor] = [ .accent,
-                                                   .accent2,
-                                                   .accent3,
-                                                   .accent4,
-                                                   .accent5 ]
-    
+        
     static func initial(title: String) -> UIColor {
-        initialColors[abs(title.hash) % initialColors.count]
+        let initialColors = SceytChatUIKit.shared.config.defaultAvatarBackgroundColors
+        return initialColors[abs(title.hash) % initialColors.count]
     }
 }
 

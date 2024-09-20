@@ -129,6 +129,190 @@ internal enum L10n {
       /// Select Chat
       internal static let title = L10n.tr("Localizable", "channel.forward.title", fallback: "Select Chat")
     }
+    internal enum Info {
+      /// About
+      internal static let about = L10n.tr("Localizable", "channel.info.about", fallback: "About")
+      /// Notifications
+      internal static let notifications = L10n.tr("Localizable", "channel.info.notifications", fallback: "Notifications")
+      /// Subject
+      internal static let subject = L10n.tr("Localizable", "channel.info.subject", fallback: "Subject")
+      /// Info
+      internal static let title = L10n.tr("Localizable", "channel.info.title", fallback: "Info")
+      internal enum Action {
+        /// Block User
+        internal static let block = L10n.tr("Localizable", "channel.info.action.block", fallback: "Block User")
+        /// Block & Kick Member
+        internal static let blockAndKickMember = L10n.tr("Localizable", "channel.info.action.block-and-kick-member", fallback: "Block & Kick Member")
+        /// Change member’s role
+        internal static let changeRole = L10n.tr("Localizable", "channel.info.action.change-role", fallback: "Change member’s role")
+        /// Clear History
+        internal static let clearHistory = L10n.tr("Localizable", "channel.info.action.clear-history", fallback: "Clear History")
+        /// join
+        internal static let join = L10n.tr("Localizable", "channel.info.action.join", fallback: "join")
+        /// more
+        internal static let more = L10n.tr("Localizable", "channel.info.action.more", fallback: "more")
+        /// mute
+        internal static let mute = L10n.tr("Localizable", "channel.info.action.mute", fallback: "mute")
+        /// Remove
+        internal static let remove = L10n.tr("Localizable", "channel.info.action.remove", fallback: "Remove")
+        /// report
+        internal static let report = L10n.tr("Localizable", "channel.info.action.report", fallback: "report")
+        /// Set Owner
+        internal static let setOwner = L10n.tr("Localizable", "channel.info.action.set-owner", fallback: "Set Owner")
+        /// Unblock User
+        internal static let unblock = L10n.tr("Localizable", "channel.info.action.unblock", fallback: "Unblock User")
+        /// unmute
+        internal static let unmute = L10n.tr("Localizable", "channel.info.action.unmute", fallback: "unmute")
+        internal enum Channel {
+          /// Block and Leave Channel
+          internal static let blockAndLeave = L10n.tr("Localizable", "channel.info.action.channel.block-and-leave", fallback: "Block and Leave Channel")
+          /// Delete Channel
+          internal static let delete = L10n.tr("Localizable", "channel.info.action.channel.delete", fallback: "Delete Channel")
+          /// Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.
+          internal static let deleteMessage = L10n.tr("Localizable", "channel.info.action.channel.deleteMessage", fallback: "Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.")
+          /// Edit Channel
+          internal static let edit = L10n.tr("Localizable", "channel.info.action.channel.edit", fallback: "Edit Channel")
+          /// Leave Channel
+          internal static let leave = L10n.tr("Localizable", "channel.info.action.channel.leave", fallback: "Leave Channel")
+          /// Pin Channel
+          internal static let pin = L10n.tr("Localizable", "channel.info.action.channel.pin", fallback: "Pin Channel")
+          /// Unpin Channel
+          internal static let unpin = L10n.tr("Localizable", "channel.info.action.channel.unpin", fallback: "Unpin Channel")
+        }
+        internal enum Chat {
+          /// Delete Chat
+          internal static let delete = L10n.tr("Localizable", "channel.info.action.chat.delete", fallback: "Delete Chat")
+          /// Once you delete this chat it will be removed from the chat list with its message history.
+          internal static let deleteMessage = L10n.tr("Localizable", "channel.info.action.chat.deleteMessage", fallback: "Once you delete this chat it will be removed from the chat list with its message history.")
+          /// Pin Chat
+          internal static let pin = L10n.tr("Localizable", "channel.info.action.chat.pin", fallback: "Pin Chat")
+          /// Unpin Chat
+          internal static let unpin = L10n.tr("Localizable", "channel.info.action.chat.unpin", fallback: "Unpin Chat")
+        }
+        internal enum Group {
+          /// Block and Leave Group
+          internal static let blockAndLeave = L10n.tr("Localizable", "channel.info.action.group.block-and-leave", fallback: "Block and Leave Group")
+          /// Delete Group
+          internal static let delete = L10n.tr("Localizable", "channel.info.action.group.delete", fallback: "Delete Group")
+          /// Once you delete this group it will be permanently removed along with its entire history for all the group members.
+          internal static let deleteMessage = L10n.tr("Localizable", "channel.info.action.group.deleteMessage", fallback: "Once you delete this group it will be permanently removed along with its entire history for all the group members.")
+          /// Edit Group
+          internal static let edit = L10n.tr("Localizable", "channel.info.action.group.edit", fallback: "Edit Group")
+          /// Leave Group
+          internal static let leave = L10n.tr("Localizable", "channel.info.action.group.leave", fallback: "Leave Group")
+          /// Pin Group
+          internal static let pin = L10n.tr("Localizable", "channel.info.action.group.pin", fallback: "Pin Group")
+          /// Unpin Group
+          internal static let unpin = L10n.tr("Localizable", "channel.info.action.group.unpin", fallback: "Unpin Group")
+        }
+        internal enum RemoveMember {
+          /// Are you sure to remove %@ from this group?
+          internal static func message(_ p1: Any) -> String {
+            return L10n.tr("Localizable", "channel.info.action.removeMember.message", String(describing: p1), fallback: "Are you sure to remove %@ from this group?")
+          }
+          /// Remove Member
+          internal static let title = L10n.tr("Localizable", "channel.info.action.removeMember.title", fallback: "Remove Member")
+        }
+        internal enum RemoveSubscriber {
+          /// Are you sure to remove %@ from this channel?
+          internal static func message(_ p1: Any) -> String {
+            return L10n.tr("Localizable", "channel.info.action.removeSubscriber.message", String(describing: p1), fallback: "Are you sure to remove %@ from this channel?")
+          }
+          /// Remove Subscriber
+          internal static let title = L10n.tr("Localizable", "channel.info.action.removeSubscriber.title", fallback: "Remove Subscriber")
+        }
+        internal enum RevokeAdmin {
+          /// Revoke
+          internal static let action = L10n.tr("Localizable", "channel.info.action.revokeAdmin.action", fallback: "Revoke")
+          /// Are you sure you want to revoke “Admin” rights from user: %@?
+          internal static func message(_ p1: Any) -> String {
+            return L10n.tr("Localizable", "channel.info.action.revokeAdmin.message", String(describing: p1), fallback: "Are you sure you want to revoke “Admin” rights from user: %@?")
+          }
+          /// Revoke Admin
+          internal static let title = L10n.tr("Localizable", "channel.info.action.revokeAdmin.title", fallback: "Revoke Admin")
+        }
+      }
+      internal enum Admins {
+        /// Admins
+        internal static let title = L10n.tr("Localizable", "channel.info.admins.title", fallback: "Admins")
+      }
+      internal enum AutoDelete {
+        /// Off
+        internal static let off = L10n.tr("Localizable", "channel.info.autoDelete.off", fallback: "Off")
+        /// 1 day
+        internal static let oneDay = L10n.tr("Localizable", "channel.info.autoDelete.oneDay", fallback: "1 day")
+        /// 1 month
+        internal static let oneMonth = L10n.tr("Localizable", "channel.info.autoDelete.oneMonth", fallback: "1 month")
+        /// 1 week
+        internal static let oneWeek = L10n.tr("Localizable", "channel.info.autoDelete.oneWeek", fallback: "1 week")
+        /// Auto-Delete messages:
+        internal static let title = L10n.tr("Localizable", "channel.info.autoDelete.title", fallback: "Auto-Delete messages:")
+      }
+      internal enum Item {
+        internal enum Title {
+          /// Admins
+          internal static let admins = L10n.tr("Localizable", "channel.info.item.title.admins", fallback: "Admins")
+          /// Auto-Delete messages
+          internal static let autoDeleteMessages = L10n.tr("Localizable", "channel.info.item.title.autoDeleteMessages", fallback: "Auto-Delete messages")
+          /// Members
+          internal static let members = L10n.tr("Localizable", "channel.info.item.title.members", fallback: "Members")
+          /// Message Search
+          internal static let messageSearch = L10n.tr("Localizable", "channel.info.item.title.messageSearch", fallback: "Message Search")
+          /// Subscribers
+          internal static let subscribers = L10n.tr("Localizable", "channel.info.item.title.subscribers", fallback: "Subscribers")
+        }
+      }
+      internal enum Members {
+        /// Members
+        internal static let title = L10n.tr("Localizable", "channel.info.members.title", fallback: "Members")
+      }
+      internal enum Mute {
+        /// For %d days
+        internal static func days(_ p1: Int) -> String {
+          return L10n.tr("Localizable", "channel.info.mute.days", p1, fallback: "For %d days")
+        }
+        /// Forever
+        internal static let forever = L10n.tr("Localizable", "channel.info.mute.forever", fallback: "Forever")
+        /// For %d hours
+        internal static func hours(_ p1: Int) -> String {
+          return L10n.tr("Localizable", "channel.info.mute.hours", p1, fallback: "For %d hours")
+        }
+        /// For 1 day
+        internal static let oneDay = L10n.tr("Localizable", "channel.info.mute.one-day", fallback: "For 1 day")
+        /// For 1 hour
+        internal static let oneHour = L10n.tr("Localizable", "channel.info.mute.one-hour", fallback: "For 1 hour")
+        /// Mute Chat:
+        internal static let title = L10n.tr("Localizable", "channel.info.mute.title", fallback: "Mute Chat:")
+      }
+      internal enum Segment {
+        /// Files
+        internal static let files = L10n.tr("Localizable", "channel.info.segment.files", fallback: "Files")
+        /// Links
+        internal static let links = L10n.tr("Localizable", "channel.info.segment.links", fallback: "Links")
+        /// Media
+        internal static let medias = L10n.tr("Localizable", "channel.info.segment.medias", fallback: "Media")
+        /// Members
+        internal static let members = L10n.tr("Localizable", "channel.info.segment.members", fallback: "Members")
+        /// Voice
+        internal static let voice = L10n.tr("Localizable", "channel.info.segment.voice", fallback: "Voice")
+        internal enum Files {
+          /// No file items yet
+          internal static let noItems = L10n.tr("Localizable", "channel.info.segment.files.noItems", fallback: "No file items yet")
+        }
+        internal enum Links {
+          /// No link items yet
+          internal static let noItems = L10n.tr("Localizable", "channel.info.segment.links.noItems", fallback: "No link items yet")
+        }
+        internal enum Medias {
+          /// No media items yet
+          internal static let noItems = L10n.tr("Localizable", "channel.info.segment.medias.noItems", fallback: "No media items yet")
+        }
+        internal enum Voice {
+          /// No voice items yet
+          internal static let noItems = L10n.tr("Localizable", "channel.info.segment.voice.noItems", fallback: "No voice items yet")
+        }
+      }
+    }
     internal enum Intro {
       /// New Channel
       internal static let title = L10n.tr("Localizable", "channel.intro.title", fallback: "New Channel")
@@ -206,190 +390,6 @@ internal enum L10n {
     internal enum Private {
       /// Members
       internal static let sectionTitle = L10n.tr("Localizable", "channel.private.sectionTitle", fallback: "Members")
-    }
-    internal enum Profile {
-      /// About
-      internal static let about = L10n.tr("Localizable", "channel.profile.about", fallback: "About")
-      /// Notifications
-      internal static let notifications = L10n.tr("Localizable", "channel.profile.notifications", fallback: "Notifications")
-      /// Subject
-      internal static let subject = L10n.tr("Localizable", "channel.profile.subject", fallback: "Subject")
-      /// Info
-      internal static let title = L10n.tr("Localizable", "channel.profile.title", fallback: "Info")
-      internal enum Action {
-        /// Block User
-        internal static let block = L10n.tr("Localizable", "channel.profile.action.block", fallback: "Block User")
-        /// Block & Kick Member
-        internal static let blockAndKickMember = L10n.tr("Localizable", "channel.profile.action.block-and-kick-member", fallback: "Block & Kick Member")
-        /// Change member’s role
-        internal static let changeRole = L10n.tr("Localizable", "channel.profile.action.change-role", fallback: "Change member’s role")
-        /// Clear History
-        internal static let clearHistory = L10n.tr("Localizable", "channel.profile.action.clear-history", fallback: "Clear History")
-        /// join
-        internal static let join = L10n.tr("Localizable", "channel.profile.action.join", fallback: "join")
-        /// more
-        internal static let more = L10n.tr("Localizable", "channel.profile.action.more", fallback: "more")
-        /// mute
-        internal static let mute = L10n.tr("Localizable", "channel.profile.action.mute", fallback: "mute")
-        /// Remove
-        internal static let remove = L10n.tr("Localizable", "channel.profile.action.remove", fallback: "Remove")
-        /// report
-        internal static let report = L10n.tr("Localizable", "channel.profile.action.report", fallback: "report")
-        /// Set Owner
-        internal static let setOwner = L10n.tr("Localizable", "channel.profile.action.set-owner", fallback: "Set Owner")
-        /// Unblock User
-        internal static let unblock = L10n.tr("Localizable", "channel.profile.action.unblock", fallback: "Unblock User")
-        /// unmute
-        internal static let unmute = L10n.tr("Localizable", "channel.profile.action.unmute", fallback: "unmute")
-        internal enum Channel {
-          /// Block and Leave Channel
-          internal static let blockAndLeave = L10n.tr("Localizable", "channel.profile.action.channel.block-and-leave", fallback: "Block and Leave Channel")
-          /// Delete Channel
-          internal static let delete = L10n.tr("Localizable", "channel.profile.action.channel.delete", fallback: "Delete Channel")
-          /// Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.
-          internal static let deleteMessage = L10n.tr("Localizable", "channel.profile.action.channel.deleteMessage", fallback: "Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.")
-          /// Edit Channel
-          internal static let edit = L10n.tr("Localizable", "channel.profile.action.channel.edit", fallback: "Edit Channel")
-          /// Leave Channel
-          internal static let leave = L10n.tr("Localizable", "channel.profile.action.channel.leave", fallback: "Leave Channel")
-          /// Pin Channel
-          internal static let pin = L10n.tr("Localizable", "channel.profile.action.channel.pin", fallback: "Pin Channel")
-          /// Unpin Channel
-          internal static let unpin = L10n.tr("Localizable", "channel.profile.action.channel.unpin", fallback: "Unpin Channel")
-        }
-        internal enum Chat {
-          /// Delete Chat
-          internal static let delete = L10n.tr("Localizable", "channel.profile.action.chat.delete", fallback: "Delete Chat")
-          /// Once you delete this chat it will be removed from the chat list with its message history.
-          internal static let deleteMessage = L10n.tr("Localizable", "channel.profile.action.chat.deleteMessage", fallback: "Once you delete this chat it will be removed from the chat list with its message history.")
-          /// Pin Chat
-          internal static let pin = L10n.tr("Localizable", "channel.profile.action.chat.pin", fallback: "Pin Chat")
-          /// Unpin Chat
-          internal static let unpin = L10n.tr("Localizable", "channel.profile.action.chat.unpin", fallback: "Unpin Chat")
-        }
-        internal enum Group {
-          /// Block and Leave Group
-          internal static let blockAndLeave = L10n.tr("Localizable", "channel.profile.action.group.block-and-leave", fallback: "Block and Leave Group")
-          /// Delete Group
-          internal static let delete = L10n.tr("Localizable", "channel.profile.action.group.delete", fallback: "Delete Group")
-          /// Once you delete this group it will be permanently removed along with its entire history for all the group members.
-          internal static let deleteMessage = L10n.tr("Localizable", "channel.profile.action.group.deleteMessage", fallback: "Once you delete this group it will be permanently removed along with its entire history for all the group members.")
-          /// Edit Group
-          internal static let edit = L10n.tr("Localizable", "channel.profile.action.group.edit", fallback: "Edit Group")
-          /// Leave Group
-          internal static let leave = L10n.tr("Localizable", "channel.profile.action.group.leave", fallback: "Leave Group")
-          /// Pin Group
-          internal static let pin = L10n.tr("Localizable", "channel.profile.action.group.pin", fallback: "Pin Group")
-          /// Unpin Group
-          internal static let unpin = L10n.tr("Localizable", "channel.profile.action.group.unpin", fallback: "Unpin Group")
-        }
-        internal enum RemoveMember {
-          /// Are you sure to remove %@ from this group?
-          internal static func message(_ p1: Any) -> String {
-            return L10n.tr("Localizable", "channel.profile.action.removeMember.message", String(describing: p1), fallback: "Are you sure to remove %@ from this group?")
-          }
-          /// Remove Member
-          internal static let title = L10n.tr("Localizable", "channel.profile.action.removeMember.title", fallback: "Remove Member")
-        }
-        internal enum RemoveSubscriber {
-          /// Are you sure to remove %@ from this channel?
-          internal static func message(_ p1: Any) -> String {
-            return L10n.tr("Localizable", "channel.profile.action.removeSubscriber.message", String(describing: p1), fallback: "Are you sure to remove %@ from this channel?")
-          }
-          /// Remove Subscriber
-          internal static let title = L10n.tr("Localizable", "channel.profile.action.removeSubscriber.title", fallback: "Remove Subscriber")
-        }
-        internal enum RevokeAdmin {
-          /// Revoke
-          internal static let action = L10n.tr("Localizable", "channel.profile.action.revokeAdmin.action", fallback: "Revoke")
-          /// Are you sure you want to revoke “Admin” rights from user: %@?
-          internal static func message(_ p1: Any) -> String {
-            return L10n.tr("Localizable", "channel.profile.action.revokeAdmin.message", String(describing: p1), fallback: "Are you sure you want to revoke “Admin” rights from user: %@?")
-          }
-          /// Revoke Admin
-          internal static let title = L10n.tr("Localizable", "channel.profile.action.revokeAdmin.title", fallback: "Revoke Admin")
-        }
-      }
-      internal enum Admins {
-        /// Admins
-        internal static let title = L10n.tr("Localizable", "channel.profile.admins.title", fallback: "Admins")
-      }
-      internal enum AutoDelete {
-        /// Off
-        internal static let off = L10n.tr("Localizable", "channel.profile.autoDelete.off", fallback: "Off")
-        /// 1 day
-        internal static let oneDay = L10n.tr("Localizable", "channel.profile.autoDelete.oneDay", fallback: "1 day")
-        /// 1 hour
-        internal static let oneHour = L10n.tr("Localizable", "channel.profile.autoDelete.oneHour", fallback: "1 hour")
-        /// 1 min
-        internal static let oneMin = L10n.tr("Localizable", "channel.profile.autoDelete.oneMin", fallback: "1 min")
-        /// Auto-Delete messages:
-        internal static let title = L10n.tr("Localizable", "channel.profile.autoDelete.title", fallback: "Auto-Delete messages:")
-      }
-      internal enum Item {
-        internal enum Title {
-          /// Admins
-          internal static let admins = L10n.tr("Localizable", "channel.profile.item.title.admins", fallback: "Admins")
-          /// Auto-Delete messages
-          internal static let autoDeleteMessages = L10n.tr("Localizable", "channel.profile.item.title.autoDeleteMessages", fallback: "Auto-Delete messages")
-          /// Members
-          internal static let members = L10n.tr("Localizable", "channel.profile.item.title.members", fallback: "Members")
-          /// Message Search
-          internal static let messageSearch = L10n.tr("Localizable", "channel.profile.item.title.messageSearch", fallback: "Message Search")
-          /// Subscribers
-          internal static let subscribers = L10n.tr("Localizable", "channel.profile.item.title.subscribers", fallback: "Subscribers")
-        }
-      }
-      internal enum Members {
-        /// Members
-        internal static let title = L10n.tr("Localizable", "channel.profile.members.title", fallback: "Members")
-      }
-      internal enum Mute {
-        /// For %d days
-        internal static func days(_ p1: Int) -> String {
-          return L10n.tr("Localizable", "channel.profile.mute.days", p1, fallback: "For %d days")
-        }
-        /// Forever
-        internal static let forever = L10n.tr("Localizable", "channel.profile.mute.forever", fallback: "Forever")
-        /// For %d hours
-        internal static func hours(_ p1: Int) -> String {
-          return L10n.tr("Localizable", "channel.profile.mute.hours", p1, fallback: "For %d hours")
-        }
-        /// For 1 day
-        internal static let oneDay = L10n.tr("Localizable", "channel.profile.mute.one-day", fallback: "For 1 day")
-        /// For 1 hour
-        internal static let oneHour = L10n.tr("Localizable", "channel.profile.mute.one-hour", fallback: "For 1 hour")
-        /// Mute Chat:
-        internal static let title = L10n.tr("Localizable", "channel.profile.mute.title", fallback: "Mute Chat:")
-      }
-      internal enum Segment {
-        /// Files
-        internal static let files = L10n.tr("Localizable", "channel.profile.segment.files", fallback: "Files")
-        /// Links
-        internal static let links = L10n.tr("Localizable", "channel.profile.segment.links", fallback: "Links")
-        /// Media
-        internal static let medias = L10n.tr("Localizable", "channel.profile.segment.medias", fallback: "Media")
-        /// Members
-        internal static let members = L10n.tr("Localizable", "channel.profile.segment.members", fallback: "Members")
-        /// Voice
-        internal static let voice = L10n.tr("Localizable", "channel.profile.segment.voice", fallback: "Voice")
-        internal enum Files {
-          /// No file items yet
-          internal static let noItems = L10n.tr("Localizable", "channel.profile.segment.files.noItems", fallback: "No file items yet")
-        }
-        internal enum Links {
-          /// No link items yet
-          internal static let noItems = L10n.tr("Localizable", "channel.profile.segment.links.noItems", fallback: "No link items yet")
-        }
-        internal enum Medias {
-          /// No media items yet
-          internal static let noItems = L10n.tr("Localizable", "channel.profile.segment.medias.noItems", fallback: "No media items yet")
-        }
-        internal enum Voice {
-          /// No voice items yet
-          internal static let noItems = L10n.tr("Localizable", "channel.profile.segment.voice.noItems", fallback: "No voice items yet")
-        }
-      }
     }
     internal enum ReadOnly {
       /// Read Only.

@@ -11,7 +11,7 @@ import UIKit
 extension CreateChannelViewController {
     open class ProfileView: CreateGroupViewController.ProfileView, UITextFieldDelegate {
         open lazy var uriField: MarkableTextField = {
-            $0.markerLabel.text = SceytChatUIKit.shared.config.channelURIPrefix
+            $0.markerLabel.text = SceytChatUIKit.shared.config.channelURIConfig.prefix
             $0.textField.keyboardType = .URL
             $0.textField.autocorrectionType = .no
             $0.textField.placeholder = L10n.Channel.Create.Uri.placeholder
@@ -29,8 +29,8 @@ extension CreateChannelViewController {
             .withoutAutoresizingMask
         
         override open func setup() {
-            commentLabel.text = L10n.Channel.Create.comment(SceytChatUIKit.shared.config.channelURIMinLength,
-                                                            SceytChatUIKit.shared.config.channelURIMaxLength)
+            commentLabel.text = L10n.Channel.Create.comment(SceytChatUIKit.shared.config.channelURIConfig.minLength,
+                                                            SceytChatUIKit.shared.config.channelURIConfig.maxLength)
             super.setup()
         }
         

@@ -9,8 +9,119 @@
 import UIKit
 import SceytChat
 
+extension Double {
+    var hours: Double { self * 3600 }
+    var days: Double { self * 24.hours }
+    var weeks: Double { self * 7.days }
+    var months: Double { self * 30.days }
+}
+
 extension SceytChatUIKit {
-    public struct Config {
+    public class Config {
+        
+        public var queryLimits: QueryLimits = QueryLimits(channelListQueryLimit: 20,
+                                                          channelMemberListQueryLimit: 30,
+                                                          userListQueryLimit: 30,
+                                                          messageListQueryLimit: 50,
+                                                          attachmentListQueryLimit: 20,
+                                                          reactionListQueryLimit: 30)
+        
+        public var presenceConfig: PresenceConfig = PresenceConfig(defaultPresenceState: .online,
+                                                                   defaultPresenceStatus: "")
+        
+        public var hardDeleteMessageForAll: Bool = false
+
+        public var muteChannelNotificationOptions: [IntervalOption] = [
+            IntervalOption(title: L10n.Channel.Info.Mute.oneHour, timeInterval: 1.hours),
+            IntervalOption(title: L10n.Channel.Info.Mute.hours(8), timeInterval: 8.hours),
+            IntervalOption(title: L10n.Channel.Info.Mute.forever, timeInterval: 0)
+        ]
+        
+        public var messageAutoDeleteOptions: [IntervalOption] = [
+            IntervalOption(title: L10n.Channel.Info.AutoDelete.oneDay, timeInterval: 1.days),
+            IntervalOption(title: L10n.Channel.Info.AutoDelete.oneWeek, timeInterval: 1.weeks),
+            IntervalOption(title: L10n.Channel.Info.AutoDelete.oneMonth, timeInterval: 1.months),
+            IntervalOption(title: L10n.Channel.Info.Mute.forever, timeInterval: 0)
+        ]
+
+        // MARK: - Channel Configuration
+        public var channelTypesConfig: ChannelTypesConfig = ChannelTypesConfig(direct: "direct",
+                                                                               group: "group",
+                                                                               broadcast: "broadcast")
+        public var memberRolesConfig: MemberRolesConfig = MemberRolesConfig(owner: "owner",
+                                                                            admin: "admin",
+                                                                            participant: "participant",
+                                                                            subscriber: "subscriber")
+        public var channelURIConfig: ChannelURIConfig = ChannelURIConfig(prefix: "@",
+                                                                         minLength: 5,
+                                                                         maxLength: 50,
+                                                                         regex: "^[a-zA-Z0-9_]*$")
+        
+        public var syncChannelsAfterConnect: Bool = true
+        
+        public var channelListOrder: ChannelListOrder = .lastMessage
+        
+        public var defaultAvatarBackgroundColors: [UIColor] = [
+            SceytChatUIKit.shared.theme.colors.accent,
+            SceytChatUIKit.shared.theme.colors.accent2,
+            SceytChatUIKit.shared.theme.colors.accent3,
+            SceytChatUIKit.shared.theme.colors.accent4,
+            SceytChatUIKit.shared.theme.colors.accent5
+        ]
+        
+        
+        // MARK: - Database Configuration
+        public var database: Database {
+            return _database
+        }
+        
+        public var storageConfig: StorageConfig = StorageConfig(storageDirectory: {
+            if let path = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first {
+                return URL(fileURLWithPath: path)
+            }
+            return nil
+        }(),
+                                                                dataModelName: "SceytChatModel",
+                                                                databaseFilename: "chatdb",
+                                                                databaseFileDirectory: {
+            if let path = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first {
+                return URL(fileURLWithPath: path)
+            }
+            return nil
+        }(),
+                                                                userDefaults: UserDefaults.standard)
+        
+        private lazy var _database: Database = {
+            if let directory = storageConfig.databaseFileDirectory {
+                do {
+                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+                } catch {
+                    print("Error creating directory: \(error.localizedDescription)")
+                }
+                let dbUrl = directory.appendingPathComponent(storageConfig.databaseFilename)
+                return PersistentContainer(storeType: .sqLite(databaseFileUrl: dbUrl))
+            } else {
+                return PersistentContainer(storeType: .inMemory)
+            }
+        }()
+        
+        // MARK: - Chat Constants
+        
+        public var messageEditTimeout: TimeInterval = 1.hours
+        public var avatarResizeConfig: ResizeConfig = .low
+        public var imageAttachmentResizeConfig: ResizeConfig = .medium
+        public var videoAttachmentResizeConfig: VideoResizeConfig = .medium
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
         
         // MARK: - Log Level
         public enum LogLevel: Int {
@@ -34,92 +145,25 @@ extension SceytChatUIKit {
         )
         public var chatChannelDefaultAvatar = ChannelDefaultAvatarType()
         
-        // MARK: - Option Items
-        public typealias OptionItem = (title: String, timeInterval: TimeInterval)
-        public var muteItems = [
-            OptionItem(title: L10n.Channel.Profile.Mute.oneHour, timeInterval: 60 * 60),
-            OptionItem(title: L10n.Channel.Profile.Mute.hours(2), timeInterval: 2 * 60 * 60),
-            OptionItem(title: L10n.Channel.Profile.Mute.oneDay, timeInterval: 24 * 60 * 60),
-            OptionItem(title: L10n.Channel.Profile.Mute.forever, timeInterval: 0)
-        ]
-        public var autoDeleteItems = [
-            OptionItem(title: L10n.Channel.Profile.AutoDelete.off, timeInterval: 0),
-            OptionItem(title: L10n.Channel.Profile.AutoDelete.oneMin, timeInterval: 60),
-            OptionItem(title: L10n.Channel.Profile.AutoDelete.oneHour, timeInterval: 60 * 60),
-            OptionItem(title: L10n.Channel.Profile.AutoDelete.oneDay, timeInterval: 24 * 60 * 60)
-        ]
-        
-        // MARK: - Channel Property Configuration
-        public var channelURIPrefix = "@"
-        
-        public var privateChannel = "group"
-        public var broadcastChannel = "broadcast"
-        public var directChannel = "direct"
-        
-        public var syncChannelsAfterConnect: Bool = true
-        
-        public var shouldHardDeleteMessageForAll: Bool = false
-        
-        // MARK: - Database Configuration
-        public var storageDirectory: URL? = {
-            if let path = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first {
-                return URL(fileURLWithPath: path)
-            }
-            return nil
-        }()
-        
-        public var dbFilename = "chatdb"
-        
-        public var dbFileDirectory: URL? = {
-            if let path = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first {
-                return URL(fileURLWithPath: path)
-            }
-            return nil
-        }()
-        
-        public lazy var database: Database = {
-            if let directory = dbFileDirectory {
-                do {
-                    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-                } catch {
-                    
-                }
-                let dbUrl = directory.appendingPathComponent(dbFilename)
-                return PersistentContainer(storeType: .sqLite(databaseFileUrl: dbUrl))
-            } else {
-                return PersistentContainer(storeType: .inMemory)
-            }
-        }()
-        
+                
         // MARK: - Chat Configuration
         public var mentionSymbol = "@"
         public var mentionUserURI = "sceyt://" // "sceyt://userid"
         
         public var jpegDataCompressionQuality = CGFloat(0.8)
         
-        public var channelURIMinLength = 5
-        public var channelURIMaxLength = 50
-        public var channelURIRegex = "^[a-zA-Z0-9_]*$"
-        public var channelRoleSubscriber = "subscriber"
-        public var groupRoleParticipant = "participant"
-        public var chatRoleOwner = "owner"
-        public var chatRoleAdmin = "admin"
         
         public var defaultEmojis = ["👍", "😍", "❤️", "🤝", "😂", "😏"]
         public var maxAllowedEmojisCount: UInt = 6
         public var contextMenuContentViewScale = CGAffineTransform(scaleX: 0.95, y: 0.95)
         
         // MARK: - Chat Constants
-        public var messagePossibleEditIn: TimeInterval = 3600
-        public var maximumImageSize: CGFloat = 750
-        public var maximumImageAttachmentSize: CGFloat = 1080
         public var maximumAttachmentsAllowed = 20
         public var maximumMessagesToSelect = 30
         public var minAutoDownloadSize = 3_000_000
         public var calculateFileChecksum: Bool = true
         public var displayScale = UIScreen.main.traitCollection.displayScale
         
-        public var userDefaults = UserDefaults.standard
         public var recentReactionsLimit = 30
         public var recentRowLimit = 2
     }

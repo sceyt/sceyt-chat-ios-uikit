@@ -228,9 +228,9 @@ public extension ChatChannel {
     
     var channelType: ChannelType {
         switch type {
-        case SceytChatUIKit.shared.config.directChannel:
+        case SceytChatUIKit.shared.config.channelTypesConfig.direct:
             return .direct
-        case SceytChatUIKit.shared.config.broadcastChannel:
+        case SceytChatUIKit.shared.config.channelTypesConfig.broadcast:
             return .broadcast
         default:
             return .private

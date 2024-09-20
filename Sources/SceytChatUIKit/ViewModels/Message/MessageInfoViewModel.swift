@@ -16,8 +16,8 @@ open class MessageInfoViewModel: NSObject {
 	public let data: MessageLayoutModel
 	private let queries: [MessageMarkerListQuery]
 	private let localizedMarkerNames: [DefaultMarker: String]
-    public var queryLimit: UInt
-	
+    private static let queryLimit = UInt(100)
+    
     public var markers: [(markerName: String, markerArray: [ChatMessage.Marker])] {
 		var markersArray: [(markerName: String, markerArray: [ChatMessage.Marker])] = []
 		
@@ -86,21 +86,19 @@ open class MessageInfoViewModel: NSObject {
 	public required init(
 		messageMarkerProvider: ChannelMessageMarkerProvider,
 		data: MessageLayoutModel,
-        queryLimit: UInt = 100,
 		markerNames: [DefaultMarker]? = nil,
 		localizedMarkerNames: [DefaultMarker: String]? = nil
     )
     {
 		self.messageMarkerProvider = messageMarkerProvider
 		self.data = data
-        self.queryLimit = queryLimit
 		let markerNames = markerNames ?? [DefaultMarker.displayed, DefaultMarker.received, DefaultMarker.played]
 		self.localizedMarkerNames = localizedMarkerNames ?? [DefaultMarker.displayed: L10n.Message.Info.readBy,
 															 DefaultMarker.received: L10n.Message.Info.deliveredTo,
 															 DefaultMarker.played: L10n.Message.Info.playedBy]
 		self.queries = markerNames.map {
             .Builder(messageId: data.message.id, markerName: $0.rawValue)
-			.limit(queryLimit)
+            .limit(MessageInfoViewModel.queryLimit)
 			.build()
 		}
 		super.init()

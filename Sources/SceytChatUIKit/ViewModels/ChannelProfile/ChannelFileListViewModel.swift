@@ -13,7 +13,7 @@ open class ChannelFileListViewModel: NSObject {
 
     public let channel: ChatChannel
 
-    public static var queryLimit = UInt(10)
+    public static var queryLimit = SceytChatUIKit.shared.config.queryLimits.messageListQueryLimit
     public static var queryType = "file"
 
     public typealias Item = (attachment: Attachment, createdAt: Date)

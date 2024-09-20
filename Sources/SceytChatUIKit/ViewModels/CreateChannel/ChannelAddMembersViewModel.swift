@@ -20,7 +20,7 @@ open class ChannelAddMembersViewModel: SelectChannelMembersViewModel {
     
     required public init(channel: ChatChannel,
                          title: String? = nil,
-                         roleName: String = SceytChatUIKit.shared.config.channelRoleSubscriber,
+                         roleName: String = SceytChatUIKit.shared.config.memberRolesConfig.subscriber,
                          onlyDismissAfterDone: Bool = false) {
         self.channel = channel
         self.title = title

@@ -35,7 +35,7 @@ extension ChannelInfoViewController {
         open override func setup() {
             super.setup()
             
-            noItemsMessage = L10n.Channel.Profile.Segment.Links.noItems
+            noItemsMessage = L10n.Channel.Info.Segment.Links.noItems
             register(Components.channelInfoLinkCell.self)
             register(Components.channelInfoAttachmentHeaderView.self, kind: .header)
             delegate = self

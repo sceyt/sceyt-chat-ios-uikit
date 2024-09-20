@@ -113,11 +113,11 @@ public struct MessageSearchCoordinator: SearchCoordinator {
 
     public private(set) var searchQuery: MessageListQuery?
     public let channelId: ChannelId
-    public let searchQueryLimit: Int
+    public let searchQueryLimit: UInt
     init(
         channelId: ChannelId,
         searchFields: [MessageListQuery.SearchField],
-        limit: Int = 50
+        limit: UInt = SceytChatUIKit.shared.config.queryLimits.messageListQueryLimit
     ) {
         self.channelId = channelId
         self.searchQueryLimit = limit
@@ -125,7 +125,7 @@ public struct MessageSearchCoordinator: SearchCoordinator {
             searchQuery =
             MessageListQuery
                 .Builder(channelId: channelId)
-                .limit(UInt(limit))
+                .limit(limit)
                 .searchFields(searchFields)
                 .build()
         }

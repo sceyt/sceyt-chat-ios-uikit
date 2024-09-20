@@ -29,9 +29,9 @@ open class ChannelMemberListViewController: ViewController,
         super.setup()
         
         if memberListViewModel.shouldShowOnlyAdmins {
-            title = L10n.Channel.Profile.Admins.title
+            title = L10n.Channel.Info.Admins.title
         } else {
-            title = L10n.Channel.Profile.Members.title
+            title = L10n.Channel.Info.Members.title
         }
         
         navigationItem.searchController = searchController
@@ -170,12 +170,12 @@ open class ChannelMemberListViewController: ViewController,
         guard let indexPath = self.tableView.indexPathForRow(at: location),
               longPressGesture.state == .began, let member = memberListViewModel.member(at: indexPath),
               member.id != me else { return }
-        if member.roleName == SceytChatUIKit.shared.config.chatRoleOwner {
+        if member.roleName == SceytChatUIKit.shared.config.memberRolesConfig.owner {
             return
         }
         
         if member.roleName == memberListViewModel.channel.userRole,
-           member.roleName == SceytChatUIKit.shared.config.chatRoleAdmin {
+           member.roleName == SceytChatUIKit.shared.config.memberRolesConfig.admin {
             return
         }
         let displayName = SceytChatUIKit.shared.formatters.userNameFormatter.format(member)
@@ -193,17 +193,17 @@ open class ChannelMemberListViewController: ViewController,
         ]
         let isBroadcast = memberListViewModel.channel.channelType == .broadcast
         let remove = SheetAction(
-            title: L10n.Channel.Profile.Action.remove,
+            title: L10n.Channel.Info.Action.remove,
             icon: .chatDelete,
             style: .destructive,
             handler: { [weak self] in
                 guard let self else { return }
                 let alert = self.showAlert(
-                    title: isBroadcast ? L10n.Channel.Profile.Action.RemoveSubscriber.title : L10n.Channel.Profile.Action.RemoveMember.title,
-                    message: isBroadcast ? L10n.Channel.Profile.Action.RemoveSubscriber.message(displayName) : L10n.Channel.Profile.Action.RemoveMember.message(displayName),
+                    title: isBroadcast ? L10n.Channel.Info.Action.RemoveSubscriber.title : L10n.Channel.Info.Action.RemoveMember.title,
+                    message: isBroadcast ? L10n.Channel.Info.Action.RemoveSubscriber.message(displayName) : L10n.Channel.Info.Action.RemoveMember.message(displayName),
                     actions: [
                         .init(title: L10n.Alert.Button.cancel, style: .cancel),
-                        .init(title: L10n.Channel.Profile.Action.remove, style: .destructive) { [weak self] in
+                        .init(title: L10n.Channel.Info.Action.remove, style: .destructive) { [weak self] in
                             self?.memberListViewModel
                                 .kick(memberAt: indexPath) { [weak self] error in
                                     if let error {
@@ -213,31 +213,31 @@ open class ChannelMemberListViewController: ViewController,
                         }
                     ], preferredActionIndex: 1)
                 let attributedMessage = NSMutableAttributedString(
-                    string: isBroadcast ? L10n.Channel.Profile.Action.RemoveSubscriber.message(displayName) : L10n.Channel.Profile.Action.RemoveMember.message(displayName),
+                    string: isBroadcast ? L10n.Channel.Info.Action.RemoveSubscriber.message(displayName) : L10n.Channel.Info.Action.RemoveMember.message(displayName),
                     attributes: normalAttributes)
                 attributedMessage.setAttributes(
                     hightlightedAttributes,
                     range: (attributedMessage.string as NSString).range(of: displayName))
                 alert.attributedMessage = attributedMessage
             })
-        let isOwner = memberListViewModel.channel.userRole == SceytChatUIKit.shared.config.chatRoleOwner
-        let isAdmin = memberListViewModel.channel.userRole == SceytChatUIKit.shared.config.chatRoleAdmin
-        let memberIsAdmin = memberListViewModel.member(at: indexPath)?.roleName == SceytChatUIKit.shared.config.chatRoleAdmin
+        let isOwner = memberListViewModel.channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.owner
+        let isAdmin = memberListViewModel.channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.admin
+        let memberIsAdmin = memberListViewModel.member(at: indexPath)?.roleName == SceytChatUIKit.shared.config.memberRolesConfig.admin
         var actions = [SheetAction]()
         if isOwner {
             if memberIsAdmin {
                 actions.append(.init(
-                    title: L10n.Channel.Profile.Action.RevokeAdmin.title,
+                    title: L10n.Channel.Info.Action.RevokeAdmin.title,
                     icon: .chatRevoke) { [weak self] in
                     guard let self else { return }
                         let alert = self.showAlert(
-                        title: L10n.Channel.Profile.Action.RevokeAdmin.title,
-                        message: isBroadcast ? L10n.Channel.Profile.Action.RevokeAdmin.message(displayName) : L10n.Channel.Profile.Action.RevokeAdmin.message(displayName),
+                        title: L10n.Channel.Info.Action.RevokeAdmin.title,
+                        message: isBroadcast ? L10n.Channel.Info.Action.RevokeAdmin.message(displayName) : L10n.Channel.Info.Action.RevokeAdmin.message(displayName),
                         actions: [
                             .init(title: L10n.Alert.Button.cancel, style: .cancel),
-                            .init(title: L10n.Channel.Profile.Action.RevokeAdmin.action, style: .destructive) { [weak self] in
+                            .init(title: L10n.Channel.Info.Action.RevokeAdmin.action, style: .destructive) { [weak self] in
                                 self?.memberListViewModel
-                                    .setRole(name: isBroadcast ? SceytChatUIKit.shared.config.channelRoleSubscriber : SceytChatUIKit.shared.config.groupRoleParticipant,
+                                    .setRole(name: isBroadcast ? SceytChatUIKit.shared.config.memberRolesConfig.subscriber : SceytChatUIKit.shared.config.memberRolesConfig.participant,
                                              memberAt: indexPath) { [weak self] error in
                                     if let error {
                                         self?.router.showAlert(error: error)
@@ -246,7 +246,7 @@ open class ChannelMemberListViewController: ViewController,
                             }
                         ], preferredActionIndex: 1)
                     let attributedMessage = NSMutableAttributedString(
-                        string: isBroadcast ? L10n.Channel.Profile.Action.RemoveSubscriber.message(displayName) : L10n.Channel.Profile.Action.RemoveMember.message(displayName),
+                        string: isBroadcast ? L10n.Channel.Info.Action.RemoveSubscriber.message(displayName) : L10n.Channel.Info.Action.RemoveMember.message(displayName),
                         attributes: normalAttributes)
                     attributedMessage.setAttributes(
                         hightlightedAttributes,

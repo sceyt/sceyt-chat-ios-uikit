@@ -352,7 +352,7 @@ open class SceytChatStoringKey: StoringKey {
 
     public required init() {}
 
-    open var storageFolderPath: String = SceytChatUIKit.shared.config.storageDirectory?.path ?? NSTemporaryDirectory()
+    open var storageFolderPath: String = SceytChatUIKit.shared.config.storageConfig.storageDirectory?.path ?? NSTemporaryDirectory()
 
     open func storingFilename(url: URL) -> String {
         url.encoded

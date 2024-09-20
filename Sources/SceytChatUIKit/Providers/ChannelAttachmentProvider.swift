@@ -11,7 +11,7 @@ import SceytChat
 
 open class ChannelAttachmentProvider: Provider {
     
-    public var queryLimit = UInt(10)
+    public var queryLimit = SceytChatUIKit.shared.config.queryLimits.attachmentListQueryLimit
     
     public let channelId: ChannelId
     public let attachmentTypes: [String]

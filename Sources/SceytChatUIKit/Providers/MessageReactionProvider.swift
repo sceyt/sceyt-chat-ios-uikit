@@ -11,7 +11,7 @@ import SceytChat
 
 open class MessageReactionProvider: Provider {
     
-    public var queryLimit = UInt(30)
+    public var queryLimit = SceytChatUIKit.shared.config.queryLimits.reactionListQueryLimit
     public let messageId: MessageId
     public var cleanLocalReactionAfterFirstLoad: Bool = false
     private var isCleaned = false

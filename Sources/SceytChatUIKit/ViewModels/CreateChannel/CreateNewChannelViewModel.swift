@@ -23,7 +23,7 @@ open class CreateNewChannelViewModel: NSObject {
     private func userListQuery(_ query: String? = nil) -> UserListQuery {
         return UserListQuery
             .Builder()
-            .limit(100)
+            .limit(SceytChatUIKit.shared.config.queryLimits.userListQueryLimit)
             .query(query)
             .build()
     }
@@ -73,9 +73,9 @@ open class CreateNewChannelViewModel: NSObject {
     open func createDirectChannel(peer: ChatUser) {
         
         Components.channelCreator.init()
-            .createLocalChannel(type: SceytChatUIKit.shared.config.directChannel,
-                                members: [ChatChannelMember(user: peer, roleName: SceytChatUIKit.shared.config.chatRoleOwner),
-                                          ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.chatRoleOwner)])
+            .createLocalChannel(type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
+                                members: [ChatChannelMember(user: peer, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner),
+                                          ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner)])
         { [weak self] channel, error in
             DispatchQueue.main.async {
                 if let error = error {

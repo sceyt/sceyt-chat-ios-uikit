@@ -43,7 +43,7 @@ public extension Appearance {
         }()
         public static var link: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.roundedRectangle40.image,
-                                                     renderingMode: .template(.surface2)),
+                                                     renderingMode: .template(.surface1)),
                                          .init(image: Assets.link2.image,
                                                renderingMode: .template(.accent)))!
         }()

@@ -36,7 +36,7 @@ extension ChannelInfoViewController {
             super.setupAppearance()
             
             backgroundColor = appearance.cellBackgroundColor
-            label.text = L10n.Channel.Profile.about
+            label.text = L10n.Channel.Info.about
             label.font = appearance.descriptionLabelFont
             label.textColor = appearance.descriptionLabelColor
             textView.backgroundColor = .clear
