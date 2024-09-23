@@ -5,7 +5,7 @@ public enum LoadDirection {
     case next, prev, near
 }
 
-open class LoadRangeProvider: Provider {
+open class LoadRangeProvider: DataProvider {
     
     public required override init() {
         super.init()

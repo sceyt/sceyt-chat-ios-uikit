@@ -9,7 +9,7 @@ import UIKit
 import ImageIO
 import SceytChat
 
-open class LinkMetadataProvider: Provider {
+open class LinkMetadataProvider: DataProvider {
     public static var `default` = LinkMetadataProvider()
 
     public var cache = defaultCache

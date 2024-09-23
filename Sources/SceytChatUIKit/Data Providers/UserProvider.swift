@@ -9,7 +9,7 @@
 import Foundation
 import SceytChat
 
-open class UserProvider: Provider {
+open class UserProvider: DataProvider {
     
     required public override init() {
         super.init()

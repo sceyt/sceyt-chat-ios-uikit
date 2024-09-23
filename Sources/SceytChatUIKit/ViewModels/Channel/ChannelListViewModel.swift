@@ -340,7 +340,7 @@ extension ChannelListViewModel {
         channelObserver.stopObserver()
         layoutModels.removeAll(keepingCapacity: true)
         Components.storage.deleteAll()
-        Provider.database.deleteAll { [weak self] in
+        DataProvider.database.deleteAll { [weak self] in
             guard let self else { return }
             channelObserver.startObserver()
             completion?()

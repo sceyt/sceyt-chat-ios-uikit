@@ -9,7 +9,7 @@
 import Foundation
 import SceytChat
 
-open class Provider: NSObject {
+open class DataProvider: NSObject {
     
     public static var chatClient = SceytChatUIKit.shared.chatClient
     
@@ -24,7 +24,7 @@ open class Provider: NSObject {
     }
 }
 
-public extension Provider {
+public extension DataProvider {
     
     func refreshAllObjects(resetStalenessInterval: Bool = true, completion: (() -> Void)? = nil) {
         database.refreshAllObjects(resetStalenessInterval: resetStalenessInterval, completion: completion)

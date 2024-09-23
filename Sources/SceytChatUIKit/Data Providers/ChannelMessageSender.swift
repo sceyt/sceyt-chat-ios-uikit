@@ -24,7 +24,7 @@ public protocol ChannelMessageSenderDelegate: AnyObject {
     func channelMessageSender(_ sender: ChannelMessageSender, didDelete messageId: MessageId?, error: Error?) -> MessageId?
 }
 
-open class ChannelMessageSender: Provider {
+open class ChannelMessageSender: DataProvider {
     
     public let channelId: ChannelId
     public let channelOperator: ChannelOperator

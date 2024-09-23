@@ -9,7 +9,7 @@
 import Foundation
 import SceytChat
 
-open class ChannelMessageMarkerProvider: Provider {
+open class ChannelMessageMarkerProvider: DataProvider {
 
     public let channelId: ChannelId
     public let channelOperator: ChannelOperator

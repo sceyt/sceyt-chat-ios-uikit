@@ -49,7 +49,7 @@ open class PreviewerViewModel: PreviewDataSourceItemObservable {
             return
         }
         let attachment = previewItem.attachment
-        let message = try? Provider.database.read {
+        let message = try? DataProvider.database.read {
             MessageDTO.fetch(id: attachment.messageId, context: $0)?
                 .convert()
         }.get()

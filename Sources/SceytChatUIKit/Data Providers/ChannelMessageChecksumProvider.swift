@@ -8,7 +8,7 @@
 
 import Foundation
 
-open class ChannelMessageChecksumProvider: Provider {
+open class ChannelMessageChecksumProvider: DataProvider {
     
     override public required init() {
         super.init()

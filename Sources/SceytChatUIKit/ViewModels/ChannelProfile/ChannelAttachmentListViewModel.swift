@@ -229,7 +229,7 @@ open class ChannelAttachmentListViewModel: NSObject {
             if let message {
                 fileProvider.stopTransfer(message: message, attachment: attachment) {
                     if $0 {
-                        Provider.database.write {
+                        DataProvider.database.write {
                             let attachmentDTO = AttachmentDTO.fetch(id: attachment.id, context: $0)
                             attachmentDTO?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue
                         } completion: { error in

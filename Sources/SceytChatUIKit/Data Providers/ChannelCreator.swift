@@ -10,7 +10,7 @@ import Foundation
 import SceytChat
 import CoreData
 
-open class ChannelCreator: Provider {
+open class ChannelCreator: DataProvider {
         
     public required override init() {
         super.init()

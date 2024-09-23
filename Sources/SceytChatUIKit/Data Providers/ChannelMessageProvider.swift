@@ -9,7 +9,7 @@
 import Foundation
 import SceytChat
 
-open class ChannelMessageProvider: Provider {
+open class ChannelMessageProvider: DataProvider {
     
     public var queryLimit = SceytChatUIKit.shared.config.queryLimits.messageListQueryLimit
     

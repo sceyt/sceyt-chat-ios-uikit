@@ -12,7 +12,7 @@ import Combine
 
 let fileProvider = Components.attachmentTransfer.default
 
-open class AttachmentTransfer: Provider {
+open class AttachmentTransfer: DataProvider {
     
     public typealias ProgressBlock = (AttachmentProgress) -> Void
     public typealias CompletionBlock = (AttachmentCompletion) -> Void

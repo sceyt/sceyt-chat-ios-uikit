@@ -102,7 +102,7 @@ extension ChatMessage {
             self.status = status
             self.transferProgress = transferProgress
             $user = {
-                try? Provider.database.read {
+                try? DataProvider.database.read {
                      UserDTO.fetch(id: userId, context: $0)?.convert()
                 }.get()
             }

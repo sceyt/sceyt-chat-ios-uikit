@@ -10,7 +10,7 @@ import Foundation
 import SceytChat
 import Combine
 
-public final class PresenceProvider: Provider, NSCopying {
+public final class PresenceProvider: DataProvider, NSCopying {
     
     public typealias Handler = (UserPresence) -> Void
     

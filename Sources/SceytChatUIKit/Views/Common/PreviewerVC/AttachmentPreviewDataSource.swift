@@ -178,7 +178,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
               fileProvider.filePath(attachment: attachment) == nil
         else { return }
         downloadQueue.async {
-            guard let chatMessage = try? Provider.database.read ({
+            guard let chatMessage = try? DataProvider.database.read ({
                 MessageDTO.fetch(id: attachment.messageId, context: $0)?
                     .convert()
             }).get()

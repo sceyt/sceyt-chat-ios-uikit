@@ -9,7 +9,7 @@
 import Foundation
 import SceytChat
 
-open class MessageReactionProvider: Provider {
+open class MessageReactionProvider: DataProvider {
     
     public var queryLimit = SceytChatUIKit.shared.config.queryLimits.reactionListQueryLimit
     public let messageId: MessageId

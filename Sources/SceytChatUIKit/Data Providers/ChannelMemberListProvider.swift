@@ -9,7 +9,7 @@
 import Foundation
 import SceytChat
 
-open class ChannelMemberListProvider: Provider {
+open class ChannelMemberListProvider: DataProvider {
 
     public var queryLimit = SceytChatUIKit.shared.config.queryLimits.channelMemberListQueryLimit
     public var queryOrder = MemberListOrder.username

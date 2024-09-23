@@ -9,7 +9,7 @@
 import Foundation
 import SceytChat
 
-open class ChannelListProvider: Provider {
+open class ChannelListProvider: DataProvider {
 
     public var queryLimit = SceytChatUIKit.shared.config.queryLimits.channelListQueryLimit
     public var queryListOrder = SceytChatUIKit.shared.config.channelListOrder
