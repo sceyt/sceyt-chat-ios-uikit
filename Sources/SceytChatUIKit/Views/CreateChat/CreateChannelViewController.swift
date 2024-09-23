@@ -16,11 +16,11 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
     
     open var channelAvatarImage: UIImage?
     
-    open lazy var profileView = Components.createChannelProfileView.init()
+    open lazy var detailsView = Components.createChannelDetailsView.init()
         .withoutAutoresizingMask
     
     private var textViewHeightConstraint: NSLayoutConstraint?
-    private var profileViewTopConstraint: NSLayoutConstraint!
+    private var detailsViewTopConstraint: NSLayoutConstraint!
     
     override open func setup() {
         super.setup()
@@ -31,20 +31,20 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
                                                             target: self,
                                                             action: #selector(nextAction(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
-        profileView.avatarButton.setImage(.editAvatar, for: .normal)
+        detailsView.avatarButton.setImage(.editAvatar, for: .normal)
         
-        profileView.subjectField.publisher(for: .editingDidEndOnExit).sink { [unowned self] _ in
-            profileView.descriptionField.becomeFirstResponder()
+        detailsView.subjectField.publisher(for: .editingDidEndOnExit).sink { [unowned self] _ in
+            detailsView.descriptionField.becomeFirstResponder()
         }.store(in: &subscriptions)
-        profileView.subjectField.publisher(for: .editingChanged).sink { [unowned self] _ in
+        detailsView.subjectField.publisher(for: .editingChanged).sink { [unowned self] _ in
             enableNextButtonIfNeeded()
         }.store(in: &subscriptions)
-        profileView.uriField.textField.publisher(for: .editingChanged).sink { [unowned self] _ in
-            viewModel.check(uri: profileView.uriField.text ?? "")
+        detailsView.uriField.textField.publisher(for: .editingChanged).sink { [unowned self] _ in
+            viewModel.check(uri: detailsView.uriField.text ?? "")
         }.store(in: &subscriptions)
-        profileView.descriptionField.delegate = self
+        detailsView.descriptionField.delegate = self
         
-        profileView.avatarButton.publisher(for: .touchUpInside).sink { [unowned self] _ in
+        detailsView.avatarButton.publisher(for: .touchUpInside).sink { [unowned self] _ in
             showCaptureAlert()
         }.store(in: &subscriptions)
         
@@ -65,13 +65,13 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
     
     override open func setupLayout() {
         super.setupLayout()
-        view.addSubview(profileView)
-        profileViewTopConstraint =
-        profileView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading(), .top(), .trailing()])[1]
+        view.addSubview(detailsView)
+        detailsViewTopConstraint =
+        detailsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading(), .top(), .trailing()])[1]
     }
     
     open func onEvent( _ event: CreatePublicChannelViewModel.Event) {
-        profileView.hideError()
+        detailsView.hideError()
         switch event {
         case .createdChannel(let channel):
             loader.isLoading = false
@@ -80,53 +80,53 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
             loader.isLoading = false
             router.showAlert(error: error)
         case let .invalidURI(error):
-            profileView.showError(error.localizedDescription)
+            detailsView.showError(error.localizedDescription)
             enableNextButtonIfNeeded()
         case .validURI:
-            profileView.showSuccess(L10n.Channel.Create.Uri.Error.success)
+            detailsView.showSuccess(L10n.Channel.Create.Uri.Error.success)
             enableNextButtonIfNeeded()
         }
     }
     
     @objc
     func nextAction(_ sender: UIBarButtonItem) {
-        guard let subject = profileView.subjectField.text,
-              let uri = profileView.uriField.text
+        guard let subject = detailsView.subjectField.text,
+              let uri = detailsView.uriField.text
         else { return}
         loader.isLoading = true
         viewModel
             .create(
                 uri: uri,
                 subject: subject,
-                metadata: profileView.descriptionField.text,
+                metadata: detailsView.descriptionField.text,
                 image: channelAvatarImage
             )
     }
     
     func enableNextButtonIfNeeded() {
-        guard viewModel.lastValidURI?.1 == profileView.uriField.text
+        guard viewModel.lastValidURI?.1 == detailsView.uriField.text
         else { return }
         
         func lastCheck() -> Bool {
             guard let last = viewModel.lastValidURI
             else { return false }
-            return last.0 == true && last.1 == profileView.uriField.text
+            return last.0 == true && last.1 == detailsView.uriField.text
         }
         
         navigationItem.rightBarButtonItem?.isEnabled =
-        !(profileView.subjectField.text ?? "").isEmpty &&
-        !(profileView.uriField.text ?? "").isEmpty &&
+        !(detailsView.subjectField.text ?? "").isEmpty &&
+        !(detailsView.uriField.text ?? "").isEmpty &&
         lastCheck()
     }
     
     private func showCaptureAlert() {
-        _ = profileView.resignFirstResponder()
+        _ = detailsView.resignFirstResponder()
         var types = [CreatePublicChannelRouter.CaptureType.camera, .photoLibrary]
         if channelAvatarImage != nil {
             types.append(.delete)
         }
         router.showCaptureAlert(types: types,
-                                sourceView: profileView.avatarButton) { [unowned self] capture in
+                                sourceView: detailsView.avatarButton) { [unowned self] capture in
             switch capture {
             case .camera:
                 router.showCamera(mediaTypes: [.image]) { [unowned self] picked in
@@ -137,7 +137,7 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
                     guard let image = image else { return }
                     router.editImage(image) { [unowned self] edited in
                         channelAvatarImage = edited
-                        profileView.avatarButton.setImage(channelAvatarImage, for: .normal)
+                        detailsView.avatarButton.setImage(channelAvatarImage, for: .normal)
                     }
                 }
             case .photoLibrary:
@@ -149,12 +149,12 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
                     guard let image = image else { return }
                     router.editImage(image) { [unowned self] edited in
                         channelAvatarImage = edited
-                        profileView.avatarButton.setImage(channelAvatarImage, for: .normal)
+                        detailsView.avatarButton.setImage(channelAvatarImage, for: .normal)
                     }
                 }
             case .delete:
                 channelAvatarImage = nil
-                profileView.avatarButton.setImage(.editAvatar, for: .normal)
+                detailsView.avatarButton.setImage(.editAvatar, for: .normal)
             default:
                 break
             }
@@ -163,7 +163,7 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
     
     override open func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
-        _ = profileView.resignFirstResponder()
+        _ = detailsView.resignFirstResponder()
     }
     
     func adjustTableViewToKeyboard(notification: Notification) {
@@ -172,12 +172,12 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
         let curve = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt ?? 0
         var changed = false
         if notification.name == UIResponder.keyboardWillHideNotification {
-            profileViewTopConstraint.constant = 0
+            detailsViewTopConstraint.constant = 0
             changed = true
         } else if notification.name == UIResponder.keyboardWillShowNotification {
-            let maxY = profileView.frameRelativeToWindow().maxY
+            let maxY = detailsView.frameRelativeToWindow().maxY
             if maxY > keyboardFrame.minY {
-                profileViewTopConstraint.constant = -(maxY - keyboardFrame.minY)
+                detailsViewTopConstraint.constant = -(maxY - keyboardFrame.minY)
             }
             changed = true
         }

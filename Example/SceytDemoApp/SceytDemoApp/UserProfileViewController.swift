@@ -212,7 +212,7 @@ class UserProfileViewController: UIViewController {
     ) {
         showBottomSheet(
             title: "Mute",
-            actions: SceytChatUIKit.shared.config.muteItems.map { item in
+            actions: SceytChatUIKit.shared.config.muteChannelNotificationOptions.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
             } + [.init(title: "Cancel", style: .cancel) { canceled() }])
     }

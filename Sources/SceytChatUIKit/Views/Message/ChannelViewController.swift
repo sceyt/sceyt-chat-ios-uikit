@@ -36,14 +36,14 @@ open class ChannelViewController: ViewController,
     open lazy var coverView = BarCoverView()
         .withoutAutoresizingMask
     
-    open lazy var customInputViewController = Components.inputViewController
+    open lazy var customInputViewController = Components.messageInputViewController
         .init()
     
-    open var inputTextView: InputViewController.InputTextView {
+    open var inputTextView: MessageInputViewController.InputTextView {
         customInputViewController.inputTextView
     }
     
-    open var mediaView: InputViewController.MediaView {
+    open var mediaView: MessageInputViewController.MediaView {
         customInputViewController.mediaView
     }
     
@@ -55,18 +55,18 @@ open class ChannelViewController: ViewController,
         .init()
         .withoutAutoresizingMask
     
-    open var bottomView = Components.inputCoverView
+    open var bottomView = Components.messageInputCoverView
         .init()
         .withoutAutoresizingMask
     
-    open var searchControlsView = Components.inputMessageSearchControlsView
+    open var searchControlsView = Components.messageInputMessageSearchControlsView
         .init()
         .withoutAutoresizingMask
     
     open lazy var joinGlobalChannelButton = UIButton()
         .withoutAutoresizingMask
     
-    open lazy var selectingView = Components.inputSelectedMessagesActionsView
+    open lazy var selectingView = Components.messageInputSelectedMessagesActionsView
         .init()
         .withoutAutoresizingMask
     
@@ -233,7 +233,7 @@ open class ChannelViewController: ViewController,
         contextMenu.snapshotDelegate = self
         
         customInputViewController.mentionUserListViewController = { [unowned self] in
-            let viewController = Components.inputMentionUsersListViewController.init()
+            let viewController = Components.messageInputMentionUsersListViewController.init()
             viewController.viewModel = Components.mentioningUserListViewModel
                 .init(channelId: channelViewModel.channel.id)
             return viewController
@@ -1079,7 +1079,7 @@ open class ChannelViewController: ViewController,
         else { return false }
         guard !(touch.view?.tag == 999)
         else { return false }
-        guard !(touch.view is MessageCell.LinkView)
+        guard !(touch.view is MessageCell.LinkPreviewView)
         else { return false }
         guard !(touch.view is MessageCell.ReplyView)
         else { return false }

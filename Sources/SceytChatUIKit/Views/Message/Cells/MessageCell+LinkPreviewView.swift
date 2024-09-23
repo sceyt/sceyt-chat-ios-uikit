@@ -1,5 +1,5 @@
 //
-//  MessageCell+LinkView.swift
+//  MessageCell+LinkPreviewView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -11,7 +11,7 @@ import LinkPresentation
 
 extension MessageCell {
 
-    open class LinkView: View, Measurable {
+    open class LinkPreviewView: View, Measurable {
         
         public lazy var appearance = MessageCell.appearance {
             didSet {

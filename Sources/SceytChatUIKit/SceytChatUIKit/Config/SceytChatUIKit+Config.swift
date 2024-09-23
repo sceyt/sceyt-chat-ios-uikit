@@ -72,6 +72,7 @@ extension SceytChatUIKit {
             return nil
         }(),
                                                                 dataModelName: "SceytChatModel",
+                                                                enableDatabase: true,
                                                                 databaseFilename: "chatdb",
                                                                 databaseFileDirectory: {
             if let path = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first {
@@ -106,23 +107,6 @@ extension SceytChatUIKit {
         
         
         
-        
-        
-        
-        
-        // MARK: - Log Level
-        public enum LogLevel: Int {
-            case none
-            case fatal
-            case error
-            case warning
-            case info
-            case verbose
-        }
-        
-        public func setLogLevel(_ level: LogLevel) {
-            ChatClient.setLogLevel(SceytChat.LogLevel(rawValue: level.rawValue) ?? .none)
-        }
         
         // MARK: - Chat Avatar
         public var chatUserDefaultAvatar = UserDefaultAvatarType(

@@ -27,7 +27,7 @@ open class ChannelSearchResultsViewController: ViewController,
         .init()
         .withoutAutoresizingMask
     
-    public var noDataViewBottom: NSLayoutConstraint!
+    public var emptyStateViewBottom: NSLayoutConstraint!
     
     override open func setup() {
         super.setup()
@@ -59,7 +59,7 @@ open class ChannelSearchResultsViewController: ViewController,
         view.addSubview(tableView)
         view.addSubview(emptyStateView)
         tableView.pin(to: view)
-        noDataViewBottom = emptyStateView.pin(to: view.safeAreaLayoutGuide, anchors: [.bottom, .top, .leading, .trailing])[0]
+        emptyStateViewBottom = emptyStateView.pin(to: view.safeAreaLayoutGuide, anchors: [.bottom, .top, .leading, .trailing])[0]
     }
     
     open override func setupAppearance() {
@@ -94,9 +94,9 @@ open class ChannelSearchResultsViewController: ViewController,
 
         tableView.adjustInsetsToKeyboard(notification: notification, container: view)
         if notification.name == UIResponder.keyboardWillHideNotification {
-            noDataViewBottom.constant = 0
+            emptyStateViewBottom.constant = 0
         } else if notification.name == UIResponder.keyboardWillShowNotification {
-            noDataViewBottom.constant = -keyboardFrame.height/2
+            emptyStateViewBottom.constant = -keyboardFrame.height/2
         }
         UIView.animate(withDuration: duration,
                        delay: 0,

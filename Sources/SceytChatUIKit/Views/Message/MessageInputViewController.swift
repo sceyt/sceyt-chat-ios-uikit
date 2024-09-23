@@ -1,5 +1,5 @@
 //
-//  InputViewController.swift
+//  MessageInputViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,7 +10,7 @@ import Combine
 import UIKit
 import CoreText
 
-open class InputViewController: ViewController, UITextViewDelegate {
+open class MessageInputViewController: ViewController, UITextViewDelegate {
     open lazy var addMediaButton = UIButton()
         .withoutAutoresizingMask
     
@@ -27,15 +27,15 @@ open class InputViewController: ViewController, UITextViewDelegate {
     open lazy var separatorViewCenter = UIView()
         .withoutAutoresizingMask
     
-    open lazy var mediaView = Components.inputMediaView
+    open lazy var mediaView = Components.messageInputMediaView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var inputTextView = Components.inputTextView
+    open lazy var inputTextView = Components.messageInputTextView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var actionView = Components.inputMessageActionsView
+    open lazy var actionView = Components.messageInputMessageActionsView
         .init()
         .withoutAutoresizingMask
     
@@ -71,7 +71,7 @@ open class InputViewController: ViewController, UITextViewDelegate {
         }
     }
     
-    open lazy var recordedView = Components.inputVoiceRecordPlaybackView.init()
+    open lazy var recordedView = Components.messageInputVoiceRecordPlaybackView.init()
         .withoutAutoresizingMask
     
     open var shouldHideRecordButton = false {
@@ -87,8 +87,8 @@ open class InputViewController: ViewController, UITextViewDelegate {
     }
     
     public var canRunMentionUserLogic = true
-    open var mentionUserListViewController: (() -> InputViewController.MentionUsersListViewController)?
-    open weak var presentedMentionUserListViewController: InputViewController.MentionUsersListViewController?
+    open var mentionUserListViewController: (() -> MessageInputViewController.MentionUsersListViewController)?
+    open weak var presentedMentionUserListViewController: MessageInputViewController.MentionUsersListViewController?
     public var isPresentedMentionUserListViewController: Bool {
         presentedMentionUserListViewController != nil
     }
@@ -178,7 +178,7 @@ open class InputViewController: ViewController, UITextViewDelegate {
         addMediaButton.addTarget(self, action: #selector(addMediaButtonAction(_:)), for: .touchUpInside)
         sendButton.addTarget(self, action: #selector(sendButtonAction(_:)), for: .touchUpInside)
         
-        let longPress = UILongPressGestureRecognizer(target: recorderView, action: #selector(Components.inputVoiceRecorderView.onLongPress))
+        let longPress = UILongPressGestureRecognizer(target: recorderView, action: #selector(Components.messageInputVoiceRecorderView.onLongPress))
         longPress.minimumPressDuration = 0.05
         recordButton.isUserInteractionEnabled = true
         recordButton.addGestureRecognizer(longPress)
@@ -1136,7 +1136,7 @@ open class InputViewController: ViewController, UITextViewDelegate {
     }
 }
 
-public extension InputViewController {
+public extension MessageInputViewController {
     enum Style {
         case small
         case large
@@ -1206,7 +1206,7 @@ public extension InputViewController {
     
 }
 
-public extension InputViewController {
+public extension MessageInputViewController {
     enum Layouts {
         public static var actionViewHeight: CGFloat = 56
         public static var recorderShadowBlur: CGFloat = 24

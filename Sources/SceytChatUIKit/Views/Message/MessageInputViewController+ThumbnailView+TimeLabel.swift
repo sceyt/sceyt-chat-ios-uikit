@@ -1,5 +1,5 @@
 //
-//  InputViewController+ThumbnailView+TimeLabel.swift
+//  MessageInputViewController+ThumbnailView+TimeLabel.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,9 +8,9 @@
 
 import UIKit
 
-extension InputViewController.ThumbnailView {
+extension MessageInputViewController.ThumbnailView {
     open class TimeLabel: View {
-        public lazy var appearance = Components.inputViewController.appearance {
+        public lazy var appearance = Components.messageInputViewController.appearance {
             didSet {
                 setupAppearance()
             }

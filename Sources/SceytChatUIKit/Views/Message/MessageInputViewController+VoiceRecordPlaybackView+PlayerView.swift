@@ -1,5 +1,5 @@
 //
-//  InputViewController+VoiceRecordPlaybackView+PlayerView.swift
+//  MessageInputViewController+VoiceRecordPlaybackView+PlayerView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 19/03/2023.
@@ -9,9 +9,9 @@
 import AVFoundation
 import UIKit
 
-extension InputViewController.VoiceRecordPlaybackView {
+extension MessageInputViewController.VoiceRecordPlaybackView {
     open class PlayerView: View {
-        public lazy var appearance = Components.inputViewController.appearance {
+        public lazy var appearance = Components.messageInputViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -26,7 +26,7 @@ extension InputViewController.VoiceRecordPlaybackView {
                 switch state {
                 case .stopped:
                     button.setImage(.audioPlayerPlayGrey, for: [])
-                    waveformView.progress = 0
+                    audioWaveformView.progress = 0
                     displayDuration = 0
                 case .paused:
                     button.setImage(.audioPlayerPlayGrey, for: [])
@@ -42,7 +42,7 @@ extension InputViewController.VoiceRecordPlaybackView {
             return $0
         }(UIButton())
         
-        public let waveformView = Components.waveformView.init()
+        public let audioWaveformView = Components.audioWaveformView.init()
         
         open lazy var durationLabel = {
             $0.setContentHuggingPriority(.required, for: .horizontal)
@@ -54,7 +54,7 @@ extension InputViewController.VoiceRecordPlaybackView {
         private lazy var row = {
             $0.setCustomSpacing(12, after: button)
             return $0
-        }(UIStackView(row: button, waveformView, durationLabel))
+        }(UIStackView(row: button, audioWaveformView, durationLabel))
         
         public let bg = UIView()
         
@@ -90,7 +90,7 @@ extension InputViewController.VoiceRecordPlaybackView {
             addSubview(row.withoutAutoresizingMask)
             row.pin(to: self, anchors: [.leading(12), .trailing(-12), .top(8), .bottom(-8)])
             
-            waveformView.resize(anchors: [.height(20)])
+            audioWaveformView.resize(anchors: [.height(20)])
             durationLabel.resize(anchors: [.width(38)])
         }
         
@@ -105,15 +105,15 @@ extension InputViewController.VoiceRecordPlaybackView {
         open func setup(url: URL, metadata: ChatMessage.Attachment.Metadata<[Int]>) -> Self {
             self.url = url
             
-            waveformView.progress = 0
-            waveformView.data = metadata.thumbnail.map { Float($0) }
+            audioWaveformView.progress = 0
+            audioWaveformView.data = metadata.thumbnail.map { Float($0) }
             displayDuration = CMTimeGetSeconds(AVPlayerItem(url: url).asset.duration)
             return self
         }
         
         open func setDuration(duration: Double, progress: Double) {
             displayDuration = duration
-            waveformView.progress = progress
+            audioWaveformView.progress = progress
         }
         
         @objc
@@ -145,7 +145,7 @@ extension InputViewController.VoiceRecordPlaybackView {
         open func stop() {
             state = .stopped
             displayDuration = 0
-            waveformView.progress = 0
+            audioWaveformView.progress = 0
         }
     }        
 }

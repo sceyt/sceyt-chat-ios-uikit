@@ -1,5 +1,5 @@
 //
-//  NoDataView.swift
+//  EmptyStateView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 19/10/2023.

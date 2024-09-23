@@ -1,5 +1,5 @@
 //
-//  CreateChannelViewController+ProfileView.swift
+//  CreateChannelViewController+DetailsView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import UIKit
 
 extension CreateChannelViewController {
-    open class ProfileView: CreateGroupViewController.ProfileView, UITextFieldDelegate {
+    open class DetailsView: CreateGroupViewController.DetailsView, UITextFieldDelegate {
         open lazy var uriField: MarkableTextField = {
             $0.markerLabel.text = SceytChatUIKit.shared.config.channelURIConfig.prefix
             $0.textField.keyboardType = .URL

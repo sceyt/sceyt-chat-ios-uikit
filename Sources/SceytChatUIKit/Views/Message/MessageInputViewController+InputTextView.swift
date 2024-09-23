@@ -1,5 +1,5 @@
 //
-//  InputViewController+InputTextView.swift
+//  MessageInputViewController+InputTextView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,7 +10,7 @@ import UIKit
 import Combine
 import CoreServices
 
-extension InputViewController {
+extension MessageInputViewController {
     open class InputTextView: PlaceholderTextView {
         open private(set) var typingTimer: Timer?
         
@@ -193,7 +193,7 @@ extension InputViewController {
     }
 }
 
-public extension InputViewController.InputTextView {
+public extension MessageInputViewController.InputTextView {
     enum FormatEvent {
         case bold, italic, monospace, strikethrough, underline
     }

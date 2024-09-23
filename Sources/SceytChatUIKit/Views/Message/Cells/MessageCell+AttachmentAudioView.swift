@@ -20,7 +20,7 @@ extension MessageCell {
                 switch state {
                 case .stopped:
                     playPauseButton.image = .audioPlayerPlay
-                    waveformView.progress = 0
+                    audioWaveformView.progress = 0
                 case .paused:
                     playPauseButton.image = .audioPlayerPlay
                 case .playing:
@@ -55,7 +55,7 @@ extension MessageCell {
             return $0
         }(UIImageView())
         
-        private let waveformView = WaveformView()
+        private let audioWaveformView = Components.audioWaveformView.init()
         private let speedButton = {
             $0.setContentHuggingPriority(.required, for: .horizontal)
             $0.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -64,7 +64,7 @@ extension MessageCell {
 
         private let speedLabel = UILabel()
         
-        private lazy var waveformRow = UIStackView(row: [waveformView, speedButton], alignment: .center)
+        private lazy var waveformRow = UIStackView(row: [audioWaveformView, speedButton], alignment: .center)
         
         private lazy var durationLabel = UILabel()
                 
@@ -110,7 +110,7 @@ extension MessageCell {
             
             addSubview(row.withoutAutoresizingMask)
             row.pin(to: self, anchors: [.leading(Layouts.horizontalPadding), .trailing(0), .top(6)])
-            waveformView.resize(anchors: [.height(20)])
+            audioWaveformView.resize(anchors: [.height(20)])
             speedLabel.resize(anchors: [.height(20), .width(30)])
             
             speedButton.addSubview(speedLabel.withoutAutoresizingMask)
@@ -128,7 +128,7 @@ extension MessageCell {
         
         override open var data: MessageLayoutModel.AttachmentLayout! {
             didSet {
-                waveformView.data = data.voiceWaveform
+                audioWaveformView.data = data.voiceWaveform
                 displayDuration = data.mediaDuration
                 
                 if let fileUrl = data.attachment.fileUrl, fileUrl == SimpleSinglePlayer.url {
@@ -182,7 +182,7 @@ extension MessageCell {
         
         func setDuration(duration: TimeInterval, progress: Double) {
             displayDuration = duration
-            waveformView.progress = progress
+            audioWaveformView.progress = progress
         }
     }
 }

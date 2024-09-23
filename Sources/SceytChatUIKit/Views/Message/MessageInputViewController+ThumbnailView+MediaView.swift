@@ -1,5 +1,5 @@
 //
-//  InputViewController+ThumbnailView+MediaView.swift
+//  MessageInputViewController+ThumbnailView+MediaView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,13 +8,13 @@
 
 import UIKit
 
-extension InputViewController.ThumbnailView {
+extension MessageInputViewController.ThumbnailView {
     open class MediaView: View {
         open lazy var imageView = UIImageView()
             .withoutAutoresizingMask
             .contentMode(.scaleAspectFill)
         
-        open lazy var timeLabel = Components.inputThumbnailViewTimeLabel.init()
+        open lazy var timeLabel = Components.messageInputThumbnailViewTimeLabel.init()
             .withoutAutoresizingMask
         
         override open func setup() {

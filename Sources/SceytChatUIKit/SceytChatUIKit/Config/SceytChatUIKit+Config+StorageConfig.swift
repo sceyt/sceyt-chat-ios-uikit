@@ -12,6 +12,7 @@ extension SceytChatUIKit.Config {
     public struct StorageConfig {
         public var storageDirectory: URL?
         public let dataModelName: String
+        public var enableDatabase: Bool
         public let databaseFilename: String
         public var databaseFileDirectory: URL?
         public var userDefaults: UserDefaults

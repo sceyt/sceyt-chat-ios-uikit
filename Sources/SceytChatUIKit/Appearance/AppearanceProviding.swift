@@ -273,7 +273,7 @@ extension MessageCell: AppearanceProviding {
     }
 }
 
-extension InputViewController: AppearanceProviding {
+extension MessageInputViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -321,7 +321,7 @@ extension InputViewController: AppearanceProviding {
     }
 }
 
-extension InputViewController.InputTextView: AppearanceProviding {
+extension MessageInputViewController.InputTextView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -564,7 +564,7 @@ extension CircularProgressView: AppearanceProviding {
     }
 }
 
-extension InputViewController.MentionUsersListViewController: AppearanceProviding {
+extension MessageInputViewController.MentionUsersListViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -576,7 +576,7 @@ extension InputViewController.MentionUsersListViewController: AppearanceProvidin
     }
 }
 
-extension InputViewController.MentionUsersListViewController.MentionUserCell: AppearanceProviding {
+extension MessageInputViewController.MentionUsersListViewController.MentionUserCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -747,7 +747,7 @@ extension ImagePreviewViewController: AppearanceProviding {
     }
 }
 
-extension InputViewController.SelectedMessagesActionsView: AppearanceProviding {
+extension MessageInputViewController.SelectedMessagesActionsView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -944,7 +944,7 @@ extension StartChatViewController.ActionsView: AppearanceProviding {
     }
 }
 
-extension CreateGroupViewController.ProfileView: AppearanceProviding {
+extension CreateGroupViewController.DetailsView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1035,7 +1035,7 @@ extension ChannelCreatedView: AppearanceProviding {
     }
 }
 
-extension InputViewController.CoverView: AppearanceProviding {
+extension MessageInputViewController.CoverView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
@@ -1049,7 +1049,7 @@ extension InputViewController.CoverView: AppearanceProviding {
     }
 }
 
-extension InputViewController.MessageSearchControlsView: AppearanceProviding {
+extension MessageInputViewController.MessageSearchControlsView: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {

@@ -1,5 +1,5 @@
 //
-//  InputViewController+SelectedMessagesActionsView.swift
+//  MessageInputViewController+SelectedMessagesActionsView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 02/09/2023.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension InputViewController {
+extension MessageInputViewController {
     open class SelectedMessagesActionsView: View {
         private let buttonDelete = {
             $0.setImage(.chatDelete, for: [])

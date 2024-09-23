@@ -47,6 +47,8 @@ extension SceytChatUIKit {
 
         public var mediaPreviewDateFormatter: any DateFormatting = MediaPreviewDateFormatter()
         
+        public var logDateFormatter: any DateFormatting = LogDateFormatter()
+        
         public init() {}
     }
 }

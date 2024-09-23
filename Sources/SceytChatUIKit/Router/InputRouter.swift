@@ -15,7 +15,7 @@ public enum AttachmentPickerSource {
     case file
 }
 
-open class InputRouter: Router<InputViewController> {
+open class InputRouter: Router<MessageInputViewController> {
     func showAttachmentAlert(sources: [AttachmentPickerSource], sourceView: UIView?, callback: @escaping (AttachmentPickerSource?) -> Void) {
         var actions = [SheetAction]()
         if sources.contains(.camera) {

@@ -1,5 +1,5 @@
 //
-//  InputViewController+MediaView.swift
+//  MessageInputViewController+MediaView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -10,11 +10,11 @@ import CoreServices
 import Photos
 import UIKit
 
-extension InputViewController {
+extension MessageInputViewController {
     open class MediaView: View {
         public static var scale: CGFloat = UIScreen.main.traitCollection.displayScale
         
-        public lazy var appearance = InputViewController.appearance {
+        public lazy var appearance = MessageInputViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -77,18 +77,18 @@ extension InputViewController {
             let v: View!
             switch view.type {
             case .file:
-                let fv = Components.inputThumbnailViewFileView.init()
+                let fv = Components.messageInputThumbnailViewFileView.init()
                     .withoutAutoresizingMask
                 fv.imageView.image = view.thumbnail
                 v = fv
             default:
-                let mv = Components.inputThumbnailViewMediaView.init()
+                let mv = Components.messageInputThumbnailViewMediaView.init()
                     .withoutAutoresizingMask
                 mv.imageView.image = view.thumbnail
                 v = mv
             }
             _onUpdate?()
-            let tv = Components.inputThumbnailView
+            let tv = Components.messageInputThumbnailView
                 .init(containerView: v)
                 .withoutAutoresizingMask
             if index != -1, stackView.arrangedSubviews.indices.contains(index) {

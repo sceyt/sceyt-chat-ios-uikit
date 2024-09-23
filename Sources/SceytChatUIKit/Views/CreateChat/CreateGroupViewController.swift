@@ -25,7 +25,7 @@ open class CreateGroupViewController: ViewController,
         return $0.withoutAutoresizingMask
     }(UITableView())
     
-    lazy var profileView = Components.createGroupProfileView.init()
+    lazy var detailsView = Components.createGroupDetailsView.init()
         .withoutAutoresizingMask
     
     var textViewHeightConstraint: NSLayoutConstraint?
@@ -41,15 +41,15 @@ open class CreateGroupViewController: ViewController,
         tableView.register(Components.userCell.self)
         tableView.register(Components.separatorHeaderView.self)
         
-        profileView.subjectField.publisher(for: .editingDidEndOnExit).sink { [unowned self] _ in
-            profileView.descriptionField.becomeFirstResponder()
+        detailsView.subjectField.publisher(for: .editingDidEndOnExit).sink { [unowned self] _ in
+            detailsView.descriptionField.becomeFirstResponder()
         }.store(in: &subscriptions)
-        profileView.subjectField.publisher(for: .editingChanged).sink { [unowned self] _ in
-            navigationItem.rightBarButtonItem?.isEnabled = !(profileView.subjectField.text ?? "").isEmpty
+        detailsView.subjectField.publisher(for: .editingChanged).sink { [unowned self] _ in
+            navigationItem.rightBarButtonItem?.isEnabled = !(detailsView.subjectField.text ?? "").isEmpty
         }.store(in: &subscriptions)
-        profileView.descriptionField.delegate = self
+        detailsView.descriptionField.delegate = self
         
-        profileView.avatarButton.publisher(for: .touchUpInside).sink { [unowned self] _ in
+        detailsView.avatarButton.publisher(for: .touchUpInside).sink { [unowned self] _ in
             showCaptureAlert()
         }.store(in: &subscriptions)
         
@@ -63,11 +63,11 @@ open class CreateGroupViewController: ViewController,
     
     override open func setupLayout() {
         super.setupLayout()
-        view.addSubview(profileView)
+        view.addSubview(detailsView)
         view.addSubview(tableView)
-        profileView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .top, .trailing])
+        detailsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .top, .trailing])
         tableView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .bottom, .trailing])
-        tableView.topAnchor.pin(to: profileView.bottomAnchor)
+        tableView.topAnchor.pin(to: detailsView.bottomAnchor)
     }
     
     override open func setupAppearance() {
@@ -83,7 +83,7 @@ open class CreateGroupViewController: ViewController,
         }
         
         view.backgroundColor = appearance.backgroundColor
-        profileView.avatarButton.setImage(.editAvatar, for: .normal)
+        detailsView.avatarButton.setImage(.editAvatar, for: .normal)
     }
     
     @objc
@@ -99,8 +99,8 @@ open class CreateGroupViewController: ViewController,
     private func create() {
         loader.isLoading = true
         viewModel
-            .create(subject: profileView.subjectField.text ?? "",
-                    metadata: profileView.descriptionField.text,
+            .create(subject: detailsView.subjectField.text ?? "",
+                    metadata: detailsView.descriptionField.text,
                     image: channelAvatarImage)
     }
     
@@ -116,13 +116,13 @@ open class CreateGroupViewController: ViewController,
     }
     
     private func showCaptureAlert() {
-        _ = profileView.resignFirstResponder()
+        _ = detailsView.resignFirstResponder()
         var types = [CreatePrivateChannelRouter.CaptureType.camera, .photoLibrary]
         if channelAvatarImage != nil {
             types.append(.delete)
         }
         router.showCaptureAlert(types: types,
-                                sourceView: profileView.avatarButton)
+                                sourceView: detailsView.avatarButton)
         { [unowned self] capture in
             switch capture {
             case .camera:
@@ -134,7 +134,7 @@ open class CreateGroupViewController: ViewController,
                     guard let image = image else { return }
                     router.editImage(image) { [unowned self] edited in
                         channelAvatarImage = edited
-                        profileView.avatarButton.setImage(channelAvatarImage, for: .normal)
+                        detailsView.avatarButton.setImage(channelAvatarImage, for: .normal)
                     }
                 }
             case .photoLibrary:
@@ -146,12 +146,12 @@ open class CreateGroupViewController: ViewController,
                     guard let image = image else { return }
                     router.editImage(image) { [unowned self] edited in
                         channelAvatarImage = edited
-                        profileView.avatarButton.setImage(channelAvatarImage, for: .normal)
+                        detailsView.avatarButton.setImage(channelAvatarImage, for: .normal)
                     }
                 }
             case .delete:
                 channelAvatarImage = nil
-                profileView.avatarButton.setImage(.editAvatar, for: .normal)
+                detailsView.avatarButton.setImage(.editAvatar, for: .normal)
             default:
                 break
             }
@@ -160,7 +160,7 @@ open class CreateGroupViewController: ViewController,
     
     override open func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
-        _ = profileView.resignFirstResponder()
+        _ = detailsView.resignFirstResponder()
     }
     
     open func numberOfSections(in tableView: UITableView) -> Int {
@@ -194,10 +194,10 @@ open class CreateGroupViewController: ViewController,
     }
     
     open func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        if profileView.canResignFirstResponder,
+        if detailsView.canResignFirstResponder,
            scrollView == tableView
         {
-            _ = profileView.resignFirstResponder()
+            _ = detailsView.resignFirstResponder()
         }
     }
     

@@ -1,5 +1,5 @@
 //
-//  InputViewController+MentionUsersListViewController.swift
+//  MessageInputViewController+MentionUsersListViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -9,7 +9,7 @@
 import UIKit
 import SceytChat
 
-extension InputViewController {
+extension MessageInputViewController {
     open class MentionUsersListViewController: ViewController,
                                    UITableViewDelegate,
                                    UITableViewDataSource {
@@ -26,7 +26,7 @@ extension InputViewController {
         open override func setup() {
             super.setup()
             
-            tableView.register(Components.inputMentionUsersCell)
+            tableView.register(Components.messageInputMentionUsersCell)
             tableView.delegate = self
             tableView.dataSource = self
             tableView.clipsToBounds = true
@@ -98,7 +98,7 @@ extension InputViewController {
         open override func viewDidLayoutSubviews() {
             super.viewDidLayoutSubviews()
             
-            let cellHeight = Components.inputMentionUsersCell.Layouts.cellHeight
+            let cellHeight = Components.messageInputMentionUsersCell.Layouts.cellHeight
             let newHeight = round(tableView.height - cellHeight * 4 - 4 * 2 - view.safeAreaInsets.bottom)
             if tableView.frame.height != 0,
                tableView.contentInset.bottom != newHeight {
@@ -212,7 +212,7 @@ extension InputViewController {
             _ tableView: UITableView,
             cellForRowAt indexPath: IndexPath
         ) -> UITableViewCell {
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.inputMentionUsersCell)
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.messageInputMentionUsersCell)
             cell.transform = .init(scaleX: 1, y: -1)
             guard let item = viewModel.member(at: indexPath)
             else { return cell }
@@ -224,12 +224,12 @@ extension InputViewController {
         }
         
         public func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-            var height = Components.inputMentionUsersCell.Layouts.cellHeight
+            var height = Components.messageInputMentionUsersCell.Layouts.cellHeight
             if tableView.isFirst(indexPath) {
-                height += Components.inputMentionUsersCell.Layouts.verticalPadding
+                height += Components.messageInputMentionUsersCell.Layouts.verticalPadding
             }
             if tableView.isLast(indexPath) {
-                height += Components.inputMentionUsersCell.Layouts.verticalPadding
+                height += Components.messageInputMentionUsersCell.Layouts.verticalPadding
             }
             return height
         }
@@ -242,7 +242,7 @@ extension InputViewController {
             if indexPath.row == 0 {
                 cell.separatorInset.left = tableView.width
             } else {
-                cell.separatorInset.left = Components.inputMentionUsersCell.Layouts.avatarSize + Components.inputMentionUsersCell.Layouts.avatarLeftPaddding
+                cell.separatorInset.left = Components.messageInputMentionUsersCell.Layouts.avatarSize + Components.messageInputMentionUsersCell.Layouts.avatarLeftPaddding
             }
         }
     }
@@ -257,7 +257,7 @@ private extension UITableView {
     }
 }
 
-public extension InputViewController.MentionUsersListViewController {
+public extension MessageInputViewController.MentionUsersListViewController {
     enum Layouts {
         public static var horizontalPadding: CGFloat = 8
         public static var bottomPadding: CGFloat = 8

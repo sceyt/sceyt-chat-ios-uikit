@@ -19,7 +19,7 @@ extension MessageCell {
             }
         }
 
-        open var onDidTapContentView: ((LinkView) -> Void)?
+        open var onDidTapContentView: ((LinkPreviewView) -> Void)?
 
         public override init(frame: CGRect) {
             super.init(frame: frame)
@@ -64,7 +64,7 @@ extension MessageCell {
                         let preview = data.linkPreviews?.first
                 else { return }
                 [preview].forEach {
-                    let v = Components.messageCellLinkView.init()
+                    let v = Components.messageCellLinkPreviewView.init()
                         .withoutAutoresizingMask
                     addArrangedSubview(v)
                     v.leadingAnchor.pin(to: self.leadingAnchor, constant: 8)
@@ -81,7 +81,7 @@ extension MessageCell {
        
         @objc
         open func openUrlAction(_ sender: UITapGestureRecognizer) {
-            guard let linkView = sender.view as? LinkView else {
+            guard let linkView = sender.view as? LinkPreviewView else {
                 return
             }
             onDidTapContentView?(linkView)
@@ -92,7 +92,7 @@ extension MessageCell {
             else { return .zero }
             
             let size = [linkPreview].reduce(CGSize.zero) { partialResult, preview in
-                let size = Components.messageCellLinkView.measure(model: preview, appearance: appearance)
+                let size = Components.messageCellLinkPreviewView.measure(model: preview, appearance: appearance)
                 var result = partialResult
                 result.width = max(result.width, size.width)
                 if size.height > 0 {

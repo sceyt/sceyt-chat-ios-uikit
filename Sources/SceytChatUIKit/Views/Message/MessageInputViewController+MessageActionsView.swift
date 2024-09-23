@@ -1,5 +1,5 @@
 //
-//  InputViewController+MessageActionsView.swift
+//  MessageInputViewController+MessageActionsView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -8,11 +8,11 @@
 
 import UIKit
 
-extension InputViewController {
+extension MessageInputViewController {
     
     open class MessageActionsView: View {
         
-        public lazy var appearance = InputViewController.appearance {
+        public lazy var appearance = MessageInputViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -37,7 +37,7 @@ extension InputViewController {
             .withoutAutoresizingMask
             .contentMode(.scaleAspectFill)
         
-        open lazy var mediaTimestampLabel = Components.inputThumbnailViewTimeLabel.init()
+        open lazy var mediaTimestampLabel = Components.messageInputThumbnailViewTimeLabel.init()
             .withoutAutoresizingMask
 
         open lazy var cancelButton = UIButton()

@@ -1,5 +1,5 @@
 //
-//  InputViewController+VoiceRecordPlaybackView.swift
+//  MessageInputViewController+VoiceRecordPlaybackView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 19/03/2023.
@@ -9,9 +9,9 @@
 import AVFoundation
 import UIKit
 
-extension InputViewController {
+extension MessageInputViewController {
     open class VoiceRecordPlaybackView: View {
-        public lazy var appearance = Components.inputViewController.appearance {
+        public lazy var appearance = Components.messageInputViewController.appearance {
             didSet {
                 setupAppearance()
             }
@@ -30,7 +30,7 @@ extension InputViewController {
             return $0
         }(UIButton())
         
-        private let audioPlayerView = Components.inputVoiceRecordPlaybackPlayerView.init()
+        private let audioPlayerView = Components.messageInputVoiceRecordPlaybackPlayerView.init()
         
         private let sendButton = {
             $0.setImage(.messageSendAction, for: [])

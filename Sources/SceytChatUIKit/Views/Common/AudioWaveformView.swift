@@ -1,5 +1,5 @@
 //
-//  WaveformView.swift
+//  AudioWaveformView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,8 +8,8 @@
 
 import UIKit
 
-open class WaveformView: View {
-    public lazy var appearance = InputViewController.appearance {
+open class AudioWaveformView: View {
+    public lazy var appearance = MessageInputViewController.appearance {
         didSet {
             setupAppearance()
         }
