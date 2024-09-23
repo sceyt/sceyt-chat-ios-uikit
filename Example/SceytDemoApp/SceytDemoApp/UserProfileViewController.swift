@@ -176,7 +176,7 @@ class UserProfileViewController: UIViewController {
     private func onSignOut(_ sender: UIButton) {
         Config.currentUserId = nil
         SceytChatUIKit.shared.chatClient.disconnect()
-        Provider.database.deleteAll()
+        DataProvider.database.deleteAll()
         let loginViewController = LoginViewController()
         loginViewController.modalPresentationStyle = .fullScreen
         present(loginViewController, animated: true)
