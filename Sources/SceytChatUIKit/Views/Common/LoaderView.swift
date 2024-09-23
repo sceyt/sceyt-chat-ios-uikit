@@ -8,7 +8,7 @@
 
 import UIKit
 
-public let loader = SCTUIKitComponents.loader
+public let loader = Components.loader
 
 public protocol LoaderRepresentable {
     static func show()

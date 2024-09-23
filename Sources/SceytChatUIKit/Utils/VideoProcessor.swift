@@ -154,7 +154,7 @@ open class VideoProcessor {
                        let assetUrl = segment.sourceURL {
                         completion(assetUrl)
                     } else {
-                        SCTUIKitComponents.videoProcessor.getSlowmoVideoUrl(
+                        Components.videoProcessor.getSlowmoVideoUrl(
                             composition,
                             completion: { url in
                                 completion(url)
@@ -246,7 +246,7 @@ open class VideoOperation: AsyncOperation {
                 if let urlAsset = avAsset as? AVURLAsset {
                     self.compressVideo(inputURL: urlAsset.url)
                 } else if let avCompositionAsset = avAsset as? AVComposition {
-                    SCTUIKitComponents.videoProcessor.getSlowmoVideoUrl(
+                    Components.videoProcessor.getSlowmoVideoUrl(
                         avCompositionAsset,
                         completion: { [weak self] url in
                             guard let self else { return }

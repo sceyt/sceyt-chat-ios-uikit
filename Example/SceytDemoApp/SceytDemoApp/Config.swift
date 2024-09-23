@@ -58,7 +58,9 @@ func configureSceytChatUIKit() {
                               appId: Config.sceytAppId,
                               clientId: Config.clientId!)
     SceytChatUIKit.shared.config.storageConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
-    SceytChatUIKit.shared.config.setLogLevel(.verbose)
+    SceytChatUIKit.shared.setLogger(with: .verbose) { logMessage, logLevel, logString, file, function, line in
+        print()
+    }
     
     // Set customized Subclass for formatters
     SceytChatUIKit.shared.formatters.userNameFormatter = UserDisplayNameFormatter()

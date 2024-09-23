@@ -142,12 +142,12 @@ open class SCTSession: NSObject, SCTDataSession {
             if attachment.type == "image" {
                 image = UIImage(contentsOfFile: path)
             } else if attachment.type == "video" {
-                image = SCTUIKitComponents.videoProcessor.copyFrame(url: URL(fileURLWithPath: path))
+                image = Components.videoProcessor.copyFrame(url: URL(fileURLWithPath: path))
             } else if attachment.type == "file", URL(fileURLWithPath: path).isImage {
                 image = UIImage(contentsOfFile: path)
             }
             if let image,
-               let ib = try? SCTUIKitComponents.imageBuilder.init(image: image).resize(max: newSize.maxSide),
+               let ib = try? Components.imageBuilder.init(image: image).resize(max: newSize.maxSide),
                let data = ib.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality)
             {
                 logger.debug("[thumbnail] 3 stored \(thumbnailPath)")
@@ -211,7 +211,7 @@ open class SCTUploadOperation: AsyncOperation {
             let transferId = UUID().uuidString
             if attachment.type == "video" {
                 let videoProcessInfo = SCVideoProcessInfo()
-                let result = await SCTUIKitComponents.videoProcessor.export(from: filePath, processInfo: videoProcessInfo)
+                let result = await Components.videoProcessor.export(from: filePath, processInfo: videoProcessInfo)
                 switch result {
                 case .success(let success):
                     let path = self.fileStorage.store(transferId: transferId, fileName: success.lastPathComponent, file: success.path)
@@ -221,7 +221,7 @@ open class SCTUploadOperation: AsyncOperation {
                     logger.errorIfNotNil(error, "")
                 }
             } else if attachment.type == "image" {
-                if let builder = SCTUIKitComponents.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)) {
+                if let builder = Components.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)) {
                     let imageSize = builder.imageSize
                     if !imageSize.isNan {
                         if let data = try? builder.resize(max: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.dimensionThreshold).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
