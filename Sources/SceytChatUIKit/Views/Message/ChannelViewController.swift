@@ -1955,7 +1955,7 @@ open class ChannelViewController: ViewController,
         case .didSetUnreadIndexPath(let indexPath):
             unreadMessageIndexPath = indexPath
         case .typing(let isTyping, let user):
-            if channelViewModel.channel.isGroup {
+            if !channelViewModel.channel.isDirect {
                 if showTyping(member: SceytChatUIKit.shared.formatters.userNameFormatter.format(user),
                               isTyping: isTyping) == 0 {
                     updateTitle()

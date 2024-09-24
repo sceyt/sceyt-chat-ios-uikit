@@ -17,6 +17,7 @@ public class SceytChatUIKit {
     public lazy var config = SceytChatUIKit.Config()
     public var theme = SceytChatUIKit.Theme()
     public var formatters = SceytChatUIKit.Formatters()
+    public var visualProviders = SceytChatUIKit.VisualProviders()
     
     public var chatClient: ChatClient {
         ChatClient.shared

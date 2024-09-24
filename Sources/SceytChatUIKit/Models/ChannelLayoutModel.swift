@@ -315,7 +315,7 @@ open class ChannelLayoutModel {
                     // don't display sender
                 } else if (user.id == me) || (user.id.isEmpty && lastMessage?.incoming == false) {
                     sender = "\(L10n.User.current): "
-                } else if channel.isGroup {
+                } else if !channel.isDirect {
                     sender = "\(SceytChatUIKit.shared.formatters.userNameFormatter.short(user)): "
                 }
             }

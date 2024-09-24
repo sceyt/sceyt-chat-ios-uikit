@@ -36,7 +36,7 @@ open class ChannelProfileEditViewModel: NSObject {
         switch channel.channelType {
         case .broadcast:
             return L10n.Channel.Subject.Channel.placeholder
-        case .private:
+        case .group:
             return L10n.Channel.Subject.Group.placeholder
         default:
             return nil

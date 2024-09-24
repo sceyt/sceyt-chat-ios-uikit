@@ -442,7 +442,7 @@ open class MessageLayoutModel {
     }
     
     open func showUserInfo(_ show: Bool) {
-        guard channel.isGroup
+        guard !channel.isDirect
         else { return }
         if showUserInfo != show {
             if show,

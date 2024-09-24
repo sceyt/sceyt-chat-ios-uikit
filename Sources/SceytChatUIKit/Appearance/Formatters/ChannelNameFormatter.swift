@@ -14,7 +14,7 @@ open class ChannelNameFormatter: ChannelFormatting {
     public init() {}
 
     open func format( _ channel: ChatChannel) -> String {
-        if channel.isGroup {
+        if !channel.isDirect {
             return channel.subject ?? ""
         }
         guard let peer = channel.peer

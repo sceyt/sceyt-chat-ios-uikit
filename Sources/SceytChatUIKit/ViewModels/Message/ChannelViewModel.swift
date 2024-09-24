@@ -268,7 +268,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         prevMessage: ChatMessage?,
         nextIndexPath: IndexPath?,
         nextMessage: ChatMessage?) {
-            guard channel.isGroup
+            guard !channel.isDirect
             else { return }
             if indexPath.item == 0 {
                 if message.incoming {
@@ -1503,7 +1503,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     
     //MARK: Presence
     open func subscribeToPeerPresence() {
-        if !channel.isGroup, let peer = channel.peer {
+        if channel.isDirect, let peer = channel.peer {
             if let presence = presenceProvider.presence(userId: peer.id)?.presence {
                 peerPresence = presence
             }
@@ -1845,7 +1845,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func canShowInfo(model: MessageLayoutModel) -> Bool {
         !model.message.incoming &&
-        model.channel.channelType == .private
+        model.channel.channelType == .group
     }
     
     open func canEdit(model: MessageLayoutModel) -> Bool {
@@ -1885,18 +1885,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             return L10n.Channel.Self.hint
         }
         let memberCount = (isThread ||
-                           !channel.isGroup) ? 0 : channel.memberCount
+                           channel.isDirect) ? 0 : channel.memberCount
         var subTitle: String?
         
         switch memberCount {
         case 1:
-            if channel.channelType == .private {
+            if channel.channelType == .group {
                 subTitle = L10n.Channel.MembersCount.one
             } else {
                 subTitle = L10n.Channel.SubscriberCount.one
             }
         case 2...:
-            if channel.channelType == .private {
+            if channel.channelType == .group {
                 subTitle = L10n.Channel.MembersCount.more(Int(memberCount))
             } else {
                 subTitle = L10n.Channel.SubscriberCount.more(Int(memberCount))
@@ -1925,7 +1925,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         if channel.userRole != self.channel.userRole {
             return true
         }
-        if !channel.isGroup {
+        if channel.isDirect {
             if let p1 = channel.peer, let p2 = self.channel.peer {
                 if p1 !~= p2 {
                     return true

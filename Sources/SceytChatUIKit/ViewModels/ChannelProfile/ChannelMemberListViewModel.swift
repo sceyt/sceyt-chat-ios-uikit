@@ -75,7 +75,7 @@ open class ChannelMemberListViewModel: NSObject {
         switch channel.channelType {
         case .direct:
             return false
-        case .private:
+        case .group:
             if shouldShowOnlyAdmins {
                 return channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.owner || channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.admin
             }

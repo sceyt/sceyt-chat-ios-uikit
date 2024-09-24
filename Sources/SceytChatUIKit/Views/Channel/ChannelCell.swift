@@ -210,7 +210,7 @@ open class ChannelCell: TableViewCell {
         unreadCount.backgroundColor = !data.channel.muted ? appearance.unreadCountBackgroundColor : appearance.unreadCountMutedBackgroundColor
         atView.backgroundColor = !data.channel.muted ? appearance.unreadCountBackgroundColor : appearance.unreadCountMutedBackgroundColor
 
-        if !data.channel.isGroup, let peer = data.channel.peer {
+        if data.channel.isDirect, let peer = data.channel.peer {
             presenceView.isHidden = peer.presence.state != .online
         } else {
             presenceView.isHidden = true
@@ -268,7 +268,7 @@ open class ChannelCell: TableViewCell {
     
     open func didStartTyping(member: ChatChannelMember) {
         let message = NSMutableAttributedString(string: "")
-        if data.channel.isGroup {
+        if !data.channel.isDirect {
             message.append(NSAttributedString(
                 string: "\(Components.typingView.display(typer: SceytChatUIKit.shared.formatters.userNameFormatter.format(member), split: .firstWord)): ",
                 attributes: [.font: appearance.senderLabelFont ?? Fonts.regular.withSize(15), .foregroundColor: appearance.senderLabelTextColor ?? .primaryText]
@@ -290,7 +290,7 @@ open class ChannelCell: TableViewCell {
     }
 
     open func subscribeForPresence() {
-        guard !data.channel.isGroup,
+        guard data.channel.isDirect,
               let peer = data.channel.peer,
               peer.state == .active
         else {
@@ -310,7 +310,7 @@ open class ChannelCell: TableViewCell {
     }
 
     open func unsubscribeFromPresence(data: ChannelLayoutModel) {
-        guard !data.channel.isGroup,
+        guard data.channel.isDirect,
                 let userId = data.channel.peer?.id
         else {
             presenceView.isHidden = true

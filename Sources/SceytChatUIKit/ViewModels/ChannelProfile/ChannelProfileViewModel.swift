@@ -24,7 +24,7 @@ open class ChannelProfileViewModel: NSObject {
 
     public var isOwner: Bool { channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.owner }
     public var isAdmin: Bool { channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.admin }
-    public var canEdit: Bool { channel.isGroup && (isOwner || isAdmin) }
+    public var canEdit: Bool { !channel.isDirect && (isOwner || isAdmin) }
 
     open lazy var channelObserver: DatabaseObserver<ChannelDTO, ChatChannel> = {
         
@@ -64,12 +64,12 @@ open class ChannelProfileViewModel: NSObject {
         event = .update
     }
 
-    open var isGroupChannel: Bool {
-        channel.channelType != .direct
+    open var isDirectChannel: Bool {
+        channel.channelType == .direct
     }
     
     open var isActive: Bool {
-        if channel.userRole == nil, channel.channelType == .private {
+        if channel.userRole == nil, channel.channelType == .group {
             return false
         }
         return true

@@ -97,7 +97,7 @@ extension ChannelInfoViewController {
                 default:
                     subtitleLabel.text = ""
                 }
-            case .private:
+            case .group:
                 switch data.memberCount {
                 case 1:
                     subtitleLabel.text = L10n.Channel.MembersCount.one

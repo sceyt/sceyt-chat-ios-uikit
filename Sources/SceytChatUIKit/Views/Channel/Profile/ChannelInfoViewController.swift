@@ -274,7 +274,7 @@ open class ChannelInfoViewController: ViewController,
         case .description:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoDescriptionCell.self)
             cell.selectionStyle = .none
-            if !profileViewModel.channel.isGroup {
+            if profileViewModel.channel.isDirect {
                 cell.data = profileViewModel.channel.peer?.presence.status
             } else {
                 cell.data = profileViewModel.channel.decodedMetadata?.description ?? ""
@@ -497,13 +497,13 @@ open class ChannelInfoViewController: ViewController,
     
     open func items() -> [ActionItem] {
         var actions = [ActionItem]()
-        if profileViewModel.isGroupChannel {
+        if !profileViewModel.isDirectChannel {
             switch profileViewModel.channelType {
             case .broadcast where profileViewModel.isOwner || profileViewModel.isAdmin:
                 actions += [
                     .init(title: L10n.Channel.Info.Item.Title.subscribers, image: .channelProfileMembers, tag: ActionTag.members)
                 ]
-            case .private:
+            case .group:
                 actions += [
                     .init(title: L10n.Channel.Info.Item.Title.members, image: .channelProfileMembers, tag: ActionTag.members)
                 ]
@@ -533,7 +533,7 @@ open class ChannelInfoViewController: ViewController,
                 logger.debug("[ChannelInfoViewController] decoded metadata description is missing")
             }     
             sections.append(.uri)
-        case .private:
+        case .group:
             if !(profileViewModel.channel.decodedMetadata?.description ?? "").isEmpty {
                 sections.append(.description)
             } else {
@@ -666,7 +666,7 @@ open class ChannelInfoViewController: ViewController,
                     })
             ]
            
-        case .private:
+        case .group:
             if profileViewModel.canEdit {
                 actions += [
                     .init(
@@ -885,7 +885,7 @@ open class ChannelInfoViewController: ViewController,
         case .direct:
             title = L10n.Channel.Info.Action.Chat.delete
             message = L10n.Channel.Info.Action.Chat.deleteMessage
-        case .private:
+        case .group:
             title = L10n.Channel.Info.Action.Group.delete
             message = L10n.Channel.Info.Action.Group.deleteMessage
         case .broadcast:

@@ -232,14 +232,14 @@ extension UIImageView: ImagePresentable {
 extension ChatChannel: AvatarBuildable {
     
     public var hashString: String {
-        if !isGroup, let peer = peer {
+        if isDirect, let peer = peer {
             return peer.hashString
         }
         return "\(id)"
     }
     
     public var imageUrl: URL? {
-        if !isGroup, let peer = peer {
+        if isDirect, let peer = peer {
             return URL(string: peer.avatarUrl)
         } else if let member = members?.first, isSelfChannel {
             return URL(string: member.avatarUrl ?? SceytChatUIKit.shared.chatClient.user.avatarUrl)
@@ -252,22 +252,15 @@ extension ChatChannel: AvatarBuildable {
     }
 
     public var defaultAvatar: UIImage? {
-        if !isGroup {
-            return peer?.defaultAvatar// members?.first?.defaultAvatar
+        if case .image(let image) = SceytChatUIKit.shared.visualProviders.channelAvatarProvider.provideVisual(for: self) {
+            return image
         }
-        switch channelType {
-        case .broadcast:
-            return SceytChatUIKit.shared.config.chatChannelDefaultAvatar.public
-        case .private:
-            return SceytChatUIKit.shared.config.chatChannelDefaultAvatar.private
-        default:
-            return SceytChatUIKit.shared.config.chatChannelDefaultAvatar.direct
-        }
+        return nil
     }
     
     public var appearance: InitialsBuilderAppearance? {
-        if SceytChatUIKit.shared.config.chatChannelDefaultAvatar.generateFromInitials {
-            return SceytChatUIKit.shared.config.chatChannelDefaultAvatar.initialsBuilderAppearance
+        if case .initialsAppearance(let appearance) = SceytChatUIKit.shared.visualProviders.channelAvatarProvider.provideVisual(for: self) {
+            return appearance
         }
         return nil
     }
@@ -288,19 +281,15 @@ extension ChatUser: AvatarBuildable {
     }
     
     public var defaultAvatar: UIImage? {
-        switch state {
-        case .active:
-            return SceytChatUIKit.shared.config.chatUserDefaultAvatar.activeState
-        case .inactive:
-            return SceytChatUIKit.shared.config.chatUserDefaultAvatar.inactiveState
-        case .deleted:
-            return SceytChatUIKit.shared.config.chatUserDefaultAvatar.deletedState
+        if case .image(let image) = SceytChatUIKit.shared.visualProviders.userAvatarProvider.provideVisual(for: self) {
+            return image
         }
+        return nil
     }
     
     public var appearance: InitialsBuilderAppearance? {
-        if SceytChatUIKit.shared.config.chatUserDefaultAvatar.generateFromInitials {
-            return SceytChatUIKit.shared.config.chatUserDefaultAvatar.initialsBuilderAppearance
+        if case .initialsAppearance(let appearance) = SceytChatUIKit.shared.visualProviders.userAvatarProvider.provideVisual(for: self) {
+            return appearance
         }
         return nil
     }

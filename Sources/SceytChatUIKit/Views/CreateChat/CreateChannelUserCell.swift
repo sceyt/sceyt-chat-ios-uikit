@@ -52,7 +52,7 @@ open class SearchResultChannelCell: BaseChannelUserCell {
                 default:
                     statusLabel.text = ""
                 }
-            case .private:
+            case .group:
                 switch channelData.memberCount {
                 case 1:
                     statusLabel.text = L10n.Channel.MembersCount.one

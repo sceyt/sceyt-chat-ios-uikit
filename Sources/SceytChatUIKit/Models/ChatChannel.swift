@@ -223,7 +223,7 @@ extension ChatChannel {
 public extension ChatChannel {
     
     enum ChannelType: String {
-        case direct, broadcast, `private`
+        case direct, group, broadcast
     }
     
     var channelType: ChannelType {
@@ -233,12 +233,12 @@ public extension ChatChannel {
         case SceytChatUIKit.shared.config.channelTypesConfig.broadcast:
             return .broadcast
         default:
-            return .private
+            return .group
         }
     }
     
-    var isGroup: Bool {
-        channelType != .direct
+    var isDirect: Bool {
+        channelType == .direct
     }
 
     var isSelfChannel: Bool {
