@@ -11,7 +11,7 @@ import UIKit
 
 extension MessageInputViewController.VoiceRecordPlaybackView {
     open class PlayerView: View {
-        public lazy var appearance = Components.messageInputViewController.appearance {
+        public lazy var appearance = Components.messageInputVoiceRecordPlaybackView.appearance {
             didSet {
                 setupAppearance()
             }
@@ -25,13 +25,12 @@ extension MessageInputViewController.VoiceRecordPlaybackView {
             didSet {
                 switch state {
                 case .stopped:
-                    button.setImage(.audioPlayerPlayGrey, for: [])
+                    button.setImage(appearance.playIcon, for: [])
                     audioWaveformView.progress = 0
-                    displayDuration = 0
                 case .paused:
-                    button.setImage(.audioPlayerPlayGrey, for: [])
+                    button.setImage(appearance.playIcon, for: [])
                 case .playing:
-                    button.setImage(.audioPlayerPauseGrey, for: [])
+                    button.setImage(appearance.pauseIcon, for: [])
                 }
             }
         }
@@ -61,18 +60,19 @@ extension MessageInputViewController.VoiceRecordPlaybackView {
         open override func setupAppearance() {
             super.setupAppearance()
             
-            backgroundColor = appearance.recorderBackgroundColor
+            backgroundColor = appearance.backgroundColor
             layer.cornerRadius = 18
             layer.masksToBounds = true
             
-            bg.backgroundColor = appearance.recorderPlayerBackgroundColor
+            bg.backgroundColor = appearance.playerBackgroundColor
             bg.layer.cornerRadius = 18
             bg.layer.masksToBounds = true
             
-            durationLabel.font = appearance.recorderDurationFont
-            durationLabel.textColor = appearance.recorderDurationColor
+            durationLabel.font = appearance.durationLabelAppearance.font
+            durationLabel.textColor = appearance.durationLabelAppearance.foregroundColor
             
-            button.setImage(.audioPlayerPlayGrey, for: [])
+            button.setImage(appearance.playIcon, for: [])
+            audioWaveformView.parentAppearance = appearance.audioWaveformViewAppearance
         }
         
         open override func setup() {
@@ -96,7 +96,7 @@ extension MessageInputViewController.VoiceRecordPlaybackView {
         
         open var displayDuration: Double = 0 {
             didSet {
-                durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(displayDuration)
+                durationLabel.text = appearance.durationFormatter.format(displayDuration)
             }
         }
         

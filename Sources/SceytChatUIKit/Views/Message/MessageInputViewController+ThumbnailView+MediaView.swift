@@ -10,6 +10,12 @@ import UIKit
 
 extension MessageInputViewController.ThumbnailView {
     open class MediaView: View {
+        public lazy var appearance = Components.messageInputSelectedMediaView.appearance {
+            didSet {
+                setupAppearance()
+            }
+        }
+        
         open lazy var imageView = UIImageView()
             .withoutAutoresizingMask
             .contentMode(.scaleAspectFill)
@@ -31,6 +37,11 @@ extension MessageInputViewController.ThumbnailView {
             imageView.pin(to: self)
             timeLabel.pin(to: self, anchors: [.leading(0, .greaterThanOrEqual), .bottom(-4), .trailing(-4)])
             imageView.heightAnchor.pin(to: imageView.widthAnchor)
+        }
+        
+        open override func setupAppearance() {
+            super.setupAppearance()
+            timeLabel.appearance = appearance.attachmentDurationLabelAppearance
         }
     }
 }

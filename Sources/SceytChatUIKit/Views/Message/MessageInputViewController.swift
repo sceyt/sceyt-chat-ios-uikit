@@ -27,7 +27,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     open lazy var separatorViewCenter = UIView()
         .withoutAutoresizingMask
     
-    open lazy var mediaView = Components.messageInputMediaView
+    open lazy var selectedMediaView = Components.messageInputSelectedMediaView
         .init()
         .withoutAutoresizingMask
     
@@ -61,7 +61,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             self.recordedView.setup(url: url, metadata: metadata)
         case let .send(url, metadata):
             if let url = Components.storage.copyFile(url) {
-                self.mediaView.insert(view: AttachmentView(voiceUrl: url, metadata: metadata))
+                self.selectedMediaView.insert(view: AttachmentModel(voiceUrl: url, metadata: metadata))
                 self.action = .send(false)
             }
         case .didStartRecording:
@@ -88,7 +88,11 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     
     public var canRunMentionUserLogic = true
     open var mentionUserListViewController: (() -> MessageInputViewController.MentionUsersListViewController)?
-    open weak var presentedMentionUserListViewController: MessageInputViewController.MentionUsersListViewController?
+    open weak var presentedMentionUserListViewController: MessageInputViewController.MentionUsersListViewController? {
+        didSet {
+            presentedMentionUserListViewController?.parentAppearance = appearance.mentionUsersListAppearance
+        }
+    }
     public var isPresentedMentionUserListViewController: Bool {
         presentedMentionUserListViewController != nil
     }
@@ -114,10 +118,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     override open func setup() {
         super.setup()
         _ = view.withoutAutoresizingMask
-        mediaView._onUpdate = { [unowned self] in
+        selectedMediaView._onUpdate = { [unowned self] in
             updateState()
         }
-        mediaView._onDelete = { [unowned self] view in
+        selectedMediaView._onDelete = { [unowned self] view in
             action = .deleteMedia(view)
             if let id = view.photoAsset?.localIdentifier {
                 selectedPhotoAssetIdentifiers.remove(id)
@@ -166,7 +170,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             case let .send(url, metadata):
                 self.recordedView.isHidden = true
                 if let url = Components.storage.copyFile(url) {
-                    self.mediaView.insert(view: AttachmentView(voiceUrl: url, metadata: metadata))
+                    self.selectedMediaView.insert(view: AttachmentModel(voiceUrl: url, metadata: metadata))
                     self.action = .send(false)
                 }
             }
@@ -192,7 +196,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
            let jpeg = Components.imageBuilder.init(image: image).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
            let url = Components.storage.storeData(jpeg, filename: UUID().uuidString + ".jpg")
         {
-            mediaView.insert(view: .init(mediaUrl: url, thumbnail: image))
+            selectedMediaView.insert(view: .init(mediaUrl: url, thumbnail: image))
             action = .send(true)
         } else if let string = UIPasteboard.general.string {
             inputTextView.text = ((inputTextView.text ?? "") as NSString).replacingCharacters(in: inputTextView.selectedRange, with: string)
@@ -204,11 +208,15 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         
         view.backgroundColor = appearance.backgroundColor
         backgroundView.backgroundColor = appearance.backgroundColor
-        addMediaButton.setImage(.attachment, for: .normal)
-        sendButton.setImage(.messageSendAction, for: .normal)
-        recordButton.image = .audioPlayerMic
+        addMediaButton.setImage(appearance.attachmentIcon, for: .normal)
+        sendButton.setImage(appearance.sendMessageIcon, for: .normal)
+        recordButton.image = appearance.voiceRecordIcon
         separatorViewTop.backgroundColor = appearance.dividerColor
         separatorViewCenter.backgroundColor = appearance.dividerColor
+        recorderView.parentAppearance = appearance.voiceRecorderAppearance
+        recordedView.parentAppearance = appearance.voiceRecordPlaybackAppearance
+        selectedMediaView.parentAppearance = appearance.selectedMediaAppearance
+        inputTextView.parentAppearance = appearance.inputAppearance
     }
     
     override open func setupLayout() {
@@ -216,7 +224,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         
         view.addSubview(actionView)
         view.addSubview(backgroundView)
-        view.addSubview(mediaView)
+        view.addSubview(selectedMediaView)
         view.addSubview(inputTextView)
         view.addSubview(addMediaButton)
         view.addSubview(sendButton)
@@ -239,10 +247,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         actionView.topAnchor.pin(to: separatorViewTop.bottomAnchor)
         actionViewHeightLayoutConstraint = actionView.heightAnchor.pin(constant: 0)
         
-        mediaView.leadingAnchor.pin(to: view.leadingAnchor)
-        mediaView.trailingAnchor.pin(to: view.trailingAnchor)
-        mediaView.topAnchor.pin(to: actionView.bottomAnchor)
-        mediaView.heightAnchor.pin(constant: 0)
+        selectedMediaView.leadingAnchor.pin(to: view.leadingAnchor)
+        selectedMediaView.trailingAnchor.pin(to: view.trailingAnchor)
+        selectedMediaView.topAnchor.pin(to: actionView.bottomAnchor)
+        selectedMediaView.heightAnchor.pin(constant: 0)
         
         addMediaButton.pin(to: view, anchors: [.leading(), .bottom()])
         addMediaButton.resize(anchors: [.height(52), .width(52)])
@@ -255,7 +263,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         updateMediaButtonAppearance(isHidden: shouldHideMediaButton, animated: false)
         inputTextView.trailingAnchor.pin(to: sendButton.leadingAnchor)
         inputTextView.trailingAnchor.pin(to: recordButton.leadingAnchor)
-        inputTextView.topAnchor.pin(to: mediaView.bottomAnchor, constant: 8).priority(.defaultLow)
+        inputTextView.topAnchor.pin(to: selectedMediaView.bottomAnchor, constant: 8).priority(.defaultLow)
         inputTextView.heightAnchor.pin(greaterThanOrEqualToConstant: 36)
         inputTextView.bottomAnchor.pin(to: view.bottomAnchor, constant: -8)
         
@@ -263,17 +271,24 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         recordedView.isHidden = true
     }
     
+    open override func setupDone() {
+        super.setupDone()
+        shouldHideRecordButton = !appearance.enableVoiceRecord
+        shouldHideMediaButton = !appearance.enableSendAttachment
+        canRunMentionUserLogic = appearance.enableMention
+    }
+    
     open func updateState() {
-        sendButton.isHidden = inputTextView.text.replacingOccurrences(of: "\u{fffc}", with: "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && mediaView.items.isEmpty
-        style = mediaView.items.count > 0 ? .large : .small
-        separatorViewCenter.isHidden = mediaView.items.count == 0
+        sendButton.isHidden = inputTextView.text.replacingOccurrences(of: "\u{fffc}", with: "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && selectedMediaView.items.isEmpty
+        style = selectedMediaView.items.count > 0 ? .large : .small
+        separatorViewCenter.isHidden = selectedMediaView.items.count == 0
         if sendButton.isHidden {
             sendButton.cancelTracking(with: nil)
         }
         recordButton.isHidden = !sendButton.isHidden || shouldHideRecordButton
-        if !mediaView.items.isEmpty, lastDetectedLinkMetadata != nil {
+        if !selectedMediaView.items.isEmpty, lastDetectedLinkMetadata != nil {
             removeActionView()
-        } else if mediaView.items.isEmpty {
+        } else if selectedMediaView.items.isEmpty {
             findLink()
         }
     }
@@ -510,7 +525,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             cachedMessage = nil
         }
         removeActionView()
-        mediaView.removeAll()
+        selectedMediaView.removeAll()
         action = .cancel
         findLink()
     }
@@ -548,7 +563,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                 logger.verbose("[ATTACHMENT] Start BG task to create attachments from assets")
                 assets.forEach { asset in
                     semaphore.wait()
-                    AttachmentView.view(from: asset, completion: { [weak self] view in
+                    AttachmentModel.view(from: asset, completion: { [weak self] view in
                         logger.verbose("[ATTACHMENT] created attachment \(view?.name)")
                         guard let self else {
                             semaphore.signal()
@@ -556,8 +571,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                         }
                         if let view {
                             selectedPhotoAssetIdentifiers.insert(asset.localIdentifier)
-                            logger.verbose("[ATTACHMENT] insert attachment in mediaView")
-                            mediaView.insert(view: view)
+                            logger.verbose("[ATTACHMENT] insert attachment in selectedMediaView")
+                            selectedMediaView.insert(view: view)
                         }
                         semaphore.signal()
                     })
@@ -586,7 +601,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     open func openDocumentsPicker() {
         router.showDocuments { [unowned self] urls in
             urls.forEach {
-                self.mediaView.insert(view: AttachmentView(fileUrl: $0))
+                self.selectedMediaView.insert(view: AttachmentModel(fileUrl: $0))
             }
             DispatchQueue.main.async { [weak self] in
                 self?.inputTextView.becomeFirstResponder()
@@ -597,7 +612,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     open func openCameraPicker() {
         router.showCamera { [unowned self] attachmentView in
             guard let attachmentView else { return }
-            self.mediaView
+            self.selectedMediaView
                 .insert(view: attachmentView)
             DispatchQueue.main.async { [weak self] in
                 self?.inputTextView.becomeFirstResponder()
@@ -649,73 +664,81 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             nextState = nil
         }
         let message = layoutModel.message
-        let title = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
+        let title = appearance.inputReplyMessageAppearance.senderNameFormatter.format(message.user)
         var text = layoutModel.attributedView.content.string.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         var image: UIImage?
         var showPlayIcon = false
         if let attachment = message.attachments?.first {
+            
             switch attachment.type {
             case "image":
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.image
+                    text = appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = attachment.thumbnailImage
             case "video":
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.video
+                    text = appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = attachment.thumbnailImage
                 showPlayIcon = true
             case "voice":
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.voice
+                    text = appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
-                image = .audioPlayerMic
+                image = appearance.inputReplyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             case "link":
                 if let metadata = layoutModel.linkPreviews?.first?.metadata {
                     addOrUpdateLinkPreview(linkDetails: metadata)
                     return
                 }
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.link
+                    text = appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = nil
             default:
                 if text.isEmpty {
-                    text = layoutModel.attachments.first?.name ?? L10n.Message.Attachment.file
+                    text = layoutModel.attachments.first?.name ?? appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
-                image = .messageFile
+                image = appearance.inputReplyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
         }
         let titleAttributedString = NSMutableAttributedString(
             string: L10n.Input.reply + ": ",
-            attributes: [.font: appearance.actionReplyTitleFont ?? Fonts.regular.withSize(13)])
+            attributes: [
+                .font: appearance.inputReplyMessageAppearance.titleLabelAppearance.font,
+                .foregroundColor: appearance.inputReplyMessageAppearance.titleLabelAppearance.foregroundColor
+            ])
         titleAttributedString.append(
             .init(
                 string: title,
-                attributes: [.font: appearance.actionReplierTitleFont ?? Fonts.semiBold.withSize(13)]))
+                attributes: [
+                    .font: appearance.inputReplyMessageAppearance.senderNameLabelAppearance.font,
+                    .foregroundColor: appearance.inputReplyMessageAppearance.senderNameLabelAppearance.foregroundColor
+                ]))
         actionView.titleLabel.attributedText = titleAttributedString
         
         let messageAttributedString = NSMutableAttributedString(
             string: text,
             attributes: [
-                .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                .foregroundColor: appearance.actionMessageColor ?? .secondaryText
+                .font: appearance.inputReplyMessageAppearance.bodyLabelAppearance.font,
+                .foregroundColor: appearance.inputReplyMessageAppearance.bodyLabelAppearance.foregroundColor
             ])
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
-                string: " " + SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration)),
+                string: " " + appearance.inputReplyMessageAppearance.attachmentDurationFormatter.format(TimeInterval(duration)),
                 attributes: [
-                    .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .accent
+                    .font: appearance.inputReplyMessageAppearance.attachmentDurationLabelAppearance.font,
+                    .foregroundColor: appearance.inputReplyMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
                 ]))
         }
         actionView.messageLabel.attributedText = messageAttributedString
         
+        actionView.backgroundColor = appearance.inputReplyMessageAppearance.backgroundColor
         actionView.isHidden = false
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
-        actionView.iconView.image = appearance.actionReplyIcon
+        actionView.iconView.image = appearance.inputReplyMessageAppearance.replyIcon
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
         actionView.playView.isHidden = !showPlayIcon
@@ -749,62 +772,66 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             switch attachment.type {
             case "image":
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.image
+                    text = appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = attachment.thumbnailImage
             case "video":
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.video
+                    text = appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = attachment.thumbnailImage
                 showPlayIcon = true
             case "voice":
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.voice
+                    text = appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
-                image = .audioPlayerMic
+                image = appearance.inputEditMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             case "link":
                 if let metadata = layoutModel.linkPreviews?.first?.metadata {
                     addOrUpdateLinkPreview(linkDetails: metadata)
                     return
                 }
                 if text.isEmpty {
-                    text = L10n.Message.Attachment.link
+                    text = appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = nil
             default:
                 if text.isEmpty {
-                    text = layoutModel.attachments.first?.name ?? L10n.Message.Attachment.file
+                    text = layoutModel.attachments.first?.name ?? appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
-                image = .messageFile
+                image = appearance.inputEditMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
         }
         let titleAttributedString = NSMutableAttributedString(
             string: L10n.Input.edit + ": ",
-            attributes: [.font: appearance.actionReplyTitleFont ?? Fonts.regular.withSize(12)])
+            attributes: [
+                .font: appearance.inputEditMessageAppearance.titleLabelAppearance.font,
+                .foregroundColor: appearance.inputEditMessageAppearance.titleLabelAppearance.foregroundColor
+            ])
         actionView.titleLabel.attributedText = titleAttributedString
         
         let messageAttributedString = NSMutableAttributedString(
             string: text,
             attributes: [
-                .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                .foregroundColor: appearance.actionMessageColor ?? .secondaryText
+                .font: appearance.inputEditMessageAppearance.bodyTextStyle.font,
+                .foregroundColor: appearance.inputEditMessageAppearance.bodyTextStyle.foregroundColor
             ])
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
-                string: " " + SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration)),
+                string: " " + appearance.inputEditMessageAppearance.attachmentDurationFormatter.format(TimeInterval(duration)),
                 attributes: [
-                    .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                    .foregroundColor: appearance.actionMessageVoiceDurationColor ?? .accent
+                    .font: appearance.inputEditMessageAppearance.attachmentDurationLabelAppearance.font,
+                    .foregroundColor: appearance.inputEditMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
                 ]))
         }
         actionView.messageLabel.attributedText = messageAttributedString
         
         cachedMessage = inputTextView.attributedText
+        actionView.backgroundColor = appearance.inputEditMessageAppearance.backgroundColor
         actionView.isHidden = false
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
-        actionView.iconView.image = appearance.actionEditIcon
+        actionView.iconView.image = appearance.inputEditMessageAppearance.editIcon
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
         updateMediaButtonAppearance(isHidden: true)
@@ -818,7 +845,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
     
     open func addOrUpdateLinkPreview(linkDetails: LinkMetadata) {
-        guard mediaView.items.isEmpty
+        guard selectedMediaView.items.isEmpty
         else { return }
         
         if let last = self.lastDetectedLinkMetadata,
@@ -847,18 +874,22 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         
         let titleAttributedString = NSMutableAttributedString(
             string: linkDetails.url.absoluteString,
-            attributes: [.font: appearance.actionLinkPreviewTitleFont ?? Fonts.regular.withSize(13), .foregroundColor: appearance.actionLinkPreviewTitleColor ?? .accent])
+            attributes: [
+                .font: appearance.linkPreviewAppearance.titleLabelAppearance.font,
+                .foregroundColor: appearance.linkPreviewAppearance.titleLabelAppearance.foregroundColor
+            ])
         actionView.titleLabel.attributedText = titleAttributedString
         
         let messageAttributedString = NSMutableAttributedString(
             string: message,
             attributes: [
-                .font: appearance.actionMessageFont ?? Fonts.regular.withSize(13),
-                .foregroundColor: appearance.actionMessageColor ?? .secondaryText
+                .font: appearance.linkPreviewAppearance.descriptionLabelAppearance.font,
+                .foregroundColor: appearance.linkPreviewAppearance.descriptionLabelAppearance.foregroundColor
             ])
 
         actionView.messageLabel.attributedText = messageAttributedString
         
+        actionView.backgroundColor = appearance.linkPreviewAppearance.backgroundColor
         actionView.isHidden = false
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
@@ -867,7 +898,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         if let icon = linkDetails.image {
             actionView.imageView.image = icon
         } else {
-            actionView.imageView.image = .link
+            actionView.imageView.image = appearance.linkPreviewAppearance.placeholderIcon
         }
         
         actionViewHeightLayoutConstraint.constant = Layouts.actionViewHeight
@@ -918,7 +949,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         didSet {
             if style != oldValue {
                 let height = view.bounds.height
-                let mediaHeight = mediaView.constraints.first(where: { $0.firstAttribute == .height })
+                let mediaHeight = selectedMediaView.constraints.first(where: { $0.firstAttribute == .height })
                 let old = mediaHeight?.constant ?? 0
                 let new = style.preferredMediaHeight
                 mediaHeight?.constant = new
@@ -962,7 +993,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         guard let mutableText = textView.attributedText.mutableCopy() as? NSMutableAttributedString
         else { return }
         
-        let defaultFont = InputTextView.appearance.textFont
+        let defaultFont = appearance.inputAppearance.textInputAppearance.labelAppearance.font
         let attributes = mutableText.attributes(at: range.location, effectiveRange: nil)
         
         var isBold = false
@@ -1038,7 +1069,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     // MARK: UITextViewDelegate
 
     open func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-        textView.typingAttributes[.foregroundColor] = InputTextView.appearance.textColor
+        textView.typingAttributes[.foregroundColor] = appearance.inputAppearance.textInputAppearance.labelAppearance.foregroundColor
         
         if text == " " {
             (textView as? InputTextView)?.resetTypingAttributes()
@@ -1178,7 +1209,7 @@ public extension MessageInputViewController {
         case send(Bool)
         case cancel
         case didActivateState(State?)
-        case deleteMedia(AttachmentView)
+        case deleteMedia(AttachmentModel)
         case didStartRecording, didStopRecording
     }
 

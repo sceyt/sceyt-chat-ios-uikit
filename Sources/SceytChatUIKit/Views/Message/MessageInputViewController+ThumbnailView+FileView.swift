@@ -10,7 +10,7 @@ import UIKit
 
 extension MessageInputViewController.ThumbnailView {
     open class FileView: View {
-        public lazy var appearance = Components.messageInputViewController.appearance {
+        public lazy var appearance = Components.messageInputSelectedMediaView.appearance {
             didSet {
                 setupAppearance()
             }
@@ -36,10 +36,10 @@ extension MessageInputViewController.ThumbnailView {
         override open func setupAppearance() {
             super.setupAppearance()
             backgroundColor = appearance.fileAttachmentBackgroundColor
-            titleLabel.textColor = appearance.fileAttachmentTitleTextColor
-            titleLabel.font = appearance.fileAttachmentTitleTextFont
-            subtitleLabel.textColor = appearance.fileAttachmentSubtitleTextColor
-            subtitleLabel.font = appearance.fileAttachmentSubtitleTextFont
+            titleLabel.textColor = appearance.fileAttachmentNameLabelAppearance.foregroundColor
+            titleLabel.font = appearance.fileAttachmentNameLabelAppearance.font
+            subtitleLabel.textColor = appearance.fileAttachmentSizeLabelAppearance.foregroundColor
+            subtitleLabel.font = appearance.fileAttachmentSizeLabelAppearance.font
         }
         
         override open func setupLayout() {

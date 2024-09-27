@@ -43,7 +43,7 @@ public extension SceytChatUIKit.Theme {
         public var footnoteText: UIColor = DefaultColors.footnoteText
         public var onPrimary: UIColor = DefaultColors.onPrimary
         
-        public var stateWarning: UIColor = DefaultColors.stateWarning
+        public var stateWarning: UIColor = DefaultColors.defaultRed
         public var stateSuccess: UIColor = DefaultColors.stateSuccess
         public var stateAttention: UIColor = DefaultColors.stateAttention
     }

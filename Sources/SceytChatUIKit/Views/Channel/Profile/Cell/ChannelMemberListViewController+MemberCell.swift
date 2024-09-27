@@ -102,7 +102,7 @@ extension ChannelMemberListViewController {
                 }
                 
                 roleLabel.text = data.roleName == SceytChatUIKit.shared.config.memberRolesConfig.participant ? nil : data.roleName?.localizedCapitalized
-                statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(data.presence)
+                statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(data)
                 
                 imageTask = AvatarBuilder
                     .loadAvatar(into: avatarView,

@@ -2,92 +2,116 @@
 //  AppearanceProviding.swift
 //  SceytChatUIKit
 //
-//  Created by Hovsep Keropyan on 26.10.23.
-//  Copyright © 2023 Sceyt LLC. All rights reserved.
+//  Created by Arthur Avagyan on 23.09.24.
+//  Copyright © 2024 Sceyt LLC. All rights reserved.
 //
 
 import UIKit
 
-public protocol AppearanceProviding {
+/// A protocol that defines a type providing appearance configurations.
+///
+/// Types conforming to this protocol can supply appearance settings through
+/// both static and instance-level properties. Additionally, they can inherit
+/// appearance configurations from a parent appearance.
+public protocol AppearanceProviding: AnyObject {
+    /// The type representing the appearance configuration.
     associatedtype AppearanceType
+    
+    /// The default appearance configuration shared across all instances.
+    ///
+    /// This static property allows setting a global appearance that applies
+    /// to all instances unless overridden by a parent appearance.
     static var appearance: AppearanceType { get set }
+    
+    /// The instance's appearance configuration.
+    ///
+    /// If a `parentAppearance` is set, this property returns the parent's
+    /// appearance. Otherwise, it falls back to the static `appearance`.
     var appearance: AppearanceType { get }
+    
+    /// The parent appearance configuration, allowing instances to inherit
+    /// appearance settings from another source.
+    ///
+    /// This property can be used to override the default static appearance
+    /// on a per-instance basis.
+    var parentAppearance: AppearanceType? { get set }
 }
 
-public extension AppearanceProviding {
+/// Provides a default implementation of the `appearance` property for
+/// conforming types that are subclasses of `NSObject`.
+///
+/// - Note: This extension leverages the `parentAppearance` to determine
+///         the effective appearance. If `parentAppearance` is `nil`,
+///         it defaults to the static `appearance`.
+public extension AppearanceProviding where Self: NSObject {
+    /// The instance's appearance configuration.
+    ///
+    /// If a `parentAppearance` is set, returns it. Otherwise, returns the
+    /// static `appearance`.
     var appearance: AppearanceType {
-        Self.appearance
+        parentAppearance ?? Self.appearance
     }
 }
 
-public struct LabelAppearance {
-    public var foregroundColor: UIColor
-    public var font: UIFont
-    public var backgroundColor: UIColor = .clear
-}
-
-extension ChannelListViewController: AppearanceProviding {
-    public static var appearance = Appearance()
+/// An extension on `NSObject` to manage associated appearance objects.
+///
+/// This extension provides methods to get and set a parent appearance
+/// using Objective-C runtime functions. It uses associated objects to
+/// store appearance configurations dynamically.
+private extension NSObject {
+    /// A unique key used for associating appearance objects with instances.
+    ///
+    /// The `UInt8` type is used here to ensure a unique memory address.
+    static var parentAppearanceKey: UInt8 = 1
     
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var tabBarItemBadgeColor: UIColor? = .stateWarning
-        public var connectionIndicatorColor: UIColor? = .accent
-        public var navigationBarBackgroundColor: UIColor? = .background
-        
-        public init() {}
+    /// Retrieves the parent appearance for a specific `AppearanceType`.
+    ///
+    /// - Returns: An optional appearance object of type `A`.
+    ///
+    /// - Note: This method uses `objc_getAssociatedObject` to fetch the
+    ///         associated appearance object for the given type.
+    func getParentAppearance<A>() -> A? {
+        let key = ObjectIdentifier(A.self)
+        return objc_getAssociatedObject(self, &Self.parentAppearanceKey) as? A
+    }
+    
+    /// Sets the parent appearance for a specific `AppearanceType`.
+    ///
+    /// - Parameter appearance: The appearance object to associate with the instance.
+    ///
+    /// - Note: This method uses `objc_setAssociatedObject` to attach the
+    ///         appearance object to the instance dynamically.
+    func setParentAppearance<A>(_ appearance: A?) {
+        let key = ObjectIdentifier(A.self)
+        objc_setAssociatedObject(self, &Self.parentAppearanceKey, appearance, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
 }
 
-extension ChannelCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var separatorColor: UIColor? = .border
-        
-        public var unreadCountBackgroundColor: UIColor? = UIColor.accent
-        public var unreadCountMutedBackgroundColor: UIColor? = .surface3
-        public var unreadCountFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var unreadCountTextColor: UIColor? = .onPrimary
-        
-        public var subjectLabelFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var subjectLabelTextColor: UIColor? = UIColor.primaryText
-        
-        public var senderLabelFont: UIFont? = Fonts.regular.withSize(15)
-        public var senderLabelTextColor: UIColor? = UIColor.primaryText
-        
-        public var messageLabelFont: UIFont? = Fonts.regular.withSize(15)
-        public var messageLabelTextColor: UIColor? = UIColor.secondaryText
-        
-        public var deletedMessageFont: UIFont? = Fonts.regular.with(traits: .traitItalic).withSize(15)
-        public var deletedMessageColor: UIColor? = UIColor.secondaryText
-        
-        public var draftMessageTitleFont: UIFont? = Fonts.regular.withSize(15)
-        public var draftMessageTitleColor: UIColor? = UIColor.accent
-        
-        public var draftMessageContentFont: UIFont? = Fonts.regular.withSize(15)
-        public var draftMessageContentColor: UIColor? = UIColor.footnoteText
-        
-        public var dateLabelFont: UIFont? = Fonts.regular.withSize(14)
-        public var dateLabelTextColor: UIColor? = UIColor.secondaryText
-        
-        public var typingFont: UIFont? = Fonts.regular.with(traits: .traitItalic).withSize(15)
-        public var typingTextColor: UIColor? = UIColor.secondaryText
-        
-        public var mentionFont: UIFont? = Fonts.bold.withSize(15)
-        public var mentionColor: UIColor? = UIColor.secondaryText
-        
-        public var linkColor: UIColor? = UIColor.secondaryText
-        public var linkFont: UIFont? = Fonts.regular.withSize(15)
-        
-        public var ticksViewTintColor: UIColor? = .accent
-        public var ticksViewDisabledTintColor: UIColor? = UIColor.secondaryText
-        public var ticksViewErrorTintColor: UIColor? = UIColor.stateWarning
-        
-        public init() {}
+/// Provides a computed property for `parentAppearance` when conforming to
+/// `AppearanceProviding` and subclassing `NSObject`.
+///
+/// This extension bridges the `parentAppearance` property with the
+/// associated object storage methods defined in the `NSObject` extension.
+public extension AppearanceProviding where Self: NSObject {//}& Configurable {
+    /// The parent appearance configuration, allowing instances to inherit
+    /// appearance settings from another source.
+    ///
+    /// - Getter: Retrieves the associated parent appearance using `getParentAppearance`.
+    /// - Setter: Sets the associated parent appearance using `setParentAppearance`.
+    var parentAppearance: AppearanceType? {
+        get {
+            return getParentAppearance()
+        }
+        set {
+            setParentAppearance(newValue)
+            // Conditionally call `setupAppearance` if `self` conforms to `Configurable`
+            if let configurableSelf = self as? Configurable {
+                configurableSelf.setupAppearance()
+            }
+        }
     }
 }
+
 
 extension ChannelSwipeActionsConfiguration: AppearanceProviding {
     public static var appearance = Appearance()
@@ -129,48 +153,8 @@ extension ChannelSwipeActionsConfiguration: AppearanceProviding {
     }
 }
 
-extension ChannelViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var coverViewBackgroundColor: UIColor? = .clear
-        public var navigationBarBackgroundColor: UIColor? = .background
-        public var searchBarBackgroundColor: UIColor? = .surface1
-        public var searchBarActivityIndicatorColor: UIColor? = .iconInactive
-        
-        public var joinFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var joinColor: UIColor? = .accent
-        public var joinBackgroundColor: UIColor? = .surface1
-        public init() {}
-    }
-}
 
-extension ChannelViewController.HeaderView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var titleColor: UIColor? = UIColor.primaryText
-        public var titleFont: UIFont? = Fonts.semiBold.withSize(19)
-        
-        public var subtitleColor: UIColor? = UIColor.primaryText
-        public var subtitleFont: UIFont? = Fonts.regular.withSize(13)
-        
-        public init() {}
-    }
-}
 
-extension ChannelViewController.ScrollDownView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var unreadCountFont: UIFont? = Fonts.regular.withSize(12)
-        public var unreadCountTextColor: UIColor? = .onPrimary
-        public var unreadCountBackgroundColor: UIColor? = UIColor.accent
-        
-        public init() {}
-    }
-}
 
 extension MessageCell: AppearanceProviding {
     public static var appearance = Appearance()
@@ -217,9 +201,7 @@ extension MessageCell: AppearanceProviding {
         public var separatorViewTextColor: UIColor? = .onPrimary
         public var separatorViewTextBorderColor: UIColor? = .clear
         
-        public var newMessagesSeparatorViewBackgroundColor: UIColor? = Appearance.bubbleIncoming
-        public var newMessagesSeparatorViewFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var newMessagesSeparatorViewTextColor: UIColor? = .secondaryText
+        public var unreadMessagesSeparatorAppearance: UnreadMessagesSeparatorView.Appearance = .init(backgroundColor: Appearance.bubbleIncoming)
         
         public var infoViewStateFont: UIFont? = Fonts.regular.with(traits: .traitItalic).withSize(12)
         public var infoViewStateTextColor: UIColor? = UIColor.secondaryText
@@ -273,67 +255,9 @@ extension MessageCell: AppearanceProviding {
     }
 }
 
-extension MessageInputViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var videoAttachmentTimeTextColor: UIColor? = .onPrimary
-        public var videoAttachmentTimeTextFont: UIFont? = Fonts.regular.withSize(12)
-        public var videoAttachmentTimeBackgroundColor: UIColor? = .overlayBackground2
-        
-        public var fileAttachmentTitleTextColor: UIColor? = .primaryText
-        public var fileAttachmentTitleTextFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var fileAttachmentSubtitleTextColor: UIColor? = .secondaryText
-        public var fileAttachmentSubtitleTextFont: UIFont? = Fonts.regular.withSize(11)
-        public var fileAttachmentBackgroundColor: UIColor? = .surface1
-        
-        public var actionViewBackgroundColor: UIColor? = .surface1
-        public var actionReplyTitleColor: UIColor? = .accent
-        public var actionReplierTitleColor: UIColor? = .accent
-        public var actionReplyTitleFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var actionReplierTitleFont: UIFont? = Fonts.bold.withSize(13)
-        public var actionMessageColor: UIColor? = .secondaryText
-        public var actionMessageVoiceDurationColor: UIColor? = .accent
-        public var actionMessageFont: UIFont? = Fonts.regular.withSize(13)
-        public var actionLinkPreviewTitleFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var actionLinkPreviewTitleColor: UIColor? = .accent
-        public var actionReplyIcon: UIImage? = nil
-        public var actionEditIcon: UIImage? = nil
-        public var mediaViewBackgroundColor: UIColor? = .background
-        
-        public var dividerColor = UIColor.border
-        public var backgroundColor: UIColor? = UIColor.background
-        public var recorderBackgroundColor: UIColor? = .background
-        public var recorderPlayerBackgroundColor: UIColor? = .surface1
-        public var recorderDurationFont: UIFont? = Fonts.regular.withSize(12)
-        public var recorderDurationColor: UIColor? = .secondaryText
-        public var recorderActiveWaveColor: UIColor = .accent
-        public var recorderInActiveWaveColor: UIColor = .secondaryText
-        public var recorderSlideToCancelFont: UIFont? = Fonts.regular.withSize(16)
-        public var recorderSlideToCancelColor: UIColor? = .secondaryText
-        public var recorderCancelFont: UIFont? = Fonts.regular.withSize(16)
-        public var recorderCancelColor: UIColor? = .stateWarning
-        public var recorderRecordingDurationFont: UIFont? = Fonts.regular.withSize(16)
-        public var recorderRecordingDurationColor: UIColor? = .primaryText
-        public var recorderRecordingDotColor: UIColor? = DefaultColors.stateWarning
-        
-        public init() {}
-    }
-}
 
-extension MessageInputViewController.InputTextView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var borderColor: UIColor? = .clear
-        public var backgroundColor: UIColor? = .surface1
-        public var placeholderColor: UIColor? = .footnoteText
-        public var textFont: UIFont = Fonts.regular.withSize(16)
-        public var textColor: UIColor? = .primaryText
-        
-        public init() {}
-    }
-}
+
+
 
 extension ChannelInfoViewController: AppearanceProviding {
     public static var appearance = Appearance()
@@ -415,22 +339,6 @@ extension ChannelMemberListViewController.MemberCell: AppearanceProviding {
     }
 }
 
-extension BaseChannelUserCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .clear
-        public var separatorColor: UIColor? = UIColor.border
-        
-        public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var titleLabelTextColor: UIColor? = UIColor.primaryText
-        
-        public var statusLabelFont: UIFont? = Fonts.regular.withSize(13)
-        public var statusLabelTextColor: UIColor? = .secondaryText
-        
-        public init() {}
-    }
-}
 
 extension ChannelMemberListViewController.AddMemberCell: AppearanceProviding {
     public static var appearance = Appearance()
@@ -551,43 +459,6 @@ extension MediaPickerViewController.MediaCell: AppearanceProviding {
     }
 }
 
-extension CircularProgressView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var progressColor: UIColor? = .onPrimary
-        public var trackColor: UIColor? = .clear
-        public var timeTextFont: UIFont? = Fonts.regular.withSize(12)
-        public var timeBackgroundColor: UIColor? = .overlayBackground2
-        
-        public init() {}
-    }
-}
-
-extension MessageInputViewController.MentionUsersListViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .clear
-        public var tableViewBackgroundColor: UIColor? = .backgroundSections
-        public var shadowColor: UIColor? = .primaryText.withAlphaComponent(0.16)
-        
-        public init() {}
-    }
-}
-
-extension MessageInputViewController.MentionUsersListViewController.MentionUserCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var titleLabelTextColor: UIColor? = UIColor.primaryText
-        public var backgroundColor: UIColor? = .background
-        
-        public init() {}
-    }
-}
-
 // Helper
 public struct ContextualActionAppearance {
     public var style: UIContextualAction.Style
@@ -650,44 +521,6 @@ extension MediaPreviewerViewController: AppearanceProviding {
     }
 }
 
-extension ReactionPickerViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = UIColor.backgroundSections
-        public var moreButtonBackgroundColor: UIColor? = UIColor.surface2
-        public var selectedBackgroundColor: UIColor? = UIColor.surface2
-        
-        public init() {}
-    }
-}
-
-extension MenuController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = UIColor.surface1
-        
-        public init() {}
-    }
-}
-
-extension MenuCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .surface1
-        public var selectedBackgroundColor: UIColor? = .surface2
-        public var separatorColor: UIColor? = .border
-        public var imageTintColor: UIColor? = .primaryText
-        public var textColor: UIColor? = .primaryText
-        public var textFont: UIFont? = Fonts.regular.withSize(16)
-        public var destructiveTextColor: UIColor? = .stateWarning
-        public var destructiveImageTintColor: UIColor? = .stateWarning
-        
-        public init() {}
-    }
-}
 
 extension ReactionsInfoViewController: AppearanceProviding {
     public static var appearance = Appearance()
@@ -715,15 +548,6 @@ extension ReactionsInfoViewController.ReactionScoreCell: AppearanceProviding {
     }
 }
 
-extension ActionPresentationController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var dimColor: UIColor? = .overlayBackground1
-        
-        public init() {}
-    }
-}
 
 extension EmojiPickerViewController.SectionHeaderView: AppearanceProviding {
     public static var appearance = Appearance()
@@ -742,17 +566,6 @@ extension ImagePreviewViewController: AppearanceProviding {
     public struct Appearance {
         public var backgroundColor: UIColor? = .background
         public var separatorColor: UIColor? = .border
-        
-        public init() {}
-    }
-}
-
-extension MessageInputViewController.SelectedMessagesActionsView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor = UIColor.background
-        public var dividerColor = UIColor.border
         
         public init() {}
     }
@@ -786,26 +599,6 @@ extension SheetViewController: AppearanceProviding {
     }
 }
 
-extension BottomSheet: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background,
-                                                                                 UIColor.surface2)
-        public var titleFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var titleColor: UIColor? = .secondaryText
-        public var buttonFont: UIFont? = Fonts.regular.withSize(16)
-        public var normalTextColor: UIColor? = .primaryText
-        public var normalIconColor: UIColor? = .accent
-        public var destructiveTextColor: UIColor? = .stateWarning
-        public var destructiveIconColor: UIColor? = .stateWarning
-        public var cancelFont: UIFont? = Fonts.semiBold.withSize(18)
-        public var cancelTextColor: UIColor? = .accent
-        public var separatorColor: UIColor? = .border
-        
-        public init() {}
-    }
-}
 
 extension Alert: AppearanceProviding {
     public static var appearance = Appearance()
@@ -830,38 +623,12 @@ extension Alert: AppearanceProviding {
     }
 }
 
-extension SeparatorHeaderView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .surface1
-        public var textColor: UIColor? = UIColor.secondaryText
-        public var font: UIFont? = Fonts.semiBold.withSize(13)
-        public var textAlignment: NSTextAlignment = .left
-        
-        public init() {}
-    }
-}
 
 extension SelectUsersViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .background
-        
-        public init() {}
-    }
-}
-
-extension SearchController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var font: UIFont? = Fonts.regular.withSize(16)
-        public var textColor: UIColor? = .primaryText
-        public var placeholderColor: UIColor? = .footnoteText
-        public var tintColor: UIColor? = .accent
         
         public init() {}
     }
@@ -1006,18 +773,6 @@ extension ReactedUserListViewController.UserReactionCell: AppearanceProviding {
     }
 }
 
-extension EmptyStateView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(20)
-        public var messageLabelFont: UIFont? = Fonts.regular.withSize(15)
-        public var titleLabelColor: UIColor? = .primaryText
-        public var messageLabelColor: UIColor? = .secondaryText
-    }
-}
 
 extension ChannelCreatedView: AppearanceProviding {
     public static var appearance = Appearance()
@@ -1035,33 +790,7 @@ extension ChannelCreatedView: AppearanceProviding {
     }
 }
 
-extension MessageInputViewController.CoverView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-        public var labelFont: UIFont? = Fonts.regular.withSize(16)
-        public var labelColor: UIColor? = .primaryText
-        public var iconColor: UIColor? = .accent
-        public var separatorColor: UIColor? = .border
-    }
-}
 
-extension MessageInputViewController.MessageSearchControlsView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var separatorColor: UIColor? = .border
-        public var backgroundColor: UIColor? = .background
-        public var buttonTintColor: UIColor? = .accent
-        public var textColor: UIColor? = .primaryText
-        public var textFont: UIFont? = Fonts.regular.withSize(16)
-    }
-}
 
 extension EmojiSectionToolBar: AppearanceProviding {
     public static var appearance = Appearance()
@@ -1122,12 +851,3 @@ extension ForwardViewController: AppearanceProviding {
     }
 }
 
-extension ChannelSearchResultsViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-    }
-}

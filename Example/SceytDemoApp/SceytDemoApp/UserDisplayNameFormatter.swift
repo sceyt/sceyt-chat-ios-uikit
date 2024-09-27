@@ -1,6 +1,6 @@
 //
 //  UserDisplayNameFormatter.swift
-//  SceytDemoApp
+//  SceytChatUIKit
 //
 //  Created by Arthur Avagyan on 24.05.24.
 //  Copyright © 2024 Sceyt LLC. All rights reserved.

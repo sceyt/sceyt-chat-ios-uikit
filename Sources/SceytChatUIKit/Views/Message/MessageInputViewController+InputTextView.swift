@@ -18,24 +18,24 @@ extension MessageInputViewController {
         open var typingEvent = PassthroughSubject<Bool, Never>()
 
         open func _setCGColors() {
-            layer.borderColor = appearance.borderColor?.cgColor
+            layer.borderColor = appearance.textInputAppearance.borderColor
         }
         
         open override func setup() {
             super.setup()
             textContainerInset = .init(top: 8, left: 12, bottom: 8, right: 12)
-            placeholder = L10n.Message.Input.placeholder
-            layer.borderWidth = 0.5
-            layer.cornerRadius = 18
+            placeholder = appearance.textInputAppearance.placeholder
+            layer.borderWidth = appearance.textInputAppearance.borderWidth
+            layer.cornerRadius = appearance.textInputAppearance.cornerRadius
             allowsEditingTextAttributes = true
         }
         
         open override func setupAppearance() {
             super.setupAppearance()
-            font = appearance.textFont
-            textColor = appearance.textColor
-            placeholderColor = appearance.placeholderColor
-            backgroundColor = appearance.backgroundColor
+            font = appearance.textInputAppearance.labelAppearance.font
+            textColor = appearance.textInputAppearance.labelAppearance.foregroundColor
+            placeholderColor = appearance.textInputAppearance.placeholderAppearance.foregroundColor
+            backgroundColor = appearance.textInputAppearance.backgroundColor
             _setCGColors()
         }
         
@@ -91,7 +91,7 @@ extension MessageInputViewController {
             let mPastedAttributedString = NSMutableAttributedString(string: pastedAttributedString.string)
             pastedAttributedString.enumerateAttributes(in: .init(location: 0, length: pastedAttributedString.length)) { value, range, pointer in
                 if let font = value[.font] as? UIFont {
-                    var newFont = InputTextView.appearance.textFont
+                    var newFont = appearance.textInputAppearance.labelAppearance.font
                     if font.isBold {
                         newFont = newFont.bold
                     }
@@ -111,7 +111,7 @@ extension MessageInputViewController {
                 }
             }
             mPastedAttributedString.addAttribute(.foregroundColor,
-                                                 value: appearance.textColor as Any,
+                                                 value: appearance.textInputAppearance.labelAppearance.foregroundColor,
                                                  range: .init(location: 0, length: mPastedAttributedString.length))
             let mAttributedText = attributedText.mutableCopy() as! NSMutableAttributedString
             let range = selectedRange
@@ -121,8 +121,8 @@ extension MessageInputViewController {
         }
         
         open func resetTypingAttributes() {
-            typingAttributes[.font] = appearance.textFont
-            typingAttributes[.foregroundColor] = appearance.textColor
+            typingAttributes[.font] = appearance.textInputAppearance.labelAppearance.font
+            typingAttributes[.foregroundColor] = appearance.textInputAppearance.labelAppearance.foregroundColor
             typingAttributes[.underlineStyle] = nil
             typingAttributes[.strikethroughStyle] = nil
         }

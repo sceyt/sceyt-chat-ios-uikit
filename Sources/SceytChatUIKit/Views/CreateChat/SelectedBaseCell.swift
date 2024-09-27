@@ -11,7 +11,7 @@ import UIKit
 open class SelectedUserCell: SelectedBaseCell {
     open var userData: ChatUser! {
         didSet {
-            label.text = SceytChatUIKit.shared.formatters.userNameFormatter.short(userData)
+            label.text = SceytChatUIKit.shared.formatters.userShortNameFormatter.format(userData)
             presenceView.isHidden = userData.presence.state != .online
             avatarView.imageView.image = .deletedUser
             imageTask = Components.avatarBuilder.loadAvatar(into: avatarView, for: userData)
@@ -23,7 +23,7 @@ open class SelectedChannelCell: SelectedBaseCell {
     open var channelData: ChatChannel! {
         didSet {
             if let peer = channelData.peer {
-                label.text = SceytChatUIKit.shared.formatters.userNameFormatter.short(peer)
+                label.text = SceytChatUIKit.shared.formatters.userShortNameFormatter.format(peer)
             } else {
                 label.text = channelData.subject
             }

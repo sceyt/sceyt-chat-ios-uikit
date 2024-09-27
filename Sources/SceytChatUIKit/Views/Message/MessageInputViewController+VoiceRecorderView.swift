@@ -11,11 +11,6 @@ import UIKit
 
 extension MessageInputViewController {
     open class VoiceRecorderView: View {
-        public lazy var appearance = MessageInputViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
         
         enum Event {
             case
@@ -46,36 +41,36 @@ extension MessageInputViewController {
                 guard let self else { return }
                 switch state {
                 case .unlock:
-                    var lockImage = UIImage.audioPlayerUnlock
+                    var lockImage = appearance.unlockedIcon
                     if MessageInputViewController.Layouts.recorderShadowBlur > 0 {
                         lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: MessageInputViewController.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
-                    self.micButton.setImage(.audioPlayerMicGreen, for: [])
+                    self.micButton.setImage(appearance.recordingIcon, for: [])
                 case .lock:
-                    var lockImage = UIImage.audioPlayerLock
+                    var lockImage = appearance.lockedIcon
                     if MessageInputViewController.Layouts.recorderShadowBlur > 0 {
                         lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: MessageInputViewController.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
-                    self.micButton.setImage(.audioPlayerMicGreen, for: [])
+                    self.micButton.setImage(appearance.recordingIcon, for: [])
                 case .locked:
-                    var lockImage = UIImage.audioPlayerStop
+                    var lockImage = appearance.stopRecordingIcon
                     if MessageInputViewController.Layouts.recorderShadowBlur > 0 {
                         lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: MessageInputViewController.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
-                    self.micButton.setImage(.audioPlayerSendLarge, for: [])
+                    self.micButton.setImage(appearance.sendVoiceIcon, for: [])
                 case .cancel:
                     self.lockButton.setImage(nil, for: [])
-                    self.micButton.setImage(.audioPlayerDelete, for: [])
+                    self.micButton.setImage(appearance.deleteRecordIcon, for: [])
                 case .recorded:
-                    var lockImage = UIImage.audioPlayerUnlock
+                    var lockImage = appearance.unlockedIcon
                     if MessageInputViewController.Layouts.recorderShadowBlur > 0 {
                         lockImage = Components.imageBuilder.addShadow(to: lockImage, blur: MessageInputViewController.Layouts.recorderShadowBlur)
                     }
                     self.lockButton.setImage(lockImage, for: [])
-                    self.micButton.setImage(.audioPlayerMicGreen, for: [])
+                    self.micButton.setImage(appearance.recordingIcon, for: [])
                     
                     if let recorder = self.recorder,
                        recorder.audioRecorder?.isRecording == true
@@ -285,6 +280,7 @@ extension MessageInputViewController {
             super.setupAppearance()
             
             backgroundColor = .clear
+            slidingView.appearance = appearance
         }
         
         override open func setup() {
@@ -354,160 +350,6 @@ extension MessageInputViewController {
         
         open func stopAndPreview() {
             state = .recorded
-        }
-    }
-}
-
-extension MessageInputViewController.VoiceRecorderView {
-    private class SlidingView: View {
-        public lazy var appearance = MessageInputViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
-        let onCancel: () -> Void
-        var duration: Double = 0.0 {
-            didSet {
-                durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)
-            }
-        }
-        
-        enum State {
-            case unlock, locked, delete
-        }
-        
-        var state = State.unlock {
-            didSet {
-                UIView.performWithoutAnimation {
-                    switch state {
-                    case .unlock:
-                        slideButton.setAttributedTitle(.init(
-                            string: L10n.Recorder.slideToCancel, attributes: [
-                                .font: appearance.recorderSlideToCancelFont as Any,
-                                .foregroundColor: appearance.recorderSlideToCancelColor as Any
-                            ]
-                        ), for: [])
-                    case .locked:
-                        slideButton.setAttributedTitle(.init(
-                            string: L10n.Recorder.cancel, attributes: [
-                                .font: appearance.recorderCancelFont as Any,
-                                .foregroundColor: appearance.recorderCancelColor as Any
-                            ]
-                        ), for: [])
-                    case .delete:
-                        slideButton.setAttributedTitle(nil, for: [])
-                    }
-                    slideButton.layoutIfNeeded()
-                }
-            }
-        }
-        
-        private let line = UIView()
-        
-        private let dotView = DotView()
-        private lazy var durationLabel = {
-            $0.text = "0:00"
-            return $0
-        }(UILabel())
-        
-        fileprivate let slideButton = UIButton()
-        
-        private lazy var row = UIStackView(row: dotView, durationLabel, spacing: 8, alignment: .center)
-        
-        init(frame: CGRect = .zero, onCancel: @escaping (() -> Void)) {
-            self.onCancel = onCancel
-            super.init(frame: frame)
-            
-            state = .unlock
-        }
-        
-        @available(*, unavailable)
-        required init?(coder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-        
-        override func setupAppearance() {
-            super.setupAppearance()
-            
-            backgroundColor = appearance.recorderBackgroundColor
-            line.backgroundColor = appearance.dividerColor
-            durationLabel.font = appearance.recorderRecordingDurationFont
-            durationLabel.textColor = appearance.recorderRecordingDurationColor
-        }
-        
-        override func setup() {
-            super.setup()
-            
-            slideButton.addTarget(self, action: #selector(onTapCancel), for: .touchUpInside)
-        }
-        
-        override func setupLayout() {
-            super.setupLayout()
-            
-            addSubview(line.withoutAutoresizingMask)
-            
-            line.pin(to: self, anchors: [.top, .leading, .trailing])
-            line.resize(anchors: [.height(0.5)])
-            
-            addSubview(row.withoutAutoresizingMask)
-            addSubview(slideButton.withoutAutoresizingMask)
-            row.pin(to: self, anchors: [.leading(12), .top(16)])
-            resize(anchors: [.height(52)])
-            slideButton.centerXAnchor.pin(to: centerXAnchor)
-            slideButton.centerYAnchor.pin(to: row.centerYAnchor)
-            
-            dotView.resize(anchors: [.height(8), .width(8)])
-        }
-        
-        @objc
-        private func onTapCancel() {
-            onCancel()
-        }
-        
-        func stopAnimating() {
-            dotView.stopAnimating()
-        }
-        
-        func startAnimating() {
-            dotView.startAnimating()
-        }
-    }
-}
-
-extension MessageInputViewController.VoiceRecorderView {
-    private class DotView: View {
-        public lazy var appearance = MessageInputViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
-        override func setupAppearance() {
-            super.setupAppearance()
-            
-            backgroundColor = appearance.recorderRecordingDotColor
-        }
-        
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            layer.cornerRadius = height / 2
-        }
-        
-        func stopAnimating() {
-            layer.removeAnimation(forKey: "pulsating")
-        }
-        
-        func startAnimating() {
-            stopAnimating()
-            let animation = CABasicAnimation(keyPath: "opacity")
-            animation.fromValue = 1
-            animation.toValue = 0
-            animation.duration = 0.5
-            animation.autoreverses = true
-            animation.repeatCount = .infinity
-            animation.isRemovedOnCompletion = false
-            layer.add(animation, forKey: "pulsating")
         }
     }
 }

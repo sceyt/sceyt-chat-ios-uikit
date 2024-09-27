@@ -16,3 +16,4 @@ public struct UserDefaultAvatarProvider: UserAvatarProviding {
         }
     }
 }
+

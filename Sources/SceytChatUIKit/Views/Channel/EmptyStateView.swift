@@ -63,9 +63,9 @@ open class EmptyStateView: View {
         iconView.isHidden = true
         titleLabel.isHidden = true
         messageLabel.isHidden = true
-        titleLabel.font = appearance.titleLabelFont
-        messageLabel.font = appearance.messageLabelFont
-        titleLabel.textColor = appearance.titleLabelColor
-        messageLabel.textColor = appearance.messageLabelColor
+        titleLabel.font = appearance.titleLabelAppearance?.font
+        messageLabel.font = appearance.messageLabelAppearance?.font
+        titleLabel.textColor = appearance.titleLabelAppearance?.foregroundColor
+        messageLabel.textColor = appearance.messageLabelAppearance?.foregroundColor
     }
 }

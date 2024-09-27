@@ -19,7 +19,8 @@ extension MediaPickerViewController {
         lazy var titleLabel = UILabel()
             .withoutAutoresizingMask
         
-        lazy var selectedCountLabel = BadgeView()
+        lazy var selectedCountLabel = Components.badgeView
+            .init()
             .withoutAutoresizingMask
         
         override open func setup() {

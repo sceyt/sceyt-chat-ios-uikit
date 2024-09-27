@@ -23,16 +23,16 @@ open class UserSendMessage {
     open var mentionUsers: [(id: UserId, displayName: String)]?
     open var metadata: String?
     open var bodyAttributes: [ChatMessage.BodyAttribute]?
-    open var attachments: [AttachmentView]?
+    open var attachments: [AttachmentModel]?
     open var type = ChannelViewModel.MessageType.text
     open var linkMetadata: LinkMetadata?
     
-    open var linkAttachments: [AttachmentView] {
+    open var linkAttachments: [AttachmentModel] {
         Self.createLinkAttachmentsFrom(text: text, linkMetaData: linkMetadata)
     }
     
     public required init(sendText: NSAttributedString,
-                         attachments: [AttachmentView]? = nil,
+                         attachments: [AttachmentModel]? = nil,
                          linkMetadata: LinkMetadata? = nil
     ) {
         let sendText = sendText.trimWhitespacesAndNewlines().mutableCopy() as! NSMutableAttributedString
@@ -99,10 +99,10 @@ open class UserSendMessage {
         }
     }
     
-    open class func createLinkAttachmentsFrom(text: String, linkMetaData: LinkMetadata?) -> [AttachmentView] {
+    open class func createLinkAttachmentsFrom(text: String, linkMetaData: LinkMetadata?) -> [AttachmentModel] {
         DataDetector.getLinks(text: text)
             .map { url in
-                AttachmentView(link: url, linkMetaData: linkMetaData, hideLinkDetails: linkMetaData == nil)
+                AttachmentModel(link: url, linkMetaData: linkMetaData, hideLinkDetails: linkMetaData == nil)
             }
     }
     
@@ -133,7 +133,7 @@ public enum AttachmentType: String {
     }
 }
 
-public struct AttachmentView {
+public struct AttachmentModel {
     public let url: URL
     public var resizedFileUrl: URL?
     public let thumbnail: UIImage
@@ -326,7 +326,7 @@ public struct AttachmentView {
         self.hideLinkDetails = hideLinkDetails
     }
     
-    static func view(from asset: PHAsset, completion: @escaping (AttachmentView?) -> Void, progressHandler: ((Float) -> Void)? = nil) {
+    static func view(from asset: PHAsset, completion: @escaping (AttachmentModel?) -> Void, progressHandler: ((Float) -> Void)? = nil) {
         if asset.mediaType == .image {
             let options: PHContentEditingInputRequestOptions = .init()
             options.isNetworkAccessAllowed = true
@@ -353,7 +353,7 @@ public struct AttachmentView {
                             if imageUrl == nil {
                                 imageUrl = fileUrl
                             }
-                            var v = AttachmentView(
+                            var v = AttachmentModel(
                                 mediaUrl: imageUrl ?? fullSizeImageURL,
                                 thumbnail: value.displaySizeImage
                             )
@@ -405,7 +405,7 @@ public struct AttachmentView {
                             duration = Int(slowMoDuration)
                         }
                         
-                        var v = AttachmentView(
+                        var v = AttachmentModel(
                             mediaUrl: URL(string: "local:///local/\(asset.localIdentifier)")!,
                             thumbnail: image,
                             imageSize: image.size,
@@ -428,10 +428,10 @@ public struct AttachmentView {
         }
     }
     
-    public static func items(attachments: [ChatMessage.Attachment]) -> [AttachmentView] {
+    public static func items(attachments: [ChatMessage.Attachment]) -> [AttachmentModel] {
         attachments
             .compactMap { Components.storage.fileUrl(for: $0) }
-            .compactMap { AttachmentView(mediaUrl: $0, thumbnail: nil) }
+            .compactMap { AttachmentModel(mediaUrl: $0, thumbnail: nil) }
     }
 }
 

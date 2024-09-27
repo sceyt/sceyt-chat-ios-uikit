@@ -326,8 +326,6 @@ open class MessageCell: CollectionViewCell,
                 return
             }
             infoView.tickView.image = deliveryStatusImage(deliveryStatus)
-                .withRenderingMode(.alwaysTemplate)
-            infoView.tickView.tintColor = deliveryStatusColor(deliveryStatus)
         }
     }
     
@@ -351,9 +349,9 @@ open class MessageCell: CollectionViewCell,
         case .pending:
             return .pendingMessage
         case .received:
-            return .deliveredMessage
+            return .receivedMessage
         case .displayed:
-            return .readMessage
+            return .displayedMessage
         case .failed:
             return .failedMessage
         }

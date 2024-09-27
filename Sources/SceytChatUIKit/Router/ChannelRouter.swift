@@ -33,7 +33,7 @@ open class ChannelRouter: Router<ChannelViewController> {
 
     open func showAttachment(_ attachment: ChatMessage.Attachment) {
         
-        let items = AttachmentView.items(attachments: [attachment])
+        let items = AttachmentModel.items(attachments: [attachment])
         guard !items.isEmpty else { return }
         let preview = FilePreviewController(
             items: items

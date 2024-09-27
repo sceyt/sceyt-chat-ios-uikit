@@ -10,7 +10,7 @@ import UIKit
 
 extension MessageInputViewController {
     open class ThumbnailView: View {
-        public lazy var appearance = Components.messageInputViewController.appearance {
+        public lazy var appearance = Components.messageInputSelectedMediaView.appearance {
             didSet {
                 setupAppearance()
             }
@@ -33,12 +33,12 @@ extension MessageInputViewController {
         
         override open func setup() {
             super.setup()
-            closeButton.setImage(Images.closeCircle, for: .normal)
             closeButton.addTarget(self, action: #selector(deleteAction), for: .touchUpInside)
         }
 
         override open func setupAppearance() {
             super.setupAppearance()
+            closeButton.setImage(appearance.removeAttachmentIcon, for: .normal)
         }
 
         override open func setupLayout() {

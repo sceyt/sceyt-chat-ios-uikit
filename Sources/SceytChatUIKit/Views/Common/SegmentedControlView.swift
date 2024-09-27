@@ -188,7 +188,8 @@ public protocol SegmentedControler {
 
 public extension SegmentedControler where Self: UIControl {}
 
-open class NativeSegmentedController: UIControl, SegmentedControler {
+open class NativeSegmentedController: UIControl, SegmentedControler, Configurable {
+    
     public var currentSegmentIndex: Int {
         get {
             segmentedControl.selectedSegmentIndex
@@ -234,14 +235,20 @@ open class NativeSegmentedController: UIControl, SegmentedControler {
         setup()
         setupLayout()
         setupAppearance()
+        setupDone()
     }
     
     public required init?(coder: NSCoder) {
         segmentedControl = .init().withoutAutoresizingMask
         super.init(coder: coder)
+        
+        setup()
+        setupLayout()
+        setupAppearance()
+        setupDone()
     }
     
-    func setup() {
+    open func setup() {
         _observer = segmentedControl.observe(\.selectedSegmentIndex, options: [.new, .old]) { [weak self] _, _ in
             guard let self = self else { return }
             self.delegate?.didSelectSegment(at: self.segmentedControl.selectedSegmentIndex)
@@ -252,7 +259,7 @@ open class NativeSegmentedController: UIControl, SegmentedControler {
         }
     }
 
-    func setupLayout() {
+    open func setupLayout() {
         addSubview(segmentedControl)
         addSubview(bottomBorder)
         addSubview(line)
@@ -262,7 +269,7 @@ open class NativeSegmentedController: UIControl, SegmentedControler {
         bottomBorder.resize(anchors: [.height(Layouts.bottomSeparatorHeight)])
     }
 
-    func setupAppearance() {
+    open func setupAppearance() {
         backgroundColor = appearance.backgroundColor
         layer.cornerRadius = Layouts.cornerRadius
         layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
@@ -280,6 +287,10 @@ open class NativeSegmentedController: UIControl, SegmentedControler {
 
         segmentedControl.setBackgroundImage(UIImage(), for: .normal, barMetrics: .default)
         segmentedControl.setDividerImage(UIImage(), forLeftSegmentState: [], rightSegmentState: [], barMetrics: .default)
+    }
+    
+    open func setupDone() {
+        
     }
     
     private var lineWidth: CGFloat {

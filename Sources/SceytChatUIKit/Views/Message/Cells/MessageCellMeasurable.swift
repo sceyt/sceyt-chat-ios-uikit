@@ -10,5 +10,5 @@ import Foundation
 
 public protocol MessageCellMeasurable: Measurable {
     associatedtype Model = MessageLayoutModel
-    associatedtype Appearance = MessageCell.Appearance
+    associatedtype AppearanceType = MessageCell.Appearance
 }

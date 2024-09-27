@@ -20,23 +20,17 @@ extension ChannelViewController {
             .init()
             .withoutAutoresizingMask
         
-        public lazy var appearance = MessageCell.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
         open override func setupAppearance() {
             super.setupAppearance()
             titleLabel.isHidden = true
-            backgroundColor = appearance.separatorViewBackgroundColor
-            titleLabel.backgroundColor = appearance.separatorViewTextBackgroundColor
-            titleLabel.font = appearance.separatorViewFont
+            backgroundColor = appearance.backgroundColor
+            titleLabel.backgroundColor = appearance.labelAppearance.backgroundColor
+            titleLabel.font = appearance.labelAppearance.font
             titleLabel.textAlignment = .center
-            titleLabel.textColor = appearance.separatorViewTextColor
+            titleLabel.textColor = appearance.labelAppearance.foregroundColor
             titleLabel.clipsToBounds = true
             titleLabel.layer.borderWidth = 1
-            titleLabel.layer.borderColor = appearance.separatorViewTextBorderColor?.cgColor
+            titleLabel.layer.borderColor = appearance.labelBorderColor
             titleLabel.layer.cornerRadius = 10
         }
         

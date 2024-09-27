@@ -19,17 +19,29 @@ extension SceytChatUIKit {
     public struct Formatters {
         public var userNameFormatter: any UserFormatting = UserNameFormatter()
         
-        public var userPresenceDateFormatter: any UserPresenceFormatting = UserPresenceDateFormatter()
+        public var userShortNameFormatter: any UserFormatting = UserShortNameFormatter()
+        
+        public var userPresenceDateFormatter: any UserFormatting = UserPresenceDateFormatter()
         
         public var channelDateFormatter: any DateFormatting = ChannelDateFormatter()
         
         public var channelNameFormatter: any ChannelFormatting = ChannelNameFormatter()
+        
+        public var channelSubtitleFormatter: any ChannelFormatting = ChannelSubtitleFormatter()
         
         public var channelUnreadCountFormatter: any UIntFormatting = ChannelUnreadCountFormatter()
         
         public var messageInfoDateFormatter: any DateFormatting = MessageInfoDateFormatter()
         
         public var messageViewCountFormatter: any UIntFormatting = MessageViewsCountFormatter()
+        
+        public var channelLastMessageSenderNameFormatter: any ChannelFormatting = ChannelLastMessageSenderNameFormatter()
+        
+        public var mentionUserNameFormatter: any UserFormatting = UserNameFormatter()
+        
+        public var reactedUserNameFormatter: any ChannelFormatting = ReactedUserNameFormatter()
+        
+        public var typingUserNameFormatter: any UserFormatting = UserShortNameFormatter()
 
         public var mediaDurationFormatter: any TimeIntervalFormatting = MediaDurationFormatter()
         
@@ -46,6 +58,8 @@ extension SceytChatUIKit {
         public var channelProfileFileTimestamp: any DateFormatting = ChannelInfoMediaSeparatorDateFormatter()
 
         public var mediaPreviewDateFormatter: any DateFormatting = MediaPreviewDateFormatter()
+        
+        public var attachmentNameFormatter: any AttachmentFormatting = AttachmentNameFormatter()
         
         public var logDateFormatter: any DateFormatting = LogDateFormatter()
         

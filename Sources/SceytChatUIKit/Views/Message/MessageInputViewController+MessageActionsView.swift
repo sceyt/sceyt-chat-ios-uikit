@@ -60,9 +60,7 @@ extension MessageInputViewController {
         
         override open func setup() {
             super.setup()
-            
-            backgroundColor = appearance.actionViewBackgroundColor
-            
+                        
             titleLabel.textAlignment = .left
             titleLabel.lineBreakMode = .byTruncatingTail
 
@@ -74,7 +72,7 @@ extension MessageInputViewController {
             
             mediaTimestampLabel.isHidden = true
             
-            cancelButton.setImage(.replyX, for: .normal)
+            cancelButton.setImage(appearance.closeIcon, for: .normal)
             
             playView.image = .replyPlay
         }
@@ -102,12 +100,6 @@ extension MessageInputViewController {
             
             imageView.layer.cornerRadius = 4
             imageView.layer.masksToBounds = true
-            
-            titleLabel.textColor = appearance.actionReplyTitleColor
-            titleLabel.font = appearance.actionReplyTitleFont
-            
-            messageLabel.textColor = appearance.actionMessageColor
-            messageLabel.font = appearance.actionMessageFont
         }
     }
 }

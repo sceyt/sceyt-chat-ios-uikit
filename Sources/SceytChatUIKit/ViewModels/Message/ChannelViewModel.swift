@@ -1519,7 +1519,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                             self.channelObserver.refresh(at: .zero)
                         }
                     }
-                    self.event = .changePresence(userPresence: presence.presence)
+                    self.event = .changePresence(userPresence: presence)
                     self.peerPresence = presence.presence
                 }
             }
@@ -1810,14 +1810,14 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         selectedMessageForAction = nil
     }
     
-    open func separatorDateForMessage(at indexPath: IndexPath) -> String? {
+    open func separatorDateForMessage(at indexPath: IndexPath, with appearance: ChannelViewController.DateSeparatorView.Appearance) -> String? {
         let firstPath = IndexPath(row: 0, section: indexPath.section)
         guard let current = message(at: firstPath) else { return nil }
         
         guard indexPath.section > 0,
               let prev = message(at: .init(row: 0,
                                            section: indexPath.section - 1)) else {
-            return SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter.format(current.createdAt)
+            return appearance.dateFormatter.format(current.createdAt)
         }
         
         let calendar = Calendar.current
@@ -1825,7 +1825,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                                     equalTo: current.createdAt,
                                     toGranularity: .day) ? current.createdAt : nil
         if let date {
-            return SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter.format(date)
+            return appearance.dateFormatter.format(date)
         }
         return nil
     }
@@ -1873,44 +1873,23 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     // MARK: view titles
-    open var title: String {
+    func getTitleForHeader(with appearance: ChannelViewController.HeaderView.Appearance) -> String {
         (isThread ?
          SceytChatUIKit.shared.formatters.userNameFormatter.format(threadMessage!.user) :
-            SceytChatUIKit.shared.formatters.channelNameFormatter.format(channel))
+            appearance.titleFormatter.format(channel))
         .trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
-    open var subTitle: String? {
+    func getSubtitleForHeader(with appearance: ChannelViewController.HeaderView.Appearance) -> String {
         if channel.isSelfChannel {
             return L10n.Channel.Self.hint
         }
         let memberCount = (isThread ||
                            channel.isDirect) ? 0 : channel.memberCount
-        var subTitle: String?
         
-        switch memberCount {
-        case 1:
-            if channel.channelType == .group {
-                subTitle = L10n.Channel.MembersCount.one
-            } else {
-                subTitle = L10n.Channel.SubscriberCount.one
-            }
-        case 2...:
-            if channel.channelType == .group {
-                subTitle = L10n.Channel.MembersCount.more(Int(memberCount))
-            } else {
-                subTitle = L10n.Channel.SubscriberCount.more(Int(memberCount))
-            }
-        default:
-            if let presence = peerPresence {
-                subTitle = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(presence: presence))
-            } else if let presence = channel.peer?.presence {
-                subTitle = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(presence)
-            }
-        }
-        return subTitle
+        return appearance.subtitleFormatter.format(channel)
     }
-    
+        
     open var draftMessage: NSAttributedString? {
         channel.draftMessage
     }
@@ -2179,7 +2158,7 @@ public extension ChannelViewModel {
         case scrollAndSelect(indexPath: IndexPath, messageId: MessageId)
         case didSetUnreadIndexPath(indexPath: IndexPath)
         case typing(isTyping: Bool, user: ChatUser)
-        case changePresence(userPresence: Presence)
+        case changePresence(userPresence: UserPresence)
         case updateChannel
         case showNoMessage
         case connection(state: ConnectionState)

@@ -13,7 +13,8 @@ extension ChannelViewController {
         open lazy var bubbleView = UIImageView()
             .withoutAutoresizingMask
         
-        open lazy var unreadCount = BadgeView()
+        open lazy var unreadCount = Components.badgeView
+            .init()
             .withoutAutoresizingMask
             .contentCompressionResistancePriorityH(.required)
         
@@ -37,10 +38,11 @@ extension ChannelViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            bubbleView.image = ImageBuilder.addShadow(to: .channelUnreadBubble, blur: 12)
-            unreadCount.font = appearance.unreadCountFont
-            unreadCount.textColor = appearance.unreadCountTextColor
-            unreadCount.backgroundColor = appearance.unreadCountBackgroundColor
+            bubbleView.image = ImageBuilder.addShadow(to: appearance.icon,
+                                                      blur: 12)
+            unreadCount.font = appearance.unreadCountLabelAppearance.font
+            unreadCount.textColor = appearance.unreadCountLabelAppearance.foregroundColor
+            unreadCount.backgroundColor = appearance.unreadCountLabelAppearance.backgroundColor
         }
     }
     

@@ -15,5 +15,7 @@ extension SceytChatUIKit {
         public var channelURIValidationMessageProvider: any ChannelURIValidationMessageProviding = ChannelURIValidationMessageProvider()
         public var attachmentIconProvider: any AttachmentIconProviding = AttachmentIconProvider()
         public var channelListAttachmentIconProvider: any AttachmentIconProviding = ChannelListAttachmentIconProvider()
+        public var connectionStateProvider: any ConnectionStateProviding = ConnectionStateTextProvider()
+        public var presenceStateIconProvider: any PresenceStateIconProviding = PresenceStateIconProvider()
     }
 }

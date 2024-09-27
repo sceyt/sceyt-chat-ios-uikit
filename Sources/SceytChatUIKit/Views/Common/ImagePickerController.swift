@@ -24,9 +24,9 @@ open class ImagePickerController: NSObject,
         ImagePickerController.retain = self
     }
 
-    open var callback: ((AttachmentView?) -> Void)?
+    open var callback: ((AttachmentModel?) -> Void)?
 
-    open func showCamera(mediaTypes: [String] = [String(kUTTypeImage), String(kUTTypeVideo), String(kUTTypeMovie)], callback: @escaping (AttachmentView?) -> Void) {
+    open func showCamera(mediaTypes: [String] = [String(kUTTypeImage), String(kUTTypeVideo), String(kUTTypeMovie)], callback: @escaping (AttachmentModel?) -> Void) {
         if UIImagePickerController.isSourceTypeAvailable(.camera) {
             self.callback = callback
             imagePicker.delegate = self
@@ -39,7 +39,7 @@ open class ImagePickerController: NSObject,
         }
     }
 
-    open func showPhotoLibrary(mediaTypes: [String] = [String(kUTTypeImage), String(kUTTypeVideo), String(kUTTypeMovie)], callback: @escaping (AttachmentView?) -> Void) {
+    open func showPhotoLibrary(mediaTypes: [String] = [String(kUTTypeImage), String(kUTTypeVideo), String(kUTTypeMovie)], callback: @escaping (AttachmentModel?) -> Void) {
         if UIImagePickerController.isSourceTypeAvailable(.photoLibrary) {
             self.callback = callback
             imagePicker.delegate = self
@@ -77,7 +77,7 @@ open class ImagePickerController: NSObject,
         didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
     ) {
         close(picker: picker)
-        callback?(AttachmentView(info: info))
+        callback?(AttachmentModel(info: info))
     }
 
     open func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
@@ -92,7 +92,7 @@ open class ImagePickerController: NSObject,
     }
 }
 
-private extension AttachmentView {
+private extension AttachmentModel {
     init?(info: [UIImagePickerController.InfoKey: Any]) {
         guard let mediaType = info[.mediaType] as? String
         else { return nil }

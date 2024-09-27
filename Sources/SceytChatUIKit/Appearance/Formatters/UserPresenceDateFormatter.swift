@@ -9,7 +9,7 @@
 import Foundation
 import SceytChat
 
-open class UserPresenceDateFormatter: UserPresenceFormatting {
+open class UserPresenceDateFormatter: UserFormatting {
     
     public init() {}
     
@@ -40,8 +40,8 @@ open class UserPresenceDateFormatter: UserPresenceFormatting {
         return formatter
     }()
     
-    open func format(_ presence: ChatUser.Presence) -> String {
-        switch presence.state {
+    open func format(_ user: ChatUser) -> String {
+        switch user.presence.state {
         case .online:
             return L10n.User.Presence.online
         case .away:
@@ -49,7 +49,7 @@ open class UserPresenceDateFormatter: UserPresenceFormatting {
         case .dnd:
             return L10n.User.Presence.dnd
         default:
-            if let lastActiveAt = presence.lastActiveAt {
+            if let lastActiveAt = user.presence.lastActiveAt {
                 return dateAgo(lastActiveAt)
             }
             return ""

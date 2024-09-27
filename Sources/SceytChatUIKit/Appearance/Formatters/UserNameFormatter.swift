@@ -7,12 +7,11 @@
 //
 
 import Foundation
-import SceytChat
 
 open class UserNameFormatter: UserFormatting {
     
     public init() {}
-
+    
     open func format(_ user: ChatUser) -> String {
         switch user.state {
         case .deleted:
@@ -28,30 +27,12 @@ open class UserNameFormatter: UserFormatting {
         }
         
         let displayName = [user.firstName, user.lastName]
-            .compactMap { 
+            .compactMap {
                 let name = $0?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 return name.isEmpty ? nil : name
             }
             .joined(separator: " ")
         
-        if displayName.isEmpty {
-            return user.id
-        } else {
-            return displayName
-        }
-    }
-
-    open func short(_ user: ChatUser) -> String {
-        if user.state != .active {
-            return format(user)
-        }
-
-        if user.id == me {
-            return L10n.User.current
-        }
-
-        let displayName = user.shortDisplayName
-
         if displayName.isEmpty {
             return user.id
         } else {

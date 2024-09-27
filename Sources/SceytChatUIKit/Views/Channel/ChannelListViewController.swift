@@ -15,7 +15,7 @@ open class ChannelListViewController: ViewController,
                           UISearchResultsUpdating {
     
     open lazy var channelListViewModel = Components.channelListViewModel
-        .init()
+        .init(cellAppearance: appearance.cellAppearance)
     
     open lazy var channelListRouter = Components.channelListRouter
         .init(rootViewController: self)
@@ -29,9 +29,11 @@ open class ChannelListViewController: ViewController,
         .init()
         .withoutAutoresizingMask
     
-    open lazy var searchController = Components.channelSearchController.init(searchResultsController: searchResultsViewController)
+    open lazy var searchController = Components.channelSearchController
+        .init(searchResultsController: searchResultsViewController)
 
-    open lazy var searchResultsViewController = Components.channelSearchResultsViewController.init()
+    open lazy var searchResultsViewController = Components.channelSearchResultsViewController
+        .init()
 
     private var isViewDidAppear = false
     
@@ -40,16 +42,11 @@ open class ChannelListViewController: ViewController,
         title = L10n.Channel.List.title
         tabBarItem.title = L10n.Channel.List.title
         
-        navigationItem.rightBarButtonItem = .init(image: Images.channelNew,
+        navigationItem.rightBarButtonItem = .init(image: .channelNew,
                                                   style: .plain,
                                                   target: self,
                                                   action: #selector(newChannelAction(_:)))
         
-//        navigationItem.leftBarButtonItem = .init(
-//            image: ImageBuilder.build(fillColor: .clear, size: .init(width: 36, height: 36)),
-//            style: .plain,
-//            target: self, 
-//            action: #selector(leftButtonAction(_:event:)))
         tableView.register(Components.channelCell)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -94,6 +91,9 @@ open class ChannelListViewController: ViewController,
         tabBarItem.badgeColor = appearance.tabBarItemBadgeColor
         view.backgroundColor = appearance.backgroundColor
         tableView.backgroundColor = .clear
+        emptyView.parentAppearance = appearance.emptyViewAppearance
+        searchController.parentAppearance = appearance.searchControllerAppearance
+        searchResultsViewController.parentAppearance = appearance.searchResultControllerAppearance
 }
     
     open override func setupDone() {
@@ -239,7 +239,7 @@ open class ChannelListViewController: ViewController,
     open func updateConnectionState(_ state: ConnectionState) {
         title = L10n.Channel.List.title
         tabBarItem.title = L10n.Channel.List.title
-        navigationItem.titleView = ConnectionStateView(state: state)
+        navigationItem.titleView = Components.connectionStateView.init(state: state, appearance: appearance.connectionIndicatorAppearance)
     }
     
     open func onSwipeAction(actions: ChannelSwipeActionsConfiguration.Actions,
@@ -323,6 +323,7 @@ open class ChannelListViewController: ViewController,
         }
         let cell = tableView.dequeueReusableCell(for: indexPath,
                                                  cellType: Components.channelCell)
+        cell.parentAppearance = appearance.cellAppearance
         if let item = channelListViewModel.layoutModel(at: indexPath) {
             cell.data = item
             if channelListViewModel.isSelected(item.channel) {

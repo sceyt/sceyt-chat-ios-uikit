@@ -8,70 +8,6 @@
 
 import UIKit
 
-open class UserCell: BaseChannelUserCell {
-    override open func setSelected(_ selected: Bool, animated: Bool) {
-        super.setSelected(selected, animated: animated)
-        checkBoxView.isSelected = selected
-    }
-    
-    open var userData: ChatUser! {
-        didSet {
-            titleLabel.text = userData.displayName
-            statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(userData.presence)
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: userData)
-            subscribeForPresence()
-        }
-    }
-    open func subscribeForPresence() {
-        guard let contact = userData
-        else { return }
-        Components.presenceProvider
-            .subscribe(userId: contact.id) { [weak self] user in
-                PresenceProvider.unsubscribe(userId: contact.id)
-                guard let self, user.userId == self.userData.id
-                else { return }
-                self.statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(presence: user.presence))
-            }
-    }
-}
-
-open class SearchResultChannelCell: BaseChannelUserCell {
-    
-    open var channelData: ChatChannel! {
-        didSet {
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: channelData)
-            titleLabel.text = channelData.displayName
-            let memberCount = Int(channelData.memberCount)
-            switch channelData.channelType {
-            case .broadcast:
-                switch channelData.memberCount {
-                case 1:
-                    statusLabel.text = L10n.Channel.SubscriberCount.one
-                case 2...:
-                    statusLabel.text = L10n.Channel.SubscriberCount.more(memberCount)
-                default:
-                    statusLabel.text = ""
-                }
-            case .group:
-                switch channelData.memberCount {
-                case 1:
-                    statusLabel.text = L10n.Channel.MembersCount.one
-                case 2...:
-                    statusLabel.text = L10n.Channel.MembersCount.more(memberCount)
-                default:
-                    statusLabel.text = ""
-                }
-            case .direct:
-                if let presence = channelData.peer?.presence {
-                    statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(presence)
-                } else {
-                    statusLabel.text = channelData.peer?.presence.status
-                }
-            }
-        }
-    }
-}
-
 open class BaseChannelUserCell: TableViewCell {
     open lazy var avatarView = Components.circleImageView.init()
         .contentMode(.scaleAspectFill)
@@ -130,20 +66,7 @@ open class BaseChannelUserCell: TableViewCell {
         separatorView.leadingAnchor.pin(to: titleLabel.leadingAnchor)
         separatorView.heightAnchor.pin(constant: 1)
     }
-    
-    override open func setupAppearance() {
-        super.setupAppearance()
         
-        backgroundColor = appearance.backgroundColor
-        contentView.backgroundColor = .clear
-        separatorView.backgroundColor = appearance.separatorColor
-        
-        titleLabel.textColor = appearance.titleLabelTextColor
-        titleLabel.font = appearance.titleLabelFont
-        statusLabel.textColor = appearance.statusLabelTextColor
-        statusLabel.font = appearance.statusLabelFont
-    }
-    
     open var imageTask: Cancellable?
  
     override open func prepareForReuse() {

@@ -22,5 +22,3 @@ open class MediaPreviewDateFormatter: DateFormatting {
         timeFormatter.string(from: date)
     }
 }
-
-

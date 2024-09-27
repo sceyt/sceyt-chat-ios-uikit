@@ -27,10 +27,7 @@ extension MessageInputViewController {
         
         open override func setup() {
             super.setup()
-            
-            nextResultButton.setImage(.chevronUp.withRenderingMode(.alwaysTemplate), for: .normal)
-            prevResultButton.setImage(.chevronDown.withRenderingMode(.alwaysTemplate), for: .normal)
-            
+                        
             nextResultButton.addTarget(self, action: #selector(onNext), for: .touchUpInside)
             prevResultButton.addTarget(self, action: #selector(onPrevious), for: .touchUpInside)
             prevResultButton.isEnabled = false
@@ -74,10 +71,10 @@ extension MessageInputViewController {
             
             backgroundColor = appearance.backgroundColor
             separatorView.backgroundColor = appearance.separatorColor
-            nextResultButton.tintColor = appearance.buttonTintColor
-            prevResultButton.tintColor = appearance.buttonTintColor
-            resultsCounterLabel.textColor = appearance.textColor
-            resultsCounterLabel.font = appearance.textFont
+            resultsCounterLabel.textColor = appearance.resultLabelAppearance.foregroundColor
+            resultsCounterLabel.font = appearance.resultLabelAppearance.font
+            nextResultButton.setImage(appearance.nextIcon, for: .normal)
+            prevResultButton.setImage(appearance.previousIcon, for: .normal)
         }
         
         open func update(with searchResult: MessageSearchCoordinator, query: String) {

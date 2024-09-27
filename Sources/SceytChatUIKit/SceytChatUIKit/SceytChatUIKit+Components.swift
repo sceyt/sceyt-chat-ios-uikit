@@ -17,7 +17,7 @@ extension SceytChatUIKit {
         public static var channelListViewController: ChannelListViewController.Type = ChannelListViewController.self
         public static var channelListViewModel: ChannelListViewModel.Type = ChannelListViewModel.self
         public static var channelListRouter: ChannelListRouter.Type = ChannelListRouter.self
-        public static var channelCell: ChannelCell.Type = ChannelCell.self
+        public static var channelCell: ChannelListViewController.ChannelCell.Type = ChannelListViewController.ChannelCell.self
         public static var emptyStateView: EmptyStateView.Type = EmptyStateView.self
         public static var channelCreatedView: ChannelCreatedView.Type = ChannelCreatedView.self
         public static var channelViewController: ChannelViewController.Type = ChannelViewController.self
@@ -75,12 +75,13 @@ extension SceytChatUIKit {
         
         public static var messageInputViewController: MessageInputViewController.Type = MessageInputViewController.self
         public static var inputRouter: InputRouter.Type = InputRouter.self
-        public static var messageInputMediaView: MessageInputViewController.MediaView.Type = MessageInputViewController.MediaView.self
+        public static var messageInputSelectedMediaView: MessageInputViewController.SelectedMediaView.Type = MessageInputViewController.SelectedMediaView.self
         public static var messageInputTextView: MessageInputViewController.InputTextView.Type = MessageInputViewController.InputTextView.self
         public static var messageInputMessageActionsView: MessageInputViewController.MessageActionsView.Type = MessageInputViewController.MessageActionsView.self
         public static var messageInputVoiceRecorderView: MessageInputViewController.VoiceRecorderView.Type = MessageInputViewController.VoiceRecorderView.self
         public static var messageInputVoiceRecordPlaybackView: MessageInputViewController.VoiceRecordPlaybackView.Type = MessageInputViewController.VoiceRecordPlaybackView.self
         public static var messageInputVoiceRecordPlaybackPlayerView: MessageInputViewController.VoiceRecordPlaybackView.PlayerView.Type = MessageInputViewController.VoiceRecordPlaybackView.PlayerView.self
+        
         public static var messageInputThumbnailView: MessageInputViewController.ThumbnailView.Type = MessageInputViewController.ThumbnailView.self
         public static var messageInputThumbnailViewMediaView: MessageInputViewController.ThumbnailView.MediaView.Type = MessageInputViewController.ThumbnailView.MediaView.self
         public static var messageInputThumbnailViewFileView: MessageInputViewController.ThumbnailView.FileView.Type = MessageInputViewController.ThumbnailView.FileView.self
@@ -230,7 +231,7 @@ extension SceytChatUIKit {
         
         public static var actionController: ActionController.Type = ActionController.self
         
-        public static var menuCell: MenuCell.Type = MenuCell.self
+        public static var menuCell: MenuController.MenuCell.Type = MenuController.MenuCell.self
         public static var menuController: MenuController.Type = MenuController.self
         
         public static var loader: LoaderRepresentable.Type = LoaderView.self

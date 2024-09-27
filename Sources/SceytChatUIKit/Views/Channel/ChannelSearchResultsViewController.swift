@@ -65,8 +65,9 @@ open class ChannelSearchResultsViewController: ViewController,
     open override func setupAppearance() {
         super.setupAppearance()
         
-        tableView.backgroundColor = .clear
+        tableView.backgroundColor = appearance.backgroundColor
         view.backgroundColor = appearance.backgroundColor
+        emptyStateView.parentAppearance = appearance.emptyViewAppearance
     }
     
     override open func setupDone() {
@@ -117,6 +118,7 @@ open class ChannelSearchResultsViewController: ViewController,
     
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.searchResultChannelCell.self)
+        cell.parentAppearance = appearance.cellAppearance
         cell.separatorView.isHidden = indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1
         cell.showCheckBox = resultsUpdater.showCheckBox
         if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
@@ -135,6 +137,7 @@ open class ChannelSearchResultsViewController: ViewController,
             else { return nil }
         
         let headerView = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+        headerView.parentAppearance = appearance.separatorViewAppearance
         headerView.titleLabel.text = header
         return headerView
     }

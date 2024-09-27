@@ -125,6 +125,7 @@ open class AvatarBuilder {
     }
     
     open class func loadAvatar(for builder: AvatarBuildable,
+                               appearance: InitialsBuilderAppearance? = nil,
                                defaultImage: UIImage? = nil,
                                size: CGSize = AvatarBuilder.avatarDefaultSize,
                                preferMemCache: Bool = true,
@@ -147,6 +148,7 @@ open class AvatarBuilder {
         return loadAvatar(
             into: avatarPresentable,
             for: builder,
+            appearance: appearance,
             defaultImage: defaultImage,
             size: size,
             preferMemCache: preferMemCache)
@@ -246,7 +248,7 @@ extension ChatChannel: AvatarBuildable {
         }
         return URL(string: avatarUrl)
     }
-
+#warning("To-Do: Remove")
     public var displayName: String {
         SceytChatUIKit.shared.formatters.channelNameFormatter.format(self)
     }
@@ -275,7 +277,7 @@ extension ChatUser: AvatarBuildable {
     public var imageUrl: URL? {
         URL(string: avatarUrl)
     }
-
+#warning("To-Do: Consider to remove")
     public var displayName: String {
         SceytChatUIKit.shared.formatters.userNameFormatter.format(self)
     }
@@ -286,7 +288,8 @@ extension ChatUser: AvatarBuildable {
         }
         return nil
     }
-    
+
+#warning("To-Do: Consider to remove")
     public var appearance: InitialsBuilderAppearance? {
         if case .initialsAppearance(let appearance) = SceytChatUIKit.shared.visualProviders.userAvatarProvider.provideVisual(for: self) {
             return appearance

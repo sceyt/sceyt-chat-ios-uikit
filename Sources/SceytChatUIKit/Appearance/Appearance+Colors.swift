@@ -72,7 +72,7 @@ public struct DefaultColors {
     public static let footnoteText: UIColor = UIColor(light: UIColor(rgb: 0xA0A1B0), dark: UIColor(rgb: 0x76787A))
     public static let onPrimary: UIColor = UIColor(light: UIColor(rgb: 0xFFFFFF), dark: UIColor(rgb: 0xFFFFFF))
     
-    public static let stateWarning: UIColor = UIColor(light: UIColor(rgb: 0xFA4C56), dark: UIColor(rgb: 0xFA4C56))
+    public static let defaultRed: UIColor = UIColor(light: UIColor(rgb: 0xFA4C56), dark: UIColor(rgb: 0xFA4C56))
     public static let stateSuccess: UIColor = UIColor(light: UIColor(rgb: 0x24C383), dark: UIColor(rgb: 0x24C383))
     public static let stateAttention: UIColor = UIColor(light: UIColor(rgb: 0xFBB019), dark: UIColor(rgb: 0xFBB019))
     

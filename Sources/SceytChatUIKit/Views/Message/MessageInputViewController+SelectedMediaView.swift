@@ -1,5 +1,5 @@
 //
-//  MessageInputViewController+MediaView.swift
+//  MessageInputViewController+SelectedMediaView.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 29.09.22.
@@ -11,14 +11,8 @@ import Photos
 import UIKit
 
 extension MessageInputViewController {
-    open class MediaView: View {
+    open class SelectedMediaView: View {
         public static var scale: CGFloat = UIScreen.main.traitCollection.displayScale
-        
-        public lazy var appearance = MessageInputViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
         
         open lazy var imageRequestOptions: PHImageRequestOptions = {
             $0.deliveryMode = .highQualityFormat
@@ -35,7 +29,7 @@ extension MessageInputViewController {
         open lazy var stackView = UIStackView()
             .withoutAutoresizingMask
 
-        var _onDelete: ((AttachmentView) -> Void)?
+        var _onDelete: ((AttachmentModel) -> Void)?
         var _onUpdate: (() -> Void)?
 
         override open func setup() {
@@ -62,13 +56,13 @@ extension MessageInputViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            backgroundColor = appearance.mediaViewBackgroundColor
+            backgroundColor = appearance.backgroundColor
         }
 
-        open private(set) var items = [AttachmentView]()
+        open private(set) var items = [AttachmentModel]()
         private var imageRequestIDs = [PHImageRequestID]()
 
-        open func insert(view: AttachmentView, at index: Int = -1) {
+        open func insert(view: AttachmentModel, at index: Int = -1) {
             if index != -1, items.indices.contains(index) {
                 items.insert(view, at: index)
             } else {
@@ -79,11 +73,14 @@ extension MessageInputViewController {
             case .file:
                 let fv = Components.messageInputThumbnailViewFileView.init()
                     .withoutAutoresizingMask
-                fv.imageView.image = view.thumbnail
+                fv.appearance = appearance
+//                fv.imageView.image = view.thumbnail
+                fv.imageView.image = appearance.fileAttachmentIconProvider.provideVisual(for: .init(attachment: view.attachment))
                 v = fv
             default:
                 let mv = Components.messageInputThumbnailViewMediaView.init()
                     .withoutAutoresizingMask
+                mv.appearance = appearance
                 mv.imageView.image = view.thumbnail
                 v = mv
             }
@@ -91,6 +88,7 @@ extension MessageInputViewController {
             let tv = Components.messageInputThumbnailView
                 .init(containerView: v)
                 .withoutAutoresizingMask
+            tv.appearance = appearance
             if index != -1, stackView.arrangedSubviews.indices.contains(index) {
                 stackView.insertArrangedSubview(tv, at: index)
             } else {
@@ -145,10 +143,10 @@ extension MessageInputViewController {
                 ]
             } else if view.duration > 0 {
                 mv?.timeLabel.isHidden = false
-                mv?.timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(Double(view.duration))
+                mv?.timeLabel.text = appearance.attachmentDurationFormatter.format(Double(view.duration))
             } else if view.type == .file {
                 fv?.titleLabel.text = view.name
-                fv?.subtitleLabel.text = SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(view.fileSize))
+                fv?.subtitleLabel.text = appearance.fileAttachmentSizeFormatter.format(UInt64(view.fileSize))
             }
         }
 

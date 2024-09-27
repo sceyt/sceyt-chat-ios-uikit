@@ -65,6 +65,13 @@ extension ChannelViewController {
 
         open override func setupAppearance() {
             super.setupAppearance()
+            
+            headLabel.textColor = appearance.titleLabelAppearance.foregroundColor
+            headLabel.font = appearance.titleLabelAppearance.font
+            subLabel.textColor = appearance.subtitleLabelAppearance.foregroundColor
+            subLabel.font = appearance.subtitleLabelAppearance.font
+            typingView.label.textColor = appearance.subtitleLabelAppearance.foregroundColor
+            typingView.label.font = appearance.subtitleLabelAppearance.font
         }
 
         open override func setupLayout() {

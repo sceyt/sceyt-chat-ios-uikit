@@ -12,7 +12,7 @@ import Combine
 
 open class ChannelLayoutModel {
     
-    public static var appearance = ChannelCell.appearance
+    public private(set) var appearance: ChannelListViewController.ChannelCell.Appearance
     
     public private(set) var channel: ChatChannel
     
@@ -51,8 +51,9 @@ open class ChannelLayoutModel {
     
     public var formatedUnreadCount: String!
     
-    required public init(channel: ChatChannel) {
+    required public init(channel: ChatChannel, appearance: ChannelListViewController.ChannelCell.Appearance) {
         self.channel = channel
+        self.appearance = appearance
         formatedSubject = createFormattedSubject()
         formatedDate = createFormattedDate()
         formatedUnreadCount = createFormattedUnreadCount()
@@ -124,7 +125,7 @@ open class ChannelLayoutModel {
             currentUser.metadata = user.metadata
             currentUser.presence = user.presence
             currentUser.state = user.state
-            formatedSubject = SceytChatUIKit.shared.formatters.channelNameFormatter.format(channel)
+            formatedSubject = createFormattedSubject()
             if shouldUpdateAvatar {
                 loadAvatar()
             }
@@ -132,16 +133,16 @@ open class ChannelLayoutModel {
     }
     
     open func attributedBody() -> NSAttributedString {
-        let deletedMessageFont = Self.appearance.deletedMessageFont ?? Appearance.Fonts.regular.with(traits: .traitItalic).withSize(15)
-        let deletedMessageColor = Self.appearance.deletedMessageColor ?? UIColor.secondaryText
-        let senderLabelFont = Self.appearance.senderLabelFont ?? Appearance.Fonts.regular.withSize(15)
-        let senderLabelTextColor = Self.appearance.senderLabelTextColor ?? UIColor.primaryText
-        let messageLabelFont = Self.appearance.messageLabelFont ?? Appearance.Fonts.regular.withSize(15)
-        let messageLabelTextColor = Self.appearance.messageLabelTextColor ?? UIColor.secondaryText
-        let mentionFont = Self.appearance.mentionFont ?? Appearance.Fonts.bold.withSize(15)
-        let mentionColor = Self.appearance.mentionColor ?? UIColor.secondaryText
-        let linkColor = Self.appearance.linkColor ?? UIColor.secondaryText
-        let linkFont = Self.appearance.linkFont ?? Appearance.Fonts.regular.withSize(15)
+        let deletedMessageFont = appearance.deletedLabelAppearance.font
+        let deletedMessageColor = appearance.deletedLabelAppearance.foregroundColor
+        let senderLabelFont = appearance.lastMessageSenderNameLabelAppearance.font
+        let senderLabelTextColor = appearance.lastMessageSenderNameLabelAppearance.foregroundColor
+        let messageLabelFont = appearance.lastMessageLabelAppearance.font
+        let messageLabelTextColor = appearance.lastMessageLabelAppearance.foregroundColor
+        let mentionFont = appearance.mentionLabelAppearance.font
+        let mentionColor = appearance.mentionLabelAppearance.foregroundColor
+        let linkColor = appearance.linkLabelAppearance.foregroundColor
+        let linkFont = appearance.linkLabelAppearance.font
         
         guard let message = lastMessage
         else {
@@ -173,7 +174,7 @@ open class ChannelLayoutModel {
                 text.addAttributes(linkAttributes, range: match.range)
             }
             
-            let mentionedUsers = message.mentionedUsers?.map { ($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) }
+            let mentionedUsers = message.mentionedUsers?.map { ($0.id, appearance.mentionUserNameFormatter.format($0)) }
             if let mentionedUsers = mentionedUsers, mentionedUsers.count > 0,
                let metadata = message.metadata?.data(using: .utf8),
                let ranges = try? JSONDecoder().decode([MentionUserPos].self, from: metadata) {
@@ -246,26 +247,11 @@ open class ChannelLayoutModel {
                     }
             }
             
-            if let attachmentType {
-                var icon: UIImage?
-                var type: String?
-                switch attachmentType {
-                case "file":
-                    icon = Images.attachmentFile
-                    type = L10n.Attachment.file
-                case "image":
-                    icon = Images.attachmentImage
-                    type = L10n.Attachment.image
-                case "video":
-                    icon = Images.attachmentVideo
-                    type = L10n.Attachment.video
-                case "voice":
-                    icon = Images.attachmentVoice
-                    type = L10n.Attachment.voice
-                default:
-                    break
-                }
-                if let icon, let type {
+            if let attachment = lastMessage?.attachments?.last {
+                let type = appearance.attachmentNameFormatter.format(attachment)
+                var icon = appearance.attachmentIconProvider.provideVisual(for: attachment)
+             
+                if let icon, !type.isEmpty {
                     let font = Fonts.regular.withSize(15)
                     let attachment = NSTextAttachment()
                     attachment.bounds = CGRect(x: 0, y: (font.capHeight - icon.size.height).rounded() / 2, width: icon.size.width, height: icon.size.height)
@@ -302,25 +288,18 @@ open class ChannelLayoutModel {
                 text.insert(prefix, at: 0)
                 text.append(suffix)
             }
-            
-            var sender: String?
-            let user: ChatUser?
-            if hasReaction {
-                user = lastReaction?.user
-            } else {
-                user = lastMessage?.user
-            }
-            if let user {
-                if lastMessage?.state == .deleted || channel.isSelfChannel {
-                    // don't display sender
-                } else if (user.id == me) || (user.id.isEmpty && lastMessage?.incoming == false) {
-                    sender = "\(L10n.User.current): "
-                } else if !channel.isDirect {
-                    sender = "\(SceytChatUIKit.shared.formatters.userNameFormatter.short(user)): "
+            var hasReaction: Bool {
+                if let reaction = channel.lastReaction,
+                   let lastMessage = channel.lastMessage,
+                   reaction.createdAt > lastMessage.createdAt,
+                   reaction.message != nil {
+                    return true
                 }
+                return false
             }
-            if let s = sender {
-                let ms = NSMutableAttributedString(string: s,
+            var sender: String = hasReaction ? appearance.lastMessageSenderNameFormatter.format(channel) : appearance.reactedUserNameFormatter.format(channel)
+            if !sender.isEmpty {
+                let ms = NSMutableAttributedString(string: sender,
                                                    attributes: [.font: senderLabelFont,
                                                                 .foregroundColor: senderLabelTextColor])
                 ms.append(text)
@@ -341,45 +320,53 @@ open class ChannelLayoutModel {
         let title = L10n.Channel.Message.draft
         let draftString = NSMutableAttributedString(string: "\(title)\n")
         draftString.addAttributes(
-            [.foregroundColor: Self.appearance.draftMessageTitleColor as Any,
-             .font: Self.appearance.draftMessageTitleFont as Any],
+            [.foregroundColor: appearance.draftPrefixLabelAppearance.foregroundColor,
+             .font: appearance.draftPrefixLabelAppearance.font],
             range: NSMakeRange(0, title.count))
         text.append(draftString)
         
         let contentString = NSMutableAttributedString(attributedString: draft)
         contentString.addAttributes(
-            [.foregroundColor: Self.appearance.draftMessageContentColor as Any,
-             .font: Self.appearance.draftMessageContentFont as Any ],
+            [.foregroundColor: appearance.lastMessageLabelAppearance.foregroundColor,
+             .font: appearance.lastMessageLabelAppearance.font],
             range: NSMakeRange(0, draft.length))
         text.append(contentString)
         return text
     }
     
     open func createFormattedSubject() -> String {
-        SceytChatUIKit.shared.formatters.channelNameFormatter.format(channel)
+        appearance.channelNameFormatter.format(channel)
     }
     
     open func createFormattedDate() -> String {
         if hasReaction,
            let message = channel.lastReaction?.message {
-            return SceytChatUIKit.shared.formatters.channelDateFormatter.format(message.updatedAt ?? message.createdAt )
+            return appearance.channelDateFormatter.format(message.updatedAt ?? message.createdAt )
         }
         if let message = channel.lastMessage {
-            return SceytChatUIKit.shared.formatters.channelDateFormatter.format(message.updatedAt ?? message.createdAt )
+            return appearance.channelDateFormatter.format(message.updatedAt ?? message.createdAt )
         }
-        return SceytChatUIKit.shared.formatters.channelDateFormatter.format(channel.updatedAt ?? channel.createdAt )
+        return appearance.channelDateFormatter.format(channel.updatedAt ?? channel.createdAt )
     }
     
     open func createFormattedUnreadCount() -> String {
-        SceytChatUIKit.shared.formatters
+        appearance
             .channelUnreadCountFormatter
             .format(channel.newMessageCount)
     }
     
     open func loadAvatar() {
-        _ = Components.avatarBuilder.loadAvatar(for: channel) {[weak self] image in
-            self?.avatar = image
+        _ = switch appearance.channelDefaultAvatarProvider.provideVisual(for: channel) {
+        case .image(let image):
+            _ = Components.avatarBuilder.loadAvatar(for: channel,
+                                                    defaultImage: image) {[weak self] image in
+                self?.avatar = image
+            }
+        case .initialsAppearance(let initialsAppearance):
+            _ = Components.avatarBuilder.loadAvatar(for: channel,
+                                                    appearance: initialsAppearance) {[weak self] image in
+                self?.avatar = image
+            }
         }
     }
-    
 }

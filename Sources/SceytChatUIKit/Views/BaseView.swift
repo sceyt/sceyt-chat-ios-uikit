@@ -377,7 +377,7 @@ open class CollectionReusableView: UICollectionReusableView, Configurable {
     }
 }
 
-open class CollectionViewCell: UICollectionViewCell {
+open class CollectionViewCell: UICollectionViewCell, Configurable {
 
     private var isConfigured = false
 

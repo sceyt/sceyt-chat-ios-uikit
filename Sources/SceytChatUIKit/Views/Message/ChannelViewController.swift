@@ -43,8 +43,8 @@ open class ChannelViewController: ViewController,
         customInputViewController.inputTextView
     }
     
-    open var mediaView: MessageInputViewController.MediaView {
-        customInputViewController.mediaView
+    open var selectedMediaView: MessageInputViewController.SelectedMediaView {
+        customInputViewController.selectedMediaView
     }
     
     open var titleView = Components.channelHeaderView
@@ -80,20 +80,24 @@ open class ChannelViewController: ViewController,
     
     open lazy var searchBar = {
         let searchBar = UISearchBar()
-        searchBar.placeholder = L10n.Channel.Search.search
-        searchBar.showsCancelButton = true
+        searchBar.placeholder = appearance.searchBarAppearance.placeholder
+        searchBar.showsCancelButton = appearance.searchBarAppearance.showsCancelButton
         searchBar.delegate = self
-        searchBar.searchTextField.returnKeyType = .default
-        searchBar.barTintColor = appearance.searchBarBackgroundColor
-        searchBar.searchTextField.backgroundColor = appearance.searchBarBackgroundColor
+        searchBar.searchTextField.returnKeyType = appearance.searchBarAppearance.textFieldReturnKeyType
+        searchBar.barTintColor = appearance.searchBarAppearance.backgroundColor
+        searchBar.layer.cornerRadius = appearance.searchBarAppearance.cornerRadius
+        searchBar.layer.cornerCurve = appearance.searchBarAppearance.cornerCurve
+        searchBar.layer.borderColor = appearance.searchBarAppearance.borderColor
+        searchBar.layer.borderWidth = appearance.searchBarAppearance.borderWidth
+        searchBar.searchTextField.backgroundColor = appearance.searchBarAppearance.backgroundColor
         return searchBar
     }()
     
     open lazy var searchBarActivityIndicator = {
-        let activityIndicator = UIActivityIndicatorView(style: .medium)
-        activityIndicator.backgroundColor = appearance.searchBarBackgroundColor
-        activityIndicator.color = appearance.searchBarActivityIndicatorColor
-        activityIndicator.hidesWhenStopped = true
+        let activityIndicator = UIActivityIndicatorView(style: appearance.searchBarAppearance.activityIndicatorStyle)
+        activityIndicator.backgroundColor = appearance.searchBarAppearance.backgroundColor
+        activityIndicator.color = appearance.searchBarAppearance.activityIndicatorColor
+        activityIndicator.hidesWhenStopped = appearance.searchBarAppearance.activityIndicatorHidesWhenStopped
         return activityIndicator
     }()
     
@@ -226,7 +230,7 @@ open class ChannelViewController: ViewController,
     
     override open func setup() {
         super.setup()
-        
+                
         contextMenu = ContextMenu(parent: self)
         contextMenu.dataSource = self
         contextMenu.delegate = self
@@ -274,9 +278,6 @@ open class ChannelViewController: ViewController,
         collectionView.delegate = self
         collectionView.dataSource = self
         
-        emptyStateView.icon = Images.noMessages
-        emptyStateView.title = L10n.Channel.NoMessages.title
-        emptyStateView.message = L10n.Channel.NoMessages.message
         emptyStateView.isHidden = true
         createdView.isHidden = true
         updateUnreadViewVisibility()
@@ -360,23 +361,31 @@ open class ChannelViewController: ViewController,
     override open func setupAppearance() {
         super.setupAppearance()
         
+        canShowUnreadCountView = appearance.enableScrollDownButton
         navigationItem.standardAppearance = NavigationController.appearance.standard
         navigationItem.standardAppearance?.backgroundColor = .surface1
         navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
         navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
 
         view.backgroundColor = appearance.backgroundColor
-        coverView.backgroundColor = appearance.coverViewBackgroundColor
+        coverView.backgroundColor = .clear
         collectionView.backgroundColor = appearance.backgroundColor
-        
+        unreadCountView.parentAppearance = appearance.scrollDownAppearance
         joinGlobalChannelButton.setAttributedTitle(.init(
             string: L10n.Channel.join,
             attributes: [
-                .font: appearance.joinFont as Any,
-                .foregroundColor: appearance.joinColor as Any
+                .font: appearance.messageInputAppearance.joinButtonAppearance.labelAppearance.font,
+                .foregroundColor: appearance.messageInputAppearance.joinButtonAppearance.labelAppearance.foregroundColor
             ]), for: .normal)
-        joinGlobalChannelButton.backgroundColor = appearance.joinBackgroundColor
+        joinGlobalChannelButton.backgroundColor = appearance.messageInputAppearance.joinButtonAppearance.backgroundColor
         keyboardBgView.backgroundColor = view.backgroundColor
+        titleView.parentAppearance = appearance.headerAppearance
+        customInputViewController.parentAppearance = appearance.messageInputAppearance
+        unreadCountView.parentAppearance = appearance.scrollDownAppearance
+        emptyStateView.parentAppearance = appearance.emptyStateAppearance
+        searchControlsView.parentAppearance = Components.messageInputViewController.appearance.messageSearchControlsAppearance
+        bottomView.parentAppearance = Components.messageInputViewController.appearance.coverAppearance
+        selectingView.parentAppearance = Components.messageInputViewController.appearance.selectedMessagesActionsAppearance
     }
     
     override open func setupDone() {
@@ -432,7 +441,7 @@ open class ChannelViewController: ViewController,
                 case .cancel:
                     channelViewModel.removeSelectedMessage()
                 case .deleteMedia:
-                    if customInputViewController.mediaView.items.count == 0 {
+                    if customInputViewController.selectedMediaView.items.count == 0 {
                         UIView.animate(withDuration: 0.25) { [weak self] in
                             self?.view.layoutIfNeeded()
                         }
@@ -736,19 +745,30 @@ open class ChannelViewController: ViewController,
     }
     
     // MARK: Title
-    
     open func updateTitle() {
         showTitle(
-            title: channelViewModel.title,
-            subTitle: channelViewModel.subTitle
+            title: channelViewModel.getTitleForHeader(with: appearance.headerAppearance),
+            subTitle: channelViewModel.getSubtitleForHeader(with: appearance.headerAppearance)
         )
-        var appearance = channelViewModel.channel.appearance
-        appearance?.size = .init(width: 36, height: 36)
-        avatarTask = Components.avatarBuilder.loadAvatar(
-            into: titleView.profileImageView,
-            for: channelViewModel.channel,
-            appearance: appearance
-        )
+        let avatarRepresentation = appearance.headerAppearance.avatarProvider.provideVisual(for: channelViewModel.channel)
+        
+        switch avatarRepresentation {
+        case .image(let image):
+            avatarTask = Components.avatarBuilder.loadAvatar(
+                into: titleView.profileImageView,
+                for: channelViewModel.channel,
+                defaultImage: image,
+                size: .init(width: 36, height: 36)
+            )
+        case .initialsAppearance(var initialsBuilderAppearance):
+            initialsBuilderAppearance?.size = .init(width: 36, height: 36)
+            avatarTask = Components.avatarBuilder.loadAvatar(
+                into: titleView.profileImageView,
+                for: channelViewModel.channel,
+                appearance: initialsBuilderAppearance,
+                size: .init(width: 36, height: 36)
+            )
+        }
     }
     
     open func showTitle(
@@ -758,12 +778,8 @@ open class ChannelViewController: ViewController,
         titleView.mode = .default
         var attrs = [NSAttributedString.Key: Any]()
         
-        if let font = titleView.appearance.titleFont {
-            attrs[.font] = font
-        }
-        if let color = titleView.appearance.titleColor {
-            attrs[.foregroundColor] = color
-        }
+        attrs[.font] = titleView.appearance.titleLabelAppearance.font
+        attrs[.foregroundColor] = titleView.appearance.titleLabelAppearance.foregroundColor
         
         let head = NSMutableAttributedString(
             string: title,
@@ -773,12 +789,8 @@ open class ChannelViewController: ViewController,
         
         attrs.removeAll(keepingCapacity: true)
         
-        if let font = titleView.appearance.subtitleFont {
-            attrs[.font] = font
-        }
-        if let color = titleView.appearance.subtitleColor {
-            attrs[.foregroundColor] = color
-        }
+        attrs[.font] = titleView.appearance.subtitleLabelAppearance.font
+        attrs[.foregroundColor] = titleView.appearance.subtitleLabelAppearance.foregroundColor
         
         if let subTitle {
             let sub = NSAttributedString(
@@ -806,12 +818,8 @@ open class ChannelViewController: ViewController,
         titleView.mode = .default
         var attrs = [NSAttributedString.Key: Any]()
         
-        if let font = titleView.appearance.titleFont {
-            attrs[.font] = font
-        }
-        if let color = titleView.appearance.titleColor {
-            attrs[.foregroundColor] = color
-        }
+        attrs[.font] = titleView.appearance.titleLabelAppearance.font
+        attrs[.foregroundColor] = titleView.appearance.titleLabelAppearance.foregroundColor
         
         let head = NSMutableAttributedString(
             string: SceytChatUIKit.shared.formatters.channelNameFormatter.format(channelViewModel.channel),
@@ -821,12 +829,8 @@ open class ChannelViewController: ViewController,
         
         attrs.removeAll(keepingCapacity: true)
         
-        if let font = titleView.appearance.subtitleFont {
-            attrs[.font] = font
-        }
-        if let color = titleView.appearance.subtitleColor {
-            attrs[.foregroundColor] = color
-        }
+        attrs[.font] = titleView.appearance.subtitleLabelAppearance.font
+        attrs[.foregroundColor] = titleView.appearance.subtitleLabelAppearance.foregroundColor
         
         let sub = NSAttributedString(
             string: text,
@@ -849,12 +853,8 @@ open class ChannelViewController: ViewController,
         
         var attrs = [NSAttributedString.Key: Any]()
         
-        if let font = titleView.appearance.titleFont {
-            attrs[.font] = font
-        }
-        if let color = titleView.appearance.titleColor {
-            attrs[.foregroundColor] = color
-        }
+        attrs[.font] = titleView.appearance.titleLabelAppearance.font
+        attrs[.foregroundColor] = titleView.appearance.titleLabelAppearance.foregroundColor
         
         let head = NSMutableAttributedString(
             string: SceytChatUIKit.shared.formatters.channelNameFormatter.format(channelViewModel.channel),
@@ -862,7 +862,8 @@ open class ChannelViewController: ViewController,
         )
         
         titleView.headLabel.attributedText = head
-        titleView.typingView.label.font = titleView.appearance.subtitleFont
+        titleView.typingView.label.font = titleView.appearance.subtitleLabelAppearance.font
+        titleView.typingView.label.textColor = titleView.appearance.subtitleLabelAppearance.foregroundColor
         titleView.typingView.update(
             typer: member,
             typing: isTyping
@@ -1356,6 +1357,7 @@ open class ChannelViewController: ViewController,
         Components.channelIncomingMessageCell :
         Components.channelOutgoingMessageCell
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: type)
+        cell.parentAppearance = appearance.messageCellAppearance
         cell.isEditing = channelViewModel.isEditing
         if cell.isEditing {
             cell.contentView.alpha = channelViewModel.canSelectMessage(at: indexPath) ? 1 : 0.5
@@ -1473,7 +1475,8 @@ open class ChannelViewController: ViewController,
             cellType: Components.channelDateSeparatorView.self,
             kind: .header
         )
-        cell.date = channelViewModel.separatorDateForMessage(at: indexPath)
+        cell.parentAppearance = appearance.dateSeparatorAppearance
+        cell.date = channelViewModel.separatorDateForMessage(at: indexPath, with: appearance.dateSeparatorAppearance)
         return cell
     }
     
@@ -1560,7 +1563,7 @@ open class ChannelViewController: ViewController,
     open func createMessage(shouldClearText: Bool = true) -> UserSendMessage {
         let m = UserSendMessage(
             sendText: shouldClearText ? inputTextView.attributedText : .init(),
-            attachments: mediaView.items,
+            attachments: selectedMediaView.items,
             linkMetadata: customInputViewController.lastDetectedLinkMetadata
         )
         if let ma = channelViewModel.selectedMessageForAction {
@@ -1585,7 +1588,7 @@ open class ChannelViewController: ViewController,
         if shouldClearText {
             inputTextView.text = nil
         }
-        customInputViewController.mediaView.removeAll()
+        customInputViewController.selectedMediaView.removeAll()
         if channelViewModel.selectedMessageForAction == nil ||
             channelViewModel.selectedMessageForAction?.1 == .reply {
             UIView.animate(withDuration: 0.25) { [weak self] in
@@ -1970,15 +1973,17 @@ open class ChannelViewController: ViewController,
                     updateTitle()
                 }
             }
-        case .changePresence(let presence):
+        case .changePresence(let userPresence):
             RunLoop.main.perform { [weak self] in
                 guard let self
                 else { return }
-                let mode = self.titleView.mode
-                let change = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(presence: presence))
-                self.showTitle(title: self.channelViewModel.title, subTitle: change)
-                if mode == .typing {
-                    self.titleView.mode = mode
+                switch self.titleView.mode {
+                case .default:
+                    self.showTitle(title: self.channelViewModel.getTitleForHeader(with: appearance.headerAppearance),
+                                   subTitle: self.channelViewModel.getSubtitleForHeader(with: appearance.headerAppearance))
+                case .typing:
+                    // Force the view to update
+                    self.titleView.mode = self.titleView.mode
                 }
             }
             
@@ -2130,7 +2135,7 @@ open class ChannelViewController: ViewController,
             customInputViewController.addMediaButton.isHidden = true
             customInputViewController.sendButton.isHidden = true
             customInputViewController.recordButton.isHidden = true
-            customInputViewController.mediaView.isHidden = true
+            customInputViewController.selectedMediaView.isHidden = true
             customInputViewController.actionView.isHidden = true
         } else {
             bottomView.removeFromSuperview()
@@ -2186,10 +2191,10 @@ open class ChannelViewController: ViewController,
         return true
     }
     
-    open func canShowEmojis(contextMenu: ContextMenu, identifier: Identifier) -> Bool {
+    open func canShowEmojis(contextMenu: ContextMenu, identifier: Identifier) -> (canShowEmojis: Bool, emojisViewAppearance: ReactionPickerViewController.Appearance) {
         guard let model = identifier.value as? MessageLayoutModel
-        else { return false }
-        return ![.pending, .failed].contains(model.message.deliveryStatus)
+        else { return (false, appearance.reactionPickerAppearance) }
+        return (![.pending, .failed].contains(model.message.deliveryStatus), appearance.reactionPickerAppearance)
     }
     
     open func emojis(contextMenu: ContextMenu, identifier: Identifier) -> [String] {

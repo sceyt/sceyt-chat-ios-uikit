@@ -11,12 +11,6 @@ import UIKit
 open class SeparatorHeaderView: TableViewHeaderFooterView {
     open lazy var titleLabel = UILabel().withoutAutoresizingMask
 
-    override open func setup() {
-        super.setup()
-
-        titleLabel.text = L10n.Channel.New.userSectionTitle
-    }
-
     override open func setupLayout() {
         super.setupLayout()
 
@@ -28,9 +22,10 @@ open class SeparatorHeaderView: TableViewHeaderFooterView {
     override open func setupAppearance() {
         super.setupAppearance()
 
+        titleLabel.text = appearance.title
         contentView.backgroundColor = appearance.backgroundColor
-        titleLabel.textColor = appearance.textColor
-        titleLabel.font = appearance.font
+        titleLabel.textColor = appearance.labelAppearance.foregroundColor
+        titleLabel.font = appearance.labelAppearance.font
         titleLabel.textAlignment = appearance.textAlignment
     }
 }

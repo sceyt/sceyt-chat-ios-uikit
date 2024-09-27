@@ -27,10 +27,12 @@ extension MessageInputViewController.MentionUsersListViewController {
             super.setupAppearance()
             
             backgroundColor = .clear
+            contentView.backgroundColor = .clear
             selectionStyle = .gray
             titleLabel.textAlignment = .left
-            titleLabel.font = appearance.titleLabelFont
-            onlineStatusView.image = Images.online
+            titleLabel.font = appearance.titleLabelAppearance.font
+            titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
+            onlineStatusView.image = nil
         }
         
         open override func setupLayout() {
@@ -39,7 +41,7 @@ extension MessageInputViewController.MentionUsersListViewController {
             contentView.addSubview(titleLabel)
             contentView.addSubview(onlineStatusView)
             avatarView.pin(to: contentView, anchors: [
-                .leading(Layouts.avatarLeftPaddding),
+                .leading(Layouts.avatarLeftPadding),
                 .top(Layouts.avatarVerticalPadding, .greaterThanOrEqual),
                 .centerY
             ])
@@ -56,12 +58,21 @@ extension MessageInputViewController.MentionUsersListViewController {
         open var data: ChatChannelMember! {
             didSet {
                 guard let data = data else { return }
-                titleLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(data)
-                if me == data.id {
-                    titleLabel.text! += " (\(L10n.User.current))"
-                }
+                titleLabel.text = appearance.titleFormatter.format(data)
+                
+                onlineStatusView.image = appearance.presenceStateIconProvider.provideVisual(for: data.presence.state)
                 onlineStatusView.isHidden = data.presence.state != .online
-                imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: data)
+                
+                imageTask = switch appearance.avatarProvider.provideVisual(for: data) {
+                case .image(let image):
+                    Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
+                                                        for: data,
+                                                        defaultImage: image)
+                case .initialsAppearance(let initialsAppearance):
+                    Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
+                                                        for: data,
+                                                        appearance: initialsAppearance)
+                }
             }
         }
         
@@ -85,7 +96,7 @@ extension MessageInputViewController.MentionUsersListViewController {
 public extension MessageInputViewController.MentionUsersListViewController.MentionUserCell {
     enum Layouts {
         public static var avatarSize: CGFloat = 40
-        public static var avatarLeftPaddding: CGFloat = 16
+        public static var avatarLeftPadding: CGFloat = 16
         public static var avatarVerticalPadding: CGFloat = 6
         public static var cellHeight: CGFloat { avatarSize + avatarVerticalPadding * 2 }
         public static var verticalPadding: CGFloat = 4

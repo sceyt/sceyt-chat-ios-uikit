@@ -31,6 +31,6 @@ open class ChannelSearchController: SearchController {
     override open func setup() {
         super.setup()
         
-        searchBar.placeholder = L10n.Channel.List.search
+        placeholder = appearance.searchBarAppearance.placeholder
     }
 }

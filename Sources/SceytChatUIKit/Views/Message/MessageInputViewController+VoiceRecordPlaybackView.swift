@@ -11,42 +11,37 @@ import UIKit
 
 extension MessageInputViewController {
     open class VoiceRecordPlaybackView: View {
-        public lazy var appearance = Components.messageInputViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
         enum Event {
             case send(url: URL, metadata: ChatMessage.Attachment.Metadata<[Int]>), cancel
         }
         
         var onEvent: ((Event) -> Void)?
         
-        private let cancelButton = {
-            $0.setImage(.audioPlayerCancel, for: [])
+        open lazy var cancelButton = {
+            $0.setImage(appearance.closeIcon, for: [])
             $0.setContentHuggingPriority(.required, for: .horizontal)
             $0.setContentCompressionResistancePriority(.required, for: .horizontal)
             return $0
         }(UIButton())
         
-        private let audioPlayerView = Components.messageInputVoiceRecordPlaybackPlayerView.init()
+        open lazy var audioPlayerView = Components.messageInputVoiceRecordPlaybackPlayerView.init()
         
-        private let sendButton = {
-            $0.setImage(.messageSendAction, for: [])
+        open lazy var sendButton = {
+            $0.setImage(appearance.sendVoiceIcon, for: [])
             $0.imageView?.contentMode = .scaleAspectFit
             $0.setContentHuggingPriority(.required, for: .horizontal)
             $0.setContentCompressionResistancePriority(.required, for: .horizontal)
             return $0
         }(UIButton())
         
-        private lazy var spacerColumn = UIStackView(column: UIView(), audioPlayerView, UIView(), spacing: 0, distribution: .equalSpacing)
-        private lazy var row = UIStackView(row: cancelButton, spacerColumn, sendButton, spacing: 0)
+        open lazy var spacerColumn = UIStackView(column: UIView(), audioPlayerView, UIView(), spacing: 0, distribution: .equalSpacing)
+        open lazy var row = UIStackView(row: cancelButton, spacerColumn, sendButton, spacing: 0)
         
         override open func setupAppearance() {
             super.setupAppearance()
             
-            backgroundColor = appearance.recorderBackgroundColor
+            backgroundColor = appearance.backgroundColor
+            audioPlayerView.appearance = appearance
         }
         
         override open func setup() {

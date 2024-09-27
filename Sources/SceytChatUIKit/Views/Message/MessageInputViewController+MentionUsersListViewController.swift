@@ -29,6 +29,7 @@ extension MessageInputViewController {
             tableView.register(Components.messageInputMentionUsersCell)
             tableView.delegate = self
             tableView.dataSource = self
+            tableView.separatorColor = appearance.separatorColor
             tableView.clipsToBounds = true
             tableView.showsVerticalScrollIndicator = false
             tableView.showsHorizontalScrollIndicator = false
@@ -84,12 +85,12 @@ extension MessageInputViewController {
         open override func setupAppearance() {
             super.setupAppearance()
             
-            shadowsView.backgroundColor = appearance.tableViewBackgroundColor
+            shadowsView.backgroundColor = appearance.backgroundColor
             if Layouts.shadowRadius > 0 {
                 shadowsView.layer.shadowColor = appearance.shadowColor?.cgColor
             }
             
-            tableView.backgroundColor = .clear
+            tableView.backgroundColor = appearance.backgroundColor
             
             view.backgroundColor = appearance.backgroundColor
         }
@@ -213,6 +214,7 @@ extension MessageInputViewController {
             cellForRowAt indexPath: IndexPath
         ) -> UITableViewCell {
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.messageInputMentionUsersCell)
+            cell.parentAppearance = appearance.cellAppearance
             cell.transform = .init(scaleX: 1, y: -1)
             guard let item = viewModel.member(at: indexPath)
             else { return cell }
@@ -242,7 +244,7 @@ extension MessageInputViewController {
             if indexPath.row == 0 {
                 cell.separatorInset.left = tableView.width
             } else {
-                cell.separatorInset.left = Components.messageInputMentionUsersCell.Layouts.avatarSize + Components.messageInputMentionUsersCell.Layouts.avatarLeftPaddding
+                cell.separatorInset.left = Components.messageInputMentionUsersCell.Layouts.avatarSize + Components.messageInputMentionUsersCell.Layouts.avatarLeftPadding
             }
         }
     }

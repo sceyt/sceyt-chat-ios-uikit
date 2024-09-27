@@ -10,7 +10,7 @@ import UIKit
 
 public protocol ContextMenuDataSource: AnyObject {
     func canShow(contextMenu: ContextMenu, identifier: Identifier) -> Bool
-    func canShowEmojis(contextMenu: ContextMenu, identifier: Identifier) -> Bool
+    func canShowEmojis(contextMenu: ContextMenu, identifier: Identifier) -> (canShowEmojis: Bool, emojisViewAppearance: ReactionPickerViewController.Appearance)
     func emojis(contextMenu: ContextMenu, identifier: Identifier) -> [String]
     func showPlusAfterEmojis(contextMenu: ContextMenu, identifier: Identifier) -> Bool
     func selectedEmojis(contextMenu: ContextMenu, identifier: Identifier) -> [String]
@@ -205,9 +205,11 @@ private extension ContextMenu {
         )
         _menuItems = nil
         actionController?.loadViewIfNeeded()
-        if dataSource?.canShowEmojis(contextMenu: self, identifier: identifier) == false {
+        let emojisConfig = dataSource?.canShowEmojis(contextMenu: self, identifier: identifier)
+        if emojisConfig?.canShowEmojis == false {
             actionController?.emojiController.view.isHidden = true
         } else {
+            actionController?.emojiController.parentAppearance = emojisConfig?.emojisViewAppearance
             actionController?.emojiController.dataSource = self
             actionController?.emojiController.delegate = self
         }

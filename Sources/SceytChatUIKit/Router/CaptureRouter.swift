@@ -64,12 +64,12 @@ public extension Router {
         rootViewController.showBottomSheet(actions: actions)
     }
     
-    func showCamera(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentView?) -> Void) {
+    func showCamera(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentModel?) -> Void) {
         ImagePickerController(presenter: rootViewController)
             .showCamera(mediaTypes: mediaTypes.map { $0.rawValue }, callback: done)
     }
     
-    func selectPhoto(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentView?) -> Void) {
+    func selectPhoto(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentModel?) -> Void) {
         ImagePickerController(presenter: rootViewController)
             .showPhotoLibrary(mediaTypes: mediaTypes.map { $0.rawValue }, callback: done)
     }

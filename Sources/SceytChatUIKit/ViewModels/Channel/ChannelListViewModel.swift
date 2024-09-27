@@ -23,7 +23,8 @@ open class ChannelListViewModel: NSObject,
 
     public let clientDelegateIdentifier = NSUUID().uuidString
     public let channelDelegateIdentifier = NSUUID().uuidString
-        
+    
+    public var cellAppearance: ChannelListViewController.ChannelCell.Appearance = Components.channelCell.appearance
     open var provider: ChannelListProvider
     open var presenceService = Components.presenceProvider.default
     private let searchService: ChannelListSearchService
@@ -65,6 +66,15 @@ open class ChannelListViewModel: NSObject,
         SceytChatUIKit.shared.chatClient.add(channelDelegate: self, identifier: channelDelegateIdentifier)
     }
     
+    public required init(cellAppearance: ChannelListViewController.ChannelCell.Appearance) {
+        self.cellAppearance = cellAppearance
+        provider = Components.channelListProvider.init()
+        searchService = .init(provider: provider, filter: .all)
+        super.init()
+        SceytChatUIKit.shared.chatClient.add(delegate: self, identifier: clientDelegateIdentifier)
+        SceytChatUIKit.shared.chatClient.add(channelDelegate: self, identifier: channelDelegateIdentifier)
+    }
+    
     deinit {
         SceytChatUIKit.shared.chatClient.removeDelegate(identifier: clientDelegateIdentifier)
         SceytChatUIKit.shared.chatClient.removeChannelDelegate(identifier: channelDelegateIdentifier)
@@ -94,7 +104,7 @@ open class ChannelListViewModel: NSObject,
         if let model = layoutModels[channel] {
             _ = model.update(channel: channel)
         } else {
-            layoutModels[channel] = Components.channelLayoutModel.init(channel: channel)
+            layoutModels[channel] = Components.channelLayoutModel.init(channel: channel, appearance: cellAppearance)
         }
     }
     

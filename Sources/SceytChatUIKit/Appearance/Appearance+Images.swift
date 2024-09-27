@@ -111,12 +111,12 @@ public extension Appearance {
             AssetComposer.shared.compose(from: .init(image: Assets.messageTickSent.image,
                                                      renderingMode: .template(.iconInactive)))!
         }()
-        public static var deliveredMessage: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.messageTickDelivered.image,
+        public static var receivedMessage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.messageTickReceived.image,
                                                      renderingMode: .template(.iconInactive)))!
         }()
-        public static var readMessage: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.messageTickRead.image,
+        public static var displayedMessage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.messageTickDisplayed.image,
                                                      renderingMode: .template(.accent)))!
         }()
         public static var failedMessage: UIImage = {
@@ -178,7 +178,9 @@ public extension Appearance {
                                                renderingMode: .template(.onPrimary)))!
         }()
         public static var messageActionMoreReactions: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.plus.image,
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.surface2)),
+                                         .init(image: Assets.plus.image,
                                                      renderingMode: .template(.accent)))!
         }()
         public static var attachmentTransferPause: UIImage = {
@@ -526,8 +528,8 @@ public extension Appearance {
             AssetComposer.shared.compose(from: .init(image: Assets.replyPlay.image,
                                                      renderingMode: .template(.onPrimary)))!
         }()
-        public static var replyX: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.replyX.image,
+        public static var closeIcon: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.closeIcon.image,
                                                      renderingMode: .template(.iconInactive)))!
         }()
         
@@ -553,109 +555,119 @@ public extension Appearance {
 }
 
 extension UIImage {
-    static var emptyChannelList: UIImage { Images.emptyChannelList }
-    static var mute: UIImage { Images.mute }
-    static var online: UIImage { Images.online }
-    static var closeCircle: UIImage { Images.closeCircle }
-    static var file: UIImage { Images.file }
-    static var link: UIImage { Images.link }
-    static var avatar: UIImage { Images.avatar }
-    static var warning: UIImage { Images.warning }
-    static var eye: UIImage { Images.eye }
-    static var chevron: UIImage { Images.chevron }
-    static var chevronUp: UIImage { Images.chevronUp }
-    static var chevronDown: UIImage { Images.chevronDown }
-    static var deletedUser: UIImage { Images.deletedUser }
-    static var attachment: UIImage { Images.attachment }
-    static var addMember: UIImage { Images.addMember }
-    static var radio: UIImage { Images.radio }
-    static var radioGray: UIImage { Images.radioGray }
-    static var radioSelected: UIImage { Images.radioSelected }
-    static var galleryVideoAsset: UIImage { Images.galleryVidepAsset }
-    static var forwardedMessage: UIImage { Images.forwardedMessage }
-    static var editAvatar: UIImage { Images.editAvatar }
+    public static var emptyChannelList: UIImage { Images.emptyChannelList }
+    public static var noMessages: UIImage { Images.noMessages }
+    public static var noResultsSearch: UIImage { Images.noResultsSearch }
+    public static var mute: UIImage { Images.mute }
+    public static var channelPin: UIImage { Images.channelPin }
+    public static var online: UIImage { Images.online }
+    public static var closeCircle: UIImage { Images.closeCircle }
+    public static var file: UIImage { Images.file }
+    public static var link: UIImage { Images.link }
+    public static var avatar: UIImage { Images.avatar }
+    public static var warning: UIImage { Images.warning }
+    public static var eye: UIImage { Images.eye }
+    public static var chevron: UIImage { Images.chevron }
+    public static var chevronUp: UIImage { Images.chevronUp }
+    public static var chevronDown: UIImage { Images.chevronDown }
+    public static var deletedUser: UIImage { Images.deletedUser }
+    public static var attachment: UIImage { Images.attachment }
+    public static var addMember: UIImage { Images.addMember }
+    public static var radio: UIImage { Images.radio }
+    public static var radioGray: UIImage { Images.radioGray }
+    public static var radioSelected: UIImage { Images.radioSelected }
+    public static var galleryVideoAsset: UIImage { Images.galleryVidepAsset }
+    public static var forwardedMessage: UIImage { Images.forwardedMessage }
+    public static var editAvatar: UIImage { Images.editAvatar }
     
-    static var pendingMessage: UIImage { Images.pendingMessage }
-    static var sentMessage: UIImage { Images.sentMessage }
-    static var deliveredMessage: UIImage { Images.deliveredMessage }
-    static var readMessage: UIImage { Images.readMessage }
-    static var failedMessage: UIImage { Images.failedMessage }
+    public static var pendingMessage: UIImage { Images.pendingMessage }
+    public static var sentMessage: UIImage { Images.sentMessage }
+    public static var receivedMessage: UIImage { Images.receivedMessage }
+    public static var displayedMessage: UIImage { Images.displayedMessage }
+    public static var failedMessage: UIImage { Images.failedMessage }
     
-    static var messageActionInfo: UIImage { Images.messageActionInfo }
-    static var messageActionEdit: UIImage { Images.messageActionEdit }
-    static var messageActionReply: UIImage { Images.messageActionReply }
-    static var messageActionReplyInThread: UIImage { Images.messageActionReplyInThread }
-    static var messageActionForward: UIImage { Images.messageActionForward }
-    static var messageActionShare: UIImage { Images.messageActionShare }
-    static var messageActionCopy: UIImage { Images.messageActionCopy }
-    static var messageActionDelete: UIImage { Images.messageActionDelete }
-    static var messageActionSelect: UIImage { Images.messageActionSelect }
-    static var messageActionRemove: UIImage { Images.messageActionRemove }
-    static var messageActionReport: UIImage { Images.messageActionReport }
-    static var attachmentTransferPause: UIImage { Images.attachmentTransferPause }
-    static var attachmentUpload: UIImage { Images.attachmentUpload }
-    static var attachmentDownload: UIImage { Images.attachmentDownload }
+    public static var messageActionInfo: UIImage { Images.messageActionInfo }
+    public static var messageActionEdit: UIImage { Images.messageActionEdit }
+    public static var messageActionReply: UIImage { Images.messageActionReply }
+    public static var messageActionReplyInThread: UIImage { Images.messageActionReplyInThread }
+    public static var messageActionForward: UIImage { Images.messageActionForward }
+    public static var messageActionShare: UIImage { Images.messageActionShare }
+    public static var messageActionCopy: UIImage { Images.messageActionCopy }
+    public static var messageActionDelete: UIImage { Images.messageActionDelete }
+    public static var messageActionSelect: UIImage { Images.messageActionSelect }
+    public static var messageActionRemove: UIImage { Images.messageActionRemove }
+    public static var messageActionReport: UIImage { Images.messageActionReport }
+    public static var attachmentTransferPause: UIImage { Images.attachmentTransferPause }
+    public static var attachmentUpload: UIImage { Images.attachmentUpload }
+    public static var attachmentDownload: UIImage { Images.attachmentDownload }
     
-    static var videoPlay: UIImage { Images.videoPlay }
-    static var videoPause: UIImage { Images.videoPause }
-    static var videoPlayerPause: UIImage { Images.videoPlayerPause }
-    static var videoPlayerPlay: UIImage { Images.videoPlayerPlay }
-    static var messageSendAction: UIImage { Images.messageSendAction }
+    public static var attachmentVoice: UIImage { Images.attachmentVoice }
+    public static var attachmentVideo: UIImage { Images.attachmentVideo }
+    public static var attachmentImage: UIImage { Images.attachmentImage }
+    public static var attachmentFile: UIImage { Images.attachmentFile }
+    
+    public static var videoPlay: UIImage { Images.videoPlay }
+    public static var videoPause: UIImage { Images.videoPause }
+    public static var videoPlayerPause: UIImage { Images.videoPlayerPause }
+    public static var videoPlayerPlay: UIImage { Images.videoPlayerPlay }
+    public static var messageSendAction: UIImage { Images.messageSendAction }
+    public static var messageActionMoreReactions: UIImage { Images.messageActionMoreReactions }
+    
         
-    static var channelNew: UIImage { Images.channelNew }
-    static var channelCreatePublic: UIImage { Images.channelCreatePublic }
-    static var channelCreatePrivate: UIImage { Images.channelCreatePrivate }
+    public static var channelNew: UIImage { Images.channelNew }
+    public static var channelCreatePublic: UIImage { Images.channelCreatePublic }
+    public static var channelCreatePrivate: UIImage { Images.channelCreatePrivate }
     
-    static var channelUnreadBubble: UIImage { Images.channelUnreadBubble }
-    static var channelProfileURI: UIImage { Images.channelProfileURI }
-    static var channelProfileQR: UIImage { Images.channelProfileQR }
-    static var channelProfileBell: UIImage { Images.channelProfileBell }
-    static var channelProfileMore: UIImage { Images.channelProfileMore }
-    static var channelProfileAutoDeleteMessages: UIImage { Images.channelProfileAutoDeleteMessages }
-    static var channelProfileMembers: UIImage { Images.channelProfileMembers }
-    static var channelProfileAdmins: UIImage { Images.channelProfileAdmins }
-    static var channelProfileEditAvatar: UIImage { Images.channelProfileEditAvatar }
-    static var channelReply: UIImage { Images.channelReply }
+    public static var channelUnreadBubble: UIImage { Images.channelUnreadBubble }
+    public static var channelProfileURI: UIImage { Images.channelProfileURI }
+    public static var channelProfileQR: UIImage { Images.channelProfileQR }
+    public static var channelProfileBell: UIImage { Images.channelProfileBell }
+    public static var channelProfileMore: UIImage { Images.channelProfileMore }
+    public static var channelProfileAutoDeleteMessages: UIImage { Images.channelProfileAutoDeleteMessages }
+    public static var channelProfileMembers: UIImage { Images.channelProfileMembers }
+    public static var channelProfileAdmins: UIImage { Images.channelProfileAdmins }
+    public static var channelProfileEditAvatar: UIImage { Images.channelProfileEditAvatar }
+    public static var channelReply: UIImage { Images.channelReply }
     
-    static var audioPlayerCancel: UIImage { Images.audioPlayerCancel }
-    static var audioPlayerDelete: UIImage { Images.audioPlayerDelete }
-    static var audioPlayerLock: UIImage { Images.audioPlayerLock }
-    static var audioPlayerMic: UIImage { Images.audioPlayerMic }
-    static var audioPlayerMicGreen: UIImage { Images.audioPlayerMicGreen }
-    static var audioPlayerPauseGrey: UIImage { Images.audioPlayerPauseGrey }
-    static var audioPlayerPause: UIImage { Images.audioPlayerPause }
-    static var audioPlayerPlayGrey: UIImage { Images.audioPlayerPlayGrey }
-    static var audioPlayerPlay: UIImage { Images.audioPlayerPlay }
-    static var audioPlayerSendLarge: UIImage { Images.audioPlayerSendLarge }
-    static var audioPlayerStop: UIImage { Images.audioPlayerStop }
-    static var audioPlayerUnlock: UIImage { Images.audioPlayerUnlock }
+    public static var audioPlayerCancel: UIImage { Images.audioPlayerCancel }
+    public static var audioPlayerDelete: UIImage { Images.audioPlayerDelete }
+    public static var audioPlayerLock: UIImage { Images.audioPlayerLock }
+    public static var audioPlayerMic: UIImage { Images.audioPlayerMic }
+    public static var audioPlayerMicGreen: UIImage { Images.audioPlayerMicGreen }
+    public static var audioPlayerPauseGrey: UIImage { Images.audioPlayerPauseGrey }
+    public static var audioPlayerPause: UIImage { Images.audioPlayerPause }
+    public static var audioPlayerPlayGrey: UIImage { Images.audioPlayerPlayGrey }
+    public static var audioPlayerPlay: UIImage { Images.audioPlayerPlay }
+    public static var audioPlayerSendLarge: UIImage { Images.audioPlayerSendLarge }
+    public static var audioPlayerStop: UIImage { Images.audioPlayerStop }
+    public static var audioPlayerUnlock: UIImage { Images.audioPlayerUnlock }
     
-    static var chatPin: UIImage { Images.chatPin }
-    static var chatUnpin: UIImage { Images.chatUnpin }
-    static var chatBlock: UIImage { Images.chatBlock }
-    static var chatUnBlock: UIImage { Images.chatUnBlock }
-    static var chatClear: UIImage { Images.chatClear }
-    static var chatDelete: UIImage { Images.chatDelete }
-    static var chatLeave: UIImage { Images.chatLeave }
-    static var chatSavePhoto: UIImage { Images.chatSavePhoto }
-    static var chatForward: UIImage { Images.chatForward }
-    static var chatShare: UIImage { Images.chatShare }
-    static var chatEdit: UIImage { Images.chatEdit }
-    static var chatRevoke: UIImage { Images.chatRevoke }
+    public static var chatPin: UIImage { Images.chatPin }
+    public static var chatUnpin: UIImage { Images.chatUnpin }
+    public static var chatBlock: UIImage { Images.chatBlock }
+    public static var chatUnBlock: UIImage { Images.chatUnBlock }
+    public static var chatClear: UIImage { Images.chatClear }
+    public static var chatDelete: UIImage { Images.chatDelete }
+    public static var chatLeave: UIImage { Images.chatLeave }
+    public static var chatSavePhoto: UIImage { Images.chatSavePhoto }
+    public static var chatForward: UIImage { Images.chatForward }
+    public static var chatShare: UIImage { Images.chatShare }
+    public static var chatEdit: UIImage { Images.chatEdit }
+    public static var chatRevoke: UIImage { Images.chatRevoke }
     
-    static var chatActionCamera: UIImage { Images.chatActionCamera }
-    static var chatActionGallery: UIImage { Images.chatActionGallery }
-    static var chatActionFile: UIImage { Images.chatActionFile }
-    static var chatActionContact: UIImage { Images.chatActionContact }
-    static var chatActionLocation: UIImage { Images.chatActionLocation }
+    public static var chatActionCamera: UIImage { Images.chatActionCamera }
+    public static var chatActionGallery: UIImage { Images.chatActionGallery }
+    public static var chatActionFile: UIImage { Images.chatActionFile }
+    public static var chatActionContact: UIImage { Images.chatActionContact }
+    public static var chatActionLocation: UIImage { Images.chatActionLocation }
     
-    static var searchIcon: UIImage { Images.searchIcon }
-    static var searchFill: UIImage { Images.searchFill }
+    public static var searchIcon: UIImage { Images.searchIcon }
+    public static var searchFill: UIImage { Images.searchFill }
     
-    static var downloadStart: UIImage { Images.downloadStart }
-    static var downloadStop: UIImage { Images.downloadStop }
+    public static var downloadStart: UIImage { Images.downloadStart }
+    public static var downloadStop: UIImage { Images.downloadStop }
     
-    static var replyPlay: UIImage { Images.replyPlay }
-    static var replyX: UIImage { Images.replyX }
-    static var messageFile: UIImage { Images.messageFile }
+    public static var replyPlay: UIImage { Images.replyPlay }
+    public static var closeIcon: UIImage { Images.closeIcon }
+    public static var messageFile: UIImage { Images.messageFile }
 }

@@ -11,19 +11,19 @@ import UIKit
 extension MessageInputViewController {
     open class SelectedMessagesActionsView: View {
         private let buttonDelete = {
-            $0.setImage(.chatDelete, for: [])
+            $0.setImage(appearance.deleteIcon, for: [])
             $0.contentEdgeInsets = .init(top: 14, left: 16, bottom: 14, right: 16)
             return $0
         }(UIButton())
         
         private let buttonShare = {
-            $0.setImage(.chatShare, for: [])
+            $0.setImage(appearance.shareIcon, for: [])
             $0.contentEdgeInsets = .init(top: 14, left: 16, bottom: 14, right: 16)
             return $0
         }(UIButton())
         
         private let buttonForward = {
-            $0.setImage(.chatForward, for: [])
+            $0.setImage(appearance.forwardIcon, for: [])
             $0.contentEdgeInsets = .init(top: 14, left: 16, bottom: 14, right: 16)
             return $0
         }(UIButton())
@@ -63,7 +63,7 @@ extension MessageInputViewController {
             super.setupAppearance()
             
             backgroundColor = appearance.backgroundColor
-            line.backgroundColor = appearance.dividerColor
+            line.backgroundColor = appearance.separatorColor
         }
         
         @objc open func onDelete() { onAction?(.delete) }

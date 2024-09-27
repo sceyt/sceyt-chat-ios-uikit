@@ -29,9 +29,10 @@ open class SearchController: UISearchController {
         get { searchBar.placeholder }
         set {
             if let newValue {
-                searchBar.searchTextField.attributedPlaceholder = .init(string: newValue, attributes: [
-                    .font: appearance.font ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.placeholderColor ?? .footnoteText
+                searchBar.searchTextField.attributedPlaceholder = .init(string: newValue,
+                                                                        attributes: [
+                    .font: appearance.searchBarAppearance.placeholderAppearance.font,
+                    .foregroundColor: appearance.searchBarAppearance.placeholderAppearance.foregroundColor
                 ])
             } else {
                 searchBar.searchTextField.attributedText = nil
@@ -47,7 +48,7 @@ open class SearchController: UISearchController {
     }
 
     open func setup() {
-        placeholder = L10n.SearchBar.placeholder
+        placeholder = appearance.searchBarAppearance.placeholder
     }
 
     open func setupLayout() {
@@ -56,14 +57,17 @@ open class SearchController: UISearchController {
 
     open func setupAppearance() {
         searchBar.backgroundImage = .init()
-        searchBar.backgroundColor = appearance.backgroundColor
-        searchBar.setImage(.searchIcon, for: .search, state: [])
-        searchBar.searchTextField.layer.cornerRadius = Layouts.cornerRadius
+        searchBar.backgroundColor = appearance.searchBarAppearance.backgroundColor
+        searchBar.setImage(appearance.searchBarAppearance.searchIcon, for: .search, state: [])
+        searchBar.searchTextField.layer.cornerRadius = appearance.searchBarAppearance.cornerRadius
+        searchBar.searchTextField.layer.cornerCurve = appearance.searchBarAppearance.cornerCurve
+        searchBar.searchTextField.layer.borderWidth = appearance.searchBarAppearance.borderWidth
+        searchBar.searchTextField.layer.borderColor = appearance.searchBarAppearance.borderColor
         searchBar.searchTextField.clipsToBounds = true
-        searchBar.searchTextField.font = appearance.font
-        searchBar.searchTextField.textColor = appearance.textColor
+        searchBar.searchTextField.font = appearance.searchBarAppearance.labelAppearance.font
+        searchBar.searchTextField.textColor = appearance.searchBarAppearance.labelAppearance.foregroundColor
         searchBar.searchTextPositionAdjustment = UIOffset(horizontal: 4, vertical: 0)
-        searchBar.tintColor = appearance.tintColor
+        searchBar.tintColor = appearance.searchBarAppearance.tintColor
     }
 
     override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {

@@ -40,13 +40,14 @@ extension MessageCell {
             titleLabel.text = L10n.Message.List.unread
             titleLabel.textAlignment = .center
         }
+        
         open override func setupAppearance() {
             super.setupAppearance()
             
             backgroundColor = .clear
-            backgroundView.backgroundColor = appearance.newMessagesSeparatorViewBackgroundColor
-            titleLabel.font = appearance.newMessagesSeparatorViewFont
-            titleLabel.textColor = appearance.newMessagesSeparatorViewTextColor
+            backgroundView.backgroundColor = appearance.unreadMessagesSeparatorAppearance.backgroundColor
+            titleLabel.font = appearance.unreadMessagesSeparatorAppearance.labelAppearance.font
+            titleLabel.textColor = appearance.unreadMessagesSeparatorAppearance.labelAppearance.foregroundColor
         }
 
         open override func setupLayout() {

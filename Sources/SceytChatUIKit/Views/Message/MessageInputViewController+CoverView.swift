@@ -59,9 +59,8 @@ extension MessageInputViewController {
             super.setupAppearance()
             
             backgroundColor = appearance.backgroundColor
-            iconView.tintColor = appearance.iconColor
-            textLabel.font = appearance.labelFont
-            textLabel.textColor = appearance.labelColor
+            textLabel.font = appearance.labelAppearance.font
+            textLabel.textColor = appearance.labelAppearance.foregroundColor
             separatorView.backgroundColor = appearance.separatorColor
         }
     }

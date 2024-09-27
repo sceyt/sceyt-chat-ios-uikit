@@ -49,13 +49,13 @@ open class InputRouter: Router<MessageInputViewController> {
     open func showPhotos(selectedPhotoAssetIdentifiers: Set<String>? = nil,
                          callback: @escaping ([PHAsset], MediaPickerViewController) -> Bool)
     {
-        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
+        guard rootViewController.selectedMediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
         let picker = Components.mediaPickerViewController.init(
             selectedAssetIdentifiers: selectedPhotoAssetIdentifiers,
-            attachmentSelectionLimit: SceytChatUIKit.shared.config.attachmentSelectionLimit - rootViewController.mediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
+            attachmentSelectionLimit: SceytChatUIKit.shared.config.attachmentSelectionLimit - rootViewController.selectedMediaView.items.count + (selectedPhotoAssetIdentifiers?.count ?? 0)
         )
         picker.onSelected = callback
         let nav = Components.navigationController.init()
@@ -64,7 +64,7 @@ open class InputRouter: Router<MessageInputViewController> {
     }
 
     open func showDocuments(callback: @escaping ([URL]) -> Void) {
-        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
+        guard rootViewController.selectedMediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
             showAlert(message: L10n.Error.max20Items)
             return
         }
@@ -72,8 +72,8 @@ open class InputRouter: Router<MessageInputViewController> {
             .showPicker(callback: callback)
     }
 
-    open func showCamera(callback: @escaping (AttachmentView?) -> Void) {
-        guard rootViewController.mediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
+    open func showCamera(callback: @escaping (AttachmentModel?) -> Void) {
+        guard rootViewController.selectedMediaView.items.count < SceytChatUIKit.shared.config.attachmentSelectionLimit else {
             showAlert(message: L10n.Error.max20Items)
             return
         }

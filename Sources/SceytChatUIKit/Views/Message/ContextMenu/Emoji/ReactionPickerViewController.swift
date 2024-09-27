@@ -156,7 +156,7 @@ public extension ReactionPickerViewController {
     enum Layouts {
         public static let containerHeight: CGFloat = 48
         public static let emojiSize: CGFloat = 40
-        public static let emojiFont: CGFloat = 32
+        public static let emojiFont: CGFloat = 30
     }
 }
 
@@ -183,7 +183,7 @@ private extension ReactionPickerViewController {
             ), for: .normal)
             button.sizeToFit()
             button.tag = index
-            button.titleEdgeInsets = .init(top: 0, left: 2, bottom: 0, right: 0)
+            button.titleEdgeInsets = .init(top: 0, left: 0, bottom: 0, right: 0)
             button.resize(anchors: [.height(Layouts.emojiSize), .width(Layouts.emojiSize)])
             
             containerStackView.addArrangedSubview(button)
@@ -195,12 +195,12 @@ private extension ReactionPickerViewController {
             backedStackView.addArrangedSubview(backgroundView)
         }
         if dataSource.showPlusAfterEmojis == true {
-            let imageView = UIImageView(image: Images.messageActionMoreReactions)
+            let imageView = UIImageView(image: appearance.moreIcon)
                 .withoutAutoresizingMask
             imageView.contentMode = .center
             
-            imageView.backgroundColor = appearance.moreButtonBackgroundColor
-            imageView.layer.cornerRadius = Layouts.emojiFont / 2
+//            imageView.backgroundColor = appearance.moreButtonBackgroundColor
+//            imageView.layer.cornerRadius = Layouts.emojiFont / 2
             
             let moreControl = UIControl().withoutAutoresizingMask
             moreControl.tag = dataSource.emojis.count

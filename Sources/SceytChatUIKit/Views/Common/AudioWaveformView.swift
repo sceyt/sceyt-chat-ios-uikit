@@ -9,12 +9,7 @@
 import UIKit
 
 open class AudioWaveformView: View {
-    public lazy var appearance = MessageInputViewController.appearance {
-        didSet {
-            setupAppearance()
-        }
-    }
-    
+
     open var lineWidth: CGFloat = 1.2 {
         didSet { setNeedsDisplay() }
     }
@@ -24,7 +19,9 @@ open class AudioWaveformView: View {
     }
     
     private var _progress: Double = 0.0 {
-        didSet { setNeedsDisplay() }
+        didSet {
+            setNeedsDisplay()
+        }
     }
     
     open var progress: Double {
@@ -67,9 +64,9 @@ open class AudioWaveformView: View {
             context.move(to: CGPoint(x: x, y: middleY - pixel))
             context.addLine(to: CGPoint(x: x, y: middleY + pixel))
             if Double(index) / Double(samples.count) < progress {
-                context.setStrokeColor(appearance.recorderActiveWaveColor.cgColor)
+                context.setStrokeColor(appearance.progressColor.cgColor)
             } else {
-                context.setStrokeColor(appearance.recorderInActiveWaveColor.cgColor)
+                context.setStrokeColor(appearance.trackColor.cgColor)
             }
             context.strokePath()
         }

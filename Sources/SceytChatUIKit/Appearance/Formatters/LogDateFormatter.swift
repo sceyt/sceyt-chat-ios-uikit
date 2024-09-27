@@ -1,6 +1,6 @@
 //
 //  LogDateFormatter.swift
-//  SceytDemoApp
+//  SceytChatUIKit
 //
 //  Created by Arthur Avagyan on 23.09.24.
 //  Copyright © 2024 Sceyt LLC. All rights reserved.
@@ -22,3 +22,4 @@ open class LogDateFormatter: DateFormatting {
         formatter.string(from: date)
     }
 }
+

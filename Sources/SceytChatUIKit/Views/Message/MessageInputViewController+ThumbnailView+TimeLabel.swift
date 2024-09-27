@@ -10,12 +10,12 @@ import UIKit
 
 extension MessageInputViewController.ThumbnailView {
     open class TimeLabel: View {
-        public lazy var appearance = Components.messageInputViewController.appearance {
+        public lazy var appearance = Components.messageInputSelectedMediaView.appearance.attachmentDurationLabelAppearance {
             didSet {
                 setupAppearance()
             }
         }
-        
+
         open lazy var timeLabel: UILabel = {
             $0.font = Fonts.regular.withSize(12)
             return $0.withoutAutoresizingMask
@@ -23,9 +23,9 @@ extension MessageInputViewController.ThumbnailView {
         
         override open func setupAppearance() {
             super.setupAppearance()
-            backgroundColor = appearance.videoAttachmentTimeBackgroundColor
-            timeLabel.font = appearance.videoAttachmentTimeTextFont
-            timeLabel.textColor = appearance.videoAttachmentTimeTextColor
+            backgroundColor = appearance.backgroundColor
+            timeLabel.font = appearance.font
+            timeLabel.textColor = appearance.foregroundColor
         }
         
         override open func setupLayout() {

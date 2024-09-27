@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import SceytChat
 
 /// A protocol that defines a method for providing a visual representation for a given input.
 public protocol VisualProviding {
@@ -56,8 +57,28 @@ public protocol AttachmentIconProviding: VisualProviding {
     func provideVisual(for attachment: ChatMessage.Attachment) -> UIImage?
 }
 
+/// A protocol for providing text for connection state.
+public protocol ConnectionStateProviding: VisualProviding {
+    /// Provides a text for the specified connection state.
+    ///
+    /// - Parameter state: The connection state for which to provide the text.
+    /// - Returns: A `String` representing the connection text.
+    func provideVisual(for state: ConnectionState) -> String
+}
+
+/// A protocol for providing image for presence state.
+public protocol PresenceStateIconProviding: VisualProviding {
+    /// Provides an image for the specified presence state.
+    ///
+    /// - Parameter state: The presence state for which to provide the image.
+    /// - Returns: A `UIImage` representing the icon.
+    func provideVisual(for state: ChatUser.Presence.State) -> UIImage?
+}
+
+
 
 // MARK: - Enums
+
 /// An enumeration representing different types of avatar representations.
 public enum AvatarRepresentation {
     /// An avatar represented by an image.

@@ -8,7 +8,7 @@
 
 import UIKit
 
-typealias Fonts = Appearance.Fonts
+public typealias Fonts = Appearance.Fonts
 
 public extension Appearance {
     public struct Fonts {

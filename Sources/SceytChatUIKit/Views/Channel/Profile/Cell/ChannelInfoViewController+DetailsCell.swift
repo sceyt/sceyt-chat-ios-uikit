@@ -107,8 +107,8 @@ extension ChannelInfoViewController {
                     subtitleLabel.text = ""
                 }
             case .direct:
-                if let presence = data.peer?.presence {
-                    subtitleLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(presence)
+                if let peer = data.peer {
+                    subtitleLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(peer)
                 } else {
                     subtitleLabel.text = data.peer?.presence.status
                 }

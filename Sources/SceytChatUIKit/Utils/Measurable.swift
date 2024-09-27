@@ -10,6 +10,6 @@ import Foundation
 
 public protocol Measurable: AnyObject {
     associatedtype Model
-    associatedtype Appearance
-    static func measure(model: Model, appearance: Appearance) -> CGSize
+    associatedtype AppearanceType
+    static func measure(model: Model, appearance: AppearanceType) -> CGSize
 }
