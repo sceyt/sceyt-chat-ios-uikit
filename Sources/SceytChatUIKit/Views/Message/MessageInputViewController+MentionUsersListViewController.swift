@@ -90,12 +90,18 @@ extension MessageInputViewController {
                 shadowsView.layer.shadowColor = appearance.shadowColor?.cgColor
             }
             
-            tableView.backgroundColor = appearance.backgroundColor
+            tableView.backgroundColor = .clear
             
-            view.backgroundColor = appearance.backgroundColor
+            view.backgroundColor = .clear
+            view.clipsToBounds = true
+        }
+        
+        open override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            shadowsView.backgroundColor = appearance.backgroundColor
         }
         
         private var firstLayout = true
+        
         open override func viewDidLayoutSubviews() {
             super.viewDidLayoutSubviews()
             
@@ -111,23 +117,33 @@ extension MessageInputViewController {
                 }
                 firstLayout = false
             }
+            
+            updateTableViewMask()
         }
         
         public func scrollViewDidScroll(_ scrollView: UIScrollView) {
             updateShadows()
         }
         
+        @discardableResult
+        func updateTableViewMask() -> CAShapeLayer {
+            let maskLayer = CAShapeLayer()
+            let maskPath = UIBezierPath(roundedRect: shadowsView.convert(shadowsView.bounds, to: tableView), cornerRadius: shadowsView.layer.cornerRadius)
+            maskLayer.path = maskPath.cgPath
+            tableView.layer.mask = maskLayer
+            return maskLayer
+        }
+        
         func updateShadows(animated: Bool = false) {
             tableView.sendSubviewToBack(shadowsView)
             
             DispatchQueue.main.async { [weak self] in
-                guard let self,
-                      let last = self.tableView.visibleCells.last
-                else { return }
+                guard let self, let last = self.tableView.visibleCells.last else { return }
                 let top = last.frameRelativeTo(view: self.view).minY
                 
                 func perform() {
-                    self.shadowsView.frame = .init(
+                    // Update the shadowsView frame and shadow path
+                    self.shadowsView.frame = CGRect(
                         x: self.tableView.left,
                         y: top,
                         width: self.tableView.width,
@@ -135,11 +151,36 @@ extension MessageInputViewController {
                     )
                     self.shadowsView.layer.shadowPath = UIBezierPath(roundedRect: self.shadowsView.bounds,
                                                                      cornerRadius: Layouts.cornerRadius).cgPath
+                    
+                    updateTableViewMask()
                 }
+                
+                let maskLayer = updateTableViewMask()
+                
                 if animated {
+                    CATransaction.begin()
+                    CATransaction.setAnimationDuration(0.25)
+                    CATransaction.setAnimationTimingFunction(CAMediaTimingFunction(name: .linear))
+                    
                     UIView.animate(withDuration: 0.25) {
                         perform()
                     }
+                    
+                    let newMaskPath = UIBezierPath(
+                        roundedRect: self.shadowsView.convert(self.shadowsView.bounds, to: self.tableView),
+                        cornerRadius: self.shadowsView.layer.cornerRadius
+                    ).cgPath
+
+                    // Animate mask path
+                    let pathAnimation = CABasicAnimation(keyPath: "path")
+                    pathAnimation.fromValue = maskLayer.path
+                    pathAnimation.toValue = newMaskPath
+                    pathAnimation.duration = 0.25
+                    maskLayer.add(pathAnimation, forKey: "pathAnimation")
+                    maskLayer.path = newMaskPath
+                    tableView.layer.mask = maskLayer
+                    
+                    CATransaction.commit()
                 } else {
                     perform()
                 }
@@ -159,19 +200,6 @@ extension MessageInputViewController {
                         self.updateShadows()
                     }
                 } else {
-                    //                tableView.performBatchUpdates {
-                    //                    tableView.insertRows(at: paths.inserts, with: .none)
-                    //                    tableView.reloadRows(at: paths.updates, with: .none)
-                    //                    tableView.deleteRows(at: paths.deletes, with: .none)
-                    //                    paths.moves.forEach {
-                    //                        tableView.moveRow(at: $0.from, to: $0.to)
-                    //                    }
-                    //                } completion: { [weak self] _ in
-                    //                    let indexPaths = paths.moves.map(\.to)
-                    //                    if !indexPaths.isEmpty {
-                    //                        self?.tableView.reloadRows(at: indexPaths, with: .none)
-                    //                    }
-                    //                }
                     tableView.reloadData()
                 }
             case .reload:
@@ -219,9 +247,6 @@ extension MessageInputViewController {
             guard let item = viewModel.member(at: indexPath)
             else { return cell }
             cell.data = item
-            //        if indexPath.row > indexPath.row - 10 {
-            //            viewModel.loadMembers()
-            //        }
             return cell
         }
         
@@ -273,7 +298,6 @@ public extension MessageInputViewController.MentionUsersListViewController {
         ]
     }
 }
-
 
 private extension UITableView {
     func isFirst(_ indexPath: IndexPath) -> Bool {
