@@ -26,7 +26,7 @@ extension ChannelEditViewController {
             }
         }
         
-        public lazy var appearance = ChannelEditViewController.appearance {
+        public lazy var appearance = Components.channelEditViewController.appearance {
             didSet {
                 setupAppearance()
             }

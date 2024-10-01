@@ -1,5 +1,5 @@
 //
-//  ChannelUnreadCountFormatter.swift
+//  UnreadCountFormatter.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import Foundation
 
-open class ChannelUnreadCountFormatter: UIntFormatting {
+open class UnreadCountFormatter: UIntFormatting {
 
     public init() {}
     

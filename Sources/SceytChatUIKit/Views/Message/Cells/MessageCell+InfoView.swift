@@ -37,7 +37,7 @@ extension MessageCell {
             alignment: .center)
             .withoutAutoresizingMask
 
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -49,24 +49,18 @@ extension MessageCell {
                 && !data.hasVoiceAttachments
         }
         
-        override open func setup() {
-            super.setup()
-            
-            eyeView.image = Images.eye.withRenderingMode(.alwaysTemplate)
-        }
-        
         override open func setupAppearance() {
             super.setupAppearance()
             
             backgroundView.clipsToBounds = true
-            backgroundView.backgroundColor = appearance.dateTickBackgroundViewColor
+            backgroundView.backgroundColor = appearance.overlayColor
             backgroundView.layer.cornerRadius = 12
             backgroundView.isHidden = true
-
-            stateLabel.font = appearance.infoViewStateFont
-            stateLabel.textColor = appearance.infoViewStateTextColor
-            dateLabel.font = appearance.infoViewDateFont
-            dateLabel.textColor = appearance.infoViewDateTextColor
+            eyeView.image = appearance.viewCountIcon.withRenderingMode(.alwaysTemplate)
+            stateLabel.font = appearance.messageStateLabelAppearance.font
+            stateLabel.textColor = appearance.messageStateLabelAppearance.foregroundColor
+            dateLabel.font = appearance.messageDateLabelAppearance.font
+            dateLabel.textColor = appearance.messageDateLabelAppearance.foregroundColor
             eyeView.tintColor = dateLabel.textColor
             displayedLabel.font = dateLabel.font
             displayedLabel.textColor = dateLabel.textColor
@@ -91,7 +85,7 @@ extension MessageCell {
                     if data.channel.channelType == .broadcast {
                         eyeView.isHidden = false
                         displayedLabel.isHidden = false
-                        displayedLabel.text = "\(SceytChatUIKit.shared.formatters.messageViewCountFormatter.format(UInt64(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0))) •"
+                        displayedLabel.text = "\(appearance.messageViewCountFormatter.format(UInt64(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0))) •"
                         tickView.isHidden = true
                     } else if !message.incoming {
                         eyeView.isHidden = true
@@ -107,11 +101,11 @@ extension MessageCell {
                     displayedLabel.isHidden = true
                     tickView.isHidden = true
                 }
-                dateLabel.text = SceytChatUIKit.shared.formatters.messageDateFormatter.format(message.createdAt)
+                dateLabel.text = appearance.messageDateFormatter.format(message.createdAt)
                 if message.state == .edited {
                     stateLabel.isHidden = false
                     stateLabel.text = L10n.Message.Info.edited
-                    stateLabel.textColor = hasBackground ? appearance.infoViewStateWithBackgroundTextColor : appearance.infoViewStateTextColor
+                    stateLabel.textColor = hasBackground ? appearance.onOverlayColor : appearance.messageStateLabelAppearance.foregroundColor
                 } else {
                     stateLabel.isHidden = true
                     stateLabel.text = nil
@@ -134,23 +128,23 @@ extension MessageCell {
             var config = TextSizeMeasure.Config()
             config.maximumNumberOfLines = 1
             config.lastFragmentUsedRect = false
-            config.font = appearance.infoViewDateFont
+            config.font = appearance.messageDateLabelAppearance.font
             
-            let createdAt = SceytChatUIKit.shared.formatters.messageDateFormatter.format(message.createdAt)
+            let createdAt = appearance.messageDateFormatter.format(message.createdAt)
             var size = TextSizeMeasure.calculateSize(of: createdAt, config: config).textSize
             size.width += 4
             
             if message.state != .deleted {
                 if channel.channelType == .broadcast {
-                    let displayed = "\(SceytChatUIKit.shared.formatters.messageViewCountFormatter.format(UInt64(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0))) •"
+                    let displayed = "\(appearance.messageViewCountFormatter.format(UInt64(message.markerCount?[DefaultMarker.displayed.rawValue] ?? 0))) •"
                     let displayedSize = TextSizeMeasure.calculateSize(of: displayed, config: config).textSize
                     size.width += 4 + displayedSize.width
                     size.height = max(size.height, displayedSize.height)
-                    let eyeSize = Images.eye.size
+                    let eyeSize = appearance.viewCountIcon.size
                     size.width += 4 + eyeSize.width
                     size.height = max(size.height, eyeSize.height)
                 } else {
-                    let tickViewSize = Images.sentMessage.size
+                    let tickViewSize = appearance.messageDeliveryStatusIcons.sentIcon.size
                     if !message.incoming {
                         size.width += 4 + tickViewSize.width
                     }
@@ -159,8 +153,8 @@ extension MessageCell {
             }
             
             if message.state == .edited {
-                config.font = appearance.infoViewStateFont
-                let stateLabelText = L10n.Message.Info.edited
+                config.font = appearance.messageStateLabelAppearance.font
+                let stateLabelText = appearance.editedStateText
                 let stateLabelSize = TextSizeMeasure.calculateSize(of: stateLabelText, config: config).textSize
                 size.width += 4 + stateLabelSize.width
                 size.height = max(size.height, stateLabelSize.height)

@@ -82,3 +82,12 @@ public protocol AttachmentFormatting: Formatting {
     /// - Returns: A `String` representing the formatted attachment.
     func format(_ attachment: ChatMessage.Attachment) -> String
 }
+
+/// A protocol that defines formatting behavior for chat message.
+public protocol MessageFormatting: Formatting {
+    /// Formats a chat message attachment into a string.
+    ///
+    /// - Parameter attachment: The `ChatMessage` instance to format.
+    /// - Returns: A `String` representing the formatted attachment.
+    func format(_ message: ChatMessage) -> String
+}

@@ -21,14 +21,16 @@ extension MessageInputViewController: AppearanceProviding {
         public lazy var enableSendAttachment: Bool = true
         public lazy var enableMention: Bool = true
         public lazy var inputAppearance: InputTextView.Appearance = .init()
+        public lazy var mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
+                                                                        font: Fonts.regular.withSize(16))
         public lazy var joinButtonAppearance: ButtonAppearance = .init(labelAppearance: .init(foregroundColor: .accent,
                                                                                               font: Fonts.semiBold.withSize(16)),
                                                                        backgroundColor: .surface1)
         public lazy var selectedAttachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.attachmentIconProvider
         public lazy var closeIcon: UIImage = .closeIcon
-        public lazy var linkPreviewAppearance: LinkPreviewAppearance = .init(backgroundColor: .surface1)
-        public lazy var inputReplyMessageAppearance: InputReplyMessageAppearance = .init()
-        public lazy var inputEditMessageAppearance: InputEditMessageAppearance = .init()
+        public lazy var linkPreviewAppearance: InputLinkPreviewAppearance = .init(backgroundColor: .surface1)
+        public lazy var replyMessageAppearance: InputReplyMessageAppearance = .init()
+        public lazy var editMessageAppearance: InputEditMessageAppearance = .init()
         public lazy var selectedMediaAppearance: SelectedMediaView.Appearance = SelectedMediaView.appearance
         public lazy var voiceRecorderAppearance: VoiceRecorderView.Appearance = VoiceRecorderView.appearance
         public lazy var voiceRecordPlaybackAppearance: VoiceRecordPlaybackView.Appearance = VoiceRecordPlaybackView.appearance
@@ -36,6 +38,7 @@ extension MessageInputViewController: AppearanceProviding {
         public lazy var messageSearchControlsAppearance: MessageSearchControlsView.Appearance = MessageSearchControlsView.appearance
         public lazy var coverAppearance: CoverView.Appearance = CoverView.appearance
         public lazy var selectedMessagesActionsAppearance: SelectedMessagesActionsView.Appearance = SelectedMessagesActionsView.appearance
+        public lazy var mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userNameFormatter
         
         // Initializer with default values
         public init(
@@ -49,21 +52,24 @@ extension MessageInputViewController: AppearanceProviding {
             enableSendAttachment: Bool = true,
             enableMention: Bool = true,
             inputAppearance: InputTextView.Appearance = .init(),
+            mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
+                                                            font: Fonts.regular.withSize(16)),
             joinButtonAppearance: ButtonAppearance = .init(labelAppearance: .init(foregroundColor: .accent,
                                                                                   font: Fonts.semiBold.withSize(16)),
                                                            backgroundColor: .surface1),
             selectedAttachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
             closeIcon: UIImage = .closeIcon,
-            linkPreviewAppearance: LinkPreviewAppearance = .init(backgroundColor: .surface1),
-            inputReplyMessageAppearance: InputReplyMessageAppearance = .init(),
-            inputEditMessageAppearance: InputEditMessageAppearance = .init(),
+            linkPreviewAppearance: InputLinkPreviewAppearance = .init(backgroundColor: .surface1),
+            replyMessageAppearance: InputReplyMessageAppearance = .init(),
+            editMessageAppearance: InputEditMessageAppearance = .init(),
             selectedMediaAppearance: SelectedMediaView.Appearance = SelectedMediaView.appearance,
             voiceRecorderAppearance: VoiceRecorderView.Appearance = VoiceRecorderView.appearance,
             voiceRecordPlaybackAppearance: VoiceRecordPlaybackView.Appearance = VoiceRecordPlaybackView.appearance,
             mentionUsersListAppearance: MentionUsersListViewController.Appearance = MentionUsersListViewController.appearance,
             messageSearchControlsAppearance: MessageSearchControlsView.Appearance = MessageSearchControlsView.appearance,
             coverAppearance: CoverView.Appearance = CoverView.appearance,
-            selectedMessagesActionsAppearance: SelectedMessagesActionsView.Appearance = SelectedMessagesActionsView.appearance
+            selectedMessagesActionsAppearance: SelectedMessagesActionsView.Appearance = SelectedMessagesActionsView.appearance,
+            mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userNameFormatter
         ) {
             self.backgroundColor = backgroundColor
             self.dividerColor = dividerColor
@@ -75,12 +81,13 @@ extension MessageInputViewController: AppearanceProviding {
             self.enableSendAttachment = enableSendAttachment
             self.enableMention = enableMention
             self.inputAppearance = inputAppearance
+            self.mentionLabelAppearance = mentionLabelAppearance
             self.joinButtonAppearance = joinButtonAppearance
             self.selectedAttachmentIconProvider = selectedAttachmentIconProvider
             self.closeIcon = closeIcon
             self.linkPreviewAppearance = linkPreviewAppearance
-            self.inputReplyMessageAppearance = inputReplyMessageAppearance
-            self.inputEditMessageAppearance = inputEditMessageAppearance
+            self.replyMessageAppearance = replyMessageAppearance
+            self.editMessageAppearance = editMessageAppearance
             self.selectedMediaAppearance = selectedMediaAppearance
             self.voiceRecorderAppearance = voiceRecorderAppearance
             self.voiceRecordPlaybackAppearance = voiceRecordPlaybackAppearance
@@ -88,6 +95,7 @@ extension MessageInputViewController: AppearanceProviding {
             self.messageSearchControlsAppearance = messageSearchControlsAppearance
             self.coverAppearance = coverAppearance
             self.selectedMessagesActionsAppearance = selectedMessagesActionsAppearance
+            self.mentionUserNameFormatter = mentionUserNameFormatter
         }
     }
 }

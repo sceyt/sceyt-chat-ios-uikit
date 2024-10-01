@@ -12,6 +12,8 @@ extension CircularProgressView: AppearanceProviding {
     
     public class Appearance {
         public lazy var progressColor: UIColor? = .onPrimary
+        public lazy var progressLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
+                                                                         font: Fonts.regular.withSize(12))
         public lazy var trackColor: UIColor? = .clear
         public lazy var backgroundColor: UIColor? = nil
         public lazy var cancelIcon: UIImage? = nil
@@ -21,6 +23,8 @@ extension CircularProgressView: AppearanceProviding {
         // Initializer with default values
         public init(
             progressColor: UIColor? = .onPrimary,
+            progressLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
+                                                             font: Fonts.regular.withSize(12)),
             trackColor: UIColor? = .clear,
             backgroundColor: UIColor? = nil,
             cancelIcon: UIImage? = nil,
@@ -28,6 +32,7 @@ extension CircularProgressView: AppearanceProviding {
             downloadIcon: UIImage? = nil
         ) {
             self.progressColor = progressColor
+            self.progressLabelAppearance = progressLabelAppearance
             self.trackColor = trackColor
             self.backgroundColor = backgroundColor
             self.cancelIcon = cancelIcon

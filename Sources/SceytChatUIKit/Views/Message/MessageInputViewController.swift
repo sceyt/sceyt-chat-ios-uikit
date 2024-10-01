@@ -392,8 +392,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     open func updateMentions() {
         guard canRunMentionUserLogic else { return }
         func attributedString(_ text: String, key: String) -> NSAttributedString {
-            NSAttributedString(string: text, attributes: [.font: inputTextView.font as Any,
-                                                          .foregroundColor: UIColor.accent,
+            NSAttributedString(string: text, attributes: [.font: appearance.mentionLabelAppearance.font,
+                                                          .foregroundColor: appearance.mentionLabelAppearance.foregroundColor,
                                                           .mention: key])
         }
         
@@ -664,7 +664,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             nextState = nil
         }
         let message = layoutModel.message
-        let title = appearance.inputReplyMessageAppearance.senderNameFormatter.format(message.user)
+        let title = appearance.replyMessageAppearance.senderNameFormatter.format(message.user)
         var text = layoutModel.attributedView.content.string.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         var image: UIImage?
         var showPlayIcon = false
@@ -673,72 +673,83 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             switch attachment.type {
             case "image":
                 if text.isEmpty {
-                    text = appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = attachment.thumbnailImage
             case "video":
                 if text.isEmpty {
-                    text = appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = attachment.thumbnailImage
                 showPlayIcon = true
             case "voice":
                 if text.isEmpty {
-                    text = appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
-                image = appearance.inputReplyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
+                image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             case "link":
                 if let metadata = layoutModel.linkPreviews?.first?.metadata {
                     addOrUpdateLinkPreview(linkDetails: metadata)
                     return
                 }
                 if text.isEmpty {
-                    text = appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = nil
             default:
                 if text.isEmpty {
-                    text = layoutModel.attachments.first?.name ?? appearance.inputReplyMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = layoutModel.attachments.first?.name ?? appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
-                image = appearance.inputReplyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
+                image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
         }
         let titleAttributedString = NSMutableAttributedString(
             string: L10n.Input.reply + ": ",
             attributes: [
-                .font: appearance.inputReplyMessageAppearance.titleLabelAppearance.font,
-                .foregroundColor: appearance.inputReplyMessageAppearance.titleLabelAppearance.foregroundColor
+                .font: appearance.replyMessageAppearance.titleLabelAppearance.font,
+                .foregroundColor: appearance.replyMessageAppearance.titleLabelAppearance.foregroundColor
             ])
         titleAttributedString.append(
             .init(
                 string: title,
                 attributes: [
-                    .font: appearance.inputReplyMessageAppearance.senderNameLabelAppearance.font,
-                    .foregroundColor: appearance.inputReplyMessageAppearance.senderNameLabelAppearance.foregroundColor
+                    .font: appearance.replyMessageAppearance.senderNameLabelAppearance.font,
+                    .foregroundColor: appearance.replyMessageAppearance.senderNameLabelAppearance.foregroundColor
                 ]))
         actionView.titleLabel.attributedText = titleAttributedString
         
         let messageAttributedString = NSMutableAttributedString(
             string: text,
             attributes: [
-                .font: appearance.inputReplyMessageAppearance.bodyLabelAppearance.font,
-                .foregroundColor: appearance.inputReplyMessageAppearance.bodyLabelAppearance.foregroundColor
+                .font: appearance.replyMessageAppearance.bodyLabelAppearance.font,
+                .foregroundColor: appearance.replyMessageAppearance.bodyLabelAppearance.foregroundColor
             ])
+        message.bodyAttributes?
+            .filter { $0.type == .mention }
+            .sorted(by: { $0.offset > $1.offset })
+            .forEach { bodyAttribute in
+                let range = NSRange(location: bodyAttribute.offset, length: bodyAttribute.length)
+                var mentionAttributes: [NSAttributedString.Key : Any] = [:]
+                mentionAttributes[.font] = appearance.replyMessageAppearance.mentionLabelAppearance.font
+                mentionAttributes[.foregroundColor] = appearance.replyMessageAppearance.mentionLabelAppearance.foregroundColor
+                
+                messageAttributedString.setAttributes(mentionAttributes, range: range)
+            }
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
-                string: " " + appearance.inputReplyMessageAppearance.attachmentDurationFormatter.format(TimeInterval(duration)),
+                string: " " + appearance.replyMessageAppearance.attachmentDurationFormatter.format(TimeInterval(duration)),
                 attributes: [
-                    .font: appearance.inputReplyMessageAppearance.attachmentDurationLabelAppearance.font,
-                    .foregroundColor: appearance.inputReplyMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
+                    .font: appearance.replyMessageAppearance.attachmentDurationLabelAppearance.font,
+                    .foregroundColor: appearance.replyMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
                 ]))
         }
         actionView.messageLabel.attributedText = messageAttributedString
         
-        actionView.backgroundColor = appearance.inputReplyMessageAppearance.backgroundColor
+        actionView.backgroundColor = appearance.replyMessageAppearance.backgroundColor
         actionView.isHidden = false
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
-        actionView.iconView.image = appearance.inputReplyMessageAppearance.replyIcon
+        actionView.iconView.image = appearance.replyMessageAppearance.replyIcon
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
         actionView.playView.isHidden = !showPlayIcon
@@ -772,66 +783,77 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             switch attachment.type {
             case "image":
                 if text.isEmpty {
-                    text = appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = attachment.thumbnailImage
             case "video":
                 if text.isEmpty {
-                    text = appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = attachment.thumbnailImage
                 showPlayIcon = true
             case "voice":
                 if text.isEmpty {
-                    text = appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
-                image = appearance.inputEditMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
+                image = appearance.editMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             case "link":
                 if let metadata = layoutModel.linkPreviews?.first?.metadata {
                     addOrUpdateLinkPreview(linkDetails: metadata)
                     return
                 }
                 if text.isEmpty {
-                    text = appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
                 image = nil
             default:
                 if text.isEmpty {
-                    text = layoutModel.attachments.first?.name ?? appearance.inputEditMessageAppearance.attachmentNameFormatter.format(attachment)
+                    text = layoutModel.attachments.first?.name ?? appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
                 }
-                image = appearance.inputEditMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
+                image = appearance.editMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
         }
         let titleAttributedString = NSMutableAttributedString(
             string: L10n.Input.edit + ": ",
             attributes: [
-                .font: appearance.inputEditMessageAppearance.titleLabelAppearance.font,
-                .foregroundColor: appearance.inputEditMessageAppearance.titleLabelAppearance.foregroundColor
+                .font: appearance.editMessageAppearance.titleLabelAppearance.font,
+                .foregroundColor: appearance.editMessageAppearance.titleLabelAppearance.foregroundColor
             ])
         actionView.titleLabel.attributedText = titleAttributedString
         
         let messageAttributedString = NSMutableAttributedString(
             string: text,
             attributes: [
-                .font: appearance.inputEditMessageAppearance.bodyTextStyle.font,
-                .foregroundColor: appearance.inputEditMessageAppearance.bodyTextStyle.foregroundColor
+                .font: appearance.editMessageAppearance.bodyTextStyle.font,
+                .foregroundColor: appearance.editMessageAppearance.bodyTextStyle.foregroundColor
             ])
+        message.bodyAttributes?
+            .filter { $0.type == .mention }
+            .sorted(by: { $0.offset > $1.offset })
+            .forEach { bodyAttribute in
+                let range = NSRange(location: bodyAttribute.offset, length: bodyAttribute.length)
+                var mentionAttributes: [NSAttributedString.Key : Any] = [:]
+                mentionAttributes[.font] = appearance.editMessageAppearance.mentionLabelAppearance.font
+                mentionAttributes[.foregroundColor] = appearance.editMessageAppearance.mentionLabelAppearance.foregroundColor
+                
+                messageAttributedString.setAttributes(mentionAttributes, range: range)
+            }
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
-                string: " " + appearance.inputEditMessageAppearance.attachmentDurationFormatter.format(TimeInterval(duration)),
+                string: " " + appearance.editMessageAppearance.attachmentDurationFormatter.format(TimeInterval(duration)),
                 attributes: [
-                    .font: appearance.inputEditMessageAppearance.attachmentDurationLabelAppearance.font,
-                    .foregroundColor: appearance.inputEditMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
+                    .font: appearance.editMessageAppearance.attachmentDurationLabelAppearance.font,
+                    .foregroundColor: appearance.editMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
                 ]))
         }
         actionView.messageLabel.attributedText = messageAttributedString
         
         cachedMessage = inputTextView.attributedText
-        actionView.backgroundColor = appearance.inputEditMessageAppearance.backgroundColor
+        actionView.backgroundColor = appearance.editMessageAppearance.backgroundColor
         actionView.isHidden = false
         separatorViewCenter.isHidden = false
         actionView.iconView.isHidden = true
-        actionView.iconView.image = appearance.inputEditMessageAppearance.editIcon
+        actionView.iconView.image = appearance.editMessageAppearance.editIcon
         actionView.imageView.isHidden = image == nil
         actionView.imageView.image = image
         updateMediaButtonAppearance(isHidden: true)
@@ -975,7 +997,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         (parent as? ChannelViewController)?.collectionView.isUserInteractionEnabled = false
         viewController.view.pin(to: parent.view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
         viewController.view.bottomAnchor.pin(to: view.topAnchor)
-        viewController.didSelectMember = { callback($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) }
+        
+        viewController.didSelectMember = { [unowned self] in
+            callback($0.id, self.appearance.mentionUserNameFormatter.format($0))
+        }
     }
 
     open func dismiss() {

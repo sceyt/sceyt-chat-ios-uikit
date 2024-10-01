@@ -22,16 +22,15 @@ extension MessageCell {
             super.setupAppearance()
             imageView.clipsToBounds = true
             imageView.layer.cornerRadius = 4
-            imageView.image = .messageFile
 
-            titleLabel.font = appearance.attachmentFileNameFont
-            titleLabel.textColor = appearance.attachmentFileNameColor
+            titleLabel.font = appearance.attachmentFileNameLabelAppearance.font
+            titleLabel.textColor = appearance.attachmentFileNameLabelAppearance.foregroundColor
             titleLabel.lineBreakMode = .byTruncatingMiddle
 
-            sizeLabel.font = appearance.attachmentFileSizeFont
-            sizeLabel.textColor = appearance.attachmentFileSizeColor
+            sizeLabel.font = appearance.attachmentFileSizeLabelAppearance.font
+            sizeLabel.textColor = appearance.attachmentFileSizeLabelAppearance.foregroundColor
 
-            progressView.backgroundColor = .accent
+            progressView.backgroundColor = appearance.mediaLoaderAppearance.backgroundColor
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
         }
 
@@ -58,8 +57,9 @@ extension MessageCell {
 
         open override var data: MessageLayoutModel.AttachmentLayout! {
             didSet {
+                imageView.image = appearance.attachmentIconProvider.provideVisual(for: data.attachment)
                 titleLabel.text = data.name
-                sizeLabel.text = data.fileSize
+                sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
             }
         }
         
@@ -68,11 +68,11 @@ extension MessageCell {
             
             let message: String
             if progress.progress <= 0.01 || progress.progress >= 1 {
-                message = data.fileSize
+                message = data.fileSize(using: appearance.attachmentFileSizeFormatter)
             } else {
                 let total = progress.attachment.uploadedFileSize
                 let downloaded = UInt(progress.progress * Double(total))
-                message = "\(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(downloaded))) • \(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(total)))"
+                message = "\(appearance.attachmentFileSizeFormatter.format(UInt64(downloaded))) • \(appearance.attachmentFileSizeFormatter.format(UInt64(total)))"
             }
             sizeLabel.text = message
         }
@@ -81,7 +81,7 @@ extension MessageCell {
             super.setCompletion(completion)
             guard completion.error == nil
             else { return }
-            sizeLabel.text = data.fileSize
+            sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
         }
     }
 }

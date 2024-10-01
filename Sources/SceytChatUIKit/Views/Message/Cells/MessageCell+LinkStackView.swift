@@ -13,7 +13,7 @@ extension MessageCell {
 
     open class LinkStackView: UIStackView, Measurable {
         
-        public lazy var appearance = MessageCell.appearance {
+        open lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -33,7 +33,7 @@ extension MessageCell {
             setupAppearance()
         }
 
-        private var isConfigured = false
+        open var isConfigured = false
 
         open override func willMove(toSuperview newSuperview: UIView?) {
             super.willMove(toSuperview: newSuperview)
@@ -42,11 +42,11 @@ extension MessageCell {
             setupLayout()
         }
 
-        func setup() {
+        open func setup() {
             
         }
         
-        func setupLayout() {
+        open func setupLayout() {
             
         }
         
@@ -66,6 +66,7 @@ extension MessageCell {
                 [preview].forEach {
                     let v = Components.messageCellLinkPreviewView.init()
                         .withoutAutoresizingMask
+                    v.appearance = appearance
                     addArrangedSubview(v)
                     v.leadingAnchor.pin(to: self.leadingAnchor, constant: 8)
                     v.trailingAnchor.pin(to: self.trailingAnchor, constant: -8)
@@ -73,8 +74,8 @@ extension MessageCell {
                     v.addGestureRecognizer(tap)
                     v.data = $0
                     v.backgroundColor = data.message.incoming ?
-                    appearance.linkPreviewBackgroundColor.in :
-                    appearance.linkPreviewBackgroundColor.out
+                    appearance.incomingLinkPreviewBackgroundColor :
+                    appearance.outgoingLinkPreviewBackgroundColor
                 }
             }
         }

@@ -15,15 +15,33 @@ extension ChannelViewController {
             didSet {
                 switch highlightMode {
                 case .reply:
-                    bubbleView.backgroundColor = appearance.highlightedBubbleColor.out
+                    bubbleView.backgroundColor = appearance.outgoingHighlightedBubbleColor
+                    replyView.backgroundColor = appearance.outgoingHighlightedOverlayColor
+                    linkView.arrangedSubviews.forEach { subview in
+                        if subview is MessageCell.LinkPreviewView {
+                            subview.backgroundColor = appearance.outgoingHighlightedOverlayColor
+                        }
+                    }
                 case .search:
-                    bubbleView.backgroundColor = appearance.highlightedSearchResultColor.out
+                    bubbleView.backgroundColor = appearance.outgoingHighlightedSearchResultColor
+                    replyView.backgroundColor = appearance.outgoingHighlightedOverlaySearchResultColor
+                    linkView.arrangedSubviews.forEach { subview in
+                        if subview is MessageCell.LinkPreviewView {
+                            subview.backgroundColor = appearance.outgoingHighlightedOverlaySearchResultColor
+                        }
+                    }
                 case .none:
-                    bubbleView.backgroundColor = appearance.bubbleColor.out
+                    bubbleView.backgroundColor = appearance.outgoingBubbleColor
+                    replyView.backgroundColor = appearance.outgoingReplyBackgroundColor
+                    linkView.arrangedSubviews.forEach { subview in
+                        if subview is MessageCell.LinkPreviewView {
+                            subview.backgroundColor = appearance.outgoingLinkPreviewBackgroundColor
+                        }
+                    }
                 }
                 if data?.hasMediaAttachments == true {
-                    attachmentOverlayView.backgroundColor = appearance.highlightedOverlayColor.out
-                    attachmentOverlayView.alpha = highlightMode == .reply ? 1 : 0
+                    attachmentOverlayView.backgroundColor = highlightMode == .reply ? appearance.outgoingHighlightedOverlayColor : appearance.outgoingHighlightedOverlaySearchResultColor
+                    attachmentOverlayView.alpha = highlightMode == .none ? 0 : 0.5
                 } else {
                     attachmentOverlayView.alpha = 0
                 }
@@ -39,8 +57,8 @@ extension ChannelViewController {
             let attachmentsContainerSize = layout.attachmentsContainerSize
             var layoutConstraint = [NSLayoutConstraint]()
             UIView.performWithoutAnimation {
-                bubbleView.backgroundColor = appearance.bubbleColor.out
-                infoView.dateLabel.textColor = appearance.infoViewDateTextColor
+                bubbleView.backgroundColor = appearance.outgoingBubbleColor
+                infoView.dateLabel.textColor = appearance.messageDateLabelAppearance.foregroundColor
                 infoView.displayedLabel.textColor = infoView.dateLabel.textColor
                 infoView.eyeView.tintColor = infoView.dateLabel.textColor
             }
@@ -108,7 +126,7 @@ extension ChannelViewController {
                 ]
                 
             } else if layout.contentOptions == .image {
-                infoView.dateLabel.textColor = appearance.infoViewRevertColorOnBackgroundView
+                infoView.dateLabel.textColor = appearance.onOverlayColor
                 infoView.displayedLabel.textColor = infoView.dateLabel.textColor
                 infoView.eyeView.tintColor = infoView.dateLabel.textColor
                 //            infoView.tickView.tintColor = appearance.infoViewRevertColorOnBackgroundView
@@ -166,10 +184,10 @@ extension ChannelViewController {
             } else {
                 infoView.backgroundView.isHidden = layout.contentOptions.contains(.file)
                 if !infoView.backgroundView.isHidden {
-                    infoView.dateLabel.textColor = appearance.infoViewRevertColorOnBackgroundView
+                    infoView.dateLabel.textColor = appearance.onOverlayColor
                     //                infoView.tickView.tintColor = appearance.infoViewRevertColorOnBackgroundView
                 } else {
-                    infoView.dateLabel.textColor = appearance.infoViewDateTextColor
+                    infoView.dateLabel.textColor = appearance.messageDateLabelAppearance.foregroundColor
                 }
                 infoView.displayedLabel.textColor = infoView.dateLabel.textColor
                 infoView.eyeView.tintColor = infoView.dateLabel.textColor
@@ -273,7 +291,7 @@ extension ChannelViewController {
         open override func prepareForReuse() {
             super.prepareForReuse()
             infoView.backgroundView.isHidden = true
-            infoView.dateLabel.textColor = appearance.infoViewDateTextColor
+            infoView.dateLabel.textColor = appearance.messageDateLabelAppearance.foregroundColor
             infoView.displayedLabel.textColor = infoView.dateLabel.textColor
             infoView.eyeView.tintColor = infoView.dateLabel.textColor
         }

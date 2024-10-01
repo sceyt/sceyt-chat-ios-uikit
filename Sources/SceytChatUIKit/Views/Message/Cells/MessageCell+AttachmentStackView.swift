@@ -10,18 +10,12 @@ import SceytChat
 import UIKit
 
 extension MessageCell {
-    open class AttachmentStackView: UIView, Configurable {
+    open class AttachmentStackView: View {
         
-        override public init(frame: CGRect) {
-            super.init(frame: frame)
-            setup()
-            setupAppearance()
-        }
-        
-        public required init?(coder: NSCoder) {
-            super.init(coder: coder)
-            setup()
-            setupAppearance()
+        public lazy var appearance = Components.messageCell.appearance {
+            didSet {
+                setupAppearance()
+            }
         }
         
         open var onAction: ((Action) -> Void)?
@@ -38,25 +32,24 @@ extension MessageCell {
             isConfigured = true
         }
         
-        open func setup() {
+        open override func setup() {
+            super.setup()
             let tap = UITapGestureRecognizer(target: self, action: #selector(tapAction(_:)))
             addGestureRecognizer(tap)
         }
         
-        open func setupLayout() {}
-        
-        open func setupAppearance() {
+        open override func setupAppearance() {
+            super.setupAppearance()
 //            alignment = .center
 //            distribution = .fillProportionally
 //            axis = .vertical
 //            spacing = 4
         }
         
-        open func setupDone() {}
-        
         open func addImageView(layout: MessageLayoutModel.AttachmentLayout) -> AttachmentImageView {
             let v = Components.messageCellAttachmentImageView.init()
                 .withoutAutoresizingMask
+            v.appearance = appearance
             addSubview(v)
             v.pin(to: self)
             v.heightAnchor.pin(constant: layout.thumbnailSize.height)
@@ -68,6 +61,7 @@ extension MessageCell {
         open func addVideoView(layout: MessageLayoutModel.AttachmentLayout) -> AttachmentVideoView {
             let v = Components.messageCellAttachmentVideoView.init()
                 .withoutAutoresizingMask
+            v.appearance = appearance
             addSubview(v)
             v.pin(to: self)
             v.heightAnchor.pin(constant: layout.thumbnailSize.height)
@@ -79,6 +73,7 @@ extension MessageCell {
         open func addFileView(layout: MessageLayoutModel.AttachmentLayout) -> AttachmentFileView {
             let v = Components.messageCellAttachmentFileView.init()
                 .withoutAutoresizingMask
+            v.appearance = appearance
             addSubview(v)
             v.pin(to: self)
             v.heightAnchor.pin(constant: layout.thumbnailSize.height)
@@ -90,6 +85,7 @@ extension MessageCell {
         open func addAudioView(layout: MessageLayoutModel.AttachmentLayout) -> AttachmentAudioView {
             let v = Components.messageCellAttachmentAudioView.init()
                 .withoutAutoresizingMask
+            v.appearance = appearance
             addSubview(v)
             v.pin(to: self)
             v.heightAnchor.pin(constant: layout.thumbnailSize.height)

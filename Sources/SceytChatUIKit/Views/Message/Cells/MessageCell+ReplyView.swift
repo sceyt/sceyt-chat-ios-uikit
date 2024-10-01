@@ -38,7 +38,7 @@ extension MessageCell {
         open lazy var stackViewH2 = UIStackView()
             .withoutAutoresizingMask
         
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -91,13 +91,13 @@ extension MessageCell {
             super.setupAppearance()
             isHidden = true
 
-            nameLabel.font = appearance.replyUserTitleFont
-            nameLabel.textColor = appearance.replyUserTitleColor
+            nameLabel.font = appearance.replyMessageAppearance.titleLabelAppearance.font
+            nameLabel.textColor = appearance.replyMessageAppearance.titleLabelAppearance.foregroundColor
 
-            messageLabel.font = appearance.replyMessageFont
-            messageLabel.textColor = appearance.replyMessageColor
+            messageLabel.font = appearance.replyMessageAppearance.subtitleLabelAppearance.font
+            messageLabel.textColor = appearance.replyMessageAppearance.subtitleLabelAppearance.foregroundColor
             
-            borderView.backgroundColor = appearance.replyMessageBorderColor
+            borderView.backgroundColor = appearance.replyMessageAppearance.borderColor
         }
 
         open var data: MessageLayoutModel.ReplyLayout? {
@@ -114,11 +114,11 @@ extension MessageCell {
                     return
                 }
                 isHidden = false
-                backgroundColor = data.byMe ? appearance.replyBackgroundColor.out : appearance.replyBackgroundColor.in
+                backgroundColor = data.byMe ? appearance.outgoingReplyBackgroundColor : appearance.incomingReplyBackgroundColor
                 layer.cornerRadius = Layouts.cornerRadius
                 layer.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
                 layer.masksToBounds = true
-                nameLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(data.user)
+                nameLabel.text = appearance.replyMessageAppearance.senderNameFormatter.format(data.user)
                 messageLabel.attributedText = data.attributedBody
                 if let image = data.icon {
                     stackViewH2.insertArrangedSubview(iconView, at: 0)
@@ -195,12 +195,12 @@ extension MessageCell {
                 space = 10
             }
             var config = TextSizeMeasure.Config(maximumNumberOfLines: 1, lastFragmentUsedRect: false)
-            config.font = appearance.replyUserTitleFont
+            config.font = appearance.replyMessageAppearance.titleLabelAppearance.font
             config.restrictingWidth = MessageLayoutModel.defaults.messageWidth - thumbnailSize.width
             let user = SceytChatUIKit.shared.formatters.userNameFormatter.format(data.user)
             let nameLabelSize = TextSizeMeasure.calculateSize(of: user, config: config).textSize
             
-            config.font = appearance.replyMessageFont
+            config.font = appearance.replyMessageAppearance.subtitleLabelAppearance.font
             config.restrictingWidth = MessageLayoutModel.defaults.messageWidth - space
             config.maximumNumberOfLines = data.attachment == nil ? 2 : 1
             let messageLabelSize = TextSizeMeasure.calculateSize(of: data.attributedBody, config: config).textSize

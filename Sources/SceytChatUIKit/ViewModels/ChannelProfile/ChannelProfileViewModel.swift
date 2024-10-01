@@ -17,6 +17,7 @@ open class ChannelProfileViewModel: NSObject {
     public private(set) var channelProvider: ChannelProvider
     public private(set) var userProvider: UserProvider
     public private(set) var channel: ChatChannel
+    public private(set) var appearance: MessageCell.Appearance
     open var channelType: ChatChannel.ChannelType { channel.channelType }
     open var autoDelete: TimeInterval = 0
 
@@ -36,8 +37,9 @@ open class ChannelProfileViewModel: NSObject {
     }()
 
 
-    public required init(channel: ChatChannel) {
+    public required init(channel: ChatChannel, appearance: MessageCell.Appearance) {
         self.channel = channel
+        self.appearance = appearance
         channelProvider = Components.channelProvider
             .init(channelId: channel.id)
         userProvider = Components.userProvider
@@ -85,25 +87,29 @@ open class ChannelProfileViewModel: NSObject {
     open var mediaListViewModel: ChannelAttachmentListViewModel {
         Components.channelAttachmentListViewModel
             .init(channel: channel,
-                  attachmentTypes: ["image", "video"])
+                  attachmentTypes: ["image", "video"],
+                  appearance: appearance)
     }
 
     open var fileListViewModel: ChannelAttachmentListViewModel {
         Components.channelAttachmentListViewModel
             .init(channel: channel, 
-                  attachmentTypes: ["file"])
+                  attachmentTypes: ["file"],
+                  appearance: appearance)
     }
 
     open var linkListViewModel: ChannelAttachmentListViewModel {
         Components.channelAttachmentListViewModel
             .init(channel: channel,
-                  attachmentTypes: ["link"])
+                  attachmentTypes: ["link"],
+                  appearance: appearance)
     }
     
     open var voiceListViewModel: ChannelAttachmentListViewModel {
         Components.channelAttachmentListViewModel
             .init(channel: channel,
-                  attachmentTypes: ["voice"])
+                  attachmentTypes: ["voice"],
+                  appearance: appearance)
     }
     
     open var previewer: AttachmentPreviewDataSource {

@@ -26,7 +26,8 @@ open class ChannelRouter: Router<ChannelViewController> {
         let profileViewController = Components.channelInfoViewController.init()
         profileViewController.profileViewModel = Components.channelProfileViewModel
             .init(
-                channel: rootViewController.channelViewModel.channel
+                channel: rootViewController.channelViewModel.channel,
+                appearance: MessageCell.appearance
             )
         rootViewController.show(profileViewController, sender: self)
     }
@@ -106,7 +107,7 @@ open class ChannelRouter: Router<ChannelViewController> {
     open func showChannelInfoViewController(channel: ChatChannel) {
         let viewController = Components.channelInfoViewController.init()
         viewController.hidesBottomBarWhenPushed = true
-        viewController.profileViewModel = Components.channelProfileViewModel.init(channel: channel)
+        viewController.profileViewModel = Components.channelProfileViewModel.init(channel: channel, appearance: MessageCell.appearance)
         self.rootViewController.show(viewController, sender: self)
     }
     

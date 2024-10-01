@@ -19,12 +19,12 @@ extension MessageCell {
             didSet {
                 switch state {
                 case .stopped:
-                    playPauseButton.image = .audioPlayerPlay
-                    audioWaveformView.progress = 0
+                    playPauseButton.image = appearance.voicePlayIcon
+//                    audioWaveformView.progress = 0
                 case .paused:
-                    playPauseButton.image = .audioPlayerPlay
+                    playPauseButton.image = appearance.voicePlayIcon
                 case .playing:
-                    playPauseButton.image = .audioPlayerPause
+                    playPauseButton.image = appearance.voicePauseIcon
                 }
             }
         }
@@ -77,24 +77,25 @@ extension MessageCell {
             layer.cornerRadius = 16
             layer.masksToBounds = true
             
-            playPauseButton.image = .audioPlayerPlay
+            playPauseButton.image = appearance.voicePlayIcon
             
-            speedLabel.backgroundColor = appearance.audioSpeedBackgroundColor
+            speedLabel.backgroundColor = appearance.voiceSpeedLabelAppearance.backgroundColor
             speedLabel.layer.cornerRadius = 10
             speedLabel.layer.masksToBounds = true
-            speedLabel.font = appearance.audioSpeedFont
-            speedLabel.textColor = appearance.audioSpeedColor
+            speedLabel.font = appearance.voiceSpeedLabelAppearance.font
+            speedLabel.textColor = appearance.voiceSpeedLabelAppearance.foregroundColor
             speedLabel.textAlignment = .center
             
-            durationLabel.font = appearance.audioDurationFont
-            durationLabel.textColor = appearance.audioDurationColor
+            durationLabel.font = appearance.voiceDurationLabelAppearance.font
+            durationLabel.textColor = appearance.voiceDurationLabelAppearance.foregroundColor
             
             imageView.clipsToBounds = true
             
-            progressView.backgroundColor = appearance.audioProgressBackgroundColor
+            progressView.backgroundColor = appearance.mediaLoaderAppearance.backgroundColor
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
-            progressView.trackColor = appearance.audioProgressTrackColor
-            progressView.progressColor = appearance.audioProgressColor
+            progressView.trackColor = appearance.mediaLoaderAppearance.trackColor
+            progressView.progressColor = appearance.mediaLoaderAppearance.progressColor
+            audioWaveformView.parentAppearance = appearance.voiceWaveformViewAppearance
         }
         
         override open func setup() {
@@ -142,7 +143,7 @@ extension MessageCell {
         
         private var displayDuration = 0.0 {
             didSet {
-                durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(displayDuration)
+                durationLabel.text = appearance.voiceDurationFormatter.format(displayDuration)
             }
         }
         

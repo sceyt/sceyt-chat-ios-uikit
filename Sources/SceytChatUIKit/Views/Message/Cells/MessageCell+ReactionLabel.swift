@@ -16,7 +16,7 @@ extension MessageCell {
 
         public let key: String
 
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -53,8 +53,8 @@ extension MessageCell {
         }
         
         open func setupAppearance() {
-            font = appearance.reactionFont
-            textColor = appearance.reactionColor
+            font = appearance.reactionCountLabelAppearance.font
+            textColor = appearance.reactionCountLabelAppearance.foregroundColor
         }
         
         open func setupLayout() {}

@@ -12,7 +12,7 @@ extension MessageInputViewController {
     
     open class MessageActionsView: View {
         
-        public lazy var appearance = MessageInputViewController.appearance {
+        public lazy var appearance = Components.messageInputViewController.appearance {
             didSet {
                 setupAppearance()
             }

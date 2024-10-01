@@ -13,7 +13,7 @@ extension MessageCell {
     
     open class ReplyArrowView: View {
         
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -35,8 +35,7 @@ extension MessageCell {
         open override func draw(_ layer: CALayer, in ctx: CGContext) {
             super.draw(layer, in: ctx)
             
-            guard let strokeColor = appearance.replyArrowStrokeColor?.cgColor
-            else { return }
+            let strokeColor = appearance.threadReplyArrowStrokeColor.cgColor
             
             let rect = bounds.insetBy(dx: 1, dy: 1)
             let radius = CGFloat(rect.width / 2)

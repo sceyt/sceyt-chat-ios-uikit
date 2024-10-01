@@ -83,6 +83,17 @@ public struct DefaultColors {
                                                         dark: .accent.dark.withAlphaComponent(0.14).blendColors(with: .background.dark))
     public static var bubbleOutgoingSecondary: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.24).blendColors(with: .background.light),
                                                                  dark: .accent.dark.withAlphaComponent(0.24).blendColors(with: .background.dark))
+    
+    public static var bubbleIncomingHighlighted: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6).light.withAlphaComponent(0.30).blendColors(with: .background.light),
+                                                                   dark: UIColor(rgb: 0x232324).dark.withAlphaComponent(0.30).blendColors(with: .background.dark))
+    public static var bubbleIncomingHighlightedSecondary: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE).light.withAlphaComponent(0.34).blendColors(with: .background.light),
+                                                                            dark: UIColor(rgb: 0x303032).dark.withAlphaComponent(0.34).blendColors(with: .background.dark))
+    
+    public static var bubbleOutgoingHighlighted: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.30).blendColors(with: .background.light),
+                                                                   dark: .accent.dark.withAlphaComponent(0.30).blendColors(with: .background.dark))
+    public static var bubbleOutgoingHighlightedSecondary: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.34).blendColors(with: .background.light),
+                                                                    dark: .accent.dark.withAlphaComponent(0.34).blendColors(with: .background.dark))
+
 }
 
 public extension UIColor {

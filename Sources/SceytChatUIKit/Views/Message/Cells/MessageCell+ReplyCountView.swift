@@ -13,7 +13,7 @@ extension MessageCell {
 
     open class ReplyCountView: Button {
         
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -25,8 +25,8 @@ extension MessageCell {
         }
         open override func setupAppearance() {
             super.setupAppearance()
-            setTitleColor(appearance.replyCountTextColor, for: .normal)
-            titleLabel?.font = appearance.replyCountTextFont
+            setTitleColor(appearance.threadReplyCountLabelAppearance.foregroundColor, for: .normal)
+            titleLabel?.font = appearance.threadReplyCountLabelAppearance.font
         }
 
         open var count: Int = 0 {

@@ -15,6 +15,8 @@ public class InputReplyMessageAppearance {
                                                                        font: Fonts.bold.withSize(13))
     public lazy var bodyLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                  font: Fonts.regular.withSize(13))
+    public lazy var mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
+                                                                    font: Fonts.regular.withSize(13))
     public lazy var attachmentDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
                                                                                font: Fonts.regular.withSize(13))
     public lazy var replyIcon: UIImage? = nil
@@ -33,6 +35,8 @@ public class InputReplyMessageAppearance {
                                                            font: Fonts.bold.withSize(13)),
         bodyLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                      font: Fonts.regular.withSize(13)),
+        mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
+                                                        font: Fonts.regular.withSize(13)),
         attachmentDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
                                                                    font: Fonts.regular.withSize(13)),
         replyIcon: UIImage? = nil,
@@ -45,6 +49,7 @@ public class InputReplyMessageAppearance {
         self.titleLabelAppearance = titleLabelAppearance
         self.senderNameLabelAppearance = senderNameLabelAppearance
         self.bodyLabelAppearance = bodyLabelAppearance
+        self.mentionLabelAppearance = mentionLabelAppearance
         self.attachmentDurationLabelAppearance = attachmentDurationLabelAppearance
         self.replyIcon = replyIcon
         self.attachmentDurationFormatter = attachmentDurationFormatter

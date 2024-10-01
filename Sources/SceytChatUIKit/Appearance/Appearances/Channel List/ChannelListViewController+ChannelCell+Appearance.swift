@@ -26,7 +26,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         public lazy var unreadCountMutedStateLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
                                                                                       font: Fonts.semiBold.withSize(14),
                                                                                       backgroundColor: .surface3)
-        public lazy var onlineStateIcon: UIImage = .online
         public lazy var separatorColor: UIColor = .border
         public lazy var dateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                      font: Fonts.regular.withSize(14))
@@ -38,10 +37,10 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
                                                                             font: Fonts.regular.withSize(15))
         public lazy var typingLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                        font: Fonts.regular.with(traits: .traitItalic).withSize(15))
-        public lazy var mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
+        public lazy var unreadMentionLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                         font: Fonts.bold.withSize(15),
                                                                         backgroundColor: .accent)
-        public lazy var mentionMutedStateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
+        public lazy var unreadMentionMutedStateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                                   font: Fonts.bold.withSize(15),
                                                                                   backgroundColor: .surface3)
         public lazy var linkLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
@@ -52,7 +51,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         
         public lazy var channelNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter
         public lazy var channelDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.channelDateFormatter
-        public lazy var channelUnreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.channelUnreadCountFormatter
+        public lazy var unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter
         public lazy var userShortNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userShortNameFormatter
         public lazy var typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter
         public lazy var mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter
@@ -61,6 +60,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         public lazy var reactedUserNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.reactedUserNameFormatter
         public lazy var attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.channelListAttachmentIconProvider
         public lazy var channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelAvatarProvider
+        public lazy var presenceStateIconProvider: any PresenceStateIconProviding = SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
         
         // Initializer with default values
         public init(
@@ -70,7 +70,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             lastMessageLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(15)),
             unreadCountLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary, font: Fonts.semiBold.withSize(14), backgroundColor: .accent),
             unreadCountMutedStateLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary, font: Fonts.semiBold.withSize(14), backgroundColor: .surface3),
-            onlineStateIcon: UIImage = .online,
             separatorColor: UIColor = .border,
             dateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(14)),
             lastMessageSenderNameLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText, font: Fonts.regular.withSize(15)),
@@ -85,7 +84,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             messageDeliveryStatusIcons: MessageDeliveryStatusIcons = .init(),
             channelNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter,
             channelDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.channelDateFormatter,
-            channelUnreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.channelUnreadCountFormatter,
+            unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter,
             userShortNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userShortNameFormatter,
             typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter,
             mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
@@ -93,7 +92,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             lastMessageSenderNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelLastMessageSenderNameFormatter,
             reactedUserNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.reactedUserNameFormatter,
             attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.channelListAttachmentIconProvider,
-            channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelAvatarProvider
+            channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelAvatarProvider,
+            presenceStateIconProvider: any PresenceStateIconProviding = SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
         ) {
             self.backgroundColor = backgroundColor
             self.pinnedChannelBackgroundColor = pinnedChannelBackgroundColor
@@ -101,22 +101,21 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self.lastMessageLabelAppearance = lastMessageLabelAppearance
             self.unreadCountLabelAppearance = unreadCountLabelAppearance
             self.unreadCountMutedStateLabelAppearance = unreadCountMutedStateLabelAppearance
-            self.onlineStateIcon = onlineStateIcon
             self.separatorColor = separatorColor
             self.dateLabelAppearance = dateLabelAppearance
             self.lastMessageSenderNameLabelAppearance = lastMessageSenderNameLabelAppearance
             self.deletedLabelAppearance = deletedLabelAppearance
             self.draftPrefixLabelAppearance = draftPrefixLabelAppearance
             self.typingLabelAppearance = typingLabelAppearance
-            self.mentionLabelAppearance = mentionLabelAppearance
-            self.mentionMutedStateLabelAppearance = mentionMutedStateLabelAppearance
+            self.unreadMentionLabelAppearance = mentionLabelAppearance
+            self.unreadMentionMutedStateLabelAppearance = mentionMutedStateLabelAppearance
             self.linkLabelAppearance = linkLabelAppearance
             self.mutedIcon = mutedIcon
             self.pinIcon = pinIcon
             self.messageDeliveryStatusIcons = messageDeliveryStatusIcons
             self.channelNameFormatter = channelNameFormatter
             self.channelDateFormatter = channelDateFormatter
-            self.channelUnreadCountFormatter = channelUnreadCountFormatter
+            self.unreadCountFormatter = unreadCountFormatter
             self.userShortNameFormatter = userShortNameFormatter
             self.typingUserNameFormatter = typingUserNameFormatter
             self.mentionUserNameFormatter = mentionUserNameFormatter
@@ -125,6 +124,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self.reactedUserNameFormatter = reactedUserNameFormatter
             self.attachmentIconProvider = attachmentIconProvider
             self.channelDefaultAvatarProvider = channelDefaultAvatarProvider
+            self.presenceStateIconProvider = presenceStateIconProvider
         }
     }
 }

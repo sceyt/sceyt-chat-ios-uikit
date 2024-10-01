@@ -732,7 +732,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             .init(
                 channel: channel,
                 message: message,
-                lastDisplayedMessageId: lastDisplayedMessageId)
+                lastDisplayedMessageId: lastDisplayedMessageId,
+                appearance: MessageCell.appearance)
         layoutModels[.init(message: message)] = model
         updateLinkPreviewsForLayoutModelIfNeeded(model: model)
         return model
@@ -816,7 +817,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             .init(
                 channel: channel,
                 message: lastMessage,
-                lastDisplayedMessageId: lastDisplayedMessageId)
+                lastDisplayedMessageId: lastDisplayedMessageId,
+                appearance: MessageCell.appearance)
         
         layoutModels[.init(message: lastMessage)] = model
     }

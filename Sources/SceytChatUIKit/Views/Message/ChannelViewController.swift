@@ -516,7 +516,8 @@ open class ChannelViewController: ViewController,
             .receive(on: DispatchQueue.main)
             .removeDuplicates()
             .sink { [weak self] value in
-                self?.unreadCountView.unreadCount.value = SceytChatUIKit.shared.formatters.channelUnreadCountFormatter.format(value)
+                guard let self else { return }
+                unreadCountView.unreadCount.value = appearance.unreadCountFormatter.format(value)
             }.store(in: &subscriptions)
         
         channelViewModel
@@ -822,7 +823,7 @@ open class ChannelViewController: ViewController,
         attrs[.foregroundColor] = titleView.appearance.titleLabelAppearance.foregroundColor
         
         let head = NSMutableAttributedString(
-            string: SceytChatUIKit.shared.formatters.channelNameFormatter.format(channelViewModel.channel),
+            string: appearance.headerAppearance.titleFormatter.format(channelViewModel.channel),
             attributes: attrs
         )
         titleView.headLabel.attributedText = head
@@ -857,7 +858,7 @@ open class ChannelViewController: ViewController,
         attrs[.foregroundColor] = titleView.appearance.titleLabelAppearance.foregroundColor
         
         let head = NSMutableAttributedString(
-            string: SceytChatUIKit.shared.formatters.channelNameFormatter.format(channelViewModel.channel),
+            string: appearance.headerAppearance.titleFormatter.format(channelViewModel.channel),
             attributes: attrs
         )
         
@@ -1007,11 +1008,10 @@ open class ChannelViewController: ViewController,
         var items = [Any]()
         channelViewModel.selectedMessages.sorted().forEach {
             let message = $0.message
-            guard let user = message.user
-            else { return }
+            guard message.user != nil else { return }
             let body = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
             if !body.isEmpty {
-                items.append("\(SceytChatUIKit.shared.formatters.userNameFormatter.format(user)) [\(SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(message.createdAt))]\n\(body)")
+                items.append(appearance.messageShareBodyFormatter.format(message))
             }
             items += message.attachments?.compactMap {
                 if $0.type == "link" {
@@ -1528,7 +1528,7 @@ open class ChannelViewController: ViewController,
         referenceSizeForHeaderInSection section: Int
     ) -> CGSize {
         let width = collectionView.bounds.width
-        return CGSize(width: width, height: 40)
+        return appearance.enableDateSeparator ? CGSize(width: width, height: 40) : .zero
     }
     
     open func collectionView(
@@ -1641,6 +1641,7 @@ open class ChannelViewController: ViewController,
                 self.customInputViewController.addReply(layoutModel: layoutModel)
             }
         } else {
+            
             showThreadForMessage(layoutModel.message)
         }
     }
@@ -1959,14 +1960,14 @@ open class ChannelViewController: ViewController,
             unreadMessageIndexPath = indexPath
         case .typing(let isTyping, let user):
             if !channelViewModel.channel.isDirect {
-                if showTyping(member: SceytChatUIKit.shared.formatters.userNameFormatter.format(user),
+                if showTyping(member: appearance.headerAppearance.typingUserNameFormatter.format(user),
                               isTyping: isTyping) == 0 {
                     updateTitle()
                 }
             } else {
                 if isTyping {
                     _ = showTyping(
-                        member: channelViewModel.channel.channelType == .direct ? "" : SceytChatUIKit.shared.formatters.userNameFormatter.format(user),
+                        member: channelViewModel.channel.channelType == .direct ? "" : appearance.headerAppearance.typingUserNameFormatter.format(user),
                         isTyping: isTyping
                     )
                 } else {

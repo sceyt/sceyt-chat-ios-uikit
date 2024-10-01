@@ -28,7 +28,7 @@ extension MessageCell {
 
         open private(set) var contentConstraints: [NSLayoutConstraint]?
         
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -37,7 +37,6 @@ extension MessageCell {
         open override func setup() {
             super.setup()
             
-            titleLabel.text = L10n.Message.List.unread
             titleLabel.textAlignment = .center
         }
         
@@ -48,6 +47,7 @@ extension MessageCell {
             backgroundView.backgroundColor = appearance.unreadMessagesSeparatorAppearance.backgroundColor
             titleLabel.font = appearance.unreadMessagesSeparatorAppearance.labelAppearance.font
             titleLabel.textColor = appearance.unreadMessagesSeparatorAppearance.labelAppearance.foregroundColor
+            titleLabel.text = appearance.unreadMessagesSeparatorAppearance.unreadText
         }
 
         open override func setupLayout() {

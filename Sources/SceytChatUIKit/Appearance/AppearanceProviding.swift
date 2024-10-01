@@ -156,104 +156,6 @@ extension ChannelSwipeActionsConfiguration: AppearanceProviding {
 
 
 
-extension MessageCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public static var bubbleOutgoing: UIColor = DefaultColors.bubbleOutgoing
-        public static var bubbleOutgoingSecondary: UIColor = DefaultColors.bubbleOutgoingSecondary
-        public static var bubbleIncoming: UIColor = DefaultColors.bubbleIncoming
-        public static var bubbleIncomingSecondary: UIColor = DefaultColors.bubbleIncomingSecondary
-        
-        public var backgroundColor: UIColor? = .clear
-        public var titleFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var titleColor: UIColor? = nil // initials random
-        public var messageFont: UIFont? = Fonts.regular.withSize(16)
-        public var messageColor: UIColor? = UIColor.primaryText
-        public var deletedMessageFont: UIFont? = Fonts.regular.with(traits: .traitItalic).withSize(16)
-        public var deletedMessageColor: UIColor? = UIColor.secondaryText
-        public var bubbleColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncoming,
-                                                                 Appearance.bubbleOutgoing)
-        public var highlightedBubbleColor: (in: UIColor?, out: UIColor?) = (UIColor.secondaryText.withAlphaComponent(0.4),
-                                                                            UIColor.secondaryText.withAlphaComponent(0.4))
-        
-        public var highlightedSearchResultColor: (in: UIColor?, out: UIColor?) = (
-            Appearance.bubbleIncomingSecondary,
-            Appearance.bubbleOutgoingSecondary
-        )
-        public var highlightedOverlayColor: (in: UIColor?, out: UIColor?) = (UIColor(hex: "#17191C", alpha: 0.4),
-                                                                             UIColor(hex: "#17191C", alpha: 0.4))
-        public var linkColor: UIColor? = UIColor.systemBlue
-        public var linkFont: UIFont? = Fonts.regular.withSize(16)
-        public var linkTitleFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var linkTitleColor: UIColor? = UIColor.primaryText
-        public var linkDescriptionFont: UIFont? = Fonts.regular.withSize(13)
-        public var linkDescriptionColor: UIColor? = UIColor.secondaryText
-        public var linkPreviewBackgroundColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncomingSecondary,
-                                                                                Appearance.bubbleOutgoingSecondary)
-        public var highlightedLinkBackgroundColor: UIColor? = UIColor.footnoteText
-        public var mentionUserColor: UIColor? = UIColor.accent
-        public var dateTickBackgroundViewColor: UIColor? = .overlayBackground2
-        
-        public var separatorViewBackgroundColor: UIColor? = .clear
-        public var separatorViewTextBackgroundColor: UIColor? = .overlayBackground1
-        public var separatorViewFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var separatorViewTextColor: UIColor? = .onPrimary
-        public var separatorViewTextBorderColor: UIColor? = .clear
-        
-        public var unreadMessagesSeparatorAppearance: UnreadMessagesSeparatorView.Appearance = .init(backgroundColor: Appearance.bubbleIncoming)
-        
-        public var infoViewStateFont: UIFont? = Fonts.regular.with(traits: .traitItalic).withSize(12)
-        public var infoViewStateTextColor: UIColor? = UIColor.secondaryText
-        public var infoViewStateWithBackgroundTextColor = UIColor.onPrimary
-        public var infoViewDateFont: UIFont? = Fonts.regular.withSize(12)
-        public var infoViewDateTextColor: UIColor? = UIColor.secondaryText
-        public var infoViewRevertColorOnBackgroundView: UIColor? = .onPrimary
-        
-        public var replyCountTextColor: UIColor? = UIColor.accent
-        public var replyCountTextFont: UIFont? = Fonts.semiBold.withSize(12)
-        public var replyArrowStrokeColor: UIColor? = UIColor.border
-        public var replyUserTitleColor: UIColor? = UIColor.accent
-        public var replyUserTitleFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var replyMessageColor: UIColor? = UIColor.primaryText
-        public var replyMessageVoiceDurationColor: UIColor? = UIColor.accent
-        public var replyMessageFont: UIFont? = Fonts.regular.withSize(14)
-        public var replyMessageBorderColor: UIColor? = UIColor.accent
-        public var replyBackgroundColor: (in: UIColor?, out: UIColor?) = (Appearance.bubbleIncomingSecondary,
-                                                                          Appearance.bubbleOutgoingSecondary)
-        public var forwardTitleColor: UIColor? = UIColor.accent
-        public var forwardTitleFont: UIFont? = Fonts.semiBold.withSize(13)
-        
-        public var reactionContainerBackgroundColor: UIColor = .backgroundSections
-        public var reactionCommonScoreFont: UIFont = Fonts.regular.withSize(13)
-        public var reactionFont: UIFont? = Fonts.regular.withSize(13)
-        public var reactionColor: UIColor? = UIColor.primaryText
-        
-        public var videoTimeTextColor: UIColor? = .onPrimary
-        public var videoTimeTextFont: UIFont? = Fonts.regular.withSize(12)
-        public var videoTimeBackgroundColor: UIColor? = .overlayBackground2
-        
-        public var audioSpeedBackgroundColor: UIColor? = .background
-        public var audioSpeedColor: UIColor? = .secondaryText
-        public var audioSpeedFont: UIFont? = Fonts.semiBold.withSize(12)
-        public var audioDurationColor: UIColor? = .footnoteText
-        public var audioDurationFont: UIFont? = Fonts.regular.withSize(11)
-        public var audioProgressBackgroundColor: UIColor? = .accent
-        public var audioProgressTrackColor: UIColor? = .clear
-        public var audioProgressColor: UIColor? = .onPrimary
-        
-        public var ticksViewTintColor: UIColor? = .accent
-        public var ticksViewDisabledTintColor: UIColor? = UIColor.secondaryText
-        public var ticksViewErrorTintColor: UIColor? = UIColor.stateWarning
-        
-        public var attachmentFileNameFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var attachmentFileNameColor: UIColor? = .primaryText
-        public var attachmentFileSizeFont: UIFont? = Fonts.regular.withSize(12)
-        public var attachmentFileSizeColor: UIColor? = .secondaryText
-        
-        public init() {}
-    }
-}
 
 
 
@@ -449,12 +351,13 @@ extension ChannelInfoViewController.VoiceCollectionView: AppearanceProviding {
 extension MediaPickerViewController.MediaCell: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public struct Appearance {
+    public class Appearance {
         public var backgroundColor: UIColor? = .surface1
         public var timeTextColor: UIColor? = .onPrimary
         public var timeTextFont: UIFont? = Fonts.regular.withSize(12)
         public var timeBackgroundColor: UIColor? = .overlayBackground2
-        
+        public lazy var checkboxAppearance: CheckBoxView.Appearance = CheckBoxView.appearance
+
         public init() {}
     }
 }

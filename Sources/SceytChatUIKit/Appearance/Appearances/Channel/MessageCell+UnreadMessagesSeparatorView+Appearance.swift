@@ -11,6 +11,7 @@ import UIKit
 extension MessageCell.UnreadMessagesSeparatorView {
     
     public class Appearance {
+        public lazy var unreadText: String = L10n.Message.List.unread
         public lazy var backgroundColor: UIColor = SceytChatUIKit.Components.messageCell.Appearance.bubbleIncoming
         public lazy var labelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                  font: Fonts.semiBold.withSize(14))

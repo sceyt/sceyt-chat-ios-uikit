@@ -45,18 +45,18 @@ open class ChannelLayoutModel {
         channel.lastReaction
     }
     
-    public var formatedSubject: String!
+    public var formattedSubject: String!
     
-    public var formatedDate: String!
+    public var formattedDate: String!
     
-    public var formatedUnreadCount: String!
+    public var formattedUnreadCount: String!
     
     required public init(channel: ChatChannel, appearance: ChannelListViewController.ChannelCell.Appearance) {
         self.channel = channel
         self.appearance = appearance
-        formatedSubject = createFormattedSubject()
-        formatedDate = createFormattedDate()
-        formatedUnreadCount = createFormattedUnreadCount()
+        formattedSubject = createFormattedSubject()
+        formattedDate = createFormattedDate()
+        formattedUnreadCount = createFormattedUnreadCount()
         if let message = createDraftMessageIfNeeded() {
             attributedView = message
         } else {
@@ -104,9 +104,9 @@ open class ChannelLayoutModel {
             if channel.imageUrl != selfChannel.imageUrl {
                 loadAvatar()
             }
-            formatedSubject = createFormattedSubject()
-            formatedDate = createFormattedDate()
-            formatedUnreadCount = createFormattedUnreadCount()
+            formattedSubject = createFormattedSubject()
+            formattedDate = createFormattedDate()
+            formattedUnreadCount = createFormattedUnreadCount()
             
             if update {
                 updateChannel()
@@ -125,7 +125,7 @@ open class ChannelLayoutModel {
             currentUser.metadata = user.metadata
             currentUser.presence = user.presence
             currentUser.state = user.state
-            formatedSubject = createFormattedSubject()
+            formattedSubject = createFormattedSubject()
             if shouldUpdateAvatar {
                 loadAvatar()
             }
@@ -139,8 +139,8 @@ open class ChannelLayoutModel {
         let senderLabelTextColor = appearance.lastMessageSenderNameLabelAppearance.foregroundColor
         let messageLabelFont = appearance.lastMessageLabelAppearance.font
         let messageLabelTextColor = appearance.lastMessageLabelAppearance.foregroundColor
-        let mentionFont = appearance.mentionLabelAppearance.font
-        let mentionColor = appearance.mentionLabelAppearance.foregroundColor
+        let mentionFont = appearance.unreadMentionLabelAppearance.font
+        let mentionColor = appearance.unreadMentionLabelAppearance.foregroundColor
         let linkColor = appearance.linkLabelAppearance.foregroundColor
         let linkFont = appearance.linkLabelAppearance.font
         

@@ -17,17 +17,27 @@ extension ChannelViewController.DateSeparatorView: AppearanceProviding {
                                                                  font: Fonts.semiBold.withSize(13),
                                                                  backgroundColor: .overlayBackground1)
         public lazy var labelBorderColor: CGColor = UIColor.clear.cgColor
+        public lazy var labelBorderWidth: CGFloat = 1
+        public lazy var labelCornerRadius: CGFloat = 10
+        public lazy var labelCornerCurve: CALayerCornerCurve = .continuous
+        
         public lazy var dateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter
         
         public init(backgroundColor: UIColor = .clear,
                     labelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
                                                              font: Fonts.semiBold.withSize(13),
                                                              backgroundColor: .overlayBackground1),
-                    labelBorderColor: UIColor = .clear,
+                    labelBorderColor: UIColor = UIColor.clear,
+                    labelBorderWidth: CGFloat = 1,
+                    labelCornerRadius: CGFloat = 10,
+                    labelCornerCurve: CALayerCornerCurve = .continuous,
                     dateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter) {
             self.backgroundColor = backgroundColor
             self.labelAppearance = labelAppearance
             self.labelBorderColor = labelBorderColor.cgColor
+            self.labelBorderWidth = labelBorderWidth
+            self.labelCornerRadius = labelCornerRadius
+            self.labelCornerCurve = labelCornerCurve
             self.dateFormatter = dateFormatter
         }
     }

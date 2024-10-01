@@ -13,7 +13,7 @@ extension MessageCell {
 
     open class LinkPreviewView: View, Measurable {
         
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -46,10 +46,10 @@ extension MessageCell {
 
         open override func setupAppearance() {
             super.setupAppearance()
-            titleLabel.font = appearance.linkTitleFont
-            titleLabel.textColor = appearance.linkTitleColor
-            descriptionLabel.font = appearance.linkDescriptionFont
-            descriptionLabel.textColor = appearance.linkDescriptionColor
+            titleLabel.font = appearance.linkPreviewAppearance.titleLabelAppearance.font
+            titleLabel.textColor = appearance.linkPreviewAppearance.titleLabelAppearance.foregroundColor
+            descriptionLabel.font = appearance.linkPreviewAppearance.descriptionLabelAppearance.font
+            descriptionLabel.textColor = appearance.linkPreviewAppearance.descriptionLabelAppearance.foregroundColor
         }
 
         open override func setupLayout() {

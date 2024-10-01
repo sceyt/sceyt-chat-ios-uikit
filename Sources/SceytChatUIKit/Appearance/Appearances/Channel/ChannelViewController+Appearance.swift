@@ -17,6 +17,7 @@ extension ChannelViewController: AppearanceProviding {
         //        public var searchBarBackgroundColor: UIColor? = .surface1
         //        public var searchBarActivityIndicatorColor: UIColor? = .iconInactive
         //
+        // review searchBar.barTintColor = appearance.searchBarAppearance.backgroundColor
         public lazy var backgroundColor: UIColor = .background
         public lazy var headerAppearance: HeaderView.Appearance = HeaderView.appearance
         public lazy var emptyStateAppearance: EmptyStateView.Appearance = .init(icon: .noMessages,
@@ -25,13 +26,16 @@ extension ChannelViewController: AppearanceProviding {
         public lazy var scrollDownAppearance: ScrollDownView.Appearance = ScrollDownView.appearance
         public lazy var dateSeparatorAppearance: DateSeparatorView.Appearance = DateSeparatorView.appearance
         public lazy var reactionPickerAppearance: ReactionPickerViewController.Appearance = ReactionPickerViewController.appearance
+        public lazy var enableDateSeparator: Bool = true
         public lazy var enableScrollDownButton: Bool = true
         public lazy var messageCellAppearance: MessageCell.Appearance = MessageCell.appearance
         public lazy var searchBarAppearance: SearchBarAppearance = SearchBarAppearance(placeholder: L10n.Channel.Search.search)
-        // review searchBar.barTintColor = appearance.searchBarAppearance.backgroundColor
-        //        public var reactionPickerAppearance: ReactionPickerViewController.Appearance = .init()
 
         public lazy var messageInputAppearance: MessageInputViewController.Appearance = MessageInputViewController.appearance
+        
+        public lazy var messageShareBodyFormatter: any MessageFormatting = SceytChatUIKit.shared.formatters.messageShareBodyFormatter
+        public lazy var unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter
+
         
         // Initializer with default values
         public init(
@@ -43,10 +47,13 @@ extension ChannelViewController: AppearanceProviding {
             scrollDownAppearance: ScrollDownView.Appearance = ScrollDownView.appearance,
             dateSeparatorAppearance: DateSeparatorView.Appearance = DateSeparatorView.appearance,
             reactionPickerAppearance: ReactionPickerViewController.Appearance = ReactionPickerViewController.appearance,
+            enableDateSeparator: Bool = true,
             enableScrollDownButton: Bool = true,
             messageCellAppearance: MessageCell.Appearance = MessageCell.appearance,
             searchBarAppearance: SearchBarAppearance = SearchBarAppearance(placeholder: L10n.Channel.Search.search),
-            messageInputAppearance: MessageInputViewController.Appearance = MessageInputViewController.appearance
+            messageInputAppearance: MessageInputViewController.Appearance = MessageInputViewController.appearance,
+            messageShareBodyFormatter: any MessageFormatting = SceytChatUIKit.shared.formatters.messageShareBodyFormatter,
+            unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter
         ) {
             self.backgroundColor = backgroundColor
             self.headerAppearance = headerAppearance
@@ -54,10 +61,13 @@ extension ChannelViewController: AppearanceProviding {
             self.scrollDownAppearance = scrollDownAppearance
             self.dateSeparatorAppearance = dateSeparatorAppearance
             self.reactionPickerAppearance = reactionPickerAppearance
+            self.enableDateSeparator = enableDateSeparator
             self.enableScrollDownButton = enableScrollDownButton
             self.messageCellAppearance = messageCellAppearance
             self.searchBarAppearance = searchBarAppearance
             self.messageInputAppearance = messageInputAppearance
+            self.messageShareBodyFormatter = messageShareBodyFormatter
+            self.unreadCountFormatter = unreadCountFormatter
         }
     }
 }
@@ -69,9 +79,6 @@ extension ChannelViewController: AppearanceProviding {
 //navigationBarBackgroundColor: UIColor (iOS only)
 //searchBarBackgroundColor: UIColor (iOS only)
 //searchBarActivityIndicatorColor: UIColor (iOS only)
-
-
-
 
 //enableDateSeparator: Boolean,
 //sameSenderMessageDistance: Int

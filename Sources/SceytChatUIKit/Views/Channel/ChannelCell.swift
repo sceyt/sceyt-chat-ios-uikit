@@ -149,7 +149,7 @@ extension ChannelListViewController {
             separatorView.pin(to: contentView, anchors: [.bottom(), .trailing(-Layouts.horizontalPadding)])
             separatorView.leadingAnchor.pin(to: messageStackView.leadingAnchor)
             separatorView.heightAnchor.pin(constant: 1)
-            updateContraints()
+            updateConstraint()
         }
         
         override open func setupAppearance() {
@@ -158,8 +158,8 @@ extension ChannelListViewController {
             backgroundColor = appearance.backgroundColor
             unreadCount.font = appearance.unreadCountLabelAppearance.font
             unreadCount.textColor = appearance.unreadCountLabelAppearance.foregroundColor
-            atView.font = appearance.mentionLabelAppearance.font
-            atView.textColor = appearance.mentionLabelAppearance.foregroundColor
+            atView.font = appearance.unreadMentionLabelAppearance.font
+            atView.textColor = appearance.unreadMentionLabelAppearance.foregroundColor
             subjectLabel.font = appearance.subjectLabelAppearance.font
             subjectLabel.textColor = appearance.subjectLabelAppearance.foregroundColor
             
@@ -167,11 +167,10 @@ extension ChannelListViewController {
             dateLabel.clipsToBounds = true
             dateLabel.font = appearance.dateLabelAppearance.font
             dateLabel.textColor = appearance.dateLabelAppearance.foregroundColor
-            presenceView.image = appearance.onlineStateIcon
             separatorView.backgroundColor = appearance.separatorColor
         }
         
-        private func updateContraints() {
+        private func updateConstraint() {
             if !unreadCount.isHidden {
                 unreadCountWidthAnchorConstraint?.constant = 20
             }
@@ -198,23 +197,24 @@ extension ChannelListViewController {
         }
         
         open func bind(_ data: ChannelLayoutModel) {
-            subjectLabel.text = data.formatedSubject
+            subjectLabel.text = data.formattedSubject
             update(messageText: data.attributedView)
-            dateLabel.text = data.formatedDate
+            dateLabel.text = data.formattedDate
             pinView.isHidden = data.channel.pinnedAt == nil
             backgroundColor = data.channel.pinnedAt == nil ? .clear : appearance.backgroundColor
             ticksView.image = deliveryStatusImage(message: data.lastMessage)
             ticksView.isHidden = data.lastMessage?.state == .deleted
-            unreadCount.value = data.formatedUnreadCount
+            unreadCount.value = data.formattedUnreadCount
             if unreadCount.isHidden, data.channel.unread {
                 unreadCount.isHidden = false
             }
             muteView.isHidden = !data.channel.muted
             unreadCount.backgroundColor = !data.channel.muted ? appearance.unreadCountLabelAppearance.backgroundColor : appearance.unreadCountMutedStateLabelAppearance.backgroundColor
-            atView.backgroundColor = !data.channel.muted ? appearance.mentionLabelAppearance.backgroundColor : appearance.mentionMutedStateLabelAppearance.backgroundColor
+            atView.backgroundColor = !data.channel.muted ? appearance.unreadMentionLabelAppearance.backgroundColor : appearance.unreadMentionMutedStateLabelAppearance.backgroundColor
             
             if data.channel.isDirect, let peer = data.channel.peer {
                 presenceView.isHidden = peer.presence.state != .online
+                presenceView.image = appearance.presenceStateIconProvider.provideVisual(for: peer.presence.state)
             } else {
                 presenceView.isHidden = true
             }
@@ -228,7 +228,7 @@ extension ChannelListViewController {
                 .sink {[weak self] image in
                     self?.avatarView.image = image
                 }.store(in: &subscriptions)
-            updateContraints()
+            updateConstraints()
         }
         
         open func deliveryStatusImage(message: ChatMessage?) -> UIImage? {
@@ -243,12 +243,12 @@ extension ChannelListViewController {
             case .displayed:
                 return appearance.messageDeliveryStatusIcons.displayedIcon
             case .failed:
-                return .failedMessage
+                return appearance.messageDeliveryStatusIcons.failedIcon
             }
         }
                 
         open func unreadCount(channel: ChatChannel) -> String? {
-            appearance.channelUnreadCountFormatter.format(channel.newMessageCount)
+            appearance.unreadCountFormatter.format(channel.newMessageCount)
         }
         
         open func didStartTyping(member: ChatChannelMember) {

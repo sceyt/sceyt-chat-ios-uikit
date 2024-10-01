@@ -15,15 +15,33 @@ extension ChannelViewController {
             didSet {
                 switch highlightMode {
                 case .reply:
-                    bubbleView.backgroundColor = appearance.highlightedBubbleColor.in
+                    bubbleView.backgroundColor = appearance.incomingHighlightedBubbleColor
+                    replyView.backgroundColor = appearance.incomingHighlightedOverlayColor
+                    linkView.arrangedSubviews.forEach { subview in
+                        if subview is MessageCell.LinkPreviewView {
+                            subview.backgroundColor = appearance.incomingHighlightedOverlayColor
+                        }
+                    }
                 case .search:
-                    bubbleView.backgroundColor = appearance.highlightedSearchResultColor.in
+                    bubbleView.backgroundColor = appearance.incomingHighlightedSearchResultColor
+                    replyView.backgroundColor = appearance.incomingHighlightedOverlaySearchResultColor
+                    linkView.arrangedSubviews.forEach { subview in
+                        if subview is MessageCell.LinkPreviewView {
+                            subview.backgroundColor = appearance.incomingHighlightedOverlaySearchResultColor
+                        }
+                    }
                 case .none:
-                    bubbleView.backgroundColor = appearance.bubbleColor.in
+                    bubbleView.backgroundColor = appearance.incomingBubbleColor
+                    replyView.backgroundColor = appearance.incomingReplyBackgroundColor
+                    linkView.arrangedSubviews.forEach { subview in
+                        if subview is MessageCell.LinkPreviewView {
+                            subview.backgroundColor = appearance.incomingLinkPreviewBackgroundColor
+                        }
+                    }
                 }
                 if data?.hasMediaAttachments == true {
-                    attachmentOverlayView.backgroundColor = appearance.highlightedOverlayColor.in
-                    attachmentOverlayView.alpha = highlightMode == .reply ? 1 : 0
+                    attachmentOverlayView.backgroundColor = highlightMode == .reply ? appearance.incomingHighlightedOverlayColor : appearance.incomingHighlightedOverlaySearchResultColor
+                    attachmentOverlayView.alpha = highlightMode == .none ? 0 : 0.5
                 } else {
                     attachmentOverlayView.alpha = 0
                 }
@@ -34,10 +52,10 @@ extension ChannelViewController {
             let attachmentsContainerSize = layout.attachmentsContainerSize
             var layoutConstraint = [NSLayoutConstraint]()
             UIView.performWithoutAnimation {
-                bubbleView.backgroundColor = appearance.bubbleColor.in
-                infoView.dateLabel.textColor = appearance.infoViewDateTextColor
-                infoView.displayedLabel.textColor = infoView.dateLabel.textColor
-                infoView.eyeView.tintColor = infoView.dateLabel.textColor
+                bubbleView.backgroundColor = appearance.incomingBubbleColor
+                infoView.dateLabel.textColor = appearance.messageDateLabelAppearance.foregroundColor
+                infoView.displayedLabel.textColor = appearance.messageStateLabelAppearance.foregroundColor
+                infoView.eyeView.tintColor = appearance.messageDateLabelAppearance.foregroundColor
                 infoView.tickView.isHidden = true
             }
             
@@ -151,9 +169,9 @@ extension ChannelViewController {
                     infoView.widthAnchor.pin(constant: infoWidth)
                 ]
             } else if options == .image {
-                infoView.dateLabel.textColor = appearance.infoViewRevertColorOnBackgroundView
-                infoView.displayedLabel.textColor = infoView.dateLabel.textColor
-                infoView.eyeView.tintColor = infoView.dateLabel.textColor
+                infoView.dateLabel.textColor = appearance.onOverlayColor
+                infoView.displayedLabel.textColor = appearance.onOverlayColor
+                infoView.eyeView.tintColor = appearance.onOverlayColor
                 infoView.backgroundView.isHidden = false
                 
                 layoutConstraint += [
@@ -215,9 +233,9 @@ extension ChannelViewController {
             } else {
                 infoView.backgroundView.isHidden = layout.contentOptions.contains(.file)
                 if !infoView.backgroundView.isHidden {
-                    infoView.dateLabel.textColor = appearance.infoViewRevertColorOnBackgroundView
+                    infoView.dateLabel.textColor = appearance.onOverlayColor
                 } else {
-                    infoView.dateLabel.textColor = appearance.infoViewDateTextColor
+                    infoView.dateLabel.textColor = appearance.messageDateLabelAppearance.foregroundColor
                 }
                 infoView.displayedLabel.textColor = infoView.dateLabel.textColor
                 infoView.eyeView.tintColor = infoView.dateLabel.textColor
@@ -305,9 +323,9 @@ extension ChannelViewController {
         open override func prepareForReuse() {
             super.prepareForReuse()
             infoView.backgroundView.isHidden = true
-            infoView.dateLabel.textColor = appearance.infoViewDateTextColor
-            infoView.displayedLabel.textColor = infoView.dateLabel.textColor
-            infoView.eyeView.tintColor = infoView.dateLabel.textColor
+            infoView.dateLabel.textColor = appearance.messageDateLabelAppearance.foregroundColor
+            infoView.displayedLabel.textColor = appearance.messageDateLabelAppearance.foregroundColor
+            infoView.eyeView.tintColor = appearance.messageDateLabelAppearance.foregroundColor
         }
         
         open override class func measure(
@@ -353,7 +371,7 @@ extension ChannelViewController {
                         of: text,
                         config: .init(
                             maximumNumberOfLines: 1,
-                            font: appearance.titleFont,
+                            font: appearance.senderNameLabelAppearance.font,
                             lastFragmentUsedRect: false
                         )).textSize
                 userNameSize.width = min(userNameSize.width, model.messageUserTitleSize.width)

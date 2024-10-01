@@ -155,8 +155,7 @@ extension TypingView {
         }
 
         open lazy var colors = [UIColor.secondaryText.withAlphaComponent(1).cgColor,
-                                UIColor.secondaryText.withAlphaComponent(0.7).cgColor,
-                                UIColor.secondaryText.withAlphaComponent(0.5).cgColor]
+                                UIColor.secondaryText.withAlphaComponent(0.7).cgColor]
 
         open var ellipseSize: CGFloat = 4 {
             didSet { setNeedsDisplay() }

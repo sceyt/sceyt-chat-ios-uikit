@@ -114,5 +114,4 @@ open class EmojiSectionToolBar: View {
             buttons[section].isSelected = true
         }
     }
-
 }

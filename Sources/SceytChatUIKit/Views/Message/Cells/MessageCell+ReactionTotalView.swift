@@ -14,7 +14,11 @@ extension MessageCell {
         open lazy var stackView = UIStackView()
             .withoutAutoresizingMask
 
-        public lazy var appearance = MessageCell.appearance
+        open lazy var appearance = Components.messageCell.appearance {
+            didSet {
+                setupAppearance()
+            }
+        }
         
         override open func setup() {
             super.setup()
@@ -34,7 +38,7 @@ extension MessageCell {
         override open func setupAppearance() {
             super.setupAppearance()
             layer.shadowColor = UIColor.darkGray.withAlphaComponent(0.3).cgColor
-            backgroundColor = appearance.reactionContainerBackgroundColor
+            backgroundColor = appearance.reactionsContainerBackgroundColor
         }
     
         override open func layoutSubviews() {

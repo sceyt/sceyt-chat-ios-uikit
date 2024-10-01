@@ -47,8 +47,7 @@ extension MediaPickerViewController {
             timeLabel.backgroundColor = appearance.timeBackgroundColor
             timeLabel.textLabel.font = appearance.timeTextFont
             timeLabel.textLabel.textColor = appearance.timeTextColor
-            checkBoxView.selectedImage = .radioSelected
-            checkBoxView.unselectedImage = .radioGray
+            checkBoxView.parentAppearance = appearance.checkboxAppearance
         }
         
         override open func setupLayout() {

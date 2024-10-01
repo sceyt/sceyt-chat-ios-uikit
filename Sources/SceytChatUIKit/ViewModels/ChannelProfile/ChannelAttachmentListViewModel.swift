@@ -16,6 +16,7 @@ open class ChannelAttachmentListViewModel: NSObject {
     public let channel: ChatChannel
     public let attachmentTypes: [String]
     public let provider: ChannelAttachmentProvider
+    public var appearance: MessageCell.Appearance
     @Published public var event: Event?
     private let downloadQueue = DispatchQueue(label: "com.sceytchat.uikit.attachments", qos: .userInitiated)
 
@@ -30,11 +31,13 @@ open class ChannelAttachmentListViewModel: NSObject {
     public required init(
         channel: ChatChannel,
         attachmentTypes: [String],
-        sectionNameKeyPath: String? = "createdYearMonth"
+        sectionNameKeyPath: String? = "createdYearMonth",
+        appearance: MessageCell.Appearance
     ) {
         self.sectionNameKeyPath = sectionNameKeyPath
         self.channel = channel
         self.attachmentTypes = attachmentTypes
+        self.appearance = appearance
         provider = Components.channelAttachmentProvider
             .init(channelId: channel.id, attachmentTypes: attachmentTypes)
         provider.queryLimit = 20
@@ -73,9 +76,9 @@ open class ChannelAttachmentListViewModel: NSObject {
             sectionNameKeyPath: sectionNameKeyPath,
             fetchPredicate: predicate,
             relationshipKeyPathsObserver: []
-        ) { [weak self] in
+        ) { [unowned self] in
             let attachment = $0.convert()
-            if let self, let prevItem = self.attachmentObserver.item(for: $0.objectID) {
+            if let prevItem = self.attachmentObserver.item(for: $0.objectID) {
                 prevItem.update(attachment: attachment)
                 if let message = $0.message?.convert() {
                     prevItem.updateMessageIfNeeded(ownerMessage: message)
@@ -86,12 +89,13 @@ open class ChannelAttachmentListViewModel: NSObject {
                 .AttachmentLayout(
                     attachment: attachment,
                     ownerMessage: $0.message?.convert(),
-                    ownerChannel: self?.channel,
-                    thumbnailSize: self?.thumbnailSize,
+                    ownerChannel: self.channel,
+                    thumbnailSize: self.thumbnailSize,
                     onLoadThumbnail: { [weak self] in
                         self?.cacheThumbnail($0, for: attachment)
                     },
-                    asyncLoadThumbnail: true
+                    asyncLoadThumbnail: true,
+                    appearance: self.appearance
                 )
         }
 

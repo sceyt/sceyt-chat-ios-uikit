@@ -19,7 +19,7 @@ open class MessageCell: CollectionViewCell,
     open lazy var checkBoxView = {
         $0.isUserInteractionEnabled = false
         return $0.withoutAutoresizingMask
-    }(CheckBoxView())
+    }(Components.checkBoxView.init())
     
     open lazy var containerView = UIView()
         .withoutAutoresizingMask
@@ -81,7 +81,7 @@ open class MessageCell: CollectionViewCell,
         .init()
         .withoutAutoresizingMask
     
-    open lazy var replyIcon = UIImageView(image: .channelReply)
+    open lazy var replyIcon = UIImageView(image: appearance.swipeToReplyIcon)
         .withoutAutoresizingMask
     
     open var highlightMode = HighlightMode.none
@@ -184,6 +184,22 @@ open class MessageCell: CollectionViewCell,
         replyView.appearance = appearance
         replyArrowView.appearance = appearance
         replyCountView.appearance = appearance
+        forwardView.appearance = appearance
+        attachmentView.appearance = appearance
+        linkView.appearance = appearance
+        infoView.appearance = appearance
+        reactionTotalView.appearance = appearance
+        unreadMessagesSeparatorView.appearance = appearance
+        checkBoxView.parentAppearance = appearance.checkboxAppearance
+        
+        if data != nil {
+            bind()
+            makeConstraints()
+        }
+        
+        bubbleView.addSubview(attachmentOverlayView)
+
+        
         backgroundColor = .clear
         contentView.backgroundColor = .clear
         containerView.backgroundColor = .clear
@@ -193,7 +209,7 @@ open class MessageCell: CollectionViewCell,
         bubbleView.layer.cornerRadius = 16
         bubbleView.isUserInteractionEnabled = true
                 
-        nameLabel.font = appearance.titleFont
+        nameLabel.font = appearance.senderNameLabelAppearance.font
         
         avatarView.clipsToBounds = true
         avatarView.layer.cornerRadius = 18
@@ -202,6 +218,8 @@ open class MessageCell: CollectionViewCell,
                                            left: Layouts.checkBoxPadding,
                                            bottom: Layouts.checkBoxPadding,
                                            right: Layouts.checkBoxPadding)
+        
+        
     }
     
     public var showSenderInfo: Bool = true
@@ -230,8 +248,8 @@ open class MessageCell: CollectionViewCell,
         unreadMessagesSeparatorView.isHidden = !data.isLastDisplayedMessage
         textLabel.attributedText = data.attributedView.content
         infoView.data = data
-        nameLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
-        nameLabel.textColor = appearance.titleColor ?? .initial(title: message.user.id)
+        nameLabel.text = appearance.senderNameFormatter.format(message.user)
+        nameLabel.textColor = appearance.senderNameLabelAppearance.foregroundColor ?? appearance.senderNameColorProvider.provideVisual(for: message.user)
         attachmentView.data = data
         linkView.data = data
         reactionTotalView.data = data
@@ -243,12 +261,26 @@ open class MessageCell: CollectionViewCell,
             nameLabel.isHidden = false
             avatarView.isHidden = false
             let scale = UIScreen.main.traitCollection.displayScale
-            imageTask = Components.avatarBuilder
-                .loadAvatar(
-                    into: avatarView,
-                    for: message.user,
-                    size: CGSize(width: 36 * scale,
-                                 height: 36 * scale))
+            let avatarRepresentation = appearance.userDefaultAvatarProvider.provideVisual(for: message.user)
+            
+            imageTask = switch avatarRepresentation {
+            case .image(let image):
+                Components.avatarBuilder
+                    .loadAvatar(
+                        into: avatarView,
+                        for: message.user,
+                        defaultImage: image,
+                        size: CGSize(width: 36 * scale,
+                                     height: 36 * scale))
+            case .initialsAppearance(let initialsAppearance):
+                Components.avatarBuilder
+                    .loadAvatar(
+                        into: avatarView,
+                        for: message.user,
+                        appearance: initialsAppearance,
+                        size: CGSize(width: 36 * scale,
+                                     height: 36 * scale))
+            }
         } else {
             nameLabel.isHidden = true
             avatarView.isHidden = true
@@ -344,34 +376,16 @@ open class MessageCell: CollectionViewCell,
     
     open func deliveryStatusImage(_ status: ChatMessage.DeliveryStatus) -> UIImage {
         switch status {
-        case .sent:
-            return .sentMessage
         case .pending:
-            return .pendingMessage
-        case .received:
-            return .receivedMessage
-        case .displayed:
-            return .displayedMessage
-        case .failed:
-            return .failedMessage
-        }
-    }
-    
-    open func deliveryStatusColor(_ status: ChatMessage.DeliveryStatus) -> UIColor? {
-        if hasBackground, ![.failed, .displayed].contains(status) {
-            return appearance.infoViewRevertColorOnBackgroundView
-        }
-        switch status {
-        case .pending:
-            return appearance.ticksViewDisabledTintColor
+            return appearance.messageDeliveryStatusIcons.pendingIcon
         case .sent:
-            return appearance.ticksViewDisabledTintColor
+            return appearance.messageDeliveryStatusIcons.sentIcon
         case .received:
-            return appearance.ticksViewDisabledTintColor
+            return appearance.messageDeliveryStatusIcons.receivedIcon
         case .displayed:
-            return appearance.ticksViewTintColor
+            return appearance.messageDeliveryStatusIcons.displayedIcon
         case .failed:
-            return appearance.ticksViewErrorTintColor
+            return appearance.messageDeliveryStatusIcons.failedIcon
         }
     }
     
@@ -520,9 +534,9 @@ open class MessageCell: CollectionViewCell,
     }
     
     private func selectLink(range: NSRange) {
-        guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString,
-                let color = appearance.highlightedLinkBackgroundColor
+        guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString
         else { return }
+        let color = appearance.linkPreviewAppearance.highlightedLinkBackgroundColor
         if range.location >= 0 && range.length >= 0 && range.upperBound <= text.length {
             text.addAttributes([.backgroundColor: color], range: range)
         }

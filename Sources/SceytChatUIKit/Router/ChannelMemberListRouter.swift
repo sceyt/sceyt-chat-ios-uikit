@@ -33,7 +33,8 @@ open class ChannelMemberListRouter: Router<ChannelMemberListViewController> {
     
     open func showChannelInfoViewController(channel: ChatChannel) {
         let viewController = Components.channelInfoViewController.init()
-        viewController.profileViewModel = Components.channelProfileViewModel.init(channel: channel)
+        viewController.profileViewModel = Components.channelProfileViewModel.init(channel: channel,
+                                                                                  appearance: MessageCell.appearance)
         rootViewController.show(viewController, sender: self)
     }
 }

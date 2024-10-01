@@ -22,19 +22,16 @@ extension MessageCell {
         
         private var progressViewHeightConstraint: NSLayoutConstraint?
         
-        override open func setup() {
-            super.setup()
-            playButton.image = Images.videoPlay
-        }
         
         override open func setupAppearance() {
             super.setupAppearance()
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
             progressView.backgroundColor = .black.withAlphaComponent(0.3)
             
-            timeLabel.backgroundColor = appearance.videoTimeBackgroundColor
-            timeLabel.textLabel.font = appearance.videoTimeTextFont
-            timeLabel.textLabel.textColor = appearance.videoTimeTextColor
+            playButton.image = appearance.videoPlayIcon
+            timeLabel.backgroundColor = appearance.overlayColor
+            timeLabel.textLabel.font = appearance.videoDurationLabelAppearance.font
+            timeLabel.textLabel.textColor = appearance.videoDurationLabelAppearance.foregroundColor
         }
 
         override open func setupLayout() {

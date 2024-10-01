@@ -13,6 +13,7 @@ extension SceytChatUIKit {
         public var userAvatarProvider: any UserAvatarProviding = UserDefaultAvatarProvider()
         public var channelAvatarProvider: any ChannelAvatarProviding = ChannelDefaultAvatarProvider()
         public var channelURIValidationMessageProvider: any ChannelURIValidationMessageProviding = ChannelURIValidationMessageProvider()
+        public var senderNameColorProvider: any UserColorProviding = SenderNameColorProvider()
         public var attachmentIconProvider: any AttachmentIconProviding = AttachmentIconProvider()
         public var channelListAttachmentIconProvider: any AttachmentIconProviding = ChannelListAttachmentIconProvider()
         public var connectionStateProvider: any ConnectionStateProviding = ConnectionStateTextProvider()

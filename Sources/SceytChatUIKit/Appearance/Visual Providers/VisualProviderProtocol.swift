@@ -75,6 +75,15 @@ public protocol PresenceStateIconProviding: VisualProviding {
     func provideVisual(for state: ChatUser.Presence.State) -> UIImage?
 }
 
+/// A protocol for providing color for given user.
+public protocol UserColorProviding: VisualProviding {
+    /// Provides a color for the specified user.
+    ///
+    /// - Parameter user: The user for whom to provide the color.
+    /// - Returns: A `UIColor` representing the icon.
+    func provideVisual(for user: ChatUser) -> UIColor
+}
+
 
 
 // MARK: - Enums

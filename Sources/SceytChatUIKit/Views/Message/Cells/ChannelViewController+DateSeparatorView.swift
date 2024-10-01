@@ -29,9 +29,10 @@ extension ChannelViewController {
             titleLabel.textAlignment = .center
             titleLabel.textColor = appearance.labelAppearance.foregroundColor
             titleLabel.clipsToBounds = true
-            titleLabel.layer.borderWidth = 1
+            titleLabel.layer.borderWidth = appearance.labelBorderWidth
             titleLabel.layer.borderColor = appearance.labelBorderColor
-            titleLabel.layer.cornerRadius = 10
+            titleLabel.layer.cornerRadius = appearance.labelCornerRadius
+            titleLabel.layer.cornerCurve = appearance.labelCornerCurve
         }
         
         open override func setupLayout() {

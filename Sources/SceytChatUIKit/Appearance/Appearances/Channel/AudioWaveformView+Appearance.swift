@@ -15,7 +15,8 @@ extension AudioWaveformView: AppearanceProviding {
         public lazy var trackColor: UIColor = .iconSecondary
         
         // Initializer with default values
-        public init(progressColor: UIColor = .accent, trackColor: UIColor = .iconSecondary) {
+        public init(progressColor: UIColor = .accent,
+                    trackColor: UIColor = .iconSecondary) {
             self.progressColor = progressColor
             self.trackColor = trackColor
         }

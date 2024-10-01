@@ -71,7 +71,7 @@ extension MessageInfoViewController {
                     setupLayout()
                 }
                 sentValueLabel.text = SceytChatUIKit.shared.formatters.messageInfoDateFormatter.format(data.message.createdAt)
-                if let fileSize = data.attachments.first?.fileSize {
+                if let fileSize = data.attachments.first?.fileSize(using: SceytChatUIKit.shared.formatters.fileSizeFormatter) {
                     sizeHStack.isHidden = false
                     sizeValueLabel.text = fileSize
                 } else {

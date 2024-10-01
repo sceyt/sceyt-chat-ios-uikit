@@ -9,19 +9,26 @@ import UIKit
 
 public struct AttachmentIconProvider: AttachmentIconProviding {
     public func provideVisual(for attachment: ChatMessage.Attachment) -> UIImage? {
-        switch attachment.type {
-        case "file":
+        switch AttachmentType(rawValue: attachment.type) {
+        case .file:
             return .messageFile
-        case "image":
+        case .image:
             return nil
-        case "video":
+        case .video:
             return nil
-        case "voice":
+        case .voice:
             return .audioPlayerMic
-        case "link":
+        case .link:
             return .link
         default:
             return nil
         }
     }
 }
+
+public struct SenderNameColorProvider: UserColorProviding {
+    public func provideVisual(for user: ChatUser) -> UIColor {
+        .initial(title: user.id)
+    }
+}
+

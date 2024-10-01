@@ -12,7 +12,7 @@ import SceytChat
 open class MessageLayoutModel {
     
     public static var defaults = Defaults()
-    public static var appearance = MessageCell.appearance
+    public var appearance: MessageCell.Appearance
     public static var textSizeMeasure = TextSizeMeasure.self
     
     open var contentOptions = MessageContentOptions()
@@ -98,21 +98,24 @@ open class MessageLayoutModel {
         channel: ChatChannel,
         message: ChatMessage,
         userSendMessage: UserSendMessage? = nil,
-        lastDisplayedMessageId: MessageId = 0
+        lastDisplayedMessageId: MessageId = 0,
+        appearance: MessageCell.Appearance
     ) {
         self.channel = channel
         self.message = message
         self.lastDisplayedMessageId = lastDisplayedMessageId
+        self.appearance = appearance
         messageDeliveryStatus = message.deliveryStatus
         replyCount = message.replyCount
         self.userSendMessage = userSendMessage
         attributedView = Self.attributedView(
             message: message,
-            userSendMessage: userSendMessage
+            userSendMessage: userSendMessage,
+            appearance: appearance
         )
         
-        attachments = Self.attachmentLayout(message: message, channel: channel)
-        linkAttachments = Self.linkAttachmentLayout(message: message, channel: channel)
+        attachments = Self.attachmentLayout(message: message, channel: channel, appearance: appearance)
+        linkAttachments = Self.linkAttachmentLayout(message: message, channel: channel, appearance: appearance)
         let restrictingTextWidth = Self.restrictingWidth(attachments: attachments) - 12 * 2
         
         let size = Self.textSizeMeasure
@@ -120,7 +123,7 @@ open class MessageLayoutModel {
                 of: attributedView.content,
                 config: .init(restrictingWidth: restrictingTextWidth))
         
-        messageUserTitle = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
+        messageUserTitle = appearance.senderNameFormatter.format(message.user)
         if !message.incoming ||
             channel.channelType == .direct ||
             channel.channelType == .broadcast {
@@ -130,7 +133,9 @@ open class MessageLayoutModel {
                 of:
                     NSAttributedString(
                         string: messageUserTitle,
-                        attributes: [.font: (Self.appearance.titleFont ?? Fonts.bold.withSize(12)) as Any]
+                        attributes: [
+                            .font: appearance.senderNameLabelAppearance.font
+                        ]
                     ),
                 config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
             ).textSize
@@ -139,7 +144,8 @@ open class MessageLayoutModel {
         if let parent = message.parent {
             let parentAttributedView = Self.attributedView(
                 message: parent,
-                userSendMessage: userSendMessage
+                userSendMessage: userSendMessage,
+                appearance: appearance
             )
             let parentSize = Self.textSizeMeasure
                 .calculateSize(
@@ -147,12 +153,14 @@ open class MessageLayoutModel {
                     config: .init(restrictingWidth: restrictingTextWidth))
             self.parentAttributedView = parentAttributedView
             parentTextSize = parentSize.textSize
-            parentMessageUserTitle = SceytChatUIKit.shared.formatters.userNameFormatter.format(parent.user)
+            parentMessageUserTitle = appearance.replyMessageAppearance.senderNameFormatter.format(parent.user)
             parentMessageUserTitleSize = Self.textSizeMeasure.calculateSize(
                 of:
                     NSAttributedString(
                         string: parentMessageUserTitle,
-                        attributes: [.font: (Self.appearance.titleFont ?? Fonts.bold.withSize(12)) as Any]
+                        attributes: [
+                            .font: appearance.replyMessageAppearance.titleLabelAppearance.font
+                        ]
                     ),
                 config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
             ).textSize
@@ -161,7 +169,8 @@ open class MessageLayoutModel {
                 byMe: message.user.id == me,
                 channel: channel,
                 thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
-                attributedBody: parentAttributedView.content)
+                attributedBody: parentAttributedView.content,
+                appearance: appearance)
         } else {
             parentTextSize = .zero
             parentMessageUserTitle = ""
@@ -323,7 +332,8 @@ open class MessageLayoutModel {
             !isEqualMentionedUsers {
             attributedView = Self.attributedView(
                 message: message,
-                userSendMessage: userSendMessage
+                userSendMessage: userSendMessage,
+                appearance: appearance
             )
             let size = Self.textSizeMeasure.calculateSize(of: attributedView.content,
                                                           config: .init(restrictingWidth: restrictingTextWidth))
@@ -334,7 +344,7 @@ open class MessageLayoutModel {
             }
             updateOptions.insert(.body)
         }
-        let title = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
+        let title = appearance.senderNameFormatter.format(message.user)
         if !message.incoming ||
             channel.channelType == .direct ||
             channel.channelType == .broadcast {
@@ -345,7 +355,9 @@ open class MessageLayoutModel {
                 of:
                     NSAttributedString(
                         string: title,
-                        attributes: [.font: (Self.appearance.titleFont ?? Fonts.bold.withSize(12)) as Any]
+                        attributes: [
+                            .font: appearance.senderNameLabelAppearance.font
+                        ]
                     ),
                 config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
             ).textSize
@@ -362,14 +374,16 @@ open class MessageLayoutModel {
         }
         
         if let parent = message.parent {
-            let title = SceytChatUIKit.shared.formatters.userNameFormatter.format(parent.user)
+            let title = appearance.senderNameFormatter.format(parent.user)
             if title != parentMessageUserTitle {
-                parentMessageUserTitle = SceytChatUIKit.shared.formatters.userNameFormatter.format(parent.user)
+                parentMessageUserTitle = appearance.replyMessageAppearance.senderNameFormatter.format(parent.user)
                 parentMessageUserTitleSize = Self.textSizeMeasure.calculateSize(
                     of:
                         NSAttributedString(
                             string: parentMessageUserTitle,
-                            attributes: [.font: (Self.appearance.titleFont ?? Fonts.bold.withSize(12)) as Any]
+                            attributes: [
+                                .font: appearance.replyMessageAppearance.titleLabelAppearance.font
+                            ]
                         ),
                     config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
                 ).textSize
@@ -379,7 +393,8 @@ open class MessageLayoutModel {
             if force || self.message.parent?.body != message.parent?.body || self.message.parent?.state != message.parent?.state {
                 let parentAttributedView = Self.attributedView(
                     message: parent,
-                    userSendMessage: userSendMessage
+                    userSendMessage: userSendMessage,
+                    appearance: appearance
                 )
                 
                 let parentSize = Self.textSizeMeasure.calculateSize(of: parentAttributedView.content,
@@ -393,7 +408,8 @@ open class MessageLayoutModel {
                 byMe: message.user.id == me,
                 channel: channel,
                 thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
-                attributedBody: parentAttributedView?.content)
+                attributedBody: parentAttributedView?.content,
+                appearance: appearance)
         } else {
             parentTextSize = .zero
             parentMessageUserTitle = ""
@@ -462,7 +478,7 @@ open class MessageLayoutModel {
     }
     
     private func createMessageUserTitle() {
-        messageUserTitle = SceytChatUIKit.shared.formatters.userNameFormatter.format(message.user)
+        messageUserTitle = appearance.senderNameFormatter.format(message.user)
         if !message.incoming ||
             channel.channelType == .direct ||
             channel.channelType == .broadcast {
@@ -472,7 +488,9 @@ open class MessageLayoutModel {
                 of:
                     NSAttributedString(
                         string: messageUserTitle,
-                        attributes: [.font: (Self.appearance.titleFont ?? Fonts.bold.withSize(12)) as Any]
+                        attributes: [
+                            .font: appearance.senderNameLabelAppearance.font
+                        ]
                     ),
                 config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
             ).textSize
@@ -501,7 +519,9 @@ open class MessageLayoutModel {
             }.sorted(by: { $0.key > $1.key })
             if reactionType == .withTotalScore, commonScore > 1 {
                 let key = "\(commonScore)"
-                let width = key.size(withAttributes: [.font: Self.appearance.reactionCommonScoreFont]).width
+                let width = key.size(withAttributes: [
+                    .font: appearance.reactionCountLabelAppearance.font
+                ]).width
                 reactions.append(.init(key: key, score: 0, byMe: false, width: ceil(width)))
             }
         } else {
@@ -530,10 +550,10 @@ open class MessageLayoutModel {
         return itemCount
     }
     
-    open class func attachmentLayout(message: ChatMessage, channel: ChatChannel) -> [AttachmentLayout] {
+    open class func attachmentLayout(message: ChatMessage, channel: ChatChannel, appearance: MessageCell.Appearance) -> [AttachmentLayout] {
         (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
-            let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel)
+            let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
             return layout.type == .link ? nil : layout
         } ?? [])
         .sorted { lh, rh in
@@ -543,10 +563,10 @@ open class MessageLayoutModel {
         }
     }
     
-    open class func linkAttachmentLayout(message: ChatMessage, channel: ChatChannel) -> [AttachmentLayout] {
+    open class func linkAttachmentLayout(message: ChatMessage, channel: ChatChannel, appearance: MessageCell.Appearance) -> [AttachmentLayout] {
         (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
-            let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel)
+            let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
             return layout.type != .link || $0.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
@@ -559,7 +579,7 @@ open class MessageLayoutModel {
                 attachments[index].update(attachment: attachment)
                 return attachments[index]
             }
-            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel)
+            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel, appearance: appearance)
             return layout.type == .link ? nil : layout
         } ?? [])
         .sorted { lh, rh in
@@ -575,28 +595,33 @@ open class MessageLayoutModel {
                 attachments[index].update(attachment: attachment)
                 return attachments[index]
             }
-            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel)
+            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel, appearance: appearance)
             return layout.type != .link || attachment.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
     
     open class func attributedView(message: ChatMessage,
                                    userSendMessage: UserSendMessage? = nil,
-                                   multiLine: Bool = true
+                                   multiLine: Bool = true,
+                                   appearance: MessageCell.Appearance
     ) -> AttributedView {
         
-        let deletedStateFont = appearance.deletedMessageFont ?? Fonts.regular.with(traits: .traitItalic).withSize(16)
-        let deletedStateColor = appearance.deletedMessageColor ?? UIColor.secondaryText
-        let bodyFont = appearance.messageFont ?? Fonts.regular.withSize(16)
-        let bodyColor = appearance.messageColor ?? UIColor.primaryText
-        let linkColor = appearance.linkColor ?? UIColor.accent
-        let mentionColor = appearance.mentionUserColor ?? UIColor.accent
+        let deletedStateFont = appearance.deletedMessageLabelAppearance.font
+        let deletedStateColor = appearance.deletedMessageLabelAppearance.foregroundColor
+        let bodyFont = appearance.bodyLabelAppearance.font
+        let bodyColor = appearance.bodyLabelAppearance.foregroundColor
+        let linkFont = appearance.linkLabelAppearance.font
+        let linkColor = appearance.linkLabelAppearance.foregroundColor
+        let mentionFont = appearance.mentionLabelAppearance.font
+        let mentionColor = appearance.mentionLabelAppearance.foregroundColor
         
         switch message.state {
         case .deleted:
-            return .init(content: NSAttributedString(string: L10n.Message.deleted,
-                                                     attributes: [.font: deletedStateFont,
-                                                                  .foregroundColor: deletedStateColor]))
+            return .init(content: NSAttributedString(string: appearance.deletedStateText,
+                                                     attributes: [
+                                                        .font: deletedStateFont,
+                                                        .foregroundColor: deletedStateColor
+                                                     ]))
         default:
             var content = multiLine ? message.body : message.body.replacingOccurrences(of: "\n", with: " ")
             content = content.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -604,14 +629,16 @@ open class MessageLayoutModel {
             
             let text = NSMutableAttributedString(
                 attributedString: NSAttributedString(string: content,
-                                                     attributes: [.font: bodyFont,
-                                                                  .foregroundColor: bodyColor]))
+                                                     attributes: [
+                                                        .font: bodyFont,
+                                                        .foregroundColor: bodyColor
+                                                     ]))
             
             var items = [ContentItem]()
             var replacedContent = content
             
             let mentionedUsers = message.mentionedUsers != nil ?
-            message.mentionedUsers!.map { ($0.id, SceytChatUIKit.shared.formatters.userNameFormatter.format($0)) } :
+            message.mentionedUsers!.map { ($0.id, appearance.mentionUserNameFormatter.format($0)) } :
             userSendMessage?.mentionUsers
             if let mentionedUsers = mentionedUsers, mentionedUsers.count > 0,
                let metadata = message.metadata?.data(using: .utf8),
@@ -619,9 +646,11 @@ open class MessageLayoutModel {
                 var lengths = 0
                 for pos in ranges.reversed() {
                     if let user = mentionedUsers.last(where: { $0.0 == pos.id }), pos.loc >= 0 {
-                        let attributes: [NSAttributedString.Key : Any] = [.font: bodyFont,
-                                                                          .foregroundColor: mentionColor,
-                                                                          .mention: pos.id]
+                        let attributes: [NSAttributedString.Key : Any] = [
+                            .font: mentionFont,
+                            .foregroundColor: mentionColor,
+                            .mention: pos.id
+                        ]
                         let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + user.displayName,
                                                          attributes: attributes)
                         guard text.length >= pos.loc + pos.len else {
@@ -681,6 +710,7 @@ open class MessageLayoutModel {
                             let user = message.mentionedUsers?.first(where: { $0.id == userId }) {
                             var attributes = text.attributes(at: range.location, effectiveRange: nil)
                             attributes[.foregroundColor] = mentionColor
+                            attributes[.font] = mentionFont
                             attributes[.mention] = userId
                             let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + user.displayName,
                                                              attributes: attributes)
@@ -699,6 +729,7 @@ open class MessageLayoutModel {
                 let linkAttributes: [NSAttributedString.Key : Any] = [
                     NSAttributedString.Key.foregroundColor: linkColor,
                     NSAttributedString.Key.underlineColor: linkColor,
+                    NSAttributedString.Key.font: linkFont,
                     NSAttributedString.Key.underlineStyle: NSUnderlineStyle.single.rawValue
                 ]
                 text.addAttributes(linkAttributes, range: match.range)
@@ -808,12 +839,11 @@ open class MessageLayoutModel {
         }
         preview.image = linkMetadata.thumbnail ?? linkMetadata.image
         if let description = linkMetadata.summary {
-            let font = Self.appearance.linkDescriptionFont ?? Fonts.regular.withSize(13)
             let text = NSMutableAttributedString(
                 attributedString: NSAttributedString(string: description,
                                                      attributes:
-                                                        [.font: font,
-                                                         .foregroundColor: Self.appearance.linkDescriptionColor ?? UIColor.primaryText
+                                                        [.font: appearance.linkLabelAppearance.font,
+                                                         .foregroundColor: appearance.linkLabelAppearance.foregroundColor
                                                         ])
             )
             
@@ -824,10 +854,12 @@ open class MessageLayoutModel {
             preview.description = text
         }
         if let title = linkMetadata.title {
-            let font = Self.appearance.linkTitleFont ?? Fonts.semiBold.withSize(14)
             let text = NSMutableAttributedString(
                 attributedString: NSAttributedString(string: title,
-                                                     attributes: [.font: font, .foregroundColor: Self.appearance.linkTitleColor ?? UIColor.primaryText]))
+                                                     attributes: [
+                                                        .font: appearance.linkLabelAppearance.font,
+                                                        .foregroundColor: appearance.linkLabelAppearance.foregroundColor
+                                                     ]))
             preview.titleSize = Self.textSizeMeasure
                 .calculateSize(of: text,
                                config: .init(restrictingWidth: Self.defaults.imageAttachmentSize.width - 12,
@@ -854,12 +886,12 @@ open class MessageLayoutModel {
     }
     
     open func measure() -> CGSize {
-        infoViewMeasure = MessageCell.InfoView.measure(model: self, appearance: Self.appearance)
-        linkViewMeasure = Components.messageCellLinkStackView.measure(model: self, appearance: Self.appearance)
+        infoViewMeasure = MessageCell.InfoView.measure(model: self, appearance: appearance)
+        linkViewMeasure = Components.messageCellLinkStackView.measure(model: self, appearance: appearance)
         if message.incoming {
-            return Components.channelIncomingMessageCell.measure(model: self, appearance: Self.appearance)
+            return Components.channelIncomingMessageCell.measure(model: self, appearance: appearance)
         } else {
-            return Components.channelOutgoingMessageCell.measure(model: self, appearance: Self.appearance)
+            return Components.channelOutgoingMessageCell.measure(model: self, appearance: appearance)
         }
     }
     
@@ -993,6 +1025,7 @@ extension MessageLayoutModel {
         public private(set) var attachment: ChatMessage.Attachment
         public private(set) var ownerMessage: ChatMessage?
         public private(set) var ownerChannel: ChatChannel?
+        public var appearance: MessageCell.Appearance
         public var thumbnail: UIImage?
         public var thumbnailSize: CGSize = .zero
         public var voiceWaveform: [Float]?
@@ -1019,7 +1052,7 @@ extension MessageLayoutModel {
             attachment.name ?? ((attachment.url ?? attachment.filePath) as NSString?)?.lastPathComponent ?? ""
         }
         
-        open var fileSize: String {
+        open func fileSize(using formatter: any UIntFormatting) -> String {
             let fileSize: UInt
             if attachment.uploadedFileSize > 0 {
                 fileSize = attachment.uploadedFileSize
@@ -1028,7 +1061,8 @@ extension MessageLayoutModel {
             } else {
                 fileSize = 0
             }
-            return SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(fileSize))
+            
+            return formatter.format(UInt64(fileSize))
         }
         
         @Atomic private var isLoadedThumbnail: Bool = false
@@ -1048,11 +1082,13 @@ extension MessageLayoutModel {
             ownerChannel: ChatChannel?,
             thumbnailSize: CGSize? = nil,
             onLoadThumbnail: ((UIImage?) -> Void)? = nil,
-            asyncLoadThumbnail: Bool = false
+            asyncLoadThumbnail: Bool = false,
+            appearance: MessageCell.Appearance
         ) {
             self.attachment = attachment
             self.ownerMessage = ownerMessage
             self.ownerChannel = ownerChannel
+            self.appearance = appearance
             self.thumbnailSize = thumbnailSize ?? calculateAttachmentsContainerSize()
             self.onLoadThumbnail = onLoadThumbnail
             if asyncLoadThumbnail {
@@ -1076,7 +1112,7 @@ extension MessageLayoutModel {
             }
             switch type {
             case .voice:
-                thumbnail = .audioPlayerMic
+                thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
                 voiceWaveform = attachment.voiceDecodedMetadata?.thumbnail.map { Float($0) }
             case .image, .video:
                 if let path = fileProvider.thumbnailFile(for: attachment, preferred: thumbnailSize) {
@@ -1098,7 +1134,7 @@ extension MessageLayoutModel {
                               let image = Components.imageBuilder.image(thumbHash: base64) {
                         thumbnail = image
                     } else {
-                        thumbnail = nil
+                        thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
                     }
                 }
             case .file:
@@ -1113,7 +1149,7 @@ extension MessageLayoutModel {
                     }
                 }
                 if thumbnail == nil {
-                    thumbnail = .messageFile
+                    thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
                 }
             case .link:
                 if thumbnail == nil {
@@ -1124,7 +1160,7 @@ extension MessageLayoutModel {
                               let image = Components.imageBuilder.image(thumbHash: base64) {
                         thumbnail = image
                     } else {
-                        thumbnail = nil
+                        thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
                     }
                 }
             default:
@@ -1175,11 +1211,11 @@ extension MessageLayoutModel {
                 size.height = defaults.fileAttachmentSize.height
                 var config = TextSizeMeasure.Config()
                 config.maximumNumberOfLines = 1
-                config.font = MessageCell.appearance.attachmentFileNameFont
+                config.font = appearance.attachmentFileNameLabelAppearance.font
                 let nameWidth = TextSizeMeasure.calculateSize(
                     of: name,
                     config: config).textSize.width
-                config.font = MessageCell.appearance.attachmentFileSizeFont
+                config.font = appearance.attachmentFileSizeLabelAppearance.font
                 var sizeWidth = TextSizeMeasure.calculateSize(
                     of: "\(fileSize) • \(fileSize)",
                     config: config).textSize.width
@@ -1257,6 +1293,7 @@ extension MessageLayoutModel {
         public let byMe: Bool
         public let thumbnailSize: CGSize?
         public var attributedBody = NSAttributedString()
+        public var appearance: MessageCell.Appearance
         public private(set) var attachment: AttachmentLayout?
         public var user: ChatUser {
             message.user
@@ -1268,23 +1305,44 @@ extension MessageLayoutModel {
             byMe: Bool,
             channel: ChatChannel,
             thumbnailSize: CGSize?,
-            attributedBody: NSAttributedString? = nil) {
+            attributedBody: NSAttributedString? = nil,
+            appearance: MessageCell.Appearance) {
                 self.message = message
                 self.byMe = byMe
                 self.thumbnailSize = thumbnailSize
+                self.appearance = appearance
                 if let attachment = message.attachments?.first {
                     self.attachment = .init(
                         attachment: attachment,
                         ownerMessage: message,
                         ownerChannel: channel,
-                        thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize)
+                        thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize,
+                        appearance: appearance)
                 }
                 if let attributedBody, attributedBody.length > 0 {
                     let attributedBody = attributedBody.mutableCopy() as! NSMutableAttributedString
+                    
                     attributedBody.enumerateAttributes(in: NSRange(location: 0, length: attributedBody.length), using: { attributes, range, _ in
                         var attributes = attributes
-                        attributes[.font] = (attributes[.font] as? UIFont)?.withSize(appearance.replyMessageFont?.pointSize ?? 14)
+                        attributes[.font] = appearance.replyMessageAppearance.subtitleLabelAppearance.font
+                        attributes[.foregroundColor] = appearance.replyMessageAppearance.subtitleLabelAppearance.foregroundColor
+                        if attributes.contains(where: { (key,_) in
+                            key == .underlineColor
+                        }) {
+                            attributes[.underlineColor] = appearance.replyMessageAppearance.subtitleLabelAppearance.foregroundColor
+                        }
                         attributedBody.setAttributes(attributes, range: range)
+                        message.bodyAttributes?
+                            .filter { $0.type == .mention }
+                            .sorted(by: { $0.offset > $1.offset })
+                            .forEach { bodyAttribute in
+                                let range = NSRange(location: bodyAttribute.offset, length: bodyAttribute.length)
+                                var mentionAttributes: [NSAttributedString.Key : Any] = [:]
+                                mentionAttributes[.font] = appearance.replyMessageAppearance.mentionLabelAppearance.font
+                                mentionAttributes[.foregroundColor] = appearance.replyMessageAppearance.mentionLabelAppearance.foregroundColor
+                                
+                                attributedBody.setAttributes(mentionAttributes, range: range)
+                            }
                     })
                     self.attributedBody = attributedBody
                 } else {
@@ -1301,7 +1359,8 @@ extension MessageLayoutModel {
                     attachment: attachment,
                     ownerMessage: message,
                     ownerChannel: self.attachment?.ownerChannel,
-                    thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize)
+                    thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize,
+                    appearance: appearance)
             }
         }
         
@@ -1309,34 +1368,39 @@ extension MessageLayoutModel {
             var body = message.body
             switch message.state {
             case .deleted:
-                body = L10n.Message.deleted
+                body = appearance.deletedStateText
+                return .init(string: body, attributes: [
+                    .font: appearance.replyMessageAppearance.deletedLabelAppearance.font,
+                    .foregroundColor: appearance.replyMessageAppearance.deletedLabelAppearance.foregroundColor
+                ])
             default:
                 if body.isEmpty,
                    let attachment = message.attachments?.first {
                     switch AttachmentLayout.AttachmentType(rawValue: attachment.type) {
                     case .image:
-                        body = L10n.Message.Attachment.image
+                        body = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
                     case .video:
-                        body = L10n.Message.Attachment.video
+                        body = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
                     case .voice:
-                        let body = NSMutableAttributedString(string: L10n.Message.Attachment.voice, attributes: [
-                            .font: appearance.replyMessageFont as Any,
-                            .foregroundColor: appearance.replyMessageColor as Any
+                        let body = NSMutableAttributedString(string: appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment),
+                                                             attributes: [
+                                                                .font: appearance.replyMessageAppearance.subtitleLabelAppearance.font,
+                                                                .foregroundColor: appearance.replyMessageAppearance.subtitleLabelAppearance.foregroundColor
                         ])
-                        body.append(.init(string: " \(SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(Double(attachment.voiceDecodedMetadata?.duration ?? 0)))", attributes: [
-                            .font: appearance.replyMessageFont as Any,
-                            .foregroundColor: appearance.replyMessageVoiceDurationColor as Any
+                        body.append(.init(string: " \(appearance.replyMessageAppearance.attachmentDurationFormatter.format(Double(attachment.voiceDecodedMetadata?.duration ?? 0)))", attributes: [
+                            .font: appearance.replyMessageAppearance.attachmentDurationLabelAppearance.font,
+                            .foregroundColor: appearance.replyMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
                         ]))
                         return body
                     default:
-                        body = L10n.Message.Attachment.file
+                        body = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
                     }
                 }
+                return .init(string: body, attributes: [
+                    .font: appearance.replyMessageAppearance.subtitleLabelAppearance.font,
+                    .foregroundColor: appearance.replyMessageAppearance.subtitleLabelAppearance.foregroundColor
+                ])
             }
-            return .init(string: body, attributes: [
-                .font: appearance.replyMessageFont as Any,
-                .foregroundColor: appearance.replyMessageColor as Any
-            ])
         }
         
         open func makeIcon() -> UIImage? {

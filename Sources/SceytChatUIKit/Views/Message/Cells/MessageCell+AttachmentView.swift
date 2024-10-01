@@ -11,7 +11,7 @@ import UIKit
 
 extension MessageCell {
     open class AttachmentView: View {
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -36,7 +36,7 @@ extension MessageCell {
         
         override open func setup() {
             super.setup()
-            pauseButton.setImage(.attachmentTransferPause, for: .normal)
+            
             progressView.isHidden = true
             progressLabel.isHidden = true
             pauseButton.isHidden = true
@@ -47,11 +47,13 @@ extension MessageCell {
         
         override open func setupAppearance() {
             super.setupAppearance()
-            progressView.progressColor = progressView.appearance.progressColor
-            progressView.trackColor = progressView.appearance.trackColor
-            progressLabel.backgroundColor = appearance.videoTimeBackgroundColor
-            progressLabel.textLabel.font = appearance.videoTimeTextFont
-            progressLabel.textLabel.textColor = appearance.videoTimeTextColor
+            pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
+            progressView.progressColor = appearance.overlayMediaLoaderAppearance.progressColor
+            progressView.trackColor = appearance.overlayMediaLoaderAppearance.trackColor
+            progressLabel.backgroundColor = appearance.overlayMediaLoaderAppearance.backgroundColor
+            progressLabel.textLabel.font = appearance.overlayMediaLoaderAppearance.progressLabelAppearance.font
+            progressLabel.textLabel.textColor = appearance.overlayMediaLoaderAppearance.progressLabelAppearance.foregroundColor
+            progressView.parentAppearance = appearance.overlayMediaLoaderAppearance
         }
         
         open func setupPreviewer() {
@@ -69,7 +71,7 @@ extension MessageCell {
                 progressLabel.text = L10n.Upload.preparing
             } else {
                 let downloaded = UInt(progress.progress * Double(total))
-                progressLabel.text = "\(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(downloaded))) / \(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(total)))"
+                progressLabel.text = "\(appearance.attachmentFileSizeFormatter.format(UInt64(downloaded))) / \(appearance.attachmentFileSizeFormatter.format(UInt64(total)))"
             }
             setProgress(progress.progress)
         }
@@ -79,7 +81,7 @@ extension MessageCell {
             else { return }
             let total = completion.attachment.uploadedFileSize
             if total > 0 {
-                progressLabel.text = "\(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(total))) / \(SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(total)))"
+                progressLabel.text = "\(appearance.attachmentFileSizeFormatter.format(UInt64(total))) / \(appearance.attachmentFileSizeFormatter.format(UInt64(total)))"
             }
         }
         
@@ -136,19 +138,19 @@ extension MessageCell {
             case .pending:
                 break
             case .uploading:
-                pauseButton.setImage(.attachmentTransferPause, for: .normal)
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
             case .downloading:
-                pauseButton.setImage(.attachmentTransferPause, for: .normal)
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
             case .pauseUploading, .failedUploading:
                 setProgress(0.0001)
                 progressView.isHiddenProgress = true
                 progressLabel.isHidden = true
-                pauseButton.setImage(.attachmentUpload, for: .normal)
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.uploadIcon, for: .normal)
             case .pauseDownloading, .failedDownloading:
                 setProgress(0.0001)
                 progressView.isHiddenProgress = true
                 progressLabel.isHidden = true
-                pauseButton.setImage(.attachmentDownload, for: .normal)
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.downloadIcon, for: .normal)
             case .done:
                 if progressView.progress > 0 {
                     setProgress(1)

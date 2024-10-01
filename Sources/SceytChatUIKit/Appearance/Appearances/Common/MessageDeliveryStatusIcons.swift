@@ -12,17 +12,20 @@ public class MessageDeliveryStatusIcons {
     public lazy var sentIcon: UIImage = .sentMessage
     public lazy var receivedIcon: UIImage = .receivedMessage
     public lazy var displayedIcon: UIImage = .displayedMessage
+    public lazy var failedIcon: UIImage = .failedMessage
     
     // Initializer with default values
     public init(
         pendingIcon: UIImage = .pendingMessage,
         sentIcon: UIImage = .sentMessage,
         receivedIcon: UIImage = .receivedMessage,
-        displayedIcon: UIImage = .displayedMessage
+        displayedIcon: UIImage = .displayedMessage,
+        failedIcon: UIImage = .failedMessage
     ) {
         self.pendingIcon = pendingIcon
         self.sentIcon = sentIcon
         self.receivedIcon = receivedIcon
         self.displayedIcon = displayedIcon
+        self.failedIcon = failedIcon
     }
 }

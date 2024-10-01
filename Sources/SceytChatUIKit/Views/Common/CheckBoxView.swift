@@ -8,15 +8,13 @@
 
 import UIKit
 
-open class CheckBoxView: UIControl {
+open class CheckBoxView: Control {
     open override var isSelected: Bool {
         didSet {
             updateState()
         }
     }
     
-    open var unselectedImage: UIImage = .radio
-    open var selectedImage: UIImage = .radioSelected
     open var contentInsets: UIEdgeInsets = .init(top: 10, left: 10, bottom: 10, right: 10) {
         didSet {
             imageView.removeFromSuperview()
@@ -24,7 +22,7 @@ open class CheckBoxView: UIControl {
         }
     }
     
-    private let imageView = {
+    public let imageView = {
         $0.isUserInteractionEnabled = false
         return $0.withoutAutoresizingMask
     }(UIImageView())
@@ -39,7 +37,7 @@ open class CheckBoxView: UIControl {
         setup()
     }
     
-    private func setup() {
+    open override func setup() {
         addSubview(imageView)
         imageView.pin(to: self, anchors: [
             .leading(contentInsets.left),
@@ -50,8 +48,13 @@ open class CheckBoxView: UIControl {
         updateState()
     }
     
-    private func updateState() {
-        imageView.image = isSelected ? selectedImage : unselectedImage
+    open override func setupAppearance() {
+        super.setupAppearance()
+        updateState()
+    }
+    
+    open func updateState() {
+        imageView.image = isSelected ? appearance.checkedIcon : appearance.uncheckedIcon
     }
     
     open override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {

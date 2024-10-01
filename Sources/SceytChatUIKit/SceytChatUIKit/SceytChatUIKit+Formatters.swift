@@ -13,7 +13,6 @@ import Foundation
 
 //    messageDateFromatter:Interface
 //    messageMarkerDateFormatter:Interface
-//    messageShareDateFormatter:Interface // IOS only
 
 extension SceytChatUIKit {
     public struct Formatters {
@@ -29,7 +28,7 @@ extension SceytChatUIKit {
         
         public var channelSubtitleFormatter: any ChannelFormatting = ChannelSubtitleFormatter()
         
-        public var channelUnreadCountFormatter: any UIntFormatting = ChannelUnreadCountFormatter()
+        public var unreadCountFormatter: any UIntFormatting = UnreadCountFormatter()
         
         public var messageInfoDateFormatter: any DateFormatting = MessageInfoDateFormatter()
         
@@ -52,6 +51,9 @@ extension SceytChatUIKit {
         public var messageDateSeparatorFormatter: any DateFormatting = MessageDateSeparatorFormatter()
 
         public var messageDateFormatter: any DateFormatting = MessageDateFormatter()
+        
+        public var messageShareBodyFormatter: any MessageFormatting = MessageShareBodyFormatter()
+
         
         public var channelInfoMediaDateFormatter: any DateFormatting = ChannelInfoMediaDateFormatter()
 
