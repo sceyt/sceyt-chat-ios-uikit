@@ -84,6 +84,15 @@ public protocol UserColorProviding: VisualProviding {
     func provideVisual(for user: ChatUser) -> UIColor
 }
 
+/// A protocol for providing name for given default marker.
+public protocol DefaultMarkerTitleProviding: VisualProviding {
+    /// Provides a name for the specified marker.
+    ///
+    /// - Parameter marker: The marker for whom to provide the color.
+    /// - Returns: A `String` representing the icon.
+    func provideVisual(for marker: DefaultMarker) -> String
+}
+
 
 
 // MARK: - Enums

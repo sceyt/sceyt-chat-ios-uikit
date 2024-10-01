@@ -7,13 +7,13 @@
 
 import UIKit
 
-public class SelectableItemAppearance<T: Formatting,
+public class SelectableCellAppearance<T: Formatting,
                                       S: Formatting,
-                                      A: VisualProviding>: ItemAppearance<T, S, A> {
+                                      A: VisualProviding>: CellAppearance<T, S, A> {
     public var selectedIcon: UIImage
     public var unselectedIcon: UIImage
     
-    /// Initializes a new instance of `SelectableItemAppearance` with the provided parameters.
+    /// Initializes a new instance of `SelectableCellAppearance` with the provided parameters.
     ///
     /// - Parameters:
     ///   - titleLabelAppearance: The appearance settings for the title label.

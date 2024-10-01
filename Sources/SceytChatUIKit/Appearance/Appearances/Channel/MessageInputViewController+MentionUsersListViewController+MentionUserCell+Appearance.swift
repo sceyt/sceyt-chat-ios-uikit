@@ -10,7 +10,7 @@ import UIKit
 extension MessageInputViewController.MentionUsersListViewController.MentionUserCell: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance: ItemAppearance<AnyUserFormatting, EmptyFormatter, AnyUserAvatarProviding> {
+    public class Appearance: CellAppearance<AnyUserFormatting, EmptyFormatter, AnyUserAvatarProviding> {
         public lazy var presenceStateIconProvider: any PresenceStateIconProviding = SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
         
         // Initializer with default values

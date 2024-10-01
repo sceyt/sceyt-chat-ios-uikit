@@ -14,7 +14,7 @@ extension ChannelListViewController: AppearanceProviding {
         public lazy var backgroundColor: UIColor? = .background
         public lazy var tabBarItemBadgeColor: UIColor? = .stateWarning
         public lazy var connectionIndicatorAppearance: ConnectionStateViewAppearance = .init()
-        public lazy var navigationBarAppearance: NavigationBarAppearance = .init()
+//        public lazy var navigationBarAppearance: NavigationBarAppearance = .init()
         public lazy var searchControllerAppearance: SearchController.Appearance = .init(searchBarAppearance: .init(placeholder: L10n.Channel.List.search))
         public lazy var searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance = ChannelSearchResultsViewController.appearance
         public lazy var emptyViewAppearance: EmptyStateView.Appearance = .init(icon: .emptyChannelList,
@@ -27,7 +27,7 @@ extension ChannelListViewController: AppearanceProviding {
             backgroundColor: UIColor? = .background,
             tabBarItemBadgeColor: UIColor? = .stateWarning,
             connectionIndicatorAppearance: ConnectionStateViewAppearance = .init(),
-            navigationBarAppearance: NavigationBarAppearance = .init(),
+//            navigationBarAppearance: NavigationBarAppearance = .init(),
             searchControllerAppearance: SearchController.Appearance = .init(searchBarAppearance: .init(placeholder: L10n.Channel.List.search)),
             searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance = ChannelSearchResultsViewController.appearance,
             emptyViewAppearance: EmptyStateView.Appearance = .init(icon: .emptyChannelList,
@@ -38,7 +38,7 @@ extension ChannelListViewController: AppearanceProviding {
             self.backgroundColor = backgroundColor
             self.tabBarItemBadgeColor = tabBarItemBadgeColor
             self.connectionIndicatorAppearance = connectionIndicatorAppearance
-            self.navigationBarAppearance = navigationBarAppearance
+//            self.navigationBarAppearance = navigationBarAppearance
             self.searchControllerAppearance = searchControllerAppearance
             self.searchResultControllerAppearance = searchResultControllerAppearance
             self.emptyViewAppearance = emptyViewAppearance

@@ -11,7 +11,7 @@ import UIKit
 extension SearchResultChannelCell: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance: ItemAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
+    public class Appearance: CellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
         public lazy var backgroundColor: UIColor = .clear
         public lazy var separatorColor: UIColor = .border
         

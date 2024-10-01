@@ -546,6 +546,7 @@ extension NavigationController: AppearanceProviding {
                 .font: Fonts.bold.withSize(20),
                 .foregroundColor: UIColor.primaryText
             ]
+            $0.backgroundEffect = UIBlurEffect(style: .systemMaterial)
             $0.backgroundColor = .background
             $0.shadowColor = .border
             return $0
@@ -719,30 +720,8 @@ extension EmojiPickerViewController: AppearanceProviding {
     }
 }
 
-extension MessageInfoViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .backgroundSecondary
-        public var cellBackgroundColor: UIColor? = .backgroundSections
-        
-        public var infoFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var infoValueFont: UIFont? = Fonts.regular.withSize(14)
-        public var infoColor: UIColor? = .primaryText
-        public var infoValueColor: UIColor? = .secondaryText
-        
-        public var headerFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var headerColor: UIColor? = .secondaryText
-        
-        public var nameFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var nameColor: UIColor? = .primaryText
-        
-        public var dateTimeFont: UIFont? = Fonts.regular.withSize(13)
-        public var dateTimeColor: UIColor? = .secondaryText
-    }
-}
+
+
 
 extension ForwardViewController: AppearanceProviding {
     public static var appearance = Appearance()

@@ -18,5 +18,6 @@ extension SceytChatUIKit {
         public var channelListAttachmentIconProvider: any AttachmentIconProviding = ChannelListAttachmentIconProvider()
         public var connectionStateProvider: any ConnectionStateProviding = ConnectionStateTextProvider()
         public var presenceStateIconProvider: any PresenceStateIconProviding = PresenceStateIconProvider()
+        public var defaultMarkerTitleProvider: any DefaultMarkerTitleProviding = DefaultMarkerTitleProvider()
     }
 }

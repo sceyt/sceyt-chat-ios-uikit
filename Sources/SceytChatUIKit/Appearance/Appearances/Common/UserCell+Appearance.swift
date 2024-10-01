@@ -11,7 +11,7 @@ import UIKit
 extension UserCell: AppearanceProviding {
     public static var appearance = Appearance()
 #warning("change fromatters")
-    public class Appearance: ItemAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
+    public class Appearance: CellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
         public var backgroundColor: UIColor
         public var separatorColor: UIColor
         

@@ -1,5 +1,5 @@
 //
-//  SelectedItemAppearance.swift
+//  SelectedCellAppearance.swift
 //  SceytChatUIKit
 //
 //  Created by Arthur Avagyan on 24.09.24.
@@ -7,7 +7,7 @@
 
 import UIKit
 
-public class SelectedItemAppearance<T: Formatting,
+public class SelectedCellAppearance<T: Formatting,
                                      A: VisualProviding> {
     public var labelAppearance: LabelAppearance
     public var titleFormatter: T

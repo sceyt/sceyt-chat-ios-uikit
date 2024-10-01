@@ -19,7 +19,7 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
     override open func setup() {
         super.setup()
 
-        title = L10n.Message.Info.title
+        title = appearance.navigationBarTitle
         navigationItem.leftBarButtonItem = .init(title: L10n.Nav.Bar.cancel,
                                                  style: .plain,
                                                  cancellables: &subscriptions,
@@ -98,7 +98,8 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
         guard let header = viewModel.header(section: section)
         else { return nil }
         let headerView = tableView.dequeueReusableHeaderFooterView(Components.messageInfoHeaderView.self)
-        headerView.label.text = header
+        headerView.appearance = appearance
+        headerView.label.text = appearance.markerTitleProvider.provideVisual(for: header)
         return headerView
     }
 
@@ -111,10 +112,12 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
         switch section {
         case 0:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.messageInfoMessageCell.self)
+            cell.appearance = appearance
             cell.data = viewModel.data
             return cell
         default:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.messageInfoMarkerCell.self)
+            cell.parentAppearance = appearance.markerCellAppearance
             cell.data = viewModel.marker(at: indexPath)
             cell.contentInsets.top = tableView.isFirst(indexPath) ? 8 : 0
             cell.contentInsets.bottom = tableView.isLast(indexPath) ? 8 : 0

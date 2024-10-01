@@ -504,9 +504,7 @@ open class NavigationController: UINavigationController, Configurable {
         setupDone()
     }
     
-    open func setup() {
-//        modalPresentationStyle = .fullScreen
-    }
+    open func setup() {}
     
     open func setupAppearance() {
         navigationBar.tintColor = appearance.tintColor

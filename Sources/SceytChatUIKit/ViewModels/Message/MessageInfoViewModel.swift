@@ -15,7 +15,6 @@ open class MessageInfoViewModel: NSObject {
 	
 	public let data: MessageLayoutModel
 	private let queries: [MessageMarkerListQuery]
-	private let localizedMarkerNames: [DefaultMarker: String]
     private static let queryLimit = UInt(100)
     
     public var markers: [(markerName: String, markerArray: [ChatMessage.Marker])] {
@@ -86,16 +85,12 @@ open class MessageInfoViewModel: NSObject {
 	public required init(
 		messageMarkerProvider: ChannelMessageMarkerProvider,
 		data: MessageLayoutModel,
-		markerNames: [DefaultMarker]? = nil,
-		localizedMarkerNames: [DefaultMarker: String]? = nil
+		markerNames: [DefaultMarker]? = nil
     )
     {
 		self.messageMarkerProvider = messageMarkerProvider
 		self.data = data
 		let markerNames = markerNames ?? [DefaultMarker.displayed, DefaultMarker.received, DefaultMarker.played]
-		self.localizedMarkerNames = localizedMarkerNames ?? [DefaultMarker.displayed: L10n.Message.Info.readBy,
-															 DefaultMarker.received: L10n.Message.Info.deliveredTo,
-															 DefaultMarker.played: L10n.Message.Info.playedBy]
 		self.queries = markerNames.map {
             .Builder(messageId: data.message.id, markerName: $0.rawValue)
             .limit(MessageInfoViewModel.queryLimit)
@@ -137,13 +132,13 @@ open class MessageInfoViewModel: NSObject {
         }
     }
     
-    open func header(section: Int) -> String? {
+    open func header(section: Int) -> DefaultMarker? {
         guard numberOfRows(section: section) > 0
         else { return nil }
         
         switch section {
         case 0: return nil
-        default: return localizedMarkerNames[DefaultMarker(rawValue: markers[section - 1].markerName)]
+        default: return DefaultMarker(rawValue: markers[section - 1].markerName)
         }
     }
     

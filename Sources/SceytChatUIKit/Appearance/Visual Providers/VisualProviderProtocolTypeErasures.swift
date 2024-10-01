@@ -118,3 +118,25 @@ public class AnyConnectionStateProviding: ConnectionStateProviding {
         return _provideVisual(state)
     }
 }
+
+/// A type-erased wrapper for any `DefaultMarkerTitleProviding` implementation.
+/// This allows instances conforming to `DefaultMarkerTitleProviding` to be used
+/// without exposing their concrete types.
+public class AnyDefaultMarkerTitleProviding: DefaultMarkerTitleProviding {
+    private let _provideVisual: (DefaultMarker) -> String
+    
+    /// Initializes the type-erased wrapper with a specific `DefaultMarkerTitleProviding` instance.
+    ///
+    /// - Parameter provider: The concrete provider to be wrapped.
+    public init<P: DefaultMarkerTitleProviding>(_ provider: P) {
+        self._provideVisual = provider.provideVisual(for:)
+    }
+    
+    /// Provides a text for the specified connection state.
+    ///
+    /// - Parameter marker: The default marker for which to provide the text.
+    /// - Returns: A `String` representing the connection text.
+    public func provideVisual(for marker: DefaultMarker) -> String {
+        return _provideVisual(marker)
+    }
+}

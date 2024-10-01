@@ -350,9 +350,7 @@ open class ChannelLayoutModel {
     }
     
     open func createFormattedUnreadCount() -> String {
-        appearance
-            .channelUnreadCountFormatter
-            .format(channel.newMessageCount)
+        appearance.unreadCountFormatter.format(channel.newMessageCount)
     }
     
     open func loadAvatar() {

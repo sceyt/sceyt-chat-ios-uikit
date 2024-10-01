@@ -1,5 +1,5 @@
 //
-//  ItemAppearance.swift
+//  CellAppearance.swift
 //  SceytChatUIKit
 //
 //  Created by Arthur Avagyan on 24.09.24.
@@ -7,7 +7,7 @@
 
 import UIKit
 
-public class ItemAppearance<T: Formatting,
+public class CellAppearance<T: Formatting,
                             S: Formatting,
                             A: VisualProviding> {
     
@@ -17,7 +17,7 @@ public class ItemAppearance<T: Formatting,
     public var subtitleFormatter: S
     public var avatarProvider: A
     
-    /// Initializes a new instance of `ItemAppearance` with the provided parameters.
+    /// Initializes a new instance of `CellAppearance` with the provided parameters.
     ///
     /// - Parameters:
     ///   - titleLabelAppearance: The appearance settings for the title label.

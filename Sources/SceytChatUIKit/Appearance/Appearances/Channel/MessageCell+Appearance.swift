@@ -290,3 +290,5 @@ extension MessageCell: AppearanceProviding {
         }
     }
 }
+
+
