@@ -26,12 +26,6 @@ extension ChannelInfoViewController {
         open lazy var column = UIStackView(column: [titleLabel, subtitleLabel])
             .withoutAutoresizingMask
         
-        public lazy var appearance = Components.channelInfoViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
         override open func setup() {
             super.setup()
         }
@@ -39,11 +33,11 @@ extension ChannelInfoViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            backgroundColor = appearance.cellBackgroundColor
-            titleLabel.textColor = appearance.titleColor
-            titleLabel.font = appearance.titleFont
-            subtitleLabel.textColor = appearance.subtitleColor
-            subtitleLabel.font = appearance.subtitleFont
+            backgroundColor = appearance.backgroundColor
+            titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
+            titleLabel.font = appearance.titleLabelAppearance.font
+            subtitleLabel.textColor = appearance.subtitleLabelAppearance.foregroundColor
+            subtitleLabel.font = appearance.subtitleLabelAppearance.font
         }
         
         override open func setupLayout() {
@@ -72,47 +66,25 @@ extension ChannelInfoViewController {
         }
         
         open func updateAvatar() {
-            imageTask = AvatarBuilder
-                .loadAvatar(into: avatarButton,
-                            for: data)
+            let avatarRepresentation = appearance.channelDefaultAvatarProvider.provideVisual(for: data)
+            imageTask = switch avatarRepresentation {
+            case .image(let image):
+                AvatarBuilder.loadAvatar(into: avatarButton,
+                                         for: data,
+                                         defaultImage: image)
+            case .initialsAppearance(let initialsBuilderAppearance):
+                AvatarBuilder.loadAvatar(into: avatarButton,
+                                         for: data,
+                                         appearance: initialsBuilderAppearance)
+            }
         }
         
         open func updateTitle() {
-            titleLabel.text = data.displayName
+            titleLabel.text = appearance.channelNameFormatter.format(data)
         }
         
         open func updateSubtitle() {
-            guard data.userRole != nil
-            else {
-                subtitleLabel.text = nil
-                return
-            }
-            switch data.channelType {
-            case .broadcast:
-                switch data.memberCount {
-                case 1:
-                    subtitleLabel.text = L10n.Channel.SubscriberCount.one
-                case 2...:
-                    subtitleLabel.text = L10n.Channel.SubscriberCount.more(Int(data.memberCount))
-                default:
-                    subtitleLabel.text = ""
-                }
-            case .group:
-                switch data.memberCount {
-                case 1:
-                    subtitleLabel.text = L10n.Channel.MembersCount.one
-                case 2...:
-                    subtitleLabel.text = L10n.Channel.MembersCount.more(Int(data.memberCount))
-                default:
-                    subtitleLabel.text = ""
-                }
-            case .direct:
-                if let peer = data.peer {
-                    subtitleLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(peer)
-                } else {
-                    subtitleLabel.text = data.peer?.presence.status
-                }
-            }
+            subtitleLabel.text = appearance.channelSubtitleFormatter.format(data)
         }
         
         override open func prepareForReuse() {

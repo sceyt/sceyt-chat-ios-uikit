@@ -121,7 +121,7 @@ extension MessageCell: AppearanceProviding {
         public lazy var senderNameColorProvider: any UserColorProviding = SceytChatUIKit.shared.visualProviders.senderNameColorProvider
         public lazy var senderNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userNameFormatter
         public lazy var voiceDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter
-        public lazy var attachmentFileSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.fileSizeFormatter
+        public lazy var attachmentFileSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter
         public lazy var messageViewCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.messageViewCountFormatter
         public lazy var messageDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateFormatter
         public lazy var mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter
@@ -160,7 +160,8 @@ extension MessageCell: AppearanceProviding {
             linkPreviewAppearance: LinkPreviewAppearance = .init(
                 titleLabelAppearance: .init(foregroundColor: .primaryText, font: Fonts.semiBold.withSize(14)),
                 descriptionLabelAppearance: .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(13)),
-                highlightedLinkBackgroundColor: .footnoteText
+                highlightedLinkBackgroundColor: .footnoteText,
+                placeholderIcon: nil
             ),
             videoDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary, font: Fonts.regular.withSize(12)),
             threadReplyCountLabelAppearance: LabelAppearance = .init(foregroundColor: .accent, font: Fonts.semiBold.withSize(12)),
@@ -209,7 +210,7 @@ extension MessageCell: AppearanceProviding {
             senderNameColorProvider: any UserColorProviding = SceytChatUIKit.shared.visualProviders.senderNameColorProvider,
             senderNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userNameFormatter,
             voiceDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter,
-            attachmentFileSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.fileSizeFormatter,
+            attachmentFileSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter,
             messageViewCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.messageViewCountFormatter,
             messageDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateFormatter,
             mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter,

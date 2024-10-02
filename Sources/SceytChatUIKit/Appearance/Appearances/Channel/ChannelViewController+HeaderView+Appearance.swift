@@ -19,7 +19,7 @@ extension ChannelViewController.HeaderView: AppearanceProviding {
         public lazy var titleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter
         public lazy var subtitleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelSubtitleFormatter
         public lazy var typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter
-        public lazy var avatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelAvatarProvider
+        public lazy var avatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
         
         // Initializer with default values
         public init(
@@ -30,7 +30,7 @@ extension ChannelViewController.HeaderView: AppearanceProviding {
             titleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter,
             subtitleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelSubtitleFormatter,
             typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter,
-            avatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelAvatarProvider
+            avatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
         ) {
             self.titleLabelAppearance = titleLabelAppearance
             self.subtitleLabelAppearance = subtitleLabelAppearance

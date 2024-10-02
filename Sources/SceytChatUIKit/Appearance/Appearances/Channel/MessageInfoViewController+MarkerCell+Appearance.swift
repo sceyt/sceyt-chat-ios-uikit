@@ -26,14 +26,14 @@ extension MessageInfoViewController.MarkerCell: AppearanceProviding {
             ),
             titleFormatter: AnyUserFormatting = AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
             subtitleFormatter: AnyDateFormatting = AnyDateFormatting(SceytChatUIKit.shared.formatters.messageInfoDateFormatter),
-            avatarProvider: AnyUserAvatarProviding = AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
+            visualProvider: AnyUserAvatarProviding = AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
         ) {
             super.init(
                 titleLabelAppearance: titleLabelAppearance,
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                avatarProvider: avatarProvider
+                visualProvider: visualProvider
             )
             
             self.backgroundColor = backgroundColor

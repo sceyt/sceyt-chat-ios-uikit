@@ -9,13 +9,13 @@ import UIKit
 
 public class CellAppearance<T: Formatting,
                             S: Formatting,
-                            A: VisualProviding> {
+                            V: VisualProviding> {
     
     public var titleLabelAppearance: LabelAppearance
     public var subtitleLabelAppearance: LabelAppearance?
     public var titleFormatter: T
     public var subtitleFormatter: S
-    public var avatarProvider: A
+    public var visualProvider: V
     
     /// Initializes a new instance of `CellAppearance` with the provided parameters.
     ///
@@ -24,18 +24,18 @@ public class CellAppearance<T: Formatting,
     ///   - subtitleLabelAppearance: The appearance settings for the subtitle label.
     ///   - titleFormatter: The formatter to use for the title text.
     ///   - subtitleFormatter: The formatter to use for the subtitle text.
-    ///   - avatarProvider: The provider for avatar visuals.
+    ///   - visualProvider: The provider for visuals.
     public init(
         titleLabelAppearance: LabelAppearance,
         subtitleLabelAppearance: LabelAppearance?,
         titleFormatter: T,
         subtitleFormatter: S,
-        avatarProvider: A
+        visualProvider: V
     ) {
         self.titleLabelAppearance = titleLabelAppearance
         self.subtitleLabelAppearance = subtitleLabelAppearance
         self.titleFormatter = titleFormatter
         self.subtitleFormatter = subtitleFormatter
-        self.avatarProvider = avatarProvider
+        self.visualProvider = visualProvider
     }
 }

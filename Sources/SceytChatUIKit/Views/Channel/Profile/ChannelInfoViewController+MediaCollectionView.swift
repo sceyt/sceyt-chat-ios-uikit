@@ -45,7 +45,7 @@ extension ChannelInfoViewController {
             noItemsMessage = L10n.Channel.Info.Segment.Medias.noItems
             register(Components.channelInfoImageAttachmentCell.self)
             register(Components.channelInfoVideoAttachmentCell.self)
-            register(Components.channelInfoAttachmentHeaderView.self, kind: .header)
+            register(Components.channelInfoDateSeparatorView.self, kind: .header)
             delegate = self
             dataSource = self
         }
@@ -110,6 +110,7 @@ extension ChannelInfoViewController {
             switch model?.attachment.type {
             case "video":
                 cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoVideoAttachmentCell.self)
+                (cell as? VideoAttachmentCell)?.parentAppearance = appearance.videoAttachmentCellAppearance
             default:
                 cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoImageAttachmentCell.self)
             }
@@ -133,13 +134,14 @@ extension ChannelInfoViewController {
         }
         
         public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
-            return .init(width: collectionView.width, height: Components.channelInfoAttachmentHeaderView.Layouts.headerHeight)
+            return .init(width: collectionView.width, height: Components.channelInfoDateSeparatorView.Layouts.headerHeight)
         }
         
         public func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
             switch kind {
             case UICollectionView.SupplementaryViewKind.header.rawValue:
-                let cell = collectionView.dequeueReusableSupplementaryView(for: indexPath, cellType: Components.channelInfoAttachmentHeaderView.self, kind: .header)
+                let cell = collectionView.dequeueReusableSupplementaryView(for: indexPath, cellType: Components.channelInfoDateSeparatorView.self, kind: .header)
+                cell.parentAppearance = appearance.separatorAppearance
                 cell.date = mediaViewModel.attachmentLayout(at: indexPath)?.attachment.createdAt
                 return cell
             default:

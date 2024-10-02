@@ -50,7 +50,7 @@ extension MessageInfoViewController {
                     setupLayout()
                 }
                 sentValueLabel.text = appearance.messageDateFormatter.format(data.message.createdAt)
-                if let fileSize = data.attachments.first?.fileSize(using: appearance.messageFileSizeFormatter) {
+                if let fileSize = data.attachments.first?.fileSize(using: appearance.attachmentSizeFormatter) {
                     sizeHStack.isHidden = false
                     sizeValueLabel.text = fileSize
                 } else {

@@ -21,14 +21,14 @@ extension MessageInputViewController.MentionUsersListViewController.MentionUserC
                 font: Fonts.semiBold.withSize(16)
             ),
             titleFormatter: AnyUserFormatting = AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
-            avatarProvider: AnyUserAvatarProviding = AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
+            visualProvider: AnyUserAvatarProviding = AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
         ) {
             super.init(
                 titleLabelAppearance: titleLabelAppearance,
                 subtitleLabelAppearance: nil,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: EmptyFormatter(),
-                avatarProvider: avatarProvider
+                visualProvider: visualProvider
             )
             
             self.presenceStateIconProvider = presenceStateIconProvider

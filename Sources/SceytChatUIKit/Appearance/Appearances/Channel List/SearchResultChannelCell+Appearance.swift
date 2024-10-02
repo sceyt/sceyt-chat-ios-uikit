@@ -29,14 +29,14 @@ extension SearchResultChannelCell: AppearanceProviding {
             ),
             titleFormatter: AnyChannelFormatting = AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelNameFormatter),
             subtitleFormatter: AnyChannelFormatting = AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelSubtitleFormatter),
-            avatarProvider: AnyChannelAvatarProviding = AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelAvatarProvider)
+            visualProvider: AnyChannelAvatarProviding = AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider)
         ) {
             super.init(
                 titleLabelAppearance: titleLabelAppearance,
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                avatarProvider: avatarProvider
+                visualProvider: visualProvider
             )
             
             self.backgroundColor = backgroundColor

@@ -63,7 +63,7 @@ extension MessageInputViewController.MentionUsersListViewController {
                 onlineStatusView.image = appearance.presenceStateIconProvider.provideVisual(for: data.presence.state)
                 onlineStatusView.isHidden = data.presence.state != .online
                 
-                imageTask = switch appearance.avatarProvider.provideVisual(for: data) {
+                imageTask = switch appearance.visualProvider.provideVisual(for: data) {
                 case .image(let image):
                     Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
                                                         for: data,

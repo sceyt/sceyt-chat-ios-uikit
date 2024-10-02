@@ -517,11 +517,11 @@ public extension Appearance {
         
         public static var downloadStart: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.downloadStart.image,
-                                                     renderingMode: .template(.accent)))!
+                                                     renderingMode: .template(.onPrimary)))!
         }()
         public static var downloadStop: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.downloadStop.image,
-                                                     renderingMode: .template(.accent)))!
+                                                     renderingMode: .template(.onPrimary)))!
         }()
         
         public static var replyPlay: UIImage = {

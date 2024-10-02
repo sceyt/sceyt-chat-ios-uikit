@@ -29,22 +29,22 @@ open class ChannelInfoViewController: ViewController,
     open lazy var fileListViewController = Components.channelInfoFileCollectionView
         .init()
     
-    open lazy var linkListViewController = Components.channelInfoLinkCollectionView
+    open lazy var voiceListViewController = Components.channelInfoVoiceCollectionView
         .init()
     
-    open lazy var voiceListViewController = Components.channelInfoVoiceCollectionView
+    open lazy var linkListViewController = Components.channelInfoLinkCollectionView
         .init()
     
     open lazy var segmentViewController = Components.segmentedControlView
         .init(items: [
-            SegmentedControlView.SectionItem(content: mediaListViewController,
-                                             title: L10n.Channel.Info.Segment.medias),
-            SegmentedControlView.SectionItem(content: fileListViewController,
-                                             title: L10n.Channel.Info.Segment.files),
-            SegmentedControlView.SectionItem(content: voiceListViewController,
-                                             title: L10n.Channel.Info.Segment.voice),
-            SegmentedControlView.SectionItem(content: linkListViewController,
-                                             title: L10n.Channel.Info.Segment.links)
+            .init(content: mediaListViewController,
+                  title: L10n.Channel.Info.Segment.medias),
+            .init(content: fileListViewController,
+                  title: L10n.Channel.Info.Segment.files),
+            .init(content: voiceListViewController,
+                  title: L10n.Channel.Info.Segment.voice),
+            .init(content: linkListViewController,
+                  title: L10n.Channel.Info.Segment.links)
         ]).withoutAutoresizingMask
     
     public var sections = [Sections]()
@@ -152,12 +152,17 @@ open class ChannelInfoViewController: ViewController,
         super.setupAppearance()
         
         navigationItem.standardAppearance = NavigationController.appearance.standard
-        navigationItem.standardAppearance?.backgroundColor = appearance.cellBackgroundColor
+        navigationItem.standardAppearance?.backgroundColor = .backgroundSections
         navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
         navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
         
         view.backgroundColor = appearance.backgroundColor
-        tableView.backgroundColor = .clear        
+        tableView.backgroundColor = .clear
+        segmentViewController.appearance = appearance.segmentedControlAppearance
+        mediaListViewController.parentAppearance = appearance.mediaCollectionAppearance
+        fileListViewController.parentAppearance = appearance.fileCollectionAppearance
+        voiceListViewController.parentAppearance = appearance.voiceCollectionAppearance
+        linkListViewController.parentAppearance = appearance.linkCollectionAppearance
     }
     
     override open func viewSafeAreaInsetsDidChange() {
@@ -264,6 +269,7 @@ open class ChannelInfoViewController: ViewController,
         switch sections[indexPath.section] {
         case .header:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoDetailsCell.self)
+            cell.parentAppearance = appearance.detailsCellAppearance
             cell.selectionStyle = .none
             cell.data = profileViewModel.channel
             cell.avatarButton.publisher(for: .touchUpInside).sink { [weak self] _ in
@@ -273,6 +279,7 @@ open class ChannelInfoViewController: ViewController,
             _cell = cell
         case .description:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoDescriptionCell.self)
+            cell.parentAppearance = appearance.descriptionCellAppearance
             cell.selectionStyle = .none
             if profileViewModel.channel.isDirect {
                 cell.data = profileViewModel.channel.peer?.presence.status
@@ -282,12 +289,14 @@ open class ChannelInfoViewController: ViewController,
             _cell = cell
         case .uri:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoOptionCell.self)
-            cell.iconView.image = .channelProfileURI
+            cell.parentAppearance = appearance.uriCellAppearance
+            cell.iconView.image = appearance.optionIcons.uriIcon
             cell.titleLabel.text = SceytChatUIKit.shared.config.channelURIConfig.prefix + (profileViewModel.channel.uri)
             cell.selectionStyle = .none
             _cell = cell
         case .options, .items:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoOptionCell.self)
+            cell.parentAppearance = appearance.optionItemCellAppearance
             let action = (sections[indexPath.section] == .options ? options() : items())[indexPath.row]
             cell.iconView.image = action.image
             cell.titleLabel.text = action.title
@@ -299,13 +308,13 @@ open class ChannelInfoViewController: ViewController,
             if action.tag == ActionTag.notifications {
                 cell.selectionStyle = .none
                 let sw = UISwitch()
-                sw.onTintColor = .accent
+                sw.onTintColor = appearance.optionItemCellAppearance.switchTintColor
                 sw.addTarget(self, action: #selector(muteAction), for: .valueChanged)
                 sw.isOn = !profileViewModel.channel.muted
                 cell.accessoryView = sw
             } else if action.displayArrow {
                 cell.selectionStyle = .gray
-                cell.accessoryView = UIImageView(image: .chevron)
+                cell.accessoryView = UIImageView(image: appearance.optionItemCellAppearance.accessoryImage)
             } else {
                 cell.selectionStyle = .none
                 cell.accessoryView = nil
@@ -374,7 +383,7 @@ open class ChannelInfoViewController: ViewController,
                 layer.name = "bottomBorder"
                 cell.layer.addSublayer(layer)
             }
-            layer.borderColor = appearance.cellSeparatorColor?.cgColor
+            layer.borderColor = appearance.separatorColor.cgColor
             layer.borderWidth = Components.channelInfoViewController.Layouts.cellSeparatorWidth
             layer.frame = CGRect(x: 0, y: cell.height - layer.borderWidth, width: cell.width, height: layer.borderWidth)
         }
@@ -403,14 +412,14 @@ open class ChannelInfoViewController: ViewController,
     var segmentTop: CGFloat { floor(tableView.contentSize.height - tableView.height - 18) }
     
     open var titleLabel = {
-        $0.font = Components.channelInfoViewController.appearance.titleFont?.withSize(16)
-        $0.textColor = Components.channelInfoViewController.appearance.titleColor
+        $0.font = appearance.titleLabelAppearance.font
+        $0.textColor = appearance.titleLabelAppearance.foregroundColor
         return $0
     }(UILabel())
     
     open var subTitleLabel = {
-        $0.font = Components.channelInfoViewController.appearance.subtitleFont?.withSize(13)
-        $0.textColor = Components.channelInfoViewController.appearance.subtitleColor
+        $0.font = appearance.subtitleLabelAppearance.font
+        $0.textColor = appearance.subtitleLabelAppearance.foregroundColor
         return $0
     }(UILabel())
     
@@ -485,11 +494,16 @@ open class ChannelInfoViewController: ViewController,
     
     open func options() -> [ActionItem] {
         var actions: [ActionItem] = [
-            .init(title: L10n.Channel.Info.notifications, image: .channelProfileBell, tag: ActionTag.notifications)
+            .init(title: appearance.optionTitles.notificationsTitleText,
+                  image: appearance.optionIcons.notificationsIcon,
+                  tag: ActionTag.notifications)
         ]
         if profileViewModel.isOwner || profileViewModel.isAdmin {
             actions += [
-                .init(title: L10n.Channel.Info.Item.Title.autoDeleteMessages, image: .channelProfileAutoDeleteMessages, tag: ActionTag.autoDeleteMessages, toggle: profileViewModel.autoDelete > 0)
+                .init(title: appearance.optionTitles.autoDeleteMessagesTitleText,
+                      image: appearance.optionIcons.autoDeleteMessagesIcon,
+                      tag: ActionTag.autoDeleteMessages,
+                      toggle: profileViewModel.autoDelete > 0)
             ]
         }
         return actions
@@ -501,22 +515,28 @@ open class ChannelInfoViewController: ViewController,
             switch profileViewModel.channelType {
             case .broadcast where profileViewModel.isOwner || profileViewModel.isAdmin:
                 actions += [
-                    .init(title: L10n.Channel.Info.Item.Title.subscribers, image: .channelProfileMembers, tag: ActionTag.members)
+                    .init(title: appearance.optionTitles.subscribersTitleText,
+                          image: appearance.optionIcons.subscribersIcon,
+                          tag: ActionTag.members)
                 ]
             case .group:
                 actions += [
-                    .init(title: L10n.Channel.Info.Item.Title.members, image: .channelProfileMembers, tag: ActionTag.members)
+                    .init(title: appearance.optionTitles.membersTitleText,
+                          image: appearance.optionIcons.membersIcon,
+                          tag: ActionTag.members)
                 ]
             default:
                 break
             }
             if profileViewModel.isOwner {
-                actions += [.init(title: L10n.Channel.Info.Item.Title.admins, image: .channelProfileAdmins, tag: ActionTag.admins)]
+                actions += [.init(title: appearance.optionTitles.adminsTitleText,
+                                  image: appearance.optionIcons.adminsIcon,
+                                  tag: ActionTag.admins)]
             }
         }
         actions.append(.init(
-            title: L10n.Channel.Info.Item.Title.messageSearch,
-            image: .searchFill,
+            title: appearance.optionTitles.searchTitleText,
+            image: appearance.optionIcons.searchIcon,
             tag: ActionTag.messageSearch,
             displayArrow: false
         ))

@@ -161,36 +161,6 @@ extension ChannelSwipeActionsConfiguration: AppearanceProviding {
 
 
 
-extension ChannelInfoViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var titleColor: UIColor? = .primaryText
-        public var titleFont: UIFont? = Fonts.bold.withSize(20)
-        public var subtitleColor: UIColor? = .secondaryText
-        public var subtitleFont: UIFont? = Fonts.regular.withSize(16)
-        
-        public var descriptionLabelFont: UIFont? = Fonts.regular.withSize(13)
-        public var descriptionFont: UIFont? = Fonts.regular.withSize(16)
-        public var descriptionLabelColor: UIColor? = .secondaryText
-        public var descriptionColor: UIColor? = .primaryText
-        
-        public var uriColor: UIColor? = .primaryText
-        public var uriFont: UIFont? = Fonts.regular.withSize(16)
-        
-        public var itemColor: UIColor? = .primaryText
-        public var itemFont: UIFont? = Fonts.regular.withSize(16)
-        public var detailColor: UIColor? = .secondaryText
-        public var detailFont: UIFont? = Fonts.regular.withSize(16)
-        
-        public var backgroundColor: UIColor? = .backgroundSecondary
-        
-        public var cellSeparatorColor: UIColor? = UIColor.border
-        public var cellBackgroundColor: UIColor? = .backgroundSections
-        
-        public init() {}
-    }
-}
 
 extension ChannelEditViewController: AppearanceProviding {
     public static var appearance = Appearance()
@@ -276,77 +246,7 @@ extension MediaPickerViewController: AppearanceProviding {
     }
 }
 
-extension ChannelInfoViewController.MediaCollectionView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        
-        public var videoTimeTextColor: UIColor? = .onPrimary
-        public var videoTimeTextFont: UIFont? = Fonts.regular.withSize(12)
-        public var videoTimeBackgroundColor: UIColor? = .overlayBackground2
-        
-        public init() {}
-    }
-}
 
-extension ChannelInfoViewController.FileCollectionView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        
-        public var titleTextColor: UIColor? = .primaryText
-        public var titleFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var detailTextColor: UIColor? = .secondaryText
-        public var detailFont: UIFont? = Fonts.regular.withSize(13)
-        
-        public var downloadBackgroundColor: UIColor? = .surface1
-        public var progressColor: UIColor? = .accent
-        public var trackColor: UIColor? = .clear
-        
-        public init() {}
-    }
-}
-
-extension ChannelInfoViewController.LinkCollectionView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        
-        public var titleLabelTextColor: UIColor? = .primaryText
-        public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var linkLabelTextColor: UIColor? = .systemBlue
-        public var linkLabelFont: UIFont? = Fonts.regular.withSize(14)
-        public var detailLabelTextColor: UIColor? = .secondaryText
-        public var detailLabelFont: UIFont? = Fonts.regular.withSize(13)
-        public var linkIcon: UIImage = .link
-
-        public init() {}
-    }
-}
-
-extension ChannelInfoViewController.VoiceCollectionView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        
-        public var titleLabelTextColor: UIColor? = .primaryText
-        public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var durationLabelTextColor: UIColor? = .primaryText
-        public var durationLabelFont: UIFont? = Fonts.regular.withSize(13)
-        public var dateLabelTextColor: UIColor? = .secondaryText
-        public var dateLabelFont: UIFont? = Fonts.regular.withSize(13)
-        
-        public var downloadBackgroundColor: UIColor? = .accent
-        public var progressColor: UIColor? = .onPrimary
-        public var trackColor: UIColor? = .clear
-        
-        public init() {}
-    }
-}
 
 extension MediaPickerViewController.MediaCell: AppearanceProviding {
     public static var appearance = Appearance()
@@ -474,17 +374,6 @@ extension ImagePreviewViewController: AppearanceProviding {
     }
 }
 
-extension NativeSegmentedController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .backgroundSections
-        public var font: UIFont? = Fonts.semiBold.withSize(16)
-        public var selectedTextColor: UIColor? = .primaryText
-        public var textColor: UIColor? = .secondaryText
-        public init() {}
-    }
-}
 
 extension SheetViewController: AppearanceProviding {
     public static var appearance = Appearance()
@@ -553,18 +442,6 @@ extension NavigationController: AppearanceProviding {
         }(UINavigationBarAppearance())
         
         public var tintColor: UIColor? = .accent
-        
-        public init() {}
-    }
-}
-
-extension ChannelInfoViewController.AttachmentHeaderView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var headerBackgroundColor: UIColor? = .surface1
-        public var headerTextColor: UIColor? = .secondaryText
-        public var headerFont: UIFont? = Fonts.semiBold.withSize(13)
         
         public init() {}
     }

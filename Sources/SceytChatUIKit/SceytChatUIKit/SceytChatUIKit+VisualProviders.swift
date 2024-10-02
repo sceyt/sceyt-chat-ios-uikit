@@ -11,7 +11,7 @@ extension SceytChatUIKit {
     public struct VisualProviders {
         
         public var userAvatarProvider: any UserAvatarProviding = UserDefaultAvatarProvider()
-        public var channelAvatarProvider: any ChannelAvatarProviding = ChannelDefaultAvatarProvider()
+        public var channelDefaultAvatarProvider: any ChannelAvatarProviding = ChannelDefaultAvatarProvider()
         public var channelURIValidationMessageProvider: any ChannelURIValidationMessageProviding = ChannelURIValidationMessageProvider()
         public var senderNameColorProvider: any UserColorProviding = SenderNameColorProvider()
         public var attachmentIconProvider: any AttachmentIconProviding = AttachmentIconProvider()

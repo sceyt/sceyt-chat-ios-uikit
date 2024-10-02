@@ -18,11 +18,6 @@ open class ChannelInfoMediaSeparatorDateFormatter: DateFormatting {
     }()
 
     open func format(_ date: Date) -> String {
-        dateFormatter.dateFormat = "dd.MM.yy, HH:mm"
-        return dateFormatter.string(from: date)
-    }
-    
-    open func header(_ date: Date) -> String {
         dateFormatter.setLocalizedDateFormatFromTemplate("MMMM yyyy")
         return dateFormatter.string(from: date).uppercased()
     }

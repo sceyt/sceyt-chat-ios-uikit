@@ -12,15 +12,15 @@ public class SelectedCellAppearance<T: Formatting,
     public var labelAppearance: LabelAppearance
     public var titleFormatter: T
     public var removeIcon: UIImage
-    public var avatarProvider: A
+    public var visualProvider: A
     
     public init(labelAppearance: LabelAppearance,
                 titleFormatter: T,
                 removeIcon: UIImage,
-                avatarProvider: A) {
+                visualProvider: A) {
         self.labelAppearance = labelAppearance
         self.titleFormatter = titleFormatter
         self.removeIcon = removeIcon
-        self.avatarProvider = avatarProvider
+        self.visualProvider = visualProvider
     }
 }

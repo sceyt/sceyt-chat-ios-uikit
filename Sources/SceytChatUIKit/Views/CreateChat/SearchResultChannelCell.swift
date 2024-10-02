@@ -12,7 +12,7 @@ open class SearchResultChannelCell: BaseChannelUserCell {
     
     open var channelData: ChatChannel! {
         didSet {
-            imageTask = switch appearance.avatarProvider.provideVisual(for: channelData) {
+            imageTask = switch appearance.visualProvider.provideVisual(for: channelData) {
             case .image(let image):
                 Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
                                                     for: channelData,

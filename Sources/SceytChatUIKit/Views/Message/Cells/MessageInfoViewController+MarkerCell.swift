@@ -30,7 +30,7 @@ extension MessageInfoViewController {
             didSet {
                 guard let data,
                       let user = data.user else { return }
-                let avatarRepresentation = appearance.avatarProvider.provideVisual(for: user)
+                let avatarRepresentation = appearance.visualProvider.provideVisual(for: user)
                 imageTask = switch avatarRepresentation {
                 case .image(let image):
                     Components.avatarBuilder.loadAvatar(into: avatarView.imageView,

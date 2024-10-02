@@ -20,7 +20,7 @@ public class SelectableCellAppearance<T: Formatting,
     ///   - subtitleLabelAppearance: The appearance settings for the subtitle label.
     ///   - titleFormatter: The formatter to use for the title text.
     ///   - subtitleFormatter: The formatter to use for the subtitle text.
-    ///   - avatarProvider: The provider for avatar visuals.
+    ///   - visualProvider: The provider for avatar visuals.
     ///   - selectedIcon: The image to use when the item is selected.
     ///   - unselectedIcon: The image to use when the item is unselected.
     public init(
@@ -28,7 +28,7 @@ public class SelectableCellAppearance<T: Formatting,
         subtitleLabelAppearance: LabelAppearance,
         titleFormatter: T,
         subtitleFormatter: S,
-        avatarProvider: A,
+        visualProvider: A,
         selectedIcon: UIImage,
         unselectedIcon: UIImage
     ) {
@@ -40,7 +40,7 @@ public class SelectableCellAppearance<T: Formatting,
             subtitleLabelAppearance: subtitleLabelAppearance,
             titleFormatter: titleFormatter,
             subtitleFormatter: subtitleFormatter,
-            avatarProvider: avatarProvider
+            visualProvider: visualProvider
         )
     }
 }

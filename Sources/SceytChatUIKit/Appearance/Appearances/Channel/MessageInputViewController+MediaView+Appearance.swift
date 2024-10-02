@@ -22,7 +22,7 @@ extension MessageInputViewController.SelectedMediaView: AppearanceProviding {
                                                                                    font: Fonts.regular.withSize(11))
         public lazy var fileAttachmentBackgroundColor: UIColor = .surface1
         public lazy var fileAttachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.attachmentIconProvider
-        public lazy var fileAttachmentSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.fileSizeFormatter
+        public lazy var fileAttachmentSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter
         public lazy var attachmentDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter
         
         // Initializer with default values
@@ -38,7 +38,7 @@ extension MessageInputViewController.SelectedMediaView: AppearanceProviding {
                                                                        font: Fonts.regular.withSize(11)),
             fileAttachmentBackgroundColor: UIColor = .surface1,
             fileAttachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
-            fileAttachmentSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.fileSizeFormatter,
+            fileAttachmentSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter,
             attachmentDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter
         ) {
             self.backgroundColor = backgroundColor

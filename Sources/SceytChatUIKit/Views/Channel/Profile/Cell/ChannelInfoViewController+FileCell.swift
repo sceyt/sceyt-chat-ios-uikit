@@ -34,17 +34,10 @@ extension ChannelInfoViewController {
             return $0.withoutAutoresizingMask
         }(UIStackView(row: [iconView, textVStack, downloadButton], spacing: Components.channelInfoFileCollectionView.Layouts.horizontalPadding, alignment: .center))
         
-        public lazy var appearance = Components.channelInfoFileCollectionView.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
         override open func setup() {
             super.setup()
             
             selectedBackgroundView = UIView()
-            iconView.image = .file
             titleLabel.lineBreakMode = .byTruncatingMiddle
             iconView.clipsToBounds = true
             
@@ -59,21 +52,21 @@ extension ChannelInfoViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            selectedBackgroundView?.backgroundColor = UIColor.surface2
+            selectedBackgroundView?.backgroundColor = appearance.selectedBackgroundColor
             
             iconView.layer.cornerRadius = Components.channelInfoFileCollectionView.Layouts.cornerRadius
             
-            titleLabel.font = appearance.titleFont
-            titleLabel.textColor = appearance.titleTextColor
+            titleLabel.font = appearance.fileNameLabelAppearance.font
+            titleLabel.textColor = appearance.fileNameLabelAppearance.foregroundColor
             
-            detailLabel.font = appearance.detailFont
-            detailLabel.textColor = appearance.detailTextColor
+            detailLabel.font = appearance.subtitleLabelAppearance.font
+            detailLabel.textColor = appearance.subtitleLabelAppearance.foregroundColor
             
-            downloadButton.backgroundColor = appearance.downloadBackgroundColor
+            downloadButton.backgroundColor = appearance.loaderAppearance.backgroundColor
             downloadButton.layer.cornerRadius = Components.channelInfoFileCollectionView.Layouts.iconSize / 2
             
-            progressView.progressColor = appearance.progressColor
-            progressView.trackColor = appearance.trackColor
+            progressView.progressColor = appearance.loaderAppearance.progressColor
+            progressView.trackColor = appearance.loaderAppearance.trackColor
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
         }
         
@@ -104,9 +97,9 @@ extension ChannelInfoViewController {
                 guard let data = data
                 else { return }
                 let attachment = data.attachment
-                iconView.image = data.thumbnail
-                titleLabel.text = attachment.name ?? attachment.originUrl.lastPathComponent
-                detailLabel.text = SceytChatUIKit.shared.formatters.fileSizeFormatter.format(UInt64(attachment.uploadedFileSize)) + " • " + SceytChatUIKit.shared.formatters.channelInfoMediaDateFormatter.format(attachment.createdAt)
+                iconView.image = appearance.iconProvider.provideVisual(for: attachment)
+                titleLabel.text = appearance.fileNameFormatter.format(attachment)
+                detailLabel.text = appearance.subtitleFormatter.format(attachment)
                 
                 updateStatus()
             }
@@ -122,13 +115,13 @@ extension ChannelInfoViewController {
                 showDownloadButton(false)
             case .downloading:
                 showDownloadButton(true)
-                downloadButton.setImage(.downloadStop, for: [])
+                downloadButton.setImage(appearance.loaderAppearance.cancelIcon, for: [])
                 progressView.isHidden = false
                 progressView.progress = fileProvider.currentProgressPercent(message: message, attachment: attachment) ?? attachment.transferProgress
                 setProgressHandler()
             case .pending, .pauseDownloading, .failedDownloading:
                 showDownloadButton(true)
-                downloadButton.setImage(.downloadStart, for: [])
+                downloadButton.setImage(appearance.loaderAppearance.downloadIcon, for: [])
                 progressView.isHidden = true
             }
         }
@@ -212,6 +205,7 @@ extension ChannelInfoViewController {
 
 public extension ChannelInfoViewController.FileCell {
     enum Event {
-        case pause(MessageLayoutModel.AttachmentLayout), resume(MessageLayoutModel.AttachmentLayout)
+        case pause(MessageLayoutModel.AttachmentLayout)
+        case resume(MessageLayoutModel.AttachmentLayout)
     }
 }

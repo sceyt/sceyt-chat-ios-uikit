@@ -254,14 +254,14 @@ extension ChatChannel: AvatarBuildable {
     }
 
     public var defaultAvatar: UIImage? {
-        if case .image(let image) = SceytChatUIKit.shared.visualProviders.channelAvatarProvider.provideVisual(for: self) {
+        if case .image(let image) = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider.provideVisual(for: self) {
             return image
         }
         return nil
     }
     
     public var appearance: InitialsBuilderAppearance? {
-        if case .initialsAppearance(let appearance) = SceytChatUIKit.shared.visualProviders.channelAvatarProvider.provideVisual(for: self) {
+        if case .initialsAppearance(let appearance) = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider.provideVisual(for: self) {
             return appearance
         }
         return nil

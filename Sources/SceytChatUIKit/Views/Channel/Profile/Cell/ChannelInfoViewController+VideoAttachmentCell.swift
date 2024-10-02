@@ -19,14 +19,7 @@ extension ChannelInfoViewController {
             super.setup()
             
             timeLabel.isUserInteractionEnabled = false
-            timeLabel.iconView.image = nil
             timeLabel.stackView.spacing = 0
-        }
-        
-        public lazy var appearance = Components.channelInfoMediaCollectionView.appearance {
-            didSet {
-                setupAppearance()
-            }
         }
         
         open override func setupLayout() {
@@ -38,9 +31,10 @@ extension ChannelInfoViewController {
         
         open override func setupAppearance() {
             super.setupAppearance()
-            timeLabel.backgroundColor = appearance.videoTimeBackgroundColor
-            timeLabel.textLabel.font = appearance.videoTimeTextFont
-            timeLabel.textLabel.textColor = appearance.videoTimeTextColor
+            timeLabel.iconView.image = appearance.videoDurationIcon
+            timeLabel.backgroundColor = appearance.durationLabelAppearance.backgroundColor
+            timeLabel.textLabel.font = appearance.durationLabelAppearance.font
+            timeLabel.textLabel.textColor = appearance.durationLabelAppearance.foregroundColor
         }
         
         open override var data: MessageLayoutModel.AttachmentLayout? {
@@ -48,7 +42,7 @@ extension ChannelInfoViewController {
                 guard let data
                 else { return }
                 if let duration = data.attachment.imageDecodedMetadata?.duration, duration > 0 {
-                    timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration))
+                    timeLabel.text = appearance.durationFormatter.format(TimeInterval(duration))
                 } else {
                     timeLabel.text = ""
                 }

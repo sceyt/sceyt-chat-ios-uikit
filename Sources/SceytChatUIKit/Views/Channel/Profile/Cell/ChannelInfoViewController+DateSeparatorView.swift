@@ -1,5 +1,5 @@
 //
-//  ChannelInfoViewController+AttachmentHeaderView.swift
+//  ChannelInfoViewController+DateSeparatorView.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 29/09/2023.
@@ -9,7 +9,7 @@
 import UIKit
 
 extension ChannelInfoViewController {
-    open class AttachmentHeaderView: CollectionReusableView {
+    open class DateSeparatorView: CollectionReusableView {
         open lazy var headerLabel = UILabel()
             .withoutAutoresizingMask
         
@@ -24,20 +24,20 @@ extension ChannelInfoViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            headerLabel.font = appearance.headerFont
-            headerLabel.textColor = appearance.headerTextColor
-            backgroundColor = appearance.headerBackgroundColor
+            headerLabel.font = appearance.labelAppearance.font
+            headerLabel.textColor = appearance.labelAppearance.foregroundColor
+            backgroundColor = appearance.backgroundColor
         }
         
         open var date: Date? {
             didSet {
-                headerLabel.text = SceytChatUIKit.shared.formatters.channelInfoMediaDateFormatter.format(date ?? Date())
+                headerLabel.text = appearance.dateFormatter.format(date ?? Date())
             }
         }
     }
 }
 
-public extension ChannelInfoViewController.AttachmentHeaderView {
+public extension ChannelInfoViewController.DateSeparatorView {
     enum Layouts {
         public static var horizontalPadding: CGFloat = 16
         public static var verticalPadding: CGFloat = 8

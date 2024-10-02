@@ -61,7 +61,7 @@ extension SceytChatUIKit {
         public static var channelInfoVoiceCollectionView: ChannelInfoViewController.VoiceCollectionView.Type = ChannelInfoViewController.VoiceCollectionView.self
         public static var channelInfoImageAttachmentCell: ChannelInfoViewController.ImageAttachmentCell.Type = ChannelInfoViewController.ImageAttachmentCell.self
         public static var channelInfoVideoAttachmentCell: ChannelInfoViewController.VideoAttachmentCell.Type = ChannelInfoViewController.VideoAttachmentCell.self
-        public static var channelInfoAttachmentHeaderView: ChannelInfoViewController.AttachmentHeaderView.Type = ChannelInfoViewController.AttachmentHeaderView.self
+        public static var channelInfoDateSeparatorView: ChannelInfoViewController.DateSeparatorView.Type = ChannelInfoViewController.DateSeparatorView.self
         public static var channelInfoFileCell: ChannelInfoViewController.FileCell.Type = ChannelInfoViewController.FileCell.self
         public static var channelInfoLinkCell: ChannelInfoViewController.LinkCell.Type = ChannelInfoViewController.LinkCell.self
         public static var channelInfoVoiceCell: ChannelInfoViewController.VoiceCell.Type = ChannelInfoViewController.VoiceCell.self
@@ -72,7 +72,8 @@ extension SceytChatUIKit {
         public static var channelAttachmentListViewModel: ChannelAttachmentListViewModel.Type = ChannelAttachmentListViewModel.self
         
         public static var segmentedControlView: SegmentedControlView.Type = SegmentedControlView.self
-        
+        public static var segmentedControl: SegmentedControl.Type = SegmentedControl.self
+
         public static var messageInputViewController: MessageInputViewController.Type = MessageInputViewController.self
         public static var inputRouter: InputRouter.Type = InputRouter.self
         public static var messageInputSelectedMediaView: MessageInputViewController.SelectedMediaView.Type = MessageInputViewController.SelectedMediaView.self

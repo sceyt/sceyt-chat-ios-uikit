@@ -29,7 +29,7 @@ extension UserCell: AppearanceProviding {
             ),
             titleFormatter: AnyChannelFormatting = AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelNameFormatter),
             subtitleFormatter: AnyChannelFormatting = AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelSubtitleFormatter),
-            avatarProvider: AnyChannelAvatarProviding = AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelAvatarProvider)
+            visualProvider: AnyChannelAvatarProviding = AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider)
         ) {
             self.backgroundColor = backgroundColor
             self.separatorColor = separatorColor
@@ -38,7 +38,7 @@ extension UserCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                avatarProvider: avatarProvider
+                visualProvider: visualProvider
             )
         }
     }

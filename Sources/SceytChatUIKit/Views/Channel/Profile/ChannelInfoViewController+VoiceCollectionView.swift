@@ -36,7 +36,7 @@ extension ChannelInfoViewController {
             
             noItemsMessage = L10n.Channel.Info.Segment.Voice.noItems
             register(Components.channelInfoVoiceCell.self)
-            register(Components.channelInfoAttachmentHeaderView.self, kind: .header)
+            register(Components.channelInfoDateSeparatorView.self, kind: .header)
             delegate = self
             dataSource = self
         }
@@ -87,6 +87,7 @@ extension ChannelInfoViewController {
         
         open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
             let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoVoiceCell.self)
+            cell.parentAppearance = appearance.cellAppearance
             cell.data = voiceViewModel.attachmentLayout(at: indexPath)
             cell.event
                 .receive(on: DispatchQueue.main)
@@ -115,13 +116,14 @@ extension ChannelInfoViewController {
         }
         
         public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
-            return .init(width: collectionView.width, height: Components.channelInfoAttachmentHeaderView.Layouts.headerHeight)
+            return .init(width: collectionView.width, height: Components.channelInfoDateSeparatorView.Layouts.headerHeight)
         }
         
         public func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
             switch kind {
             case UICollectionView.SupplementaryViewKind.header.rawValue:
-                let cell = collectionView.dequeueReusableSupplementaryView(for: indexPath, cellType: Components.channelInfoAttachmentHeaderView.self, kind: .header)
+                let cell = collectionView.dequeueReusableSupplementaryView(for: indexPath, cellType: Components.channelInfoDateSeparatorView.self, kind: .header)
+                cell.parentAppearance = appearance.separatorAppearance
                 cell.date = voiceViewModel.attachmentLayout(at: indexPath)?.attachment.createdAt
                 return cell
             default:

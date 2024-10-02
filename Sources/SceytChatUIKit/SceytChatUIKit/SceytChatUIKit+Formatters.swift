@@ -44,7 +44,7 @@ extension SceytChatUIKit {
 
         public var mediaDurationFormatter: any TimeIntervalFormatting = MediaDurationFormatter()
         
-        public var fileSizeFormatter: any UIntFormatting = FileSizeFormatter()
+        public var attachmentSizeFormatter: any UIntFormatting = FileSizeFormatter()
 
         public var avatarInitialsFormatter: any StringFormatting = AvatarInitialsFormatter()
         
@@ -54,14 +54,17 @@ extension SceytChatUIKit {
         
         public var messageShareBodyFormatter: any MessageFormatting = MessageShareBodyFormatter()
 
-        
-        public var channelInfoMediaDateFormatter: any DateFormatting = ChannelInfoMediaDateFormatter()
+        public var channelInfoAttachmentDateFormatter: any DateFormatting = ChannelInfoMediaDateFormatter()
 
-        public var channelProfileFileTimestamp: any DateFormatting = ChannelInfoMediaSeparatorDateFormatter()
+        public var channelInfoAttachmentSeparatorDateFormatter: any DateFormatting = ChannelInfoMediaSeparatorDateFormatter()
 
         public var mediaPreviewDateFormatter: any DateFormatting = MediaPreviewDateFormatter()
         
         public var attachmentNameFormatter: any AttachmentFormatting = AttachmentNameFormatter()
+        
+        public var attachmentFileNameFormatter: any AttachmentFormatting = AttachmentFileNameFormatter()
+        
+        public var attachmentFileSubtitleFormatter: any AttachmentFormatting = AttachmentFileSubtitleFormatter()
         
         public var logDateFormatter: any DateFormatting = LogDateFormatter()
         

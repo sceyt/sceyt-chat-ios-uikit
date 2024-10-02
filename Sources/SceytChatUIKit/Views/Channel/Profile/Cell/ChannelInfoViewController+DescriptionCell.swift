@@ -16,12 +16,6 @@ extension ChannelInfoViewController {
         open lazy var textView = UITextView()
             .withoutAutoresizingMask
         
-        public lazy var appearance = Components.channelInfoViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
         override open func setup() {
             super.setup()
             
@@ -35,13 +29,13 @@ extension ChannelInfoViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            backgroundColor = appearance.cellBackgroundColor
-            label.text = L10n.Channel.Info.about
-            label.font = appearance.descriptionLabelFont
-            label.textColor = appearance.descriptionLabelColor
+            backgroundColor = appearance.backgroundColor
+            label.text = appearance.titleText
+            label.font = appearance.titleLabelAppearance.font
+            label.textColor = appearance.titleLabelAppearance.foregroundColor
             textView.backgroundColor = .clear
-            textView.textColor = appearance.descriptionColor
-            textView.font = appearance.descriptionFont
+            textView.textColor = appearance.descriptionLabelAppearance.foregroundColor
+            textView.font = appearance.descriptionLabelAppearance.font
         }
         
         override open func setupLayout() {

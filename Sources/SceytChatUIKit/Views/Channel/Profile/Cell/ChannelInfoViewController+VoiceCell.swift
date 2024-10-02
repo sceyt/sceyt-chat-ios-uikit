@@ -35,15 +35,9 @@ extension ChannelInfoViewController {
             .init()
             .withoutAutoresizingMask
         
-        public lazy var appearance = Components.channelInfoVoiceCollectionView.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
         public private(set) var isPlaying = false {
             didSet {
-                playButton.setImage(isPlaying ? Images.audioPlayerPause : Images.audioPlayerPlay, for: .normal)
+                playButton.setImage(isPlaying ? appearance.pauseIcon : appearance.playIcon, for: .normal)
                 isPlaying ? play() : pause()
             }
         }
@@ -65,21 +59,23 @@ extension ChannelInfoViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            titleLabel.font = appearance.titleLabelFont
-            titleLabel.textColor = appearance.titleLabelTextColor
+            titleLabel.font = appearance.titleLabelAppearance.font
+            titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
             
-            dateLabel.font = appearance.dateLabelFont
-            dateLabel.textColor = appearance.dateLabelTextColor
+            dateLabel.font = appearance.subtitleLabelAppearance.font
+            dateLabel.textColor = appearance.subtitleLabelAppearance.foregroundColor
             
-            durationLabel.font = appearance.durationLabelFont
-            durationLabel.textColor = appearance.dateLabelTextColor
+            durationLabel.font = appearance.durationLabelAppearance.font
+            durationLabel.textColor = appearance.durationLabelAppearance.foregroundColor
             
-            downloadButton.backgroundColor = appearance.downloadBackgroundColor
+            downloadButton.backgroundColor = appearance.loaderAppearance.backgroundColor
             downloadButton.layer.cornerRadius = Layouts.iconSize / 2
             
-            progressView.progressColor = appearance.progressColor
-            progressView.trackColor = appearance.trackColor
+            progressView.progressColor = appearance.loaderAppearance.progressColor
+            progressView.trackColor = appearance.loaderAppearance.trackColor
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
+            
+            playButton.setImage(isPlaying ? appearance.pauseIcon : appearance.playIcon, for: .normal)
         }
         
         override open func setupLayout() {
@@ -122,16 +118,12 @@ extension ChannelInfoViewController {
                 else { return }
                 
                 if let user = attachment.user {
-                    if user.id == me {
-                        titleLabel.text = L10n.User.current
-                    } else {
-                        titleLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
-                    }
+                    titleLabel.text = appearance.titleFormatter.format(user)
                 } else {
                     titleLabel.text = attachment.userId
                 }
                 
-                dateLabel.text = SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(attachment.createdAt)
+                dateLabel.text = appearance.subtitleFormatter.format(attachment.createdAt)
                 
                 reset()
                 if let fileUrl = attachment.fileUrl, fileUrl == SimpleSinglePlayer.url, SimpleSinglePlayer.isPlaying {
@@ -146,7 +138,7 @@ extension ChannelInfoViewController {
         }
         
         open func setDuration(duration: TimeInterval, progress: Double) {
-            durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)
+            durationLabel.text = appearance.durationFormatter.format(duration)
         }
         
         @objc
@@ -170,7 +162,7 @@ extension ChannelInfoViewController {
         
         open func reset() {
             if let duration = data?.attachment.voiceDecodedMetadata?.duration, duration > 0 {
-                durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(TimeInterval(duration))
+                durationLabel.text = appearance.durationFormatter.format(TimeInterval(duration))
             } else {
                 durationLabel.text = ""
             }
@@ -187,13 +179,13 @@ extension ChannelInfoViewController {
                 showDownloadButton(false)
             case .downloading:
                 showDownloadButton(true)
-                downloadButton.setImage(.downloadStop.withTintColor(appearance.progressColor ?? .white), for: [])
+                downloadButton.setImage(appearance.loaderAppearance.cancelIcon, for: [])
                 progressView.isHidden = false
                 progressView.progress = fileProvider.currentProgressPercent(message: message, attachment: attachment) ?? attachment.transferProgress
                 setProgressHandler()
             case .pending, .pauseDownloading, .failedDownloading:
                 showDownloadButton(true)
-                downloadButton.setImage(.downloadStart.withTintColor(appearance.progressColor ?? .white), for: [])
+                downloadButton.setImage(appearance.loaderAppearance.downloadIcon, for: [])
                 progressView.isHidden = true
             }
             playButton.isHidden = !downloadButton.isHidden

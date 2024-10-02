@@ -59,7 +59,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         public lazy var lastMessageSenderNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelLastMessageSenderNameFormatter
         public lazy var reactedUserNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.reactedUserNameFormatter
         public lazy var attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.channelListAttachmentIconProvider
-        public lazy var channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelAvatarProvider
+        public lazy var channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
         public lazy var presenceStateIconProvider: any PresenceStateIconProviding = SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
         
         // Initializer with default values
@@ -92,7 +92,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             lastMessageSenderNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelLastMessageSenderNameFormatter,
             reactedUserNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.reactedUserNameFormatter,
             attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.channelListAttachmentIconProvider,
-            channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelAvatarProvider,
+            channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider,
             presenceStateIconProvider: any PresenceStateIconProviding = SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
         ) {
             self.backgroundColor = backgroundColor

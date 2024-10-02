@@ -14,7 +14,7 @@ public class LinkPreviewAppearance {
     public lazy var descriptionLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                         font: Fonts.regular.withSize(13))
     public lazy var highlightedLinkBackgroundColor: UIColor = .clear
-    public lazy var placeholderIcon: UIImage = .link
+    public lazy var placeholderIcon: UIImage? = .link
     
     // Initializer with default values
     public init(
@@ -23,7 +23,7 @@ public class LinkPreviewAppearance {
         descriptionLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                             font: Fonts.regular.withSize(13)),
         highlightedLinkBackgroundColor: UIColor = .clear,
-        placeholderIcon: UIImage = .link
+        placeholderIcon: UIImage? = .link
     ) {
         self.titleLabelAppearance = titleLabelAppearance
         self.descriptionLabelAppearance = descriptionLabelAppearance

@@ -842,8 +842,8 @@ open class MessageLayoutModel {
             let text = NSMutableAttributedString(
                 attributedString: NSAttributedString(string: description,
                                                      attributes:
-                                                        [.font: appearance.linkLabelAppearance.font,
-                                                         .foregroundColor: appearance.linkLabelAppearance.foregroundColor
+                                                        [.font: appearance.linkPreviewAppearance.descriptionLabelAppearance.font,
+                                                         .foregroundColor: appearance.linkPreviewAppearance.descriptionLabelAppearance.foregroundColor
                                                         ])
             )
             
@@ -857,8 +857,8 @@ open class MessageLayoutModel {
             let text = NSMutableAttributedString(
                 attributedString: NSAttributedString(string: title,
                                                      attributes: [
-                                                        .font: appearance.linkLabelAppearance.font,
-                                                        .foregroundColor: appearance.linkLabelAppearance.foregroundColor
+                                                        .font: appearance.linkPreviewAppearance.titleLabelAppearance.font,
+                                                        .foregroundColor: appearance.linkPreviewAppearance.titleLabelAppearance.foregroundColor
                                                      ]))
             preview.titleSize = Self.textSizeMeasure
                 .calculateSize(of: text,
@@ -1160,7 +1160,7 @@ extension MessageLayoutModel {
                               let image = Components.imageBuilder.image(thumbHash: base64) {
                         thumbnail = image
                     } else {
-                        thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                        thumbnail = appearance.linkPreviewAppearance.placeholderIcon
                     }
                 }
             default:

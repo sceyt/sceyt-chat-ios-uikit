@@ -19,21 +19,15 @@ extension ChannelInfoViewController {
         
         open lazy var row = UIStackView(row: [iconView, titleLabel, detailLabel], spacing: 16, alignment: .center)
             .withoutAutoresizingMask
-        
-        public lazy var appearance = Components.channelInfoViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
+                
         open override func setupAppearance() {
             super.setupAppearance()
             
-            backgroundColor = appearance.cellBackgroundColor
-            titleLabel.textColor = appearance.itemColor
-            titleLabel.font = appearance.itemFont
-            detailLabel.textColor = appearance.detailColor
-            detailLabel.font = appearance.detailFont
+            backgroundColor = appearance.backgroundColor
+            titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
+            titleLabel.font = appearance.titleLabelAppearance.font
+            detailLabel.textColor = appearance.descriptionLabelAppearance?.foregroundColor
+            detailLabel.font = appearance.descriptionLabelAppearance?.font
         }
         
         open override func setupLayout() {
