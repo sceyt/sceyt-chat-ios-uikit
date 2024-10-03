@@ -66,7 +66,7 @@ open class ChannelProfileRouter: Router<ChannelInfoViewController> {
     }
     
     open func showEditChannel() {
-        let viewController = Components.channelEditViewController.init()
+        let viewController = Components.editChannelViewController.init()
         viewController.profileViewModel = Components.channelProfileEditViewModel.init(channel: rootViewController.profileViewModel.channel)
         rootViewController.show(viewController, sender: self)
     }

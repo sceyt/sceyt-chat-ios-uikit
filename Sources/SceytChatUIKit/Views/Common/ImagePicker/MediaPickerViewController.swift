@@ -85,11 +85,7 @@ open class MediaPickerViewController: ViewController,
     override open func setup() {
         super.setup()
         
-        title = L10n.ImagePicker.title
-        
         collectionView.allowsMultipleSelection = allowsMultipleSelection
-        collectionView.backgroundColor = .white
-        
         collectionView.dataSource = self
         collectionView.delegate = self
         collectionViewLayout?.minimumInteritemSpacing = 2
@@ -112,8 +108,11 @@ open class MediaPickerViewController: ViewController,
     override open func setupAppearance() {
         super.setupAppearance()
         
+        title = appearance.titleText
+        
         view.backgroundColor = appearance.backgroundColor
         collectionView.backgroundColor = .clear
+        footerView.appearance = appearance
     }
     
     override open func setupLayout() {

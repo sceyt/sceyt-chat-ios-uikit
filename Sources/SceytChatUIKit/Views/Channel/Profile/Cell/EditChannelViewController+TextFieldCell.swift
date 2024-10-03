@@ -1,5 +1,5 @@
 //
-//  ChannelEditViewController+TextFieldCell.swift
+//  EditChannelViewController+TextFieldCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelEditViewController {
+extension EditChannelViewController {
     open class TextFieldCell: TableViewCell, UITextViewDelegate {
         
         open lazy var textView = PlaceholderTextView()
@@ -21,12 +21,6 @@ extension ChannelEditViewController {
         
         open var onTextChanged: ((String) -> Void)?
         
-        public lazy var appearance = Components.channelEditViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
         open override func setup() {
             super.setup()
             textView.isScrollEnabled = false
@@ -38,12 +32,12 @@ extension ChannelEditViewController {
         open override func setupAppearance() {
             super.setupAppearance()
             textView.backgroundColor = .clear
-            textView.textColor = appearance.textFieldColor
-            textView.font = appearance.textFieldFont
-            textView.placeholderColor = appearance.textFieldPlaceholderColor
+            textView.textColor = appearance.labelAppearance.foregroundColor
+            textView.font = appearance.labelAppearance.font
+            textView.placeholderColor = appearance.placeholderAppearance.foregroundColor
             
             separatorView.backgroundColor = appearance.separatorColor
-            backgroundColor = appearance.textFieldBackgroundColor
+            backgroundColor = appearance.backgroundColor
         }
         
         open override func setupLayout() {

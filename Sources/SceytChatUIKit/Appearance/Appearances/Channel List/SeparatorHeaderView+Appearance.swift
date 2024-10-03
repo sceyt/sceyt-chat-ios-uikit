@@ -11,19 +11,23 @@ import UIKit
 extension SeparatorHeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance {
-        public lazy var title: String? = nil
-        public lazy var backgroundColor: UIColor = .surface1
-        public lazy var labelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                 font: Fonts.semiBold.withSize(13))
-        public lazy var textAlignment: NSTextAlignment = .left
+    public struct Appearance {
+        public var title: String? = nil
+        public var backgroundColor: UIColor = .surface1
+        public var labelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.semiBold.withSize(13)
+        )
+        public var textAlignment: NSTextAlignment = .left
         
         // Initializer with default values
         public init(
             title: String? = nil,
             backgroundColor: UIColor = .surface1,
-            labelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                     font: Fonts.semiBold.withSize(13)),
+            labelAppearance: LabelAppearance = .init(
+                foregroundColor: .secondaryText,
+                font: Fonts.semiBold.withSize(13)
+            ),
             textAlignment: NSTextAlignment = .left
         ) {
             self.title = title

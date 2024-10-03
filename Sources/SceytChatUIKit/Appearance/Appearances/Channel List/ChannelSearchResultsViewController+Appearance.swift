@@ -10,20 +10,24 @@ import UIKit
 extension ChannelSearchResultsViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance {
-        public lazy var backgroundColor: UIColor? = .background
-        public lazy var emptyViewAppearance: EmptyStateView.Appearance = .init(icon: .noResultsSearch,
-                                                                               title: "No Results",
-                                                                               message: "There were no results found.")
-        public lazy var cellAppearance: SearchResultChannelCell.Appearance = SearchResultChannelCell.appearance
-        public lazy var separatorViewAppearance: SeparatorHeaderView.Appearance = SeparatorHeaderView.appearance
+    public struct Appearance {
+        public var backgroundColor: UIColor? = .background
+        public var emptyViewAppearance: EmptyStateView.Appearance = .init(
+            icon: .noResultsSearch,
+            title: "No Results",
+            message: "There were no results found."
+        )
+        public var cellAppearance: SearchResultChannelCell.Appearance = SearchResultChannelCell.appearance
+        public var separatorViewAppearance: SeparatorHeaderView.Appearance = SeparatorHeaderView.appearance
         
         // Initializer with default values
         public init(
             backgroundColor: UIColor? = .background,
-            emptyViewAppearance: EmptyStateView.Appearance = .init(icon: .noResultsSearch,
-                                                                   title: "No Results",
-                                                                   message: "There were no results found."),
+            emptyViewAppearance: EmptyStateView.Appearance = .init(
+                icon: .noResultsSearch,
+                title: "No Results",
+                message: "There were no results found."
+            ),
             cellAppearance: SearchResultChannelCell.Appearance = SearchResultChannelCell.appearance,
             separatorViewAppearance: SeparatorHeaderView.Appearance = SeparatorHeaderView.appearance
         ) {

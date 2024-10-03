@@ -35,14 +35,10 @@ extension MediaPickerViewController {
             }
         }
         
-        override open func setup() {
-            super.setup()
-            attachButton.layer.cornerRadius = 8
-        }
-        
         override open func setupAppearance() {
             super.setupAppearance()
-            backgroundColor = appearance.toolbarBackgroundColor
+            backgroundColor = .clear
+            attachButton.appearance = appearance
         }
         
         override open func setupLayout() {

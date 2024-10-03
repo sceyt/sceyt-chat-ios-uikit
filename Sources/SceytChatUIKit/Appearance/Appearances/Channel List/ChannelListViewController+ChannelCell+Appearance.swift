@@ -11,74 +11,138 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
     
     public static var appearance = Appearance()
     
-    public class Appearance {
-        public lazy var backgroundColor: UIColor = .clear
-        public lazy var pinnedChannelBackgroundColor: UIColor = .background
+    public struct Appearance {
+        public var backgroundColor: UIColor = .clear
+        public var pinnedChannelBackgroundColor: UIColor = .background
         
-        public lazy var subjectLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-                                                                        font: Fonts.semiBold.withSize(16))
-        public lazy var lastMessageLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                            font: Fonts.regular.withSize(15))
-        public lazy var unreadCountLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
-                                                                            font: Fonts.semiBold.withSize(14),
-                                                                            backgroundColor: .accent)
+        public var subjectLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .primaryText,
+            font: Fonts.semiBold.withSize(16)
+        )
+        public var lastMessageLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.regular.withSize(15)
+        )
+        public var unreadCountLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .onPrimary,
+            font: Fonts.semiBold.withSize(14),
+            backgroundColor: .accent
+        )
         
-        public lazy var unreadCountMutedStateLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
-                                                                                      font: Fonts.semiBold.withSize(14),
-                                                                                      backgroundColor: .surface3)
-        public lazy var separatorColor: UIColor = .border
-        public lazy var dateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                     font: Fonts.regular.withSize(14))
-        public lazy var lastMessageSenderNameLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-                                                                                      font: Fonts.regular.withSize(15))
-        public lazy var deletedLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                        font: Fonts.regular.with(traits: .traitItalic).withSize(15))
-        public lazy var draftPrefixLabelAppearance: LabelAppearance = .init(foregroundColor: DefaultColors.defaultRed,
-                                                                            font: Fonts.regular.withSize(15))
-        public lazy var typingLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                       font: Fonts.regular.with(traits: .traitItalic).withSize(15))
-        public lazy var unreadMentionLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                        font: Fonts.bold.withSize(15),
-                                                                        backgroundColor: .accent)
-        public lazy var unreadMentionMutedStateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                                  font: Fonts.bold.withSize(15),
-                                                                                  backgroundColor: .surface3)
-        public lazy var linkLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                     font: Fonts.regular.withSize(15))
-        public lazy var mutedIcon: UIImage = .mute
-        public lazy var pinIcon: UIImage = .channelPin
-        public lazy var messageDeliveryStatusIcons: MessageDeliveryStatusIcons = .init()
+        public var unreadCountMutedStateLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .onPrimary,
+            font: Fonts.semiBold.withSize(14),
+            backgroundColor: .surface3
+        )
+        public var separatorColor: UIColor = .border
+        public var dateLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.regular.withSize(14)
+        )
+        public var lastMessageSenderNameLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .primaryText,
+            font: Fonts.regular.withSize(15)
+        )
+        public var deletedLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.regular.with(traits: .traitItalic).withSize(15)
+        )
+        public var draftPrefixLabelAppearance: LabelAppearance = .init(
+            foregroundColor: DefaultColors.defaultRed,
+            font: Fonts.regular.withSize(15)
+        )
+        public var typingLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.regular.with(traits: .traitItalic).withSize(15)
+        )
+        public var unreadMentionLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.bold.withSize(15),
+            backgroundColor: .accent
+        )
+        public var unreadMentionMutedStateLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.bold.withSize(15),
+            backgroundColor: .surface3
+        )
+        public var linkLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.regular.withSize(15)
+        )
+        public var mutedIcon: UIImage = .mute
+        public var pinIcon: UIImage = .channelPin
+        public var messageDeliveryStatusIcons: MessageDeliveryStatusIcons = .init()
         
-        public lazy var channelNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter
-        public lazy var channelDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.channelDateFormatter
-        public lazy var unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter
-        public lazy var userShortNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userShortNameFormatter
-        public lazy var typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter
-        public lazy var mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter
-        public lazy var attachmentNameFormatter: any AttachmentFormatting = SceytChatUIKit.shared.formatters.attachmentNameFormatter
-        public lazy var lastMessageSenderNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelLastMessageSenderNameFormatter
-        public lazy var reactedUserNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.reactedUserNameFormatter
-        public lazy var attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.channelListAttachmentIconProvider
-        public lazy var channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
-        public lazy var presenceStateIconProvider: any PresenceStateIconProviding = SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
+        public var channelNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter
+        public var channelDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.channelDateFormatter
+        public var unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter
+        public var userShortNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userShortNameFormatter
+        public var typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter
+        public var mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter
+        public var attachmentNameFormatter: any AttachmentFormatting = SceytChatUIKit.shared.formatters.attachmentNameFormatter
+        public var lastMessageSenderNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelLastMessageSenderNameFormatter
+        public var reactedUserNameFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.reactedUserNameFormatter
+        public var attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.channelListAttachmentIconProvider
+        public var channelDefaultAvatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
+        public var presenceStateIconProvider: any PresenceStateIconProviding = SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
         
         // Initializer with default values
         public init(
             backgroundColor: UIColor = .clear,
             pinnedChannelBackgroundColor: UIColor = .background,
-            subjectLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText, font: Fonts.semiBold.withSize(16)),
-            lastMessageLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(15)),
-            unreadCountLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary, font: Fonts.semiBold.withSize(14), backgroundColor: .accent),
-            unreadCountMutedStateLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary, font: Fonts.semiBold.withSize(14), backgroundColor: .surface3),
+            subjectLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .primaryText,
+                font: Fonts.semiBold.withSize(16)
+            ),
+            lastMessageLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .secondaryText,
+                font: Fonts.regular.withSize(15)
+            ),
+            unreadCountLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .onPrimary,
+                font: Fonts.semiBold.withSize(14),
+                backgroundColor: .accent
+            ),
+            unreadCountMutedStateLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .onPrimary,
+                font: Fonts.semiBold.withSize(14),
+                backgroundColor: .surface3
+            ),
             separatorColor: UIColor = .border,
-            dateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(14)),
-            lastMessageSenderNameLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText, font: Fonts.regular.withSize(15)),
-            deletedLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.with(traits: .traitItalic).withSize(15)),
-            draftPrefixLabelAppearance: LabelAppearance = .init(foregroundColor: DefaultColors.defaultRed, font: Fonts.regular.withSize(15)),
-            typingLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.with(traits: .traitItalic).withSize(15)),
-            mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.bold.withSize(15), backgroundColor: .accent),
-            mentionMutedStateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.bold.withSize(15), backgroundColor: .surface3),
-            linkLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(15)),
+            dateLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .secondaryText,
+                font: Fonts.regular.withSize(14)
+            ),
+            lastMessageSenderNameLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .primaryText,
+                font: Fonts.regular.withSize(15)
+            ),
+            deletedLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .secondaryText,
+                font: Fonts.regular.with(traits: .traitItalic).withSize(15)
+            ),
+            draftPrefixLabelAppearance: LabelAppearance = .init(
+                foregroundColor: DefaultColors.defaultRed,
+                font: Fonts.regular.withSize(15)
+            ),
+            typingLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .secondaryText,
+                font: Fonts.regular.with(traits: .traitItalic).withSize(15)
+            ),
+            mentionLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .secondaryText,
+                font: Fonts.bold.withSize(15),
+                backgroundColor: .accent
+            ),
+            mentionMutedStateLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .secondaryText,
+                font: Fonts.bold.withSize(15),
+                backgroundColor: .surface3
+            ),
+            linkLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .secondaryText,
+                font: Fonts.regular.withSize(15)
+            ),
             mutedIcon: UIImage = .mute,
             pinIcon: UIImage = .channelPin,
             messageDeliveryStatusIcons: MessageDeliveryStatusIcons = .init(),

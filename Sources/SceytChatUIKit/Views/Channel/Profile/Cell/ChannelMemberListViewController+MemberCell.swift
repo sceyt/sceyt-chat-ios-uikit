@@ -52,15 +52,15 @@ extension ChannelMemberListViewController {
             contentView.backgroundColor = .clear
             separatorView.backgroundColor = appearance.separatorColor
             
-            titleLabel.textColor = appearance.titleLabelTextColor
-            titleLabel.font = appearance.titleLabelFont
+            titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
+            titleLabel.font = appearance.titleLabelAppearance.font
             
-            statusLabel.textColor = appearance.statusLabelTextColor
-            statusLabel.font = appearance.statusLabelFont
+            statusLabel.textColor = appearance.subtitleLabelAppearance?.foregroundColor
+            statusLabel.font = appearance.subtitleLabelAppearance?.font
             
-            roleLabel.textColor = appearance.roleLabelTextColor
-            roleLabel.font = appearance.roleLabelFont
-            roleLabel.backgroundColor = appearance.roleLabelBackgroundColor
+            roleLabel.textColor = appearance.roleLabelAppearance.foregroundColor
+            roleLabel.font = appearance.roleLabelAppearance.font
+            roleLabel.backgroundColor = appearance.roleLabelAppearance.backgroundColor
         }
         
         override open func setupLayout() {
@@ -90,23 +90,26 @@ extension ChannelMemberListViewController {
         
         open var data: ChatChannelMember! {
             didSet {
-                guard let data
-                else { return }
+                guard let data else { return }
                 
-                if me == data.id {
-                    titleLabel.text = L10n.User.current
-                    selectionStyle = .none
-                } else {
-                    titleLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(data)
-                    selectionStyle = .default
-                }
+                selectionStyle = me == data.id ? .none : .default
+                titleLabel.text = appearance.titleFormatter.format(data)
                 
                 roleLabel.text = data.roleName == SceytChatUIKit.shared.config.memberRolesConfig.participant ? nil : data.roleName?.localizedCapitalized
-                statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(data)
+                statusLabel.text = appearance.subtitleFormatter.format(data)
                 
-                imageTask = AvatarBuilder
-                    .loadAvatar(into: avatarView,
-                                for: data)
+                let avatarRepresentation = appearance.visualProvider.provideVisual(for: data)
+                
+                imageTask = switch avatarRepresentation {
+                case .image(let image):
+                    AvatarBuilder.loadAvatar(into: avatarView,
+                                             for: data,
+                                             defaultImage: image)
+                case .initialsAppearance(let initialsAppearance):
+                    AvatarBuilder.loadAvatar(into: avatarView,
+                                             for: data,
+                                             appearance: initialsAppearance)
+                }
             }
         }
         

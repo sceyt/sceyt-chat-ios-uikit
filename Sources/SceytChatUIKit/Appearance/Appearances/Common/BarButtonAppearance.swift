@@ -7,11 +7,11 @@
 
 import UIKit
 
-public class BarButtonAppearance {
-    public lazy var text: String? = nil
-    public lazy var icon: UIImage? = nil
-    public lazy var color: UIColor = .primaryText
-    public lazy var inactiveColor: UIColor? = nil
+public struct BarButtonAppearance {
+    public var text: String? = nil
+    public var icon: UIImage? = nil
+    public var color: UIColor = .primaryText
+    public var inactiveColor: UIColor? = nil
     
     // Initializer with default values
     public init(

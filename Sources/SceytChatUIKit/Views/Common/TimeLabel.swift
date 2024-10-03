@@ -21,7 +21,6 @@ open class TimeLabel: View {
     
     open override func setup() {
         super.setup()
-        iconView.image = .galleryVideoAsset
         stackView.axis = .horizontal
         stackView.alignment = .fill
         stackView.distribution = .fillProportionally

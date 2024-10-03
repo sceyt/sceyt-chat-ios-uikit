@@ -162,105 +162,12 @@ extension ChannelSwipeActionsConfiguration: AppearanceProviding {
 
 
 
-extension ChannelEditViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var textFieldColor: UIColor? = .primaryText
-        public var textFieldFont: UIFont? = Fonts.regular.withSize(16)
-        public var textFieldPlaceholderColor: UIColor? = .secondaryText
-        public var textFieldBackgroundColor: UIColor? = .backgroundSections
-        public var successColor: UIColor? = .stateSuccess
-        public var errorColor: UIColor? = .stateWarning
-        public var errorFont: UIFont? = Fonts.regular.withSize(13)
-        public var separatorColor: UIColor? = .border
-        public var backgroundColor: UIColor? = .backgroundSecondary
-        
-        public init() {}
-    }
-}
-
-extension ChannelMemberListViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        
-        public init() {}
-    }
-}
-
-extension ChannelMemberListViewController.MemberCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var separatorColor: UIColor? = UIColor.border
-        
-        public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var titleLabelTextColor: UIColor? = UIColor.primaryText
-        
-        public var statusLabelFont: UIFont? = Fonts.regular.withSize(13)
-        public var statusLabelTextColor: UIColor? = .secondaryText
-        
-        public var roleLabelFont: UIFont? = Fonts.regular.withSize(13)
-        public var roleLabelTextColor: UIColor? = .secondaryText
-        public var roleLabelBackgroundColor: UIColor? = .clear
-        
-        public init() {}
-    }
-}
-
-
-extension ChannelMemberListViewController.AddMemberCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var titleLabelFont: UIFont? = Fonts.regular.withSize(16)
-        public var titleLabelTextColor: UIColor? = UIColor.primaryText
-        public var separatorColor: UIColor? = UIColor.border
-        
-        public init() {}
-    }
-}
-
-extension MediaPickerViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var toolbarBackgroundColor: UIColor? = .background
-        
-        public var attachButtonBackgroundColor: UIColor? = .accent
-        
-        public var attachTitleColor: UIColor? = .onPrimary
-        public var attachTitleFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var attachTitleBackgroundColor: UIColor? = .clear
-        
-        public var attachCountTextColor: UIColor? = .accent
-        public var attachCountTextFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var attachCountBackgroundColor: UIColor? = .onPrimary
-        
-        public init() {}
-    }
-}
 
 
 
-extension MediaPickerViewController.MediaCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public class Appearance {
-        public var backgroundColor: UIColor? = .surface1
-        public var timeTextColor: UIColor? = .onPrimary
-        public var timeTextFont: UIFont? = Fonts.regular.withSize(12)
-        public var timeBackgroundColor: UIColor? = .overlayBackground2
-        public lazy var checkboxAppearance: CheckBoxView.Appearance = CheckBoxView.appearance
 
-        public init() {}
-    }
-}
+
+
 
 // Helper
 public struct ContextualActionAppearance {
@@ -447,15 +354,6 @@ extension NavigationController: AppearanceProviding {
     }
 }
 
-extension ChannelEditViewController.AvatarCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var avatarBackgroundColor: UIColor? = .surface3
-        
-        public init() {}
-    }
-}
 
 extension ImageCropperViewController: AppearanceProviding {
     public static var appearance = Appearance()

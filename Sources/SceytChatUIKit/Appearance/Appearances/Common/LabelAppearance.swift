@@ -7,12 +7,16 @@
 
 import UIKit
 
-public class LabelAppearance {
+public struct LabelAppearance {
     public var foregroundColor: UIColor?
     public var font: UIFont
     public var backgroundColor: UIColor = .clear
-
-    public init(foregroundColor: UIColor?, font: UIFont, backgroundColor: UIColor = .clear) {
+    
+    public init(
+        foregroundColor: UIColor?,
+        font: UIFont,
+        backgroundColor: UIColor = .clear
+    ) {
         self.foregroundColor = foregroundColor
         self.font = font
         self.backgroundColor = backgroundColor

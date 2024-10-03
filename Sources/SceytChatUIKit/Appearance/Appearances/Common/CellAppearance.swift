@@ -39,3 +39,5 @@ public class CellAppearance<T: Formatting,
         self.visualProvider = visualProvider
     }
 }
+
+

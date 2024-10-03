@@ -11,39 +11,43 @@ import UIKit
 extension ChannelViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance {
+    public struct Appearance {
         //        public var coverViewBackgroundColor: UIColor? = .clear
         //        public var navigationBarBackgroundColor: UIColor? = .background
         //        public var searchBarBackgroundColor: UIColor? = .surface1
         //        public var searchBarActivityIndicatorColor: UIColor? = .iconInactive
         //
         // review searchBar.barTintColor = appearance.searchBarAppearance.backgroundColor
-        public lazy var backgroundColor: UIColor = .background
-        public lazy var headerAppearance: HeaderView.Appearance = HeaderView.appearance
-        public lazy var emptyStateAppearance: EmptyStateView.Appearance = .init(icon: .noMessages,
-                                                                                title: L10n.Channel.NoMessages.title,
-                                                                                message: L10n.Channel.NoMessages.message)
-        public lazy var scrollDownAppearance: ScrollDownView.Appearance = ScrollDownView.appearance
-        public lazy var dateSeparatorAppearance: DateSeparatorView.Appearance = DateSeparatorView.appearance
-        public lazy var reactionPickerAppearance: ReactionPickerViewController.Appearance = ReactionPickerViewController.appearance
-        public lazy var enableDateSeparator: Bool = true
-        public lazy var enableScrollDownButton: Bool = true
-        public lazy var messageCellAppearance: MessageCell.Appearance = MessageCell.appearance
-        public lazy var searchBarAppearance: SearchBarAppearance = SearchBarAppearance(placeholder: L10n.Channel.Search.search)
-
-        public lazy var messageInputAppearance: MessageInputViewController.Appearance = MessageInputViewController.appearance
+        public var backgroundColor: UIColor = .background
+        public var headerAppearance: HeaderView.Appearance = HeaderView.appearance
+        public var emptyStateAppearance: EmptyStateView.Appearance = .init(
+            icon: .noMessages,
+            title: L10n.Channel.NoMessages.title,
+            message: L10n.Channel.NoMessages.message
+        )
+        public var scrollDownAppearance: ScrollDownView.Appearance = ScrollDownView.appearance
+        public var dateSeparatorAppearance: DateSeparatorView.Appearance = DateSeparatorView.appearance
+        public var reactionPickerAppearance: ReactionPickerViewController.Appearance = ReactionPickerViewController.appearance
+        public var enableDateSeparator: Bool = true
+        public var enableScrollDownButton: Bool = true
+        public var messageCellAppearance: MessageCell.Appearance = MessageCell.appearance
+        public var searchBarAppearance: SearchBarAppearance = SearchBarAppearance(placeholder: L10n.Channel.Search.search)
         
-        public lazy var messageShareBodyFormatter: any MessageFormatting = SceytChatUIKit.shared.formatters.messageShareBodyFormatter
-        public lazy var unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter
-
+        public var messageInputAppearance: MessageInputViewController.Appearance = MessageInputViewController.appearance
+        
+        public var messageShareBodyFormatter: any MessageFormatting = SceytChatUIKit.shared.formatters.messageShareBodyFormatter
+        public var unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter
+        
         
         // Initializer with default values
         public init(
             backgroundColor: UIColor = .background,
             headerAppearance: HeaderView.Appearance = HeaderView.appearance,
-            emptyStateAppearance: EmptyStateView.Appearance = .init(icon: .noMessages,
-                                                                    title: L10n.Channel.NoMessages.title,
-                                                                    message: L10n.Channel.NoMessages.message),
+            emptyStateAppearance: EmptyStateView.Appearance = .init(
+                icon: .noMessages,
+                title: L10n.Channel.NoMessages.title,
+                message: L10n.Channel.NoMessages.message
+            ),
             scrollDownAppearance: ScrollDownView.Appearance = ScrollDownView.appearance,
             dateSeparatorAppearance: DateSeparatorView.Appearance = DateSeparatorView.appearance,
             reactionPickerAppearance: ReactionPickerViewController.Appearance = ReactionPickerViewController.appearance,

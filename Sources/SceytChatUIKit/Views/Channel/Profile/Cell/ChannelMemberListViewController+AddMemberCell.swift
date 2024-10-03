@@ -39,7 +39,6 @@ extension ChannelMemberListViewController {
         
         open override func setup() {
             super.setup()
-            iconView.image = .addMember
             titleLabel.textAlignment = .left
         }
         
@@ -47,11 +46,11 @@ extension ChannelMemberListViewController {
             super.setupAppearance()
             
             backgroundColor = appearance.backgroundColor
-            titleLabel.textColor = appearance.titleLabelTextColor
-            titleLabel.font = appearance.titleLabelFont
-            titleLabel.backgroundColor = .clear
+            iconView.image = appearance.addIcon
+            titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
+            titleLabel.font = appearance.titleLabelAppearance.font
+            titleLabel.backgroundColor = appearance.titleLabelAppearance.backgroundColor
             separatorView.backgroundColor = appearance.separatorColor
         }
-        
     }
 }

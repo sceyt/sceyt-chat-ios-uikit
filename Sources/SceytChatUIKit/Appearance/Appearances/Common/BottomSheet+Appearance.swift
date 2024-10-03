@@ -10,18 +10,18 @@ import UIKit
 extension BottomSheet: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance {
-        public lazy var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background, .surface2)
-        public lazy var titleFont: UIFont? = Fonts.semiBold.withSize(14)
-        public lazy var titleColor: UIColor? = .secondaryText
-        public lazy var buttonFont: UIFont? = Fonts.regular.withSize(16)
-        public lazy var normalTextColor: UIColor? = .primaryText
-        public lazy var normalIconColor: UIColor? = .accent
-        public lazy var destructiveTextColor: UIColor? = .stateWarning
-        public lazy var destructiveIconColor: UIColor? = .stateWarning
-        public lazy var cancelFont: UIFont? = Fonts.semiBold.withSize(18)
-        public lazy var cancelTextColor: UIColor? = .accent
-        public lazy var separatorColor: UIColor? = .border
+    public struct Appearance {
+        public var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background, .surface2)
+        public var titleFont: UIFont? = Fonts.semiBold.withSize(14)
+        public var titleColor: UIColor? = .secondaryText
+        public var buttonFont: UIFont? = Fonts.regular.withSize(16)
+        public var normalTextColor: UIColor? = .primaryText
+        public var normalIconColor: UIColor? = .accent
+        public var destructiveTextColor: UIColor? = .stateWarning
+        public var destructiveIconColor: UIColor? = .stateWarning
+        public var cancelFont: UIFont? = Fonts.semiBold.withSize(18)
+        public var cancelTextColor: UIColor? = .accent
+        public var separatorColor: UIColor? = .border
         
         // Initializer with default values
         public init(

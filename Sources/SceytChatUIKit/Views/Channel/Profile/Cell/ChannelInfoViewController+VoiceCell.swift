@@ -59,8 +59,8 @@ extension ChannelInfoViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            titleLabel.font = appearance.titleLabelAppearance.font
-            titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
+            titleLabel.font = appearance.userNameLabelAppearance.font
+            titleLabel.textColor = appearance.userNameLabelAppearance.foregroundColor
             
             dateLabel.font = appearance.subtitleLabelAppearance.font
             dateLabel.textColor = appearance.subtitleLabelAppearance.foregroundColor
@@ -118,12 +118,12 @@ extension ChannelInfoViewController {
                 else { return }
                 
                 if let user = attachment.user {
-                    titleLabel.text = appearance.titleFormatter.format(user)
+                    titleLabel.text = appearance.userNameFormatter.format(user)
                 } else {
                     titleLabel.text = attachment.userId
                 }
                 
-                dateLabel.text = appearance.subtitleFormatter.format(attachment.createdAt)
+                dateLabel.text = appearance.subtitleFormatter.format(attachment)
                 
                 reset()
                 if let fileUrl = attachment.fileUrl, fileUrl == SimpleSinglePlayer.url, SimpleSinglePlayer.isPlaying {

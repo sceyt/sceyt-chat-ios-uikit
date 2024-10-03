@@ -44,13 +44,15 @@ extension MediaPickerViewController {
         
         override open func setupAppearance() {
             super.setupAppearance()
-            backgroundColor = appearance.attachButtonBackgroundColor
-            titleLabel.textColor = appearance.attachTitleColor
-            titleLabel.font = appearance.attachTitleFont
-            titleLabel.backgroundColor = appearance.attachTitleBackgroundColor
-            selectedCountLabel.textColor = appearance.attachCountTextColor
-            selectedCountLabel.font = appearance.attachCountTextFont
-            selectedCountLabel.backgroundColor = appearance.attachCountBackgroundColor
+            layer.cornerRadius = appearance.confirmButtonAppearance.cornerRadius
+            layer.cornerCurve = appearance.confirmButtonAppearance.cornerCurve
+            backgroundColor = appearance.confirmButtonAppearance.backgroundColor
+            titleLabel.textColor = appearance.confirmButtonAppearance.labelAppearance.foregroundColor
+            titleLabel.font = appearance.confirmButtonAppearance.labelAppearance.font
+            titleLabel.backgroundColor = appearance.confirmButtonAppearance.labelAppearance.backgroundColor
+            selectedCountLabel.textColor = appearance.countLabelAppearance.foregroundColor
+            selectedCountLabel.font = appearance.countLabelAppearance.font
+            selectedCountLabel.backgroundColor = appearance.countLabelAppearance.backgroundColor
             selectedCountLabel.widthAnchor.pin(greaterThanOrEqualTo: selectedCountLabel.heightAnchor)
         }
         

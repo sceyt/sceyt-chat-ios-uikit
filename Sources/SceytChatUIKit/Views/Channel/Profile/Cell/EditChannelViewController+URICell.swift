@@ -1,5 +1,5 @@
 //
-//  ChannelEditViewController+URICell.swift
+//  EditChannelViewController+URICell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelEditViewController {
+extension EditChannelViewController {
     open class URICell: TableViewCell {
         open lazy var prefixLabel = UILabel()
         
@@ -26,12 +26,6 @@ extension ChannelEditViewController {
             }
         }
         
-        public lazy var appearance = Components.channelEditViewController.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-        
         open override func setup() {
             super.setup()
             
@@ -44,15 +38,15 @@ extension ChannelEditViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            prefixLabel.textColor = appearance.textFieldColor
-            prefixLabel.font = appearance.textFieldFont
+            prefixLabel.textColor = appearance.prefixLabelAppearance.foregroundColor
+            prefixLabel.font = appearance.prefixLabelAppearance.font
             
             textField.backgroundColor = .clear
             textField.borderStyle = .none
             textField.returnKeyType = .next
-            textField.textColor = appearance.textFieldColor
-            textField.font = appearance.textFieldFont
-            backgroundColor = appearance.textFieldBackgroundColor
+            textField.textColor = appearance.labelAppearance.foregroundColor
+            textField.font = appearance.labelAppearance.font
+            backgroundColor = appearance.backgroundColor
         }
         
         override open func setupLayout() {

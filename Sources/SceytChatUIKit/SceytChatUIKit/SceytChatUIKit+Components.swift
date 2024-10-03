@@ -41,10 +41,10 @@ extension SceytChatUIKit {
         public static var channelInfoOptionCell: ChannelInfoViewController.OptionCell.Type = ChannelInfoViewController.OptionCell.self
         public static var channelInfoContainerCell: ChannelInfoViewController.ContainerCell.Type = ChannelInfoViewController.ContainerCell.self
         
-        public static var channelEditViewController: ChannelEditViewController.Type = ChannelEditViewController.self
-        public static var channelEditAvatarCell: ChannelEditViewController.AvatarCell.Type = ChannelEditViewController.AvatarCell.self
-        public static var channelEditTextFieldCell: ChannelEditViewController.TextFieldCell.Type = ChannelEditViewController.TextFieldCell.self
-        public static var channelEditURICell: ChannelEditViewController.URICell.Type = ChannelEditViewController.URICell.self
+        public static var editChannelViewController: EditChannelViewController.Type = EditChannelViewController.self
+        public static var channelEditAvatarCell: EditChannelViewController.AvatarCell.Type = EditChannelViewController.AvatarCell.self
+        public static var channelEditTextFieldCell: EditChannelViewController.TextFieldCell.Type = EditChannelViewController.TextFieldCell.self
+        public static var channelEditURICell: EditChannelViewController.URICell.Type = EditChannelViewController.URICell.self
         
         public static var channelProfileEditViewModel: ChannelProfileEditViewModel.Type = ChannelProfileEditViewModel.self
         

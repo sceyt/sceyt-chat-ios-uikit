@@ -12,13 +12,15 @@ extension CheckBoxView: AppearanceProviding {
     
     public static var appearance = Appearance()
     
-    public class Appearance {
-        public lazy var uncheckedIcon: UIImage = .radio
-        public lazy var checkedIcon: UIImage = .radioSelected
+    public struct Appearance {
+        public var uncheckedIcon: UIImage = .radio
+        public var checkedIcon: UIImage = .radioSelected
         
         // Initializer with default values
-        public init(uncheckedIcon: UIImage = .radio,
-                    checkedIcon: UIImage = .radioSelected) {
+        public init(
+            uncheckedIcon: UIImage = .radio,
+            checkedIcon: UIImage = .radioSelected
+        ) {
             self.uncheckedIcon = uncheckedIcon
             self.checkedIcon = checkedIcon
         }

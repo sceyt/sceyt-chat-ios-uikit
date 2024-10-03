@@ -11,7 +11,7 @@ import UIKit
 extension MessageCell: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance {
+    public struct Appearance {
         // Static properties
         public static var bubbleOutgoing: UIColor = DefaultColors.bubbleOutgoing
         public static var bubbleOutgoingSecondary: UIColor = DefaultColors.bubbleOutgoingSecondary
@@ -23,88 +23,88 @@ extension MessageCell: AppearanceProviding {
         public static var bubbleIncomingHighlightedSecondary: UIColor = DefaultColors.bubbleIncomingHighlightedSecondary
         
         // Colors
-        public lazy var backgroundColor: UIColor = .clear
-        public lazy var incomingBubbleColor: UIColor = Self.bubbleIncoming
-        public lazy var outgoingBubbleColor: UIColor = Self.bubbleOutgoing
-        public lazy var incomingReplyBackgroundColor: UIColor = Self.bubbleIncomingSecondary
-        public lazy var outgoingReplyBackgroundColor: UIColor = Self.bubbleOutgoingSecondary
-        public lazy var incomingLinkPreviewBackgroundColor: UIColor = Self.bubbleIncomingSecondary
-        public lazy var outgoingLinkPreviewBackgroundColor: UIColor = Self.bubbleOutgoingSecondary
-        public lazy var incomingHighlightedBubbleColor: UIColor = Self.bubbleIncomingHighlighted
-        public lazy var outgoingHighlightedBubbleColor: UIColor = Self.bubbleOutgoingHighlighted
-        public lazy var incomingHighlightedOverlayColor: UIColor = Self.bubbleIncomingHighlightedSecondary
-        public lazy var outgoingHighlightedOverlayColor: UIColor = Self.bubbleOutgoingHighlightedSecondary
-        public lazy var incomingHighlightedSearchResultColor: UIColor = Self.bubbleIncomingHighlighted
-        public lazy var outgoingHighlightedSearchResultColor: UIColor = Self.bubbleOutgoingHighlighted
-        public lazy var incomingHighlightedOverlaySearchResultColor: UIColor = Self.bubbleIncomingHighlightedSecondary
-        public lazy var outgoingHighlightedOverlaySearchResultColor: UIColor = Self.bubbleOutgoingHighlightedSecondary
-        public lazy var overlayColor: UIColor = .overlayBackground2
-        public lazy var onOverlayColor: UIColor = .onPrimary
-        public lazy var reactionsContainerBackgroundColor: UIColor = .backgroundSections
-        public lazy var threadReplyArrowStrokeColor: UIColor = .border
+        public var backgroundColor: UIColor = .clear
+        public var incomingBubbleColor: UIColor = Self.bubbleIncoming
+        public var outgoingBubbleColor: UIColor = Self.bubbleOutgoing
+        public var incomingReplyBackgroundColor: UIColor = Self.bubbleIncomingSecondary
+        public var outgoingReplyBackgroundColor: UIColor = Self.bubbleOutgoingSecondary
+        public var incomingLinkPreviewBackgroundColor: UIColor = Self.bubbleIncomingSecondary
+        public var outgoingLinkPreviewBackgroundColor: UIColor = Self.bubbleOutgoingSecondary
+        public var incomingHighlightedBubbleColor: UIColor = Self.bubbleIncomingHighlighted
+        public var outgoingHighlightedBubbleColor: UIColor = Self.bubbleOutgoingHighlighted
+        public var incomingHighlightedOverlayColor: UIColor = Self.bubbleIncomingHighlightedSecondary
+        public var outgoingHighlightedOverlayColor: UIColor = Self.bubbleOutgoingHighlightedSecondary
+        public var incomingHighlightedSearchResultColor: UIColor = Self.bubbleIncomingHighlighted
+        public var outgoingHighlightedSearchResultColor: UIColor = Self.bubbleOutgoingHighlighted
+        public var incomingHighlightedOverlaySearchResultColor: UIColor = Self.bubbleIncomingHighlightedSecondary
+        public var outgoingHighlightedOverlaySearchResultColor: UIColor = Self.bubbleOutgoingHighlightedSecondary
+        public var overlayColor: UIColor = .overlayBackground2
+        public var onOverlayColor: UIColor = .onPrimary
+        public var reactionsContainerBackgroundColor: UIColor = .backgroundSections
+        public var threadReplyArrowStrokeColor: UIColor = .border
         
         // Label Appearances
-        public lazy var senderNameLabelAppearance: LabelAppearance = .init(foregroundColor: nil, // Will use randomized color from initials colors
+        public var senderNameLabelAppearance: LabelAppearance = .init(foregroundColor: nil, // Will use randomized color from initials colors
                                                                            font: Fonts.semiBold.withSize(14))
-        public lazy var bodyLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
+        public var bodyLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
                                                                      font: Fonts.regular.withSize(16))
-        public lazy var mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
+        public var mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
                                                                         font: Fonts.regular.withSize(16))
-        public lazy var deletedMessageLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
+        public var deletedMessageLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                                font: Fonts.regular.with(traits: .traitItalic).withSize(16))
-        public lazy var messageDateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
+        public var messageDateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                             font: Fonts.regular.withSize(12))
-        public lazy var messageStateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
+        public var messageStateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                              font: Fonts.regular.with(traits: .traitItalic).withSize(12))
-        public lazy var linkLabelAppearance: LabelAppearance = .init(foregroundColor: .systemBlue,
+        public var linkLabelAppearance: LabelAppearance = .init(foregroundColor: .systemBlue,
                                                                      font: Fonts.regular.withSize(16))
-        public lazy var linkPreviewAppearance: LinkPreviewAppearance = .init(
+        public var linkPreviewAppearance: LinkPreviewAppearance = .init(
             titleLabelAppearance: .init(foregroundColor: .primaryText,
                                         font: Fonts.semiBold.withSize(14)),
             descriptionLabelAppearance: .init(foregroundColor: .secondaryText,
                                               font: Fonts.regular.withSize(13)),
             highlightedLinkBackgroundColor: .footnoteText
         )
-        public lazy var videoDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
+        public var videoDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
                                                                               font: Fonts.regular.withSize(12))
-        public lazy var threadReplyCountLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
+        public var threadReplyCountLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
                                                                                  font: Fonts.semiBold.withSize(12))
-        public lazy var forwardedTitleLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
+        public var forwardedTitleLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
                                                                                font: Fonts.semiBold.withSize(13))
-        public lazy var reactionCountLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
+        public var reactionCountLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
                                                                               font: Fonts.regular.withSize(13))
-        public lazy var voiceSpeedLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
+        public var voiceSpeedLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                            font: Fonts.semiBold.withSize(12),
                                                                            backgroundColor: .background)
-        public lazy var voiceDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .footnoteText,
+        public var voiceDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .footnoteText,
                                                                               font: Fonts.regular.withSize(11))
-        public lazy var attachmentFileNameLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
+        public var attachmentFileNameLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
                                                                                    font: Fonts.semiBold.withSize(16))
-        public lazy var attachmentFileSizeLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
+        public var attachmentFileSizeLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
                                                                                    font: Fonts.regular.withSize(12))
         
         // Icons
-        public lazy var messageDeliveryStatusIcons: MessageDeliveryStatusIcons = .init()
-        public lazy var viewCountIcon: UIImage = .eye
-        public lazy var videoIcon: UIImage = .galleryVideoAsset
-        public lazy var videoPlayIcon: UIImage = .videoPlay
-        public lazy var swipeToReplyIcon: UIImage = .channelReply
-        public lazy var forwardedIcon: UIImage = .forwardedMessage
-        public lazy var voicePlayIcon: UIImage = .audioPlayerPlay
-        public lazy var voicePauseIcon: UIImage = .audioPlayerPause
+        public var messageDeliveryStatusIcons: MessageDeliveryStatusIcons = .init()
+        public var viewCountIcon: UIImage = .eye
+        public var videoIcon: UIImage = .galleryVideoAsset
+        public var videoPlayIcon: UIImage = .videoPlay
+        public var swipeToReplyIcon: UIImage = .channelReply
+        public var forwardedIcon: UIImage = .forwardedMessage
+        public var voicePlayIcon: UIImage = .audioPlayerPlay
+        public var voicePauseIcon: UIImage = .audioPlayerPause
         
         // Other Appearances
-        public lazy var unreadMessagesSeparatorAppearance: UnreadMessagesSeparatorView.Appearance = .init(backgroundColor: Appearance.bubbleIncoming)
-        public lazy var replyMessageAppearance: ReplyMessageAppearance = .init()
-        public lazy var checkboxAppearance: CheckBoxView.Appearance = CheckBoxView.appearance
-        public lazy var voiceWaveformViewAppearance: AudioWaveformView.Appearance = AudioWaveformView.appearance
-        public lazy var mediaLoaderAppearance: CircularProgressView.Appearance = .init(progressColor: .onPrimary,
+        public var unreadMessagesSeparatorAppearance: UnreadMessagesSeparatorView.Appearance = .init(backgroundColor: Appearance.bubbleIncoming)
+        public var replyMessageAppearance: ReplyMessageAppearance = .init()
+        public var checkboxAppearance: CheckBoxView.Appearance = CheckBoxView.appearance
+        public var voiceWaveformViewAppearance: AudioWaveformView.Appearance = AudioWaveformView.appearance
+        public var mediaLoaderAppearance: CircularProgressView.Appearance = .init(progressColor: .onPrimary,
                                                                                        trackColor: .clear,
                                                                                        backgroundColor: .accent,
                                                                                        cancelIcon: nil,
                                                                                        uploadIcon: nil,
                                                                                        downloadIcon: nil)
-        public lazy var overlayMediaLoaderAppearance: CircularProgressView.Appearance = .init(progressColor: .onPrimary,
+        public var overlayMediaLoaderAppearance: CircularProgressView.Appearance = .init(progressColor: .onPrimary,
                                                                                               trackColor: .clear,
                                                                                               backgroundColor: .overlayBackground2,
                                                                                               cancelIcon: .attachmentTransferPause,
@@ -112,20 +112,20 @@ extension MessageCell: AppearanceProviding {
                                                                                               downloadIcon: .attachmentDownload)
         
         // Other properties
-        public lazy var editedStateText: String = L10n.Message.Info.edited
-        public lazy var deletedStateText: String = L10n.Message.deleted
-        public lazy var forwardedText: String = L10n.Message.Forward.title
+        public var editedStateText: String = L10n.Message.Info.edited
+        public var deletedStateText: String = L10n.Message.deleted
+        public var forwardedText: String = L10n.Message.Forward.title
         
         // Formatters and providers
-        public lazy var attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.attachmentIconProvider
-        public lazy var senderNameColorProvider: any UserColorProviding = SceytChatUIKit.shared.visualProviders.senderNameColorProvider
-        public lazy var senderNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userNameFormatter
-        public lazy var voiceDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter
-        public lazy var attachmentFileSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter
-        public lazy var messageViewCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.messageViewCountFormatter
-        public lazy var messageDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateFormatter
-        public lazy var mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter
-        public lazy var userDefaultAvatarProvider: any UserAvatarProviding = SceytChatUIKit.shared.visualProviders.userAvatarProvider
+        public var attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.attachmentIconProvider
+        public var senderNameColorProvider: any UserColorProviding = SceytChatUIKit.shared.visualProviders.senderNameColorProvider
+        public var senderNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userNameFormatter
+        public var voiceDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter
+        public var attachmentFileSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter
+        public var messageViewCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.messageViewCountFormatter
+        public var messageDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateFormatter
+        public var mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter
+        public var userDefaultAvatarProvider: any UserAvatarProviding = SceytChatUIKit.shared.visualProviders.userAvatarProvider
         
         public init(
             // Colors

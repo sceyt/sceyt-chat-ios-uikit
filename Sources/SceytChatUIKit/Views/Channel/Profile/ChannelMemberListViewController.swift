@@ -132,15 +132,15 @@ open class ChannelMemberListViewController: ViewController,
         
         if indexPath.section == 0, memberListViewModel.canAddMembers {
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelAddMemberCell.self)
+            cell.parentAppearance = appearance.addCellAppearance
             cell.titleLabel.text = memberListViewModel.addTitle
             return cell
         }
         
         let item = memberListViewModel.member(at: indexPath)
         let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelMemberCell.self)
-//        cell.selectionStyle = .none
-        guard let item
-        else { return cell }
+        cell.parentAppearance = appearance.cellAppearance
+        guard let item else { return cell }
         cell.data = item
         return cell
     }

@@ -64,8 +64,10 @@ extension SceytChatUIKit {
         
         public var attachmentFileNameFormatter: any AttachmentFormatting = AttachmentFileNameFormatter()
         
-        public var attachmentFileSubtitleFormatter: any AttachmentFormatting = AttachmentFileSubtitleFormatter()
+        public var channelInfoFileSubtitleFormatter: any AttachmentFormatting = ChannelInfoFileSubtitleFormatter()
         
+        public var channelInfoVoiceSubtitleFormatter: any AttachmentFormatting = ChannelInfoVoiceSubtitleFormatter()
+
         public var logDateFormatter: any DateFormatting = LogDateFormatter()
         
         public init() {}

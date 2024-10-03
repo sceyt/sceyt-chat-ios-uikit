@@ -12,8 +12,8 @@ extension SearchResultChannelCell: AppearanceProviding {
     public static var appearance = Appearance()
     
     public class Appearance: CellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
-        public lazy var backgroundColor: UIColor = .clear
-        public lazy var separatorColor: UIColor = .border
+        public var backgroundColor: UIColor = .clear
+        public var separatorColor: UIColor = .border
         
         // Initializer with default values
         public init(

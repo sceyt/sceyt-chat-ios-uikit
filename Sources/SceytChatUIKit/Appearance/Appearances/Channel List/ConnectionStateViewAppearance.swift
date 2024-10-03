@@ -8,17 +8,22 @@
 
 import UIKit
 
-public class ConnectionStateViewAppearance {
-    public lazy var labelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-                                                             font: Fonts.semiBold.withSize(18))
-    public lazy var failedIcon: UIImage = .failedMessage
-    public lazy var indicatorColor: UIColor = .accent
-    public lazy var indicatorStyle: UIActivityIndicatorView.Style = .medium
-    public lazy var connectionStateTextProvider: any ConnectionStateProviding = SceytChatUIKit.shared.visualProviders.connectionStateProvider
+public struct ConnectionStateViewAppearance {
+    public var labelAppearance: LabelAppearance = .init(
+        foregroundColor: .primaryText,
+        font: Fonts.semiBold.withSize(18)
+    )
+    public var failedIcon: UIImage = .failedMessage
+    public var indicatorColor: UIColor = .accent
+    public var indicatorStyle: UIActivityIndicatorView.Style = .medium
+    public var connectionStateTextProvider: any ConnectionStateProviding = SceytChatUIKit.shared.visualProviders.connectionStateProvider
     
     // Initializer with default values
     public init(
-        labelAppearance: LabelAppearance = .init(foregroundColor: .primaryText, font: Fonts.semiBold.withSize(18)),
+        labelAppearance: LabelAppearance = .init(
+            foregroundColor: .primaryText,
+            font: Fonts.semiBold.withSize(18)
+        ),
         failedIcon: UIImage = .failedMessage,
         indicatorColor: UIColor = .accent,
         indicatorStyle: UIActivityIndicatorView.Style = .medium,

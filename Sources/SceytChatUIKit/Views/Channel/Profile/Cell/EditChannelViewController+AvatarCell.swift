@@ -1,5 +1,5 @@
 //
-//  ChannelEditViewController+AvatarCell.swift
+//  EditChannelViewController+AvatarCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -8,7 +8,7 @@
 
 import UIKit
 
-extension ChannelEditViewController {
+extension EditChannelViewController {
     open class AvatarCell: TableViewCell {
         open lazy var avatarButton = CircleButton()
             .withoutAutoresizingMask
@@ -85,7 +85,7 @@ extension URL: AvatarBuildable {
     }
 }
 
-public extension ChannelEditViewController.AvatarCell {
+public extension EditChannelViewController.AvatarCell {
     enum Layouts {
         public static var avatarSize: CGFloat = 120
     }

@@ -7,7 +7,7 @@
 
 import UIKit
 
-public class NavigationBarAppearance {
+public struct NavigationBarAppearance {
     public var backgroundColor: UIColor? = .background
     public var backIcon: UIImage?
     public var leftBarButtonsAppearance: [BarButtonAppearance] = []

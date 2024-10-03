@@ -11,22 +11,30 @@ import UIKit
 extension ChannelViewController.HeaderView: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance {
-        public lazy var titleLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-                                                                      font: Fonts.semiBold.withSize(19))
-        public lazy var subtitleLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-                                                                         font: Fonts.regular.withSize(13))
-        public lazy var titleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter
-        public lazy var subtitleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelSubtitleFormatter
-        public lazy var typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter
-        public lazy var avatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
+    public struct Appearance {
+        public var titleLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .primaryText,
+            font: Fonts.semiBold.withSize(19)
+        )
+        public var subtitleLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .primaryText,
+            font: Fonts.regular.withSize(13)
+        )
+        public var titleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter
+        public var subtitleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelSubtitleFormatter
+        public var typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter
+        public var avatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
         
         // Initializer with default values
         public init(
-            titleLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-                                                          font: Fonts.semiBold.withSize(19)),
-            subtitleLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-                                                             font: Fonts.regular.withSize(13)),
+            titleLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .primaryText,
+                font: Fonts.semiBold.withSize(19)
+            ),
+            subtitleLabelAppearance: LabelAppearance = .init(
+                foregroundColor: .primaryText,
+                font: Fonts.regular.withSize(13)
+            ),
             titleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter,
             subtitleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelSubtitleFormatter,
             typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter,

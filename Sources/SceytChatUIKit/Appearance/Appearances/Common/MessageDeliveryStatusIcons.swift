@@ -7,12 +7,12 @@
 
 import UIKit
 
-public class MessageDeliveryStatusIcons {
-    public lazy var pendingIcon: UIImage = .pendingMessage
-    public lazy var sentIcon: UIImage = .sentMessage
-    public lazy var receivedIcon: UIImage = .receivedMessage
-    public lazy var displayedIcon: UIImage = .displayedMessage
-    public lazy var failedIcon: UIImage = .failedMessage
+public struct MessageDeliveryStatusIcons {
+    public var pendingIcon: UIImage = .pendingMessage
+    public var sentIcon: UIImage = .sentMessage
+    public var receivedIcon: UIImage = .receivedMessage
+    public var displayedIcon: UIImage = .displayedMessage
+    public var failedIcon: UIImage = .failedMessage
     
     // Initializer with default values
     public init(

@@ -10,13 +10,19 @@ import UIKit
 extension SearchController: AppearanceProviding {
     public static var appearance = Appearance()
     
-    public class Appearance {
-        public lazy var searchBarAppearance: SearchBarAppearance = .init(placeholder: L10n.SearchBar.placeholder,
-                                                                         searchIcon: .searchIcon)
+    public struct Appearance {
+        public var searchBarAppearance: SearchBarAppearance = .init(
+            placeholder: L10n.SearchBar.placeholder,
+            searchIcon: .searchIcon
+        )
         
         // Initializer with custom searchBarAppearance
-        public init(searchBarAppearance: SearchBarAppearance = .init(placeholder: L10n.SearchBar.placeholder,
-                                                                     searchIcon: .searchIcon)) {
+        public init(
+            searchBarAppearance: SearchBarAppearance = .init(
+                placeholder: L10n.SearchBar.placeholder,
+                searchIcon: .searchIcon
+            )
+        ) {
             self.searchBarAppearance = searchBarAppearance
         }
     }

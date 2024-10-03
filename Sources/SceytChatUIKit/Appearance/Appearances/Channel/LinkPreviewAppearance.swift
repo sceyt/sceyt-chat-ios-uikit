@@ -7,21 +7,29 @@
 
 import UIKit
 
-public class LinkPreviewAppearance {
+public struct LinkPreviewAppearance {
     
-    public lazy var titleLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
-                                                                  font: Fonts.semiBold.withSize(13))
-    public lazy var descriptionLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                                        font: Fonts.regular.withSize(13))
-    public lazy var highlightedLinkBackgroundColor: UIColor = .clear
-    public lazy var placeholderIcon: UIImage? = .link
+    public var titleLabelAppearance: LabelAppearance = .init(
+        foregroundColor: .accent,
+        font: Fonts.semiBold.withSize(13)
+    )
+    public var descriptionLabelAppearance: LabelAppearance = .init(
+        foregroundColor: .secondaryText,
+        font: Fonts.regular.withSize(13)
+    )
+    public var highlightedLinkBackgroundColor: UIColor = .clear
+    public var placeholderIcon: UIImage? = .link
     
     // Initializer with default values
     public init(
-        titleLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
-                                                      font: Fonts.semiBold.withSize(13)),
-        descriptionLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-                                                            font: Fonts.regular.withSize(13)),
+        titleLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .accent,
+            font: Fonts.semiBold.withSize(13)
+        ),
+        descriptionLabelAppearance: LabelAppearance = .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.regular.withSize(13)
+        ),
         highlightedLinkBackgroundColor: UIColor = .clear,
         placeholderIcon: UIImage? = .link
     ) {
@@ -31,5 +39,3 @@ public class LinkPreviewAppearance {
         self.placeholderIcon = placeholderIcon
     }
 }
-
-

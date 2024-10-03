@@ -44,9 +44,12 @@ extension MediaPickerViewController {
         
         override open func setupAppearance() {
             super.setupAppearance()
-            timeLabel.backgroundColor = appearance.timeBackgroundColor
-            timeLabel.textLabel.font = appearance.timeTextFont
-            timeLabel.textLabel.textColor = appearance.timeTextColor
+            
+            backgroundColor = appearance.backgroundColor
+            timeLabel.backgroundColor = appearance.videoDurationLabelAppearance.backgroundColor
+            timeLabel.textLabel.font = appearance.videoDurationLabelAppearance.font
+            timeLabel.textLabel.textColor = appearance.videoDurationLabelAppearance.foregroundColor
+            timeLabel.iconView.image = appearance.videoDurationIcon
             checkBoxView.parentAppearance = appearance.checkboxAppearance
         }
         
@@ -86,7 +89,7 @@ extension MediaPickerViewController {
             
             if data.asset.duration > 0 {
                 timeLabel.isHidden = false
-                timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(data.asset.duration)
+                timeLabel.text = appearance.durationFormatter.format(data.asset.duration)
             } else {
                 timeLabel.isHidden = true
             }
@@ -100,7 +103,7 @@ extension MediaPickerViewController {
                     options: nil,
                     resultHandler: { [weak self] result, _ in
                         guard self?.assetIdentifier == data.asset.localIdentifier else { return }
-                        self?.imageView.image = result
+                        self?.imageView.image = result ?? self?.appearance.brokenMediaPlaceholderIcon
                         self?.imageRequestID = nil
                     })
         }

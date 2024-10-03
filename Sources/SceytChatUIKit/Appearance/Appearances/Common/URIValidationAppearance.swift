@@ -7,7 +7,7 @@
 
 import UIKit
 
-public class URIValidationAppearance {
+public struct URIValidationAppearance {
     public var successLabelAppearance: LabelAppearance
     public var errorLabelAppearance: LabelAppearance
     public var messageProvider: any ChannelURIValidationMessageProviding = SceytChatUIKit.shared.visualProviders.channelURIValidationMessageProvider
