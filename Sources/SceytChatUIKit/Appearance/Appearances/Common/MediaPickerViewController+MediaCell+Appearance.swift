@@ -15,7 +15,7 @@ extension MediaPickerViewController.MediaCell: AppearanceProviding {
         public var backgroundColor: UIColor
         public var videoDurationLabelAppearance: LabelAppearance
         public var videoDurationIcon: UIImage
-        public var brokenMediaPlaceholderIcon: UIImage
+        public var brokenMediaPlaceholderIcon: UIImage?
         public var durationFormatter: any TimeIntervalFormatting
         public var checkboxAppearance: CheckBoxView.Appearance
         
@@ -27,12 +27,13 @@ extension MediaPickerViewController.MediaCell: AppearanceProviding {
                 backgroundColor: .overlayBackground2
             ),
             videoDurationIcon: UIImage = .galleryVideoAsset,
-            brokenMediaPlaceholderIcon: UIImage = UIImage(
-                systemName: "photo.badge.exclamationmark.fill",
-                withConfiguration: UIImage.SymbolConfiguration(pointSize: 100,
-                                                               weight: .regular,
-                                                               scale: .small)
-            )!.withTintColor(.accent),
+            brokenMediaPlaceholderIcon: UIImage? = AssetComposer.shared.compose(
+                from: .init(
+                    image: UIImage(systemName: "photo.badge.exclamationmark.fill")!,
+                    renderingMode: .template(.accent)
+                ),
+                maxSize: .init(width: 60, height: 60)
+            ),
             checkboxAppearance: CheckBoxView.Appearance = CheckBoxView.appearance,
             durationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter
         ) {

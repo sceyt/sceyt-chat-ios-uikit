@@ -18,12 +18,12 @@ open class AssetComposer {
     private let darkTrait = UITraitCollection(userInterfaceStyle: .dark)
     private let scale = UITraitCollection(displayScale: UIScreen.main.scale)
     
-    init(anchorCalculator: AnchorCalculating = DefaultAnchorCalculator()) {
+    public init(anchorCalculator: AnchorCalculating = DefaultAnchorCalculator()) {
         self.anchorCalculator = anchorCalculator
     }
     
-    open func compose(from assets: Asset...) -> UIImage? {
-        let maxSize = assets.map(\.image.size).max
+    open func compose(from assets: Asset..., maxSize: CGSize? = nil) -> UIImage? {
+        let maxSize = maxSize ?? assets.map(\.image.size).max
         
         guard maxSize != .zero else { return nil }
         
@@ -65,7 +65,7 @@ open class AssetComposer {
 }
 
 public extension AssetComposer {
-    enum Anchor {
+    public enum Anchor {
         case top(CGPoint = .zero)
         case topLeading(CGPoint = .zero)
         case topTrailing(CGPoint = .zero)
@@ -77,15 +77,25 @@ public extension AssetComposer {
         case trailing(CGPoint = .zero)
     }
     
-    enum RenderingMode {
+    public enum RenderingMode {
         case template(UIColor)
         case original
     }
     
-    struct Asset {
+    public struct Asset {
         let image: UIImage
         let renderingMode: RenderingMode
-        var anchor: Anchor = .center()
+        var anchor: Anchor
+        
+        public init(
+            image: UIImage,
+            renderingMode: RenderingMode,
+            anchor: Anchor = .center()
+        ) {
+            self.image = image
+            self.renderingMode = renderingMode
+            self.anchor = anchor
+        }
     }
 }
 

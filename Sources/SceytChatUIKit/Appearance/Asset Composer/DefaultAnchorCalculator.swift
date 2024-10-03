@@ -13,6 +13,7 @@ public protocol AnchorCalculating {
 }
 
 open class DefaultAnchorCalculator: AnchorCalculating {
+    public init() {}
     open func calculate(anchor: AssetComposer.Anchor, for size: CGSize, inMaxSize maxSize: CGSize) -> CGPoint {
         guard size != maxSize else { return .zero }
         
