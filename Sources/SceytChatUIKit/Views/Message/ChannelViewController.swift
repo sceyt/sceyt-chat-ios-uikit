@@ -362,11 +362,7 @@ open class ChannelViewController: ViewController,
         super.setupAppearance()
         
         canShowUnreadCountView = appearance.enableScrollDownButton
-        navigationItem.standardAppearance = NavigationController.appearance.standard
-        navigationItem.standardAppearance?.backgroundColor = .surface1
-        navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
-        navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
-
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         view.backgroundColor = appearance.backgroundColor
         coverView.backgroundColor = .clear
         collectionView.backgroundColor = appearance.backgroundColor

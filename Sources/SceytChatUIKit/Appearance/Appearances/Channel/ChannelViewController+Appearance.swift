@@ -12,10 +12,12 @@ extension ChannelViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
+        public var navigationBarAppearance: NavigationBarAppearance = {
+            $0.standardAppearance?.backgroundColor = .surface1
+            return $0
+        }(NavigationBarAppearance())
+
         //        public var coverViewBackgroundColor: UIColor? = .clear
-        //        public var navigationBarBackgroundColor: UIColor? = .background
-        //        public var searchBarBackgroundColor: UIColor? = .surface1
-        //        public var searchBarActivityIndicatorColor: UIColor? = .iconInactive
         //
         // review searchBar.barTintColor = appearance.searchBarAppearance.backgroundColor
         public var backgroundColor: UIColor = .background
@@ -41,6 +43,10 @@ extension ChannelViewController: AppearanceProviding {
         
         // Initializer with default values
         public init(
+            navigationBarAppearance: NavigationBarAppearance = {
+                $0.standardAppearance?.backgroundColor = .surface1
+                return $0
+            }(NavigationBarAppearance()),
             backgroundColor: UIColor = .background,
             headerAppearance: HeaderView.Appearance = HeaderView.appearance,
             emptyStateAppearance: EmptyStateView.Appearance = .init(
@@ -59,6 +65,7 @@ extension ChannelViewController: AppearanceProviding {
             messageShareBodyFormatter: any MessageFormatting = SceytChatUIKit.shared.formatters.messageShareBodyFormatter,
             unreadCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.unreadCountFormatter
         ) {
+            self.navigationBarAppearance = navigationBarAppearance
             self.backgroundColor = backgroundColor
             self.headerAppearance = headerAppearance
             self.emptyStateAppearance = emptyStateAppearance
@@ -80,9 +87,6 @@ extension ChannelViewController: AppearanceProviding {
 ////emptyState: Int, (Android Only)
 ////emptyStateForSelfChannel: Int,(Android Only)
 ////loadingState: Int,(Android Only)
-//navigationBarBackgroundColor: UIColor (iOS only)
-//searchBarBackgroundColor: UIColor (iOS only)
-//searchBarActivityIndicatorColor: UIColor (iOS only)
 
 //enableDateSeparator: Boolean,
 //sameSenderMessageDistance: Int

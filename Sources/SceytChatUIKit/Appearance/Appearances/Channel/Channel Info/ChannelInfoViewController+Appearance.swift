@@ -12,6 +12,11 @@ extension ChannelInfoViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
+        public var navigationBarAppearance: NavigationBarAppearance = {
+            $0.standardAppearance?.backgroundColor = .backgroundSections
+            return $0
+        }(NavigationBarAppearance())
+
         public var backgroundColor: UIColor = .backgroundSecondary
         public var separatorColor: UIColor = .border
         
@@ -48,6 +53,10 @@ extension ChannelInfoViewController: AppearanceProviding {
         public var moreIcon: UIImage = .channelProfileMore
         
         public init(
+            navigationBarAppearance: NavigationBarAppearance = {
+                $0.standardAppearance?.backgroundColor = .backgroundSections
+                return $0
+            }(NavigationBarAppearance()),
             backgroundColor: UIColor = .backgroundSecondary,
             separatorColor: UIColor = .border,
             titleLabelAppearance: LabelAppearance = .init(
@@ -77,6 +86,7 @@ extension ChannelInfoViewController: AppearanceProviding {
             voiceCollectionAppearance: VoiceCollectionView.Appearance = SceytChatUIKit.Components.channelInfoVoiceCollectionView.appearance,
             linkCollectionAppearance: LinkCollectionView.Appearance = SceytChatUIKit.Components.channelInfoLinkCollectionView.appearance
         ) {
+            self.navigationBarAppearance = navigationBarAppearance
             self.backgroundColor = backgroundColor
             self.separatorColor = separatorColor
             self.titleLabelAppearance = titleLabelAppearance

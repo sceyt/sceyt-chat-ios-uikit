@@ -66,12 +66,7 @@ open class ChannelMemberListViewController: ViewController,
     
     open override func setupAppearance() {
         super.setupAppearance()
-        
-        navigationItem.standardAppearance = NavigationController.appearance.standard
-        navigationItem.standardAppearance?.backgroundColor = .surface1
-        navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
-        navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
-
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         view.backgroundColor = appearance.backgroundColor
         tableView.backgroundColor = .clear
     }

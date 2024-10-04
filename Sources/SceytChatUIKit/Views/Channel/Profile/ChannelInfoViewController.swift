@@ -151,11 +151,7 @@ open class ChannelInfoViewController: ViewController,
     override open func setupAppearance() {
         super.setupAppearance()
         
-        navigationItem.standardAppearance = NavigationController.appearance.standard
-        navigationItem.standardAppearance?.backgroundColor = .backgroundSections
-        navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
-        navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
-        
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         view.backgroundColor = appearance.backgroundColor
         tableView.backgroundColor = .clear
         segmentViewController.appearance = appearance.segmentedControlAppearance

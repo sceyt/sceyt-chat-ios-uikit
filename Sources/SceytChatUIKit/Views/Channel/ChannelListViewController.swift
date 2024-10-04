@@ -82,11 +82,13 @@ open class ChannelListViewController: ViewController,
     
     open override func setupAppearance() {
         super.setupAppearance()
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         
-        navigationItem.standardAppearance = NavigationController.appearance.standard
-        navigationItem.standardAppearance?.backgroundColor = .surface1
-        navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
-        navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
+
+//        navigationItem.standardAppearance = NavigationController.appearance.standard
+//        navigationItem.standardAppearance?.backgroundColor = .surface1
+//        navigationItem.scrollEdgeAppearance = NavigationController.appearance.standard
+//        navigationItem.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
 
         tabBarItem.badgeColor = appearance.tabBarItemBadgeColor
         view.backgroundColor = appearance.backgroundColor

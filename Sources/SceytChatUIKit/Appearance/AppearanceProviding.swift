@@ -333,26 +333,6 @@ extension SelectUsersViewController: AppearanceProviding {
     }
 }
 
-extension NavigationController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var standard = {
-            $0.titleTextAttributes = [
-                .font: Fonts.bold.withSize(20),
-                .foregroundColor: UIColor.primaryText
-            ]
-            $0.backgroundEffect = UIBlurEffect(style: .systemMaterial)
-            $0.backgroundColor = .background
-            $0.shadowColor = .border
-            return $0
-        }(UINavigationBarAppearance())
-        
-        public var tintColor: UIColor? = .accent
-        
-        public init() {}
-    }
-}
 
 
 extension ImageCropperViewController: AppearanceProviding {

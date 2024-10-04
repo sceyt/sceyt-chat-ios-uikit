@@ -14,6 +14,11 @@ extension MessageInfoViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
+        public var navigationBarAppearance: NavigationBarAppearance = {
+            $0.standardAppearance?.backgroundColor = .surface1
+            return $0
+        }(NavigationBarAppearance())
+        
         public var backgroundColor: UIColor? = .backgroundSecondary
         public var cellBackgroundColor: UIColor? = .backgroundSections
         
@@ -41,6 +46,10 @@ extension MessageInfoViewController: AppearanceProviding {
         public var markerTitleProvider: any DefaultMarkerTitleProviding = SceytChatUIKit.shared.visualProviders.defaultMarkerTitleProvider
         
         public init(
+            navigationBarAppearance: NavigationBarAppearance = {
+                $0.standardAppearance?.backgroundColor = .surface1
+                return $0
+            }(NavigationBarAppearance()),
             backgroundColor: UIColor? = .backgroundSecondary,
             cellBackgroundColor: UIColor? = .backgroundSections,
             messageCellAppearance: MessageCellAppearance = SceytChatUIKit.Components.messageCell.appearance,
@@ -64,6 +73,7 @@ extension MessageInfoViewController: AppearanceProviding {
             attachmentSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter,
             markerTitleProvider: any DefaultMarkerTitleProviding = SceytChatUIKit.shared.visualProviders.defaultMarkerTitleProvider
         ) {
+            self.navigationBarAppearance = navigationBarAppearance
             self.backgroundColor = backgroundColor
             self.cellBackgroundColor = cellBackgroundColor
             self.messageCellAppearance = messageCellAppearance
