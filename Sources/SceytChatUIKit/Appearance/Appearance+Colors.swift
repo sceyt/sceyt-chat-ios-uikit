@@ -79,26 +79,26 @@ public struct DefaultColors {
     // These colors are not a part of the theme, but they use theme's values by default
     public static var bubbleIncoming: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6), dark: UIColor(rgb: 0x232324))
     public static var bubbleIncomingSecondary: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE), dark: UIColor(rgb: 0x303032))
-    public static var bubbleOutgoing: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.14).blendColors(with: .background.light),
-                                                        dark: .accent.dark.withAlphaComponent(0.14).blendColors(with: .background.dark))
-    public static var bubbleOutgoingSecondary: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.24).blendColors(with: .background.light),
-                                                                 dark: .accent.dark.withAlphaComponent(0.24).blendColors(with: .background.dark))
+    public static var bubbleOutgoing: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.14).blend(with: .background.light),
+                                                        dark: .accent.dark.withAlphaComponent(0.14).blend(with: .background.dark))
+    public static var bubbleOutgoingSecondary: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.24).blend(with: .background.light),
+                                                                 dark: .accent.dark.withAlphaComponent(0.24).blend(with: .background.dark))
     
-    public static var bubbleIncomingHighlighted: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6).light.withAlphaComponent(0.30).blendColors(with: .background.light),
-                                                                   dark: UIColor(rgb: 0x232324).dark.withAlphaComponent(0.30).blendColors(with: .background.dark))
-    public static var bubbleIncomingHighlightedSecondary: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE).light.withAlphaComponent(0.34).blendColors(with: .background.light),
-                                                                            dark: UIColor(rgb: 0x303032).dark.withAlphaComponent(0.34).blendColors(with: .background.dark))
+    public static var bubbleIncomingHighlighted: UIColor = UIColor(light: UIColor(rgb: 0xF1F2F6).light.withAlphaComponent(0.30).blend(with: .background.light),
+                                                                   dark: UIColor(rgb: 0x232324).dark.withAlphaComponent(0.30).blend(with: .background.dark))
+    public static var bubbleIncomingHighlightedSecondary: UIColor = UIColor(light: UIColor(rgb: 0xE4E6EE).light.withAlphaComponent(0.34).blend(with: .background.light),
+                                                                            dark: UIColor(rgb: 0x303032).dark.withAlphaComponent(0.34).blend(with: .background.dark))
     
-    public static var bubbleOutgoingHighlighted: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.30).blendColors(with: .background.light),
-                                                                   dark: .accent.dark.withAlphaComponent(0.30).blendColors(with: .background.dark))
-    public static var bubbleOutgoingHighlightedSecondary: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.34).blendColors(with: .background.light),
-                                                                    dark: .accent.dark.withAlphaComponent(0.34).blendColors(with: .background.dark))
+    public static var bubbleOutgoingHighlighted: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.30).blend(with: .background.light),
+                                                                   dark: .accent.dark.withAlphaComponent(0.30).blend(with: .background.dark))
+    public static var bubbleOutgoingHighlightedSecondary: UIColor = UIColor(light: .accent.light.withAlphaComponent(0.34).blend(with: .background.light),
+                                                                    dark: .accent.dark.withAlphaComponent(0.34).blend(with: .background.dark))
 
 }
 
 public extension UIColor {
     
-    func blendColors(with background: UIColor) -> UIColor {
+    public func blend(with background: UIColor) -> UIColor {
         var fgRed: CGFloat = 0, fgGreen: CGFloat = 0, fgBlue: CGFloat = 0, fgAlpha: CGFloat = 0
         var bgRed: CGFloat = 0, bgGreen: CGFloat = 0, bgBlue: CGFloat = 0, bgAlpha: CGFloat = 0
         
