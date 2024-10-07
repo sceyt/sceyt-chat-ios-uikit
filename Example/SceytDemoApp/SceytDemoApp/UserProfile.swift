@@ -56,7 +56,8 @@ struct UserProfile {
                 firstName: firstName,
                 lastName: lastName,
                 avatarUrl: uploadedAvatarUrl,
-                metadata: SceytChatUIKit.shared.chatClient.user.metadata)
+                metadataMap: SceytChatUIKit.shared.chatClient.user.metadataMap,
+                username: SceytChatUIKit.shared.chatClient.user.username)
         { _, error in
             completion?(error)
         }

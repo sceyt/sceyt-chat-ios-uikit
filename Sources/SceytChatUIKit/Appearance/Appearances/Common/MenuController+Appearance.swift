@@ -8,16 +8,29 @@
 import UIKit
 
 extension MenuController: AppearanceProviding {
-    public static var appearance = Appearance()
+    public static var appearance = Appearance(
+        backgroundColor: .surface1
+    )
     
-    public struct Appearance {
-        public var backgroundColor: UIColor? = UIColor.surface1
+    public class Appearance {
+        @Trackable<Appearance, UIColor>
+        public var backgroundColor: UIColor
         
-        // Initializer with default values
+        // Primary Initializer with all parameters
         public init(
-            backgroundColor: UIColor? = UIColor.surface1
+            backgroundColor: UIColor
         ) {
-            self.backgroundColor = backgroundColor
+            self._backgroundColor = Trackable(value: backgroundColor)
+        }
+        
+        // Secondary Initializer with optional parameters
+        public init(
+            reference: MenuController.Appearance,
+            backgroundColor: UIColor? = nil
+        ) {
+            self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+            
+            if let backgroundColor { self.backgroundColor = backgroundColor }
         }
     }
 }

@@ -10,9 +10,12 @@ import UIKit
 public class SelectableCellAppearance<T: Formatting,
                                       S: Formatting,
                                       A: VisualProviding>: CellAppearance<T, S, A> {
+    @Trackable<Appearance, UIImage>
     public var selectedIcon: UIImage
-    public var unselectedIcon: UIImage
     
+    @Trackable<Appearance, UIImage>
+    public var unselectedIcon: UIImage
+
     /// Initializes a new instance of `SelectableCellAppearance` with the provided parameters.
     ///
     /// - Parameters:
@@ -32,9 +35,9 @@ public class SelectableCellAppearance<T: Formatting,
         selectedIcon: UIImage,
         unselectedIcon: UIImage
     ) {
-        self.selectedIcon = selectedIcon
-        self.unselectedIcon = unselectedIcon
-        
+        self._selectedIcon = Trackable(value: selectedIcon)
+        self._unselectedIcon = Trackable(value: unselectedIcon)
+
         super.init(
             titleLabelAppearance: titleLabelAppearance,
             subtitleLabelAppearance: subtitleLabelAppearance,

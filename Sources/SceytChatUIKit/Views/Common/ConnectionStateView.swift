@@ -24,7 +24,7 @@ open class ConnectionStateView: View {
     
     public required init?(coder: NSCoder) {
         state = .connected
-        appearance = ConnectionStateViewAppearance()
+        appearance = ConnectionStateViewAppearance(reference: ConnectionStateViewAppearance.appearance)
         super.init(coder: coder)
     }
     

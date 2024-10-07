@@ -9,27 +9,41 @@
 import UIKit
 
 extension ChannelViewController.ScrollDownView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var unreadCountLabelAppearance: LabelAppearance = .init(
+    public static var appearance = Appearance(
+        unreadCountLabelAppearance: LabelAppearance(
             foregroundColor: .onPrimary,
             font: Fonts.regular.withSize(12),
             backgroundColor: .accent
-        )
-        public var icon: UIImage = .channelUnreadBubble
+        ),
+        icon: .channelUnreadBubble
+    )
+    
+    public struct Appearance {
+        @Trackable<Appearance, LabelAppearance>
+        public var unreadCountLabelAppearance: LabelAppearance
+        
+        @Trackable<Appearance, UIImage>
+        public var icon: UIImage
         
         // Initializer with default values
         public init(
-            unreadCountLabelAppearance: LabelAppearance = .init(
-                foregroundColor: .onPrimary,
-                font: Fonts.regular.withSize(12),
-                backgroundColor: .accent
-            ),
-            icon: UIImage = .channelUnreadBubble
+            unreadCountLabelAppearance: LabelAppearance,
+            icon: UIImage
         ) {
-            self.unreadCountLabelAppearance = unreadCountLabelAppearance
-            self.icon = icon
+            self._unreadCountLabelAppearance = Trackable(value: unreadCountLabelAppearance)
+            self._icon = Trackable(value: icon)
+        }
+        
+        public init(
+            reference: ChannelViewController.ScrollDownView.Appearance,
+            unreadCountLabelAppearance: LabelAppearance? = nil,
+            icon: UIImage? = nil
+        ) {
+            self._unreadCountLabelAppearance = Trackable(reference: reference, referencePath: \.unreadCountLabelAppearance)
+            self._icon = Trackable(reference: reference, referencePath: \.icon)
+            
+            if let unreadCountLabelAppearance { self.unreadCountLabelAppearance = unreadCountLabelAppearance }
+            if let icon { self.icon = icon }
         }
     }
 }

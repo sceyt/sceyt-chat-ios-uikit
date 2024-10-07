@@ -257,9 +257,11 @@ open class ChannelMessageSender: DataProvider {
             } else {
                 let chatMessage = ChatMessage(message: message, channelId: self.channelId)
                 self.uploadAttachmentsIfNeeded(message: chatMessage)
-                { message, error in
-                    if error == nil, let message {
-                        let sendableMessage = message.builder.build()
+                { messageResponse, error in
+                    if error == nil, let messageResponse {
+                        let sendableMessageBuilder = messageResponse.builder
+                        sendableMessageBuilder.mentionUserIds(message.requestedMentionUserIds ?? [])
+                        let sendableMessage = sendableMessageBuilder.build()
                         guard let sendableMessage = self.willEdit(sendableMessage)
                         else {
                             completion?(nil)

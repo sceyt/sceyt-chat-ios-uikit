@@ -9,27 +9,48 @@
 import UIKit
 
 extension ChannelInfoViewController.DateSeparatorView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor = .surface1
-        public var labelAppearance: LabelAppearance = .init(
+    public static var appearance = Appearance(
+        backgroundColor: .surface1,
+        labelAppearance: LabelAppearance(
             foregroundColor: .secondaryText,
             font: Fonts.semiBold.withSize(13)
-        )
-        public var dateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.channelInfoAttachmentSeparatorDateFormatter
+        ),
+        dateFormatter: SceytChatUIKit.shared.formatters.channelInfoAttachmentSeparatorDateFormatter
+    )
+    
+    public struct Appearance {
+        @Trackable<Appearance, UIColor>
+        public var backgroundColor: UIColor
+        
+        @Trackable<Appearance, LabelAppearance>
+        public var labelAppearance: LabelAppearance
+        
+        @Trackable<Appearance, any DateFormatting>
+        public var dateFormatter: any DateFormatting
         
         public init(
-            backgroundColor: UIColor = .surface1,
-            labelAppearance: LabelAppearance = .init(
-                foregroundColor: .secondaryText,
-                font: Fonts.semiBold.withSize(13)
-            ),
-            dateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.channelInfoAttachmentSeparatorDateFormatter
+            backgroundColor: UIColor,
+            labelAppearance: LabelAppearance,
+            dateFormatter: any DateFormatting
         ) {
-            self.backgroundColor = backgroundColor
-            self.labelAppearance = labelAppearance
-            self.dateFormatter = dateFormatter
+            self._backgroundColor = Trackable(value: backgroundColor)
+            self._labelAppearance = Trackable(value: labelAppearance)
+            self._dateFormatter = Trackable(value: dateFormatter)
+        }
+        
+        public init(
+            reference: ChannelInfoViewController.DateSeparatorView.Appearance,
+            backgroundColor: UIColor? = nil,
+            labelAppearance: LabelAppearance? = nil,
+            dateFormatter: (any DateFormatting)? = nil
+        ) {
+            self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+            self._labelAppearance = Trackable(reference: reference, referencePath: \.labelAppearance)
+            self._dateFormatter = Trackable(reference: reference, referencePath: \.dateFormatter)
+            
+            if let backgroundColor { self.backgroundColor = backgroundColor }
+            if let labelAppearance { self.labelAppearance = labelAppearance }
+            if let dateFormatter { self.dateFormatter = dateFormatter }
         }
     }
 }

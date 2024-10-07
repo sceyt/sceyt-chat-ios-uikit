@@ -7,58 +7,182 @@
 
 import UIKit
 
-public class SearchBarAppearance: TextInputAppearance {
-    public var searchIcon: UIImage? = nil
-    public var clearIcon: UIImage? = nil
-    public var activityIndicatorStyle: UIActivityIndicatorView.Style = .medium
-    public var activityIndicatorColor: UIColor = .iconInactive
-    public var showsCancelButton: Bool = true
-    public var activityIndicatorHidesWhenStopped: Bool = true
-    public var textFieldReturnKeyType: UIReturnKeyType = .default
+public class SearchBarAppearance: AppearanceProviding {
+    public var appearance: Appearance {
+        parentAppearance ?? Self.appearance
+    }
     
-    // Initializer with default values
-    public init(
-        backgroundColor: UIColor = .background,
-        labelAppearance: LabelAppearance = .init(
+    public var parentAppearance: Appearance?
+    
+    
+    public static var appearance = Appearance(
+        backgroundColor: .background,
+        labelAppearance: LabelAppearance(
             foregroundColor: .primaryText,
-            font: Fonts.regular.withSize(16)
+            font: Fonts.regular.withSize(16),
+            backgroundColor: .clear
         ),
-        placeholderAppearance: LabelAppearance = .init(
+        placeholderAppearance: LabelAppearance(
             foregroundColor: .footnoteText,
-            font: Fonts.regular.withSize(16)
+            font: Fonts.regular.withSize(16),
+            backgroundColor: .clear
         ),
-        placeholder: String? = nil,
-        tintColor: UIColor = .accent,
-        cornerRadius: CGFloat = 18,
-        cornerCurve: CALayerCornerCurve = .continuous,
-        borderWidth: CGFloat = 0,
-        borderColor: UIColor? = nil,
-        searchIcon: UIImage? = nil,
-        clearIcon: UIImage? = nil,
-        activityIndicatorStyle: UIActivityIndicatorView.Style = .medium,
-        activityIndicatorColor: UIColor = .iconInactive,
-        showsCancelButton: Bool = true,
-        activityIndicatorHidesWhenStopped: Bool = true,
-        textFieldReturnKeyType: UIReturnKeyType = .default
-    ) {
-        super.init(
-            backgroundColor: backgroundColor,
-            labelAppearance: labelAppearance,
-            placeholderAppearance: placeholderAppearance,
-            placeholder: placeholder,
-            tintColor: tintColor,
-            cornerRadius: cornerRadius,
-            cornerCurve: cornerCurve,
-            borderWidth: borderWidth,
-            borderColor: borderColor
-        )
+        placeholder: nil,
+        tintColor: .accent,
+        cornerRadius: 18,
+        cornerCurve: .continuous,
+        borderWidth: 0,
+        borderColor: nil,
+        searchIcon: nil,
+        clearIcon: nil,
+        activityIndicatorStyle: .medium,
+        activityIndicatorColor: .iconInactive,
+        showsCancelButton: true,
+        activityIndicatorHidesWhenStopped: true,
+        textFieldReturnKeyType: .default
+    )
+    
+    public class Appearance {
+        // Inherited from TextInputAppearance
+        @Trackable<Appearance, UIColor>
+        public var backgroundColor: UIColor
         
-        self.searchIcon = searchIcon
-        self.clearIcon = clearIcon
-        self.activityIndicatorStyle = activityIndicatorStyle
-        self.activityIndicatorColor = activityIndicatorColor
-        self.showsCancelButton = showsCancelButton
-        self.activityIndicatorHidesWhenStopped = activityIndicatorHidesWhenStopped
-        self.textFieldReturnKeyType = textFieldReturnKeyType
+        @Trackable<Appearance, LabelAppearance>
+        public var labelAppearance: LabelAppearance
+        
+        @Trackable<Appearance, LabelAppearance>
+        public var placeholderAppearance: LabelAppearance
+        
+        @Trackable<Appearance, String?>
+        public var placeholder: String?
+        
+        @Trackable<Appearance, UIColor>
+        public var tintColor: UIColor
+        
+        @Trackable<Appearance, CGFloat>
+        public var cornerRadius: CGFloat
+        
+        @Trackable<Appearance, CALayerCornerCurve>
+        public var cornerCurve: CALayerCornerCurve
+        
+        @Trackable<Appearance, CGFloat>
+        public var borderWidth: CGFloat
+        
+        @Trackable<Appearance, UIColor?>
+        public var borderColor: UIColor?
+        
+        // Specific to SearchBarAppearance
+        @Trackable<Appearance, UIImage?>
+        public var searchIcon: UIImage?
+        
+        @Trackable<Appearance, UIImage?>
+        public var clearIcon: UIImage?
+        
+        @Trackable<Appearance, UIActivityIndicatorView.Style>
+        public var activityIndicatorStyle: UIActivityIndicatorView.Style
+        
+        @Trackable<Appearance, UIColor>
+        public var activityIndicatorColor: UIColor
+        
+        @Trackable<Appearance, Bool>
+        public var showsCancelButton: Bool
+        
+        @Trackable<Appearance, Bool>
+        public var activityIndicatorHidesWhenStopped: Bool
+        
+        @Trackable<Appearance, UIReturnKeyType>
+        public var textFieldReturnKeyType: UIReturnKeyType
+        
+        // Primary Initializer with all parameters
+        public init(
+            backgroundColor: UIColor,
+            labelAppearance: LabelAppearance,
+            placeholderAppearance: LabelAppearance,
+            placeholder: String?,
+            tintColor: UIColor,
+            cornerRadius: CGFloat,
+            cornerCurve: CALayerCornerCurve,
+            borderWidth: CGFloat,
+            borderColor: UIColor?,
+            searchIcon: UIImage?,
+            clearIcon: UIImage?,
+            activityIndicatorStyle: UIActivityIndicatorView.Style,
+            activityIndicatorColor: UIColor,
+            showsCancelButton: Bool,
+            activityIndicatorHidesWhenStopped: Bool,
+            textFieldReturnKeyType: UIReturnKeyType
+        ) {
+            self._backgroundColor = Trackable(value: backgroundColor)
+            self._labelAppearance = Trackable(value: labelAppearance)
+            self._placeholderAppearance = Trackable(value: placeholderAppearance)
+            self._placeholder = Trackable(value: placeholder)
+            self._tintColor = Trackable(value: tintColor)
+            self._cornerRadius = Trackable(value: cornerRadius)
+            self._cornerCurve = Trackable(value: cornerCurve)
+            self._borderWidth = Trackable(value: borderWidth)
+            self._borderColor = Trackable(value: borderColor)
+            self._searchIcon = Trackable(value: searchIcon)
+            self._clearIcon = Trackable(value: clearIcon)
+            self._activityIndicatorStyle = Trackable(value: activityIndicatorStyle)
+            self._activityIndicatorColor = Trackable(value: activityIndicatorColor)
+            self._showsCancelButton = Trackable(value: showsCancelButton)
+            self._activityIndicatorHidesWhenStopped = Trackable(value: activityIndicatorHidesWhenStopped)
+            self._textFieldReturnKeyType = Trackable(value: textFieldReturnKeyType)
+        }
+        
+        // Secondary Initializer with optional parameters
+        public init(
+            reference: SearchBarAppearance.Appearance,
+            backgroundColor: UIColor? = nil,
+            labelAppearance: LabelAppearance? = nil,
+            placeholderAppearance: LabelAppearance? = nil,
+            placeholder: String? = nil,
+            tintColor: UIColor? = nil,
+            cornerRadius: CGFloat? = nil,
+            cornerCurve: CALayerCornerCurve? = nil,
+            borderWidth: CGFloat? = nil,
+            borderColor: UIColor? = nil,
+            searchIcon: UIImage? = nil,
+            clearIcon: UIImage? = nil,
+            activityIndicatorStyle: UIActivityIndicatorView.Style? = nil,
+            activityIndicatorColor: UIColor? = nil,
+            showsCancelButton: Bool? = nil,
+            activityIndicatorHidesWhenStopped: Bool? = nil,
+            textFieldReturnKeyType: UIReturnKeyType? = nil
+        ) { 
+            self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+            self._labelAppearance = Trackable(reference: reference, referencePath: \.labelAppearance)
+            self._placeholderAppearance = Trackable(reference: reference, referencePath: \.placeholderAppearance)
+            self._placeholder = Trackable(reference: reference, referencePath: \.placeholder)
+            self._tintColor = Trackable(reference: reference, referencePath: \.tintColor)
+            self._cornerRadius = Trackable(reference: reference, referencePath: \.cornerRadius)
+            self._cornerCurve = Trackable(reference: reference, referencePath: \.cornerCurve)
+            self._borderWidth = Trackable(reference: reference, referencePath: \.borderWidth)
+            self._borderColor = Trackable(reference: reference, referencePath: \.borderColor)
+            self._searchIcon = Trackable(reference: reference, referencePath: \.searchIcon)
+            self._clearIcon = Trackable(reference: reference, referencePath: \.clearIcon)
+            self._activityIndicatorStyle = Trackable(reference: reference, referencePath: \.activityIndicatorStyle)
+            self._activityIndicatorColor = Trackable(reference: reference, referencePath: \.activityIndicatorColor)
+            self._showsCancelButton = Trackable(reference: reference, referencePath: \.showsCancelButton)
+            self._activityIndicatorHidesWhenStopped = Trackable(reference: reference, referencePath: \.activityIndicatorHidesWhenStopped)
+            self._textFieldReturnKeyType = Trackable(reference: reference, referencePath: \.textFieldReturnKeyType)
+            
+            if let backgroundColor { self.backgroundColor = backgroundColor }
+            if let labelAppearance { self.labelAppearance = labelAppearance }
+            if let placeholderAppearance { self.placeholderAppearance = placeholderAppearance }
+            if let placeholder { self.placeholder = placeholder }
+            if let tintColor { self.tintColor = tintColor }
+            if let cornerRadius { self.cornerRadius = cornerRadius }
+            if let cornerCurve { self.cornerCurve = cornerCurve }
+            if let borderWidth { self.borderWidth = borderWidth }
+            if let borderColor { self.borderColor = borderColor }
+            if let searchIcon { self.searchIcon = searchIcon }
+            if let clearIcon { self.clearIcon = clearIcon }
+            if let activityIndicatorStyle { self.activityIndicatorStyle = activityIndicatorStyle }
+            if let activityIndicatorColor { self.activityIndicatorColor = activityIndicatorColor }
+            if let showsCancelButton { self.showsCancelButton = showsCancelButton }
+            if let activityIndicatorHidesWhenStopped { self.activityIndicatorHidesWhenStopped = activityIndicatorHidesWhenStopped }
+            if let textFieldReturnKeyType { self.textFieldReturnKeyType = textFieldReturnKeyType }
+        }
     }
 }

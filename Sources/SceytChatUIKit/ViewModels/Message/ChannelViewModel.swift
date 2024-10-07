@@ -1171,7 +1171,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         let builder = Message
             .Builder()
-            .type(userMessage.type.rawValue)
+            .type(userMessage.type)
         var editAttachments = [Attachment]()
         switch userMessage.action {
         case let .edit(message):

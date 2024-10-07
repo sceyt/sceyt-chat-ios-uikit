@@ -8,17 +8,39 @@
 import UIKit
 
 public struct LabelAppearance {
+    @Trackable<LabelAppearance, UIColor?>
     public var foregroundColor: UIColor?
-    public var font: UIFont
-    public var backgroundColor: UIColor = .clear
     
+    @Trackable<LabelAppearance, UIFont>
+    public var font: UIFont
+    
+    @Trackable<LabelAppearance, UIColor>
+    public var backgroundColor: UIColor
+    
+    // Initializer with default values
     public init(
         foregroundColor: UIColor?,
         font: UIFont,
         backgroundColor: UIColor = .clear
     ) {
-        self.foregroundColor = foregroundColor
-        self.font = font
-        self.backgroundColor = backgroundColor
+        self._foregroundColor = Trackable(value: foregroundColor)
+        self._font = Trackable(value: font)
+        self._backgroundColor = Trackable(value: backgroundColor)
+    }
+    
+    // Convenience initializer for optional values
+    public init(
+        reference: LabelAppearance,
+        foregroundColor: UIColor? = nil,
+        font: UIFont? = nil,
+        backgroundColor: UIColor? = nil
+    ) {
+        self._foregroundColor = Trackable(reference: reference, referencePath: \.foregroundColor)
+        self._font = Trackable(reference: reference, referencePath: \.font)
+        self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+        
+        if let foregroundColor { self.foregroundColor = foregroundColor }
+        if let font { self.font = font }
+        if let backgroundColor { self.backgroundColor = backgroundColor }
     }
 }

@@ -7,49 +7,111 @@
 
 import UIKit
 
-public class TextInputAppearance {
-    public var backgroundColor: UIColor = .background
-    public var labelAppearance: LabelAppearance = .init(
-        foregroundColor: .primaryText,
-        font: Fonts.regular.withSize(16)
-    )
-    public var placeholderAppearance: LabelAppearance = .init(
-        foregroundColor: .footnoteText,
-        font: Fonts.regular.withSize(16)
-    )
-    public var placeholder: String? = nil
-    public var tintColor: UIColor = .accent
-    public var cornerRadius: CGFloat = 18
-    public var cornerCurve: CALayerCornerCurve = .continuous
-    public var borderWidth: CGFloat = 0
-    public var borderColor: CGColor? = nil
+public class TextInputAppearance: AppearanceProviding {
     
-    // Initializer with default values
-    public init(
-        backgroundColor: UIColor = .background,
-        labelAppearance: LabelAppearance = .init(
+    public var appearance: TextInputAppearance {
+        parentAppearance ?? Self.appearance
+    }
+    
+    public var parentAppearance: TextInputAppearance?
+    
+    public static var appearance = TextInputAppearance(
+        backgroundColor: .background,
+        labelAppearance: LabelAppearance(
             foregroundColor: .primaryText,
             font: Fonts.regular.withSize(16)
         ),
-        placeholderAppearance: LabelAppearance = .init(
+        placeholderAppearance: LabelAppearance(
             foregroundColor: .footnoteText,
             font: Fonts.regular.withSize(16)
         ),
+        placeholder: nil,
+        tintColor: .accent,
+        cornerRadius: 18,
+        cornerCurve: .continuous,
+        borderWidth: 0,
+        borderColor: nil
+    )
+    
+    @Trackable<TextInputAppearance, UIColor>
+    public var backgroundColor: UIColor
+    
+    @Trackable<TextInputAppearance, LabelAppearance>
+    public var labelAppearance: LabelAppearance
+    
+    @Trackable<TextInputAppearance, LabelAppearance>
+    public var placeholderAppearance: LabelAppearance
+    
+    @Trackable<TextInputAppearance, String?>
+    public var placeholder: String?
+    
+    @Trackable<TextInputAppearance, UIColor>
+    public var tintColor: UIColor
+    
+    @Trackable<TextInputAppearance, CGFloat>
+    public var cornerRadius: CGFloat
+    
+    @Trackable<TextInputAppearance, CALayerCornerCurve>
+    public var cornerCurve: CALayerCornerCurve
+    
+    @Trackable<TextInputAppearance, CGFloat>
+    public var borderWidth: CGFloat
+    
+    @Trackable<TextInputAppearance, CGColor?>
+    public var borderColor: CGColor?
+    
+    public init(
+        backgroundColor: UIColor,
+        labelAppearance: LabelAppearance,
+        placeholderAppearance: LabelAppearance,
+        placeholder: String?,
+        tintColor: UIColor,
+        cornerRadius: CGFloat,
+        cornerCurve: CALayerCornerCurve,
+        borderWidth: CGFloat,
+        borderColor: UIColor?
+    ) {
+        self._backgroundColor = Trackable(value: backgroundColor)
+        self._labelAppearance = Trackable(value: labelAppearance)
+        self._placeholderAppearance = Trackable(value: placeholderAppearance)
+        self._placeholder = Trackable(value: placeholder)
+        self._tintColor = Trackable(value: tintColor)
+        self._cornerRadius = Trackable(value: cornerRadius)
+        self._cornerCurve = Trackable(value: cornerCurve)
+        self._borderWidth = Trackable(value: borderWidth)
+        self._borderColor = Trackable(value: borderColor?.cgColor)
+    }
+    
+    public init(
+        reference: TextInputAppearance,
+        backgroundColor: UIColor? = nil,
+        labelAppearance: LabelAppearance? = nil,
+        placeholderAppearance: LabelAppearance? = nil,
         placeholder: String? = nil,
-        tintColor: UIColor = .accent,
-        cornerRadius: CGFloat = 18,
-        cornerCurve: CALayerCornerCurve = .continuous,
-        borderWidth: CGFloat = 0,
+        tintColor: UIColor? = nil,
+        cornerRadius: CGFloat? = nil,
+        cornerCurve: CALayerCornerCurve? = nil,
+        borderWidth: CGFloat? = nil,
         borderColor: UIColor? = nil
     ) {
-        self.backgroundColor = backgroundColor
-        self.labelAppearance = labelAppearance
-        self.placeholderAppearance = placeholderAppearance
-        self.placeholder = placeholder
-        self.tintColor = tintColor
-        self.cornerRadius = cornerRadius
-        self.cornerCurve = cornerCurve
-        self.borderWidth = borderWidth
-        self.borderColor = borderColor?.cgColor
+        self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+        self._labelAppearance = Trackable(reference: reference, referencePath: \.labelAppearance)
+        self._placeholderAppearance = Trackable(reference: reference, referencePath: \.placeholderAppearance)
+        self._placeholder = Trackable(reference: reference, referencePath: \.placeholder)
+        self._tintColor = Trackable(reference: reference, referencePath: \.tintColor)
+        self._cornerRadius = Trackable(reference: reference, referencePath: \.cornerRadius)
+        self._cornerCurve = Trackable(reference: reference, referencePath: \.cornerCurve)
+        self._borderWidth = Trackable(reference: reference, referencePath: \.borderWidth)
+        self._borderColor = Trackable(reference: reference, referencePath: \.borderColor)
+        
+        if let backgroundColor { self.backgroundColor = backgroundColor }
+        if let labelAppearance { self.labelAppearance = labelAppearance }
+        if let placeholderAppearance { self.placeholderAppearance = placeholderAppearance }
+        if let placeholder { self.placeholder = placeholder }
+        if let tintColor { self.tintColor = tintColor }
+        if let cornerRadius { self.cornerRadius = cornerRadius }
+        if let cornerCurve { self.cornerCurve = cornerCurve }
+        if let borderWidth { self.borderWidth = borderWidth }
+        if let borderColor { self.borderColor = borderColor.cgColor }
     }
 }

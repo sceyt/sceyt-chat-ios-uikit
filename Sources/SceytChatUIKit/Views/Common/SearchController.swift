@@ -62,7 +62,7 @@ open class SearchController: UISearchController {
         searchBar.searchTextField.layer.cornerRadius = appearance.searchBarAppearance.cornerRadius
         searchBar.searchTextField.layer.cornerCurve = appearance.searchBarAppearance.cornerCurve
         searchBar.searchTextField.layer.borderWidth = appearance.searchBarAppearance.borderWidth
-        searchBar.searchTextField.layer.borderColor = appearance.searchBarAppearance.borderColor
+        searchBar.searchTextField.layer.borderColor = appearance.searchBarAppearance.borderColor?.cgColor
         searchBar.searchTextField.clipsToBounds = true
         searchBar.searchTextField.font = appearance.searchBarAppearance.labelAppearance.font
         searchBar.searchTextField.textColor = appearance.searchBarAppearance.labelAppearance.foregroundColor

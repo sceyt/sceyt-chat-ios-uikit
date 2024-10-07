@@ -9,18 +9,36 @@
 import UIKit
 
 extension EditChannelViewController.AvatarCell: AppearanceProviding {
-    public static var appearance = Appearance()
+    public static var appearance = Appearance(
+        avatarBackgroundColor: .surface3,
+        avatarPlaceholderIcon: .channelProfileEditAvatar
+    )
     
     public struct Appearance {
-        public var avatarBackgroundColor: UIColor = .surface3
-        public var avatarPlaceholderIcon: UIImage = .channelProfileEditAvatar
+        @Trackable<Appearance, UIColor>
+        public var avatarBackgroundColor: UIColor
+        
+        @Trackable<Appearance, UIImage>
+        public var avatarPlaceholderIcon: UIImage
         
         public init(
-            avatarBackgroundColor: UIColor = .surface3,
-            avatarPlaceholderIcon: UIImage = .channelProfileEditAvatar
+            avatarBackgroundColor: UIColor,
+            avatarPlaceholderIcon: UIImage
         ) {
-            self.avatarBackgroundColor = avatarBackgroundColor
-            self.avatarPlaceholderIcon = avatarPlaceholderIcon
+            self._avatarBackgroundColor = Trackable(value: avatarBackgroundColor)
+            self._avatarPlaceholderIcon = Trackable(value: avatarPlaceholderIcon)
+        }
+        
+        public init(
+            reference: EditChannelViewController.AvatarCell.Appearance,
+            avatarBackgroundColor: UIColor? = nil,
+            avatarPlaceholderIcon: UIImage? = nil
+        ) {
+            self._avatarBackgroundColor = Trackable(reference: reference, referencePath: \.avatarBackgroundColor)
+            self._avatarPlaceholderIcon = Trackable(reference: reference, referencePath: \.avatarPlaceholderIcon)
+            
+            if let avatarBackgroundColor { self.avatarBackgroundColor = avatarBackgroundColor }
+            if let avatarPlaceholderIcon { self.avatarPlaceholderIcon = avatarPlaceholderIcon }
         }
     }
 }

@@ -9,43 +9,78 @@
 import UIKit
 
 extension ChannelViewController.HeaderView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var titleLabelAppearance: LabelAppearance = .init(
+    public static var appearance = Appearance(
+        titleLabelAppearance: LabelAppearance(
             foregroundColor: .primaryText,
             font: Fonts.semiBold.withSize(19)
-        )
-        public var subtitleLabelAppearance: LabelAppearance = .init(
+        ),
+        subtitleLabelAppearance: LabelAppearance(
             foregroundColor: .primaryText,
             font: Fonts.regular.withSize(13)
-        )
-        public var titleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter
-        public var subtitleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelSubtitleFormatter
-        public var typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter
-        public var avatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
+        ),
+        titleFormatter: SceytChatUIKit.shared.formatters.channelNameFormatter,
+        subtitleFormatter: SceytChatUIKit.shared.formatters.channelSubtitleFormatter,
+        typingUserNameFormatter: SceytChatUIKit.shared.formatters.typingUserNameFormatter,
+        avatarProvider: SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
+    )
+    
+    public struct Appearance {
+        @Trackable<Appearance, LabelAppearance>
+        public var titleLabelAppearance: LabelAppearance
         
-        // Initializer with default values
+        @Trackable<Appearance, LabelAppearance>
+        public var subtitleLabelAppearance: LabelAppearance
+        
+        @Trackable<Appearance, any ChannelFormatting>
+        public var titleFormatter: any ChannelFormatting
+        
+        @Trackable<Appearance, any ChannelFormatting>
+        public var subtitleFormatter: any ChannelFormatting
+        
+        @Trackable<Appearance, any UserFormatting>
+        public var typingUserNameFormatter: any UserFormatting
+        
+        @Trackable<Appearance, any ChannelAvatarProviding>
+        public var avatarProvider: any ChannelAvatarProviding
+        
         public init(
-            titleLabelAppearance: LabelAppearance = .init(
-                foregroundColor: .primaryText,
-                font: Fonts.semiBold.withSize(19)
-            ),
-            subtitleLabelAppearance: LabelAppearance = .init(
-                foregroundColor: .primaryText,
-                font: Fonts.regular.withSize(13)
-            ),
-            titleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelNameFormatter,
-            subtitleFormatter: any ChannelFormatting = SceytChatUIKit.shared.formatters.channelSubtitleFormatter,
-            typingUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.typingUserNameFormatter,
-            avatarProvider: any ChannelAvatarProviding = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
+            titleLabelAppearance: LabelAppearance,
+            subtitleLabelAppearance: LabelAppearance,
+            titleFormatter: any ChannelFormatting,
+            subtitleFormatter: any ChannelFormatting,
+            typingUserNameFormatter: any UserFormatting,
+            avatarProvider: any ChannelAvatarProviding
         ) {
-            self.titleLabelAppearance = titleLabelAppearance
-            self.subtitleLabelAppearance = subtitleLabelAppearance
-            self.titleFormatter = titleFormatter
-            self.subtitleFormatter = subtitleFormatter
-            self.typingUserNameFormatter = typingUserNameFormatter
-            self.avatarProvider = avatarProvider
+            self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
+            self._subtitleLabelAppearance = Trackable(value: subtitleLabelAppearance)
+            self._titleFormatter = Trackable(value: titleFormatter)
+            self._subtitleFormatter = Trackable(value: subtitleFormatter)
+            self._typingUserNameFormatter = Trackable(value: typingUserNameFormatter)
+            self._avatarProvider = Trackable(value: avatarProvider)
+        }
+        
+        public init(
+            reference: ChannelViewController.HeaderView.Appearance,
+            titleLabelAppearance: LabelAppearance? = nil,
+            subtitleLabelAppearance: LabelAppearance? = nil,
+            titleFormatter: (any ChannelFormatting)? = nil,
+            subtitleFormatter: (any ChannelFormatting)? = nil,
+            typingUserNameFormatter: (any UserFormatting)? = nil,
+            avatarProvider: (any ChannelAvatarProviding)? = nil
+        ) {
+            self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
+            self._subtitleLabelAppearance = Trackable(reference: reference, referencePath: \.subtitleLabelAppearance)
+            self._titleFormatter = Trackable(reference: reference, referencePath: \.titleFormatter)
+            self._subtitleFormatter = Trackable(reference: reference, referencePath: \.subtitleFormatter)
+            self._typingUserNameFormatter = Trackable(reference: reference, referencePath: \.typingUserNameFormatter)
+            self._avatarProvider = Trackable(reference: reference, referencePath: \.avatarProvider)
+            
+            if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
+            if let subtitleLabelAppearance { self.subtitleLabelAppearance = subtitleLabelAppearance }
+            if let titleFormatter { self.titleFormatter = titleFormatter }
+            if let subtitleFormatter { self.subtitleFormatter = subtitleFormatter }
+            if let typingUserNameFormatter { self.typingUserNameFormatter = typingUserNameFormatter }
+            if let avatarProvider { self.avatarProvider = avatarProvider }
         }
     }
 }

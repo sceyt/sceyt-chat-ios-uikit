@@ -8,22 +8,30 @@
 import UIKit
 
 extension SearchController: AppearanceProviding {
-    public static var appearance = Appearance()
     
-    public struct Appearance {
-        public var searchBarAppearance: SearchBarAppearance = .init(
-            placeholder: L10n.SearchBar.placeholder,
-            searchIcon: .searchIcon
-        )
-        
-        // Initializer with custom searchBarAppearance
-        public init(
-            searchBarAppearance: SearchBarAppearance = .init(
+    public static var appearance = Appearance(searchBarAppearance:
+            .init(
+                reference: SearchBarAppearance.appearance,
                 placeholder: L10n.SearchBar.placeholder,
                 searchIcon: .searchIcon
             )
+    )
+    
+    public struct Appearance {
+        @Trackable<Appearance, SearchBarAppearance.Appearance>
+        public var searchBarAppearance: SearchBarAppearance.Appearance
+        
+        // Initializer with custom searchBarAppearance
+        public init(searchBarAppearance: SearchBarAppearance.Appearance) {
+            self._searchBarAppearance = Trackable(value: searchBarAppearance)
+        }
+        
+        public init(
+            reference: SearchController.Appearance,
+            searchBarAppearance: SearchBarAppearance.Appearance? = nil
         ) {
-            self.searchBarAppearance = searchBarAppearance
+            self._searchBarAppearance = Trackable(reference: reference, referencePath: \.searchBarAppearance)
+            if let searchBarAppearance { self.searchBarAppearance = searchBarAppearance }
         }
     }
 }

@@ -8,19 +8,36 @@
 import UIKit
 
 extension AudioWaveformView: AppearanceProviding {
-    public static var appearance = Appearance()
+    public static var appearance = Appearance(
+        progressColor: .accent,
+        trackColor: .iconSecondary
+    )
     
     public struct Appearance {
-        public var progressColor: UIColor = .accent
-        public var trackColor: UIColor = .iconSecondary
+        @Trackable<Appearance, UIColor>
+        public var progressColor: UIColor
         
-        // Initializer with default values
+        @Trackable<Appearance, UIColor>
+        public var trackColor: UIColor
+        
         public init(
-            progressColor: UIColor = .accent,
-            trackColor: UIColor = .iconSecondary
+            progressColor: UIColor,
+            trackColor: UIColor
         ) {
-            self.progressColor = progressColor
-            self.trackColor = trackColor
+            self._progressColor = Trackable(value: progressColor)
+            self._trackColor = Trackable(value: trackColor)
+        }
+        
+        public init(
+            reference: AudioWaveformView.Appearance,
+            progressColor: UIColor? = nil,
+            trackColor: UIColor? = nil
+        ) {
+            self._progressColor = Trackable(reference: reference, referencePath: \.progressColor)
+            self._trackColor = Trackable(reference: reference, referencePath: \.trackColor)
+            
+            if let progressColor { self.progressColor = progressColor }
+            if let trackColor { self.trackColor = trackColor }
         }
     }
 }

@@ -22,107 +22,258 @@ import UIKit
 //    public init() {}
 //}
 
-public struct NavigationBarAppearance {
-    // General Appearance
-    public var barStyle: UIBarStyle
-    public var isTranslucent: Bool
-    public var prefersLargeTitles: Bool
-    public var tintColor: UIColor
-    public var barTintColor: UIColor?
-    public var backgroundColor: UIColor?
-    public var backgroundEffect: UIBlurEffect?
+//
+//  NavigationBarAppearance.swift
+//  SceytChatUIKit
+//
+//  Created by Arthur Avagyan on 24.09.24.
+//
+
+import UIKit
+
+public class NavigationBarAppearance: AppearanceProviding {
+    public var appearance: Appearance {
+        parentAppearance ?? Self.appearance
+    }
     
-    // Title Attributes
-    public var titleTextAttributes: [NSAttributedString.Key: Any]?
-    public var largeTitleTextAttributes: [NSAttributedString.Key: Any]?
+    public var parentAppearance: Appearance?
     
-    // Back Indicator Images
-    public var backIndicatorImage: UIImage?
-    public var backIndicatorTransitionMaskImage: UIImage?
     
-    // Background and Shadow Images
-    public var backgroundImage: UIImage?
-    public var shadowImage: UIImage?
-    public var shadowColor: UIColor?
-    
-    // Appearance for Different States
-    public var standardAppearance: UINavigationBarAppearance?
-    public var compactAppearance: UINavigationBarAppearance?
-    public var scrollEdgeAppearance: UINavigationBarAppearance?
-    public var compactScrollEdgeAppearance: UINavigationBarAppearance?
-    
-    // Button Item Appearances
-    public var backButtonAppearance: UIBarButtonItemAppearance?
-    public var buttonAppearance: UIBarButtonItemAppearance?
-    public var doneButtonAppearance: UIBarButtonItemAppearance?
-    
-    public init(
-        barStyle: UIBarStyle = .default,
-        isTranslucent: Bool = true,
-        prefersLargeTitles: Bool = false,
-        tintColor: UIColor = .accent,
-        barTintColor: UIColor? = .green,
-        backgroundColor: UIColor? = nil,
-        backgroundEffect: UIBlurEffect? = nil,
-        titleTextAttributes: [NSAttributedString.Key : Any]? = nil,
-        largeTitleTextAttributes: [NSAttributedString.Key : Any]? = nil,
-        backIndicatorImage: UIImage? = nil,
-        backIndicatorTransitionMaskImage: UIImage? = nil,
-        backgroundImage: UIImage? = nil,
-        shadowImage: UIImage? = nil,
-        shadowColor: UIColor? = nil,
-        standardAppearance: UINavigationBarAppearance? = {
-            $0.titleTextAttributes = [
+    public static var appearance = Appearance(
+        barStyle: .default,
+        isTranslucent: true,
+        prefersLargeTitles: false,
+        tintColor: .accent,
+        barTintColor: .green,
+        backgroundColor: nil,
+        backgroundEffect: nil,
+        titleTextAttributes: [
+            .font: Fonts.bold.withSize(20),
+            .foregroundColor: UIColor.primaryText
+        ],
+        largeTitleTextAttributes: [
+            .font: Fonts.bold.withSize(20),
+            .foregroundColor: UIColor.primaryText
+        ],
+        backIndicatorImage: nil,
+        backIndicatorTransitionMaskImage: nil,
+        backgroundImage: nil,
+        shadowImage: nil,
+        shadowColor: nil,
+        standardAppearance: {
+            let appearance = UINavigationBarAppearance()
+            appearance.titleTextAttributes = [
                 .font: Fonts.bold.withSize(20),
                 .foregroundColor: UIColor.primaryText
             ]
-            $0.backgroundEffect = UIBlurEffect(style: .systemMaterial)
-            $0.backgroundColor = .background
-            $0.shadowColor = .border
-            return $0
-        }(UINavigationBarAppearance()),
-        compactAppearance: UINavigationBarAppearance? = nil,
-        scrollEdgeAppearance: UINavigationBarAppearance? = {
-            $0.titleTextAttributes = [
+            appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+            appearance.backgroundColor = .background
+            appearance.shadowColor = .border
+            return appearance
+        }(),
+        compactAppearance: nil,
+        scrollEdgeAppearance: {
+            let appearance = UINavigationBarAppearance()
+            appearance.titleTextAttributes = [
                 .font: Fonts.bold.withSize(20),
                 .foregroundColor: UIColor.primaryText
             ]
-            $0.backgroundEffect = UIBlurEffect(style: .systemMaterial)
-            $0.backgroundColor = .background
-            $0.shadowColor = .border
-            return $0
-        }(UINavigationBarAppearance()),
-        compactScrollEdgeAppearance: UINavigationBarAppearance? = nil,
-        backButtonAppearance: UIBarButtonItemAppearance? = nil,
-        buttonAppearance: UIBarButtonItemAppearance? = nil,
-        doneButtonAppearance: UIBarButtonItemAppearance? = nil
-    ) {
-        self.barStyle = barStyle
-        self.isTranslucent = isTranslucent
-        self.prefersLargeTitles = prefersLargeTitles
-        self.tintColor = tintColor
-        self.barTintColor = barTintColor
-        self.backgroundColor = backgroundColor
-        self.backgroundEffect = backgroundEffect
-        self.titleTextAttributes = titleTextAttributes
-        self.largeTitleTextAttributes = largeTitleTextAttributes
-        self.backIndicatorImage = backIndicatorImage
-        self.backIndicatorTransitionMaskImage = backIndicatorTransitionMaskImage
-        self.backgroundImage = backgroundImage
-        self.shadowImage = shadowImage
-        self.shadowColor = shadowColor
-        self.standardAppearance = standardAppearance
-        self.compactAppearance = compactAppearance
-        self.scrollEdgeAppearance = scrollEdgeAppearance
-        self.compactScrollEdgeAppearance = compactScrollEdgeAppearance
-        self.backButtonAppearance = backButtonAppearance
-        self.buttonAppearance = buttonAppearance
-        self.doneButtonAppearance = doneButtonAppearance
+            appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+            appearance.backgroundColor = .background
+            appearance.shadowColor = .border
+            return appearance
+        }(),
+        compactScrollEdgeAppearance: nil,
+        backButtonAppearance: nil,
+        buttonAppearance: nil,
+        doneButtonAppearance: nil
+    )
+    
+    public class Appearance {
+        @Trackable<Appearance, UIBarStyle>
+        public var barStyle: UIBarStyle
+        
+        @Trackable<Appearance, Bool>
+        public var isTranslucent: Bool
+        
+        @Trackable<Appearance, Bool>
+        public var prefersLargeTitles: Bool
+        
+        @Trackable<Appearance, UIColor>
+        public var tintColor: UIColor
+        
+        @Trackable<Appearance, UIColor?>
+        public var barTintColor: UIColor?
+        
+        @Trackable<Appearance, UIColor?>
+        public var backgroundColor: UIColor?
+        
+        @Trackable<Appearance, UIBlurEffect?>
+        public var backgroundEffect: UIBlurEffect?
+        
+        @Trackable<Appearance, [NSAttributedString.Key: Any]?>
+        public var titleTextAttributes: [NSAttributedString.Key: Any]?
+        
+        @Trackable<Appearance, [NSAttributedString.Key: Any]?>
+        public var largeTitleTextAttributes: [NSAttributedString.Key: Any]?
+        
+        @Trackable<Appearance, UIImage?>
+        public var backIndicatorImage: UIImage?
+        
+        @Trackable<Appearance, UIImage?>
+        public var backIndicatorTransitionMaskImage: UIImage?
+        
+        @Trackable<Appearance, UIImage?>
+        public var backgroundImage: UIImage?
+        
+        @Trackable<Appearance, UIImage?>
+        public var shadowImage: UIImage?
+        
+        @Trackable<Appearance, UIColor?>
+        public var shadowColor: UIColor?
+        
+        @Trackable<Appearance, UINavigationBarAppearance?>
+        public var standardAppearance: UINavigationBarAppearance?
+        
+        @Trackable<Appearance, UINavigationBarAppearance?>
+        public var compactAppearance: UINavigationBarAppearance?
+        
+        @Trackable<Appearance, UINavigationBarAppearance?>
+        public var scrollEdgeAppearance: UINavigationBarAppearance?
+        
+        @Trackable<Appearance, UINavigationBarAppearance?>
+        public var compactScrollEdgeAppearance: UINavigationBarAppearance?
+        
+        @Trackable<Appearance, UIBarButtonItemAppearance?>
+        public var backButtonAppearance: UIBarButtonItemAppearance?
+        
+        @Trackable<Appearance, UIBarButtonItemAppearance?>
+        public var buttonAppearance: UIBarButtonItemAppearance?
+        
+        @Trackable<Appearance, UIBarButtonItemAppearance?>
+        public var doneButtonAppearance: UIBarButtonItemAppearance?
+        
+        // Primary Initializer with all parameters
+        public init(
+            barStyle: UIBarStyle,
+            isTranslucent: Bool,
+            prefersLargeTitles: Bool,
+            tintColor: UIColor,
+            barTintColor: UIColor?,
+            backgroundColor: UIColor?,
+            backgroundEffect: UIBlurEffect?,
+            titleTextAttributes: [NSAttributedString.Key: Any]?,
+            largeTitleTextAttributes: [NSAttributedString.Key: Any]?,
+            backIndicatorImage: UIImage?,
+            backIndicatorTransitionMaskImage: UIImage?,
+            backgroundImage: UIImage?,
+            shadowImage: UIImage?,
+            shadowColor: UIColor?,
+            standardAppearance: UINavigationBarAppearance?,
+            compactAppearance: UINavigationBarAppearance?,
+            scrollEdgeAppearance: UINavigationBarAppearance?,
+            compactScrollEdgeAppearance: UINavigationBarAppearance?,
+            backButtonAppearance: UIBarButtonItemAppearance?,
+            buttonAppearance: UIBarButtonItemAppearance?,
+            doneButtonAppearance: UIBarButtonItemAppearance?
+        ) {
+            self._barStyle = Trackable(value: barStyle)
+            self._isTranslucent = Trackable(value: isTranslucent)
+            self._prefersLargeTitles = Trackable(value: prefersLargeTitles)
+            self._tintColor = Trackable(value: tintColor)
+            self._barTintColor = Trackable(value: barTintColor)
+            self._backgroundColor = Trackable(value: backgroundColor)
+            self._backgroundEffect = Trackable(value: backgroundEffect)
+            self._titleTextAttributes = Trackable(value: titleTextAttributes)
+            self._largeTitleTextAttributes = Trackable(value: largeTitleTextAttributes)
+            self._backIndicatorImage = Trackable(value: backIndicatorImage)
+            self._backIndicatorTransitionMaskImage = Trackable(value: backIndicatorTransitionMaskImage)
+            self._backgroundImage = Trackable(value: backgroundImage)
+            self._shadowImage = Trackable(value: shadowImage)
+            self._shadowColor = Trackable(value: shadowColor)
+            self._standardAppearance = Trackable(value: standardAppearance)
+            self._compactAppearance = Trackable(value: compactAppearance)
+            self._scrollEdgeAppearance = Trackable(value: scrollEdgeAppearance)
+            self._compactScrollEdgeAppearance = Trackable(value: compactScrollEdgeAppearance)
+            self._backButtonAppearance = Trackable(value: backButtonAppearance)
+            self._buttonAppearance = Trackable(value: buttonAppearance)
+            self._doneButtonAppearance = Trackable(value: doneButtonAppearance)
+        }
+        
+        // Secondary Initializer with optional parameters
+        public init(
+            reference: NavigationBarAppearance.Appearance,
+            barStyle: UIBarStyle? = nil,
+            isTranslucent: Bool? = nil,
+            prefersLargeTitles: Bool? = nil,
+            tintColor: UIColor? = nil,
+            barTintColor: UIColor? = nil,
+            backgroundColor: UIColor? = nil,
+            backgroundEffect: UIBlurEffect? = nil,
+            titleTextAttributes: [NSAttributedString.Key: Any]? = nil,
+            largeTitleTextAttributes: [NSAttributedString.Key: Any]? = nil,
+            backIndicatorImage: UIImage? = nil,
+            backIndicatorTransitionMaskImage: UIImage? = nil,
+            backgroundImage: UIImage? = nil,
+            shadowImage: UIImage? = nil,
+            shadowColor: UIColor? = nil,
+            standardAppearance: UINavigationBarAppearance? = nil,
+            compactAppearance: UINavigationBarAppearance? = nil,
+            scrollEdgeAppearance: UINavigationBarAppearance? = nil,
+            compactScrollEdgeAppearance: UINavigationBarAppearance? = nil,
+            backButtonAppearance: UIBarButtonItemAppearance? = nil,
+            buttonAppearance: UIBarButtonItemAppearance? = nil,
+            doneButtonAppearance: UIBarButtonItemAppearance? = nil
+        ) {
+            self._barStyle = Trackable(reference: reference, referencePath: \.barStyle)
+            self._isTranslucent = Trackable(reference: reference, referencePath: \.isTranslucent)
+            self._prefersLargeTitles = Trackable(reference: reference, referencePath: \.prefersLargeTitles)
+            self._tintColor = Trackable(reference: reference, referencePath: \.tintColor)
+            self._barTintColor = Trackable(reference: reference, referencePath: \.barTintColor)
+            self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+            self._backgroundEffect = Trackable(reference: reference, referencePath: \.backgroundEffect)
+            self._titleTextAttributes = Trackable(reference: reference, referencePath: \.titleTextAttributes)
+            self._largeTitleTextAttributes = Trackable(reference: reference, referencePath: \.largeTitleTextAttributes)
+            self._backIndicatorImage = Trackable(reference: reference, referencePath: \.backIndicatorImage)
+            self._backIndicatorTransitionMaskImage = Trackable(reference: reference, referencePath: \.backIndicatorTransitionMaskImage)
+            self._backgroundImage = Trackable(reference: reference, referencePath: \.backgroundImage)
+            self._shadowImage = Trackable(reference: reference, referencePath: \.shadowImage)
+            self._shadowColor = Trackable(reference: reference, referencePath: \.shadowColor)
+            self._standardAppearance = Trackable(reference: reference, referencePath: \.standardAppearance)
+            self._compactAppearance = Trackable(reference: reference, referencePath: \.compactAppearance)
+            self._scrollEdgeAppearance = Trackable(reference: reference, referencePath: \.scrollEdgeAppearance)
+            self._compactScrollEdgeAppearance = Trackable(reference: reference, referencePath: \.compactScrollEdgeAppearance)
+            self._backButtonAppearance = Trackable(reference: reference, referencePath: \.backButtonAppearance)
+            self._buttonAppearance = Trackable(reference: reference, referencePath: \.buttonAppearance)
+            self._doneButtonAppearance = Trackable(reference: reference, referencePath: \.doneButtonAppearance)
+            
+            if let barStyle { self.barStyle = barStyle }
+            if let isTranslucent { self.isTranslucent = isTranslucent }
+            if let prefersLargeTitles { self.prefersLargeTitles = prefersLargeTitles }
+            if let tintColor { self.tintColor = tintColor }
+            if let barTintColor { self.barTintColor = barTintColor }
+            if let backgroundColor { self.backgroundColor = backgroundColor }
+            if let backgroundEffect { self.backgroundEffect = backgroundEffect }
+            if let titleTextAttributes { self.titleTextAttributes = titleTextAttributes }
+            if let largeTitleTextAttributes { self.largeTitleTextAttributes = largeTitleTextAttributes }
+            if let backIndicatorImage { self.backIndicatorImage = backIndicatorImage }
+            if let backIndicatorTransitionMaskImage { self.backIndicatorTransitionMaskImage = backIndicatorTransitionMaskImage }
+            if let backgroundImage { self.backgroundImage = backgroundImage }
+            if let shadowImage { self.shadowImage = shadowImage }
+            if let shadowColor { self.shadowColor = shadowColor }
+            if let standardAppearance { self.standardAppearance = standardAppearance }
+            if let compactAppearance { self.compactAppearance = compactAppearance }
+            if let scrollEdgeAppearance { self.scrollEdgeAppearance = scrollEdgeAppearance }
+            if let compactScrollEdgeAppearance { self.compactScrollEdgeAppearance = compactScrollEdgeAppearance }
+            if let backButtonAppearance { self.backButtonAppearance = backButtonAppearance }
+            if let buttonAppearance { self.buttonAppearance = buttonAppearance }
+            if let doneButtonAppearance { self.doneButtonAppearance = doneButtonAppearance }
+        }
     }
 }
 
 extension UINavigationBar {
-    public func apply(appearance: NavigationBarAppearance) {
+    public func apply(appearance: NavigationBarAppearance.Appearance) {
         // General Appearance
         self.barStyle = appearance.barStyle
         self.isTranslucent = appearance.isTranslucent

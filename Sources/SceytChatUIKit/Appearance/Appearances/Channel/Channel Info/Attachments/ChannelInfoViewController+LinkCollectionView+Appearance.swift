@@ -9,21 +9,45 @@
 import UIKit
 
 extension ChannelInfoViewController.LinkCollectionView: AppearanceProviding {
-    public static var appearance = Appearance()
+    public static var appearance = Appearance(
+        backgroundColor: .background,
+        cellAppearance: SceytChatUIKit.Components.channelInfoLinkCell.appearance,
+        separatorAppearance: SceytChatUIKit.Components.channelInfoDateSeparatorView.appearance
+    )
     
     public struct Appearance {
-        public var backgroundColor: UIColor = .background
-        public var cellAppearance: ChannelInfoViewController.LinkCell.Appearance = Components.channelInfoLinkCell.appearance
-        public var separatorAppearance: ChannelInfoViewController.DateSeparatorView.Appearance = Components.channelInfoDateSeparatorView.appearance
+        @Trackable<Appearance, UIColor>
+        public var backgroundColor: UIColor
+        
+        @Trackable<Appearance, ChannelInfoViewController.LinkCell.Appearance>
+        public var cellAppearance: ChannelInfoViewController.LinkCell.Appearance
+        
+        @Trackable<Appearance, ChannelInfoViewController.DateSeparatorView.Appearance>
+        public var separatorAppearance: ChannelInfoViewController.DateSeparatorView.Appearance
         
         public init(
-            backgroundColor: UIColor = .background,
-            cellAppearance: ChannelInfoViewController.LinkCell.Appearance = SceytChatUIKit.Components.channelInfoLinkCell.appearance,
-            separatorAppearance: ChannelInfoViewController.DateSeparatorView.Appearance = SceytChatUIKit.Components.channelInfoDateSeparatorView.appearance
+            backgroundColor: UIColor,
+            cellAppearance: ChannelInfoViewController.LinkCell.Appearance,
+            separatorAppearance: ChannelInfoViewController.DateSeparatorView.Appearance
         ) {
-            self.backgroundColor = backgroundColor
-            self.cellAppearance = cellAppearance
-            self.separatorAppearance = separatorAppearance
+            self._backgroundColor = Trackable(value: backgroundColor)
+            self._cellAppearance = Trackable(value: cellAppearance)
+            self._separatorAppearance = Trackable(value: separatorAppearance)
+        }
+        
+        public init(
+            reference: ChannelInfoViewController.LinkCollectionView.Appearance,
+            backgroundColor: UIColor? = nil,
+            cellAppearance: ChannelInfoViewController.LinkCell.Appearance? = nil,
+            separatorAppearance: ChannelInfoViewController.DateSeparatorView.Appearance? = nil
+        ) {
+            self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+            self._cellAppearance = Trackable(reference: reference, referencePath: \.cellAppearance)
+            self._separatorAppearance = Trackable(reference: reference, referencePath: \.separatorAppearance)
+            
+            if let backgroundColor { self.backgroundColor = backgroundColor }
+            if let cellAppearance { self.cellAppearance = cellAppearance }
+            if let separatorAppearance { self.separatorAppearance = separatorAppearance }
         }
     }
 }

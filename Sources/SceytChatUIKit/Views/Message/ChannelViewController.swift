@@ -87,7 +87,7 @@ open class ChannelViewController: ViewController,
         searchBar.barTintColor = appearance.searchBarAppearance.backgroundColor
         searchBar.layer.cornerRadius = appearance.searchBarAppearance.cornerRadius
         searchBar.layer.cornerCurve = appearance.searchBarAppearance.cornerCurve
-        searchBar.layer.borderColor = appearance.searchBarAppearance.borderColor
+        searchBar.layer.borderColor = appearance.searchBarAppearance.borderColor?.cgColor
         searchBar.layer.borderWidth = appearance.searchBarAppearance.borderWidth
         searchBar.searchTextField.backgroundColor = appearance.searchBarAppearance.backgroundColor
         return searchBar
@@ -1568,6 +1568,8 @@ open class ChannelViewController: ViewController,
                 m.action = .reply(message)
             case (let message, .edit):
                 m.action = .edit(message)
+                m.type = message.type
+                m.metadata = message.metadata
             default:
                 break
             }

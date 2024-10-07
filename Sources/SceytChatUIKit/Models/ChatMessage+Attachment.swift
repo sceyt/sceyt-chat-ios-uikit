@@ -256,6 +256,12 @@ extension ChatMessage.Attachment: Hashable {
         hasher.combine(tid)
         hasher.combine(name)
         hasher.combine(type)
+        
+        if let url {
+            hasher.combine(url)
+        } else {
+            hasher.combine(filePath)
+        }
     }
 }
 

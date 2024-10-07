@@ -7,14 +7,35 @@
 
 import UIKit
 
-public struct ButtonAppearance {
-    public var labelAppearance: LabelAppearance = .init(
-        foregroundColor: .accent,
-        font: Fonts.semiBold.withSize(16)
+public class ButtonAppearance: AppearanceProviding {
+    public var appearance: ButtonAppearance {
+        parentAppearance ?? Self.appearance
+    }
+    
+    public var parentAppearance: ButtonAppearance?
+    
+    
+    @Trackable<ButtonAppearance, LabelAppearance>
+    public var labelAppearance: LabelAppearance
+    
+    @Trackable<ButtonAppearance, UIColor>
+    public var backgroundColor: UIColor
+    
+    @Trackable<ButtonAppearance, CGFloat>
+    public var cornerRadius: CGFloat
+    
+    @Trackable<ButtonAppearance, CALayerCornerCurve>
+    public var cornerCurve: CALayerCornerCurve
+    
+    public static var appearance = ButtonAppearance(
+        labelAppearance: .init(
+            foregroundColor: .accent,
+            font: Fonts.semiBold.withSize(16)
+        ),
+        backgroundColor: .clear,
+        cornerRadius: 0,
+        cornerCurve: .continuous
     )
-    public var backgroundColor: UIColor = .clear
-    public var cornerRadius: CGFloat = 0
-    public var cornerCurve: CALayerCornerCurve = .continuous
     
     // Initializer with default values
     public init(
@@ -26,9 +47,28 @@ public struct ButtonAppearance {
         cornerRadius: CGFloat = 0,
         cornerCurve: CALayerCornerCurve = .continuous
     ) {
-        self.labelAppearance = labelAppearance
-        self.backgroundColor = backgroundColor
-        self.cornerRadius = cornerRadius
-        self.cornerCurve = cornerCurve
+        self._labelAppearance = Trackable(value: labelAppearance)
+        self._backgroundColor = Trackable(value: backgroundColor)
+        self._cornerRadius = Trackable(value: cornerRadius)
+        self._cornerCurve = Trackable(value: cornerCurve)
+    }
+    
+    // Convenience initializer using reference appearance
+    public init(
+        reference: ButtonAppearance.AppearanceType,
+        labelAppearance: LabelAppearance? = nil,
+        backgroundColor: UIColor? = nil,
+        cornerRadius: CGFloat? = nil,
+        cornerCurve: CALayerCornerCurve? = nil
+    ) {
+        self._labelAppearance = Trackable(reference: reference, referencePath: \.labelAppearance)
+        self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+        self._cornerRadius = Trackable(reference: reference, referencePath: \.cornerRadius)
+        self._cornerCurve = Trackable(reference: reference, referencePath: \.cornerCurve)
+        
+        if let labelAppearance { self.labelAppearance = labelAppearance }
+        if let backgroundColor { self.backgroundColor = backgroundColor }
+        if let cornerRadius { self.cornerRadius = cornerRadius }
+        if let cornerCurve { self.cornerCurve = cornerCurve }
     }
 }

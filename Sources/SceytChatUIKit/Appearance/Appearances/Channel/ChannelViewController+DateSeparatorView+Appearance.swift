@@ -9,42 +9,85 @@
 import UIKit
 
 extension ChannelViewController.DateSeparatorView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor = .clear
-        public var labelAppearance: LabelAppearance = .init(
+    public static var appearance = Appearance(
+        backgroundColor: .clear,
+        labelAppearance: LabelAppearance(
             foregroundColor: .onPrimary,
             font: Fonts.semiBold.withSize(13),
             backgroundColor: .overlayBackground1
-        )
-        public var labelBorderColor: CGColor = UIColor.clear.cgColor
-        public var labelBorderWidth: CGFloat = 1
-        public var labelCornerRadius: CGFloat = 10
-        public var labelCornerCurve: CALayerCornerCurve = .continuous
+        ),
+        labelBorderColor: .clear,
+        labelBorderWidth: 1,
+        labelCornerRadius: 10,
+        labelCornerCurve: .continuous,
+        dateFormatter: SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter
+    )
+    
+    public struct Appearance {
+        @Trackable<Appearance, UIColor>
+        public var backgroundColor: UIColor
         
-        public var dateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter
+        @Trackable<Appearance, LabelAppearance>
+        public var labelAppearance: LabelAppearance
+        
+        @Trackable<Appearance, CGColor>
+        public var labelBorderColor: CGColor
+        
+        @Trackable<Appearance, CGFloat>
+        public var labelBorderWidth: CGFloat
+        
+        @Trackable<Appearance, CGFloat>
+        public var labelCornerRadius: CGFloat
+        
+        @Trackable<Appearance, CALayerCornerCurve>
+        public var labelCornerCurve: CALayerCornerCurve
+        
+        @Trackable<Appearance, any DateFormatting>
+        public var dateFormatter: any DateFormatting
         
         public init(
-            backgroundColor: UIColor = .clear,
-            labelAppearance: LabelAppearance = .init(
-                foregroundColor: .onPrimary,
-                font: Fonts.semiBold.withSize(13),
-                backgroundColor: .overlayBackground1
-            ),
-            labelBorderColor: UIColor = UIColor.clear,
-            labelBorderWidth: CGFloat = 1,
-            labelCornerRadius: CGFloat = 10,
-            labelCornerCurve: CALayerCornerCurve = .continuous,
-            dateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateSeparatorFormatter
+            backgroundColor: UIColor,
+            labelAppearance: LabelAppearance,
+            labelBorderColor: UIColor,
+            labelBorderWidth: CGFloat,
+            labelCornerRadius: CGFloat,
+            labelCornerCurve: CALayerCornerCurve,
+            dateFormatter: any DateFormatting
         ) {
-            self.backgroundColor = backgroundColor
-            self.labelAppearance = labelAppearance
-            self.labelBorderColor = labelBorderColor.cgColor
-            self.labelBorderWidth = labelBorderWidth
-            self.labelCornerRadius = labelCornerRadius
-            self.labelCornerCurve = labelCornerCurve
-            self.dateFormatter = dateFormatter
+            self._backgroundColor = Trackable(value: backgroundColor)
+            self._labelAppearance = Trackable(value: labelAppearance)
+            self._labelBorderColor = Trackable(value: labelBorderColor.cgColor)
+            self._labelBorderWidth = Trackable(value: labelBorderWidth)
+            self._labelCornerRadius = Trackable(value: labelCornerRadius)
+            self._labelCornerCurve = Trackable(value: labelCornerCurve)
+            self._dateFormatter = Trackable(value: dateFormatter)
+        }
+        
+        public init(
+            reference: ChannelViewController.DateSeparatorView.Appearance,
+            backgroundColor: UIColor? = nil,
+            labelAppearance: LabelAppearance? = nil,
+            labelBorderColor: UIColor? = nil,
+            labelBorderWidth: CGFloat? = nil,
+            labelCornerRadius: CGFloat? = nil,
+            labelCornerCurve: CALayerCornerCurve? = nil,
+            dateFormatter: (any DateFormatting)? = nil
+        ) {
+            self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+            self._labelAppearance = Trackable(reference: reference, referencePath: \.labelAppearance)
+            self._labelBorderColor = Trackable(reference: reference, referencePath: \.labelBorderColor)
+            self._labelBorderWidth = Trackable(reference: reference, referencePath: \.labelBorderWidth)
+            self._labelCornerRadius = Trackable(reference: reference, referencePath: \.labelCornerRadius)
+            self._labelCornerCurve = Trackable(reference: reference, referencePath: \.labelCornerCurve)
+            self._dateFormatter = Trackable(reference: reference, referencePath: \.dateFormatter)
+            
+            if let backgroundColor { self.backgroundColor = backgroundColor }
+            if let labelAppearance { self.labelAppearance = labelAppearance }
+            if let labelBorderColor { self.labelBorderColor = labelBorderColor.cgColor }
+            if let labelBorderWidth { self.labelBorderWidth = labelBorderWidth }
+            if let labelCornerRadius { self.labelCornerRadius = labelCornerRadius }
+            if let labelCornerCurve { self.labelCornerCurve = labelCornerCurve }
+            if let dateFormatter { self.dateFormatter = dateFormatter }
         }
     }
 }

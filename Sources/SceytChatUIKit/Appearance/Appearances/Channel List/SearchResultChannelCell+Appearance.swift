@@ -9,28 +9,42 @@
 import UIKit
 
 extension SearchResultChannelCell: AppearanceProviding {
-    public static var appearance = Appearance()
+    public static var appearance = Appearance(
+        backgroundColor: .clear,
+        separatorColor: .border,
+        titleLabelAppearance: LabelAppearance(
+            foregroundColor: .primaryText,
+            font: Fonts.semiBold.withSize(16)
+        ),
+        subtitleLabelAppearance: LabelAppearance(
+            foregroundColor: .secondaryText,
+            font: Fonts.regular.withSize(13)
+        ),
+        titleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelNameFormatter),
+        subtitleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelSubtitleFormatter),
+        visualProvider: AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider)
+    )
     
     public class Appearance: CellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
-        public var backgroundColor: UIColor = .clear
-        public var separatorColor: UIColor = .border
+        
+        @Trackable<Appearance, UIColor>
+        public var backgroundColor: UIColor
+        
+        @Trackable<Appearance, UIColor>
+        public var separatorColor: UIColor
         
         // Initializer with default values
         public init(
-            backgroundColor: UIColor = .clear,
-            separatorColor: UIColor = .border,
-            titleLabelAppearance: LabelAppearance = .init(
-                foregroundColor: .primaryText,
-                font: Fonts.semiBold.withSize(16)
-            ),
-            subtitleLabelAppearance: LabelAppearance = .init(
-                foregroundColor: .secondaryText,
-                font: Fonts.regular.withSize(13)
-            ),
-            titleFormatter: AnyChannelFormatting = AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelNameFormatter),
-            subtitleFormatter: AnyChannelFormatting = AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelSubtitleFormatter),
-            visualProvider: AnyChannelAvatarProviding = AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider)
+            backgroundColor: UIColor,
+            separatorColor: UIColor,
+            titleLabelAppearance: LabelAppearance,
+            subtitleLabelAppearance: LabelAppearance,
+            titleFormatter: AnyChannelFormatting,
+            subtitleFormatter: AnyChannelFormatting,
+            visualProvider: AnyChannelAvatarProviding
         ) {
+            self._backgroundColor = Trackable(value: backgroundColor)
+            self._separatorColor = Trackable(value: separatorColor)
             super.init(
                 titleLabelAppearance: titleLabelAppearance,
                 subtitleLabelAppearance: subtitleLabelAppearance,
@@ -38,9 +52,31 @@ extension SearchResultChannelCell: AppearanceProviding {
                 subtitleFormatter: subtitleFormatter,
                 visualProvider: visualProvider
             )
+        }
+        
+        // Convenience initializer with optional parameters
+        public init(
+            reference: SearchResultChannelCell.Appearance,
+            backgroundColor: UIColor? = nil,
+            separatorColor: UIColor? = nil,
+            titleLabelAppearance: LabelAppearance? = nil,
+            subtitleLabelAppearance: LabelAppearance? = nil,
+            titleFormatter: AnyChannelFormatting? = nil,
+            subtitleFormatter: AnyChannelFormatting? = nil,
+            visualProvider: AnyChannelAvatarProviding? = nil
+        ) {
+            self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+            self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
+            super.init(
+                titleLabelAppearance: titleLabelAppearance ?? reference.titleLabelAppearance,
+                subtitleLabelAppearance: subtitleLabelAppearance ?? reference.subtitleLabelAppearance,
+                titleFormatter: titleFormatter ?? reference.titleFormatter,
+                subtitleFormatter: subtitleFormatter ?? reference.subtitleFormatter,
+                visualProvider: visualProvider ?? reference.visualProvider
+            )
             
-            self.backgroundColor = backgroundColor
-            self.separatorColor = separatorColor
+            if let backgroundColor { self.backgroundColor = backgroundColor }
+            if let separatorColor { self.separatorColor = separatorColor }
         }
     }
 }

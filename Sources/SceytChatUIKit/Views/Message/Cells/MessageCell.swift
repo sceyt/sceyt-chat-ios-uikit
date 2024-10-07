@@ -200,7 +200,7 @@ open class MessageCell: CollectionViewCell,
         bubbleView.addSubview(attachmentOverlayView)
 
         
-        backgroundColor = .clear
+        backgroundColor = appearance.backgroundColor
         contentView.backgroundColor = .clear
         containerView.backgroundColor = .clear
         

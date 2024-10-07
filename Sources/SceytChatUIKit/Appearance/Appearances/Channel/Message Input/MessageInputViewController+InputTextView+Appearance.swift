@@ -9,24 +9,32 @@
 import UIKit
 
 extension MessageInputViewController.InputTextView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var textInputAppearance: TextInputAppearance = .init(
+    public static var appearance = Appearance(
+        textInputAppearance: TextInputAppearance(
+            reference: TextInputAppearance.appearance,
             backgroundColor: .surface1,
             placeholder: L10n.Message.Input.placeholder,
             borderColor: .clear
         )
+    )
+    
+    public struct Appearance {
+        @Trackable<Appearance, TextInputAppearance>
+        public var textInputAppearance: TextInputAppearance
         
-        // Initializer with default values
         public init(
-            textInputAppearance: TextInputAppearance = .init(
-                backgroundColor: .surface1,
-                placeholder: L10n.Message.Input.placeholder,
-                borderColor: .clear
-            )
+            textInputAppearance: TextInputAppearance
         ) {
-            self.textInputAppearance = textInputAppearance
+            self._textInputAppearance = Trackable(value: textInputAppearance)
+        }
+        
+        public init(
+            reference: MessageInputViewController.InputTextView.Appearance,
+            textInputAppearance: TextInputAppearance? = nil
+        ) {
+            self._textInputAppearance = Trackable(reference: reference, referencePath: \.textInputAppearance)
+            
+            if let textInputAppearance { self.textInputAppearance = textInputAppearance }
         }
     }
 }

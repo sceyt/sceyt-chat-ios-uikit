@@ -512,7 +512,7 @@ open class NavigationController: UINavigationController, Configurable {
     open func setup() {}
     
     open func setupAppearance() {
-        navigationBar.apply(appearance: appearance.barAppearance)
+        navigationBar.apply(appearance: appearance.barAppearance.appearance)
     }
     
     open func setupLayout() {

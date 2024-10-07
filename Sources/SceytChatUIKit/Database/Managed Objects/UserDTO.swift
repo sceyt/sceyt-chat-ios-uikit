@@ -16,8 +16,9 @@ public class UserDTO: NSManagedObject {
     @NSManaged public var id: String
     @NSManaged public var firstName: String?
     @NSManaged public var lastName: String?
+    @NSManaged public var username: String?
     @NSManaged public var avatarUrl: String?
-    @NSManaged public var metadata: String?
+    @NSManaged public var metadataEntries: Set<UserMetadataDTO>?
     @NSManaged public var blocked: Bool
     @NSManaged public var state: Int16
 
@@ -66,7 +67,6 @@ public class UserDTO: NSManagedObject {
         firstName = map.firstName
         lastName = map.lastName
         avatarUrl = map.avatarUrl
-        metadata = map.metadata
         blocked = map.blocked
         state = Int16(map.state.rawValue)
         presenceState = Int16(map.presence.state.rawValue)
@@ -79,8 +79,28 @@ public class UserDTO: NSManagedObject {
         id = map.id
         firstName = map.firstName
         lastName = map.lastName
+        username = map.username
         avatarUrl = map.avatarUrl
-        metadata = map.metadata
+        
+        // Remove existing metadata entries
+        if let existingEntries = metadataEntries {
+            for entry in existingEntries {
+                managedObjectContext?.delete(entry)
+            }
+        }
+        
+        if let metadataDict = map.metadataDict {
+            var newEntries = Set<UserMetadataDTO>()
+            for (key, value) in metadataDict {
+                let entry = UserMetadataDTO(context: managedObjectContext!)
+                entry.key = key
+                entry.value = value
+                entry.user = self
+                newEntries.insert(entry)
+            }
+            metadataEntries = newEntries
+        }
+
         blocked = map.blocked
         state = Int16(map.state.rawValue)
         presenceState = Int16(map.presence.state.presenceState.rawValue)
@@ -100,7 +120,25 @@ extension UserDTO {
         id = map.id
         firstName = map.firstName
         lastName = map.lastName
-        metadata = map.metadata
+        username = map.username
+        
+        // Remove existing metadata entries
+        if let existingEntries = metadataEntries {
+            for entry in existingEntries {
+                managedObjectContext?.delete(entry)
+            }
+        }
+        
+        var newEntries = Set<UserMetadataDTO>()
+        for (key, value) in map.metadataDict {
+            let entry = UserMetadataDTO(context: managedObjectContext!)
+            entry.key = key
+            entry.value = value
+            entry.user = self
+            newEntries.insert(entry)
+        }
+        metadataEntries = newEntries
+        
         return self
     }
 }

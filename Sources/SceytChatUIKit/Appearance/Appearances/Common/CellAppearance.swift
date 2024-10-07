@@ -3,6 +3,7 @@
 //  SceytChatUIKit
 //
 //  Created by Arthur Avagyan on 24.09.24.
+//  Copyright © 2024 Sceyt LLC. All rights reserved.
 //
 
 import UIKit
@@ -11,12 +12,21 @@ public class CellAppearance<T: Formatting,
                             S: Formatting,
                             V: VisualProviding> {
     
+    @Trackable<CellAppearance, LabelAppearance>
     public var titleLabelAppearance: LabelAppearance
-    public var subtitleLabelAppearance: LabelAppearance?
-    public var titleFormatter: T
-    public var subtitleFormatter: S
-    public var visualProvider: V
     
+    @Trackable<CellAppearance, LabelAppearance?>
+    public var subtitleLabelAppearance: LabelAppearance?
+    
+    @Trackable<CellAppearance, T>
+    public var titleFormatter: T
+    
+    @Trackable<CellAppearance, S>
+    public var subtitleFormatter: S
+    
+    @Trackable<CellAppearance, V>
+    public var visualProvider: V
+
     /// Initializes a new instance of `CellAppearance` with the provided parameters.
     ///
     /// - Parameters:
@@ -32,12 +42,10 @@ public class CellAppearance<T: Formatting,
         subtitleFormatter: S,
         visualProvider: V
     ) {
-        self.titleLabelAppearance = titleLabelAppearance
-        self.subtitleLabelAppearance = subtitleLabelAppearance
-        self.titleFormatter = titleFormatter
-        self.subtitleFormatter = subtitleFormatter
-        self.visualProvider = visualProvider
+        self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
+        self._subtitleLabelAppearance = Trackable(value: subtitleLabelAppearance)
+        self._titleFormatter = Trackable(value: titleFormatter)
+        self._subtitleFormatter = Trackable(value: subtitleFormatter)
+        self._visualProvider = Trackable(value: visualProvider)
     }
 }
-
-

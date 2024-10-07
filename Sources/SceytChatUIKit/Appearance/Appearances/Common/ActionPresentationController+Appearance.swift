@@ -8,16 +8,25 @@
 import UIKit
 
 extension ActionPresentationController: AppearanceProviding {
-    public static var appearance = Appearance()
+    public static var appearance = Appearance(dimColor: .overlayBackground1)
     
     public struct Appearance {
-        public var dimColor: UIColor? = .overlayBackground1
+        @Trackable<Appearance, UIColor>
+        public var dimColor: UIColor
         
-        // Initializer with default values
+        // Initializer with all parameters
+        public init(dimColor: UIColor) {
+            self._dimColor = Trackable(value: dimColor)
+        }
+        
+        // Convenience initializer with optional parameters
         public init(
-            dimColor: UIColor? = .overlayBackground1
-        ) {
-            self.dimColor = dimColor
+            reference: ActionPresentationController.Appearance,
+            dimColor: UIColor? = nil
+        ) {            
+            self._dimColor = Trackable(reference: reference, referencePath: \.dimColor)
+            
+            if let dimColor { self.dimColor = dimColor }
         }
     }
 }

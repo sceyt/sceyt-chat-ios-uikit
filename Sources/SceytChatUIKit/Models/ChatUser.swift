@@ -14,8 +14,9 @@ public class ChatUser {
     public var id: UserId
     public var firstName: String?
     public var lastName: String?
+    public var username: String?
     public var avatarUrl: String?
-    public var metadata: String?
+    public var metadataDict: [String: String]?
     public var blocked: Bool
     public var presence: Presence
     public var state: State
@@ -24,8 +25,15 @@ public class ChatUser {
         id = dto.id
         firstName = dto.firstName
         lastName = dto.lastName
+        username = dto.username
         avatarUrl = dto.avatarUrl
-        metadata = dto.metadata
+        var metadataDict = [String: String]()
+        if let entries = dto.metadataEntries {
+            for entry in entries {
+                metadataDict[entry.key] = entry.value
+            }
+        }
+        self.metadataDict = metadataDict
         blocked = dto.blocked
         state = .init(rawValue: Int(dto.state))!
         presence = .init(state: .init(rawValue: Int(dto.presenceState))!,
@@ -37,8 +45,9 @@ public class ChatUser {
         id: UserId,
         firstName: String? = nil,
         lastName: String? = nil,
+        username: String? = nil,
         avatarUrl: String? = nil,
-        metadata: String? = nil,
+        metadataDict: [String: String]? = nil,
         blocked: Bool = false,
         presence: ChatUser.Presence = .init(state: .online),
         activityState: ChatUser.State = .active)
@@ -46,8 +55,9 @@ public class ChatUser {
         self.id = id
         self.firstName = firstName
         self.lastName = lastName
+        self.username = username
         self.avatarUrl = avatarUrl
-        self.metadata = metadata
+        self.metadataDict = metadataDict
         self.blocked = blocked
         self.presence = presence
         self.state = activityState
@@ -58,8 +68,9 @@ public class ChatUser {
             id: user.id,
             firstName: user.firstName,
             lastName: user.lastName,
+            username: user.username,
             avatarUrl: user.avatarUrl,
-            metadata: user.metadata,
+            metadataDict: user.metadataMap,
             blocked: user.blocked,
             presence: .init(
                 state: .init(rawValue: user.presence.state),
@@ -205,8 +216,9 @@ extension ChatUser: Equatable {
         lhs == rhs &&
         lhs.firstName == rhs.firstName &&
         lhs.lastName == rhs.lastName &&
+        lhs.username == rhs.username &&
         lhs.avatarUrl == rhs.avatarUrl &&
-        lhs.metadata == rhs.metadata &&
+        lhs.metadataDict == rhs.metadataDict &&
         lhs.blocked == rhs.blocked &&
         lhs.state == rhs.state &&
         lhs.presence.state == rhs.presence.state &&
