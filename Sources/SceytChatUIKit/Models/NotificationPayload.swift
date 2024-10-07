@@ -63,14 +63,16 @@ struct NotificationPayload {
                                 id: $0.id,
                                 firstName: user.firstName ?? "",
                                 lastName: user.lastName ?? "",
-                                metadata: user.metadata ?? "",
+                                username: user.username ?? "",
+                                metadataDict: user.metadataMap ?? [:],
                                 presenceStatus: user.presence.status ?? "")
                         }
                         return .init(
                             id: $0.id,
                             firstName: "",
                             lastName: "",
-                            metadata: "",
+                            username: "",
+                            metadataDict: [:],
                             presenceStatus: "")
                     }
                 } else {
@@ -180,7 +182,8 @@ struct NotificationPayload {
         let id: String
         let firstName: String
         let lastName: String
-        let metadata: String
+        let username: String
+        let metadataDict: [String: String]
         let presenceStatus: String
         
         var displayName: String {
@@ -188,9 +191,11 @@ struct NotificationPayload {
         }
         
         enum CodingKeys: String, CodingKey {
-            case id, metadata
+            case id
+            case metadataDict = "metadata_map"
             case firstName = "first_name"
             case lastName = "last_name"
+            case username
             case presenceStatus = "presence_status"
         }
         
@@ -199,7 +204,8 @@ struct NotificationPayload {
             id = try values.decode(String.self, forKey: .id)
             firstName = try values.decode(String.self, forKey: .firstName)
             lastName = try values.decode(String.self, forKey: .lastName)
-            metadata = try values.decode(String.self, forKey: .metadata)
+            username = try values.decode(String.self, forKey: .username)
+            metadataDict = try values.decode([String: String].self, forKey: .metadataDict)
             presenceStatus = try values.decode(String.self, forKey: .presenceStatus)
         }
         
@@ -207,13 +213,15 @@ struct NotificationPayload {
             id: String,
             firstName: String,
             lastName: String,
-            metadata: String,
+            username: String,
+            metadataDict: [String: String],
             presenceStatus: String)
         {
             self.id = id
             self.firstName = firstName
             self.lastName = lastName
-            self.metadata = metadata
+            self.username = username
+            self.metadataDict = metadataDict
             self.presenceStatus = presenceStatus
         }
     }

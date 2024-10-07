@@ -120,8 +120,9 @@ open class ChannelLayoutModel {
             let shouldUpdateAvatar = currentUser.avatarUrl != user.avatarUrl
             currentUser.firstName = user.firstName
             currentUser.lastName = user.lastName
+            currentUser.username = user.username
             currentUser.avatarUrl = user.avatarUrl
-            currentUser.metadata = user.metadata
+            currentUser.metadataDict = user.metadataDict
             currentUser.presence = user.presence
             currentUser.state = user.state
             formatedSubject = Formatters.channelDisplayName.format(channel)

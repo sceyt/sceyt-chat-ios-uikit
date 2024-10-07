@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="22757" systemVersion="23E224" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23231" systemVersion="24A335" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
     <entity name="AttachmentDTO" representedClassName="AttachmentDTO" syncable="YES">
         <attribute name="channelId" optional="YES" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="createdAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
@@ -129,13 +129,12 @@
         <attribute name="incoming" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="markerTotal" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="NSDictionary"/>
         <attribute name="metadata" optional="YES" attributeType="String"/>
-        <attribute name="orderedMentionedUserIds" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="Array&lt;String&gt;"/>
+        <attribute name="orderedMentionedUserIds" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="NSArray&lt;NSString&gt;"/>
         <attribute name="pendingMarkerNames" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer"/>
         <attribute name="reactionScores" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="NSDictionary"/>
         <attribute name="replied" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="repliedInThread" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="replyCount" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
-        <attribute name="selfMarkerNames" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromDataTransformer" customClassName="Array&lt;String&gt;"/>
         <attribute name="silent" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="state" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="tid" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
@@ -202,11 +201,11 @@
         <attribute name="firstName" optional="YES" attributeType="String"/>
         <attribute name="id" optional="YES" attributeType="String" defaultValueString=""/>
         <attribute name="lastName" optional="YES" attributeType="String"/>
-        <attribute name="metadata" optional="YES" attributeType="String"/>
         <attribute name="presenceLastActiveAt" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="presenceState" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="presenceStatus" optional="YES" attributeType="String"/>
         <attribute name="state" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="username" optional="YES" attributeType="String"/>
         <relationship name="creator" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="createdBy" inverseEntity="ChannelDTO"/>
         <relationship name="forward" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="forwardUser" inverseEntity="MessageDTO"/>
         <relationship name="markers" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MarkerDTO" inverseName="user" inverseEntity="MarkerDTO"/>
@@ -214,6 +213,7 @@
         <relationship name="mention" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="mentionedUsers" inverseEntity="MessageDTO"/>
         <relationship name="messageChange" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="changedBy" inverseEntity="MessageDTO"/>
         <relationship name="messages" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MessageDTO" inverseName="user" inverseEntity="MessageDTO"/>
+        <relationship name="metadataEntries" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="UserMetadataDTO" inverseName="user" inverseEntity="UserMetadataDTO"/>
         <relationship name="reaction" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ReactionDTO" inverseName="user" inverseEntity="ReactionDTO"/>
         <uniquenessConstraints>
             <uniquenessConstraint>
@@ -222,5 +222,10 @@
                 <constraint value="state"/>
             </uniquenessConstraint>
         </uniquenessConstraints>
+    </entity>
+    <entity name="UserMetadataDTO" representedClassName="UserMetadataDTO" syncable="YES">
+        <attribute name="key" attributeType="String"/>
+        <attribute name="value" attributeType="String"/>
+        <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserDTO" inverseName="metadataEntries" inverseEntity="UserDTO"/>
     </entity>
 </model>

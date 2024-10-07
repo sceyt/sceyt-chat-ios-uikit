@@ -56,7 +56,9 @@ struct UserProfile {
                 firstName: firstName,
                 lastName: lastName,
                 avatarUrl: uploadedAvatarUrl,
-                metadata: ChatClient.shared.user.metadata)
+                metadata: ChatClient.shared.user.metadata,
+                metadataMap: ChatClient.shared.user.metadataMap,
+                username: ChatClient.shared.user.username)
         { _, error in
             completion?(error)
         }
