@@ -21,7 +21,7 @@ extension MessageCell {
         open lazy var stackView = UIStackView()
             .withoutAutoresizingMask
         
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -34,8 +34,7 @@ extension MessageCell {
             stackView.axis = .horizontal
             stackView.spacing = Measure.itemSpacing
             
-            iconView.image = Images.forwardedMessage
-            titleLabel.text = L10n.Message.Forward.title
+            titleLabel.text = appearance.forwardedText
         }
        
         open override func setupLayout() {
@@ -48,9 +47,9 @@ extension MessageCell {
         
         open override func setupAppearance() {
             super.setupAppearance()
-            titleLabel.font = appearance.forwardTitleFont
-            titleLabel.textColor = appearance.forwardTitleColor
-
+            titleLabel.font = appearance.forwardedTitleLabelAppearance.font
+            titleLabel.textColor = appearance.forwardedTitleLabelAppearance.foregroundColor
+            iconView.image = appearance.forwardedIcon
         }
         
         open class func measure(
@@ -58,7 +57,7 @@ extension MessageCell {
             appearance: MessageCell.Appearance
         ) -> CGSize {
             let iconSize = Images.forwardedMessage.size
-            let text = NSAttributedString(string: L10n.Message.Forward.title, attributes: [.font: appearance.forwardTitleFont as Any])
+            let text = NSAttributedString(string: appearance.forwardedText, attributes: [.font: appearance.forwardedTitleLabelAppearance.font as Any])
             let textSize = TextSizeMeasure.calculateSize(of: text)
             return CGSize(width: iconSize.width + textSize.textSize.width + Measure.itemSpacing, height: max(iconSize.height, textSize.textSize.height))
         }

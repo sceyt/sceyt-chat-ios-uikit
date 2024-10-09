@@ -46,7 +46,7 @@ open class ReactionPresentationController: UIPresentationController {
     
     override open func presentationTransitionWillBegin() {
         super.presentationTransitionWillBegin()
-        dimView.backgroundColor = UIColor(rgb: 0x000000, alpha: 0.5)
+        dimView.backgroundColor = .overlayBackground1
         containerView?.addSubview(dimView)
         if let presented = presentedView {
             containerView?.addSubview(presented)

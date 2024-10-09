@@ -97,7 +97,7 @@ open class Control: UIControl, Configurable {
 }
 
 open class HighlightableControl: Control {
-    open var backgroundColors: (normal: UIColor?, highlighted: UIColor?, selected: UIColor?) = (nil, Colors.highlighted, Colors.highlighted)
+    open var backgroundColors: (normal: UIColor?, highlighted: UIColor?, selected: UIColor?) = (nil, UIColor.surface2, UIColor.surface2)
     
     open override var isSelected: Bool {
         didSet {
@@ -377,7 +377,7 @@ open class CollectionReusableView: UICollectionReusableView, Configurable {
     }
 }
 
-open class CollectionViewCell: UICollectionViewCell {
+open class CollectionViewCell: UICollectionViewCell, Configurable {
 
     private var isConfigured = false
 
@@ -440,8 +440,8 @@ open class ViewController: UIViewController, Configurable {
 
     open func setupAppearance() {
         view.setNeedsDisplay()
-        view.backgroundColor = .background
-        navigationController?.navigationBar.barTintColor = .white
+//        view.backgroundColor = .background
+//        navigationController?.navigationBar.barTintColor = .white
     }
     
     open func setupDone() {}
@@ -455,6 +455,11 @@ open class ViewController: UIViewController, Configurable {
                 _EmptyBarButtonItem(title: "", style: .plain, target: nil, action: nil)
             }
         }
+    }
+    
+    open override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        setupAppearance()
     }
     
     class _EmptyBarButtonItem: UIBarButtonItem {
@@ -504,14 +509,10 @@ open class NavigationController: UINavigationController, Configurable {
         setupDone()
     }
     
-    open func setup() {
-//        modalPresentationStyle = .fullScreen
-    }
+    open func setup() {}
     
     open func setupAppearance() {
-        navigationBar.tintColor = appearance.tintColor
-        navigationBar.standardAppearance = appearance.standard
-        navigationBar.scrollEdgeAppearance = appearance.standard
+        navigationBar.apply(appearance: appearance.barAppearance.appearance)
     }
     
     open func setupLayout() {

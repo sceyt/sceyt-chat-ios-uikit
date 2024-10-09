@@ -224,10 +224,48 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                     }
                 }
                 if self.backgroundPerformContext.hasChanges {
+                    self.logUncommittedChanges(context: self.backgroundPerformContext)
+                    logger.info("[DATABASE] Will save on backgroundPerformContext")
                     try self.backgroundPerformContext.save()
+                    logger.info("[DATABASE] Saved on backgroundPerformContext")
                 }
             } catch {
                 resultQueue.async { completion?(error) }
+            }
+        }
+    }
+    
+    func logUncommittedChanges(context: NSManagedObjectContext) {
+        let insertedObjects = context.insertedObjects
+        let updatedObjects = context.updatedObjects
+        let deletedObjects = context.deletedObjects
+        let registeredObjects = context.registeredObjects
+        
+        if !insertedObjects.isEmpty {
+            logger.info("[DATABASE] Inserted Objects:")
+            for object in insertedObjects {
+                logger.info(object.description)
+            }
+        }
+        
+        if !updatedObjects.isEmpty {
+            logger.info("[DATABASE] Updated Objects:")
+            for object in updatedObjects {
+                logger.info(object.description)
+            }
+        }
+        
+        if !deletedObjects.isEmpty {
+            logger.info("[DATABASE] Deleted Objects:")
+            for object in deletedObjects {
+                logger.info(object.description)
+            }
+        }
+        
+        if !registeredObjects.isEmpty {
+            logger.info("[DATABASE] Registered Objects:")
+            for object in registeredObjects {
+                logger.info(object.description)
             }
         }
     }
@@ -411,7 +449,7 @@ public extension NSManagedObjectContext {
     func mergeChangesWithViewContext(fromRemoteContextSave: [AnyHashable: Any]) {
         NSManagedObjectContext.mergeChanges(
             fromRemoteContextSave: fromRemoteContextSave,
-            into: [self, Config.database.viewContext]
+            into: [self, SceytChatUIKit.shared.database.viewContext]
         )
     }
 }

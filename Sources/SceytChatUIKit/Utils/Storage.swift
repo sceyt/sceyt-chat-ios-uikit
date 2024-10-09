@@ -33,6 +33,8 @@ public extension StoringKey {
 
 open class Storage: NSObject {
 
+    public static var calculateChecksumMaxBytes = 3_000_000
+    
     public static var storingKey: StoringKey = SceytChatStoringKey()
 
     open class func fileUrl(for originalUrl: URL) -> URL? {
@@ -262,7 +264,7 @@ open class Storage: NSObject {
     }
     
     open class func checksum(filePath: String) -> Int {
-        let upToCount = Config.calculateChecksumMaxBytes
+        let upToCount = calculateChecksumMaxBytes
         let fileUrl = URL(fileURLWithPath: filePath)
         let fileSize = sizeOfItem(at: fileUrl)
         guard fileSize > 0
@@ -343,14 +345,14 @@ extension Storage {
 open class SceytChatStoringKey: StoringKey {
 
     public static var sceytChatStorageHost: String {
-        ChatClient.shared.apiUrl?.host ?? ""
+        SceytChatUIKit.shared.chatClient.apiUrl?.host ?? ""
     }
 
     public static let storageFolder = "SceytChatFiles"
 
     public required init() {}
 
-    open var storageFolderPath: String = Config.storageDirectory?.path ?? NSTemporaryDirectory()
+    open var storageFolderPath: String = SceytChatUIKit.shared.config.storageConfig.storageDirectory?.path ?? NSTemporaryDirectory()
 
     open func storingFilename(url: URL) -> String {
         url.encoded

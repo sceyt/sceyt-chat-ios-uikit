@@ -21,7 +21,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = (scene as? UIWindowScene) else { return }
         
         if let window = windowScene.windows.first {
-            window.tintColor = Appearance.Colors.kitBlue
+            window.tintColor = UIColor.accent
+            self.window = window
         }
     }
 
@@ -58,7 +59,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard backgroundTaskId == .invalid else { return }
         backgroundTaskId = UIApplication.shared
             .beginBackgroundTask(withName: "Close Chat socket") {
-                SCTUIKitConfig.disconnect()
+                SceytChatUIKit.shared.disconnect()
                 UIApplication.shared.endBackgroundTask(self.backgroundTaskId)
                 self.backgroundTaskId = .invalid
             }

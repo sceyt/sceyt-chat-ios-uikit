@@ -8,4 +8,4 @@
 
 import Foundation
 
-open class ChannelForwardRouter: Router<ChannelForwardVC> {}
+open class ChannelForwardRouter: Router<ForwardViewController> {}

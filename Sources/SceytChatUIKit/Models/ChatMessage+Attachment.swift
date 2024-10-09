@@ -102,7 +102,7 @@ extension ChatMessage {
             self.status = status
             self.transferProgress = transferProgress
             $user = {
-                try? Provider.database.read {
+                try? DataProvider.database.read {
                      UserDTO.fetch(id: userId, context: $0)?.convert()
                 }.get()
             }
@@ -256,6 +256,12 @@ extension ChatMessage.Attachment: Hashable {
         hasher.combine(tid)
         hasher.combine(name)
         hasher.combine(type)
+        
+        if let url {
+            hasher.combine(url)
+        } else {
+            hasher.combine(filePath)
+        }
     }
 }
 

@@ -58,7 +58,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
                     .init(keyPath: \AttachmentDTO.id, ascending: ascending)])
                 .fetch(predicate: predicate)
                 .fetch(batchSize: 10),
-            context: Config.database.viewContext
+            context: SceytChatUIKit.shared.database.viewContext
         ) { $0.convert() }
     }()
 
@@ -159,7 +159,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
         if me == attachment.userId {
             return L10n.User.current
         } else if let user = attachment.user {
-            return Formatters.userDisplayName.format(user)
+            return SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
         } else {
             return ""
         }
@@ -178,7 +178,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
               fileProvider.filePath(attachment: attachment) == nil
         else { return }
         downloadQueue.async {
-            guard let chatMessage = try? Provider.database.read ({
+            guard let chatMessage = try? DataProvider.database.read ({
                 MessageDTO.fetch(id: attachment.messageId, context: $0)?
                     .convert()
             }).get()

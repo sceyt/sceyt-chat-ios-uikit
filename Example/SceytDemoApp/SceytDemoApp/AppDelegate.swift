@@ -37,11 +37,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         UIBarButtonItem.appearance()
             .setTitleTextAttributes([
                 .font: Appearance.Fonts.bold.withSize(16),
-                .foregroundColor: Appearance.Colors.kitBlue
+                .foregroundColor: UIColor.accent
             ], for: [])
-        UITabBar.appearance().tintColor = Appearance.Colors.kitBlue
-        UISwitch.appearance().onTintColor = Appearance.Colors.kitBlue
+        UITabBar.appearance().tintColor = UIColor.accent
+        UISwitch.appearance().onTintColor = UIColor.accent
     }
-
 }
 

@@ -28,10 +28,10 @@ open class FilePreviewController: NSObject, QLPreviewControllerDelegate, QLPrevi
 
     private var _callback: ((State) -> Void)?
 
-    open func present(on vc: UIViewController, callback: ((State) -> Void)? = nil) {
+    open func present(on viewController: UIViewController, callback: ((State) -> Void)? = nil) {
         Self.retain = self
         _callback = callback
-        vc.present(viewer, animated: true) {
+        viewController.present(viewer, animated: true) {
             self._callback?(.didPresent)
         }
     }

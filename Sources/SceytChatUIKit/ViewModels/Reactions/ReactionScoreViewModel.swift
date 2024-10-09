@@ -32,9 +32,9 @@ public struct ReactionScoreViewModel {
     }
 
     public func width(at indexPath: IndexPath) -> CGFloat {
-        let appearance = ReactionScoreCell.appearance
-        let textInsets = ReactionScoreCell.textInsets ?? .zero
-        let containerInsets = ReactionScoreCell.containerInsets ?? .zero
+        let appearance = Components.reactionsInfoScoreCell.appearance
+        let textInsets = Components.reactionsInfoScoreCell.textInsets ?? .zero
+        let containerInsets = Components.reactionsInfoScoreCell.containerInsets ?? .zero
         let size = dataSource[indexPath.item].size(withAttributes: [.font: appearance.textFont ?? .systemFont(ofSize: 12)])
         return ceil(size.width) + textInsets.left + textInsets.right + containerInsets.left + containerInsets.right
     }

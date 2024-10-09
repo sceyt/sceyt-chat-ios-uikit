@@ -225,7 +225,7 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         if let results = MemberDTO.fetch(request: fetchRequest, context: self) as? [[String: Int64]] {
             let channelIds = results.compactMap { $0.values.first.map { ChannelId($0) }}
             let fetchRequest = ChannelDTO.fetchRequest()
-            fetchRequest.predicate = NSPredicate(format: "(type == %@) AND (id IN %@)", "direct", channelIds)
+            fetchRequest.predicate = NSPredicate(format: "(type == %@) AND (id IN %@)", SceytChatUIKit.shared.config.channelTypesConfig.direct, channelIds)
             let channels = ChannelDTO.fetch(request: fetchRequest, context: self)
             channels.forEach { dto in
                 dto.toggle.toggle()

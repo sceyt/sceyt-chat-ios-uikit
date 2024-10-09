@@ -38,7 +38,7 @@ extension MessageCell {
         open lazy var stackViewH2 = UIStackView()
             .withoutAutoresizingMask
         
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -81,11 +81,9 @@ extension MessageCell {
             stackViewH2.addArrangedSubview(messageLabel)
             stackViewV.addArrangedSubview(stackViewH2)
             stackViewH.setCustomSpacing(8, after: borderView)
-            stackViewH.pin(to: self)
+            stackViewH.pin(to: self, anchors: [.leading(0), .trailing(-8), .top(8), .bottom(-8)])
             borderView.resize(anchors: [.width(2)])
-//            borderView.bottomAnchor.pin(to: messageLabel.bottomAnchor)
-            borderView.heightAnchor.pin(to: stackViewH.heightAnchor)
-//            messageLabel.widthAnchor.pin(to: stackViewV.widthAnchor)
+            borderView.heightAnchor.pin(to: self.heightAnchor)
             stackViewV.heightAnchor.pin(to: stackViewH.heightAnchor)
         }
 
@@ -93,13 +91,13 @@ extension MessageCell {
             super.setupAppearance()
             isHidden = true
 
-            nameLabel.font = appearance.replyUserTitleFont
-            nameLabel.textColor = appearance.replyUserTitleColor
+            nameLabel.font = appearance.replyMessageAppearance.titleLabelAppearance.font
+            nameLabel.textColor = appearance.replyMessageAppearance.titleLabelAppearance.foregroundColor
 
-            messageLabel.font = appearance.replyMessageFont
-            messageLabel.textColor = appearance.replyMessageColor
+            messageLabel.font = appearance.replyMessageAppearance.subtitleLabelAppearance.font
+            messageLabel.textColor = appearance.replyMessageAppearance.subtitleLabelAppearance.foregroundColor
             
-            borderView.backgroundColor = appearance.replyMessageBorderColor
+            borderView.backgroundColor = appearance.replyMessageAppearance.borderColor
         }
 
         open var data: MessageLayoutModel.ReplyLayout? {
@@ -116,7 +114,11 @@ extension MessageCell {
                     return
                 }
                 isHidden = false
-                nameLabel.text = Formatters.userDisplayName.format(data.user)
+                backgroundColor = data.byMe ? appearance.outgoingReplyBackgroundColor : appearance.incomingReplyBackgroundColor
+                layer.cornerRadius = Layouts.cornerRadius
+                layer.maskedCorners = [.layerMaxXMinYCorner, .layerMaxXMaxYCorner]
+                layer.masksToBounds = true
+                nameLabel.text = appearance.replyMessageAppearance.senderNameFormatter.format(data.user)
                 messageLabel.attributedText = data.attributedBody
                 if let image = data.icon {
                     stackViewH2.insertArrangedSubview(iconView, at: 0)
@@ -193,108 +195,18 @@ extension MessageCell {
                 space = 10
             }
             var config = TextSizeMeasure.Config(maximumNumberOfLines: 1, lastFragmentUsedRect: false)
-            config.font = appearance.replyUserTitleFont
+            config.font = appearance.replyMessageAppearance.titleLabelAppearance.font
             config.restrictingWidth = MessageLayoutModel.defaults.messageWidth - thumbnailSize.width
-            let user = Formatters.userDisplayName.format(data.user)
+            let user = SceytChatUIKit.shared.formatters.userNameFormatter.format(data.user)
             let nameLabelSize = TextSizeMeasure.calculateSize(of: user, config: config).textSize
             
-            config.font = appearance.replyMessageFont
+            config.font = appearance.replyMessageAppearance.subtitleLabelAppearance.font
             config.restrictingWidth = MessageLayoutModel.defaults.messageWidth - space
             config.maximumNumberOfLines = data.attachment == nil ? 2 : 1
             let messageLabelSize = TextSizeMeasure.calculateSize(of: data.attributedBody, config: config).textSize
             
-            return CGSize(width: thumbnailSize.width + max(nameLabelSize.width, iconSize.width + messageLabelSize.width),
-                          height: max(thumbnailSize.height, nameLabelSize.height + max(iconSize.height, messageLabelSize.height)))
-        }
-    }
-}
-
-extension MessageCell {
-
-    open class ReplyCountView: Button {
-        
-        public lazy var appearance = MessageCell.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-
-        open override func setup() {
-            super.setup()
-            isUserInteractionEnabled = false
-        }
-        open override func setupAppearance() {
-            super.setupAppearance()
-            setTitleColor(appearance.replyCountTextColor, for: .normal)
-            titleLabel?.font = appearance.replyCountTextFont
-        }
-
-        open var count: Int = 0 {
-            didSet {
-                setTitle(count > 0 ? L10n.Message.Reply.count(count) : nil, for: .normal)
-                isUserInteractionEnabled = count > 0
-            }
-        }
-    }
-}
-
-extension MessageCell {
-
-    open class ReplyArrowView: View {
-        
-        public lazy var appearance = MessageCell.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-
-        open override func setupLayout() {
-            super.setupLayout()
-            backgroundColor = .clear
-            clipsToBounds = true
-            clearsContextBeforeDrawing = true
-        }
-
-        open var isFlipped: Bool = false {
-            didSet {
-                layer.setNeedsDisplay()
-            }
-        }
-
-        open override func draw(_ layer: CALayer, in ctx: CGContext) {
-            super.draw(layer, in: ctx)
-            
-            guard let strokeColor = appearance.replyArrowStrokeColor?.cgColor
-            else { return }
-            
-            let rect = bounds.insetBy(dx: 1, dy: 1)
-            let radius = CGFloat(rect.width / 2)
-
-            UIGraphicsPushContext(ctx)
-            if isFlipped {
-                ctx.translateBy(x: rect.maxX, y: 0)
-                ctx.scaleBy(x: -1, y: 1)
-            }
-            ctx.setStrokeColor(strokeColor)
-            ctx.setLineWidth(1)
-            ctx.move(to: rect.origin)
-            ctx.addLine(to: CGPoint(x: rect.origin.x, y: rect.maxY - radius))
-            ctx.addArc(center: CGPoint(x: rect.minX + radius, y: rect.maxY - radius),
-                       radius: radius, startAngle: radians(degrees: -180),
-                       endAngle: radians(degrees: -270),
-                       clockwise: true)
-            ctx.strokePath()
-
-            UIGraphicsPopContext()
-        }
-
-        open override func layoutSubviews() {
-            super.layoutSubviews()
-            layer.setNeedsDisplay()
-        }
-
-        open func radians(degrees: CGFloat) -> CGFloat {
-            degrees * .pi / 180.0
+            return CGSize(width: thumbnailSize.width + max(nameLabelSize.width, iconSize.width + messageLabelSize.width) + 8,
+                          height: max(thumbnailSize.height, nameLabelSize.height + max(iconSize.height, messageLabelSize.height)) + 16)
         }
     }
 }

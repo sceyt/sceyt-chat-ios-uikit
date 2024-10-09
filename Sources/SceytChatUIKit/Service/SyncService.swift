@@ -150,7 +150,7 @@ public final class SyncService: NSObject {
             let completionOperator = Operation()
             let channelCompletionOperator = Operation()
             
-            let results = try? Provider.database.read { context in
+            let results = try? DataProvider.database.read { context in
                 let result1 = context.fetchChannelsToSyncMessages()
                 let result2 = context.fetchPendingMarkerToSyncMessages()
                 let result3 = context.fetchChannelsForPendingMessages()
@@ -225,7 +225,7 @@ public struct Operations {
         let fetchChannels = FetchAllChannelsOperation(query: provider.defaultQuery)
         fetchChannels.onLoad = onLoad
         
-        let deleteChannels = DeleteChannelsOperation(database: Provider.database, channelIds: undeleteChannelIds)
+        let deleteChannels = DeleteChannelsOperation(database: DataProvider.database, channelIds: undeleteChannelIds)
         
         let fetchDone = BlockOperation { [unowned fetchChannels, unowned deleteChannels, unowned createChannel] in
             guard case let .success(channels)? = fetchChannels.result else {
@@ -251,7 +251,7 @@ public struct Operations {
     public static func syncChannelMessagesOperations(startMessageId: MessageId, channelId: ChannelId) -> Operation {
         let query = MessageListQuery
             .Builder(channelId: channelId)
-            .limit(30)
+            .limit(SceytChatUIKit.shared.config.queryLimits.messageListQueryLimit)
             .build()
         let messageOperation = FetchChannelMessagesOperation(query: query)
         messageOperation.startMessageId = startMessageId

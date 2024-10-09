@@ -8,10 +8,10 @@
 
 import UIKit
 
-typealias Fonts = Appearance.Fonts
+public typealias Fonts = Appearance.Fonts
 
 public extension Appearance {
-    struct Fonts {
+    public struct Fonts {
         public static var defaultSize: CGFloat = 10
         
         public static var regular: UIFont = UIFont.systemFont(ofSize: defaultSize, weight: .regular)
@@ -53,5 +53,31 @@ public extension UIFont {
     
     var isMonospace: Bool {
         fontDescriptor.symbolicTraits.contains(.traitMonoSpace) || fontName == Fonts.monospace.fontName
+    }
+    
+    var toMonospace: UIFont {
+        var result = Fonts.monospace.withSize(self.pointSize)
+        if self.isBold {
+            result = result.with(traits: .traitBold)
+        }
+        if self.isItalic {
+            result = result.with(traits: .traitItalic)
+        }
+        return result
+    }
+    
+    var toBold: UIFont {
+        var result = Fonts.bold.withSize(self.pointSize)
+        if self.isItalic {
+            result = result.with(traits: .traitItalic)
+        }
+        if self.isMonospace {
+            result = result.toMonospace
+        }
+        return result
+    }
+    
+    var toItalic: UIFont {
+        return self.with(traits: .traitItalic, pointSize: self.pointSize)
     }
 }

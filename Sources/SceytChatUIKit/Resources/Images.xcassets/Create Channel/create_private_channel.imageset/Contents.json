@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "create_private_channel.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -54,12 +54,12 @@ open class CircularProgressView: View {
         super.setupAppearance()
     
         trackLayer.fillColor = UIColor.clear.cgColor
-        trackLayer.strokeColor = trackColor?.cgColor
+        trackLayer.strokeColor = appearance.trackColor?.cgColor
         trackLayer.lineWidth = 3.0
         trackLayer.strokeEnd = 1.0
 
         progressLayer.fillColor = UIColor.clear.cgColor
-        progressLayer.strokeColor = progressColor?.cgColor
+        progressLayer.strokeColor = appearance.progressColor?.cgColor
         progressLayer.lineWidth = 3.0
         progressLayer.strokeEnd = 0.0
         progressLayer.lineCap = .round

@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ChannelSwipeActionsConfiguration {
+open class ChannelSwipeActionsConfiguration: NSObject {
     
     public typealias Handler = (UIContextualAction, UIView, Actions, @escaping (Bool) -> Void) -> Void
     

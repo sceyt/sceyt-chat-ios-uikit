@@ -14,7 +14,11 @@ extension MessageCell {
         open lazy var stackView = UIStackView()
             .withoutAutoresizingMask
 
-        public lazy var appearance = MessageCell.appearance
+        open lazy var appearance = Components.messageCell.appearance {
+            didSet {
+                setupAppearance()
+            }
+        }
         
         override open func setup() {
             super.setup()
@@ -34,7 +38,7 @@ extension MessageCell {
         override open func setupAppearance() {
             super.setupAppearance()
             layer.shadowColor = UIColor.darkGray.withAlphaComponent(0.3).cgColor
-            backgroundColor = appearance.reactionContainerBackgroundColor
+            backgroundColor = appearance.reactionsContainerBackgroundColor
         }
     
         override open func layoutSubviews() {
@@ -83,7 +87,7 @@ extension MessageCell {
                     }
                     
                     for reaction in reactions {
-                        let rLabel = ReactionLabel(key: reaction.key, isScore: reaction.isCommonScoreNumber)
+                        let rLabel = Components.messageCellReactionLabel.init(key: reaction.key)
                             .withoutAutoresizingMask
                         hv.addArrangedSubview(rLabel)
                         
@@ -128,61 +132,6 @@ extension MessageCell {
     }
 }
 
-extension MessageCell {
-    open class ReactionLabel: UILabel {
-        private var isConfigured = false
-
-        public let key: String
-        public let isScore: Bool
-
-        public lazy var appearance = MessageCell.appearance {
-            didSet {
-                setupAppearance()
-            }
-        }
-
-        public required init(key: String, isScore: Bool) {
-            self.key = key
-            self.isScore = isScore
-            super.init(frame: .zero)
-            setup()
-            setupAppearance()
-        }
-
-        public required init?(coder: NSCoder) {
-            key = ""
-            isScore = false
-            super.init(coder: coder)
-            setup()
-            setupAppearance()
-        }
-        
-        override open func didMoveToSuperview() {
-            super.didMoveToSuperview()
-            guard !isConfigured else { return }
-            setupLayout()
-            setupDone()
-            isConfigured = true
-        }
-        
-        open func setup() {
-            showsLargeContentViewer = false
-            textAlignment = .center
-            lineBreakMode = .byCharWrapping
-            layer.drawsAsynchronously = true
-            text = key
-        }
-        
-        open func setupAppearance() {
-            font = isScore ? appearance.reactionCommonScoreFont : appearance.reactionFont
-            textColor = appearance.reactionColor
-        }
-        
-        open func setupLayout() {}
-        open func setupDone() {}
-    }
-}
-
 public extension MessageCell.ReactionTotalView {
     enum Measure {
         public static var contentInsets = UIEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
@@ -191,12 +140,4 @@ public extension MessageCell.ReactionTotalView {
         public static var itemSpacingH = CGFloat(8)
         public static var itemSpacingV = CGFloat(4)
     }
-    
-//    enum Anchors {
-//        public static var top = CGFloat(2)
-//        public static var bottom = CGFloat(-2)
-//        public static var leading = CGFloat(8)
-//        public static var trailing = CGFloat(-8)
-//
-//    }
 }

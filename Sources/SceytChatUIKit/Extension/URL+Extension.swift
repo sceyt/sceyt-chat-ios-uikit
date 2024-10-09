@@ -51,18 +51,6 @@ public extension URL {
         guard let uti = uti else { return false }
         return UTTypeConformsTo(uti, kUTTypeMovie)
     }
-
-    var sanitise: URL {
-        if var components = URLComponents(url: self, resolvingAgainstBaseURL: false) {
-            if components.scheme == nil {
-                components.scheme = "http"
-            }
-
-            return components.url ?? self
-        }
-
-        return self
-    }
     
     init?(string: String?) {
         if let string {
@@ -101,6 +89,9 @@ public extension URL {
         if let url = URL(string: "http://" + absoluteString) {
             return url
         }
-        return normalizedURL
+        if let url = URL(string: "https://" + absoluteString) {
+            return url
+        }
+        return self
     }
 }

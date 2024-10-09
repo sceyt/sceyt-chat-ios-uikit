@@ -37,27 +37,31 @@ extension Config {
 struct UserDefaultsConfig<T> {
     let key: String
     let defaultValue: T?
-
+    
     init(_ key: String, defaultValue: T? = nil) {
         self.key = key
         self.defaultValue = defaultValue
     }
-
+    
     var wrappedValue: T? {
-        get { return UserDefaults.standard.object(forKey: key) as? T ?? defaultValue }
-        set { UserDefaults.standard.set(newValue, forKey: key) }
+        get { return SceytChatUIKit.shared.config.storageConfig.userDefaults.object(forKey: key) as? T ?? defaultValue }
+        set { SceytChatUIKit.shared.config.storageConfig.userDefaults.set(newValue, forKey: key) }
     }
 }
 
 
 func configureSceytChatUIKit() {
     if let currentUserId = Config.currentUserId {
-        SCTUIKitConfig.currentUserId = currentUserId
+        SceytChatUIKit.shared.currentUserId = currentUserId
     }
-    SCTUIKitConfig.initialize(apiUrl: Config.sceytApiURL, appId: Config.sceytAppId, clientId: Config.clientId!)
-    SCTUIKitConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
-    SCTUIKitConfig.setLogLevel(.verbose)
+    SceytChatUIKit.initialize(apiUrl: Config.sceytApiURL,
+                              appId: Config.sceytAppId,
+                              clientId: Config.clientId!)
+    SceytChatUIKit.shared.config.storageConfig.storageDirectory = URL(fileURLWithPath: FileStorage.default.storagePath)
+    SceytChatUIKit.shared.setLogger(with: .verbose) { logMessage, logLevel, logString, file, function, line in
+        print()
+    }
     
     // Set customized Subclass for formatters
-    Formatters.userDisplayName = UserDisplayNameFormatter()
+    SceytChatUIKit.shared.formatters.userNameFormatter = UserDisplayNameFormatter()
 }

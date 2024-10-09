@@ -1,5 +1,5 @@
 //
-//  TextView.swift
+//  TextLabel.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 09.08.23.

@@ -42,8 +42,8 @@ class LoginViewController: UIViewController {
         $0.setTitle("CONNECT", for: .normal)
         $0.setTitleColor(.white, for: .normal)
         
-        $0.setBackgroundImage(ImageBuilder.build(fillColor: Appearance.Colors.kitBlue), for: .normal)
-        $0.setBackgroundImage(ImageBuilder.build(fillColor: Appearance.Colors.kitBlue.withAlphaComponent(0.5)), for: .disabled)
+        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.accent), for: .normal)
+        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.accent.withAlphaComponent(0.5)), for: .disabled)
         $0.layer.cornerRadius = 8
         $0.layer.masksToBounds = true
         return $0.withoutAutoresizingMask
@@ -57,7 +57,7 @@ class LoginViewController: UIViewController {
         
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = Appearance.Colors.background
+        view.backgroundColor = UIColor.background
         setupLayout()
         connectButton.isEnabled = false
         connectButton.addTarget(self, action: #selector(connect(_:)), for: .touchUpInside)
@@ -77,7 +77,7 @@ class LoginViewController: UIViewController {
     
     private func addSeparatorView(to textField: UITextField) {
         let separatorView = UIView().withoutAutoresizingMask
-        separatorView.backgroundColor = Appearance.Colors.separator
+        separatorView.backgroundColor = .border
         textField.addSubview(separatorView)
         separatorView.pin(to: textField, anchors: [.bottom, .leading, .trailing])
         separatorView.heightAnchor.pin(constant: 1)
@@ -88,9 +88,9 @@ class LoginViewController: UIViewController {
         guard let username = usernameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
                 !username.isEmpty
         else { return }
-        hud.isLoading = true
+        loader.isLoading = true
         ConnectionService.shared.connect(username: username) { [weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self
             else { return }
             self.dismissSheet()
@@ -98,9 +98,9 @@ class LoginViewController: UIViewController {
                 self.showAlert(error: error)
                 return
             }
-            hud.isLoading = true
+            loader.isLoading = true
             self.updateProfile {[weak self] in
-                hud.isLoading = false
+                loader.isLoading = false
                 self?.dismiss(animated: true)
             }
             

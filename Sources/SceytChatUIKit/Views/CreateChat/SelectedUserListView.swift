@@ -24,8 +24,14 @@ open class SelectedUserListView: SelectedItemListView<ChatUser> {
         reload(items: user)
     }
     
+    override open func setup() {
+        super.setup()
+        
+        collectionView.register(Components.selectedUserCell.self)
+    }
+    
     override open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: SelectedUserCell.self)
+        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.selectedUserCell.self)
         cell.userData = items[indexPath.item]
         cell.onDelete = { [weak self] cell in
             guard let self,
@@ -37,10 +43,17 @@ open class SelectedUserListView: SelectedItemListView<ChatUser> {
 }
 
 open class SelectedChannelListView: SelectedItemListView<ChatChannel> {
+    
     public var onDelete: ((ChatChannel) -> Void)?
     
+    override open func setup() {
+        super.setup()
+        
+        collectionView.register(Components.selectedChannelCell.self)
+    }
+    
     override open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: SelectedUserCell.self)
+        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.selectedChannelCell.self)
         cell.channelData = items[indexPath.item]
         cell.onDelete = { [weak self] cell in
             guard let self,

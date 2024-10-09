@@ -23,16 +23,16 @@ open class UserSendMessage {
     open var mentionUsers: [(id: UserId, displayName: String)]?
     open var metadata: String?
     open var bodyAttributes: [ChatMessage.BodyAttribute]?
-    open var attachments: [AttachmentView]?
-    open var type = ChannelVM.MessageType.text
+    open var attachments: [AttachmentModel]?
+    open var type: String = ChannelViewModel.MessageType.text.rawValue
     open var linkMetadata: LinkMetadata?
     
-    open var linkAttachments: [AttachmentView] {
+    open var linkAttachments: [AttachmentModel] {
         Self.createLinkAttachmentsFrom(text: text, linkMetaData: linkMetadata)
     }
     
     public required init(sendText: NSAttributedString,
-                         attachments: [AttachmentView]? = nil,
+                         attachments: [AttachmentModel]? = nil,
                          linkMetadata: LinkMetadata? = nil
     ) {
         let sendText = sendText.trimWhitespacesAndNewlines().mutableCopy() as! NSMutableAttributedString
@@ -47,11 +47,11 @@ open class UserSendMessage {
         sendText.enumerateAttribute(.mention, in: NSRange(location: 0, length: sendText.length)) { obj, range, _ in
             if let id = obj as? UserId {
                 var displayName = nsString.substring(with: range)
-                if displayName.hasPrefix(Config.mentionSymbol) {
+                if displayName.hasPrefix(SceytChatUIKit.shared.config.mentionTriggerPrefix) {
                     displayName.removeFirst()
                 }
                 users.append((id, displayName))
-                mentions.append((range, Config.mentionSymbol + String(id)))
+                mentions.append((range, SceytChatUIKit.shared.config.mentionTriggerPrefix + String(id)))
             }
         }
         mentions.sorted(by: { $0.range.location > $1.range.location }).forEach {
@@ -99,10 +99,10 @@ open class UserSendMessage {
         }
     }
     
-    open class func createLinkAttachmentsFrom(text: String, linkMetaData: LinkMetadata?) -> [AttachmentView] {
+    open class func createLinkAttachmentsFrom(text: String, linkMetaData: LinkMetadata?) -> [AttachmentModel] {
         DataDetector.getLinks(text: text)
             .map { url in
-                AttachmentView(link: url, linkMetaData: linkMetaData, hideLinkDetails: linkMetaData == nil)
+                AttachmentModel(link: url, linkMetaData: linkMetaData, hideLinkDetails: linkMetaData == nil)
             }
     }
     
@@ -133,7 +133,7 @@ public enum AttachmentType: String {
     }
 }
 
-public struct AttachmentView {
+public struct AttachmentModel {
     public let url: URL
     public var resizedFileUrl: URL?
     public let thumbnail: UIImage
@@ -283,7 +283,7 @@ public struct AttachmentView {
                 self.thumbnail = image
                 type = .video
             } else {
-                self.thumbnail = .replyFile
+                self.thumbnail = .messageFile
             }
         }
         
@@ -301,7 +301,7 @@ public struct AttachmentView {
         name = url.lastPathComponent
         isLocalFile = true
         type = .file
-        thumbnail = .replyFile
+        thumbnail = .messageFile
         fileSize = Components.storage.sizeOfItem(at: url)
     }
     
@@ -310,7 +310,7 @@ public struct AttachmentView {
         name = url.lastPathComponent
         isLocalFile = true
         type = .voice
-        thumbnail = .replyFile
+        thumbnail = .messageFile
         duration = metadata.duration
         thumb = metadata.thumbnail
         fileSize = Components.storage.sizeOfItem(at: url)
@@ -326,7 +326,7 @@ public struct AttachmentView {
         self.hideLinkDetails = hideLinkDetails
     }
     
-    static func view(from asset: PHAsset, completion: @escaping (AttachmentView?) -> Void, progressHandler: ((Float) -> Void)? = nil) {
+    static func view(from asset: PHAsset, completion: @escaping (AttachmentModel?) -> Void, progressHandler: ((Float) -> Void)? = nil) {
         if asset.mediaType == .image {
             let options: PHContentEditingInputRequestOptions = .init()
             options.isNetworkAccessAllowed = true
@@ -343,7 +343,7 @@ public struct AttachmentView {
                         if let value = contentEditingInput, let fullSizeImageURL = value.fullSizeImageURL {
                             let fileUrl = Components.storage.copyFile(fullSizeImageURL) ?? fullSizeImageURL
                             var imageUrl: URL?
-                            if let jpeg = Components.imageBuilder.init(imageUrl: fileUrl)?.jpegData() {
+                            if let jpeg = Components.imageBuilder.init(imageUrl: fileUrl)?.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality) {
                                 let fileName = fileUrl
                                     .deletingPathExtension()
                                     .appendingPathExtension("jpg")
@@ -353,7 +353,7 @@ public struct AttachmentView {
                             if imageUrl == nil {
                                 imageUrl = fileUrl
                             }
-                            var v = AttachmentView(
+                            var v = AttachmentModel(
                                 mediaUrl: imageUrl ?? fullSizeImageURL,
                                 thumbnail: value.displaySizeImage
                             )
@@ -405,7 +405,7 @@ public struct AttachmentView {
                             duration = Int(slowMoDuration)
                         }
                         
-                        var v = AttachmentView(
+                        var v = AttachmentModel(
                             mediaUrl: URL(string: "local:///local/\(asset.localIdentifier)")!,
                             thumbnail: image,
                             imageSize: image.size,
@@ -428,10 +428,10 @@ public struct AttachmentView {
         }
     }
     
-    public static func items(attachments: [ChatMessage.Attachment]) -> [AttachmentView] {
+    public static func items(attachments: [ChatMessage.Attachment]) -> [AttachmentModel] {
         attachments
             .compactMap { Components.storage.fileUrl(for: $0) }
-            .compactMap { AttachmentView(mediaUrl: $0, thumbnail: nil) }
+            .compactMap { AttachmentModel(mediaUrl: $0, thumbnail: nil) }
     }
 }
 

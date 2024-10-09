@@ -1,6 +1,6 @@
 //
 //  UserDisplayNameFormatter.swift
-//  SceytDemoApp
+//  SceytChatUIKit
 //
 //  Created by Arthur Avagyan on 24.05.24.
 //  Copyright © 2024 Sceyt LLC. All rights reserved.
@@ -9,7 +9,7 @@
 import Foundation
 import SceytChatUIKit
 
-class UserDisplayNameFormatter: DefaultUserDisplayNameFormatter {
+class UserDisplayNameFormatter: UserNameFormatter {
     override func format(_ user: ChatUser) -> String {
         switch user.state {
         case .deleted, .inactive:

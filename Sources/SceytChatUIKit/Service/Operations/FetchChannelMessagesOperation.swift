@@ -95,7 +95,7 @@ open class FetchChannelMessagesOperation: SyncOperation {
     private func loadLastMessages() {
         MessageListQuery
             .Builder(channelId: query.channelId)
-            .limit(30)
+            .limit(SceytChatUIKit.shared.config.queryLimits.messageListQueryLimit)
             .build()
             .loadPrevious(messageId: 0) {[weak self] query, messages, error in
                 if let messages {

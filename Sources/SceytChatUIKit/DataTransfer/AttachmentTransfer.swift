@@ -12,7 +12,7 @@ import Combine
 
 let fileProvider = Components.attachmentTransfer.default
 
-open class AttachmentTransfer: Provider {
+open class AttachmentTransfer: DataProvider {
     
     public typealias ProgressBlock = (AttachmentProgress) -> Void
     public typealias CompletionBlock = (AttachmentCompletion) -> Void
@@ -35,6 +35,10 @@ open class AttachmentTransfer: Provider {
     public private(set) var uploadStopedOperations = [AsyncOperationBlock]()
     public var allTasks: [SCTDataSessionTaskInfo] {
         taskGroups.values.flatMap({ $0 })
+    }
+    
+    open func dataSession(for message: ChatMessage? = nil, forAttachment: ChatMessage.Attachment? = nil) -> SCTDataSession? {
+        Components.dataSession
     }
     
     private static func key(message: ChatMessage, attachment: ChatMessage.Attachment) -> String {
@@ -87,7 +91,7 @@ open class AttachmentTransfer: Provider {
                 return
             }
             
-            if let dataSession = Components.dataSession {
+            if let dataSession = self.dataSession(for: message) {
                 var tasks = [SCTDataSessionTaskInfo]()
                 let existTasks = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid]
                 for attachment in attachments {
@@ -161,7 +165,7 @@ open class AttachmentTransfer: Provider {
             $0.status != .pauseDownloading &&
             $0.status != .failedDownloading &&
             $0.status != .done &&
-            Components.dataSession?.getFilePath(attachment: $0) == nil
+            dataSession(for: message)?.getFilePath(attachment: $0) == nil
         }
         guard !needsToDownloadAttachments.isEmpty
         else { return [] }
@@ -184,7 +188,7 @@ open class AttachmentTransfer: Provider {
                 return
             }
             logger.verbose("[Attachment] downloadMessageAttachments \(attachments.map { $0.description })")
-            if let dataSession = Components.dataSession {
+            if let dataSession = self.dataSession(for: message) {
                 var tasks = [SCTDataSessionTaskInfo]()
                 let existTasks = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid]
                 for (_, attachment) in attachments.enumerated() {
@@ -491,7 +495,7 @@ open class AttachmentTransfer: Provider {
     }
     
     func filePath(attachment: ChatMessage.Attachment) -> String? {
-        guard let dataSession = Components.dataSession
+        guard let dataSession = dataSession(forAttachment: attachment)
         else {
             if attachment.filePath != nil {
                 return attachment.filePath
@@ -504,7 +508,7 @@ open class AttachmentTransfer: Provider {
     }
     
     func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
-        guard let dataSession = Components.dataSession
+        guard let dataSession = dataSession(forAttachment: attachment)
         else { return nil }
         return dataSession.thumbnailFile(for: attachment, preferred: size)
     }

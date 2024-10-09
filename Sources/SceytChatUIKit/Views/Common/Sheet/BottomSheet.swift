@@ -123,19 +123,19 @@ open class BottomSheet: View {
         if action.style == .cancel {
             button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
                 .font: appearance.cancelFont ?? Fonts.semiBold.withSize(16),
-                .foregroundColor: appearance.cancelTextColor ?? .kitBlue,
+                .foregroundColor: appearance.cancelTextColor ?? .accent,
             ]), for: .normal)
         } else {
             if action.style == .destructive {
                 button.tintColor = appearance.destructiveIconColor
                 button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
                     .font: appearance.buttonFont ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.destructiveTextColor ?? .textRed,
+                    .foregroundColor: appearance.destructiveTextColor ?? .stateWarning,
                 ]), for: .normal)
             } else {
                 button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
                     .font: appearance.buttonFont ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.normalTextColor ?? .init(light: 0x111539, dark: 0xE1E3E6),
+                    .foregroundColor: appearance.normalTextColor ?? .primaryText,
                 ]), for: .normal)
             }
         }

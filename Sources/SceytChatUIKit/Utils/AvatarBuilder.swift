@@ -29,8 +29,8 @@ public extension AvatarBuildable {
 
 open class AvatarBuilder {
 
-    public static var avatarDefaultSize = CGSize(width: 60 * Config.displayScale,
-                                          height: 60 * Config.displayScale)
+    public static var avatarDefaultSize = CGSize(width: 60 * UIScreen.main.traitCollection.displayScale,
+                                          height: 60 * UIScreen.main.traitCollection.displayScale)
     private static var cache = {
         $0.countLimit = 15
         return $0
@@ -97,7 +97,7 @@ open class AvatarBuilder {
             let image = storedImage(for: url),
             let resized = try? Components.imageBuilder.init(image: image).resize(max: size.maxSide) {
                 setImage(resized.uiImage)
-                if let jpeg = resized.jpegData() {
+            if let jpeg = resized.jpegData(compressionQuality: SceytChatUIKit.shared.config.avatarResizeConfig.compressionQuality) {
                     store(image: jpeg, fileUrl: thumbnailUrl)
                 }
             foundThumbnail = true
@@ -125,6 +125,7 @@ open class AvatarBuilder {
     }
     
     open class func loadAvatar(for builder: AvatarBuildable,
+                               appearance: InitialsBuilderAppearance? = nil,
                                defaultImage: UIImage? = nil,
                                size: CGSize = AvatarBuilder.avatarDefaultSize,
                                preferMemCache: Bool = true,
@@ -147,6 +148,7 @@ open class AvatarBuilder {
         return loadAvatar(
             into: avatarPresentable,
             for: builder,
+            appearance: appearance,
             defaultImage: defaultImage,
             size: size,
             preferMemCache: preferMemCache)
@@ -169,7 +171,7 @@ open class AvatarBuilder {
                     if let img = image,
                        let resized = try? Components.imageBuilder.init(image: img).resize(max: size.maxSide) {
                         image = resized.uiImage
-                        if let jpeg = resized.jpegData() {
+                        if let jpeg = resized.jpegData(compressionQuality: SceytChatUIKit.shared.config.avatarResizeConfig.compressionQuality) {
                             let thumbnailUrl = thumbnailUrl(builder: builder, size: size)
                             store(image: jpeg, fileUrl: thumbnailUrl)
                         }
@@ -232,42 +234,35 @@ extension UIImageView: ImagePresentable {
 extension ChatChannel: AvatarBuildable {
     
     public var hashString: String {
-        if !isGroup, let peer = peer {
+        if isDirect, let peer = peer {
             return peer.hashString
         }
         return "\(id)"
     }
     
     public var imageUrl: URL? {
-        if !isGroup, let peer = peer {
+        if isDirect, let peer = peer {
             return URL(string: peer.avatarUrl)
         } else if let member = members?.first, isSelfChannel {
-            return URL(string: member.avatarUrl ?? Config.currentUser.avatarUrl)
+            return URL(string: member.avatarUrl ?? SceytChatUIKit.shared.chatClient.user.avatarUrl)
         }
         return URL(string: avatarUrl)
     }
-
+#warning("To-Do: Remove")
     public var displayName: String {
-        Formatters.channelDisplayName.format(self)
+        SceytChatUIKit.shared.formatters.channelNameFormatter.format(self)
     }
 
     public var defaultAvatar: UIImage? {
-        if !isGroup {
-            return peer?.defaultAvatar// members?.first?.defaultAvatar
+        if case .image(let image) = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider.provideVisual(for: self) {
+            return image
         }
-        switch channelType {
-        case .broadcast:
-            return Config.chatChannelDefaultAvatar.public
-        case .private:
-            return Config.chatChannelDefaultAvatar.private
-        default:
-            return Config.chatChannelDefaultAvatar.direct
-        }
+        return nil
     }
     
     public var appearance: InitialsBuilderAppearance? {
-        if Config.chatChannelDefaultAvatar.generateFromInitials {
-            return Config.chatChannelDefaultAvatar.initialsBuilderAppearance
+        if case .initialsAppearance(let appearance) = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider.provideVisual(for: self) {
+            return appearance
         }
         return nil
     }
@@ -282,25 +277,22 @@ extension ChatUser: AvatarBuildable {
     public var imageUrl: URL? {
         URL(string: avatarUrl)
     }
-
+#warning("To-Do: Consider to remove")
     public var displayName: String {
-        Formatters.userDisplayName.format(self)
+        SceytChatUIKit.shared.formatters.userNameFormatter.format(self)
     }
     
     public var defaultAvatar: UIImage? {
-        switch state {
-        case .active:
-            return Config.chatUserDefaultAvatar.activeState
-        case .inactive:
-            return Config.chatUserDefaultAvatar.inactiveState
-        case .deleted:
-            return Config.chatUserDefaultAvatar.deletedState
+        if case .image(let image) = SceytChatUIKit.shared.visualProviders.userAvatarProvider.provideVisual(for: self) {
+            return image
         }
+        return nil
     }
-    
+
+#warning("To-Do: Consider to remove")
     public var appearance: InitialsBuilderAppearance? {
-        if Config.chatUserDefaultAvatar.generateFromInitials {
-            return Config.chatUserDefaultAvatar.initialsBuilderAppearance
+        if case .initialsAppearance(let appearance) = SceytChatUIKit.shared.visualProviders.userAvatarProvider.provideVisual(for: self) {
+            return appearance
         }
         return nil
     }

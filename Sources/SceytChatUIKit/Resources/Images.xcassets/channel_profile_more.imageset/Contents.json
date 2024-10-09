@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "more.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "more@2x.png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "more@3x.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "channel_profile_more.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

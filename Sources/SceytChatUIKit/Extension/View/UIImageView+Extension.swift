@@ -16,10 +16,10 @@ public extension UIImageView {
         var item: PreviewItem?
     }
     
-    private var vc: UIViewController? {
-        guard let rootVC = window?.rootViewController
+    private var viewController: UIViewController? {
+        guard let rootViewController = window?.rootViewController
         else { return nil }
-        return rootVC.presentedViewController != nil ? rootVC.presentedViewController : rootVC
+        return rootViewController.presentedViewController != nil ? rootViewController.presentedViewController : rootViewController
     }
     
     func setup(
@@ -57,13 +57,12 @@ public extension UIImageView {
             initialIndex = idx
         }
         
-        let imageCarousel = Components.previewerCarouselVC
-            .init(
+        let imageCarousel = Components.mediaPreviewerCarouselViewController.init(
                 sourceView: sourceView,
                 previewDataSource: previewer,
                 initialIndex: initialIndex)
         UIApplication.shared.sendAction(#selector(resignFirstResponder), to: nil, from: nil, for: nil)
-        let presentFromVC = sender.from ?? vc
-        presentFromVC?.present(Components.previewerNavigationController.init(imageCarousel), animated: true)
+        let presentFromViewController = sender.from ?? viewController
+        presentFromViewController?.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
     }
 }

@@ -46,38 +46,38 @@ final public class ActionAnimator: NSObject, UIViewControllerAnimatedTransitioni
 private extension ActionAnimator {
     
     func animatePresentation(context: UIViewControllerContextTransitioning) {
-        guard let toVc = context.viewController(forKey: .to) as? ActionController else {
+        guard let toViewController = context.viewController(forKey: .to) as? ActionController else {
             context.completeTransition(false)
             return
         }
-        toVc.loadViewIfNeeded()
-        toVc.view.layoutIfNeeded()
+        toViewController.loadViewIfNeeded()
+        toViewController.view.layoutIfNeeded()
         
-        let snapshotFinalFrame = toVc.snapshot?.frame ?? .zero
+        let snapshotFinalFrame = toViewController.snapshot?.frame ?? .zero
             
-        toVc.contextView?.alpha = 0
-        toVc.snapshot?.frame = toVc.contextView?.superview?.convert(
-            toVc.contextView?.frame ?? .zero,
-            to: toVc.view
+        toViewController.contextView?.alpha = 0
+        toViewController.snapshot?.frame = toViewController.contextView?.superview?.convert(
+            toViewController.contextView?.frame ?? .zero,
+            to: toViewController.view
         ) ?? .zero
-        toVc.snapshot?.transform = Config.contextMenuContentViewScale
+        toViewController.snapshot?.transform = SceytChatUIKit.shared.config.messageBubbleTransformScale
 
-        toVc.view.frame = context.containerView.bounds
+        toViewController.view.frame = context.containerView.bounds
         
         let duration = transitionDuration(using: context)
         
-        toVc.emojiController.setupForAnimation()
-        toVc.menuContainer.alpha = 0
-        toVc.menuContainer.transform = .identity.scaledBy(x: 0.6, y: 0.6)
+        toViewController.emojiController.setupForAnimation()
+        toViewController.menuContainer.alpha = 0
+        toViewController.menuContainer.transform = .identity.scaledBy(x: 0.6, y: 0.6)
         
         UIView.animateKeyframes(withDuration: duration, delay: 0, options: [.allowUserInteraction]) {
             UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 1.0) {
-                toVc.snapshot?.transform = .identity
-                toVc.snapshot?.frame = snapshotFinalFrame
+                toViewController.snapshot?.transform = .identity
+                toViewController.snapshot?.frame = snapshotFinalFrame
             }
             UIView.addKeyframe(withRelativeStartTime: 0.7, relativeDuration: 0.3) {
-                toVc.menuContainer.alpha = 1
-                toVc.menuContainer.transform = .identity
+                toViewController.menuContainer.alpha = 1
+                toViewController.menuContainer.transform = .identity
             }
         } completion: { _ in
             context.completeTransition(!context.transitionWasCancelled)
@@ -85,23 +85,23 @@ private extension ActionAnimator {
     }
     
     func animateDismissal(context: UIViewControllerContextTransitioning) {
-        guard let toVc = context.viewController(forKey: .to),
-              let fromVc = context.viewController(forKey: .from) as? ActionController else {
+        guard let toViewController = context.viewController(forKey: .to),
+              let fromViewController = context.viewController(forKey: .from) as? ActionController else {
             context.completeTransition(false)
             return
         }
         
         let duration = transitionDuration(using: context)
         
-        let snapshotFinalFrame = fromVc.contextView?.superview?.convert(
-            fromVc.contextView?.frame ?? .zero,
-            to: toVc.view
+        let snapshotFinalFrame = fromViewController.contextView?.superview?.convert(
+            fromViewController.contextView?.frame ?? .zero,
+            to: toViewController.view
         ) ?? .zero
-        let snapshotDif = (fromVc.snapshot?.frame.origin.y ?? .zero) - snapshotFinalFrame.origin.y
+        let snapshotDif = (fromViewController.snapshot?.frame.origin.y ?? .zero) - snapshotFinalFrame.origin.y
         
         let mAnchorPoint: CGPoint
         let eAnchorPoint: CGPoint
-        let alignment = fromVc.horizontalAlignment
+        let alignment = fromViewController.horizontalAlignment
         switch alignment {
         case .leading:
             mAnchorPoint = .init(x: 0.8, y: 0.8)
@@ -116,24 +116,24 @@ private extension ActionAnimator {
         
         UIView.animateKeyframes(withDuration: duration, delay: 0) {
             UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 1) {
-                fromVc.emojiContainer.alpha = 0
-                if fromVc.emojiContainerAtTheTop == false {
-                    fromVc.emojiContainer.layer.anchorPoint = eAnchorPoint
-                    fromVc.emojiContainer.frame.origin.y -= snapshotDif
-                    fromVc.emojiContainer.transform = .init(scaleX: 0.8, y: 0.8)
+                fromViewController.emojiContainer.alpha = 0
+                if fromViewController.emojiContainerAtTheTop == false {
+                    fromViewController.emojiContainer.layer.anchorPoint = eAnchorPoint
+                    fromViewController.emojiContainer.frame.origin.y -= snapshotDif
+                    fromViewController.emojiContainer.transform = .init(scaleX: 0.8, y: 0.8)
                 }
             }
             UIView.addKeyframe(withRelativeStartTime: 0.0, relativeDuration: 1) {
-                fromVc.menuContainer.alpha = 0
-                fromVc.menuContainer.transform = .init(scaleX: 0.6, y: 0.6)
-                fromVc.menuContainer.frame.origin.y -= snapshotDif
-                fromVc.menuContainer.layer.anchorPoint = mAnchorPoint
+                fromViewController.menuContainer.alpha = 0
+                fromViewController.menuContainer.transform = .init(scaleX: 0.6, y: 0.6)
+                fromViewController.menuContainer.frame.origin.y -= snapshotDif
+                fromViewController.menuContainer.layer.anchorPoint = mAnchorPoint
             }
             UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 1) {
-                fromVc.snapshot?.frame = snapshotFinalFrame
+                fromViewController.snapshot?.frame = snapshotFinalFrame
             }
         } completion: { _ in
-            fromVc.contextView?.alpha = 1
+            fromViewController.contextView?.alpha = 1
             context.completeTransition(!context.transitionWasCancelled)
         }
     }

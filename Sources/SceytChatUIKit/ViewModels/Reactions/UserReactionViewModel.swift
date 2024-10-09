@@ -26,7 +26,7 @@ open class UserReactionViewModel: NSObject {
             request: ReactionDTO.fetchRequest()
                 .sort(descriptors: [.init(keyPath: \ReactionDTO.key, ascending: false)])
                 .fetch(predicate: predicate),
-            context: Config.database.viewContext
+            context: SceytChatUIKit.shared.database.viewContext
         ) { $0.convert() }
     }()
 
@@ -35,7 +35,7 @@ open class UserReactionViewModel: NSObject {
         self.reactionKey = reactionKey
         var queryBuilder = ReactionListQuery
             .Builder(messageId: messageId)
-            .limit(30)
+            .limit(SceytChatUIKit.shared.config.queryLimits.reactionListQueryLimit)
         if let key = reactionKey {
             queryBuilder = queryBuilder.key(key)
         }

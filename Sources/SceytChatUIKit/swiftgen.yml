@@ -7,6 +7,7 @@ strings:
     - templateName: structured-swift5
       output: L10n.swift
       params:
+        publicAccess: true
         bundle: SCL10nBundleClass.resourcesBundle
 xcassets:
   - inputs:

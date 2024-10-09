@@ -134,7 +134,7 @@ open class SCTSession: NSObject, SCTDataSession {
     }
     
     open func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
-        let scale = SCTUIKitConfig.displayScale
+        let scale = UIScreen.main.traitCollection.displayScale
         let newSize = CGSize(width: size.width * scale, height: size.height * scale)
         
         func makeThumbnail(file path: String, thumbnailPath: String) -> String? {
@@ -142,13 +142,13 @@ open class SCTSession: NSObject, SCTDataSession {
             if attachment.type == "image" {
                 image = UIImage(contentsOfFile: path)
             } else if attachment.type == "video" {
-                image = SCTUIKitComponents.videoProcessor.copyFrame(url: URL(fileURLWithPath: path))
+                image = Components.videoProcessor.copyFrame(url: URL(fileURLWithPath: path))
             } else if attachment.type == "file", URL(fileURLWithPath: path).isImage {
                 image = UIImage(contentsOfFile: path)
             }
             if let image,
-               let ib = try? SCTUIKitComponents.imageBuilder.init(image: image).resize(max: newSize.maxSide),
-               let data = ib.jpegData()
+               let ib = try? Components.imageBuilder.init(image: image).resize(max: newSize.maxSide),
+               let data = ib.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality)
             {
                 logger.debug("[thumbnail] 3 stored \(thumbnailPath)")
                 return Storage.storeData(data, filePath: thumbnailPath)?.path
@@ -188,6 +188,10 @@ open class SCTUploadOperation: AsyncOperation {
     }
     
     override open func main() {
+        guard SceytChatUIKit.shared.config.preventDuplicateAttachmentUpload else {
+            self.startPreparing()
+            return
+        }
         taskInfo.startChecksum { [weak self] stored in
             guard let self else { return }
             if stored {
@@ -207,7 +211,7 @@ open class SCTUploadOperation: AsyncOperation {
             let transferId = UUID().uuidString
             if attachment.type == "video" {
                 let videoProcessInfo = SCVideoProcessInfo()
-                let result = await SCTUIKitComponents.videoProcessor.export(from: filePath, processInfo: videoProcessInfo)
+                let result = await Components.videoProcessor.export(from: filePath, processInfo: videoProcessInfo)
                 switch result {
                 case .success(let success):
                     let path = self.fileStorage.store(transferId: transferId, fileName: success.lastPathComponent, file: success.path)
@@ -217,10 +221,10 @@ open class SCTUploadOperation: AsyncOperation {
                     logger.errorIfNotNil(error, "")
                 }
             } else if attachment.type == "image" {
-                if let builder = SCTUIKitComponents.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)) {
+                if let builder = Components.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)) {
                     let imageSize = builder.imageSize
                     if !imageSize.isNan {
-                        if let data = try? builder.resize(max: SCTUIKitConfig.maximumImageAttachmentSize).jpegData(),
+                        if let data = try? builder.resize(max: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.dimensionThreshold).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
                            let newUrl = FileStorage.storeInTemporaryDirectory(data: data, filename: attachment.name ?? UUID().uuidString)
                         {
                             let path = self.fileStorage.store(transferId: transferId, fileName: attachment.name, file: newUrl.path)
@@ -243,7 +247,7 @@ open class SCTUploadOperation: AsyncOperation {
     
     open func startUploading(filePath: String) {
         let fileUrl = URL(fileURLWithPath: filePath)
-        ChatClient.shared.upload(fileUrl: fileUrl) { [weak self] pct in
+        SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { [weak self] pct in
             self?.taskInfo.updateProgress(pct)
         } completion: { [weak self] url, error in
             guard let self else { return }

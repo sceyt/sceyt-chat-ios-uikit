@@ -48,7 +48,7 @@ open class MenuController: ViewController,
         
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.register(MenuCell.self)
+        collectionView.register(Components.menuCell.self)
         view.layer.cornerRadius = 16
         view.clipsToBounds = true
     }
@@ -112,7 +112,7 @@ open class MenuController: ViewController,
         _ collectionView: UICollectionView,
         cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: MenuCell.self)
+        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.menuCell.self)
         cell.item = cellData[indexPath.item]
         cell.separatorView.isHidden = indexPath.item == cellData.indices.last
         cell.contentInsets.top = collectionView.isFirst(indexPath) ? Layouts.verticalPadding : 0

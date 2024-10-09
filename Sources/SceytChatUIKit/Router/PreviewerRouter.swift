@@ -9,7 +9,7 @@
 import SceytChat
 import UIKit
 
-open class PreviewerRouter: Router<PreviewerVC> {
+open class PreviewerRouter: Router<MediaPreviewerViewController> {
     public enum ShareOption {
         case saveGallery
         case forward([ChannelId])
@@ -61,14 +61,14 @@ open class PreviewerRouter: Router<PreviewerVC> {
                 callback(.cancel)
             })
         
-        rootVC.showBottomSheet(actions: actions)
+        rootViewController.showBottomSheet(actions: actions)
     }
     
     open func showForward(_ handler: @escaping ([ChatChannel]) -> Void) {
-        let vc = Components.channelForwardVC.init()
-        vc.viewModel = Components.channelForwardVM.init(handler: handler)
+        let viewController = Components.forwardViewController.init()
+        viewController.viewModel = Components.channelForwardViewModel.init(handler: handler)
         let nav = Components.navigationController.init()
-        nav.viewControllers = [vc]
-        rootVC.present(nav, animated: true)
+        nav.viewControllers = [viewController]
+        rootViewController.present(nav, animated: true)
     }
 }

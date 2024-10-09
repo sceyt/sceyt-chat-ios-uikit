@@ -13,159 +13,541 @@ typealias Images = Appearance.Images
 public extension Appearance {
     struct Images {
         
-        public static var emptyChannelList: UIImage = { Assets.noChannels.image }()
-        public static var edit: UIImage = { Assets.edit.image }()
-        public static var mute: UIImage = { Assets.mute.image }()
-        public static var online: UIImage = { Assets.online.image }()
-        public static var close: UIImage = { Assets.close.image }()
-        public static var closeCircle: UIImage = { Assets.closeCircle.image }()
-        public static var file: UIImage = { Assets.file.image }()
-        public static var link: UIImage = { Assets.link.image }()
-        public static var camera: UIImage = { Assets.camera.image }()
-        public static var warning: UIImage = { Assets.warning.image }()
-        public static var eye: UIImage = { Assets.eye.image }()
-        public static var chevron: UIImage = { Assets.chevron.image }()
-        public static var chevronUp: UIImage = { Assets.chevronUp.image }()
-        public static var chevronDown: UIImage = { Assets.chevronDown.image }()
-        public static var deletedUser: UIImage = { Assets.deletedUser.image }()
-        public static var attachment: UIImage = { Assets.attach.image }()
-        public static var swipeIndicator: UIImage = { Assets.swipeIndicator.image }()
-        public static var addMember: UIImage = { Assets.addMember.image }()
-        public static var moreMember: UIImage = { Assets.memberMore.image }()
-        public static var channelNotification: UIImage = { Assets.channelNotification.image }()
-        public static var radio: UIImage = { Assets.radio.image }()
-        public static var radioGray: UIImage = { Assets.radioGray.image }()
-        public static var radioSelected: UIImage = { Assets.radioSelected.image }()
-        public static var galleryAssetSelect: UIImage = { Assets.galleryAssetSelect.image }()
-        public static var galleryAssetUnselect: UIImage = { Assets.galleryAssetUnselect.image }()
+        public static var emptyChannelList: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.noChannels.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var mute: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.mute.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var online: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.online1.image,
+                                                     renderingMode: .template(.background)),
+                                         .init(image: Assets.online2.image,
+                                               renderingMode: .template(.stateSuccess)))!
+        }()
+        public static var closeCircle: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground20.image,
+                                                     renderingMode: .template(.surface3)),
+                                         .init(image: Assets.closeCircle1.image,
+                                               renderingMode: .template(.background)),
+                                         .init(image: Assets.closeCircle2.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var file: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.roundedRectangle40.image,
+                                                     renderingMode: .template(.surface1)),
+                                         .init(image: Assets.file2.image,
+                                               renderingMode: .template(.accent)))!
+        }()
+        public static var link: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.roundedRectangle40.image,
+                                                     renderingMode: .template(.surface1)),
+                                         .init(image: Assets.link2.image,
+                                               renderingMode: .template(.accent)))!
+        }()
+        public static var warning: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.warning.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var eye: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.eye.image,
+                                                     renderingMode: .template(.secondaryText)))!
+        }()
+        public static var chevron: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chevron.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var chevronUp: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chevronUp.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chevronDown: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chevronDown.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var deletedUser: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.deletedUser.image,
+                                                     renderingMode: .original))!
+        }()
+        public static var attachment: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.attach.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var addMember: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground40.image,
+                                                     renderingMode: .template(.surface1)),
+                                         .init(image: Assets.addMember1.image,
+                                               renderingMode: .template(.accent)))!
+        }()
+        public static var radio: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.radioCircle1.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var radioGray: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground24.image,
+                                                     renderingMode: .template(.overlayBackground1)),
+                                         .init(image: Assets.radioCircle1.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        public static var radioSelected: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.radioSelected.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
         public static var galleryVidepAsset: UIImage = { Assets.galleryVideoAsset.image }()
-        public static var editAvatar: UIImage = { Assets.editAvatar.image }()
+        public static var editAvatar: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground72.image,
+                                                     renderingMode: .template(.surface2)),
+                                         .init(image: Assets.editAvatar1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
         
-        public static var pendingMessage: UIImage = { Assets.messageTickPending.image }()
-        public static var sentMessage: UIImage = { Assets.messageTickSent.image }()
-        public static var deliveredMessage: UIImage = { Assets.messageTickDelivered.image }()
-        public static var readMessage: UIImage = { Assets.messageTickRead.image }()
-        public static var failedMessage: UIImage = { Assets.failed.image }()
-        public static var forwardedMessage: UIImage = { Assets.messageForward.image }()
+        public static var pendingMessage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.messageTickPending.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var sentMessage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.messageTickSent.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var receivedMessage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.messageTickReceived.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var displayedMessage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.messageTickDisplayed.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var failedMessage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.failed.image,
+                                                     renderingMode: .template(.stateWarning)))!
+        }()
+        public static var forwardedMessage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.messageForward.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
         
-        public static var messageActionInfo: UIImage = { Assets.actionInfo.image }()
-        public static var messageActionAdd: UIImage = { Assets.actionAdd.image }()
-        public static var messageActionEdit: UIImage = { Assets.actionEdit.image }()
-        public static var messageActionReply: UIImage = { Assets.actionReply.image }()
-        public static var messageActionReplyInThread: UIImage = { Assets.actionReplyThread.image }()
-        public static var messageActionForward: UIImage = { Assets.actionForward.image }()
-        public static var messageActionShare: UIImage = { Assets.actionShare.image }()
-        public static var messageActionCopy: UIImage = { Assets.actionCopy.image }()
-        public static var messageActionReact: UIImage = { Assets.actionReact.image }()
-        public static var messageActionDelete: UIImage = { Assets.actionDelete.image }()
-        public static var messageActionSelect: UIImage = { Assets.actionSelect.image }()
-        public static var messageActionRemove: UIImage = { Assets.actionRemove.image }()
-        public static var messageActionReport: UIImage = { Assets.actionReport.image }()
-        public static var messageSendAction: UIImage = { Assets.send.image }()
-        public static var messageActionMoreReactions: UIImage = { Assets.plus.image }()
-        public static var attachmentTransferPause: UIImage = { Assets.fileTransferPause.image }()
-        public static var attachmentUpload: UIImage = { Assets.fileUpload.image }()
-        public static var attachmentDownload: UIImage = { Assets.fileDownload.image }()
+        public static var messageActionInfo: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionInfo.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageActionEdit: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionEdit.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageActionReply: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionReply.image,
+                                                     renderingMode: .template(.primaryText)))!}()
+        public static var messageActionReplyInThread: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionReplyThread.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageActionForward: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionForward.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageActionShare: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionShare.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageActionCopy: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionCopy.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageActionDelete: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionDelete.image,
+                                                     renderingMode: .template(.stateWarning)))!
+        }()
+        public static var messageActionSelect: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionSelect.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageActionRemove: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionRemove.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var messageActionReport: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionReport.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageSendAction: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground34.image,
+                                                     renderingMode: .template(.accent)),
+                                         .init(image: Assets.send1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var messageActionMoreReactions: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.surface2)),
+                                         .init(image: Assets.plus.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var attachmentTransferPause: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.fileTransferPause.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        public static var attachmentUpload: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.fileUpload.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        public static var attachmentDownload: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.fileDownload.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
         
-        public static var messageVideoPlay: UIImage = { Assets.videoPlay.image }()
-        public static var messageVideoPause: UIImage = { Assets.videoPause.image }()
-        public static var messageVideoMute: UIImage = { Assets.videoMute.image }()
-        public static var messageVideoUnmute: UIImage = { Assets.videoUnmute.image }()
+        public static var videoPlay: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground56.image,
+                                                     renderingMode: .template(.overlayBackground2)),
+                                         .init(image: Assets.videoPlay1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var videoPause: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground56.image,
+                                                     renderingMode: .template(.overlayBackground2)),
+                                         .init(image: Assets.videoPause1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var videoPlayerPause: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.videoPause1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var videoPlayerPlay: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.videoPlay1.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+                
+        public static var channelNew: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.newChannel.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var channelCreatePublic: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.createPublicChannel.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var channelCreatePrivate: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.createPrivateChannel.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var channelUnreadBubble: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground44.image,
+                                                     renderingMode: .template(.backgroundSections)),
+                                         .init(image: Assets.channelUnreadBubble1.image,
+                                               renderingMode: .template(.secondaryText)))!
+        }()
+        public static var channelProfileURI: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.accent3)),
+                                         .init(image: Assets.channelProfileUri1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var channelProfileQR: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.channelProfileQr.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var channelProfileBell: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.accent2)),
+                                         .init(image: Assets.channelProfileBell1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var channelProfileMore: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.channelProfileMore.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var channelProfileAutoDeleteMessages: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.accent3)),
+                                         .init(image: Assets.channelProfileAutoDeleteMessages1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var channelProfileMembers: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.accent4)),
+                                         .init(image: Assets.channelProfileMembers1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var channelProfileAdmins: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.accent5)),
+                                         .init(image: Assets.channelProfileAdmins1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var channelProfileEditAvatar: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.channelProfileEditAvatar.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        public static var channelReply: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.surface3)),
+                                         .init(image: Assets.channelReply1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var channelPin: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.channelPin.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
         
-        public static var composerEditMessage: UIImage = { Assets.composerEdit.image }()
-        public static var composerReplyMessage: UIImage = { Assets.composerReply.image }()
+        public static var audioPlayerCancel: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.audioPlayerCancel.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var audioPlayerDelete: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground70.image,
+                                                     renderingMode: .template(.stateWarning)),
+                                         .init(image: Assets.audioPlayerDelete1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var audioPlayerLock: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground42.image,
+                                                     renderingMode: .template(.backgroundSections)),
+                                         .init(image: Assets.audioPlayerLock1.image,
+                                               renderingMode: .template(.accent)))!
+        }()
+        public static var audioPlayerMic: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground34.image,
+                                                     renderingMode: .template(.accent)),
+                                         .init(image: Assets.audioPlayerMic1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var audioPlayerMicGreen: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground70.image,
+                                                     renderingMode: .template(.accent)),
+                                         .init(image: Assets.audioPlayerMicRecording1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var audioPlayerPauseGrey: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.audioPlayerPauseGrey.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var audioPlayerPause: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground40.image,
+                                                     renderingMode: .template(.accent)),
+                                         .init(image: Assets.audioPlayerPause1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var audioPlayerPlayGrey: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.audioPlayerPlayGrey.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var audioPlayerPlay: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground40.image,
+                                                     renderingMode: .template(.accent)),
+                                         .init(image: Assets.audioPlayerPlay1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var audioPlayerSendLarge: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground70.image,
+                                                     renderingMode: .template(.accent)),
+                                         .init(image: Assets.audioPlayerSendLarge1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        public static var audioPlayerStop: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground42.image,
+                                                     renderingMode: .template(.backgroundSections)),
+                                         .init(image: Assets.audioPlayerStop1.image,
+                                               renderingMode: .template(.accent)))!
+        }()
+        public static var audioPlayerUnlock: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.audioPlayerUnlock1.image,
+                                                     renderingMode: .template(.backgroundSections)),
+                                         .init(image: Assets.audioPlayerUnlock2.image,
+                                               renderingMode: .template(.accent.withAlphaComponent(0.4)),
+                                               anchor: .bottom(.init(x: 0, y: -15.5))),
+                                         .init(image: Assets.audioPlayerUnlock2.image,
+                                               renderingMode: .template(.accent.withAlphaComponent(0.8)),
+                                               anchor: .bottom(.init(x: 0, y: -22))),
+                                         .init(image: Assets.audioPlayerUnlock3.image,
+                                               renderingMode: .template(.iconInactive),
+                                               anchor: .top(.init(x: 0, y: 10))))!
+        }()
         
-        public static var channelNew: UIImage = { Assets.newChannel.image }()
-        public static var channelCreatePublic: UIImage = { Assets.createPublicChannel.image }()
-        public static var channelCreatePrivate: UIImage = { Assets.createPrivateChannel.image }()
-        public static var channelUnreadBubble: UIImage = { Assets.channelUnreadBubble.image }()
-        public static var channelProfileURI: UIImage = { Assets.channelProfileUri.image }()
-        public static var channelProfileQR: UIImage = { Assets.channelProfileQr.image }()
-        public static var channelProfileMute: UIImage = { Assets.channelProfileMute.image }()
-        public static var channelProfileUnmute: UIImage = { Assets.channelProfileUnmute.image }()
-        public static var channelProfileBell: UIImage = { Assets.channelProfileBell.image }()
-        public static var channelProfileReport: UIImage = { Assets.channelProfileReport.image }()
-        public static var channelProfileJoin: UIImage = { Assets.channelProfileJoin.image }()
-        public static var channelProfileMore: UIImage = { Assets.channelProfileMore.image }()
-        public static var channelProfileAutoDeleteMessages: UIImage = { Assets.channelProfileAutoDeleteMessages.image }()
-        public static var channelProfileMembers: UIImage = { Assets.channelProfileMembers.image }()
-        public static var channelProfileAdmins: UIImage = { Assets.channelProfileAdmins.image }()
-        public static var channelProfileEditAvatar: UIImage = { Assets.channelProfileEditAvatar.image }()
-        public static var channelReply: UIImage = { Assets.channelReply.image }()
-        public static var channelCreated: UIImage = { Assets.channelCreated.image }()
-        public static var channelPin: UIImage = { Assets.channelPin.image }()
-
-        public static var audioPlayerCancel: UIImage = { Assets.audioPlayerCancel.image }()
-        public static var audioPlayerDelete: UIImage = { Assets.audioPlayerDelete.image }()
-        public static var audioPlayerLock: UIImage = { Assets.audioPlayerLock.image }()
-        public static var audioPlayerMic: UIImage = { Assets.audioPlayerMic.image }()
-        public static var audioPlayerMicGreen: UIImage = { Assets.audioPlayerMicGreen.image }()
-        public static var audioPlayerPauseGrey: UIImage = { Assets.audioPlayerPauseGrey.image }()
-        public static var audioPlayerPause: UIImage = { Assets.audioPlayerPause.image }()
-        public static var audioPlayerPlayGrey: UIImage = { Assets.audioPlayerPlayGrey.image }()
-        public static var audioPlayerPlay: UIImage = { Assets.audioPlayerPlay.image }()
-        public static var audioPlayerSend: UIImage = { Assets.audioPlayerSend.image }()
-        public static var audioPlayerSendLarge: UIImage = { Assets.audioPlayerSendLarge.image }()
-        public static var audioPlayerStop: UIImage = { Assets.audioPlayerStop.image }()
-        public static var audioPlayerUnlock: UIImage = { Assets.audioPlayerUnlock.image }()
+        public static var avatar: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.avatar.image,
+                                                     renderingMode: .original))!
+        }()
         
-        public static var attachmentFile: UIImage = { Assets.attachmentFile.image }()
-        public static var attachmentImage: UIImage = { Assets.attachmentImage.image }()
-        public static var attachmentVideo: UIImage = { Assets.attachmentVideo.image }()
-        public static var attachmentVoice: UIImage = { Assets.attachmentVoice.image }()
-
-        public static var videoPlayerPause: UIImage = { Assets.videoPlayerPause.image }()
-        public static var videoPlayerPlay: UIImage = { Assets.videoPlayerPlay.image }()
-        public static var videoPlayerThumb: UIImage = { Assets.videoPlayerThumb.image }()
-        public static var videoPlayerShare: UIImage = { Assets.videoPlayerShare.image }()
-        public static var videoPlayerBack: UIImage = { Assets.videoPlayerBack.image }()
-    
-        public static var emojiActivities: UIImage = { Assets.emojiActivities.image }()
-        public static var emojiAnimalNature: UIImage = { Assets.emojiAnimalNature.image }()
-        public static var emojiFlags: UIImage = { Assets.emojiFlags.image }()
-        public static var emojiFoodDrink: UIImage = { Assets.emojiFoodDrink.image }()
-        public static var emojiObjects: UIImage = { Assets.emojiObjects.image }()
-        public static var emojiRecent: UIImage = { Assets.emojiRecent.image }()
-        public static var emojiSmileys: UIImage = { Assets.emojiSmileys.image }()
-        public static var emojiSymbols: UIImage = { Assets.emojiSymbols.image }()
-        public static var emojiTravel: UIImage = { Assets.emojiTravel.image }()
-
-        public static var manangeAccessGallery: UIImage = { Assets.manangeAccessGallery.image }()
+        public static var attachmentFile: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.attachmentFile.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var attachmentImage: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.attachmentImage.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var attachmentVideo: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.attachmentVideo.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var attachmentVoice: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.attachmentVoice.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
         
-        public static var chatPin: UIImage = { Assets.chatPin.image }()
-        public static var chatUnpin: UIImage = { Assets.chatUnpin.image }()
-        public static var chatBlock: UIImage = { Assets.chatBlock.image }()
-        public static var chatUnBlock: UIImage = { Assets.chatUnblock.image }()
-        public static var chatClear: UIImage = { Assets.chatClear.image }()
-        public static var chatDelete: UIImage = { Assets.chatDelete.image }()
-        public static var chatLeave: UIImage = { Assets.chatLeave.image }()
-        public static var chatSavePhoto: UIImage = { Assets.chatSavePhoto.image }()
-        public static var chatForward: UIImage = { Assets.chatForward.image }()
-        public static var chatShare: UIImage = { Assets.chatShare.image }()
-        public static var chatEdit: UIImage = { Assets.chatEdit.image }()
-        public static var chatRevoke: UIImage = { Assets.chatRevoke.image }()
-
-        public static var chatActionCamera: UIImage = { Assets.chatActionCamera.image }()
-        public static var chatActionGallery: UIImage = { Assets.chatActionGallery.image }()
-        public static var chatActionFile: UIImage = { Assets.chatActionFile.image }()
-        public static var chatActionContact: UIImage = { Assets.chatActionContact.image }()
-        public static var chatActionLocation: UIImage = { Assets.chatActionLocation.image }()
-
-        public static var searchIcon: UIImage = { Assets.searchIcon.image }()
-        public static var searchBackground: UIImage = { Assets.searchBackground.image }()
-        public static var searchFill: UIImage = { Assets.searchFill.image }()
+        public static var videoPlayerThumb: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.videoPlayerThumb.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        public static var videoPlayerShare: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.videoPlayerShare.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        public static var videoPlayerBack: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.videoPlayerBack.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
         
-        public static var downloadStart: UIImage = { Assets.downloadStart.image }()
-        public static var downloadStop: UIImage = { Assets.downloadStop.image }()
+        public static var emojiActivities: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiActivities.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var emojiAnimalNature: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiAnimalNature.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var emojiFlags: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiFlags.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var emojiFoodDrink: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiFoodDrink.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var emojiObjects: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiObjects.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var emojiRecent: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiRecent.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var emojiSmileys: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiSmileys.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var emojiSymbols: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiSymbols.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var emojiTravel: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.emojiTravel.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+                
+        public static var chatPin: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatPin.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatUnpin: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatUnpin.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatBlock: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatBlock.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatUnBlock: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatUnblock.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatClear: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatClear.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatDelete: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatDelete.image,
+                                                     renderingMode: .template(.stateWarning)))!
+        }()
+        public static var chatLeave: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatLeave.image,
+                                                     renderingMode: .template(.stateWarning)))!
+        }()
+        public static var chatSavePhoto: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatSavePhoto.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatForward: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatForward.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatShare: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatShare.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatEdit: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatEdit.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatRevoke: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatRevoke.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
         
-        public static var replyPlay: UIImage = { Assets.replyPlay.image }()
-        public static var replyX: UIImage = { Assets.replyX.image }()
-        public static var replyVoice: UIImage = { Assets.replyVoice.image }()
-        public static var replyFile: UIImage = { Assets.replyFile.image }()
-        public static var messageFile: UIImage = { Assets.messageFile.image }()
-
-        public static var noResultsSearch: UIImage = { Assets.noResultsSearch.image }()
-        public static var noMessages: UIImage = { Assets.noMessages.image }()
+        public static var chatActionCamera: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatActionCamera.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatActionGallery: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatActionGallery.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatActionFile: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatActionFile.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatActionContact: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatActionContact.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var chatActionLocation: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatActionLocation.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        
+        public static var searchIcon: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.searchIcon.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        public static var searchFill: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground32.image,
+                                                     renderingMode: .template(.accent)),
+                                         .init(image: Assets.searchFill1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        
+        public static var downloadStart: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.downloadStart.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        public static var downloadStop: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.downloadStop.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        
+        public static var replyPlay: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.replyPlay.image,
+                                                     renderingMode: .template(.onPrimary)))!
+        }()
+        public static var closeIcon: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.closeIcon.image,
+                                                     renderingMode: .template(.iconInactive)))!
+        }()
+        
+        public static var messageFile: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.circleBackground40.image,
+                                                     renderingMode: .template(.accent)),
+                                         .init(image: Assets.messageFile1.image,
+                                               renderingMode: .template(.onPrimary)))!
+        }()
+        
+        public static var noResultsSearch: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.noResultsSearch.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
+        public static var noMessages: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.noMessages.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
         
         public init() { }
         
@@ -173,131 +555,119 @@ public extension Appearance {
 }
 
 extension UIImage {
-    static var emptyChannelList: UIImage { Images.emptyChannelList }
-    static var edit: UIImage { Images.edit }
-    static var mute: UIImage { Images.mute }
-    static var online: UIImage { Images.online }
-    static var close: UIImage { Images.close }
-    static var closeCircle: UIImage { Images.closeCircle }
-    static var file: UIImage { Images.file }
-    static var link: UIImage { Images.link }
-    static var camera: UIImage { Images.camera }
-    static var warning: UIImage { Images.warning }
-    static var eye: UIImage { Images.eye }
-    static var chevron: UIImage { Images.chevron }
-    static var chevronUp: UIImage { Images.chevronUp }
-    static var chevronDown: UIImage { Images.chevronDown }
-    static var deletedUser: UIImage { Images.deletedUser }
-    static var attachment: UIImage { Images.attachment }
-    static var swipeIndicator: UIImage { Images.swipeIndicator }
-    static var addMember: UIImage { Images.addMember }
-    static var moreMember: UIImage { Images.moreMember }
-    static var channelNotification: UIImage { Images.channelNotification }
-    static var radio: UIImage { Images.radio }
-    static var radioGray: UIImage { Images.radioGray }
-    static var radioSelected: UIImage { Images.radioSelected }
-    static var galleryAssetSelect: UIImage { Images.galleryAssetSelect }
-    static var galleryAssetUnselect: UIImage { Images.galleryAssetUnselect }
-    static var galleryVideoAsset: UIImage { Images.galleryVidepAsset }
-    static var forwardedMessage: UIImage { Images.forwardedMessage }
-    static var editAvatar: UIImage { Images.editAvatar }
+    public static var emptyChannelList: UIImage { Images.emptyChannelList }
+    public static var noMessages: UIImage { Images.noMessages }
+    public static var noResultsSearch: UIImage { Images.noResultsSearch }
+    public static var mute: UIImage { Images.mute }
+    public static var channelPin: UIImage { Images.channelPin }
+    public static var online: UIImage { Images.online }
+    public static var closeCircle: UIImage { Images.closeCircle }
+    public static var file: UIImage { Images.file }
+    public static var link: UIImage { Images.link }
+    public static var avatar: UIImage { Images.avatar }
+    public static var warning: UIImage { Images.warning }
+    public static var eye: UIImage { Images.eye }
+    public static var chevron: UIImage { Images.chevron }
+    public static var chevronUp: UIImage { Images.chevronUp }
+    public static var chevronDown: UIImage { Images.chevronDown }
+    public static var deletedUser: UIImage { Images.deletedUser }
+    public static var attachment: UIImage { Images.attachment }
+    public static var addMember: UIImage { Images.addMember }
+    public static var radio: UIImage { Images.radio }
+    public static var radioGray: UIImage { Images.radioGray }
+    public static var radioSelected: UIImage { Images.radioSelected }
+    public static var galleryVideoAsset: UIImage { Images.galleryVidepAsset }
+    public static var forwardedMessage: UIImage { Images.forwardedMessage }
+    public static var editAvatar: UIImage { Images.editAvatar }
     
-    static var pendingMessage: UIImage { Images.pendingMessage }
-    static var sentMessage: UIImage { Images.sentMessage }
-    static var deliveredMessage: UIImage { Images.deliveredMessage }
-    static var readMessage: UIImage { Images.readMessage }
-    static var failedMessage: UIImage { Images.failedMessage }
+    public static var pendingMessage: UIImage { Images.pendingMessage }
+    public static var sentMessage: UIImage { Images.sentMessage }
+    public static var receivedMessage: UIImage { Images.receivedMessage }
+    public static var displayedMessage: UIImage { Images.displayedMessage }
+    public static var failedMessage: UIImage { Images.failedMessage }
     
-    static var messageActionInfo: UIImage { Images.messageActionInfo }
-    static var messageActionAdd: UIImage { Images.messageActionAdd }
-    static var messageActionEdit: UIImage { Images.messageActionEdit }
-    static var messageActionReply: UIImage { Images.messageActionReply }
-    static var messageActionReplyInThread: UIImage { Images.messageActionReplyInThread }
-    static var messageActionForward: UIImage { Images.messageActionForward }
-    static var messageActionShare: UIImage { Images.messageActionShare }
-    static var messageActionCopy: UIImage { Images.messageActionCopy }
-    static var messageActionReact: UIImage { Images.messageActionReact }
-    static var messageActionDelete: UIImage { Images.messageActionDelete }
-    static var messageActionSelect: UIImage { Images.messageActionSelect }
-    static var messageActionRemove: UIImage { Images.messageActionRemove }
-    static var messageActionReport: UIImage { Images.messageActionReport }
-    static var attachmentTransferPause: UIImage { Images.attachmentTransferPause }
-    static var attachmentUpload: UIImage { Images.attachmentUpload }
-    static var attachmentDownload: UIImage { Images.attachmentDownload }
+    public static var messageActionInfo: UIImage { Images.messageActionInfo }
+    public static var messageActionEdit: UIImage { Images.messageActionEdit }
+    public static var messageActionReply: UIImage { Images.messageActionReply }
+    public static var messageActionReplyInThread: UIImage { Images.messageActionReplyInThread }
+    public static var messageActionForward: UIImage { Images.messageActionForward }
+    public static var messageActionShare: UIImage { Images.messageActionShare }
+    public static var messageActionCopy: UIImage { Images.messageActionCopy }
+    public static var messageActionDelete: UIImage { Images.messageActionDelete }
+    public static var messageActionSelect: UIImage { Images.messageActionSelect }
+    public static var messageActionRemove: UIImage { Images.messageActionRemove }
+    public static var messageActionReport: UIImage { Images.messageActionReport }
+    public static var attachmentTransferPause: UIImage { Images.attachmentTransferPause }
+    public static var attachmentUpload: UIImage { Images.attachmentUpload }
+    public static var attachmentDownload: UIImage { Images.attachmentDownload }
     
-    static var messageVideoPlay: UIImage { Images.messageVideoPlay }
-    static var messageVideoPause: UIImage { Images.messageVideoPause }
-    static var messageVideoMute: UIImage { Images.messageVideoMute }
-    static var messageVideoUnmute: UIImage { Images.messageVideoUnmute }
+    public static var attachmentVoice: UIImage { Images.attachmentVoice }
+    public static var attachmentVideo: UIImage { Images.attachmentVideo }
+    public static var attachmentImage: UIImage { Images.attachmentImage }
+    public static var attachmentFile: UIImage { Images.attachmentFile }
     
-    static var messageSendAction: UIImage { Images.messageSendAction }
+    public static var videoPlay: UIImage { Images.videoPlay }
+    public static var videoPause: UIImage { Images.videoPause }
+    public static var videoPlayerPause: UIImage { Images.videoPlayerPause }
+    public static var videoPlayerPlay: UIImage { Images.videoPlayerPlay }
+    public static var messageSendAction: UIImage { Images.messageSendAction }
+    public static var messageActionMoreReactions: UIImage { Images.messageActionMoreReactions }
     
-    static var composerEditMessage: UIImage { Images.composerEditMessage }
-    static var composerReplyMessage: UIImage { Images.composerReplyMessage }
-    
-    static var channelNew: UIImage { Images.channelNew }
-    static var channelCreatePublic: UIImage { Images.channelCreatePublic }
-    static var channelCreatePrivate: UIImage { Images.channelCreatePrivate }
-    
-    static var channelUnreadBubble: UIImage { Images.channelUnreadBubble }
-    static var channelProfileURI: UIImage { Images.channelProfileURI }
-    static var channelProfileQR: UIImage { Images.channelProfileQR }
-    static var channelProfileMute: UIImage { Images.channelProfileMute }
-    static var channelProfileUnmute: UIImage { Images.channelProfileUnmute }
-    static var channelProfileBell: UIImage { Images.channelProfileBell }
-    static var channelProfileReport: UIImage { Images.channelProfileReport }
-    static var channelProfileJoin: UIImage { Images.channelProfileJoin }
-    static var channelProfileMore: UIImage { Images.channelProfileMore }
-    static var channelProfileAutoDeleteMessages: UIImage { Images.channelProfileAutoDeleteMessages }
-    static var channelProfileMembers: UIImage { Images.channelProfileMembers }
-    static var channelProfileAdmins: UIImage { Images.channelProfileAdmins }
-    static var channelProfileEditAvatar: UIImage { Images.channelProfileEditAvatar }
-    static var channelReply: UIImage { Images.channelReply }
-    
-    static var audioPlayerCancel: UIImage { Images.audioPlayerCancel }
-    static var audioPlayerDelete: UIImage { Images.audioPlayerDelete }
-    static var audioPlayerLock: UIImage { Images.audioPlayerLock }
-    static var audioPlayerMic: UIImage { Images.audioPlayerMic }
-    static var audioPlayerMicGreen: UIImage { Images.audioPlayerMicGreen }
-    static var audioPlayerPauseGrey: UIImage { Images.audioPlayerPauseGrey }
-    static var audioPlayerPause: UIImage { Images.audioPlayerPause }
-    static var audioPlayerPlayGrey: UIImage { Images.audioPlayerPlayGrey }
-    static var audioPlayerPlay: UIImage { Images.audioPlayerPlay }
-    static var audioPlayerSend: UIImage { Images.audioPlayerSend }
-    static var audioPlayerSendLarge: UIImage { Images.audioPlayerSendLarge }
-    static var audioPlayerStop: UIImage { Images.audioPlayerStop }
-    static var audioPlayerUnlock: UIImage { Images.audioPlayerUnlock }
-    
-    static var chatPin: UIImage { Images.chatPin }
-    static var chatUnpin: UIImage { Images.chatUnpin }
-    static var chatBlock: UIImage { Images.chatBlock }
-    static var chatUnBlock: UIImage { Images.chatUnBlock }
-    static var chatClear: UIImage { Images.chatClear }
-    static var chatDelete: UIImage { Images.chatDelete }
-    static var chatLeave: UIImage { Images.chatLeave }
-    static var chatSavePhoto: UIImage { Images.chatSavePhoto }
-    static var chatForward: UIImage { Images.chatForward }
-    static var chatShare: UIImage { Images.chatShare }
-    static var chatEdit: UIImage { Images.chatEdit }
-    static var chatRevoke: UIImage { Images.chatRevoke }
-
-    static var chatActionCamera: UIImage { Images.chatActionCamera }
-    static var chatActionGallery: UIImage { Images.chatActionGallery }
-    static var chatActionFile: UIImage { Images.chatActionFile }
-    static var chatActionContact: UIImage { Images.chatActionContact }
-    static var chatActionLocation: UIImage { Images.chatActionLocation }
-    
-    static var searchIcon: UIImage { Images.searchIcon }
-    static var searchFill: UIImage { Images.searchFill }
-    static var searchBackground: UIImage { Images.searchBackground }
-    
-    static var downloadStart: UIImage { Images.downloadStart }
-    static var downloadStop: UIImage { Images.downloadStop }
         
-    static var replyPlay: UIImage { Images.replyPlay }
-    static var replyX: UIImage { Images.replyX }
-    static var replyVoice: UIImage { Images.replyVoice }
-    static var replyFile: UIImage { Images.replyFile }
-    static var messageFile: UIImage { Images.messageFile }
+    public static var channelNew: UIImage { Images.channelNew }
+    public static var channelCreatePublic: UIImage { Images.channelCreatePublic }
+    public static var channelCreatePrivate: UIImage { Images.channelCreatePrivate }
+    
+    public static var channelUnreadBubble: UIImage { Images.channelUnreadBubble }
+    public static var channelProfileURI: UIImage { Images.channelProfileURI }
+    public static var channelProfileQR: UIImage { Images.channelProfileQR }
+    public static var channelProfileBell: UIImage { Images.channelProfileBell }
+    public static var channelProfileMore: UIImage { Images.channelProfileMore }
+    public static var channelProfileAutoDeleteMessages: UIImage { Images.channelProfileAutoDeleteMessages }
+    public static var channelProfileMembers: UIImage { Images.channelProfileMembers }
+    public static var channelProfileAdmins: UIImage { Images.channelProfileAdmins }
+    public static var channelProfileEditAvatar: UIImage { Images.channelProfileEditAvatar }
+    public static var channelReply: UIImage { Images.channelReply }
+    
+    public static var audioPlayerCancel: UIImage { Images.audioPlayerCancel }
+    public static var audioPlayerDelete: UIImage { Images.audioPlayerDelete }
+    public static var audioPlayerLock: UIImage { Images.audioPlayerLock }
+    public static var audioPlayerMic: UIImage { Images.audioPlayerMic }
+    public static var audioPlayerMicGreen: UIImage { Images.audioPlayerMicGreen }
+    public static var audioPlayerPauseGrey: UIImage { Images.audioPlayerPauseGrey }
+    public static var audioPlayerPause: UIImage { Images.audioPlayerPause }
+    public static var audioPlayerPlayGrey: UIImage { Images.audioPlayerPlayGrey }
+    public static var audioPlayerPlay: UIImage { Images.audioPlayerPlay }
+    public static var audioPlayerSendLarge: UIImage { Images.audioPlayerSendLarge }
+    public static var audioPlayerStop: UIImage { Images.audioPlayerStop }
+    public static var audioPlayerUnlock: UIImage { Images.audioPlayerUnlock }
+    
+    public static var chatPin: UIImage { Images.chatPin }
+    public static var chatUnpin: UIImage { Images.chatUnpin }
+    public static var chatBlock: UIImage { Images.chatBlock }
+    public static var chatUnBlock: UIImage { Images.chatUnBlock }
+    public static var chatClear: UIImage { Images.chatClear }
+    public static var chatDelete: UIImage { Images.chatDelete }
+    public static var chatLeave: UIImage { Images.chatLeave }
+    public static var chatSavePhoto: UIImage { Images.chatSavePhoto }
+    public static var chatForward: UIImage { Images.chatForward }
+    public static var chatShare: UIImage { Images.chatShare }
+    public static var chatEdit: UIImage { Images.chatEdit }
+    public static var chatRevoke: UIImage { Images.chatRevoke }
+    
+    public static var chatActionCamera: UIImage { Images.chatActionCamera }
+    public static var chatActionGallery: UIImage { Images.chatActionGallery }
+    public static var chatActionFile: UIImage { Images.chatActionFile }
+    public static var chatActionContact: UIImage { Images.chatActionContact }
+    public static var chatActionLocation: UIImage { Images.chatActionLocation }
+    
+    public static var searchIcon: UIImage { Images.searchIcon }
+    public static var searchFill: UIImage { Images.searchFill }
+    
+    public static var downloadStart: UIImage { Images.downloadStart }
+    public static var downloadStop: UIImage { Images.downloadStop }
+    
+    public static var replyPlay: UIImage { Images.replyPlay }
+    public static var closeIcon: UIImage { Images.closeIcon }
+    public static var messageFile: UIImage { Images.messageFile }
 }
-

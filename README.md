@@ -95,7 +95,7 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
         // The user's access token for the Sceyt Chat API.
         let accessToken = "USER_ACCESS_TOKEN"
 
-        SCTUIKitConfig.connect(accessToken: accessToken)
+        SCTUIKitConfig.connect(token: accessToken)
 
         return true
     }
@@ -126,7 +126,7 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
 
         // Customizing colors is straightforward with the Appearance.Colors property.
         // For instance, to change the kit's blue color:
-        Appearance.Colors.kitBlue = UIColor.blue
+        UIColor.primaryAccent = UIColor.blue
 
         // You can also replace icons or images by using the Appearance.Images property.
         // For example, to change the chat action camera icon:

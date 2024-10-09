@@ -8,44 +8,44 @@
 
 import UIKit
 
-open class NewChannelRouter: Router<CreateNewChannelVC> {
+open class NewChannelRouter: Router<StartChatViewController> {
     open func showChannel(_ channel: ChatChannel) {
         ChannelListRouter.showChannel(channel)
-        rootVC.dismiss(animated: true)
+        rootViewController.dismiss(animated: true)
     }
 
     func showCreatePrivateChannel() {
-        let vc = SelectChannelMembersVC()
-        vc.selectMemberViewModel = .init()
-        rootVC.show(vc, sender: self)
+        let viewController = Components.selectUsersViewController.init()
+        viewController.selectMemberViewModel = .init()
+        rootViewController.show(viewController, sender: self)
     }
 
     func showCreatePublicChannel() {
-        let vc = CreatePublicChannelVC()
-        vc.viewModel = .init()
-        rootVC.show(vc, sender: self)
+        let viewController = Components.createChannelViewController.init()
+        viewController.viewModel = .init()
+        rootViewController.show(viewController, sender: self)
     }
 }
 
-open class SelectChannelMembersRouter: Router<SelectChannelMembersVC> {
+open class SelectChannelMembersRouter: Router<SelectUsersViewController> {
     open func showCreatePrivateChannel() {
-        let vc = CreatePrivateChannelVC()
-        vc.viewModel = .init(users: rootVC.selectMemberViewModel.selectedUsers)
-        rootVC.show(vc, sender: self)
+        let viewController = Components.createGroupViewController.init()
+        viewController.viewModel = .init(users: rootViewController.selectMemberViewModel.selectedUsers)
+        rootViewController.show(viewController, sender: self)
     }
 }
 
-open class CreatePrivateChannelRouter: Router<CreatePrivateChannelVC> {
+open class CreatePrivateChannelRouter: Router<CreateGroupViewController> {
     open func showChannel(_ channel: ChatChannel) {
         ChannelListRouter.showChannel(channel)
-        rootVC.dismiss(animated: true)
+        rootViewController.dismiss(animated: true)
     }
 }
 
-open class CreatePublicChannelRouter: Router<CreatePublicChannelVC> {
+open class CreatePublicChannelRouter: Router<CreateChannelViewController> {
     func showAddMember(channel: ChatChannel) {
-        let vc = ChannelAddMembersVC()
-        vc.addMembersViewModel = ChannelAddMembersVM(channel: channel)
-        rootVC.show(vc, sender: self)
+        let viewController = Components.addMembersViewController.init()
+        viewController.addMembersViewModel = ChannelAddMembersViewModel(channel: channel)
+        rootViewController.show(viewController, sender: self)
     }
 }

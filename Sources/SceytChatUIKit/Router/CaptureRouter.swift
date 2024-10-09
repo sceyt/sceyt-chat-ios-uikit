@@ -61,21 +61,21 @@ public extension Router {
             title: L10n.Alert.Button.cancel,
             style: .cancel
         ) { action(.none) })
-        rootVC.showBottomSheet(actions: actions)
+        rootViewController.showBottomSheet(actions: actions)
     }
     
-    func showCamera(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentView?) -> Void) {
-        ImagePickerController(presenter: rootVC)
+    func showCamera(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentModel?) -> Void) {
+        ImagePickerController(presenter: rootViewController)
             .showCamera(mediaTypes: mediaTypes.map { $0.rawValue }, callback: done)
     }
     
-    func selectPhoto(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentView?) -> Void) {
-        ImagePickerController(presenter: rootVC)
+    func selectPhoto(mediaTypes: [MediaType] = [.image, .video, .movie], done: @escaping (AttachmentModel?) -> Void) {
+        ImagePickerController(presenter: rootViewController)
             .showPhotoLibrary(mediaTypes: mediaTypes.map { $0.rawValue }, callback: done)
     }
     
     func editImage(_ image: UIImage, done: @escaping (UIImage) -> Void) {
-        let vc = Components.imageCropperVC.init(
+        let viewController = Components.imageCropperViewController.init(
             onComplete: { [weak self] edited in
                 guard let self else { return }
                 done(edited)
@@ -85,10 +85,10 @@ public extension Router {
                 self?.dismiss()
             }
         )
-        vc.viewModel = Components.imageCropperVM.init(image: image)
+        viewController.viewModel = Components.imageCropperViewModel.init(image: image)
         let nav = Components.navigationController.init()
-        nav.viewControllers = [vc]
+        nav.viewControllers = [viewController]
         nav.modalPresentationStyle = .fullScreen
-        rootVC.present(nav, animated: true)
+        rootViewController.present(nav, animated: true)
     }
 }

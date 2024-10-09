@@ -18,7 +18,7 @@ open class ChannelCreatedView: View {
     open override func setup() {
         super.setup()
         
-        iconView.image = Images.channelCreated
+        iconView.image = appearance.channelCreatedImage
         titleLabel.text = L10n.Channel.Created.title
         messageLabel.text = L10n.Channel.Created.message
         titleLabel.numberOfLines = 0

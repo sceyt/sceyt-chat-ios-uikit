@@ -34,11 +34,11 @@ public extension UIViewController {
 public extension Router {
     @discardableResult
     func showAlert(title: String? = nil, message: String? = nil, actions: [SheetAction]? = nil, preferredActionIndex: Int = 0, completion: (() -> Void)? = nil) -> Alert {
-        rootVC.showAlert(title: title, message: message, actions: actions, preferredActionIndex: preferredActionIndex, completion: completion)
+        rootViewController.showAlert(title: title, message: message, actions: actions, preferredActionIndex: preferredActionIndex, completion: completion)
     }
 
     @discardableResult
     func showAlert(error: Error, completion: (() -> Void)? = nil) -> Alert {
-        rootVC.showAlert(error: error, completion: completion)
+        rootViewController.showAlert(error: error, completion: completion)
     }
 }

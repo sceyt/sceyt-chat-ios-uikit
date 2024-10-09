@@ -10,213 +10,8 @@ import SceytChat
 import UIKit
 
 extension MessageCell {
-    open class AttachmentStackView: UIView, Configurable {
-        
-        override public init(frame: CGRect) {
-            super.init(frame: frame)
-            setup()
-            setupAppearance()
-        }
-        
-        public required init?(coder: NSCoder) {
-            super.init(coder: coder)
-            setup()
-            setupAppearance()
-        }
-        
-        open var onAction: ((Action) -> Void)?
-        
-        open private(set) var attachments = [Attachment]()
-        
-        private var isConfigured = false
-        
-        override open func willMove(toSuperview newSuperview: UIView?) {
-            super.willMove(toSuperview: newSuperview)
-            guard !isConfigured, newSuperview != nil else { return }
-            setupLayout()
-            setupDone()
-            isConfigured = true
-        }
-        
-        open func setup() {
-            let tap = UITapGestureRecognizer(target: self, action: #selector(tapAction(_:)))
-            addGestureRecognizer(tap)
-        }
-        
-        open func setupLayout() {}
-        
-        open func setupAppearance() {
-//            alignment = .center
-//            distribution = .fillProportionally
-//            axis = .vertical
-//            spacing = 4
-        }
-        
-        open func setupDone() {}
-        
-        open func addImageView(layout: MessageLayoutModel.AttachmentLayout) -> AttachmentImageView {
-            let v = AttachmentImageView()
-                .withoutAutoresizingMask
-            addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
-            v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
-            return v
-        }
-        
-        open func addVideoView(layout: MessageLayoutModel.AttachmentLayout) -> AttachmentVideoView {
-            let v = AttachmentVideoView()
-                .withoutAutoresizingMask
-            addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
-            v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
-            return v
-        }
-        
-        open func addFileView(layout: MessageLayoutModel.AttachmentLayout) -> AttachmentFileView {
-            let v = AttachmentFileView()
-                .withoutAutoresizingMask
-            addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
-            v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
-            return v
-        }
-        
-        open func addAudioView(layout: MessageLayoutModel.AttachmentLayout) -> AttachmentAudioView {
-            let v = AttachmentAudioView()
-                .withoutAutoresizingMask
-            addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
-            v.playPauseButton.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(onTapPlay)))
-            v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
-            return v
-        }
-
-        open var previewer: (() -> AttachmentPreviewDataSource?)?
-        
-        open var data: MessageLayoutModel! {
-            didSet {
-                guard let data = data,
-                      !data.attachments.isEmpty
-                else {
-                    subviews.forEach {
-                        $0.removeFromSuperview()
-                    }
-                    return
-                }
-                subviews.forEach {
-                    $0.removeFromSuperview()
-                }
-                addAttachmentViews(layouts: data.attachments)
-            }
-        }
-        
-        private func addAttachmentViews(layouts: [MessageLayoutModel.AttachmentLayout]) {
-            layouts.forEach { layout in
-                var av: AttachmentView?
-                switch layout.type {
-                case .image:
-                    av = addImageView(layout: layout)
-                case .video:
-                    av = addVideoView(layout: layout)
-                case .voice:
-                    av = addAudioView(layout: layout)
-                default:
-                    av = addFileView(layout: layout)
-                }
-                av?.previewer = { [weak self] in
-                    self?.previewer?()
-                }
-                guard let av else { return }
-                av.data = layout
-                av.setProgressHandler()
-                switch layout.transferStatus {
-                case .pending, .uploading, .downloading:
-                    if let progress = fileProvider.currentProgressPercent(message: data.message, attachment: layout.attachment) {
-                        av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
-                    }
-                case .pauseUploading, .failedUploading:
-                    break
-                case .pauseDownloading, .failedDownloading:
-                    break
-                case .done:
-                    av.setProgress(0)
-                }
-            }
-        }
-        
-        @objc
-        private func tapAction(_ sender: UITapGestureRecognizer) {
-            let point = sender.location(in: self)
-            if let index = subviews.firstIndex(where: { $0.frame.contains(point) }) {
-                onAction?(.userSelect(index))
-            }
-        }
-        
-        @objc
-        private func onTapPlay() {
-            guard let audioView = (subviews.first(where: { $0 is AttachmentAudioView }) as? AttachmentAudioView)
-            else { return }
-            audioView.play(onPlayed: { url in
-                onAction?(.playedAudio(url))
-            })
-        }
-        
-        @objc
-        open func pauseAction(_ sender: Button) {
-            guard let av = sender.superview as? AttachmentView
-            else { return }
-            let status = av.lastAttachmentTransferProgress?.attachment.status ?? av.data.transferStatus
-            var message: ChatMessage {
-                data.message
-            }
-            var attachment: ChatMessage.Attachment {
-                av.data.attachment
-            }
-            switch status {
-            case .pauseUploading, .failedUploading:
-                av.update(status: .uploading)
-                av.setProgressHandler()
-                onAction?(.resumeTransfer(message, attachment))
-            case .pauseDownloading, .failedDownloading:
-                av.update(status: .downloading)
-                av.setProgressHandler()
-                onAction?(.resumeTransfer(message, attachment))
-            case .uploading:
-                av.update(status: .pauseUploading)
-                av.setProgressHandler()
-                onAction?(.pauseTransfer(message, attachment))
-            case .downloading:
-                av.update(status: .pauseDownloading)
-                av.setProgressHandler()
-                onAction?(.pauseTransfer(message, attachment))
-            default:
-                break
-            }
-        }
-    }
-}
-
-public extension MessageCell.AttachmentStackView {
-    enum Action {
-        case userSelect(Int)
-        case pauseTransfer(ChatMessage, ChatMessage.Attachment)
-        case resumeTransfer(ChatMessage, ChatMessage.Attachment)
-        case play(URL)
-        case playedAudio(URL)
-    }
-}
-
-extension MessageCell {
     open class AttachmentView: View {
-        public lazy var appearance = MessageCell.appearance {
+        public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
             }
@@ -241,7 +36,7 @@ extension MessageCell {
         
         override open func setup() {
             super.setup()
-            pauseButton.setImage(.attachmentTransferPause, for: .normal)
+            
             progressView.isHidden = true
             progressLabel.isHidden = true
             pauseButton.isHidden = true
@@ -252,11 +47,13 @@ extension MessageCell {
         
         override open func setupAppearance() {
             super.setupAppearance()
-            progressView.progressColor = progressView.appearance.progressColor
-            progressView.trackColor = progressView.appearance.trackColor
-            progressLabel.backgroundColor = appearance.videoTimeBackgroundColor
-            progressLabel.textLabel.font = appearance.videoTimeTextFont
-            progressLabel.textLabel.textColor = appearance.videoTimeTextColor
+            pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
+            progressView.progressColor = appearance.overlayMediaLoaderAppearance.progressColor
+            progressView.trackColor = appearance.overlayMediaLoaderAppearance.trackColor
+            progressLabel.backgroundColor = appearance.overlayMediaLoaderAppearance.backgroundColor
+            progressLabel.textLabel.font = appearance.overlayMediaLoaderAppearance.progressLabelAppearance.font
+            progressLabel.textLabel.textColor = appearance.overlayMediaLoaderAppearance.progressLabelAppearance.foregroundColor
+            progressView.parentAppearance = appearance.overlayMediaLoaderAppearance
         }
         
         open func setupPreviewer() {
@@ -274,7 +71,7 @@ extension MessageCell {
                 progressLabel.text = L10n.Upload.preparing
             } else {
                 let downloaded = UInt(progress.progress * Double(total))
-                progressLabel.text = "\(Formatters.fileSize.format(downloaded)) / \(Formatters.fileSize.format(total))"
+                progressLabel.text = "\(appearance.attachmentFileSizeFormatter.format(UInt64(downloaded))) / \(appearance.attachmentFileSizeFormatter.format(UInt64(total)))"
             }
             setProgress(progress.progress)
         }
@@ -284,7 +81,7 @@ extension MessageCell {
             else { return }
             let total = completion.attachment.uploadedFileSize
             if total > 0 {
-                progressLabel.text = "\(Formatters.fileSize.format(total)) / \(Formatters.fileSize.format(total))"
+                progressLabel.text = "\(appearance.attachmentFileSizeFormatter.format(UInt64(total))) / \(appearance.attachmentFileSizeFormatter.format(UInt64(total)))"
             }
         }
         
@@ -341,19 +138,19 @@ extension MessageCell {
             case .pending:
                 break
             case .uploading:
-                pauseButton.setImage(.attachmentTransferPause, for: .normal)
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
             case .downloading:
-                pauseButton.setImage(.attachmentTransferPause, for: .normal)
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
             case .pauseUploading, .failedUploading:
                 setProgress(0.0001)
                 progressView.isHiddenProgress = true
                 progressLabel.isHidden = true
-                pauseButton.setImage(.attachmentUpload, for: .normal)
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.uploadIcon, for: .normal)
             case .pauseDownloading, .failedDownloading:
                 setProgress(0.0001)
                 progressView.isHiddenProgress = true
                 progressLabel.isHidden = true
-                pauseButton.setImage(.attachmentDownload, for: .normal)
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.downloadIcon, for: .normal)
             case .done:
                 if progressView.progress > 0 {
                     setProgress(1)

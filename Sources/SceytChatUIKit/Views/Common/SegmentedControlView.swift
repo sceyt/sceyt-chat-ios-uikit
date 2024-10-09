@@ -10,11 +10,18 @@ import UIKit
 
 open class SegmentedControlView: View,
     UIScrollViewDelegate,
-    SegmentedControlerDelegate
+    SegmentedControllerDelegate
 {
+    
+    public lazy var appearance: SegmentedControl.Appearance = SegmentedControl.appearance {
+        didSet {
+            setupAppearance()
+        }
+    }
+    
     public private(set) var items: [SectionItem]
 
-    open lazy var segmentController: SegmentedControler & UIControl = NativeSegmentedController(items: items.map { $0.title })
+    open lazy var segmentController: SegmentedController & UIControl = SegmentedControl(items: items.map { $0.title })
         .withoutAutoresizingMask
 
     open lazy var scrollView = UIScrollView()
@@ -93,6 +100,7 @@ open class SegmentedControlView: View,
         
         backgroundColor = .clear
         scrollView.backgroundColor = .clear
+        (segmentController as? SegmentedControl)?.parentAppearance = appearance
     }
 
     @objc
@@ -162,157 +170,5 @@ public extension SegmentedControlView {
             self.content = content
             self.title = title
         }
-    }
-}
-
-@objc
-public protocol SegmentedControlerDelegate: AnyObject {
-    @objc
-    func didSelectSegment(at index: Int)
-}
-
-@objc
-public protocol SegmentedControler {
-    @objc
-    var currentSegmentIndex: Int { get set }
-
-    @objc
-    var currentPosition: Double { get set }
-
-    @objc
-    weak var delegate: SegmentedControlerDelegate? { get set }
-    
-    @objc
-    var showCornerRadius: Bool { get set }
-}
-
-public extension SegmentedControler where Self: UIControl {}
-
-open class NativeSegmentedController: UIControl, SegmentedControler {
-    public var currentSegmentIndex: Int {
-        get {
-            segmentedControl.selectedSegmentIndex
-        }
-        set {
-            segmentedControl.selectedSegmentIndex = newValue
-        }
-    }
-
-    public var currentPosition: Double = 0 {
-        didSet {
-            setNeedsLayout()
-            layoutIfNeeded()
-        }
-    }
-
-    public weak var delegate: SegmentedControlerDelegate?
-    
-    public var showCornerRadius: Bool {
-        get {
-            layer.cornerRadius != 0
-        }
-        set {
-            layer.cornerRadius = newValue ? Layouts.cornerRadius : 0
-        }
-    }
-
-    private let segmentedControl: UISegmentedControl
-
-    private let line = {
-        $0.layer.masksToBounds = true
-        return $0
-    }(UIView())
-
-    private let bottomBorder = UIView().withoutAutoresizingMask
-
-    private var _observer: NSKeyValueObservation?
-
-    init(items: [Any]?) {
-        segmentedControl = .init(items: items).withoutAutoresizingMask
-        super.init(frame: .zero)
-
-        setup()
-        setupLayout()
-        setupAppearance()
-    }
-    
-    public required init?(coder: NSCoder) {
-        segmentedControl = .init().withoutAutoresizingMask
-        super.init(coder: coder)
-    }
-    
-    func setup() {
-        _observer = segmentedControl.observe(\.selectedSegmentIndex, options: [.new, .old]) { [weak self] _, _ in
-            guard let self = self else { return }
-            self.delegate?.didSelectSegment(at: self.segmentedControl.selectedSegmentIndex)
-        }
-
-        if segmentedControl.numberOfSegments > 0 {
-            currentPosition = 1 / Double(segmentedControl.numberOfSegments) / 2
-        }
-    }
-
-    func setupLayout() {
-        addSubview(segmentedControl)
-        addSubview(bottomBorder)
-        addSubview(line)
-        
-        segmentedControl.pin(to: self)
-        bottomBorder.pin(to: self, anchors: [.leading, .trailing, .bottom])
-        bottomBorder.resize(anchors: [.height(Layouts.bottomSeparatorHeight)])
-    }
-
-    func setupAppearance() {
-        backgroundColor = appearance.backgroundColor
-        layer.cornerRadius = Layouts.cornerRadius
-        layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        layer.masksToBounds = true
-        line.backgroundColor = .kitBlue
-        bottomBorder.backgroundColor = .separator
-        segmentedControl.setTitleTextAttributes([
-            .font: appearance.font ?? Fonts.semiBold.withSize(16),
-            .foregroundColor: appearance.selectedTextColor ?? .textBlack
-        ], for: .selected)
-        segmentedControl.setTitleTextAttributes([
-            .font: appearance.font ?? Fonts.semiBold.withSize(16),
-            .foregroundColor: appearance.textColor ?? .textGray
-        ], for: .normal)
-
-        segmentedControl.setBackgroundImage(UIImage(), for: .normal, barMetrics: .default)
-        segmentedControl.setDividerImage(UIImage(), forLeftSegmentState: [], rightSegmentState: [], barMetrics: .default)
-    }
-    
-    private var lineWidth: CGFloat {
-        let fontAttributes = [NSAttributedString.Key.font: appearance.font ?? Fonts.semiBold.withSize(16)]
-        let max = Double(segmentedControl.numberOfSegments - 1)
-        let idx = currentPosition * max
-        let leftIdx = floor(currentPosition * max)
-        let leftWidth = segmentedControl.titleForSegment(at: Int(leftIdx))?.size(withAttributes: fontAttributes).width ?? 0
-        let rightIdx = ceil(currentPosition * max)
-        let rightWidth = segmentedControl.titleForSegment(at: Int(rightIdx))?.size(withAttributes: fontAttributes).width ?? 0
-        return min(floor(width / CGFloat(segmentedControl.numberOfSegments)), leftWidth + (idx - leftIdx) * (rightWidth - leftWidth) + Layouts.selectedIndicatorPadding)
-    }
-
-    override open func layoutSubviews() {
-        super.layoutSubviews()
-
-        line.frame = .init(x: CGFloat(currentPosition) * width - line.width / 2, 
-                           y: height - Layouts.selectedIndicatorHeight,
-                           width: lineWidth,
-                           height: Layouts.selectedIndicatorHeight)
-        line.layer.cornerRadius = Layouts.selectedIndicatorHeight / 2
-    }
-
-    deinit {
-        _observer = nil
-    }
-}
-
-public extension NativeSegmentedController {
-    enum Layouts {
-        public static var cornerRadius: CGFloat = 10
-        public static var selectedIndicatorHeight: CGFloat = 3
-        public static var selectedIndicatorPadding: CGFloat = 4
-        public static var bottomSeparatorHeight: CGFloat = 1
     }
 }

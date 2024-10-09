@@ -1,19 +1,8 @@
 {
   "images" : [
     {
-      "filename" : "forward.png",
-      "idiom" : "universal",
-      "scale" : "1x"
-    },
-    {
-      "filename" : "forward@2x.png",
-      "idiom" : "universal",
-      "scale" : "2x"
-    },
-    {
-      "filename" : "forward@3x.png",
-      "idiom" : "universal",
-      "scale" : "3x"
+      "filename" : "message_forward.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

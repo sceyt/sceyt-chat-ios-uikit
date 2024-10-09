@@ -24,7 +24,6 @@ open class SelectedItemListView<Item: Equatable>: View, UICollectionViewDataSour
     override open func setup() {
         super.setup()
         
-        collectionView.register(SelectedUserCell.self)
         collectionView.dataSource = self
         collectionView.delegate = self
     }

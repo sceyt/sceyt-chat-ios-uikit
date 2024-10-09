@@ -8,6 +8,6 @@
 
 import UIKit
 
-open class MessageInfoRouter: Router<MessageInfoVC> {
+open class MessageInfoRouter: Router<MessageInfoViewController> {
     
 }

@@ -32,7 +32,7 @@ open class SCTDataSessionTaskInfo: NSObject {
     public var onAction: ((Action) -> Void)?
     public var onEvent: ((Event) -> Void)?
     public var userInfo: [AnyHashable: Any]?
-    private let checksumProvider = SCTUIKitComponents.channelMessageChecksumProvider.init()
+    private let checksumProvider = Components.channelMessageChecksumProvider.init()
 
     public enum TransferType {
         case upload

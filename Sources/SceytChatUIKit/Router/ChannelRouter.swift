@@ -10,41 +10,42 @@ import AVKit
 import UIKit
 import SceytChat
 
-open class ChannelRouter: Router<ChannelVC> {
+open class ChannelRouter: Router<ChannelViewController> {
     open func showThreadForMessage(_ message: ChatMessage) {
-        let chatVC = Components.channelVC.init()
-        chatVC.channelViewModel = Components.channelVM
+        let chatViewController = Components.channelViewController.init()
+        chatViewController.channelViewModel = Components.channelViewModel
             .init(
-                channel: rootVC.channelViewModel.channel,
+                channel: rootViewController.channelViewModel.channel,
                 threadMessage: message
             )
-        chatVC.hidesBottomBarWhenPushed = true
-        rootVC.show(chatVC, sender: self)
+        chatViewController.hidesBottomBarWhenPushed = true
+        rootViewController.show(chatViewController, sender: self)
     }
 
     open func showChannelProfile() {
-        let profileVC = Components.channelProfileVC.init()
-        profileVC.profileViewModel = Components.channelProfileVM
+        let profileViewController = Components.channelInfoViewController.init()
+        profileViewController.profileViewModel = Components.channelProfileViewModel
             .init(
-                channel: rootVC.channelViewModel.channel
+                channel: rootViewController.channelViewModel.channel,
+                appearance: MessageCell.appearance
             )
-        rootVC.show(profileVC, sender: self)
+        rootViewController.show(profileViewController, sender: self)
     }
 
     open func showAttachment(_ attachment: ChatMessage.Attachment) {
         
-        let items = AttachmentView.items(attachments: [attachment])
+        let items = AttachmentModel.items(attachments: [attachment])
         guard !items.isEmpty else { return }
         let preview = FilePreviewController(
             items: items
                 .map { .init(title: $0.name, url: $0.url) }
         )
         
-        let isFirstResponder = rootVC.inputTextView.isFirstResponder
-        rootVC.inputTextView.resignFirstResponder()
-        preview.present(on: rootVC) {
+        let isFirstResponder = rootViewController.inputTextView.isFirstResponder
+        rootViewController.inputTextView.resignFirstResponder()
+        preview.present(on: rootViewController) {
             if isFirstResponder, case .didDismiss = $0 {
-                self.rootVC.inputTextView.becomeFirstResponder()
+                self.rootViewController.inputTextView.becomeFirstResponder()
             }
         }
     }
@@ -52,7 +53,7 @@ open class ChannelRouter: Router<ChannelVC> {
     open func showConfirmationAlertForDeleteMessage(
         _ confirmed: @escaping (Bool) -> Void
     ) {
-        rootVC.showAlert(
+        rootViewController.showAlert(
             title: L10n.Message.Alert.Delete.title,
             message: L10n.Message.Alert.Delete.description,
             actions: [
@@ -64,32 +65,30 @@ open class ChannelRouter: Router<ChannelVC> {
                 }])
     }
 
-    open func showEmojis() -> EmojiListVC {
-        let emojiListVC = Components.emojiListVC
-            .init()
-        emojiListVC.viewModel = Components.emojiListVM.init()
+    open func showEmojis() -> EmojiPickerViewController {
+        let emojiPickerViewController = Components.emojiPickerViewController.init()
+        emojiPickerViewController.viewModel = Components.emojiListViewModel.init()
         let nav = EmojiViewInteractiveTransitionNavigationController
-            .init(rootViewController: emojiListVC)
-        rootVC.present(nav, animated: true)
-        return emojiListVC
+            .init(rootViewController: emojiPickerViewController)
+        rootViewController.present(nav, animated: true)
+        return emojiPickerViewController
     }
 
     open func playFrom(url: URL) {
         let player = AVPlayer(url: url)
-        let vc = AVPlayerViewController()
-        vc.player = player
+        let viewController = AVPlayerViewController()
+        viewController.player = player
 
-        rootVC.present(vc, animated: true) {
-            vc.player?.play()
+        rootViewController.present(viewController, animated: true) {
+            viewController.player?.play()
         }
     }
 
     @discardableResult
     open func showReactions(
         message: ChatMessage
-    ) -> ReactionVC {
-        let reactionPageVC = ReactionVC
-            .init()
+    ) -> ReactionsInfoViewController {
+        let reactionPageViewController = Components.reactionsInfoViewController.init()
         let reactionScores = message.reactionScores?.sorted(by: { $0.key > $1.key && $0.value > $1.value }) ?? []
         let reactionScoreViewModel = ReactionScoreViewModel(reactionScores: reactionScores)
         var userReactionViewModels: [UserReactionViewModel] = .init()
@@ -98,18 +97,18 @@ open class ChannelRouter: Router<ChannelVC> {
         reactionScores.forEach { key, _ in
             userReactionViewModels.append(.init(messageId: message.id, reactionKey: key))
         }
-        reactionPageVC.reactionScoreViewModel = reactionScoreViewModel
-        reactionPageVC.userReactionsViewModel = userReactionViewModels
-        reactionPageVC.modalPresentationStyle = .custom
-        rootVC.present(reactionPageVC, animated: true)
-        return reactionPageVC
+        reactionPageViewController.reactionScoreViewModel = reactionScoreViewModel
+        reactionPageViewController.userReactionsViewModel = userReactionViewModels
+        reactionPageViewController.modalPresentationStyle = .custom
+        rootViewController.present(reactionPageViewController, animated: true)
+        return reactionPageViewController
     }
     
-    open func showChannelProfileVC(channel: ChatChannel) {
-        let vc = Components.channelProfileVC.init()
-        vc.hidesBottomBarWhenPushed = true
-        vc.profileViewModel = Components.channelProfileVM.init(channel: channel)
-        self.rootVC.show(vc, sender: self)
+    open func showChannelInfoViewController(channel: ChatChannel) {
+        let viewController = Components.channelInfoViewController.init()
+        viewController.hidesBottomBarWhenPushed = true
+        viewController.profileViewModel = Components.channelProfileViewModel.init(channel: channel, appearance: MessageCell.appearance)
+        self.rootViewController.show(viewController, sender: self)
     }
     
     open func showDeleteOptions(clear: Bool) {
@@ -120,17 +119,17 @@ open class ChannelRouter: Router<ChannelVC> {
                              handler: { [weak self] in
             guard let self else { return }
             if clear {
-                self.rootVC.channelViewModel.deleteAllMessages(forMeOnly: false) { [weak self] error in
+                self.rootViewController.channelViewModel.deleteAllMessages(forMeOnly: false) { [weak self] error in
                     guard let self else { return }
                     if let error {
                         self.showAlert(error: error)
                     }
                 }
             } else {
-                self.rootVC.channelViewModel.deleteSelectedMessages(type: SCTUIKitConfig.shouldHardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
+                self.rootViewController.channelViewModel.deleteSelectedMessages(type: SceytChatUIKit.shared.config.hardDeleteMessageForAll ? .deleteHard : .deleteForEveryone)
             }
             
-            self.rootVC.channelViewModel.isEditing = false
+            self.rootViewController.channelViewModel.isEditing = false
         }))
         actions.append(.init(title: L10n.Message.Action.Subtitle.deleteMe,
                              icon: .chatDelete,
@@ -138,19 +137,19 @@ open class ChannelRouter: Router<ChannelVC> {
                              handler: { [weak self] in
             guard let self else { return }
             if clear {
-                self.rootVC.channelViewModel.deleteAllMessages(forMeOnly: true) { [weak self] error in
+                self.rootViewController.channelViewModel.deleteAllMessages(forMeOnly: true) { [weak self] error in
                     guard let self else { return }
                     if let error {
                         self.showAlert(error: error)
                     }
                 }
             } else {
-                self.rootVC.channelViewModel.deleteSelectedMessages(type: .deleteForMe)
+                self.rootViewController.channelViewModel.deleteSelectedMessages(type: .deleteForMe)
             }
             
-            self.rootVC.channelViewModel.isEditing = false
+            self.rootViewController.channelViewModel.isEditing = false
         }))
-        rootVC.showBottomSheet(actions: actions, withCancel: true)
+        rootViewController.showBottomSheet(actions: actions, withCancel: true)
     }
     
     @objc
@@ -160,12 +159,12 @@ open class ChannelRouter: Router<ChannelVC> {
                   actions: [
                     .init(title: L10n.Alert.Button.cancel, style: .cancel),
                     .init(title: L10n.Channel.Selecting.ClearChat.clear, style: .destructive) { [weak self] in
-                        self?.rootVC.channelViewModel.deleteAllMessages(forMeOnly: false) { [weak self] error in
+                        self?.rootViewController.channelViewModel.deleteAllMessages(forMeOnly: false) { [weak self] error in
                             guard let self else { return }
                             if let error {
                                 self.showAlert(error: error)
                             }
-                            self.rootVC.channelViewModel.isEditing = false
+                            self.rootViewController.channelViewModel.isEditing = false
                         }
                     }
                   ],
@@ -173,18 +172,18 @@ open class ChannelRouter: Router<ChannelVC> {
     }
     
     open func showMessageInfo(layoutModel: MessageLayoutModel) {
-        let vc = Components.messageInfoVC.init()
-        vc.viewModel = Components.messageInfoVM.init(messageMarkerProvider: rootVC.channelViewModel.messageMarkerProvider, data: layoutModel)
+        let viewController = Components.messageInfoViewController.init()
+        viewController.viewModel = Components.messageInfoViewModel.init(messageMarkerProvider: rootViewController.channelViewModel.messageMarkerProvider, data: layoutModel)
         let nav = Components.navigationController.init()
-        nav.viewControllers = [vc]
-        rootVC.present(nav, animated: true)
+        nav.viewControllers = [viewController]
+        rootViewController.present(nav, animated: true)
     }
     
     open func showForward(_ handler: @escaping (([ChatChannel]) -> Void)) {
-        let vc = Components.channelForwardVC.init()
-        vc.viewModel = Components.channelForwardVM.init(handler: handler)
+        let viewController = Components.forwardViewController.init()
+        viewController.viewModel = Components.channelForwardViewModel.init(handler: handler)
         let nav = Components.navigationController.init()
-        nav.viewControllers = [vc]
-        rootVC.present(nav, animated: true)
+        nav.viewControllers = [viewController]
+        rootViewController.present(nav, animated: true)
     }
 }

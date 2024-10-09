@@ -16,11 +16,11 @@ final class ConnectionService: NSObject, ChatClientDelegate {
     
     private override init() {
         super.init()
-        ChatClient.shared.add(delegate: self, identifier: String(reflecting: self))
+        SceytChatUIKit.shared.chatClient.add(delegate: self, identifier: String(reflecting: self))
     }
     
     deinit {
-        ChatClient.shared.removeDelegate(identifier: String(reflecting: self))
+        SceytChatUIKit.shared.chatClient.removeDelegate(identifier: String(reflecting: self))
     }
     
     private var callbacks = [((Error?) -> Void)]()
@@ -31,7 +31,7 @@ final class ConnectionService: NSObject, ChatClientDelegate {
                 return
             }
             Config.chatToken = token
-            SCTUIKitConfig.connect(accessToken: token)
+            SceytChatUIKit.shared.connect(token: token)
             self.callbacks.append(callback)
         }
     }
@@ -69,7 +69,7 @@ final class ConnectionService: NSObject, ChatClientDelegate {
                     return
                 }
                 Config.chatToken = token
-                chatClient.update(token: token) { _ in
+                SceytChatUIKit.shared.chatClient.update(token: token) { _ in
                     
                 }
             }
@@ -83,7 +83,7 @@ final class ConnectionService: NSObject, ChatClientDelegate {
                     return
                 }
                 Config.chatToken = token
-                chatClient.connect(token: token)
+                SceytChatUIKit.shared.chatClient.connect(token: token)
             }
         }
     }
@@ -91,8 +91,8 @@ final class ConnectionService: NSObject, ChatClientDelegate {
     func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
         if state == .connected {
             Config.currentUserId = chatClient.user.id
-            SCTUIKitConfig.currentUserId = chatClient.user.id
-            chatClient.setPresence(state: .online, status: "I'm online")
+            SceytChatUIKit.shared.currentUserId = chatClient.user.id
+            SceytChatUIKit.shared.chatClient.setPresence(state: .online, status: "I'm online")
         }
         switch state {
         case .connected, .disconnected, .failed:

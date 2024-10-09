@@ -19,12 +19,12 @@ open class MessageCell: CollectionViewCell,
     open lazy var checkBoxView = {
         $0.isUserInteractionEnabled = false
         return $0.withoutAutoresizingMask
-    }(CheckBoxView())
+    }(Components.checkBoxView.init())
     
     open lazy var containerView = UIView()
         .withoutAutoresizingMask
     
-    open lazy var unreadView = UnreadView
+    open lazy var unreadMessagesSeparatorView = Components.messageCellUnreadMessagesSeparatorView
         .init()
         .withoutAutoresizingMask
     
@@ -35,11 +35,8 @@ open class MessageCell: CollectionViewCell,
         .init()
         .withoutAutoresizingMask
     
-    open lazy var infoView = InfoView
+    open lazy var infoView = Components.messageCellInfoView
         .init()
-        .withoutAutoresizingMask
-
-    open lazy var dateTickBackgroundView = InfoViewBackgroundView()
         .withoutAutoresizingMask
     
     open lazy var nameLabel = UILabel()
@@ -49,7 +46,7 @@ open class MessageCell: CollectionViewCell,
         .withoutAutoresizingMask
         .contentMode(.scaleAspectFill)
     
-    open lazy var attachmentView = AttachmentStackView
+    open lazy var attachmentView = Components.messageCellAttachmentStackView
         .init()
         .withoutAutoresizingMask
     
@@ -60,35 +57,31 @@ open class MessageCell: CollectionViewCell,
         return $0
     }(UIView().withoutAutoresizingMask)
     
-    open lazy var linkView = LinkStackView
+    open lazy var linkView = Components.messageCellLinkStackView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var reactionView = ReactionsView
+    open lazy var reactionTotalView = Components.messageCellReactionTotalView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var reactionTotalView = ReactionTotalView
+    open lazy var replyView = Components.messageCellReplyView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var replyView = ReplyView
+    open lazy var forwardView = Components.messageCellForwardView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var forwardView = ForwardView
+    open lazy var replyCountView = Components.messageCellReplyCountView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var replyCountView = ReplyCountView
+    open lazy var replyArrowView = Components.messageCellReplyArrowView
         .init()
         .withoutAutoresizingMask
     
-    open lazy var replyArrowView = ReplyArrowView
-        .init()
-        .withoutAutoresizingMask
-    
-    open lazy var replyIcon = UIImageView(image: .channelReply)
+    open lazy var replyIcon = UIImageView(image: appearance.swipeToReplyIcon)
         .withoutAutoresizingMask
     
     open var highlightMode = HighlightMode.none
@@ -100,7 +93,7 @@ open class MessageCell: CollectionViewCell,
     open override func setup() {
         super.setup()
         
-        unreadView.isHidden = true
+        unreadMessagesSeparatorView.isHidden = true
         replyCountView.addTarget(
             self,
             action: #selector(replyCountAction(_:)),
@@ -119,17 +112,6 @@ open class MessageCell: CollectionViewCell,
                 onAction?(.playAtUrl(url))
             case .playedAudio(let url):
                 onAction?(.playedAudio(url))
-            }
-        }
-        
-        reactionView.onAction = { [unowned self] action in
-            switch action {
-            case .new:
-                onAction?(.addReaction)
-            case .delete(let key):
-                onAction?(.deleteReaction(key))
-            case .score(let key, let score, let byMe):
-                onAction?(.updateReactionScore(key, score, !byMe))
             }
         }
         
@@ -179,14 +161,12 @@ open class MessageCell: CollectionViewCell,
         bubbleView.addSubview(textLabel)
         bubbleView.addSubview(attachmentView)
         bubbleView.addSubview(linkView)
-        bubbleView.addSubview(dateTickBackgroundView)
         bubbleView.addSubview(infoView)
         bubbleView.addSubview(nameLabel)
         containerView.addSubview(avatarView)
-        containerView.addSubview(reactionView)
         containerView.addSubview(reactionTotalView)
         containerView.addSubview(replyCountView)
-        contentView.addSubview(unreadView)
+        contentView.addSubview(unreadMessagesSeparatorView)
         contentView.addSubview(replyIcon)
         contentView.addSubview(checkBoxView)
         if data != nil {
@@ -204,8 +184,23 @@ open class MessageCell: CollectionViewCell,
         replyView.appearance = appearance
         replyArrowView.appearance = appearance
         replyCountView.appearance = appearance
-        reactionView.appearance = appearance
-        backgroundColor = .clear
+        forwardView.appearance = appearance
+        attachmentView.appearance = appearance
+        linkView.appearance = appearance
+        infoView.appearance = appearance
+        reactionTotalView.appearance = appearance
+        unreadMessagesSeparatorView.appearance = appearance
+        checkBoxView.parentAppearance = appearance.checkboxAppearance
+        
+        if data != nil {
+            bind()
+            makeConstraints()
+        }
+        
+        bubbleView.addSubview(attachmentOverlayView)
+
+        
+        backgroundColor = appearance.backgroundColor
         contentView.backgroundColor = .clear
         containerView.backgroundColor = .clear
         
@@ -213,13 +208,8 @@ open class MessageCell: CollectionViewCell,
         
         bubbleView.layer.cornerRadius = 16
         bubbleView.isUserInteractionEnabled = true
-        
-        dateTickBackgroundView.clipsToBounds = true
-        dateTickBackgroundView.backgroundColor = appearance.dateTickBackgroundViewColor
-        dateTickBackgroundView.layer.cornerRadius = 12
-        dateTickBackgroundView.isHidden = true
-        
-        nameLabel.font = appearance.titleFont
+                
+        nameLabel.font = appearance.senderNameLabelAppearance.font
         
         avatarView.clipsToBounds = true
         avatarView.layer.cornerRadius = 18
@@ -228,6 +218,8 @@ open class MessageCell: CollectionViewCell,
                                            left: Layouts.checkBoxPadding,
                                            bottom: Layouts.checkBoxPadding,
                                            right: Layouts.checkBoxPadding)
+        
+        
     }
     
     public var showSenderInfo: Bool = true
@@ -253,36 +245,42 @@ open class MessageCell: CollectionViewCell,
         guard let data = data else { return }
         let message = data.message
         showSenderInfo = data.showUserInfo
-        unreadView.isHidden = !data.isLastDisplayedMessage
+        unreadMessagesSeparatorView.isHidden = !data.isLastDisplayedMessage
         textLabel.attributedText = data.attributedView.content
         infoView.data = data
-        nameLabel.text = Formatters.userDisplayName.format(message.user)
-        nameLabel.textColor = appearance.titleColor ?? .initial(title: message.user.id)
+        nameLabel.text = appearance.senderNameFormatter.format(message.user)
+        nameLabel.textColor = appearance.senderNameLabelAppearance.foregroundColor ?? appearance.senderNameColorProvider.provideVisual(for: message.user)
         attachmentView.data = data
         linkView.data = data
-        switch data.reactionType {
-        case .interactive:
-            reactionView.data = data
-            reactionView.isHidden = (data.reactions?.isEmpty ?? true)
-            reactionTotalView.isHidden = true
-        case .withTotalScore:
-            reactionTotalView.data = data
-            reactionView.isHidden = true
-            reactionTotalView.isHidden = (data.reactions?.isEmpty ?? true)
-        }
+        reactionTotalView.data = data
+        reactionTotalView.isHidden = (data.reactions?.isEmpty ?? true)
         replyView.data = message.repliedInThread ? nil : data.replyLayout
         replyCountView.count = data.replyCount
         deliveryStatus = message.deliveryStatus
         if showSenderInfo {
             nameLabel.isHidden = false
             avatarView.isHidden = false
-            let scale = Config.displayScale
-            imageTask = Components.avatarBuilder
-                .loadAvatar(
-                    into: avatarView,
-                    for: message.user,
-                    size: CGSize(width: 36 * scale,
-                                 height: 36 * scale))
+            let scale = UIScreen.main.traitCollection.displayScale
+            let avatarRepresentation = appearance.userDefaultAvatarProvider.provideVisual(for: message.user)
+            
+            imageTask = switch avatarRepresentation {
+            case .image(let image):
+                Components.avatarBuilder
+                    .loadAvatar(
+                        into: avatarView,
+                        for: message.user,
+                        defaultImage: image,
+                        size: CGSize(width: 36 * scale,
+                                     height: 36 * scale))
+            case .initialsAppearance(let initialsAppearance):
+                Components.avatarBuilder
+                    .loadAvatar(
+                        into: avatarView,
+                        for: message.user,
+                        appearance: initialsAppearance,
+                        size: CGSize(width: 36 * scale,
+                                     height: 36 * scale))
+            }
         } else {
             nameLabel.isHidden = true
             avatarView.isHidden = true
@@ -299,9 +297,9 @@ open class MessageCell: CollectionViewCell,
                                                     .trailing(-data.contentInsets.right),
                                                     .top(data.contentInsets.top)
                                                    ])
-            contentConstraints! += [containerView.bottomAnchor.pin(to: unreadView.topAnchor)]
-            contentConstraints! += unreadView.pin(to: contentView, anchors: [.leading(data.contentInsets.left), .trailing(-data.contentInsets.right)])
-            contentConstraints! += unreadView.pin(to: contentView, anchors: [.bottom(-data.contentInsets.bottom)])
+            contentConstraints! += [containerView.bottomAnchor.pin(to: unreadMessagesSeparatorView.topAnchor)]
+            contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.leading(data.contentInsets.left), .trailing(-data.contentInsets.right)])
+            contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.bottom(-data.contentInsets.bottom)])
             contentConstraints! += layoutConstraints(layout: data)
             contentConstraints! += [replyIcon.trailingAnchor.pin(to: contentView.trailingAnchor, constant: 44)]
             contentConstraints! += [replyIcon.bottomAnchor.pin(to: bubbleView.bottomAnchor)]
@@ -360,8 +358,6 @@ open class MessageCell: CollectionViewCell,
                 return
             }
             infoView.tickView.image = deliveryStatusImage(deliveryStatus)
-                .withRenderingMode(.alwaysTemplate)
-            infoView.tickView.tintColor = deliveryStatusColor(deliveryStatus)
         }
     }
     
@@ -380,34 +376,16 @@ open class MessageCell: CollectionViewCell,
     
     open func deliveryStatusImage(_ status: ChatMessage.DeliveryStatus) -> UIImage {
         switch status {
-        case .sent:
-            return .sentMessage
         case .pending:
-            return .pendingMessage
-        case .received:
-            return .deliveredMessage
-        case .displayed:
-            return .readMessage
-        case .failed:
-            return .failedMessage
-        }
-    }
-    
-    open func deliveryStatusColor(_ status: ChatMessage.DeliveryStatus) -> UIColor? {
-        if hasBackground, ![.failed, .displayed].contains(status) {
-            return appearance.infoViewRevertColorOnBackgroundView
-        }
-        switch status {
-        case .pending:
-            return appearance.ticksViewDisabledTintColor
+            return appearance.messageDeliveryStatusIcons.pendingIcon
         case .sent:
-            return appearance.ticksViewDisabledTintColor
+            return appearance.messageDeliveryStatusIcons.sentIcon
         case .received:
-            return appearance.ticksViewDisabledTintColor
+            return appearance.messageDeliveryStatusIcons.receivedIcon
         case .displayed:
-            return appearance.ticksViewTintColor
+            return appearance.messageDeliveryStatusIcons.displayedIcon
         case .failed:
-            return appearance.ticksViewErrorTintColor
+            return appearance.messageDeliveryStatusIcons.failedIcon
         }
     }
     
@@ -498,6 +476,7 @@ open class MessageCell: CollectionViewCell,
     open func handleLongPress(sender: UILongPressGestureRecognizer) -> LongPressItem? {
         switch sender.state {
         case .began:
+            connectContextMenuIfNeeded(identifier: .init(value: data))
             if textLabel.contains(gestureRecognizer: sender),
                let index = textLabel.indexForGesture(sender: sender),
                let item = data.attributedView.items.first(where: { $0.range.contains(index)}) {
@@ -555,9 +534,9 @@ open class MessageCell: CollectionViewCell,
     }
     
     private func selectLink(range: NSRange) {
-        guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString,
-                let color = appearance.highlightedLinkBackgroundColor
+        guard let text = textLabel.attributedText?.mutableCopy() as? NSMutableAttributedString
         else { return }
+        let color = appearance.linkPreviewAppearance.highlightedLinkBackgroundColor
         if range.location >= 0 && range.length >= 0 && range.upperBound <= text.length {
             text.addAttributes([.backgroundColor: color], range: range)
         }
@@ -687,6 +666,7 @@ public extension MessageCell {
         public static var checkBoxPadding: CGFloat = 12
         public static var horizontalPadding: CGFloat = 12
         public static var attachmentIconSize: CGFloat = 40
+        public static var cornerRadius: CGFloat = 8
     }
 }
 

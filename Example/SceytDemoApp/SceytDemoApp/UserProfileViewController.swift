@@ -19,10 +19,16 @@ class UserProfileViewController: UIViewController {
     lazy var notificationView = ActionView()
         .withoutAutoresizingMask
     
+    lazy var appearanceModeView = ActionView()
+        .withoutAutoresizingMask
+    
+    lazy var userInterfaceModeView = ActionView()
+        .withoutAutoresizingMask
+
     lazy var signOutButton = UIButton()
         .withoutAutoresizingMask
     
-    lazy var router = Router(rootVC: self)
+    lazy var router = Router(rootViewController: self)
     
     fileprivate var userAvatarImage: UIImage?
     fileprivate var isDeleted = false
@@ -33,14 +39,14 @@ class UserProfileViewController: UIViewController {
         $0.spacing = 16
         $0.alignment = .fill
         return $0.withoutAutoresizingMask
-    }(UIStackView(arrangedSubviews: [profileView, notificationView, signOutButton]))
+    }(UIStackView(arrangedSubviews: [profileView, notificationView, appearanceModeView, userInterfaceModeView, signOutButton]))
 
     override func viewDidLoad() {
         super.viewDidLoad()
 
         title = "My Profile"
         navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .edit, target: self, action: #selector(edit(_:)))
-        ChatClient.shared.add(delegate: self, identifier: String(reflecting: self))
+        SceytChatUIKit.shared.chatClient.add(delegate: self, identifier: String(reflecting: self))
         
         view.addSubview(stackView)
         
@@ -50,10 +56,12 @@ class UserProfileViewController: UIViewController {
         profileView.heightAnchor.pin(constant: 72)
         profileView.editButton.addTarget(self, action: #selector(editAvatar(_:)), for: .touchUpInside)
         notificationView.switch.addTarget(self, action: #selector(onMute(_:)), for: .valueChanged)
+        appearanceModeView.switch.addTarget(self, action: #selector(onAppearanceModeView(_:)), for: .valueChanged)
+        userInterfaceModeView.switch.addTarget(self, action: #selector(onUserInterfaceModeView(_:)), for: .valueChanged)
         signOutButton.setTitle("Sign Out", for: .normal)
         signOutButton.setTitleColor(.red, for: .normal)
         signOutButton.addTarget(self, action: #selector(onSignOut(_:)), for: .touchUpInside)
-        stackView.setCustomSpacing(64, after: notificationView)
+        stackView.setCustomSpacing(64, after: userInterfaceModeView)
         
         updateSettings()
     }
@@ -70,24 +78,58 @@ class UserProfileViewController: UIViewController {
     fileprivate func updateUI() {
         updateProfile()
         updateNotification()
+        updateAppearanceMode()
     }
     
     fileprivate func updateProfile() {
-        let user = ChatUser(user: ChatClient.shared.user)
-        profileView.displayNameLabel.text = Formatters.userDisplayName.format(user)
+        let user = ChatUser(user: SceytChatUIKit.shared.chatClient.user)
+        profileView.displayNameLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
         _ = AvatarBuilder.loadAvatar(into: profileView.imageView, for: user)
     }
     
     fileprivate func updateNotification() {
-        let settings = ChatClient.shared.settings
+        let settings = SceytChatUIKit.shared.chatClient.settings
         if settings.muted {
             notificationView.titleView.titleLabel.text = "Unmute Notifications"
-            notificationView.titleView.iconView.image = Appearance.Images.channelProfileUnmute
+            notificationView.titleView.iconView.image = UIImage(systemName: "speaker.fill")
         } else {
             notificationView.titleView.titleLabel.text = "Mute Notifications"
-            notificationView.titleView.iconView.image = Appearance.Images.channelNotification
+            notificationView.titleView.iconView.image = UIImage(systemName: "speaker.slash.fill")
         }
         notificationView.switch.isOn = settings.muted
+    }
+    
+    fileprivate func updateAppearanceMode() {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let sceneDelegate = scene.delegate as? SceneDelegate,
+              let window = sceneDelegate.window
+        else { return }
+
+        switch window.overrideUserInterfaceStyle {
+        case .dark:
+            appearanceModeView.titleView.titleLabel.text = "Appearance"
+            appearanceModeView.titleView.iconView.image = UIImage(systemName: "paintbrush")
+            appearanceModeView.switch.isOn = false
+            userInterfaceModeView.titleView.titleLabel.text = "Dark mode"
+            userInterfaceModeView.titleView.iconView.image = UIImage(systemName: "moon.zzz.fill")
+            userInterfaceModeView.switch.isOn = true
+            userInterfaceModeView.isHidden = false
+        case .light:
+            appearanceModeView.titleView.titleLabel.text = "Appearance"
+            appearanceModeView.titleView.iconView.image = UIImage(systemName: "paintbrush")
+            appearanceModeView.switch.isOn = false
+            userInterfaceModeView.titleView.titleLabel.text = "Light mode"
+            userInterfaceModeView.titleView.iconView.image = UIImage(systemName: "sun.max.fill")
+            userInterfaceModeView.switch.isOn = false
+            userInterfaceModeView.isHidden = false
+        case .unspecified:
+            appearanceModeView.titleView.titleLabel.text = "Appearance: System"
+            appearanceModeView.titleView.iconView.image = UIImage(systemName: "paintbrush.fill")
+            appearanceModeView.switch.isOn = true
+            userInterfaceModeView.isHidden = true
+        @unknown default:
+            fatalError()
+        }
     }
     
     @objc
@@ -104,6 +146,28 @@ class UserProfileViewController: UIViewController {
     }
     
     @objc
+    private func onAppearanceModeView(_ sender: UISwitch) {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let sceneDelegate = scene.delegate as? SceneDelegate,
+              let window = sceneDelegate.window
+        else { return }
+        
+        window.overrideUserInterfaceStyle = sender.isOn ? .unspecified : .light
+        updateAppearanceMode()
+    }
+    
+    @objc
+    private func onUserInterfaceModeView(_ sender: UISwitch) {
+        guard let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+              let sceneDelegate = scene.delegate as? SceneDelegate,
+              let window = sceneDelegate.window
+        else { return }
+
+        window.overrideUserInterfaceStyle = sender.isOn ? .dark : .light
+        updateAppearanceMode()
+    }
+
+    @objc
     private func editAvatar(_ sender: UIButton) {
         showCaptureAlert()
     }
@@ -111,11 +175,11 @@ class UserProfileViewController: UIViewController {
     @objc
     private func onSignOut(_ sender: UIButton) {
         Config.currentUserId = nil
-        ChatClient.shared.disconnect()
-        Provider.database.deleteAll()
-        let lvc = LoginViewController()
-        lvc.modalPresentationStyle = .fullScreen
-        present(lvc, animated: true)
+        SceytChatUIKit.shared.chatClient.disconnect()
+        DataProvider.database.deleteAll()
+        let loginViewController = LoginViewController()
+        loginViewController.modalPresentationStyle = .fullScreen
+        present(loginViewController, animated: true)
         needsToUpdateProfileAfterViewAppear = true
     }
     
@@ -128,9 +192,9 @@ class UserProfileViewController: UIViewController {
     @objc
     private func save(_ sender: UIBarButtonItem) {
         let displayName = profileView.displayNameLabel.text
-        hud.isLoading = true
+        loader.isLoading = true
         UserProfile.update(displayName: displayName) {[weak self] error in
-            hud.isLoading = false
+            loader.isLoading = false
             guard let self
             else { return }
             if let error {
@@ -143,18 +207,18 @@ class UserProfileViewController: UIViewController {
     }
     
     private func showMuteOptionsAlert(
-        selected: @escaping (SCTUIKitConfig.OptionItem) -> Void,
+        selected: @escaping (SceytChatUIKit.Config.IntervalOption) -> Void,
         canceled: @escaping () -> Void
     ) {
         showBottomSheet(
             title: "Mute",
-            actions: SCTUIKitConfig.muteItems.map { item in
+            actions: SceytChatUIKit.shared.config.muteChannelNotificationOptions.map { item in
                     .init(title: item.title, style: .default) { selected(item) }
             } + [.init(title: "Cancel", style: .cancel) { canceled() }])
     }
     
     open func mute(for timeInterval: TimeInterval) {
-        ChatClient.shared.mute(timeInterval: timeInterval) {[weak self] error in
+        SceytChatUIKit.shared.chatClient.mute(timeInterval: timeInterval) {[weak self] error in
             guard let self else { return }
             if let error {
                 self.showAlert(error: error)
@@ -164,7 +228,7 @@ class UserProfileViewController: UIViewController {
     }
     
     open func unmute() {
-        ChatClient.shared.unmute {[weak self] error in
+        SceytChatUIKit.shared.chatClient.unmute {[weak self] error in
             guard let self else { return }
             if let error {
                 self.showAlert(error: error)
@@ -174,15 +238,15 @@ class UserProfileViewController: UIViewController {
     }
     
     private func updateSettings() {
-        if ChatClient.shared.connectionState == .connected {
-            ChatClient.shared.getUserSettings {[weak self] _, _ in
+        if SceytChatUIKit.shared.chatClient.connectionState == .connected {
+            SceytChatUIKit.shared.chatClient.getUserSettings {[weak self] _, _ in
                 self?.updateNotification()
             }
         }
     }
     
     deinit {
-        ChatClient.shared.removeDelegate(identifier: String(reflecting: self))
+        SceytChatUIKit.shared.chatClient.removeDelegate(identifier: String(reflecting: self))
     }
 }
 
@@ -191,7 +255,7 @@ extension UserProfileViewController: ChatClientDelegate {
     func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
         if state == .connected {
             updateProfile()
-            chatClient.getUserSettings {[weak self] _, _ in
+            SceytChatUIKit.shared.chatClient.getUserSettings {[weak self] _, _ in
                 self?.updateNotification()
             }
         }
@@ -247,7 +311,7 @@ extension UserProfileViewController {
             separatorView.pin(to: displayNameLabel, anchors: [.bottom(2), .leading, .trailing(-8)])
             separatorView.heightAnchor.pin(constant: 1)
             separatorView.isHidden = true
-            separatorView.backgroundColor = Appearance.Colors.separator
+            separatorView.backgroundColor = .border
         }
         
         required init(coder: NSCoder) {
