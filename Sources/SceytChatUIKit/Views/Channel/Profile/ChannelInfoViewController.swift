@@ -273,6 +273,8 @@ open class ChannelInfoViewController: ViewController,
                 self.router.goAvatar()
             }.store(in: &cell.subscriptions)
             _cell = cell
+        case .other:
+            fatalError("handle other sections in your subclass according to your implementation")
         case .description:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoDescriptionCell.self)
             cell.parentAppearance = appearance.descriptionCellAppearance
@@ -932,6 +934,7 @@ open class ChannelInfoViewController: ViewController,
 public extension ChannelInfoViewController {
     enum Sections: Int, CaseIterable {
         case header
+        case other
         case description
         case uri
         case options

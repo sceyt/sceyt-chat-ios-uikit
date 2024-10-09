@@ -26,19 +26,3 @@ public struct PresenceStateIconProvider: PresenceStateIconProviding {
         }
     }
 }
-
-public struct DefaultMarkerTitleProvider: DefaultMarkerTitleProviding {
-    
-    public func provideVisual(for marker: DefaultMarker) -> String {
-        switch marker {
-        case .displayed:
-            L10n.Message.Info.readBy
-        case .received:
-            L10n.Message.Info.deliveredTo
-        case .played:
-            L10n.Message.Info.playedBy
-        case .custom(let custom):
-            custom
-        }
-    }
-}

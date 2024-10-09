@@ -14,5 +14,17 @@ extension SceytChatUIKit.Config {
         public let admin: String
         public let participant: String
         public let subscriber: String
+        
+        public init(
+            owner: String,
+            admin: String,
+            participant: String,
+            subscriber: String
+        ) {
+            self.owner = owner
+            self.admin = admin
+            self.participant = participant
+            self.subscriber = subscriber
+        }
     }
 }

@@ -1045,37 +1045,37 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             if isBold {
                 font = defaultFont
             } else {
-                font = defaultFont.bold
+                font = defaultFont.toBold
             }
             if isItalic {
-                font = font?.italic
+                font = font?.toItalic
             }
             if isMonospace {
-                font = font?.monospace
+                font = font?.toMonospace
             }
         case .italic:
             if isItalic {
                 font = defaultFont
             } else {
-                font = defaultFont.italic
+                font = defaultFont.toItalic
             }
             if isBold {
-                font = font?.bold
+                font = font?.toBold
             }
             if isMonospace {
-                font = font?.monospace
+                font = font?.toMonospace
             }
         case .monospace:
             if isMonospace {
                 font = defaultFont
             } else {
-                font = defaultFont.monospace
+                font = defaultFont.toMonospace
             }
             if isBold {
-                font = font?.bold
+                font = font?.toBold
             }
             if isItalic {
-                font = font?.italic
+                font = font?.toItalic
             }
         case .strikethrough:
             if attributes[.strikethroughStyle] == nil {

@@ -1875,14 +1875,14 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     // MARK: view titles
-    func getTitleForHeader(with appearance: ChannelViewController.HeaderView.Appearance) -> String {
+    open func getTitleForHeader(with appearance: ChannelViewController.HeaderView.Appearance) -> String {
         (isThread ?
          SceytChatUIKit.shared.formatters.userNameFormatter.format(threadMessage!.user) :
             appearance.titleFormatter.format(channel))
         .trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
-    func getSubtitleForHeader(with appearance: ChannelViewController.HeaderView.Appearance) -> String {
+    open func getSubtitleForHeader(with appearance: ChannelViewController.HeaderView.Appearance) -> String {
         if channel.isSelfChannel {
             return L10n.Channel.Self.hint
         }

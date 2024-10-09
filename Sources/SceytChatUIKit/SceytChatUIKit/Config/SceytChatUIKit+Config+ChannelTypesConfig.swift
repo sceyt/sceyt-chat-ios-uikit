@@ -13,5 +13,15 @@ extension SceytChatUIKit.Config {
         public let direct: String
         public let group: String
         public let broadcast: String
+        
+        public init(
+            direct: String,
+            group: String,
+            broadcast: String
+        ) {
+            self.direct = direct
+            self.group = group
+            self.broadcast = broadcast
+        }
     }
 }

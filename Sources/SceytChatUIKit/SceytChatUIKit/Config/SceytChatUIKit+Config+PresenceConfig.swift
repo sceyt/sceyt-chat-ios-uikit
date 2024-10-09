@@ -12,5 +12,13 @@ extension SceytChatUIKit.Config {
     public struct PresenceConfig {
         public var defaultPresenceState: PresenceState
         public var defaultPresenceStatus: String
+        
+        public init(
+            defaultPresenceState: PresenceState,
+            defaultPresenceStatus: String
+        ) {
+            self.defaultPresenceState = defaultPresenceState
+            self.defaultPresenceStatus = defaultPresenceStatus
+        }
     }
 }

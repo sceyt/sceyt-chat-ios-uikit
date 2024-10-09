@@ -681,13 +681,13 @@ open class MessageLayoutModel {
                 .forEach { range, value in
                     var font = bodyFont
                     if value.contains(where: { $0.type == .monospace }) {
-                        font = font.monospace
+                        font = font.toMonospace
                     }
                     if value.contains(where: { $0.type == .bold }) {
-                        font = font.bold
+                        font = font.toBold
                     }
                     if value.contains(where: { $0.type == .italic }) {
-                        font = font.italic
+                        font = font.toItalic
                     }
                     if value.contains(where: { $0.type == .strikethrough }) {
                         text.addAttributes([.strikethroughStyle : NSUnderlineStyle.single.rawValue], range: range)

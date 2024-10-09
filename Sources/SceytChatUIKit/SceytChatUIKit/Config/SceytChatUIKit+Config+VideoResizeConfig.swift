@@ -27,5 +27,17 @@ extension SceytChatUIKit.Config {
                                                                compressionQuality: 0.8,
                                                                frameRate: 30,
                                                                bitrate: 2000000)
+        
+        public init(
+            dimensionThreshold: CGFloat,
+            compressionQuality: Double,
+            frameRate: Int,
+            bitrate: Int
+        ) {
+            self.dimensionThreshold = dimensionThreshold
+            self.compressionQuality = compressionQuality
+            self.frameRate = frameRate
+            self.bitrate = bitrate
+        }
     }
 }

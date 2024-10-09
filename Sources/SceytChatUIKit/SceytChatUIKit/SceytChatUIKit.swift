@@ -42,9 +42,8 @@ public class SceytChatUIKit {
     }()
     
 
-    public static func initialize(apiUrl: String, appId: String, clientId: String = "", enableDatabase: Bool = true) {
+    public static func initialize(apiUrl: String, appId: String, clientId: String = "") {
         ChatClient.initialize(apiUrl: apiUrl, appId: appId, clientId: clientId)
-        shared.config.storageConfig.enableDatabase = enableDatabase
         shared.channelEventHandler.startEventHandler()
     }
     

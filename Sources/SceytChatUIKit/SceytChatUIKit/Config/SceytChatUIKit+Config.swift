@@ -65,22 +65,7 @@ extension SceytChatUIKit {
         
         
         // MARK: - Database Configuration
-        public var storageConfig: StorageConfig = StorageConfig(storageDirectory: {
-            if let path = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first {
-                return URL(fileURLWithPath: path)
-            }
-            return nil
-        }(),
-                                                                dataModelName: "SceytChatModel",
-                                                                enableDatabase: true,
-                                                                databaseFilename: "chatdb",
-                                                                databaseFileDirectory: {
-            if let path = NSSearchPathForDirectoriesInDomains(.applicationSupportDirectory, .userDomainMask, true).first {
-                return URL(fileURLWithPath: path)
-            }
-            return nil
-        }(),
-                                                                userDefaults: UserDefaults.standard)
+        public var storageConfig: StorageConfig = .init()
 
         
         // MARK: - Chat Configuration

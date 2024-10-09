@@ -55,7 +55,7 @@ public extension UIFont {
         fontDescriptor.symbolicTraits.contains(.traitMonoSpace) || fontName == Fonts.monospace.fontName
     }
     
-    var monospace: UIFont {
+    var toMonospace: UIFont {
         var result = Fonts.monospace.withSize(self.pointSize)
         if self.isBold {
             result = result.with(traits: .traitBold)
@@ -66,18 +66,18 @@ public extension UIFont {
         return result
     }
     
-    var bold: UIFont {
+    var toBold: UIFont {
         var result = Fonts.bold.withSize(self.pointSize)
         if self.isItalic {
             result = result.with(traits: .traitItalic)
         }
         if self.isMonospace {
-            result = result.monospace
+            result = result.toMonospace
         }
         return result
     }
     
-    var italic: UIFont {
+    var toItalic: UIFont {
         return self.with(traits: .traitItalic, pointSize: self.pointSize)
     }
 }

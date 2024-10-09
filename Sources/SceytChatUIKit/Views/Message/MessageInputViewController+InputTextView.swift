@@ -93,13 +93,13 @@ extension MessageInputViewController {
                 if let font = value[.font] as? UIFont {
                     var newFont = appearance.textInputAppearance.labelAppearance.font
                     if font.isBold {
-                        newFont = newFont.bold
+                        newFont = newFont.toBold
                     }
                     if font.isItalic {
-                        newFont = newFont.italic
+                        newFont = newFont.toItalic
                     }
                     if font.isMonospace {
-                        newFont = newFont.monospace
+                        newFont = newFont.toMonospace
                     }
                     mPastedAttributedString.addAttribute(.font, value: newFont, range: range)
                 }

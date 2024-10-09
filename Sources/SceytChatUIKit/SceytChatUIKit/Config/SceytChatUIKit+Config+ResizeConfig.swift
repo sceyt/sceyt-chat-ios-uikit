@@ -16,5 +16,13 @@ extension SceytChatUIKit.Config {
         static let low: ResizeConfig = ResizeConfig(dimensionThreshold: 720, compressionQuality: 0.8)
         static let medium: ResizeConfig = ResizeConfig(dimensionThreshold: 1080, compressionQuality: 0.8)
         static let high: ResizeConfig = ResizeConfig(dimensionThreshold: 1600, compressionQuality: 0.9)
+        
+        public init(
+            dimensionThreshold: CGFloat,
+            compressionQuality: Double
+        ) {
+            self.dimensionThreshold = dimensionThreshold
+            self.compressionQuality = compressionQuality
+        }
     }
 }

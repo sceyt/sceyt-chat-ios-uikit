@@ -12,5 +12,13 @@ extension SceytChatUIKit.Config {
     public struct IntervalOption {
         public let title: String
         public var timeInterval: TimeInterval
+        
+        public init(
+            title: String,
+            timeInterval: TimeInterval
+        ) {
+            self.title = title
+            self.timeInterval = timeInterval
+        }
     }
 }

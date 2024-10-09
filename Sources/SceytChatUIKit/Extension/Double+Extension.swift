@@ -8,7 +8,7 @@
 
 import Foundation
 
-extension Double {
+public extension Double {
     var hours: Double { self * 3600 }
     var days: Double { self * 24.hours }
     var weeks: Double { self * 7.days }
