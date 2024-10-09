@@ -341,6 +341,9 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             ms.queryRange = NSRange(location: location - 1, length: 1)
             return ms
         }
+        guard location <= text.length else {
+            return ms
+        }
         let lastRange = text.rangeOfCharacter(from: CharacterSet(charactersIn: mentionTriggerPrefix),                                              options: .backwards,
                                               range: NSRange(location: 0, length: location))
         guard lastRange.location != NSNotFound else { return ms }
