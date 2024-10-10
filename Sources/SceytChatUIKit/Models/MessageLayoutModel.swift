@@ -164,7 +164,7 @@ open class MessageLayoutModel {
                     ),
                 config: .init(restrictingWidth: Self.defaults.messageSenderNameWidth, lastFragmentUsedRect: false)
             ).textSize
-            replyLayout = .init(
+            replyLayout = Components.messageReplyLayoutModel.init(
                 message: parent,
                 byMe: message.user.id == me,
                 channel: channel,
@@ -403,7 +403,7 @@ open class MessageLayoutModel {
                 parentTextSize = parentSize.textSize
                 updateOptions.insert(.parentMessageBody)
             }
-            replyLayout = .init(
+            replyLayout = Components.messageReplyLayoutModel.init(
                 message: parent, 
                 byMe: message.user.id == me,
                 channel: channel,
@@ -553,7 +553,7 @@ open class MessageLayoutModel {
     open class func attachmentLayout(message: ChatMessage, channel: ChatChannel, appearance: MessageCell.Appearance) -> [AttachmentLayout] {
         (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
-            let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
             return layout.type == .link ? nil : layout
         } ?? [])
         .sorted { lh, rh in
@@ -566,7 +566,7 @@ open class MessageLayoutModel {
     open class func linkAttachmentLayout(message: ChatMessage, channel: ChatChannel, appearance: MessageCell.Appearance) -> [AttachmentLayout] {
         (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
-            let layout = AttachmentLayout(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
             return layout.type != .link || $0.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
@@ -579,7 +579,7 @@ open class MessageLayoutModel {
                 attachments[index].update(attachment: attachment)
                 return attachments[index]
             }
-            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: attachment, ownerMessage: message, ownerChannel: channel, appearance: appearance)
             return layout.type == .link ? nil : layout
         } ?? [])
         .sorted { lh, rh in
@@ -1076,7 +1076,7 @@ extension MessageLayoutModel {
         
         @Atomic private var isThumbnailLoadedFromFile = false
         
-        public init(
+        public required init(
             attachment: ChatMessage.Attachment,
             ownerMessage: ChatMessage?,
             ownerChannel: ChatChannel?,
@@ -1300,7 +1300,7 @@ extension MessageLayoutModel {
         }
         open var icon: UIImage?
         
-        public init(
+        public required init(
             message: ChatMessage,
             byMe: Bool,
             channel: ChatChannel,
@@ -1355,7 +1355,7 @@ extension MessageLayoutModel {
             guard self.message == message
             else { return }
             if let attachment = message.attachments?.first {
-                self.attachment = .init(
+                self.attachment = Components.messageAttachmentLayoutModel.init(
                     attachment: attachment,
                     ownerMessage: message,
                     ownerChannel: self.attachment?.ownerChannel,

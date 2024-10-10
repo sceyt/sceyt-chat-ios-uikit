@@ -275,10 +275,6 @@ extension ChannelViewController {
             } else {
                 let infoAnchorView = (layout.contentOptions.contains(.link) && layout.attachments.isEmpty) ? linkView : attachmentView
                 layoutConstraint += [
-                    infoView.backgroundView.leadingAnchor.pin(to: infoView.leadingAnchor, constant: -6),
-                    infoView.backgroundView.topAnchor.pin(to: infoView.topAnchor, constant: -3),
-                    infoView.backgroundView.trailingAnchor.pin(to: infoView.trailingAnchor, constant: 6),
-                    infoView.backgroundView.bottomAnchor.pin(to: infoView.bottomAnchor, constant: 3),
                     infoView.trailingAnchor.pin(to: infoAnchorView.trailingAnchor, constant: -12),
                     infoView.bottomAnchor.pin(to: infoAnchorView.bottomAnchor, constant: -9)
                 ]
