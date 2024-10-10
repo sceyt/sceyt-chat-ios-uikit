@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "broken_image_placeholder_icon.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

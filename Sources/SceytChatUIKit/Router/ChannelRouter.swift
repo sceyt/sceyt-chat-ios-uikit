@@ -43,7 +43,8 @@ open class ChannelRouter: Router<ChannelViewController> {
         
         let isFirstResponder = rootViewController.inputTextView.isFirstResponder
         rootViewController.inputTextView.resignFirstResponder()
-        preview.present(on: rootViewController) {
+        preview.present(on: rootViewController) { [weak self] in
+            guard let self else { return }
             if isFirstResponder, case .didDismiss = $0 {
                 self.rootViewController.inputTextView.becomeFirstResponder()
             }

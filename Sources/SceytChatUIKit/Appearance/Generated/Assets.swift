@@ -86,6 +86,7 @@ internal enum Assets {
   internal static let addMember1 = ImageAsset(name: "addMember_1")
   internal static let attach = ImageAsset(name: "attach")
   internal static let avatar = ImageAsset(name: "avatar")
+  internal static let brokenImagePlaceholderIcon = ImageAsset(name: "broken_image_placeholder_icon")
   internal static let channelPin = ImageAsset(name: "channel_pin")
   internal static let channelProfileAdmins1 = ImageAsset(name: "channel_profile_admins_1")
   internal static let channelProfileAutoDeleteMessages1 = ImageAsset(name: "channel_profile_auto_delete_messages_1")
