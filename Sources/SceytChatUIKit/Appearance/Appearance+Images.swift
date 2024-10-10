@@ -103,10 +103,10 @@ public extension Appearance {
                                                renderingMode: .template(.onPrimary)))!
         }()
         
-        public static var brokenImage: UIImage = {
+        public static var brokenImagePlaceholderIcon: UIImage = {
             AssetComposer.shared.compose(
                 from: .init(
-                    image: Assets.brokenImage.image,
+                    image: Assets.brokenImagePlaceholderIcon.image,
                     renderingMode: .original
                 )
             )!
@@ -588,7 +588,7 @@ extension UIImage {
     public static var galleryVideoAsset: UIImage { Images.galleryVidepAsset }
     public static var forwardedMessage: UIImage { Images.forwardedMessage }
     public static var editAvatar: UIImage { Images.editAvatar }
-    public static var brokenImage: UIImage { Images.brokenImage }
+    public static var brokenImagePlaceholderIcon: UIImage { Images.brokenImagePlaceholderIcon }
     
     public static var pendingMessage: UIImage { Images.pendingMessage }
     public static var sentMessage: UIImage { Images.sentMessage }

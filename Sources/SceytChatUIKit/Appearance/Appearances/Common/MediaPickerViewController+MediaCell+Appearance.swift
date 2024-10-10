@@ -17,7 +17,7 @@ extension MediaPickerViewController.MediaCell: AppearanceProviding {
             backgroundColor: .overlayBackground2
         ),
         videoDurationIcon: .galleryVideoAsset,
-        brokenMediaPlaceholderIcon: .brokenImage,
+        brokenMediaPlaceholderIcon: .brokenImagePlaceholderIcon,
         durationFormatter: SceytChatUIKit.shared.formatters.mediaDurationFormatter,
         checkboxAppearance: CheckBoxView.appearance
     )
