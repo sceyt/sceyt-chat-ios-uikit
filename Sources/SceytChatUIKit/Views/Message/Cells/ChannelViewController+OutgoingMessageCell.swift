@@ -124,7 +124,6 @@ extension ChannelViewController {
                     infoView.leadingAnchor.pin(greaterThanOrEqualTo: bubbleView.leadingAnchor, constant: 10),
                     infoView.widthAnchor.pin(constant: infoWidth)
                 ]
-                
             } else if layout.contentOptions == .image {
                 infoView.dateLabel.textColor = appearance.onOverlayColor
                 infoView.displayedLabel.textColor = infoView.dateLabel.textColor
@@ -227,10 +226,6 @@ extension ChannelViewController {
                 ]
             } else {
                 layoutConstraint += [
-                    infoView.backgroundView.leadingAnchor.pin(to: infoView.leadingAnchor, constant: -6),
-                    infoView.backgroundView.topAnchor.pin(to: infoView.topAnchor, constant: -3),
-                    infoView.backgroundView.trailingAnchor.pin(to: infoView.trailingAnchor, constant: 6),
-                    infoView.backgroundView.bottomAnchor.pin(to: infoView.bottomAnchor, constant: 3),
                     infoView.trailingAnchor.pin(to: attachmentView.trailingAnchor, constant: -12),
                     infoView.bottomAnchor.pin(to: attachmentView.bottomAnchor, constant: -9)
                 ]

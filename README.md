@@ -78,10 +78,10 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
         // The ID of the Sceyt Chat application used by the UIKit app.
         let appId = "APP_ID"
 
-        SCTUIKitConfig.initialize(apiUrl: apiUrl, appId: appId)
-
+        SceytChatUIKit.initialize(apiUrl: apiUrl, appId: appId)
+        
         // Set the current user's ID.
-        SCTUIKitConfig.currentUserId = "CURRENT_USER_ID"
+        SceytChatUIKit.shared.currentUserId = "CURRENT_USER_ID"
 
         return true
     }
@@ -91,11 +91,12 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
 
 ```swift
 func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-
+        
+        ...
         // The user's access token for the Sceyt Chat API.
         let accessToken = "USER_ACCESS_TOKEN"
 
-        SCTUIKitConfig.connect(token: accessToken)
+        SceytChatUIKit.shared.connect(token: accessToken)
 
         return true
     }
@@ -113,10 +114,10 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
 
         ...
 
-        SCTUIKitConfig.initialize(apiUrl: apiUrl, appId: appId)
+        SceytChatUIKit.initialize(apiUrl: apiUrl, appId: appId)
 
         // Set the current user's ID.
-        SCTUIKitConfig.currentUserId = "CURRENT_USER_ID"
+        SceytChatUIKit.shared.currentUserId = "CURRENT_USER_ID"
 
         ...
 
@@ -125,8 +126,8 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
         Appearance.Fonts.regular = UIFont(name: "CUSTOM_FONT", size: 10)
 
         // Customizing colors is straightforward with the Appearance.Colors property.
-        // For instance, to change the kit's blue color:
-        UIColor.primaryAccent = UIColor.blue
+        // FOr instance to change only the accent color:
+        SceytChatUIKit.shared.theme.colors = .init(accent: .blue)
 
         // You can also replace icons or images by using the Appearance.Images property.
         // For example, to change the chat action camera icon:
@@ -140,13 +141,21 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
 For comprehensive customization, create custom subclasses and override relevant functions during the UIKit initialization. This allows you to adjust default values and appearance according to your preferences.
 
 ```swift
+func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+    ...
+    SceytChatUIKit.Components.channelCell = DemoChannelCell.self
+    ...
+    return true
+}
+```
+```swift
 class DemoChannelCell: ChannelCell {
 
     override func setupAppearance() {
 
         super.setupAppearance()
 
-        messageLabel.textColor = .green
+        dateLabel.textColor = .green
         subjectLabel.font = UIFont.systemFont(ofSize: 14)
 
     }

@@ -157,6 +157,8 @@ extension SceytChatUIKit {
         public static var textLabel: TextLabel.Type = TextLabel.self
         
         public static var messageLayoutModel: MessageLayoutModel.Type = MessageLayoutModel.self
+        public static var messageAttachmentLayoutModel: MessageLayoutModel.AttachmentLayout.Type = MessageLayoutModel.AttachmentLayout.self
+        public static var messageReplyLayoutModel: MessageLayoutModel.ReplyLayout.Type = MessageLayoutModel.ReplyLayout.self
         public static var channelLayoutModel: ChannelLayoutModel.Type = ChannelLayoutModel.self
         public static var initialsBuilder: InitialsBuilder.Type = InitialsBuilder.self
         public static var imageBuilder: ImageBuilder.Type = ImageBuilder.self
