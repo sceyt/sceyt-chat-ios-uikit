@@ -17,9 +17,7 @@ extension MediaPickerViewController: AppearanceProviding {
             font: Fonts.semiBold.withSize(14),
             backgroundColor: .onPrimary
         ),
-        cellAppearance: MediaPickerViewController.MediaCell.Appearance(
-            reference: MediaPickerViewController.MediaCell.appearance
-        )
+        cellAppearance: SceytChatUIKit.Components.mediaPickerCell.appearance
     )
     
     public class Appearance {

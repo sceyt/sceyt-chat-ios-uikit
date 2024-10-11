@@ -59,6 +59,8 @@ extension ChannelViewController {
                 infoView.tickView.isHidden = true
             }
             
+            infoView.backgroundView.isHidden = true
+            
             let hasName = layout.contentOptions.contains(.name)
             let hasVoicesOrFiles = layout.contentOptions.contains(.file) || layout.contentOptions.contains(.voice)
             var options = layout.contentOptions
