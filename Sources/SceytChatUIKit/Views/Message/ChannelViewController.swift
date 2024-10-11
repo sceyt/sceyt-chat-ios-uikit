@@ -1609,7 +1609,7 @@ open class ChannelViewController: ViewController,
     }
     
     open func info(layoutModel: MessageLayoutModel) {
-        router.showMessageInfo(layoutModel: layoutModel)
+        router.showMessageInfo(layoutModel: layoutModel, messageCellAppearance: appearance.messageCellAppearance)
     }
     
     open func report(layoutModel: MessageLayoutModel) {

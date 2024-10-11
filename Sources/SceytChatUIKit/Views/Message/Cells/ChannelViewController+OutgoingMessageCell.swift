@@ -63,6 +63,8 @@ extension ChannelViewController {
                 infoView.eyeView.tintColor = infoView.dateLabel.textColor
             }
             
+            infoView.backgroundView.isHidden = true
+            
             let hasVoicesOrFiles = layout.contentOptions.contains(.file) || layout.contentOptions.contains(.voice)
             let bubbleViewTopAnchor: NSLayoutYAxisAnchor
             let maxBubbleWidth = max(attachmentsContainerSize.width + 4, layout.textSize.width + 28, layout.measureSize.width)

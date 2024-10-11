@@ -16,6 +16,18 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
     open lazy var tableView = TableView(frame: .zero, style: .insetGrouped)
         .withoutAutoresizingMask
 
+    required public init(messageCellAppearance: MessageCellAppearance? = nil) {
+        super.init(nibName: nil, bundle: nil)
+        parentAppearance = .init(
+            reference: appearance,
+            messageCellAppearance: messageCellAppearance
+        )
+    }
+    
+    public required init?(coder: NSCoder) {
+        super.init(coder: coder)
+    }
+  
     override open func setup() {
         super.setup()
 
@@ -40,6 +52,7 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
     }
 
     override open func setupAppearance() {
+        guard isViewLoaded else { return } // handles the case when parent appearance is set before the view being loaded
         super.setupAppearance()
         navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         

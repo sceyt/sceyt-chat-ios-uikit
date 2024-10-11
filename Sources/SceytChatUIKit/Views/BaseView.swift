@@ -439,9 +439,8 @@ open class ViewController: UIViewController, Configurable {
     }
 
     open func setupAppearance() {
+        guard isViewLoaded else { return } // handles the case when parent appearance is set before the view being loaded
         view.setNeedsDisplay()
-//        view.backgroundColor = .background
-//        navigationController?.navigationBar.barTintColor = .white
     }
     
     open func setupDone() {}

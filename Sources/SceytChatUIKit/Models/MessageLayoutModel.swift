@@ -1341,7 +1341,9 @@ extension MessageLayoutModel {
                                 mentionAttributes[.font] = appearance.replyMessageAppearance.mentionLabelAppearance.font
                                 mentionAttributes[.foregroundColor] = appearance.replyMessageAppearance.mentionLabelAppearance.foregroundColor
                                 
-                                attributedBody.setAttributes(mentionAttributes, range: range)
+                                if range.location >= 0 && (range.location + range.length) <= attributedBody.length {
+                                    attributedBody.setAttributes(mentionAttributes, range: range)
+                                }
                             }
                     })
                     self.attributedBody = attributedBody
