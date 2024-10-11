@@ -52,6 +52,7 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
     }
 
     override open func setupAppearance() {
+        guard isViewLoaded else { return } // handles the case when parent appearance is set before the view being loaded
         super.setupAppearance()
         navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         
