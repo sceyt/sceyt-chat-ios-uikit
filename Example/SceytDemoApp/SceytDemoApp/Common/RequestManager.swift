@@ -19,7 +19,6 @@ class RequestManager {
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         
-        // If the API requires headers, add them here
         // request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             
@@ -42,7 +41,7 @@ class RequestManager {
                 // Username is taken
                 completion(true)
             default:
-                // Handle other status codes if necessary
+                // Handle other cases
                 completion(nil)
             }
         }

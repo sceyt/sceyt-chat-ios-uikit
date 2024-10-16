@@ -29,22 +29,18 @@ enum UsernameValidation {
         let fullText = "Use a-z, 0-9 and underscores. Username length must be 3 to 20 characters."
         let attributedText = NSMutableAttributedString(string: fullText)
         
-        // Define attributes for the full text
         let fullTextAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: .init(13), weight: .regular),
             .foregroundColor: UIColor.secondaryText.light
         ]
         
-        // Apply full text attributes
         attributedText.addAttributes(fullTextAttributes, range: NSRange(location: 0, length: fullText.count))
         
-        // Define attributes for bold style
         let boldAttributes: [NSAttributedString.Key: Any] = [
             .font: UIFont.systemFont(ofSize: .init(13), weight: .bold),
             .foregroundColor: UIColor.secondaryText.light
         ]
         
-        // Define ranges to apply bold attributes
         let rangesToBold = [
             ("a-z", fullText),
             ("0-9", fullText),
@@ -52,7 +48,6 @@ enum UsernameValidation {
             ("3 to 20", fullText)
         ]
         
-        // Apply bold attributes to specified ranges
         for (substring, fullText) in rangesToBold {
             if let range = fullText.range(of: substring) {
                 let nsRange = NSRange(range, in: fullText)
@@ -63,7 +58,6 @@ enum UsernameValidation {
     }
     
     static func validateUsername(_ username: String) -> UsernameValidation? {
-        // Check length
         if username.count < 3 {
             return .tooShort
         }
@@ -71,7 +65,6 @@ enum UsernameValidation {
             return .tooLong
         }
         
-        // Check allowed characters
         let allowedCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789_")
         let lowercasedUsername = username.lowercased()
         if lowercasedUsername.rangeOfCharacter(from: allowedCharacters.inverted) != nil {

@@ -20,9 +20,7 @@ class ProfileViewController: ViewController {
     override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
         
-        // Check if the user interface style has changed
         if previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle {
-            // Iterate through visible cells and update their border colors
             tableView.visibleCells.forEach { cell in
                 if let borderLayer = cell.layer.sublayers?.first(where: { $0.name == "bottomBorder" }) {
                     borderLayer.borderColor = UIColor.border.cgColor

@@ -46,7 +46,6 @@ class EditProfileViewController: ViewController {
         $0.layer.cornerRadius = 12
         $0.layer.cornerCurve = .continuous
         
-        // Add left and right padding
         let label = UILabel()
         label.text = "@"
         label.font = .systemFont(ofSize: .init(16), weight: .regular)
@@ -62,8 +61,6 @@ class EditProfileViewController: ViewController {
         $0.rightView = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 0))
         $0.rightViewMode = .always
         
-        
-        // Set placeholder text color
         $0.attributedPlaceholder = NSAttributedString(
             string: "username",
             attributes: [.foregroundColor: UIColor.secondaryText]
@@ -319,24 +316,19 @@ extension EditProfileViewController: UITextFieldDelegate {
         
         switch textField {
         case usernameTextField:
-            // Define allowed characters: a-z, 0-9, and underscores
             let allowedCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789_")
             let characterSet = CharacterSet(charactersIn: string.lowercased())
             
-            // Check if the new characters are in the allowed set
             if !allowedCharacters.isSuperset(of: characterSet) {
                 return false
             }
             
-            // Get the current text
             let currentText = textField.text ?? ""
-            // Create the proposed new text
             guard let stringRange = Range(range, in: currentText) else {
                 return false
             }
             let updatedText = currentText.replacingCharacters(in: stringRange, with: string)
             
-            // Enforce length between 3 and 20 characters
             if updatedText.count > 20 {
                 return false
             }
