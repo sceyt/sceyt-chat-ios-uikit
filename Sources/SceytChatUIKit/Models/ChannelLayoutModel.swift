@@ -213,7 +213,7 @@ open class ChannelLayoutModel {
                         font = font.toMonospace
                     }
                     if value.contains(where: { $0.type == .bold }) {
-                        font = font.toBold
+                        font = font.toSemiBold
                     }
                     if value.contains(where: { $0.type == .italic }) {
                         font = font.toItalic
