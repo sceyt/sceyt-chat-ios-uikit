@@ -42,6 +42,11 @@ class EditProfileViewController: ViewController {
         $0.textColor = .primaryText
         $0.backgroundColor = .backgroundSections
         $0.autocapitalizationType = .none
+        $0.autocorrectionType = .no
+        $0.spellCheckingType = .no
+        if #available(iOS 17.0, *) {
+            $0.inlinePredictionType = .no
+        }
         $0.borderStyle = .none
         $0.layer.cornerRadius = 12
         $0.layer.cornerCurve = .continuous

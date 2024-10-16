@@ -16,12 +16,14 @@ class ProfileEditNameCell: TableViewCell {
     lazy var firstNameField: UITextField = {
         $0.font = .systemFont(ofSize: .init(16), weight: .regular)
         $0.textColor = .primaryText
+        $0.textContentType = .givenName
         return $0.withoutAutoresizingMask
     }(UITextField())
     
     lazy var lastNameField: UITextField = {
         $0.font = .systemFont(ofSize: .init(16), weight: .regular)
         $0.textColor = .primaryText
+        $0.textContentType = .familyName
         return $0.withoutAutoresizingMask
     }(UITextField())
     

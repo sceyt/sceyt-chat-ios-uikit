@@ -93,6 +93,7 @@ final class ConnectionService: NSObject, ChatClientDelegate {
             Config.currentUserId = chatClient.user.id
             SceytChatUIKit.shared.currentUserId = chatClient.user.id
             SceytChatUIKit.shared.chatClient.setPresence(state: .online, status: "I'm online")
+            NotificationCenter.default.post(name: NSNotification.Name(rawValue: "userProfileUpdated"), object: nil)
         }
         switch state {
         case .connected, .disconnected, .failed:

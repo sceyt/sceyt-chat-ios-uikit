@@ -38,6 +38,7 @@ class LoginViewController: ViewController {
     lazy var firstNameTextField: UITextField = {
         $0.font = Appearance.Fonts.regular.withSize(16)
         $0.textColor = .primaryText.light
+        $0.textContentType = .givenName
         $0.borderStyle = .none
         $0.backgroundColor = .surface1.light
         $0.layer.cornerRadius = 12
@@ -58,6 +59,7 @@ class LoginViewController: ViewController {
     lazy var lastNameTextField: UITextField = {
         $0.font = Appearance.Fonts.regular.withSize(16)
         $0.textColor = .primaryText.light
+        $0.textContentType = .familyName
         $0.borderStyle = .none
         $0.backgroundColor = .surface1.light
         $0.layer.cornerRadius = 12
@@ -79,6 +81,11 @@ class LoginViewController: ViewController {
         $0.font = Appearance.Fonts.regular.withSize(16)
         $0.textColor = .primaryText.light
         $0.autocapitalizationType = .none
+        $0.autocorrectionType = .no
+        $0.spellCheckingType = .no
+        if #available(iOS 17.0, *) {
+            $0.inlinePredictionType = .no
+        }
         $0.borderStyle = .none
         $0.backgroundColor = .surface1.light
         $0.layer.cornerRadius = 12
@@ -205,12 +212,14 @@ class LoginViewController: ViewController {
     
     private func updateProfile(completion: @escaping () -> Void) {
         guard let firstName = firstNameTextField.text,
-              let lastName = lastNameTextField.text else {
+              let lastName = lastNameTextField.text,
+              let username else {
             completion()
             return
         }
         UserProfile.update(firstName: firstName,
-                           lastName: lastName) { _ in
+                           lastName: lastName,
+                           username: username) { _ in
             completion()
         }
     }

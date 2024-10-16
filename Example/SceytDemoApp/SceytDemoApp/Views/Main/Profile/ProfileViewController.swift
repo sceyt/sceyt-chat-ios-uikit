@@ -163,7 +163,7 @@ extension ProfileViewController: UITableViewDataSource {
             cell.selectionStyle = .none
             let user = ChatUser(user: SceytChatUIKit.shared.chatClient.user)
             cell.titleLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
-            cell.subtitleLabel.text =  "@\(user.username ?? "")"//  SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(user)
+            cell.subtitleLabel.text = user.username == nil ? nil : "@\(user.username!)"
             _ = AvatarBuilder.loadAvatar(into: cell.avatarButton, for: user)
             return cell
         case .options:
@@ -181,9 +181,24 @@ extension ProfileViewController: UITableViewDataSource {
                 sw.isOn = !SceytChatUIKit.shared.chatClient.settings.muted
             case .appearanceMode:
                 cell.iconView.image = .appearanceIcon
-                cell.titleLabel.text = "Dark mode"
+                if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                      let sceneDelegate = scene.delegate as? SceneDelegate,
+                      let window = sceneDelegate.window {
+                    cell.titleLabel.text = switch window.overrideUserInterfaceStyle {
+                    case .dark: "Dark mode"
+                    case .light: "Light mode"
+                    case .unspecified: "System appearance"
+                    @unknown default: fatalError()
+                    }
+                    
+                    sw.isOn = switch window.overrideUserInterfaceStyle {
+                    case .dark: true
+                    case .light: false
+                    case .unspecified: true
+                    @unknown default: fatalError()
+                    }
+                }
                 sw.addTarget(self, action: #selector(appearanceAction), for: .valueChanged)
-                sw.isOn = true
             }
             
             cell.accessoryView = sw
@@ -261,6 +276,10 @@ extension ProfileViewController {
         else { return }
 
         window.overrideUserInterfaceStyle = sender.isOn ? .dark : .light
+        tableView.reloadRows(at: [IndexPath(row: OptionsSection.appearanceMode.rawValue,
+                                            section: Sections.options.rawValue)],
+                             with: .none)
+
     }
 }
 
