@@ -40,15 +40,3 @@ open class UserNameFormatter: UserFormatting {
         }
     }
 }
-
-public extension ChatUser {
-    var shortDisplayName: String {
-        if let firstName, !firstName.isEmpty {
-            return firstName
-        }
-        if let lastName, !lastName.isEmpty {
-            return lastName
-        }
-        return ""
-    }
-}

@@ -19,8 +19,14 @@ open class UserShortNameFormatter: UserFormatting {
             return L10n.User.current
         }
 
-        let displayName = user.shortDisplayName
-
+        let displayName = if let firstName = user.firstName, !firstName.isEmpty {
+            firstName
+        } else if let lastName = user.lastName, !lastName.isEmpty {
+            lastName
+        } else {
+            ""
+        }
+        
         if displayName.isEmpty {
             return user.id
         } else {
