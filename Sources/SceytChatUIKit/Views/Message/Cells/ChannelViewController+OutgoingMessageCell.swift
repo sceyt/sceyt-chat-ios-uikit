@@ -54,6 +54,9 @@ extension ChannelViewController {
         }
         
         open override func layoutConstraints(layout: MessageLayoutModel) -> [NSLayoutConstraint] {
+            defer {
+                deliveryStatus = deliveryStatus
+            }
             let attachmentsContainerSize = layout.attachmentsContainerSize
             var layoutConstraint = [NSLayoutConstraint]()
             UIView.performWithoutAnimation {

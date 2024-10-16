@@ -80,6 +80,12 @@ extension MessageInputViewController {
                 pastedAttributedString = try? NSAttributedString(data: data, options: [NSAttributedString.DocumentReadingOptionKey.documentType: NSAttributedString.DocumentType.rtfd], documentAttributes: nil)
             } else if let data = pasteboard.data(forPasteboardType: "com.apple.flat-rtfd") {
                 pastedAttributedString = try? NSAttributedString(data: data, options: [NSAttributedString.DocumentReadingOptionKey.documentType: NSAttributedString.DocumentType.rtfd], documentAttributes: nil)
+            } else if pasteboard.hasImages {
+                event = .pastedImage
+                return
+            } else if let text = pasteboard.string {
+                self.text = text
+                return
             }
             
             guard let pastedAttributedString
