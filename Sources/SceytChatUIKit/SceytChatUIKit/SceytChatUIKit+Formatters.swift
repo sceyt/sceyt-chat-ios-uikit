@@ -32,6 +32,8 @@ extension SceytChatUIKit {
         
         public var messageInfoDateFormatter: any DateFormatting = MessageInfoDateFormatter()
         
+        public var messageInfoMarkerDateFormatter: any DateFormatting = MediaPreviewDateFormatter()
+        
         public var messageViewCountFormatter: any UIntFormatting = MessageViewsCountFormatter()
         
         public var channelLastMessageSenderNameFormatter: any ChannelFormatting = ChannelLastMessageSenderNameFormatter()
