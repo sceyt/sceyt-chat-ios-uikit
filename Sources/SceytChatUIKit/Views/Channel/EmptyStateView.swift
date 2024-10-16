@@ -60,12 +60,14 @@ open class EmptyStateView: View {
         super.setupAppearance()
         
         backgroundColor = .clear
-        iconView.isHidden = true
-        titleLabel.isHidden = true
-        messageLabel.isHidden = true
+        icon = appearance.icon
+        title = appearance.title
+        message = appearance.message
         titleLabel.font = appearance.titleLabelAppearance?.font
         messageLabel.font = appearance.messageLabelAppearance?.font
         titleLabel.textColor = appearance.titleLabelAppearance?.foregroundColor
         messageLabel.textColor = appearance.messageLabelAppearance?.foregroundColor
+        
+        messageLabel.textAlignment = .center
     }
 }

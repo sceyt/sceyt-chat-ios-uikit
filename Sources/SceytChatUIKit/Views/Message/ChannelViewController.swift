@@ -73,11 +73,7 @@ open class ChannelViewController: ViewController,
     open lazy var emptyStateView = Components.emptyStateView
         .init()
         .withoutAutoresizingMask
-    
-    open lazy var createdView = Components.channelCreatedView
-        .init()
-        .withoutAutoresizingMask
-    
+        
     open lazy var searchBar = {
         let searchBar = UISearchBar()
         searchBar.placeholder = appearance.searchBarAppearance.placeholder
@@ -278,8 +274,6 @@ open class ChannelViewController: ViewController,
         collectionView.delegate = self
         collectionView.dataSource = self
         
-        emptyStateView.isHidden = true
-        createdView.isHidden = true
         updateUnreadViewVisibility()
         updateTitle()
         unreadCountView.addTarget(self, action: #selector(unreadButtonAction(_:)), for: .touchUpInside)
@@ -313,7 +307,6 @@ open class ChannelViewController: ViewController,
         
         view.addSubview(collectionView)
         view.addSubview(emptyStateView)
-        view.addSubview(createdView)
         view.addSubview(coverView)
         view.addSubview(searchControlsView)
         addChild(customInputViewController)
@@ -334,8 +327,6 @@ open class ChannelViewController: ViewController,
         emptyStateView.pin(to: view, anchors: [.leading, .trailing])
         emptyStateView.topAnchor.pin(to: view.safeAreaLayoutGuide.topAnchor)
         emptyStateView.bottomAnchor.pin(to: customInputViewController.view.topAnchor)
-        createdView.pin(to: view, anchors: [.leading, .trailing])
-        createdView.bottomAnchor.pin(to: customInputViewController.view.topAnchor)
         customInputViewController.view.pin(to: coverView.safeAreaLayoutGuide, anchors: [.leading, .trailing])
         unreadCountView.trailingAnchor.pin(to: customInputViewController.view.trailingAnchor, constant: -10)
         unreadCountView.bottomAnchor.pin(to: customInputViewController.view.topAnchor, constant: -10)
@@ -1822,9 +1813,9 @@ open class ChannelViewController: ViewController,
             let sectionDeletes = paths.sectionDeletes
             let continuesOptions = paths.continuesOptions
             var needsToScrollBottom = false
-            if !emptyStateView.isHidden {
-                showEmptyViewIfNeeded()
-            }
+            
+            showEmptyViewIfNeeded()
+            
             if let unreadMessageIndexPath, checkOnlyFirstTimeReceivedMessagesFromArchive {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
                 if inserts.count == 1,
@@ -1939,21 +1930,24 @@ open class ChannelViewController: ViewController,
                 collectionView.reloadDataIfNeeded()
             }
             updateUnreadViewVisibility()
+            showEmptyViewIfNeeded()
         case .reload(let indexPath):
             UIView.performWithoutAnimation {
                 collectionView.performUpdates {
                     collectionView.reloadItems(at: [indexPath])
                 }
             }
+            showEmptyViewIfNeeded()
         case .reloadDataAndScrollToBottom:
             collectionView.reloadDataAndScrollToBottom()
-            
+            showEmptyViewIfNeeded()
         case let .reloadDataAndScroll(indexPath, animated, pos):
             collectionView.reloadDataAndScrollTo(
                 indexPath: indexPath,
                 pos: pos,
                 animated: animated)
             updateUnreadViewVisibility()
+            showEmptyViewIfNeeded()
         case .didSetUnreadIndexPath(let indexPath):
             unreadMessageIndexPath = indexPath
         case .typing(let isTyping, let user):
@@ -1990,6 +1984,7 @@ open class ChannelViewController: ViewController,
             updateTitle()
             updateJoinButtonVisibility()
             showBottomViewIfNeeded()
+            showEmptyViewIfNeeded()
         case .showNoMessage:
             showEmptyViewIfNeeded()
         case .close:
@@ -2094,20 +2089,15 @@ open class ChannelViewController: ViewController,
             }
             NotificationCenter.default.post(name: .selectMessage, object: (messageId, mode))
             collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: true)
+            showEmptyViewIfNeeded()
         }
     }
     
     open func showEmptyViewIfNeeded() {
-        emptyStateView.isHidden = (
-            channelViewModel.channel.channelType == .broadcast
-            && channelViewModel.channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.owner
-        )
-        || channelViewModel.numberOfSections > 0
+        emptyStateView.isHidden =
+        channelViewModel.numberOfSections > 0
         || channelViewModel.scrollToMessageIdIfSearching != 0
         || channelViewModel.scrollToRepliedMessageId != 0
-        createdView.isHidden = channelViewModel.channel.channelType != .broadcast
-        || collectionView.numberOfSections > 0
-        || channelViewModel.channel.userRole != SceytChatUIKit.shared.config.memberRolesConfig.owner
     }
     
     open func showBottomViewIfNeeded() {

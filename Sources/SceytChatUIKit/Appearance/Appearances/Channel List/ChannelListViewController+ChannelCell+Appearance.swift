@@ -52,13 +52,18 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             foregroundColor: .secondaryText,
             font: Fonts.regular.with(traits: .traitItalic).withSize(15)
         ),
-        unreadMentionLabelAppearance: LabelAppearance(
+        mentionLabelAppearance: LabelAppearance(
             foregroundColor: .secondaryText,
+            font: Fonts.bold.withSize(15),
+            backgroundColor: .surface3
+        ),
+        unreadMentionLabelAppearance: LabelAppearance(
+            foregroundColor: .onPrimary,
             font: Fonts.bold.withSize(15),
             backgroundColor: .accent
         ),
         unreadMentionMutedStateLabelAppearance: LabelAppearance(
-            foregroundColor: .secondaryText,
+            foregroundColor: .onPrimary,
             font: Fonts.bold.withSize(15),
             backgroundColor: .surface3
         ),
@@ -124,6 +129,9 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         
         @Trackable<Appearance, LabelAppearance>
         public var typingLabelAppearance: LabelAppearance
+        
+        @Trackable<Appearance, LabelAppearance>
+        public var mentionLabelAppearance: LabelAppearance
         
         @Trackable<Appearance, LabelAppearance>
         public var unreadMentionLabelAppearance: LabelAppearance
@@ -197,6 +205,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             deletedLabelAppearance: LabelAppearance,
             draftPrefixLabelAppearance: LabelAppearance,
             typingLabelAppearance: LabelAppearance,
+            mentionLabelAppearance: LabelAppearance,
             unreadMentionLabelAppearance: LabelAppearance,
             unreadMentionMutedStateLabelAppearance: LabelAppearance,
             linkLabelAppearance: LabelAppearance,
@@ -234,6 +243,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._deletedLabelAppearance = Trackable(value: deletedLabelAppearance)
             self._draftPrefixLabelAppearance = Trackable(value: draftPrefixLabelAppearance)
             self._typingLabelAppearance = Trackable(value: typingLabelAppearance)
+            self._mentionLabelAppearance = Trackable(value: mentionLabelAppearance)
             self._unreadMentionLabelAppearance = Trackable(value: unreadMentionLabelAppearance)
             self._unreadMentionMutedStateLabelAppearance = Trackable(value: unreadMentionMutedStateLabelAppearance)
             self._linkLabelAppearance = Trackable(value: linkLabelAppearance)
@@ -274,6 +284,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             deletedLabelAppearance: LabelAppearance? = nil,
             draftPrefixLabelAppearance: LabelAppearance? = nil,
             typingLabelAppearance: LabelAppearance? = nil,
+            mentionLabelAppearance: LabelAppearance? = nil,
             unreadMentionLabelAppearance: LabelAppearance? = nil,
             unreadMentionMutedStateLabelAppearance: LabelAppearance? = nil,
             linkLabelAppearance: LabelAppearance? = nil,
@@ -309,6 +320,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._deletedLabelAppearance = Trackable(reference: reference, referencePath: \.deletedLabelAppearance)
             self._draftPrefixLabelAppearance = Trackable(reference: reference, referencePath: \.draftPrefixLabelAppearance)
             self._typingLabelAppearance = Trackable(reference: reference, referencePath: \.typingLabelAppearance)
+            self._mentionLabelAppearance = Trackable(reference: reference, referencePath: \.mentionLabelAppearance)
             self._unreadMentionLabelAppearance = Trackable(reference: reference, referencePath: \.unreadMentionLabelAppearance)
             self._unreadMentionMutedStateLabelAppearance = Trackable(reference: reference, referencePath: \.unreadMentionMutedStateLabelAppearance)
             self._linkLabelAppearance = Trackable(reference: reference, referencePath: \.linkLabelAppearance)
@@ -340,6 +352,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             if let deletedLabelAppearance { self.deletedLabelAppearance = deletedLabelAppearance }
             if let draftPrefixLabelAppearance { self.draftPrefixLabelAppearance = draftPrefixLabelAppearance }
             if let typingLabelAppearance { self.typingLabelAppearance = typingLabelAppearance }
+            if let mentionLabelAppearance { self.mentionLabelAppearance = mentionLabelAppearance }
             if let unreadMentionLabelAppearance { self.unreadMentionLabelAppearance = unreadMentionLabelAppearance }
             if let unreadMentionMutedStateLabelAppearance { self.unreadMentionMutedStateLabelAppearance = unreadMentionMutedStateLabelAppearance }
             if let linkLabelAppearance { self.linkLabelAppearance = linkLabelAppearance }
