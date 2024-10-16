@@ -310,10 +310,6 @@ extension EditProfileViewController: UITableViewDelegate, UITableViewDataSource 
 extension EditProfileViewController: UITextFieldDelegate {
     
     func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
-        defer {
-            updateConnectButton()
-        }
-        
         switch textField {
         case usernameTextField:
             let allowedCharacters = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyz0123456789_")
