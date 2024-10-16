@@ -39,7 +39,7 @@ class RequestManager {
                 completion(true)
             case 400:
                 // Username is taken
-                completion(true)
+                completion(false)
             default:
                 // Handle other cases
                 completion(nil)
