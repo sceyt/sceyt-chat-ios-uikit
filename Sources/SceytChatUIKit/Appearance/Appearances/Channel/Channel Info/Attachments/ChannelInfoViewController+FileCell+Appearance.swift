@@ -28,8 +28,8 @@ extension ChannelInfoViewController.FileCell: AppearanceProviding {
             uploadIcon: nil,
             downloadIcon: .downloadStart
         ),
-        fileNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
-        subtitleFormatter: SceytChatUIKit.shared.formatters.channelInfoVoiceSubtitleFormatter,
+        fileNameFormatter: SceytChatUIKit.shared.formatters.attachmentFileNameFormatter,
+        subtitleFormatter: SceytChatUIKit.shared.formatters.channelInfoFileSubtitleFormatter,
         iconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider
     )
     
