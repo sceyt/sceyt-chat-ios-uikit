@@ -1,5 +1,5 @@
 //
-//  DemoTabBarController.swift
+//  TabBarController.swift
 //  SceytDemoApp
 //
 //  Created by Hovsep Keropyan on 28.10.23.
@@ -10,7 +10,7 @@ import UIKit
 import SceytChatUIKit
 import SceytChat
 
-class DemoTabBarController: UITabBarController {
+class TabBarController: UITabBarController {
     
     lazy var activityIndicatorView: UIActivityIndicatorView = {
         UIActivityIndicatorView(style: .large)
@@ -18,14 +18,11 @@ class DemoTabBarController: UITabBarController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        // Do any additional setup after loading the view.
         
-        tabBar.items?.first?.image = UIImage(named: "chats_tabbar")
-        tabBar.items?.last?.image = UIImage(named: "profile_tabbar")
+        tabBar.items?.first?.image = .chatsTabbar
+        tabBar.items?.last?.image = .profileTabbar
+        tabBar.items?.last?.title = "Profile"
         
-        if Config.currentUserId == nil {
-            Config.currentUserId = users.randomElement()
-        }
         addAppNotifications()
         showSheet(activityIndicatorView, style: .center, backgroundDismiss: false) { [unowned self] in
             activityIndicatorView.startAnimating()
@@ -66,6 +63,5 @@ class DemoTabBarController: UITabBarController {
                 return
             }
         }
-    }
-    
+    }    
 }

@@ -1,17 +1,53 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23094" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="MDq-9y-qrv">
-    <device id="retina6_12" orientation="portrait" appearance="light"/>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23094" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="6sV-rg-et5">
+    <device id="retina6_3" orientation="portrait" appearance="light"/>
     <dependencies>
+        <deployment identifier="iOS"/>
         <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23084"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <scenes>
-        <!--Demo Tab Bar Controller-->
+        <!--Splash View Controller-->
+        <scene sceneID="T5e-3v-oXA">
+            <objects>
+                <viewController storyboardIdentifier="SplashViewController" useStoryboardIdentifierAsRestorationIdentifier="YES" id="6sV-rg-et5" customClass="SplashViewController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="AqH-Pm-g3z">
+                        <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="log_in_background" translatesAutoresizingMaskIntoConstraints="NO" id="wOZ-VR-RDV">
+                                <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
+                            </imageView>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="logo" translatesAutoresizingMaskIntoConstraints="NO" id="PTT-ED-SJJ">
+                                <rect key="frame" x="81" y="407" width="240" height="60"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" secondItem="PTT-ED-SJJ" secondAttribute="height" multiplier="4:1" id="X3Y-hd-5JC"/>
+                                </constraints>
+                            </imageView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="Q0o-Ap-gea"/>
+                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        <constraints>
+                            <constraint firstItem="wOZ-VR-RDV" firstAttribute="leading" secondItem="Q0o-Ap-gea" secondAttribute="leading" id="IvI-KU-F4x"/>
+                            <constraint firstAttribute="bottom" secondItem="wOZ-VR-RDV" secondAttribute="bottom" id="KZL-C8-bnn"/>
+                            <constraint firstItem="PTT-ED-SJJ" firstAttribute="width" secondItem="wOZ-VR-RDV" secondAttribute="width" multiplier="0.597015" id="Lxq-1i-60v"/>
+                            <constraint firstItem="wOZ-VR-RDV" firstAttribute="top" secondItem="AqH-Pm-g3z" secondAttribute="top" id="Ybm-m2-rFT"/>
+                            <constraint firstItem="Q0o-Ap-gea" firstAttribute="trailing" secondItem="wOZ-VR-RDV" secondAttribute="trailing" id="aXa-9W-Dev"/>
+                            <constraint firstItem="PTT-ED-SJJ" firstAttribute="centerX" secondItem="wOZ-VR-RDV" secondAttribute="centerX" id="toO-aD-iga"/>
+                            <constraint firstItem="PTT-ED-SJJ" firstAttribute="centerY" secondItem="wOZ-VR-RDV" secondAttribute="centerY" id="wE3-Zi-oKg"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="nqj-SB-fhO" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-3009" y="-1400"/>
+        </scene>
+        <!--Tab Bar Controller-->
         <scene sceneID="anu-ei-m19">
             <objects>
-                <tabBarController id="MDq-9y-qrv" customClass="DemoTabBarController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
+                <tabBarController storyboardIdentifier="TabBarController" useStoryboardIdentifierAsRestorationIdentifier="YES" id="MDq-9y-qrv" customClass="TabBarController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
                     <tabBar key="tabBar" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" id="xqd-Eq-ZyB">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="49"/>
                         <autoresizingMask key="autoresizingMask"/>
@@ -24,7 +60,54 @@
                 </tabBarController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="PHK-FY-tOE" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-1790" y="-725"/>
+            <point key="canvasLocation" x="-1846" y="-737"/>
+        </scene>
+        <!--Navigation Controller-->
+        <scene sceneID="Jph-XN-iRD">
+            <objects>
+                <navigationController storyboardIdentifier="LandingNavigationController" useStoryboardIdentifierAsRestorationIdentifier="YES" id="3LB-Gn-Cl6" sceneMemberID="viewController">
+                    <navigationBar key="navigationBar" contentMode="scaleToFill" id="jV1-it-B2s">
+                        <rect key="frame" x="0.0" y="62" width="402" height="44"/>
+                        <autoresizingMask key="autoresizingMask"/>
+                    </navigationBar>
+                    <connections>
+                        <segue destination="1ce-x2-ka1" kind="relationship" relationship="rootViewController" id="yj2-uv-hDS"/>
+                    </connections>
+                </navigationController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="zIF-eL-4RF" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-1846" y="-2196"/>
+        </scene>
+        <!--Landing View Controller-->
+        <scene sceneID="SBL-3C-uO6">
+            <objects>
+                <viewController storyboardIdentifier="LandingViewController" useStoryboardIdentifierAsRestorationIdentifier="YES" id="1ce-x2-ka1" customClass="LandingViewController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="cfs-6d-08j">
+                        <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <viewLayoutGuide key="safeArea" id="pg1-FW-YZk"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                    </view>
+                    <navigationItem key="navigationItem" id="3z8-9y-eHJ"/>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="Zyu-pU-tge" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-946" y="-2196"/>
+        </scene>
+        <!--Account Picker View Controller-->
+        <scene sceneID="Awk-at-PU6">
+            <objects>
+                <viewController storyboardIdentifier="AccountPickerViewController" useStoryboardIdentifierAsRestorationIdentifier="YES" id="0Ju-qg-aMd" customClass="AccountPickerViewController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="AQs-fl-8el">
+                        <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <viewLayoutGuide key="safeArea" id="tzp-Rc-oZo"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="XB7-e8-Dcq" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-49" y="-2537"/>
         </scene>
         <!--Item-->
         <scene sceneID="PBN-Z8-VRF">
@@ -33,7 +116,7 @@
                     <tabBarItem key="tabBarItem" title="Item" id="qs1-1j-auu"/>
                     <simulatedTabBarMetrics key="simulatedBottomBarMetrics"/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="E3Z-ak-ors">
-                        <rect key="frame" x="0.0" y="59" width="393" height="44"/>
+                        <rect key="frame" x="0.0" y="62" width="402" height="44"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </navigationBar>
                     <connections>
@@ -42,14 +125,14 @@
                 </navigationController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="jkj-Qb-doP" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-1078" y="-724"/>
+            <point key="canvasLocation" x="-946" y="-1118"/>
         </scene>
         <!--Channel List View Controller-->
         <scene sceneID="mWM-J8-vh1">
             <objects>
                 <viewController id="K9b-pC-ig9" customClass="ChannelListViewController" customModule="SceytChatUIKit" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="ATZ-WS-hPb">
-                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <viewLayoutGuide key="safeArea" id="Gyw-64-YaO"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
@@ -58,14 +141,14 @@
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="qZF-Iy-WGQ" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-369" y="-725"/>
+            <point key="canvasLocation" x="-48" y="-1118"/>
         </scene>
         <!--Item-->
         <scene sceneID="pwu-4y-evs">
             <objects>
-                <viewController id="eI7-nE-gzK" customClass="UserProfileViewController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="ProfileViewController" useStoryboardIdentifierAsRestorationIdentifier="YES" id="eI7-nE-gzK" customClass="ProfileViewController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="Dom-pY-j6S">
-                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <viewLayoutGuide key="safeArea" id="EJJ-S1-yTj"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
@@ -75,7 +158,22 @@
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="aj8-08-Hfd" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-1013" y="-23"/>
+            <point key="canvasLocation" x="-48" y="-416"/>
+        </scene>
+        <!--Edit Profile View Controller-->
+        <scene sceneID="32v-Kw-sq1">
+            <objects>
+                <viewController storyboardIdentifier="EditProfileViewController" useStoryboardIdentifierAsRestorationIdentifier="YES" id="RRO-AW-q19" customClass="EditProfileViewController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="IkR-Tk-c9C">
+                        <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <viewLayoutGuide key="safeArea" id="el1-Mn-PuF"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="w88-RY-fll" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="875" y="-416"/>
         </scene>
         <!--Item-->
         <scene sceneID="lDy-hV-ZpD">
@@ -83,7 +181,7 @@
                 <navigationController id="kZK-Xa-ssA" sceneMemberID="viewController">
                     <tabBarItem key="tabBarItem" title="Item" id="Pzl-Ad-wHI"/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="Gia-yx-4DB">
-                        <rect key="frame" x="0.0" y="59" width="393" height="44"/>
+                        <rect key="frame" x="0.0" y="62" width="402" height="44"/>
                         <autoresizingMask key="autoresizingMask"/>
                     </navigationBar>
                     <connections>
@@ -92,10 +190,27 @@
                 </navigationController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="zTa-Ld-96A" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="-1790" y="-23"/>
+            <point key="canvasLocation" x="-947" y="-416"/>
+        </scene>
+        <!--Login View Controller-->
+        <scene sceneID="E2N-82-N1s">
+            <objects>
+                <viewController storyboardIdentifier="LoginViewController" useStoryboardIdentifierAsRestorationIdentifier="YES" id="dlm-NU-10i" customClass="LoginViewController" customModule="SceytDemoApp" customModuleProvider="target" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="pMe-Pt-q2y">
+                        <rect key="frame" x="0.0" y="0.0" width="402" height="874"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <viewLayoutGuide key="safeArea" id="vWg-6I-I4n"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="89r-OF-ICo" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="-49" y="-1836"/>
         </scene>
     </scenes>
     <resources>
+        <image name="log_in_background" width="375" height="812"/>
+        <image name="logo" width="240" height="60"/>
         <systemColor name="systemBackgroundColor">
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>

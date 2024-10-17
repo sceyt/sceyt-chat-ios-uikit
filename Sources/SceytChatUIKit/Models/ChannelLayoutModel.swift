@@ -140,8 +140,8 @@ open class ChannelLayoutModel {
         let senderLabelTextColor = appearance.lastMessageSenderNameLabelAppearance.foregroundColor
         let messageLabelFont = appearance.lastMessageLabelAppearance.font
         let messageLabelTextColor = appearance.lastMessageLabelAppearance.foregroundColor
-        let mentionFont = appearance.unreadMentionLabelAppearance.font
-        let mentionColor = appearance.unreadMentionLabelAppearance.foregroundColor
+        let mentionFont = appearance.mentionLabelAppearance.font
+        let mentionColor = appearance.mentionLabelAppearance.foregroundColor
         let linkColor = appearance.linkLabelAppearance.foregroundColor
         let linkFont = appearance.linkLabelAppearance.font
         
@@ -213,7 +213,7 @@ open class ChannelLayoutModel {
                         font = font.toMonospace
                     }
                     if value.contains(where: { $0.type == .bold }) {
-                        font = font.toBold
+                        font = font.toSemiBold
                     }
                     if value.contains(where: { $0.type == .italic }) {
                         font = font.toItalic

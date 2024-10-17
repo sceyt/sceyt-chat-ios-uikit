@@ -20,7 +20,7 @@ extension MessageInfoViewController.MarkerCell: AppearanceProviding {
             font: Fonts.regular.withSize(13)
         ),
         titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
-        subtitleFormatter: AnyDateFormatting(SceytChatUIKit.shared.formatters.messageInfoDateFormatter),
+        subtitleFormatter: AnyDateFormatting(SceytChatUIKit.shared.formatters.messageInfoMarkerDateFormatter),
         visualProvider: AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
     )
     

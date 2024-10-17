@@ -140,6 +140,15 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                     self.findLink()
                 case let .contentSizeUpdate(old: _, new: new):
                     self.update(height: max(0, new))
+                case .pastedImage:
+                    guard let images = UIPasteboard.general.images else { return }
+                    images.forEach { image in
+                        guard let jpeg = Components.imageBuilder.init(image: image).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
+                              let url = Components.storage.storeData(jpeg, filename: UUID().uuidString + ".jpg") else {
+                            return
+                        }
+                        self.selectedMediaView.insert(view: .init(mediaUrl: url, thumbnail: image))
+                    }
                 }
             }.store(in: &subscriptions)
         
@@ -189,18 +198,6 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         
         actionView.isHidden = true
         separatorViewCenter.isHidden = true
-    }
-    
-    override open func paste(_ sender: Any?) {
-        if let image = UIPasteboard.general.image,
-           let jpeg = Components.imageBuilder.init(image: image).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
-           let url = Components.storage.storeData(jpeg, filename: UUID().uuidString + ".jpg")
-        {
-            selectedMediaView.insert(view: .init(mediaUrl: url, thumbnail: image))
-            action = .send(true)
-        } else if let string = UIPasteboard.general.string {
-            inputTextView.text = ((inputTextView.text ?? "") as NSString).replacingCharacters(in: inputTextView.selectedRange, with: string)
-        }
     }
     
     override open func setupAppearance() {

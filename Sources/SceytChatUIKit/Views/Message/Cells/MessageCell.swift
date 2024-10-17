@@ -357,7 +357,10 @@ open class MessageCell: CollectionViewCell,
                 infoView.tickView.image = nil
                 return
             }
-            infoView.tickView.image = deliveryStatusImage(deliveryStatus)
+            let image = infoView.backgroundView.isHidden || data.message.deliveryStatus == .displayed ? deliveryStatusImage(deliveryStatus) :
+            deliveryStatusImage(deliveryStatus).withTintColor(appearance.onOverlayColor, renderingMode: .alwaysTemplate)
+            infoView.tickView.image = image
+            infoView.tickView.tintColor = appearance.onOverlayColor
         }
     }
     

@@ -26,6 +26,7 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
         super.setup()
         
         title = L10n.Channel.New.createPublic
+        view.backgroundColor = .background
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.Nav.Bar.create,
                                                             style: .done,
                                                             target: self,

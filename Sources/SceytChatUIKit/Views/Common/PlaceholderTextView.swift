@@ -120,6 +120,7 @@ open class PlaceholderTextView: TextView {
 public extension PlaceholderTextView {
     enum Event {
         case textChanged
+        case pastedImage
         case contentSizeUpdate(old: CGFloat, new: CGFloat)
     }
 }

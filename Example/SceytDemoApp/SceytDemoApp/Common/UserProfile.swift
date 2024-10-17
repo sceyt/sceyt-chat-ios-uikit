@@ -12,12 +12,14 @@ import SceytChatUIKit
 
 struct UserProfile {
     
-    static func update(displayName: String?,
-                avatarImage: UIImage? = nil,
+    static func update(firstName: String,
+                       lastName: String,
+                       username: String? = nil,
+                       avatarImage: UIImage? = nil,
                        deleteAvatar: Bool = false,
                        completion: ((Error?) -> Void)?) {
-        let user = makeNamesFrom(displayName: displayName)
-        if let image = avatarImage, let jpeg = try? ImageBuilder(image: image).resize(max: SceytChatUIKit.shared.config.avatarResizeConfig.dimensionThreshold).jpegData(compressionQuality: SceytChatUIKit.shared.config.avatarResizeConfig.compressionQuality) {
+        if let image = avatarImage,
+            let jpeg = try? ImageBuilder(image: image).resize(max: SceytChatUIKit.shared.config.avatarResizeConfig.dimensionThreshold).jpegData(compressionQuality: SceytChatUIKit.shared.config.avatarResizeConfig.compressionQuality) {
             if let fileUrl = Storage.storeInTemporaryDirectory(data: jpeg, ext: "jpeg") {
                 
                 SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { _ in
@@ -30,8 +32,9 @@ struct UserProfile {
                                        deleteFromSrc: true)
                     }
                     update(
-                        firstName: user.firstName,
-                        lastName: user.lastName,
+                        firstName: firstName,
+                        lastName: lastName,
+                        username: username,
                         uploadedAvatarUrl: url?.absoluteString,
                         completion: completion
                     )
@@ -39,8 +42,9 @@ struct UserProfile {
             }
         } else {
             update(
-                firstName: user.firstName,
-                lastName: user.lastName,
+                firstName: firstName,
+                lastName: lastName,
+                username: username,
                 uploadedAvatarUrl: deleteAvatar ? nil : SceytChatUIKit.shared.chatClient.user.avatarUrl,
                 completion: completion
             )
@@ -48,8 +52,9 @@ struct UserProfile {
     }
     
     private static func update(firstName: String?,
-                        lastName: String?,
-                        uploadedAvatarUrl: String?,
+                               lastName: String?,
+                               username: String?,
+                               uploadedAvatarUrl: String?,
                                completion: ((Error?) -> Void)?) {
         SceytChatUIKit.shared.chatClient
             .setProfile(
@@ -57,25 +62,12 @@ struct UserProfile {
                 lastName: lastName,
                 avatarUrl: uploadedAvatarUrl,
                 metadataMap: SceytChatUIKit.shared.chatClient.user.metadataMap,
-                username: SceytChatUIKit.shared.chatClient.user.username)
-        { _, error in
+                username: username ?? SceytChatUIKit.shared.chatClient.user.username)
+        { user, error in
+            if error == nil {
+                NotificationCenter.default.post(name: NSNotification.Name(rawValue: "userProfileUpdated"), object: nil)
+            }
             completion?(error)
         }
-    }
-    
-    private static func makeNamesFrom(displayName: String?) -> (firstName: String?, lastName: String?) {
-        guard let displayName
-        else {
-            return (nil, nil)
-        }
-        
-        if let range = displayName.range(of: " ") {
-            let firstName = String(displayName.prefix(upTo: range.lowerBound))
-            let lastName = String(displayName.suffix(from: range.upperBound))
-            return (firstName, lastName)
-        } else {
-            return (displayName, nil)
-        }
-        
     }
 }

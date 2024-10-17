@@ -77,6 +77,17 @@ public extension UIFont {
         return result
     }
     
+    var toSemiBold: UIFont {
+        var result = Fonts.semiBold.withSize(self.pointSize)
+        if self.isItalic {
+            result = result.with(traits: .traitItalic)
+        }
+        if self.isMonospace {
+            result = result.toMonospace
+        }
+        return result
+    }
+    
     var toItalic: UIFont {
         return self.with(traits: .traitItalic, pointSize: self.pointSize)
     }

@@ -2,19 +2,21 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Uses for send media from chat</string>
-    <key>NSPhotoLibraryAddUsageDescription</key>
-    <string>Uses for send media from chat</string>
-    <key>NSMicrophoneUsageDescription</key>
-    <string>Uses Microphone for record audio</string>
-    <key>NSCameraUsageDescription</key>
-    <string>Uses Camera for take photo</string>
-    <key>NSAppTransportSecurity</key>
-    <dict>
-        <key>NSAllowsArbitraryLoads</key>
-        <true/>
-    </dict>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Uses for send media from chat</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Uses for send media from chat</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Uses Microphone for record audio</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Uses Camera for take photo</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
