@@ -10,7 +10,7 @@ import Foundation
 
 class RequestManager {
     static func checkUsernameAvailability(username: String, completion: @escaping (Bool?) -> Void) {
-        let urlString = "https://h6erghqk02.execute-api.us-east-2.amazonaws.com/api/users/username/\(username)"
+        let urlString = "https://ebttn1ks2l.execute-api.us-east-2.amazonaws.com/user/check/\(username)"
         guard let url = URL(string: urlString) else {
             completion(nil)
             return

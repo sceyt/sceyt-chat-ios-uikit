@@ -28,7 +28,7 @@ class LandingViewController: ViewController {
     }(UILabel())
     
     lazy var subtitleLabel = {
-        $0.text = "You haven’t created channels yet,\ncreate one for sending messages."
+        $0.text = "Lightning-Fast Messaging.\nCreate or select an existing account to login."
         $0.numberOfLines = 0
         $0.textAlignment = .center
         $0.font = .systemFont(ofSize: .init(15), weight: .regular)
