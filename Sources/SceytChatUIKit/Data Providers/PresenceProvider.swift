@@ -77,10 +77,7 @@ public final class PresenceProvider: DataProvider, NSCopying {
         isStartedChecking = true
         if scheduler == nil {
             startScheduler()
-        } else {
-            request(userIds: filtered)
         }
-        
     }
     
     public func stop(userIds: [UserId]) {

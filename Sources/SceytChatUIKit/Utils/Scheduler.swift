@@ -19,27 +19,28 @@ public final class Scheduler {
                            repeating interval: DispatchTimeInterval = .never,
                            leeway: DispatchTimeInterval = .nanoseconds(0),
                            callback: ((Scheduler) -> Void)? = nil,
-                           callbackQueue: DispatchQueue = .main
-    ) -> Scheduler  {
+                           callbackQueue: DispatchQueue = .main) -> Scheduler  {
         
         let queue = DispatchQueue(label: "com.sceytchat.uikit.scheduler", attributes: .concurrent)
         let timerSource = DispatchSource.makeTimerSource(queue: queue)
         timerSource.schedule(deadline: deadline, repeating: interval, leeway: leeway)
-        var s: Scheduler? = Scheduler(timer: timerSource)
-        timerSource.setEventHandler(handler: {
+        let scheduler = Scheduler(timer: timerSource)
+        
+        timerSource.setEventHandler { [weak scheduler] in
+            guard let scheduler = scheduler else { return }
             if callback == nil {
-                s?.stop()
-                s = nil
-            } else if let _s = s {
+                scheduler.stop()
+            } else {
                 callbackQueue.async {
-                    callback?(_s)
+                    callback?(scheduler)
                 }
             }
-        })
+        }
+        
         timerSource.resume()
-        return s!
+        return scheduler
     }
-    
+
     public func stop() {
         guard let timerSource = timer else { return }
         if !timerSource.isCancelled {
