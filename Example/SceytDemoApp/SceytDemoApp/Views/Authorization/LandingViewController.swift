@@ -19,7 +19,7 @@ class LandingViewController: ViewController {
     }(UIImageView(image: .logo))
     
     lazy var titleLabel = {
-        $0.text = "Fast and Seamless\nChat API"
+        $0.text = "Lightning-Fast\nMessaging"
         $0.numberOfLines = 0
         $0.textAlignment = .center
         $0.font = .systemFont(ofSize: .init(32), weight: .semibold)
@@ -28,7 +28,7 @@ class LandingViewController: ViewController {
     }(UILabel())
     
     lazy var subtitleLabel = {
-        $0.text = "Lightning-Fast Messaging.\nCreate or select an existing account to login."
+        $0.text = "Create or select an existing account to login."
         $0.numberOfLines = 0
         $0.textAlignment = .center
         $0.font = .systemFont(ofSize: .init(15), weight: .regular)
