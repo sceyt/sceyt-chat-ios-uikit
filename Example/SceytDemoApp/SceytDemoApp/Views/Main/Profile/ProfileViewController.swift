@@ -11,6 +11,9 @@ import SceytChatUIKit
 
 class ProfileViewController: ViewController {
     
+    // MARK: - Properties
+    lazy var router = Router(rootViewController: self)
+    
     // MARK: - Views
     open lazy var tableView = UITableView(frame: .zero, style: .grouped)
         .withoutAutoresizingMask
@@ -37,7 +40,9 @@ class ProfileViewController: ViewController {
         tableView.register(ChannelInfoViewController.OptionCell.self)
         tableView.register(UITableViewCell.self)
         
-        navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .edit, target: self, action: #selector(edit(_:)))
+        if !users.contains(SceytChatUIKit.shared.chatClient.user.id) {
+            navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .edit, target: self, action: #selector(edit(_:)))
+        }
     }
     
     override func setupAppearance() {
@@ -73,6 +78,53 @@ class ProfileViewController: ViewController {
         show(vc, sender: self)
     }
     
+    private func showLogOutAlert() {
+        let deleteMessage = "Are you sure you want to log out?\nYou can choose to simply log out or delete all your account data before logging out.\nDeleting your account data will permanently remove all your information and cannot be undone."
+        let logoutMessage = "Are you sure you want to log out?"
+        let message = users.contains(SceytChatUIKit.shared.chatClient.user.id) ? logoutMessage : deleteMessage
+        
+        var actions: [SheetAction] = [
+            .init(
+                title: "Log Out",
+                style: .destructive,
+                handler: { [weak self] in
+                    self?.logOut()
+                }),
+                .init(
+                    title: "Cancel",
+                    style: .cancel
+                ),
+        ]
+        
+        if !users.contains(SceytChatUIKit.shared.chatClient.user.id) {
+            actions.insert(
+                .init(
+                    title: "Delete Account & Log Out",
+                    style: .destructive,
+                    handler: { [weak self] in
+                        self?.deleteAndLogout()
+                    }),
+                at: 1
+            )
+        }
+        
+        router.showAlert(title: "Confirm Logout",
+                         message: message,
+                         actions: actions,
+                         preferredActionIndex: actions.count - 1)
+    }
+    
+    private func deleteAndLogout() {
+        RequestManager.deleteUser(userId: SceytChatUIKit.shared.chatClient.user.id) { [weak self] success in
+            if success {
+                self?.logOut()
+            } else {
+                self?.router.showAlert(title: "Something went wrong",
+                                       message: "Please try again.")
+            }
+        }
+    }
+    
     private func logOut() {
         Config.currentUserId = nil
         SceytChatUIKit.shared.currentUserId = nil
@@ -97,7 +149,8 @@ extension ProfileViewController: UITableViewDelegate {
                 return
             }
         case .logout:
-            logOut()
+            showLogOutAlert()
+            tableView.deselectRow(at: indexPath, animated: true)
         }
     }
 }
@@ -182,8 +235,8 @@ extension ProfileViewController: UITableViewDataSource {
             case .appearanceMode:
                 cell.iconView.image = .appearanceIcon
                 if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-                      let sceneDelegate = scene.delegate as? SceneDelegate,
-                      let window = sceneDelegate.window {
+                   let sceneDelegate = scene.delegate as? SceneDelegate,
+                   let window = sceneDelegate.window {
                     cell.titleLabel.text = switch window.overrideUserInterfaceStyle {
                     case .dark: "Dark mode"
                     case .light: "Light mode"
@@ -250,7 +303,7 @@ extension ProfileViewController {
             updateNotification()
         }
     }
-
+    
     func unmute() {
         SceytChatUIKit.shared.chatClient.unmute {[weak self] error in
             guard let self else { return }
@@ -274,12 +327,12 @@ extension ProfileViewController {
               let sceneDelegate = scene.delegate as? SceneDelegate,
               let window = sceneDelegate.window
         else { return }
-
+        
         window.overrideUserInterfaceStyle = sender.isOn ? .dark : .light
         tableView.reloadRows(at: [IndexPath(row: OptionsSection.appearanceMode.rawValue,
                                             section: Sections.options.rawValue)],
                              with: .none)
-
+        
     }
 }
 
