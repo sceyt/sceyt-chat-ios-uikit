@@ -1941,7 +1941,6 @@ open class ChannelViewController: ViewController,
             showEmptyViewIfNeeded()
         case .reloadDataAndScrollToBottom:
             collectionView.reloadDataAndScrollToBottom()
-            showEmptyViewIfNeeded()
         case let .reloadDataAndScroll(indexPath, animated, pos):
             collectionView.reloadDataAndScrollTo(
                 indexPath: indexPath,
