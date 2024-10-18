@@ -83,9 +83,8 @@ extension MessageInputViewController {
             } else if pasteboard.hasImages {
                 event = .pastedImage
                 return
-            } else if let text = pasteboard.string {
-                self.text = text
-                return
+            } else if let data = pasteboard.data(forPasteboardType: "public.utf8-plain-text") {
+                pastedAttributedString = try? NSAttributedString(data: data, options: [:], documentAttributes: nil)
             }
             
             guard let pastedAttributedString
