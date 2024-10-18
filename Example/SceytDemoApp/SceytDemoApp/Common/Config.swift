@@ -9,7 +9,7 @@
 import Foundation
 import SceytChatUIKit
 
-let users = ["zoe", "thomas", "ethan", "charlie", "william", "michael", "james", "john", "lily", "david", "grace", "emma", "olivia", "ben", "emily", "isabella", "sophia", "alice", "jacob", "harry"]
+let users = ["zoe", "thomas", "ethan", "charlie", "william", "michael", "james", "john", "lily", "david", "grace", "emma", "olivia", "ben", "emily", "isabella", "sophia", "alice", "jacob"]
 
 struct Config {
     static let sceytApiURL = "https://us-ohio-api.sceyt.com"
@@ -62,6 +62,9 @@ func configureSceytChatUIKit() {
         print()
     }
     
-    // Set customized Subclass for formatters
+    // Set customized component subclass
+    SceytChatUIKit.Components.channelInfoViewController = CustomChannelInfoViewController.self
+    
+    // Set customized subclass for formatters
     SceytChatUIKit.shared.formatters.userNameFormatter = UserDisplayNameFormatter()
 }

@@ -17,8 +17,7 @@ open class ChannelNameFormatter: ChannelFormatting {
         if !channel.isDirect {
             return channel.subject ?? ""
         }
-        guard let peer = channel.peer
-        else { return ""}
+        guard let peer = channel.peer else { return "" }
         switch peer.state {
         case .deleted:
             return L10n.Channel.Member.deleted

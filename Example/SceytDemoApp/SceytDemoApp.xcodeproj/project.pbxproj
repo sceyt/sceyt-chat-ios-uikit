@@ -29,8 +29,10 @@
 		5674A30D2C7CC17E00C51A07 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5674A30C2C7CC17E00C51A07 /* SceytChatUIKit */; };
 		5674A3162C7F670300C51A07 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5674A3152C7F670300C51A07 /* SceytChatUIKit */; };
 		5682FA142CBFDBD6007413C1 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5682FA132CBFDBD6007413C1 /* SceytChatUIKit */; };
-		5682FA172CBFFF48007413C1 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5682FA162CBFFF48007413C1 /* SceytChatUIKit */; };
+		5692FDFE2CC1416B00803B3F /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5692FDFD2CC1416B00803B3F /* SceytChatUIKit */; };
+		5692FE002CC159B300803B3F /* CustomChannelInfoViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5692FDFF2CC159B300803B3F /* CustomChannelInfoViewController.swift */; };
 		5694FF382C664FBA008DA2DC /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5694FF372C664FBA008DA2DC /* SceytChatUIKit */; };
+		56F069CC2CC28E49003D74D8 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 56F069CB2CC28E49003D74D8 /* SceytChatUIKit */; };
 		56F88D9E2C00D3890010C3E4 /* UserDisplayNameFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */; };
 		C51C930E2B565C9C0069F9DA /* LoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C930D2B565C9C0069F9DA /* LoginViewController.swift */; };
 		C51C93102B5660CB0069F9DA /* ConnectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C930F2B5660CB0069F9DA /* ConnectionService.swift */; };
@@ -63,6 +65,7 @@
 		5649B9B62CBFB4E600E3B190 /* UIView+Extensiosn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIView+Extensiosn.swift"; sourceTree = "<group>"; };
 		5649B9B82CBFB62800E3B190 /* UsernameValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsernameValidation.swift; sourceTree = "<group>"; };
 		5649B9BA2CBFBA0000E3B190 /* RequestManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestManager.swift; sourceTree = "<group>"; };
+		5692FDFF2CC159B300803B3F /* CustomChannelInfoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomChannelInfoViewController.swift; sourceTree = "<group>"; };
 		56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UserDisplayNameFormatter.swift; sourceTree = "<group>"; };
 		C51C930D2B565C9C0069F9DA /* LoginViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewController.swift; sourceTree = "<group>"; };
 		C51C930F2B5660CB0069F9DA /* ConnectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionService.swift; sourceTree = "<group>"; };
@@ -84,12 +87,13 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				56F069CC2CC28E49003D74D8 /* SceytChatUIKit in Frameworks */,
 				5674A3162C7F670300C51A07 /* SceytChatUIKit in Frameworks */,
 				5674A30D2C7CC17E00C51A07 /* SceytChatUIKit in Frameworks */,
 				5649B9992CBE5C4400E3B190 /* SceytChatUIKit in Frameworks */,
 				5649B9AD2CBFAADE00E3B190 /* SceytChatUIKit in Frameworks */,
 				5682FA142CBFDBD6007413C1 /* SceytChatUIKit in Frameworks */,
-				5682FA172CBFFF48007413C1 /* SceytChatUIKit in Frameworks */,
+				5692FDFE2CC1416B00803B3F /* SceytChatUIKit in Frameworks */,
 				5694FF382C664FBA008DA2DC /* SceytChatUIKit in Frameworks */,
 				C5B97EA42B5692070070C913 /* SceytChatUIKit in Frameworks */,
 				5674A3052C7C8E6600C51A07 /* SceytChatUIKit in Frameworks */,
@@ -114,6 +118,7 @@
 			children = (
 				5649B9A42CBFA76800E3B190 /* Profile */,
 				C54DF6BE2AECF09100767983 /* TabBarController.swift */,
+				5692FDFF2CC159B300803B3F /* CustomChannelInfoViewController.swift */,
 			);
 			path = Main;
 			sourceTree = "<group>";
@@ -224,7 +229,8 @@
 				5649B9982CBE5C4400E3B190 /* SceytChatUIKit */,
 				5649B9AC2CBFAADE00E3B190 /* SceytChatUIKit */,
 				5682FA132CBFDBD6007413C1 /* SceytChatUIKit */,
-				5682FA162CBFFF48007413C1 /* SceytChatUIKit */,
+				5692FDFD2CC1416B00803B3F /* SceytChatUIKit */,
+				56F069CB2CC28E49003D74D8 /* SceytChatUIKit */,
 			);
 			productName = SceytDemoApp;
 			productReference = C54DF6B72AECF09100767983 /* SceytDemoApp.app */;
@@ -256,7 +262,7 @@
 			);
 			mainGroup = C54DF6AE2AECF09100767983;
 			packageReferences = (
-				5682FA152CBFFF48007413C1 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */,
+				56F069CA2CC28E49003D74D8 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */,
 			);
 			productRefGroup = C54DF6B82AECF09100767983 /* Products */;
 			projectDirPath = "";
@@ -291,6 +297,7 @@
 				5649B9B72CBFB4E600E3B190 /* UIView+Extensiosn.swift in Sources */,
 				5649B9BB2CBFBA0000E3B190 /* RequestManager.swift in Sources */,
 				561169E32CBD512D00DC1979 /* CustomInteractiveTransitionNavigationController.swift in Sources */,
+				5692FE002CC159B300803B3F /* CustomChannelInfoViewController.swift in Sources */,
 				5649B9B92CBFB62800E3B190 /* UsernameValidation.swift in Sources */,
 				C51C93102B5660CB0069F9DA /* ConnectionService.swift in Sources */,
 				56F88D9E2C00D3890010C3E4 /* UserDisplayNameFormatter.swift in Sources */,
@@ -460,16 +467,16 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 289SR6UP83;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SceytDemoApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Sceyt Chat";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Uses Camera for take photo";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Uses Microphone for record audio";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Uses for send media from chat";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Uses for send media from chat";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Sceyt Chat needs access to your camera to let you share photos and videos during chats. Please enable camera access to enhance your messaging experience.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Sceyt Chat requires microphone access to record and send voice messages. Please grant permission to use this feature effectively.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Sceyt Chat needs access to your photo library to let you add photos and videos to your chats. Please enable photo library access to enhance your messaging experience.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Sceyt Chat requires access to your photo library to view and share your existing photos and videos. Please grant permission to use this feature effectively.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -498,16 +505,16 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 3;
+				CURRENT_PROJECT_VERSION = 7;
 				DEVELOPMENT_TEAM = 289SR6UP83;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SceytDemoApp/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Sceyt Chat";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Uses Camera for take photo";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Uses Microphone for record audio";
-				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Uses for send media from chat";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Uses for send media from chat";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Sceyt Chat needs access to your camera to let you share photos and videos during chats. Please enable camera access to enhance your messaging experience.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Sceyt Chat requires microphone access to record and send voice messages. Please grant permission to use this feature effectively.";
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Sceyt Chat needs access to your photo library to let you add photos and videos to your chats. Please enable photo library access to enhance your messaging experience.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Sceyt Chat requires access to your photo library to view and share your existing photos and videos. Please grant permission to use this feature effectively.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -554,12 +561,12 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		5682FA152CBFFF48007413C1 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */ = {
+		56F069CA2CC28E49003D74D8 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sceyt/sceyt-chat-ios-uikit";
 			requirement = {
-				branch = dev;
-				kind = branch;
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.5.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -589,13 +596,17 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = SceytChatUIKit;
 		};
-		5682FA162CBFFF48007413C1 /* SceytChatUIKit */ = {
+		5692FDFD2CC1416B00803B3F /* SceytChatUIKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 5682FA152CBFFF48007413C1 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */;
 			productName = SceytChatUIKit;
 		};
 		5694FF372C664FBA008DA2DC /* SceytChatUIKit */ = {
 			isa = XCSwiftPackageProductDependency;
+			productName = SceytChatUIKit;
+		};
+		56F069CB2CC28E49003D74D8 /* SceytChatUIKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 56F069CA2CC28E49003D74D8 /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */;
 			productName = SceytChatUIKit;
 		};
 		C5B97EA32B5692070070C913 /* SceytChatUIKit */ = {

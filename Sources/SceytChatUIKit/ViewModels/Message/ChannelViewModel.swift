@@ -112,6 +112,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     //MARK: private properties
     private var schedulers = [UserId: Scheduler]()
     private var isFetchingData = false
+    private var isInitialLoad = true
     private var loadLastMessagesAfterConnect = false
     private var lastLoadPrevMessageId: MessageId = 0
     private var lastLoadNextMessageId: MessageId = 0
@@ -600,6 +601,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                         needToScroll = false
                     } else {
                         event = .reloadDataAndScrollToBottom
+                        if isInitialLoad {
+                            event = .showNoMessage
+                            isInitialLoad = false
+                        }
                     }
                 }
                 return

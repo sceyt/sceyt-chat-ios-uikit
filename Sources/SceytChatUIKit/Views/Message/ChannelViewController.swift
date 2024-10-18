@@ -370,6 +370,7 @@ open class ChannelViewController: ViewController,
         customInputViewController.parentAppearance = appearance.messageInputAppearance
         unreadCountView.parentAppearance = appearance.scrollDownAppearance
         emptyStateView.parentAppearance = appearance.emptyStateAppearance
+        emptyStateView.isHidden = true
         searchControlsView.parentAppearance = Components.messageInputViewController.appearance.messageSearchControlsAppearance
         bottomView.parentAppearance = Components.messageInputViewController.appearance.coverAppearance
         selectingView.parentAppearance = Components.messageInputViewController.appearance.selectedMessagesActionsAppearance
@@ -1940,7 +1941,6 @@ open class ChannelViewController: ViewController,
             showEmptyViewIfNeeded()
         case .reloadDataAndScrollToBottom:
             collectionView.reloadDataAndScrollToBottom()
-            showEmptyViewIfNeeded()
         case let .reloadDataAndScroll(indexPath, animated, pos):
             collectionView.reloadDataAndScrollTo(
                 indexPath: indexPath,

@@ -336,6 +336,10 @@ extension EditProfileViewController: UITextFieldDelegate {
             
             debouncer.debounce { [weak self] in
                 guard let self else { return }
+                guard updatedText != user.username else {
+                    errorLabel.isHidden = true
+                    return
+                }
                 checkUsername(updatedText)
             }
             self.username = nil
