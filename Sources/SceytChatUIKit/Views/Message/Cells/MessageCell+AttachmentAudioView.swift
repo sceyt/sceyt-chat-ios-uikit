@@ -20,7 +20,7 @@ extension MessageCell {
                 switch state {
                 case .stopped:
                     playPauseButton.image = appearance.voicePlayIcon
-//                    audioWaveformView.progress = 0
+                    audioWaveformView.progress = 0
                 case .paused:
                     playPauseButton.image = appearance.voicePlayIcon
                 case .playing:
