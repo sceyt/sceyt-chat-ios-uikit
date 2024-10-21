@@ -219,7 +219,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
     public static var appearance = Appearance()
     
     public struct Appearance {
-        public var backgroundColor = UIColor.backgroundDark
+        public var backgroundColor = DefaultColors.backgroundDark
         public var minimumTrackTintColor = UIColor.onPrimary
         public var maximumTrackTintColor = UIColor.surface3
         public var tintColor = UIColor.onPrimary
@@ -340,7 +340,7 @@ extension ImageCropperViewController: AppearanceProviding {
     
     public struct Appearance {
         public var backgroundColor: UIColor? = .background
-        public var buttonBackgroundColor: UIColor? = .backgroundDark
+        public var buttonBackgroundColor: UIColor? = DefaultColors.backgroundDark
         public var buttonFont: UIFont? = Fonts.semiBold.withSize(16)
         public var buttonColor: UIColor? = .onPrimary
         

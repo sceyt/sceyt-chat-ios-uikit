@@ -23,7 +23,6 @@ public extension UIColor {
     static var background: UIColor { SceytChatUIKit.shared.theme.colors.background }
     static var backgroundSecondary: UIColor { SceytChatUIKit.shared.theme.colors.backgroundSecondary }
     static var backgroundSections: UIColor { SceytChatUIKit.shared.theme.colors.backgroundSections }
-    static var backgroundDark: UIColor { SceytChatUIKit.shared.theme.colors.backgroundDark }
     static var border: UIColor { SceytChatUIKit.shared.theme.colors.border }
     static var iconInactive: UIColor { SceytChatUIKit.shared.theme.colors.iconInactive }
     static var iconSecondary: UIColor { SceytChatUIKit.shared.theme.colors.iconSecondary }

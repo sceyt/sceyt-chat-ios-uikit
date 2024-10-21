@@ -37,7 +37,6 @@ public extension SceytChatUIKit.Theme {
         public let background: UIColor
         public let backgroundSecondary: UIColor
         public let backgroundSections: UIColor
-        public let backgroundDark: UIColor
         public let border: UIColor
         public let iconInactive: UIColor
         public let iconSecondary: UIColor
@@ -65,7 +64,6 @@ public extension SceytChatUIKit.Theme {
             background: UIColor = DefaultColors.background,
             backgroundSecondary: UIColor = DefaultColors.backgroundSecondary,
             backgroundSections: UIColor = DefaultColors.backgroundSections,
-            backgroundDark: UIColor = DefaultColors.backgroundDark,
             border: UIColor = DefaultColors.border,
             iconInactive: UIColor = DefaultColors.iconInactive,
             iconSecondary: UIColor = DefaultColors.iconSecondary,
@@ -90,7 +88,6 @@ public extension SceytChatUIKit.Theme {
             self.background = background
             self.backgroundSecondary = backgroundSecondary
             self.backgroundSections = backgroundSections
-            self.backgroundDark = backgroundDark
             self.border = border
             self.iconInactive = iconInactive
             self.iconSecondary = iconSecondary
