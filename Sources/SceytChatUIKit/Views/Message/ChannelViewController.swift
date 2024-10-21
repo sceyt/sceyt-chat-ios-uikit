@@ -1270,7 +1270,8 @@ open class ChannelViewController: ViewController,
         willDisplay cell: UICollectionViewCell,
         forItemAt indexPath: IndexPath
     ) {
-        guard let cell = cell as? MessageCell
+        guard let cell = cell as? MessageCell,
+              cell.data != nil
         else { return }
         
         var repliedMessageId: MessageId {

@@ -18,8 +18,15 @@ class LoginViewController: ViewController {
             updateConnectButton()
         }
     }
+    private var task: URLSessionDataTask? = nil
     
     // MARK: - Views
+    lazy var scrollView: UIScrollView = {
+        let scrollView = UIScrollView().withoutAutoresizingMask
+        scrollView.keyboardDismissMode = .interactive
+        return scrollView
+    }()
+    
     lazy var titleLabel: UILabel = {
         $0.font = Appearance.Fonts.semiBold.withSize(24)
         $0.textColor = .primaryText.light
@@ -30,7 +37,7 @@ class LoginViewController: ViewController {
     lazy var subtitleLabel: UILabel = {
         $0.font = Appearance.Fonts.regular.withSize(16)
         $0.textColor = .secondaryText.light
-        $0.text = "Create an account by competing this details."
+        $0.text = "Create an account by completing these details."
         $0.numberOfLines = 0
         return $0.withoutAutoresizingMask
     }(UILabel())
@@ -51,7 +58,9 @@ class LoginViewController: ViewController {
         
         $0.attributedPlaceholder = NSAttributedString(
             string: "First name",
-            attributes: [.foregroundColor: UIColor.secondaryText.light]
+            attributes: [
+                .foregroundColor: UIColor.secondaryText.light
+            ]
         )
         return $0.withoutAutoresizingMask
     }(UITextField())
@@ -165,12 +174,25 @@ class LoginViewController: ViewController {
     
     override func setupLayout() {
         super.setupLayout()
-        view.addSubview(stackView)
-        stackView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading(16), .trailing(-16), .top(4)])
+        view.addSubview(scrollView)
+        scrollView.addSubview(stackView)
+        
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 4),
+            scrollView.leadingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.safeAreaLayoutGuide.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            stackView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor, constant: 16),
+            stackView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor, constant: -16),
+            stackView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor, constant: -16),
+            stackView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor, constant: -32)
+        ])
+        
         firstNameTextField.heightAnchor.pin(constant: 50)
         lastNameTextField.heightAnchor.pin(constant: 50)
         usernameTextField.heightAnchor.pin(constant: 50)
-        
         connectButton.heightAnchor.pin(constant: 44)
     }
     
@@ -180,13 +202,40 @@ class LoginViewController: ViewController {
         firstNameTextField.delegate = self
         lastNameTextField.delegate = self
         usernameTextField.delegate = self
+        
         NotificationCenter.default.addObserver(self, selector: #selector(updateConnectButton), name: UITextField.textDidChangeNotification, object: firstNameTextField)
         NotificationCenter.default.addObserver(self, selector: #selector(updateConnectButton), name: UITextField.textDidChangeNotification, object: lastNameTextField)
+        
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(notification:)), name: UIResponder.keyboardWillShowNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(notification:)), name: UIResponder.keyboardWillHideNotification, object: nil)
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         super.touchesBegan(touches, with: event)
         view.endEditing(true)
+    }
+    
+    // MARK: - Keyboard Handling
+    @objc
+    private func keyboardWillShow(notification: NSNotification) {
+        guard let userInfo = notification.userInfo,
+              let keyboardFrameValue = userInfo[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue else {
+            return
+        }
+        let keyboardFrame = keyboardFrameValue.cgRectValue
+        let keyboardHeight = keyboardFrame.height - view.safeAreaInsets.bottom
+        scrollView.contentInset.bottom = keyboardHeight
+        scrollView.verticalScrollIndicatorInsets.bottom = keyboardHeight
+    }
+    
+    @objc
+    private func keyboardWillHide(notification: NSNotification) {
+        scrollView.contentInset.bottom = 0
+        scrollView.verticalScrollIndicatorInsets.bottom = 0
     }
     
     // MARK: - Actions
@@ -272,9 +321,12 @@ extension LoginViewController {
             handle(validation: validation)
             return
         }
+        task?.cancel()
         
-        RequestManager.checkUsernameAvailability(username: username) { [weak self] isAvailable in
+        task = RequestManager.checkUsernameAvailability(username: username) { [weak self] isAvailable in
             guard let self = self else { return }
+            
+            task = nil
             
             DispatchQueue.main.async {
                 self.username = isAvailable ?? false ? username : nil
@@ -304,6 +356,6 @@ extension LoginViewController {
         let isFirstNameEmpty = (firstNameTextField.text ?? "").isEmpty
         let isLastNameEmpty = (lastNameTextField.text ?? "").isEmpty
         let isUsernameValid = username != nil
-        connectButton.isEnabled = !isFirstNameEmpty && !isLastNameEmpty && isUsernameValid
+        connectButton.isEnabled = !isFirstNameEmpty && !isLastNameEmpty && isUsernameValid && (task == nil)
     }
 }

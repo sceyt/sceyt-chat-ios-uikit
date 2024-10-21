@@ -1253,18 +1253,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         action: UserSendMessage.Action
     ) {
         
-        @Sendable func send() {
+        @Sendable func send(storeBeforeSend: Bool = false) {
             logger.verbose("[MESSAGE SEND] sendUserMessage messageSender \(message.body)")
             switch action {
             case .send, .reply, .forward:
-                messageSender.sendMessage(message, storeBeforeSend: false) {[weak self] _ in
+                messageSender.sendMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
                     }
                 }
             case .edit:
-                messageSender.editMessage(message, storeBeforeSend: false) {[weak self] _ in
+                messageSender.editMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
@@ -1274,19 +1274,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         
         if channel.unSynched {
-            provider.storePending(message: message) { _ in
-                Task {
-                    do {
-                        if let channel = try await self.channelCreator.createChannelOnServerIfNeeded(channelId: self.channel.id) {
-                            self.updateLocalChannel(channel) {
-                                send()
-                            }
-                        } else {
-                            send()
+            Task {
+                do {
+                    if let channel = try await self.channelCreator.createChannelOnServerIfNeeded(channelId: self.channel.id) {
+                        self.updateLocalChannel(channel) {
+                            send(storeBeforeSend: true)
                         }
-                    } catch {
-                        
+                    } else {
+                        send()
                     }
+                } catch {
+                    provider.storePending(message: message)
                 }
             }
         } else {

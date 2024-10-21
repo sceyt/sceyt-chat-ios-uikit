@@ -76,8 +76,8 @@ class LandingViewController: ViewController {
         
         logoImageView.pin(to: view.safeAreaLayoutGuide, anchors: [.top(), .centerX, .leading(60, .greaterThanOrEqual)])
         
-        titleLabel.pin(to: view, anchors: [.centerX, .centerY])
-        
+        titleLabel.pin(to: view, anchors: [.centerX, .centerY(0, .lessThanOrEqual)])
+        titleLabel.bottomAnchor.pin(lessThanOrEqualTo: subtitleLabel.topAnchor, constant: -24)
         subtitleLabel.pin(to: createButton, anchors: [.leading, .trailing])
         subtitleLabel.bottomAnchor.pin(to: createButton.topAnchor, constant: -28)
         createButton.pin(to: chooseButton, anchors: [.leading, .trailing])
