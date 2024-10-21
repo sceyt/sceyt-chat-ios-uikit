@@ -41,7 +41,7 @@ extension ChannelInfoViewController {
             didSet {
                 guard let data
                 else { return }
-                if let duration = data.attachment.imageDecodedMetadata?.duration, duration > 0 {
+                if let duration = data.attachment.imageDecodedMetadata?.duration, duration >= 0 {
                     timeLabel.text = appearance.durationFormatter.format(TimeInterval(duration))
                 } else {
                     timeLabel.text = ""

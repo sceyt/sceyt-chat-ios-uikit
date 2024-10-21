@@ -747,7 +747,7 @@ open class ChannelViewController: ViewController,
                 into: titleView.profileImageView,
                 for: channelViewModel.channel,
                 defaultImage: image,
-                size: .init(width: 36, height: 36)
+                size: .init(width: 36 * UIScreen.main.traitCollection.displayScale, height: 36 * UIScreen.main.traitCollection.displayScale)
             )
         case .initialsAppearance(var initialsBuilderAppearance):
             initialsBuilderAppearance?.size = .init(width: 36, height: 36)
@@ -755,7 +755,7 @@ open class ChannelViewController: ViewController,
                 into: titleView.profileImageView,
                 for: channelViewModel.channel,
                 appearance: initialsBuilderAppearance,
-                size: .init(width: 36, height: 36)
+                size: .init(width: 36 * UIScreen.main.traitCollection.displayScale, height: 36 * UIScreen.main.traitCollection.displayScale)
             )
         }
     }
