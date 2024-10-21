@@ -19,10 +19,10 @@ class RequestManager {
     }
     
     // MARK: - Generic Request Sender
-    static func sendRequest(urlString: String, method: HTTPMethod, completion: @escaping (Data?, URLResponse?, Error?) -> Void) {
+    static func sendRequest(urlString: String, method: HTTPMethod, completion: @escaping (Data?, URLResponse?, Error?) -> Void) -> URLSessionDataTask? {
         guard let url = URL(string: urlString) else {
             completion(nil, nil, NSError(domain: "Invalid URL", code: 0, userInfo: nil))
-            return
+            return nil
         }
         
         var request = URLRequest(url: url)
@@ -34,13 +34,15 @@ class RequestManager {
             }
         })
         task.resume()
+        return task
     }
     
     // MARK: - Check Username Availability
-    static func checkUsernameAvailability(username: String, completion: @escaping (Bool?) -> Void) {
+    @discardableResult
+    static func checkUsernameAvailability(username: String, completion: @escaping (Bool?) -> Void) -> URLSessionDataTask? {
         let urlString = "https://ebttn1ks2l.execute-api.us-east-2.amazonaws.com/user/check/\(username)"
         
-        sendRequest(urlString: urlString, method: .GET) { data, response, error in
+        return sendRequest(urlString: urlString, method: .GET) { data, response, error in
             if let error = error {
                 print("Error checking username availability: \(error)")
                 completion(nil)
@@ -67,10 +69,11 @@ class RequestManager {
     }
     
     // MARK: - Delete User
-    static func deleteUser(userId: String, completion: @escaping (Bool) -> Void) {
+    @discardableResult
+    static func deleteUser(userId: String, completion: @escaping (Bool) -> Void) -> URLSessionDataTask? {
         let urlString = "https://ebttn1ks2l.execute-api.us-east-2.amazonaws.com/user/\(userId)"
         
-        sendRequest(urlString: urlString, method: .DELETE) { data, response, error in
+        return sendRequest(urlString: urlString, method: .DELETE) { data, response, error in
             if let error = error {
                 print("Error deleting user: \(error)")
                 completion(false)

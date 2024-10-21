@@ -18,6 +18,7 @@ class LoginViewController: ViewController {
             updateConnectButton()
         }
     }
+    private var task: URLSessionDataTask? = nil
     
     // MARK: - Views
     lazy var titleLabel: UILabel = {
@@ -51,7 +52,9 @@ class LoginViewController: ViewController {
         
         $0.attributedPlaceholder = NSAttributedString(
             string: "First name",
-            attributes: [.foregroundColor: UIColor.secondaryText.light]
+            attributes: [
+                .foregroundColor: UIColor.secondaryText.light
+            ]
         )
         return $0.withoutAutoresizingMask
     }(UITextField())
@@ -272,9 +275,12 @@ extension LoginViewController {
             handle(validation: validation)
             return
         }
+        task?.cancel()
         
-        RequestManager.checkUsernameAvailability(username: username) { [weak self] isAvailable in
+        task = RequestManager.checkUsernameAvailability(username: username) { [weak self] isAvailable in
             guard let self = self else { return }
+            
+            task = nil
             
             DispatchQueue.main.async {
                 self.username = isAvailable ?? false ? username : nil
@@ -304,6 +310,6 @@ extension LoginViewController {
         let isFirstNameEmpty = (firstNameTextField.text ?? "").isEmpty
         let isLastNameEmpty = (lastNameTextField.text ?? "").isEmpty
         let isUsernameValid = username != nil
-        connectButton.isEnabled = !isFirstNameEmpty && !isLastNameEmpty && isUsernameValid
+        connectButton.isEnabled = !isFirstNameEmpty && !isLastNameEmpty && isUsernameValid && (task == nil)
     }
 }

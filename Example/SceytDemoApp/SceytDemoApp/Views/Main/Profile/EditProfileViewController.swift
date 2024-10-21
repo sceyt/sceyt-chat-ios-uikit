@@ -11,6 +11,8 @@ import SceytChatUIKit
 
 class EditProfileViewController: ViewController {
 
+    private var task: URLSessionDataTask? = nil
+    
     // MARK: - Properties
     lazy var router = Router(rootViewController: self)
     var editedAvatarImage: UIImage?
@@ -360,9 +362,12 @@ extension EditProfileViewController {
             return
         }
         
-        RequestManager.checkUsernameAvailability(username: username) { [weak self] isAvailable in
+        task?.cancel()
+        
+        task = RequestManager.checkUsernameAvailability(username: username) { [weak self] isAvailable in
             guard let self = self else { return }
             
+            task = nil
             DispatchQueue.main.async {
                 self.username = isAvailable ?? false ? username : nil
                 self.updateErrorLabel(isAvailable: isAvailable)
@@ -405,7 +410,7 @@ extension EditProfileViewController {
         let isFirstNameValidChanged = !isFirstNameEmpty && editedFirstName != user.firstName
         let isLastNameValidChanged = !isLastNameEmpty && editedLastName != user.lastName
         
-        navigationItem.rightBarButtonItem?.isEnabled = forceDisable ? false : isFirstNameValidChanged || isLastNameValidChanged || isUsernameValidAndChanged
+        navigationItem.rightBarButtonItem?.isEnabled = forceDisable ? false : (isFirstNameValidChanged || isLastNameValidChanged || isUsernameValidAndChanged) && (task == nil)
     }
 }
 

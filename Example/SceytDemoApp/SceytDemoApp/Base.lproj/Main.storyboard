@@ -30,11 +30,11 @@
                         <viewLayoutGuide key="safeArea" id="Q0o-Ap-gea"/>
                         <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
                         <constraints>
-                            <constraint firstItem="wOZ-VR-RDV" firstAttribute="leading" secondItem="Q0o-Ap-gea" secondAttribute="leading" id="IvI-KU-F4x"/>
+                            <constraint firstItem="wOZ-VR-RDV" firstAttribute="leading" secondItem="AqH-Pm-g3z" secondAttribute="leading" id="IvI-KU-F4x"/>
                             <constraint firstAttribute="bottom" secondItem="wOZ-VR-RDV" secondAttribute="bottom" id="KZL-C8-bnn"/>
                             <constraint firstItem="PTT-ED-SJJ" firstAttribute="width" secondItem="wOZ-VR-RDV" secondAttribute="width" multiplier="0.597015" id="Lxq-1i-60v"/>
                             <constraint firstItem="wOZ-VR-RDV" firstAttribute="top" secondItem="AqH-Pm-g3z" secondAttribute="top" id="Ybm-m2-rFT"/>
-                            <constraint firstItem="Q0o-Ap-gea" firstAttribute="trailing" secondItem="wOZ-VR-RDV" secondAttribute="trailing" id="aXa-9W-Dev"/>
+                            <constraint firstAttribute="trailing" secondItem="wOZ-VR-RDV" secondAttribute="trailing" id="aXa-9W-Dev"/>
                             <constraint firstItem="PTT-ED-SJJ" firstAttribute="centerX" secondItem="wOZ-VR-RDV" secondAttribute="centerX" id="toO-aD-iga"/>
                             <constraint firstItem="PTT-ED-SJJ" firstAttribute="centerY" secondItem="wOZ-VR-RDV" secondAttribute="centerY" id="wE3-Zi-oKg"/>
                         </constraints>

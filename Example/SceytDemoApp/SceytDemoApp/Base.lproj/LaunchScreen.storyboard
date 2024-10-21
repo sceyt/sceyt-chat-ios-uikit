@@ -33,9 +33,9 @@
                         <constraints>
                             <constraint firstItem="FJZ-T5-HgO" firstAttribute="centerY" secondItem="iRb-S4-j3b" secondAttribute="centerY" id="HYU-L7-Cwi"/>
                             <constraint firstAttribute="bottom" secondItem="iRb-S4-j3b" secondAttribute="bottom" id="KM8-en-xqi"/>
-                            <constraint firstItem="6Tk-OE-BBY" firstAttribute="trailing" secondItem="iRb-S4-j3b" secondAttribute="trailing" id="NEM-nE-3Z3"/>
+                            <constraint firstAttribute="trailing" secondItem="iRb-S4-j3b" secondAttribute="trailing" id="NEM-nE-3Z3"/>
                             <constraint firstItem="FJZ-T5-HgO" firstAttribute="centerX" secondItem="iRb-S4-j3b" secondAttribute="centerX" id="V3h-jf-rZv"/>
-                            <constraint firstItem="iRb-S4-j3b" firstAttribute="leading" secondItem="6Tk-OE-BBY" secondAttribute="leading" id="cbd-4U-AIC"/>
+                            <constraint firstItem="iRb-S4-j3b" firstAttribute="leading" secondItem="Ze5-6b-2t3" secondAttribute="leading" id="cbd-4U-AIC"/>
                             <constraint firstItem="iRb-S4-j3b" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="hWS-bv-PC0"/>
                             <constraint firstItem="FJZ-T5-HgO" firstAttribute="width" secondItem="iRb-S4-j3b" secondAttribute="width" multiplier="0.597015" id="zqI-96-5fX"/>
                         </constraints>
