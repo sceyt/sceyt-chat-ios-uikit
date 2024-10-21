@@ -742,7 +742,9 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                 mentionAttributes[.font] = appearance.replyMessageAppearance.mentionLabelAppearance.font
                 mentionAttributes[.foregroundColor] = appearance.replyMessageAppearance.mentionLabelAppearance.foregroundColor
                 
-                messageAttributedString.setAttributes(mentionAttributes, range: range)
+                if range.location >= 0 && (range.location + range.length) <= messageAttributedString.length {
+                    messageAttributedString.setAttributes(mentionAttributes, range: range)
+                }
             }
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
@@ -845,7 +847,9 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                 mentionAttributes[.font] = appearance.editMessageAppearance.mentionLabelAppearance.font
                 mentionAttributes[.foregroundColor] = appearance.editMessageAppearance.mentionLabelAppearance.foregroundColor
                 
-                messageAttributedString.setAttributes(mentionAttributes, range: range)
+                if range.location >= 0 && (range.location + range.length) <= messageAttributedString.length {
+                    messageAttributedString.setAttributes(mentionAttributes, range: range)
+                }
             }
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
             messageAttributedString.append(.init(
