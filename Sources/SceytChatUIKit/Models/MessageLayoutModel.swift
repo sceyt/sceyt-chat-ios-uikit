@@ -886,7 +886,7 @@ open class MessageLayoutModel {
     }
     
     open func measure() -> CGSize {
-        infoViewMeasure = MessageCell.InfoView.measure(model: self, appearance: appearance)
+        infoViewMeasure = Components.messageCellInfoView.measure(model: self, appearance: appearance)
         linkViewMeasure = Components.messageCellLinkStackView.measure(model: self, appearance: appearance)
         if message.incoming {
             return Components.channelIncomingMessageCell.measure(model: self, appearance: appearance)
