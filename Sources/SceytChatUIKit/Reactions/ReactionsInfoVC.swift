@@ -22,6 +22,7 @@ open class ReactionsInfoViewController: ViewController,
         didSet {
             viewControllers = userReactionsViewModel.map {
                 let viewController = Components.reactedUserListViewController.init()
+                viewController.appearance = appearance
                 viewController.viewModel = $0
                 viewController.onEvent = { [weak self] event in
                     switch event {
@@ -61,12 +62,13 @@ open class ReactionsInfoViewController: ViewController,
 
     open override func setup() {
         super.setup()
+        view.layer.cornerCurve
         view.clipsToBounds = true
         view.layer.cornerRadius = 16
         view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         collectionView.dataSource = self
         collectionView.delegate = self
-        collectionView.register(Components.reactionsInfoScoreCell)
+        collectionView.register(Components.reactionsInfoHeaderCell)
         collectionViewLayout.scrollDirection = .horizontal
         collectionViewLayout.minimumLineSpacing = .zero
         collectionViewLayout.minimumInteritemSpacing = .zero
@@ -96,7 +98,7 @@ open class ReactionsInfoViewController: ViewController,
         collectionView.resize(anchors: [.height(46)])
         
         let separator = UIView().withoutAutoresizingMask
-        separator.backgroundColor = .border
+        separator.backgroundColor = appearance.separatorColor
         view.addSubview(separator)
         separator.pin(to: view, anchors: [.leading, .trailing])
         separator.topAnchor.pin(to: collectionView.bottomAnchor, constant: 4)
@@ -116,7 +118,8 @@ open class ReactionsInfoViewController: ViewController,
     }
 
     open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.reactionsInfoScoreCell)
+        let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.reactionsInfoHeaderCell)
+        cell.parentAppearance = appearance.headerCellAppearance
         cell.data = reactionScoreViewModel.value(at: indexPath)
         return cell
     }

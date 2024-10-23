@@ -162,3 +162,25 @@ public class AnyAttachmentFormatting: AttachmentFormatting {
         return _format(attachment)
     }
 }
+
+/// A type-erased wrapper for any `ReactionFormatting` implementation.
+/// This allows instances conforming to `ReactionFormatting` to be used
+/// without exposing their concrete types.
+public class AnyReactionFormatting: ReactionFormatting {
+    private let _format: (ChatMessage.Reaction) -> String
+    
+    /// Initializes the type-erased wrapper with a specific `ReactionFormatting` instance.
+    ///
+    /// - Parameter formatter: The concrete formatter to be wrapped.
+    public init<F: ReactionFormatting>(_ formatter: F) {
+        self._format = formatter.format
+    }
+    
+    /// Formats the given chat message attachment into a string.
+    ///
+    /// - Parameter attachment: The `ChatMessage.Reaction` instance to format.
+    /// - Returns: A formatted string representing the attachment.
+    public func format(_ attachment: ChatMessage.Reaction) -> String {
+        return _format(attachment)
+    }
+}

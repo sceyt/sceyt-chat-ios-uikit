@@ -11,9 +11,9 @@ import UIKit
 extension ChannelMemberListViewController: AppearanceProviding {
     public static var appearance = Appearance(
         navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+            $0.standardAppearance?.backgroundColor = .surface1
+            return $0
+        }(NavigationBarAppearance.appearance),
         backgroundColor: .background,
         cellAppearance: SceytChatUIKit.Components.channelMemberCell.appearance,
         addCellAppearance: SceytChatUIKit.Components.channelAddMemberCell.appearance

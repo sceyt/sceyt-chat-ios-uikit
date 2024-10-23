@@ -16,18 +16,5 @@ public enum PreviewItem: Equatable, Hashable {
         case let .attachment(attachment):
             return attachment
         }
-    }
-    
-    public var senderTitle: String {
-        switch self  {
-        case let .attachment(attachment):
-            if me == attachment.userId {
-                return L10n.User.current
-            } else if let user = attachment.user {
-                return SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
-            } else {
-                return ""
-            }
-        }
-    }
+    }    
 }

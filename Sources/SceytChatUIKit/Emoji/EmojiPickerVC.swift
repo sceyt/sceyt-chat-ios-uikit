@@ -42,6 +42,9 @@ open class EmojiPickerViewController: ViewController,
 
     override open func setupAppearance() {
         super.setupAppearance()
+        
+        headerToolBar.appearance = appearance
+        
         collectionViewLayout.itemSize = Components.emojiListViewModel.itemSize
         collectionViewLayout.headerReferenceSize = CGSize(width: view.width, height: 30)
         collectionViewLayout.scrollDirection = .vertical
@@ -87,6 +90,7 @@ open class EmojiPickerViewController: ViewController,
             let sectionHeader = collectionView.dequeueReusableSupplementaryView(ofKind: kind,
                                                                                 withReuseIdentifier: Components.emojiPickerSectionHeaderView.reuseId,
                                                                                 for: indexPath) as! EmojiPickerViewController.SectionHeaderView
+            sectionHeader.parentAppearance = appearance.headerAppearance
             sectionHeader.bind(viewModel.groupTitle(at: indexPath.section))
             return sectionHeader
         } else {

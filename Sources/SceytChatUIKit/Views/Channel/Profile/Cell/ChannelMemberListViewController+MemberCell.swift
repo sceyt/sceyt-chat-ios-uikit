@@ -102,11 +102,11 @@ extension ChannelMemberListViewController {
                 
                 imageTask = switch avatarRepresentation {
                 case .image(let image):
-                    AvatarBuilder.loadAvatar(into: avatarView,
+                    Components.avatarBuilder.loadAvatar(into: avatarView,
                                              for: data,
                                              defaultImage: image)
                 case .initialsAppearance(let initialsAppearance):
-                    AvatarBuilder.loadAvatar(into: avatarView,
+                    Components.avatarBuilder.loadAvatar(into: avatarView,
                                              for: data,
                                              appearance: initialsAppearance)
                 }

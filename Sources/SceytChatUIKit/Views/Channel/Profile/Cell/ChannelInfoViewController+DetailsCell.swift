@@ -69,11 +69,11 @@ extension ChannelInfoViewController {
             let avatarRepresentation = appearance.channelDefaultAvatarProvider.provideVisual(for: data)
             imageTask = switch avatarRepresentation {
             case .image(let image):
-                AvatarBuilder.loadAvatar(into: avatarButton,
+                Components.avatarBuilder.loadAvatar(into: avatarButton,
                                          for: data,
                                          defaultImage: image)
             case .initialsAppearance(let initialsBuilderAppearance):
-                AvatarBuilder.loadAvatar(into: avatarButton,
+                Components.avatarBuilder.loadAvatar(into: avatarButton,
                                          for: data,
                                          appearance: initialsBuilderAppearance)
             }

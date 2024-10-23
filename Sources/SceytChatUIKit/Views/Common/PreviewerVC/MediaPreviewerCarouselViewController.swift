@@ -112,26 +112,18 @@ open class MediaPreviewerCarouselViewController: UIPageViewController,
     open func setupAppearance() {
         view.setNeedsDisplay()
         
-        view.backgroundColor = .background
-        navigationController?.navigationBar.barTintColor = appearance.tintColor
-        navigationController?.navigationBar.backgroundColor = appearance.backgroundColor
-        navigationController?.navigationBar.standardAppearance = .init()
-        navigationController?.navigationBar.standardAppearance.backgroundColor = appearance.backgroundColor
-        navigationController?.navigationBar.scrollEdgeAppearance = .init()
-        navigationController?.navigationBar.scrollEdgeAppearance?.backgroundColor = appearance.backgroundColor
+        view.backgroundColor = appearance.backgroundColor
+        
         backgroundView.backgroundColor = appearance.backgroundColor
         backgroundView.alpha = 1
         
         backButton.imageInsets = .init(top: 0, left: -8, bottom: 0, right: 0)
-        backButton.tintColor = appearance.tintColor
         
-        shareButton.tintColor = appearance.tintColor
+        titleLabel.font = appearance.titleLabelAppearance.font
+        titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
         
-        titleLabel.font = appearance.titleFont
-        titleLabel.textColor = appearance.tintColor
-        
-        subtitleLabel.font = appearance.subTitleFont
-        subtitleLabel.textColor = appearance.tintColor.withAlphaComponent(0.5)
+        subtitleLabel.font = appearance.subtitleLabelAppearance.font
+        subtitleLabel.textColor = appearance.subtitleLabelAppearance.foregroundColor
     }
     
     open func setupDone() {

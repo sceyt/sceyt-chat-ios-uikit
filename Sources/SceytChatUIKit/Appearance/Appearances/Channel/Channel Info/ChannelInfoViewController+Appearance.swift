@@ -11,9 +11,9 @@ import UIKit
 extension ChannelInfoViewController: AppearanceProviding {
     public static var appearance = Appearance(
         navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+            $0.standardAppearance?.backgroundColor = .surface1
+            return $0
+        }(NavigationBarAppearance.appearance),
         backgroundColor: .backgroundSecondary,
         separatorColor: .border,
         titleLabelAppearance: LabelAppearance(

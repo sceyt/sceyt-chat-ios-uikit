@@ -53,7 +53,7 @@ extension EditChannelViewController {
             guard let data else {
                 return avatarButton.image = nil
             }
-            imageTask = AvatarBuilder.loadAvatar(into: avatarButton, for: data)
+            imageTask = Components.avatarBuilder.loadAvatar(into: avatarButton, for: data)
         }
         
         override open func prepareForReuse() {

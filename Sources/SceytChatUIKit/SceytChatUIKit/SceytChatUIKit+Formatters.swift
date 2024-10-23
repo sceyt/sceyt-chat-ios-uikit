@@ -42,6 +42,8 @@ extension SceytChatUIKit {
         
         public var reactedUserNameFormatter: any ChannelFormatting = ReactedUserNameFormatter()
         
+        public var reactionFormatter: any ReactionFormatting = ReactionFormatter()
+        
         public var typingUserNameFormatter: any UserFormatting = UserShortNameFormatter()
 
         public var mediaDurationFormatter: any TimeIntervalFormatting = MediaDurationFormatter()

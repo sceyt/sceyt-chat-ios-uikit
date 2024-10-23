@@ -69,11 +69,8 @@ open class UserReactionViewModel: NSObject {
         reactionObserver.numberOfItems(in: section)
     }
 
-    open func cellModel(at indexPath: IndexPath) -> (ChatUser?, String)? {
-        if let item = reactionObserver.item(at: indexPath) {
-            return (item.user, item.key)
-        }
-        return nil
+    open func cellModel(at indexPath: IndexPath) -> ChatMessage.Reaction? {
+        reactionObserver.item(at: indexPath)
     }
 
     open func reaction(at indexPath: IndexPath) -> ChatMessage.Reaction? {

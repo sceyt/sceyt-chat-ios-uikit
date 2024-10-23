@@ -91,3 +91,12 @@ public protocol MessageFormatting: Formatting {
     /// - Returns: A `String` representing the formatted attachment.
     func format(_ message: ChatMessage) -> String
 }
+
+/// A protocol that defines formatting behavior for reaction.
+public protocol ReactionFormatting: Formatting {
+    /// Formats a chat message attachment into a string.
+    ///
+    /// - Parameter reaction: The `ChatMessage.Reaction` instance to format.
+    /// - Returns: A `String` representing the formatted reaction.
+    func format(_ reaction: ChatMessage.Reaction) -> String
+}

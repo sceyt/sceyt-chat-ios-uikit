@@ -145,7 +145,7 @@ extension SceytChatUIKit {
         public static var reactedUserListViewController: ReactedUserListViewController.Type = ReactedUserListViewController.self
         public static var reactedUserReactionCell: ReactedUserListViewController.UserReactionCell.Type = ReactedUserListViewController.UserReactionCell.self
         public static var reactionsInfoViewController: ReactionsInfoViewController.Type = ReactionsInfoViewController.self
-        public static var reactionsInfoScoreCell: ReactionsInfoViewController.ReactionScoreCell.Type = ReactionsInfoViewController.ReactionScoreCell.self
+        public static var reactionsInfoHeaderCell: ReactionsInfoViewController.HeaderCell.Type = ReactionsInfoViewController.HeaderCell.self
         
         public static var startChatViewController: StartChatViewController.Type = StartChatViewController.self
         public static var createNewChannelViewModel: CreateNewChannelViewModel.Type = CreateNewChannelViewModel.self

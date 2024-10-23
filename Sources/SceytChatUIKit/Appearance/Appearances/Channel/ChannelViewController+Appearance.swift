@@ -11,9 +11,9 @@ import UIKit
 extension ChannelViewController: AppearanceProviding {
     public static var appearance = Appearance(
         navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+            $0.standardAppearance?.backgroundColor = .surface1
+            return $0
+        }(NavigationBarAppearance.appearance),
         backgroundColor: .background,
         headerAppearance: HeaderView.appearance,
         emptyStateAppearance: EmptyStateView.Appearance(
@@ -173,4 +173,5 @@ extension ChannelViewController: AppearanceProviding {
 //enableDateSeparator: Boolean,
 //sameSenderMessageDistance: Int
 //differentSenderMessageDistance: Int
+
 

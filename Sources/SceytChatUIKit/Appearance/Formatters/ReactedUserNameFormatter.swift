@@ -24,3 +24,10 @@ open class ReactedUserNameFormatter: ChannelFormatting {
         return ""
     }
 }
+
+open class ReactionFormatter: ReactionFormatting {
+    
+    public func format(_ reaction: ChatMessage.Reaction) -> String {
+        return reaction.key
+    }
+}

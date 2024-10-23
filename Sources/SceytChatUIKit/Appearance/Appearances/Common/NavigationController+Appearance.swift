@@ -9,7 +9,7 @@
 import UIKit
 
 extension NavigationController: AppearanceProviding {
-    public static var appearance = Appearance(barAppearance: NavigationBarAppearance())
+    public static var appearance = NavigationBarAppearance.appearance
     
     public struct Appearance {
         @Trackable<Appearance, NavigationBarAppearance>

@@ -44,7 +44,7 @@ public class NavigationBarAppearance: AppearanceProviding {
         isTranslucent: true,
         prefersLargeTitles: false,
         tintColor: .accent,
-        barTintColor: .green,
+        barTintColor: .accent,
         backgroundColor: nil,
         backgroundEffect: nil,
         titleTextAttributes: [

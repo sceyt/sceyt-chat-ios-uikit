@@ -13,9 +13,9 @@ public typealias MessageCellAppearance = MessageCell.Appearance
 extension MessageInfoViewController: AppearanceProviding {
     public static var appearance = Appearance(
         navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+            $0.standardAppearance?.backgroundColor = .surface1
+            return $0
+        }(NavigationBarAppearance.appearance),
         backgroundColor: .backgroundSecondary,
         cellBackgroundColor: .backgroundSections,
         messageCellAppearance: SceytChatUIKit.Components.messageCell.appearance,

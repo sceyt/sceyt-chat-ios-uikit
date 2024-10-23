@@ -215,60 +215,13 @@ public struct InitialsBuilderAppearance {
     }
 }
 
-extension MediaPreviewerViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor = DefaultColors.backgroundDark
-        public var minimumTrackTintColor = UIColor.onPrimary
-        public var maximumTrackTintColor = UIColor.surface3
-        public var tintColor = UIColor.onPrimary
-        public var controlFont = Fonts.regular.withSize(13)
-        public var titleFont = Fonts.bold.withSize(16)
-        public var subTitleFont = Fonts.regular.withSize(13)
-        
-        public init() {}
-    }
-}
 
 
-extension ReactionsInfoViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = UIColor.background
-        
-        public init() {}
-    }
-}
-
-extension ReactionsInfoViewController.ReactionScoreCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = UIColor.background
-        public var selectedBackgroundColor: UIColor? = UIColor.accent
-        public var borderColor: UIColor? = .border
-        public var selectedBorderColor: UIColor? = .clear
-        public var textColor: UIColor? = UIColor.secondaryText
-        public var textFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var selectedTextColor: UIColor? = .onPrimary
-        
-        public init() {}
-    }
-}
 
 
-extension EmojiPickerViewController.SectionHeaderView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var textColor: UIColor? = .secondaryText
-        public var textFont: UIFont? = Fonts.regular.withSize(12)
-        
-        public init() {}
-    }
-}
+
+
+
 
 extension ImagePreviewViewController: AppearanceProviding {
     public static var appearance = Appearance()
@@ -409,28 +362,6 @@ extension SelectedBaseCell: AppearanceProviding {
     }
 }
 
-extension ReactedUserListViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-    }
-}
-
-extension ReactedUserListViewController.UserReactionCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var userLabelFont: UIFont? = Fonts.bold.withSize(16)
-        public var reactionLabelFont: UIFont? = Fonts.bold.withSize(24)
-        public var userLabelColor: UIColor? = .primaryText
-        public var reactionLabelColor: UIColor? = .primaryText
-    }
-}
 
 
 extension ChannelCreatedView: AppearanceProviding {
@@ -449,31 +380,6 @@ extension ChannelCreatedView: AppearanceProviding {
     }
 }
 
-
-
-extension EmojiSectionToolBar: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-        public var normalColor: UIColor? = .footnoteText
-        public var selectedColor: UIColor? = .accent
-    }
-}
-
-extension EmojiPickerViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-        public var normalColor: UIColor? = .footnoteText
-        public var selectedColor: UIColor? = .accent
-    }
-}
 
 
 
