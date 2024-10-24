@@ -19,7 +19,6 @@ extension SceytChatUIKit {
         public static var channelListRouter: ChannelListRouter.Type = ChannelListRouter.self
         public static var channelCell: ChannelListViewController.ChannelCell.Type = ChannelListViewController.ChannelCell.self
         public static var emptyStateView: EmptyStateView.Type = EmptyStateView.self
-        public static var channelCreatedView: ChannelCreatedView.Type = ChannelCreatedView.self
         public static var channelViewController: ChannelViewController.Type = ChannelViewController.self
         public static var channelViewModel: ChannelViewModel.Type = ChannelViewModel.self
         public static var channelRouter: ChannelRouter.Type = ChannelRouter.self
@@ -151,7 +150,10 @@ extension SceytChatUIKit {
         public static var createNewChannelViewModel: CreateNewChannelViewModel.Type = CreateNewChannelViewModel.self
         public static var startChatActionsView: StartChatViewController.ActionsView.Type = StartChatViewController.ActionsView.self
         public static var searchResultChannelCell: SearchResultChannelCell.Type = SearchResultChannelCell.self
+        public static var selectableChannelCell: SelectableChannelCell.Type = SelectableChannelCell.self
+        
         public static var userCell: UserCell.Type = UserCell.self
+        public static var selectableUserCell: SelectableUserCell.Type = SelectableUserCell.self
         public static var separatorHeaderView: SeparatorHeaderView.Type = SeparatorHeaderView.self
         
         public static var textLabel: TextLabel.Type = TextLabel.self

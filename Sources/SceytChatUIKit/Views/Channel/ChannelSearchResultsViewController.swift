@@ -37,6 +37,7 @@ open class ChannelSearchResultsViewController: ViewController,
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
         tableView.register(Components.searchResultChannelCell.self)
+        tableView.register(Components.selectableChannelCell.self)
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -117,13 +118,22 @@ open class ChannelSearchResultsViewController: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        if resultsUpdater.showCheckBox {
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.selectableChannelCell.self)
+            cell.parentAppearance = appearance.selectableCellAppearance
+            cell.separatorView.isHidden = indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1
+            if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
+                cell.channelData = channel
+                cell.checkBoxView.isSelected = resultsUpdater.isSelected(channel)
+            }
+            return cell
+        }
+        
         let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.searchResultChannelCell.self)
         cell.parentAppearance = appearance.cellAppearance
         cell.separatorView.isHidden = indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1
-        cell.showCheckBox = resultsUpdater.showCheckBox
         if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
             cell.channelData = channel
-            cell.checkBoxView.isSelected = resultsUpdater.isSelected(channel)
         }
         return cell
     }
@@ -146,7 +156,7 @@ open class ChannelSearchResultsViewController: ViewController,
         tableView.deselectRow(at: indexPath, animated: true)
         if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
             resultsUpdater.select(channel)
-            tableView.cell(for: indexPath, cellType: Components.searchResultChannelCell.self)?.checkBoxView.isSelected = resultsUpdater.isSelected(channel)
+            tableView.cell(for: indexPath, cellType: Components.selectableChannelCell.self)?.checkBoxView.isSelected = resultsUpdater.isSelected(channel)
         }
     }
 }

@@ -23,39 +23,14 @@ open class BaseChannelUserCell: TableViewCell {
     
     open lazy var textVStack = UIStackView(column: [titleLabel, statusLabel], spacing: Layouts.textPadding)
         .withoutAutoresizingMask
-        
-    open lazy var checkBoxView = Components.checkBoxView.init()
-        .withoutAutoresizingMask
     
     open lazy var separatorView = UIView().withoutAutoresizingMask
     
-    open var showCheckBox = false {
-        didSet {
-            selectionStyle = showCheckBox ? .none : .default
-        }
-    }
-    
-    override open func setup() {
-        super.setup()
-        
-        checkBoxView.isUserInteractionEnabled = false
-    }
-    
     override open func setupLayout() {
         super.setupLayout()
-        contentView.addSubview(checkBoxView)
         contentView.addSubview(avatarView)
         contentView.addSubview(textVStack)
         contentView.addSubview(separatorView)
-        
-        checkBoxView.pin(to: contentView, anchors: [.leading(6), .centerY()])
-        checkBoxView.resize(anchors: [.width(44), .height(44)])
-        checkBoxView.isHidden = !showCheckBox
-        if showCheckBox {
-            avatarView.leadingAnchor.pin(to: checkBoxView.trailingAnchor, constant: 2)
-        } else {
-            avatarView.leadingAnchor.pin(to: contentView.leadingAnchor, constant: Layouts.horizontalPadding)
-        }
         
         avatarView.pin(to: contentView, anchors: [.top(Layouts.verticalPadding, .greaterThanOrEqual), .centerY])
         avatarView.resize(anchors: [.height(Layouts.iconSize), .width(Layouts.iconSize)])

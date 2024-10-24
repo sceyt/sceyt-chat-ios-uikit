@@ -92,7 +92,7 @@ private extension NSObject {
 ///
 /// This extension bridges the `parentAppearance` property with the
 /// associated object storage methods defined in the `NSObject` extension.
-public extension AppearanceProviding where Self: NSObject {//}& Configurable {
+public extension AppearanceProviding where Self: NSObject {
     /// The parent appearance configuration, allowing instances to inherit
     /// appearance settings from another source.
     ///
@@ -223,16 +223,7 @@ public struct InitialsBuilderAppearance {
 
 
 
-extension ImagePreviewViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var separatorColor: UIColor? = .border
-        
-        public init() {}
-    }
-}
+
 
 
 extension SheetViewController: AppearanceProviding {
@@ -288,18 +279,6 @@ extension SelectUsersViewController: AppearanceProviding {
 
 
 
-extension ImageCropperViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var buttonBackgroundColor: UIColor? = DefaultColors.backgroundDark
-        public var buttonFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var buttonColor: UIColor? = .onPrimary
-        
-        public init() {}
-    }
-}
 
 extension StartChatViewController: AppearanceProviding {
     public static var appearance = Appearance()
@@ -348,49 +327,6 @@ extension CreateGroupViewController: AppearanceProviding {
         public var backgroundColor: UIColor? = .background
         
         public init() {}
-    }
-}
-
-extension SelectedBaseCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var font: UIFont? = Fonts.regular.withSize(13)
-        public var textColor: UIColor? = UIColor.primaryText
-    }
-}
-
-
-
-extension ChannelCreatedView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        
-        public var channelCreatedImage: UIImage? = nil
-        public var labelBackgroundColor: UIColor? = .overlayBackground1
-        public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var messageLabelFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var titleLabelColor: UIColor? = .onPrimary
-        public var messageLabelColor: UIColor? = .onPrimary
-    }
-}
-
-
-
-
-
-extension ForwardViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
     }
 }
 

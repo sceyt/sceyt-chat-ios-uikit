@@ -40,7 +40,7 @@ open class SelectUsersViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
-        tableView.register(Components.userCell.self)
+        tableView.register(Components.selectableUserCell.self)
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -169,8 +169,7 @@ open class SelectUsersViewController: ViewController,
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         switch Sections(rawValue: indexPath.section) {
         case .user:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.userCell.self)
-            cell.showCheckBox = true
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.selectableUserCell.self)
             cell.selectionStyle = .none
             cell.userData = selectMemberViewModel.user(at: indexPath)
             return cell
@@ -261,7 +260,7 @@ open class SelectUsersViewController: ViewController,
 private extension SelectUsersViewController {
     func deselectRowFor(user: ChatUser) {
         for indexPath in tableView.indexPathsForVisibleRows ?? [] {
-            if let cell = tableView.cell(for: indexPath, cellType: Components.userCell.self),
+            if let cell = tableView.cell(for: indexPath, cellType: Components.selectableUserCell.self),
                cell.userData?.id == user.id
             {
                 if let indexPathsForSelectedRows = tableView.indexPathsForSelectedRows,

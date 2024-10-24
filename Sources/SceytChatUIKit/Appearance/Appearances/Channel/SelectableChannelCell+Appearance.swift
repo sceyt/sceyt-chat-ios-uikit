@@ -1,14 +1,15 @@
 //
-//  UserCell+Appearance.swift
-//  SceytChatUIKit
+//  SelectableChannelCell+Appearance.swift
+//  SceytDemoApp
 //
-//  Created by Arthur Avagyan on 26.09.24
+//  Created by Arthur Avagyan on 24.10.24
 //  Copyright © 2024 Sceyt LLC. All rights reserved.
 //
 
 import UIKit
 
-extension UserCell: AppearanceProviding {
+extension SelectableChannelCell: AppearanceProviding {
+    
     public static var appearance = Appearance(
         backgroundColor: .clear,
         separatorColor: .border,
@@ -20,12 +21,13 @@ extension UserCell: AppearanceProviding {
             foregroundColor: .secondaryText,
             font: Fonts.regular.withSize(13)
         ),
-        titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
-        subtitleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userPresenceDateFormatter),
-        visualProvider: AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
+        titleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelNameFormatter),
+        subtitleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelSubtitleFormatter),
+        visualProvider: AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider),
+        checkBoxAppearance: CheckBoxView.appearance
     )
-
-    public class Appearance: CellAppearance<AnyUserFormatting, AnyUserFormatting, AnyUserAvatarProviding> {
+    
+    public class Appearance: SelectableCellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -38,9 +40,10 @@ extension UserCell: AppearanceProviding {
             separatorColor: UIColor,
             titleLabelAppearance: LabelAppearance,
             subtitleLabelAppearance: LabelAppearance,
-            titleFormatter: AnyUserFormatting,
-            subtitleFormatter: AnyUserFormatting,
-            visualProvider: AnyUserAvatarProviding
+            titleFormatter: AnyChannelFormatting,
+            subtitleFormatter: AnyChannelFormatting,
+            visualProvider: AnyChannelAvatarProviding,
+            checkBoxAppearance: CheckBoxView.Appearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             self._separatorColor = Trackable(value: separatorColor)
@@ -49,19 +52,21 @@ extension UserCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider
+                visualProvider: visualProvider,
+                checkBoxAppearance: checkBoxAppearance
             )
         }
         
         public init(
-            reference: UserCell.Appearance,
+            reference: SelectableChannelCell.Appearance,
             backgroundColor: UIColor? = nil,
             separatorColor: UIColor? = nil,
             titleLabelAppearance: LabelAppearance,
             subtitleLabelAppearance: LabelAppearance,
-            titleFormatter: AnyUserFormatting,
-            subtitleFormatter: AnyUserFormatting,
-            visualProvider: AnyUserAvatarProviding
+            titleFormatter: AnyChannelFormatting,
+            subtitleFormatter: AnyChannelFormatting,
+            visualProvider: AnyChannelAvatarProviding,
+            checkBoxAppearance: CheckBoxView.Appearance
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
@@ -70,7 +75,8 @@ extension UserCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider
+                visualProvider: visualProvider,
+                checkBoxAppearance: checkBoxAppearance
             )
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
@@ -78,4 +84,3 @@ extension UserCell: AppearanceProviding {
         }
     }
 }
-

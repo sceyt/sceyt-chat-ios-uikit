@@ -1,15 +1,23 @@
 //
-//  UserCell.swift
+//  SelectableUserCell.swift
 //  SceytChatUIKit
 //
-//  Created by Arthur Avagyan on 26.09.24
+//  Created by Arthur Avagyan on 24.10.24
 //  Copyright © 2024 Sceyt LLC. All rights reserved.
 //
 
 import UIKit
 
-open class UserCell: BaseChannelUserCell {
+open class SelectableUserCell: BaseChannelUserCell {
     
+    open lazy var checkBoxView = Components.checkBoxView.init()
+        .withoutAutoresizingMask
+
+    override open func setSelected(_ selected: Bool, animated: Bool) {
+        super.setSelected(selected, animated: animated)
+        checkBoxView.isSelected = selected
+    }
+
     open var userData: ChatUser! {
         didSet {
             titleLabel.text = userData.displayName
@@ -18,6 +26,7 @@ open class UserCell: BaseChannelUserCell {
             subscribeForPresence()
         }
     }
+    
     open func subscribeForPresence() {
         guard let contact = userData
         else { return }
@@ -30,11 +39,22 @@ open class UserCell: BaseChannelUserCell {
             }
     }
     
+    override open func setup() {
+        super.setup()
+        
+        checkBoxView.isUserInteractionEnabled = false
+        selectionStyle = .none
+    }
+    
     override open func setupLayout() {
         super.setupLayout()
+        contentView.addSubview(checkBoxView)
         
-        avatarView.leadingAnchor.pin(to: contentView.leadingAnchor, constant: Layouts.horizontalPadding)
+        checkBoxView.pin(to: contentView, anchors: [.leading(6), .centerY()])
+        checkBoxView.resize(anchors: [.width(44), .height(44)])
+        avatarView.leadingAnchor.pin(to: checkBoxView.trailingAnchor, constant: 2)
     }
+
     
     override open func setupAppearance() {
         super.setupAppearance()

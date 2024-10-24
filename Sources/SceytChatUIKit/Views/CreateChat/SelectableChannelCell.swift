@@ -1,14 +1,17 @@
 //
-//  SearchResultChannelCell.swift
-//  SceytChatUIKit
+//  SelectableChannelCell.swift
+//  SceytDemoApp
 //
-//  Created by Arthur Avagyan on 26.09.24
+//  Created by Arthur Avagyan on 24.10.24
 //  Copyright © 2024 Sceyt LLC. All rights reserved.
 //
 
 import UIKit
 
-open class SearchResultChannelCell: BaseChannelUserCell {
+open class SelectableChannelCell: BaseChannelUserCell {
+    
+    open lazy var checkBoxView = Components.checkBoxView.init()
+        .withoutAutoresizingMask
     
     open var channelData: ChatChannel! {
         didSet {
@@ -22,20 +25,32 @@ open class SearchResultChannelCell: BaseChannelUserCell {
                                                     for: channelData,
                                                     appearance: initialsAppearance)
             }
-
+            
             titleLabel.text = appearance.titleFormatter.format(channelData)
             statusLabel.text = appearance.subtitleFormatter.format(channelData)
         }
     }
     
-    open override func setupLayout() {
-        super.setupLayout()
+    override open func setup() {
+        super.setup()
         
-        avatarView.leadingAnchor.pin(to: contentView.leadingAnchor, constant: Layouts.horizontalPadding)
+        checkBoxView.isUserInteractionEnabled = false
+        selectionStyle = .none
+    }
+
+    override open func setupLayout() {
+        super.setupLayout()
+        contentView.addSubview(checkBoxView)
+        
+        checkBoxView.pin(to: contentView, anchors: [.leading(6), .centerY()])
+        checkBoxView.resize(anchors: [.width(44), .height(44)])
+        avatarView.leadingAnchor.pin(to: checkBoxView.trailingAnchor, constant: 2)
     }
     
     override open func setupAppearance() {
         super.setupAppearance()
+        
+        checkBoxView.parentAppearance = appearance.checkBoxAppearance
         
         backgroundColor = appearance.backgroundColor
         contentView.backgroundColor = appearance.backgroundColor

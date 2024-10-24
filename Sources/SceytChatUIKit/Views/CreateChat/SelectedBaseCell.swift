@@ -8,31 +8,6 @@
 
 import UIKit
 
-open class SelectedUserCell: SelectedBaseCell {
-    open var userData: ChatUser! {
-        didSet {
-            label.text = SceytChatUIKit.shared.formatters.userShortNameFormatter.format(userData)
-            presenceView.isHidden = userData.presence.state != .online
-            avatarView.imageView.image = .deletedUser
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView, for: userData)
-        }
-    }
-}
-
-open class SelectedChannelCell: SelectedBaseCell {
-    open var channelData: ChatChannel! {
-        didSet {
-            if let peer = channelData.peer {
-                label.text = SceytChatUIKit.shared.formatters.userShortNameFormatter.format(peer)
-            } else {
-                label.text = channelData.subject
-            }
-            presenceView.isHidden = channelData.peer?.presence.state != .online
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView, for: channelData)
-        }
-    }
-}
-
 open class SelectedBaseCell: CollectionViewCell {
     open lazy var avatarView = CircleImageView()
         .withoutAutoresizingMask
@@ -74,13 +49,6 @@ open class SelectedBaseCell: CollectionViewCell {
         
         presenceView.pin(to: avatarView, anchors: [.trailing, .bottom(-2)])
         closeButton.pin(to: avatarView, anchors: [.leading(-2), .top(-2)])
-    }
-    
-    open override func setupAppearance() {
-        super.setupAppearance()
-        
-        label.font = appearance.font
-        label.textColor = appearance.textColor
     }
     
     open var imageTask: Cancellable?

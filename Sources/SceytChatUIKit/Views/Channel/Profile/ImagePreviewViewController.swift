@@ -29,13 +29,14 @@ open class ImagePreviewViewController: ViewController, UIScrollViewDelegate {
                     self?.layout()
                 }
             }
-        title = viewModel.channel.displayName
     }
     
     override open func setupAppearance() {
         super.setupAppearance()
         
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         view.backgroundColor = appearance.backgroundColor
+        title = appearance.channelNameFormatter.format(viewModel.channel)
     }
     
     override open func setupLayout() {

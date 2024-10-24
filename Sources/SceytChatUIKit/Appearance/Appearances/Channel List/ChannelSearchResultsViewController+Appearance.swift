@@ -17,6 +17,7 @@ extension ChannelSearchResultsViewController: AppearanceProviding {
             message: "There were no results found."
         ),
         cellAppearance: SearchResultChannelCell.appearance,
+        selectableCellAppearance: SelectableChannelCell.appearance,
         separatorViewAppearance: SeparatorHeaderView.appearance
     )
     
@@ -30,6 +31,9 @@ extension ChannelSearchResultsViewController: AppearanceProviding {
         @Trackable<Appearance, SearchResultChannelCell.Appearance>
         public var cellAppearance: SearchResultChannelCell.Appearance
         
+        @Trackable<Appearance, SelectableChannelCell.Appearance>
+        public var selectableCellAppearance: SelectableChannelCell.Appearance
+        
         @Trackable<Appearance, SeparatorHeaderView.Appearance>
         public var separatorViewAppearance: SeparatorHeaderView.Appearance
         
@@ -38,11 +42,13 @@ extension ChannelSearchResultsViewController: AppearanceProviding {
             backgroundColor: UIColor?,
             emptyViewAppearance: EmptyStateView.Appearance,
             cellAppearance: SearchResultChannelCell.Appearance,
+            selectableCellAppearance: SelectableChannelCell.Appearance,
             separatorViewAppearance: SeparatorHeaderView.Appearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             self._emptyViewAppearance = Trackable(value: emptyViewAppearance)
             self._cellAppearance = Trackable(value: cellAppearance)
+            self._selectableCellAppearance = Trackable(value: selectableCellAppearance)
             self._separatorViewAppearance = Trackable(value: separatorViewAppearance)
         }
         
@@ -52,16 +58,19 @@ extension ChannelSearchResultsViewController: AppearanceProviding {
             backgroundColor: UIColor? = nil,
             emptyViewAppearance: EmptyStateView.Appearance? = nil,
             cellAppearance: SearchResultChannelCell.Appearance? = nil,
+            selectableCellAppearance: SelectableChannelCell.Appearance? = nil,
             separatorViewAppearance: SeparatorHeaderView.Appearance? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             self._emptyViewAppearance = Trackable(reference: reference, referencePath: \.emptyViewAppearance)
             self._cellAppearance = Trackable(reference: reference, referencePath: \.cellAppearance)
+            self._selectableCellAppearance = Trackable(reference: reference, referencePath: \.selectableCellAppearance)
             self._separatorViewAppearance = Trackable(reference: reference, referencePath: \.separatorViewAppearance)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
             if let emptyViewAppearance { self.emptyViewAppearance = emptyViewAppearance }
             if let cellAppearance { self.cellAppearance = cellAppearance }
+            if let selectableCellAppearance { self.selectableCellAppearance = selectableCellAppearance }
             if let separatorViewAppearance { self.separatorViewAppearance = separatorViewAppearance }
         }
     }
