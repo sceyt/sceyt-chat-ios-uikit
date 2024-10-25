@@ -41,8 +41,8 @@ extension MessageInfoViewController: AppearanceProviding {
     )
     
     public struct Appearance {
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor?>
         public var backgroundColor: UIColor?
@@ -84,7 +84,7 @@ extension MessageInfoViewController: AppearanceProviding {
         public var markerTitleProvider: any DefaultMarkerTitleProviding
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor?,
             cellBackgroundColor: UIColor?,
             messageCellAppearance: MessageCellAppearance,
@@ -117,7 +117,7 @@ extension MessageInfoViewController: AppearanceProviding {
         
         public init(
             reference: MessageInfoViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             cellBackgroundColor: UIColor? = nil,
             messageCellAppearance: MessageCellAppearance? = nil,

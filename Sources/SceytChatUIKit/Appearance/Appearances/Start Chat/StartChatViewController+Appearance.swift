@@ -40,8 +40,8 @@ extension StartChatViewController: AppearanceProviding {
     
     public struct Appearance {
         
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -74,7 +74,7 @@ extension StartChatViewController: AppearanceProviding {
         public var userCellAppearance: UserCell.Appearance
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             searchControllerAppearance: SearchController.Appearance,
             createGroupText: String,
@@ -101,7 +101,7 @@ extension StartChatViewController: AppearanceProviding {
         
         public init(
             reference: StartChatViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             searchControllerAppearance: SearchController.Appearance? = nil,
             createGroupText: String? = nil,

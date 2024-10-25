@@ -28,8 +28,8 @@ extension SelectUsersViewController: AppearanceProviding {
     
     public struct Appearance {
         
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -44,7 +44,7 @@ extension SelectUsersViewController: AppearanceProviding {
         public var userCellAppearance: SelectableUserCell.Appearance
 
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             searchControllerAppearance: SearchController.Appearance,
             separatorViewAppearance: SeparatorHeaderView.Appearance,
@@ -59,7 +59,7 @@ extension SelectUsersViewController: AppearanceProviding {
         
         public init(
             reference: SelectUsersViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             searchControllerAppearance: SearchController.Appearance? = nil,
             separatorViewAppearance: SeparatorHeaderView.Appearance? = nil,

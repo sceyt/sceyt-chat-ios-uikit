@@ -28,7 +28,7 @@ extension ChannelViewController: AppearanceProviding {
         enableDateSeparator: true,
         enableScrollDownButton: true,
         messageCellAppearance: MessageCell.appearance,
-        searchBarAppearance: SearchBarAppearance.Appearance(
+        searchBarAppearance: SearchBarAppearance(
             reference: SearchBarAppearance.appearance,
             backgroundColor: .surface1,
             placeholder: L10n.Channel.Search.search
@@ -39,8 +39,8 @@ extension ChannelViewController: AppearanceProviding {
     )
     
     public struct Appearance {
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         //        public var coverViewBackgroundColor: UIColor? = .clear
         //
@@ -72,8 +72,8 @@ extension ChannelViewController: AppearanceProviding {
         @Trackable<Appearance, MessageCell.Appearance>
         public var messageCellAppearance: MessageCell.Appearance
         
-        @Trackable<Appearance, SearchBarAppearance.Appearance>
-        public var searchBarAppearance: SearchBarAppearance.Appearance
+        @Trackable<Appearance, SearchBarAppearance>
+        public var searchBarAppearance: SearchBarAppearance
         
         @Trackable<Appearance, MessageInputViewController.Appearance>
         public var messageInputAppearance: MessageInputViewController.Appearance
@@ -85,7 +85,7 @@ extension ChannelViewController: AppearanceProviding {
         public var unreadCountFormatter: any UIntFormatting
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             headerAppearance: HeaderView.Appearance,
             emptyStateAppearance: EmptyStateView.Appearance,
@@ -95,7 +95,7 @@ extension ChannelViewController: AppearanceProviding {
             enableDateSeparator: Bool,
             enableScrollDownButton: Bool,
             messageCellAppearance: MessageCell.Appearance,
-            searchBarAppearance: SearchBarAppearance.Appearance,
+            searchBarAppearance: SearchBarAppearance,
             messageInputAppearance: MessageInputViewController.Appearance,
             messageShareBodyFormatter: any MessageFormatting,
             unreadCountFormatter: any UIntFormatting
@@ -118,7 +118,7 @@ extension ChannelViewController: AppearanceProviding {
         
         public init(
             reference: ChannelViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             headerAppearance: HeaderView.Appearance? = nil,
             emptyStateAppearance: EmptyStateView.Appearance? = nil,
@@ -128,7 +128,7 @@ extension ChannelViewController: AppearanceProviding {
             enableDateSeparator: Bool? = nil,
             enableScrollDownButton: Bool? = nil,
             messageCellAppearance: MessageCell.Appearance? = nil,
-            searchBarAppearance: SearchBarAppearance.Appearance? = nil,
+            searchBarAppearance: SearchBarAppearance? = nil,
             messageInputAppearance: MessageInputViewController.Appearance? = nil,
             messageShareBodyFormatter: (any MessageFormatting)? = nil,
             unreadCountFormatter: (any UIntFormatting)? = nil

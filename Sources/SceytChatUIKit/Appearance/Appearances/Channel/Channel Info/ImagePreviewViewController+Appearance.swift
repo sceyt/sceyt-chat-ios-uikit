@@ -20,8 +20,8 @@ extension ImagePreviewViewController: AppearanceProviding {
     
     public struct Appearance {
         
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -30,7 +30,7 @@ extension ImagePreviewViewController: AppearanceProviding {
         public var channelNameFormatter: any ChannelFormatting
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             channelNameFormatter: any ChannelFormatting
         ) {
@@ -41,7 +41,7 @@ extension ImagePreviewViewController: AppearanceProviding {
         
         public init(
             reference: ImagePreviewViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             channelNameFormatter: (any ChannelFormatting)? = nil
         ) {

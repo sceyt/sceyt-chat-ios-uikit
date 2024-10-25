@@ -113,6 +113,7 @@ open class MenuController: ViewController,
         cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.menuCell.self)
+        cell.parentAppearance = appearance.cellAppearance
         cell.item = cellData[indexPath.item]
         cell.separatorView.isHidden = indexPath.item == cellData.indices.last
         cell.contentInsets.top = collectionView.isFirst(indexPath) ? Layouts.verticalPadding : 0

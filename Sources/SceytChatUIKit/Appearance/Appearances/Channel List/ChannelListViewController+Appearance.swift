@@ -41,8 +41,8 @@ extension ChannelListViewController: AppearanceProviding {
     
     public class Appearance {
                 
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -67,7 +67,7 @@ extension ChannelListViewController: AppearanceProviding {
         
         // Initializer with default values
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             tabBarItemBadgeColor: UIColor,
             connectionIndicatorAppearance: ConnectionStateViewAppearance,
@@ -88,7 +88,7 @@ extension ChannelListViewController: AppearanceProviding {
         
         public init(
             reference: ChannelListViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             tabBarItemBadgeColor: UIColor? = nil,
             connectionIndicatorAppearance: ConnectionStateViewAppearance? = nil,

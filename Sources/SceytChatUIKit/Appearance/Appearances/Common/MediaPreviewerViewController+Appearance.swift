@@ -47,8 +47,8 @@ extension MediaPreviewerViewController: AppearanceProviding {
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
         
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIImage>
         public var playIcon: UIImage
@@ -88,7 +88,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
         
         public init(
             backgroundColor: UIColor,
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             playIcon: UIImage,
             pauseIcon: UIImage,
             trackColor: UIColor,
@@ -121,7 +121,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
         public init(
             reference: MediaPreviewerViewController.Appearance,
             backgroundColor: UIColor? = nil,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             playIcon: UIImage? = nil,
             pauseIcon: UIImage? = nil,
             trackColor: UIColor? = nil,

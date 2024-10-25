@@ -27,8 +27,8 @@ extension ForwardViewController: AppearanceProviding {
     
     public struct Appearance {
         
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -49,7 +49,7 @@ extension ForwardViewController: AppearanceProviding {
         public var channelCellAppearance: SelectableChannelCell.Appearance
         
         init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             searchControllerAppearance: SearchController.Appearance,
             searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance,
@@ -68,7 +68,7 @@ extension ForwardViewController: AppearanceProviding {
         
         init(
             reference: ForwardViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             searchControllerAppearance: SearchController.Appearance? = nil,
             searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance? = nil,

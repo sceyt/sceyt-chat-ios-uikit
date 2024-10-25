@@ -22,8 +22,8 @@ extension CreateGroupViewController: AppearanceProviding {
     
     public struct Appearance {
         
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -38,7 +38,7 @@ extension CreateGroupViewController: AppearanceProviding {
         public var userCellAppearance: UserCell.Appearance
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             detailsViewAppearance: CreateGroupViewController.DetailsView.Appearance,
             separatorViewAppearance: SeparatorHeaderView.Appearance,
@@ -53,7 +53,7 @@ extension CreateGroupViewController: AppearanceProviding {
         
         public init(
             reference: CreateGroupViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             detailsViewAppearance: CreateGroupViewController.DetailsView.Appearance? = nil,
             separatorViewAppearance: SeparatorHeaderView.Appearance? = nil,

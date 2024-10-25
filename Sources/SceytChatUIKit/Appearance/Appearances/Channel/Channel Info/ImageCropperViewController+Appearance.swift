@@ -32,8 +32,8 @@ extension ImageCropperViewController: AppearanceProviding {
     
     public struct Appearance {
         
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -51,7 +51,7 @@ extension ImageCropperViewController: AppearanceProviding {
         public var confirmButtonAppearance: ButtonAppearance
         
         init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             maskColor: UIColor,
             bottomBarBackgroundColor: UIColor,
@@ -68,7 +68,7 @@ extension ImageCropperViewController: AppearanceProviding {
         
         init(
             reference: ImageCropperViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             maskColor: UIColor? = nil,
             bottomBarBackgroundColor: UIColor? = nil,

@@ -23,8 +23,8 @@ extension CreateChannelViewController: AppearanceProviding {
     
     public struct Appearance {
         
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -33,7 +33,7 @@ extension CreateChannelViewController: AppearanceProviding {
         public var detailsViewAppearance: CreateGroupViewController.DetailsView.Appearance
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             detailsViewAppearance: CreateGroupViewController.DetailsView.Appearance
         ){
@@ -44,7 +44,7 @@ extension CreateChannelViewController: AppearanceProviding {
         
         public init(
             reference: CreateChannelViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             detailsViewAppearance: CreateGroupViewController.DetailsView.Appearance? = nil
         ) {

@@ -47,8 +47,8 @@ extension ChannelInfoViewController: AppearanceProviding {
     )
     
     public struct Appearance {
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -99,7 +99,7 @@ extension ChannelInfoViewController: AppearanceProviding {
         public var moreIcon: UIImage
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             separatorColor: UIColor,
             titleLabelAppearance: LabelAppearance,
@@ -138,7 +138,7 @@ extension ChannelInfoViewController: AppearanceProviding {
         
         public init(
             reference: ChannelInfoViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             separatorColor: UIColor? = nil,
             titleLabelAppearance: LabelAppearance? = nil,
