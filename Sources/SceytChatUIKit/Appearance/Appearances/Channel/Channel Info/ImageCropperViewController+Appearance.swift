@@ -15,12 +15,14 @@ extension ImageCropperViewController: AppearanceProviding {
         maskColor: .black.withAlphaComponent(0.5),
         bottomBarBackgroundColor: DefaultColors.backgroundDark,
         cancelButtonAppearance: .init(
+            reference: ButtonAppearance.appearance,
             labelAppearance: .init(
                 foregroundColor: .onPrimary,
                 font: Fonts.semiBold.withSize(16)
                                   )
         ),
         confirmButtonAppearance: .init(
+            reference: ButtonAppearance.appearance,
             labelAppearance: .init(
                 foregroundColor: .onPrimary,
                 font: Fonts.semiBold.withSize(16)
@@ -91,9 +93,3 @@ extension ImageCropperViewController: AppearanceProviding {
     }
 }
 
-
-//ImageCropperStyle
-//bottomBarBackgroundColor: Color
-//cancelButtonStyle: ButtonStyle
-//confirmButtonStyle: ButtonStyle
-//

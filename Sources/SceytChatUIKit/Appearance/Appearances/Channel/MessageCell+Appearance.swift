@@ -467,7 +467,7 @@ extension MessageCell: AppearanceProviding {
         threadReplyArrowStrokeColor: .border,
         
         // Label Appearances
-        senderNameLabelAppearance: LabelAppearance(
+        senderNameLabelAppearance: OptionalLabelAppearance(
             foregroundColor: nil, // Will use randomized color from initials colors
             font: Fonts.semiBold.withSize(14)
         ),
@@ -653,8 +653,8 @@ extension MessageCell: AppearanceProviding {
         public var threadReplyArrowStrokeColor: UIColor
         
         // Label Appearances
-        @Trackable<Appearance, LabelAppearance>
-        public var senderNameLabelAppearance: LabelAppearance
+        @Trackable<Appearance, OptionalLabelAppearance>
+        public var senderNameLabelAppearance: OptionalLabelAppearance
         
         @Trackable<Appearance, LabelAppearance>
         public var bodyLabelAppearance: LabelAppearance
@@ -807,7 +807,7 @@ extension MessageCell: AppearanceProviding {
             threadReplyArrowStrokeColor: UIColor,
             
             // Label Appearances
-            senderNameLabelAppearance: LabelAppearance,
+            senderNameLabelAppearance: OptionalLabelAppearance,
             bodyLabelAppearance: LabelAppearance,
             mentionLabelAppearance: LabelAppearance,
             deletedMessageLabelAppearance: LabelAppearance,
@@ -957,7 +957,7 @@ extension MessageCell: AppearanceProviding {
             threadReplyArrowStrokeColor: UIColor? = nil,
             
             // Label Appearances
-            senderNameLabelAppearance: LabelAppearance? = nil,
+            senderNameLabelAppearance: OptionalLabelAppearance? = nil,
             bodyLabelAppearance: LabelAppearance? = nil,
             mentionLabelAppearance: LabelAppearance? = nil,
             deletedMessageLabelAppearance: LabelAppearance? = nil,

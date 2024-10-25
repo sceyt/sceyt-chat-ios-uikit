@@ -26,6 +26,7 @@ extension MessageInputViewController: AppearanceProviding {
             font: Fonts.regular.withSize(16)
         ),
         joinButtonAppearance: ButtonAppearance(
+            reference: ButtonAppearance.appearance,
             labelAppearance: LabelAppearance(
                 foregroundColor: .accent,
                 font: Fonts.semiBold.withSize(16)

@@ -211,7 +211,7 @@ open class SheetViewController: ViewController {
         case .bottom:
             scrollView.layer.masksToBounds = true
             scrollView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-            scrollView.backgroundColor = appearance.contentBackgroundColor
+            scrollView.backgroundColor = appearance.backgroundColor
         case .floating, .center:
             scrollView.layer.masksToBounds = true
             scrollView.backgroundColor = .clear
@@ -219,16 +219,16 @@ open class SheetViewController: ViewController {
         
         view.backgroundColor = .clear
         
-        titleLabel.font = appearance.titleFont
-        titleLabel.textColor = appearance.titleColor
+        titleLabel.font = appearance.titleLabelAppearance.font
+        titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
         
         separator.backgroundColor = appearance.separatorColor
         
         doneButton.setAttributedTitle(NSAttributedString(
             string: L10n.Nav.Bar.done,
             attributes: [
-                .foregroundColor: appearance.doneColor ?? .accent,
-                .font: appearance.doneFont ?? Fonts.semiBold.withSize(16)
+                .foregroundColor: appearance.doneLabelAppearance.foregroundColor,
+                .font: appearance.doneLabelAppearance.font
             ]), for: [])
     }
     
@@ -276,7 +276,7 @@ open class SheetViewController: ViewController {
                 scrollView.transform = .identity
                 scrollView.alpha = 1
             }
-            view.backgroundColor = appearance.backgroundColor
+            view.backgroundColor = appearance.overlayColor
             view.layoutIfNeeded()
         }
         if animated {
