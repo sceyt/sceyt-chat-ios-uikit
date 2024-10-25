@@ -10,6 +10,9 @@ import UIKit
 
 extension StartChatViewController {
     open class ActionsView: View {
+        
+        open var appearance: StartChatViewController.Appearance = StartChatViewController.appearance
+        
         open lazy var groupView = HighlightableControl()
             .withoutAutoresizingMask
         
@@ -17,25 +20,25 @@ extension StartChatViewController {
             .withoutAutoresizingMask
         
         open lazy var groupIconView: UIImageView = {
-            $0.image = .channelCreatePrivate
+            $0.image = appearance.createGroupIcon
             $0.contentMode = .center
             return $0.withoutAutoresizingMask
         }(UIImageView())
         
         open lazy var groupTitleLabel: UILabel = {
-            $0.text = L10n.Channel.New.createPrivate
+            $0.text = appearance.createGroupText
             $0.textAlignment = .left
             return $0.withoutAutoresizingMask
         }(UILabel())
         
         open lazy var channelIconView: UIImageView = {
-            $0.image = .channelCreatePublic
+            $0.image = appearance.createChannelIcon
             $0.contentMode = .center
             return $0.withoutAutoresizingMask
         }(UIImageView())
         
         open lazy var channelTitleLabel: UILabel = {
-            $0.text = L10n.Channel.New.createPublic
+            $0.text = appearance.createChannelText
             $0.textAlignment = .left
             return $0.withoutAutoresizingMask
         }(UILabel())
@@ -79,11 +82,15 @@ extension StartChatViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            groupTitleLabel.font = appearance.font
-            groupTitleLabel.textColor = appearance.color
+            groupIconView.image = appearance.createGroupIcon
+            groupTitleLabel.text = appearance.createGroupText
+            groupTitleLabel.font = appearance.createGroupLabelAppearance.font
+            groupTitleLabel.textColor = appearance.createGroupLabelAppearance.foregroundColor
             
-            channelTitleLabel.font = appearance.font
-            channelTitleLabel.textColor = appearance.color
+            channelIconView.image = appearance.createChannelIcon
+            channelTitleLabel.text = appearance.createChannelText
+            channelTitleLabel.font = appearance.createChannelLabelAppearance.font
+            channelTitleLabel.textColor = appearance.createChannelLabelAppearance.foregroundColor
         }
     }
 }

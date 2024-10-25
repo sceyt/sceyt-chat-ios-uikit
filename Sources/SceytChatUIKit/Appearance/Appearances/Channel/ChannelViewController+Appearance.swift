@@ -30,6 +30,7 @@ extension ChannelViewController: AppearanceProviding {
         messageCellAppearance: MessageCell.appearance,
         searchBarAppearance: SearchBarAppearance.Appearance(
             reference: SearchBarAppearance.appearance,
+            backgroundColor: .surface1,
             placeholder: L10n.Channel.Search.search
         ),
         messageInputAppearance: MessageInputViewController.appearance,

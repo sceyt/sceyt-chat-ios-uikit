@@ -93,6 +93,8 @@ open class SelectUsersViewController: ViewController,
     override open func setupAppearance() {
         super.setupAppearance()
         
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
+        searchController.parentAppearance = appearance.searchControllerAppearance
         tableView.backgroundColor = .clear
         view.backgroundColor = appearance.backgroundColor
     }
@@ -170,6 +172,7 @@ open class SelectUsersViewController: ViewController,
         switch Sections(rawValue: indexPath.section) {
         case .user:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.selectableUserCell.self)
+            cell.parentAppearance = appearance.userCellAppearance
             cell.selectionStyle = .none
             cell.userData = selectMemberViewModel.user(at: indexPath)
             return cell
@@ -199,7 +202,9 @@ open class SelectUsersViewController: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+        let separatorHeaderView = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+        separatorHeaderView.parentAppearance = appearance.separatorViewAppearance
+        return separatorHeaderView
     }
     
     open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

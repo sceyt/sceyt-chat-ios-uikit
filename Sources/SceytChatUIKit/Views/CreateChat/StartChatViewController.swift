@@ -80,6 +80,7 @@ open class StartChatViewController: ViewController,
         
         definesPresentationContext = true
         
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         view.backgroundColor = appearance.backgroundColor
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -89,6 +90,7 @@ open class StartChatViewController: ViewController,
         }
         
         title = L10n.Channel.New.title
+        searchController.parentAppearance = appearance.searchControllerAppearance
     }
     
     override open func setupDone() {
@@ -131,6 +133,7 @@ open class StartChatViewController: ViewController,
         switch Sections(rawValue: indexPath.section) {
         case .user:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.userCell.self)
+            cell.parentAppearance = appearance.userCellAppearance
             if let user = viewModel.user(at: indexPath) {
                 cell.userData = user
             }
@@ -145,7 +148,9 @@ open class StartChatViewController: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+        let separatorHeaderView = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+        separatorHeaderView.parentAppearance = appearance.separatorViewAppearance
+        return separatorHeaderView
     }
     
     open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {

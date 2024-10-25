@@ -22,20 +22,12 @@ extension CreateGroupViewController {
         }(UITextField())
         
         open lazy var descriptionField: PlaceholderTextView = {
-            $0.placeholder = L10n.Channel.Subject.descriptionPlaceholder
             $0.isScrollEnabled = false
             $0.textContainerInset = .init(top: 13, left: 0, bottom: 0, right: 0)
             $0.textContainer.lineFragmentPadding = 0
             return $0.withoutAutoresizingMask
         }(PlaceholderTextView())
-        
-        open lazy var commentLabel: ContentInsetLabel = {
-            $0.text = L10n.Channel.Avatar.comment
-            $0.edgeInsets = .zero
-            $0.numberOfLines = 0
-            return $0.withoutAutoresizingMask
-        }(ContentInsetLabel())
-        
+                
         open lazy var mainStackView: UIStackView = {
             $0.axis = .vertical
             $0.alignment = .leading
@@ -80,21 +72,21 @@ extension CreateGroupViewController {
             bottomLine1.backgroundColor = appearance.separatorColor
             bottomLine2.backgroundColor = appearance.separatorColor
             
-            subjectField.font = appearance.fieldFont
-            subjectField.textColor = appearance.fieldTextColor
+            subjectField.font = appearance.nameTextFieldAppearance.labelAppearance.font
+            subjectField.textColor = appearance.nameTextFieldAppearance.labelAppearance.foregroundColor
             subjectField.attributedPlaceholder = NSAttributedString(
-                string: L10n.Channel.Subject.Group.placeholder,
-                attributes: [.font: appearance.fieldFont ?? Fonts.regular.withSize(16),
-                             .foregroundColor: appearance.fieldPlaceHolderTextColor ?? UIColor.secondaryText]
+                string: appearance.nameTextFieldAppearance.placeholder ?? "",
+                attributes: [
+                    .font: appearance.nameTextFieldAppearance.placeholderAppearance.font,
+                    .foregroundColor: appearance.nameTextFieldAppearance.placeholderAppearance.foregroundColor
+                ]
             )
             
             descriptionField.backgroundColor = .clear
-            descriptionField.font = appearance.fieldFont
-            descriptionField.textColor = appearance.fieldTextColor
-            descriptionField.placeholderColor = appearance.fieldPlaceHolderTextColor
-            
-            commentLabel.font = appearance.commentFont
-            commentLabel.textColor = appearance.commentTextColor
+            descriptionField.font = appearance.aboutTextFieldAppearance.labelAppearance.font
+            descriptionField.textColor = appearance.aboutTextFieldAppearance.labelAppearance.foregroundColor
+            descriptionField.placeholderColor = appearance.aboutTextFieldAppearance.placeholderAppearance.foregroundColor
+            descriptionField.placeholder = appearance.aboutTextFieldAppearance.placeholder
         }
         
         override open func resignFirstResponder() -> Bool {

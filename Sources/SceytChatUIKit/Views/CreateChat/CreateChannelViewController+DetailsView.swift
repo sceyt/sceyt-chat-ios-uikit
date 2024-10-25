@@ -14,13 +14,19 @@ extension CreateChannelViewController {
             $0.markerLabel.text = SceytChatUIKit.shared.config.channelURIConfig.prefix
             $0.textField.keyboardType = .URL
             $0.textField.autocorrectionType = .no
-            $0.textField.placeholder = L10n.Channel.Create.Uri.placeholder
             $0.textField.delegate = self
             return $0.withoutAutoresizingMask
         }(MarkableTextField())
         
         open lazy var errorLabel: ContentInsetLabel = {
             $0.edgeInsets.bottom = .zero
+            $0.numberOfLines = 0
+            return $0.withoutAutoresizingMask
+        }(ContentInsetLabel())
+        
+        open lazy var commentLabel: ContentInsetLabel = {
+            $0.text = L10n.Channel.Avatar.comment
+            $0.edgeInsets = .zero
             $0.numberOfLines = 0
             return $0.withoutAutoresizingMask
         }(ContentInsetLabel())
@@ -38,21 +44,24 @@ extension CreateChannelViewController {
             super.setupAppearance()
             
             subjectField.attributedPlaceholder = NSAttributedString(
-                string: L10n.Channel.Subject.Channel.placeholder,
-                attributes: [.font: appearance.fieldFont ?? Fonts.regular.withSize(16),
-                             .foregroundColor: appearance.fieldPlaceHolderTextColor ?? UIColor.secondaryText]
+                string: appearance.nameTextFieldAppearance.placeholder ?? "",
+                attributes: [
+                    .font: appearance.nameTextFieldAppearance.placeholderAppearance.font,
+                    .foregroundColor: appearance.nameTextFieldAppearance.placeholderAppearance.foregroundColor
+                ]
             )
             
-            uriField.markerLabel.font = appearance.fieldFont
-            uriField.markerLabel.textColor = appearance.fieldTextColor
-            uriField.textField.font = appearance.fieldFont
-            uriField.textField.textColor = appearance.fieldPlaceHolderTextColor
+            uriField.markerLabel.font = appearance.uriTextFieldAppearance.labelAppearance.font
+            uriField.markerLabel.textColor = appearance.uriTextFieldAppearance.labelAppearance.foregroundColor
+            uriField.textField.font = appearance.uriTextFieldAppearance.labelAppearance.font
+            uriField.textField.textColor = appearance.uriTextFieldAppearance.labelAppearance.foregroundColor
+            uriField.textField.placeholder = appearance.uriTextFieldAppearance.placeholder
             
-            errorLabel.font = appearance.errorFont
-            errorLabel.textColor = appearance.errorTextColor
+            errorLabel.font = appearance.uriValidationAppearance.errorLabelAppearance.font
+            errorLabel.textColor = appearance.uriValidationAppearance.errorLabelAppearance.foregroundColor
             
-            commentLabel.font = appearance.commentFont
-            commentLabel.textColor = appearance.commentTextColor
+            commentLabel.font = appearance.captionLabelAppearance.font
+            commentLabel.textColor = appearance.captionLabelAppearance.foregroundColor
             
             bottomLine3.backgroundColor = appearance.separatorColor
         }
@@ -84,19 +93,23 @@ extension CreateChannelViewController {
         open func showError(_ error: String) {
             errorLabel.edgeInsets.bottom = 8
             errorLabel.text = error
-            errorLabel.textColor = UIColor.stateWarning
+            errorLabel.font = appearance.uriValidationAppearance.errorLabelAppearance.font
+            errorLabel.textColor = appearance.uriValidationAppearance.errorLabelAppearance.foregroundColor
         }
         
         open func showSuccess(_ success: String) {
             errorLabel.edgeInsets.bottom = 8
             errorLabel.text = success
-            errorLabel.textColor = UIColor.stateSuccess
+            errorLabel.font = appearance.uriValidationAppearance.successLabelAppearance.font
+            errorLabel.textColor = appearance.uriValidationAppearance.successLabelAppearance.foregroundColor
+
         }
         
         open func hideError() {
             errorLabel.edgeInsets.bottom = 0
             errorLabel.text = nil
-            errorLabel.textColor = UIColor.stateWarning
+            errorLabel.font = appearance.uriValidationAppearance.errorLabelAppearance.font
+            errorLabel.textColor = appearance.uriValidationAppearance.errorLabelAppearance.foregroundColor
         }
         
         open func textField(
