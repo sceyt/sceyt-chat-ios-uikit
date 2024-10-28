@@ -10,7 +10,7 @@ import UIKit
 extension MessageInputViewController.VoiceRecorderView: AppearanceProviding {
     public static var appearance = Appearance(
         backgroundColor: .background,
-        dividerColor: .border,
+        separatorColor: .border,
         durationLabelAppearance: LabelAppearance(
             foregroundColor: .primaryText,
             font: Fonts.regular.withSize(16)
@@ -40,7 +40,7 @@ extension MessageInputViewController.VoiceRecorderView: AppearanceProviding {
         public var backgroundColor: UIColor
         
         @Trackable<Appearance, UIColor>
-        public var dividerColor: UIColor
+        public var separatorColor: UIColor
         
         @Trackable<Appearance, LabelAppearance>
         public var durationLabelAppearance: LabelAppearance
@@ -83,7 +83,7 @@ extension MessageInputViewController.VoiceRecorderView: AppearanceProviding {
         
         public init(
             backgroundColor: UIColor,
-            dividerColor: UIColor,
+            separatorColor: UIColor,
             durationLabelAppearance: LabelAppearance,
             slideToCancelTextStyleLabelAppearance: LabelAppearance,
             slideToCancelText: String,
@@ -99,7 +99,7 @@ extension MessageInputViewController.VoiceRecorderView: AppearanceProviding {
             durationFormatter: any TimeIntervalFormatting
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
-            self._dividerColor = Trackable(value: dividerColor)
+            self._separatorColor = Trackable(value: separatorColor)
             self._durationLabelAppearance = Trackable(value: durationLabelAppearance)
             self._slideToCancelTextStyleLabelAppearance = Trackable(value: slideToCancelTextStyleLabelAppearance)
             self._slideToCancelText = Trackable(value: slideToCancelText)
@@ -118,7 +118,7 @@ extension MessageInputViewController.VoiceRecorderView: AppearanceProviding {
         public init(
             reference: MessageInputViewController.VoiceRecorderView.Appearance,
             backgroundColor: UIColor? = nil,
-            dividerColor: UIColor? = nil,
+            separatorColor: UIColor? = nil,
             durationLabelAppearance: LabelAppearance? = nil,
             slideToCancelTextStyleLabelAppearance: LabelAppearance? = nil,
             slideToCancelText: String? = nil,
@@ -134,7 +134,7 @@ extension MessageInputViewController.VoiceRecorderView: AppearanceProviding {
             durationFormatter: (any TimeIntervalFormatting)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
-            self._dividerColor = Trackable(reference: reference, referencePath: \.dividerColor)
+            self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
             self._durationLabelAppearance = Trackable(reference: reference, referencePath: \.durationLabelAppearance)
             self._slideToCancelTextStyleLabelAppearance = Trackable(reference: reference, referencePath: \.slideToCancelTextStyleLabelAppearance)
             self._slideToCancelText = Trackable(reference: reference, referencePath: \.slideToCancelText)
@@ -150,7 +150,7 @@ extension MessageInputViewController.VoiceRecorderView: AppearanceProviding {
             self._durationFormatter = Trackable(reference: reference, referencePath: \.durationFormatter)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
-            if let dividerColor { self.dividerColor = dividerColor }
+            if let separatorColor { self.separatorColor = separatorColor }
             if let durationLabelAppearance { self.durationLabelAppearance = durationLabelAppearance }
             if let slideToCancelTextStyleLabelAppearance { self.slideToCancelTextStyleLabelAppearance = slideToCancelTextStyleLabelAppearance }
             if let slideToCancelText { self.slideToCancelText = slideToCancelText }

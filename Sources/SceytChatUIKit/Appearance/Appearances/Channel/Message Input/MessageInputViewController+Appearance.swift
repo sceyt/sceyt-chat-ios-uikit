@@ -10,7 +10,7 @@ import UIKit
 extension MessageInputViewController: AppearanceProviding {
     public static var appearance = Appearance(
         backgroundColor: .background,
-        dividerColor: .border,
+        separatorColor: .border,
         attachmentIcon: .attachment,
         sendMessageIcon: .messageSendAction,
         voiceRecordIcon: .audioPlayerMic,
@@ -60,7 +60,7 @@ extension MessageInputViewController: AppearanceProviding {
         public var backgroundColor: UIColor
         
         @Trackable<Appearance, UIColor>
-        public var dividerColor: UIColor
+        public var separatorColor: UIColor
         
         @Trackable<Appearance, UIImage>
         public var attachmentIcon: UIImage
@@ -133,7 +133,7 @@ extension MessageInputViewController: AppearanceProviding {
         
         public init(
             backgroundColor: UIColor,
-            dividerColor: UIColor,
+            separatorColor: UIColor,
             attachmentIcon: UIImage,
             sendMessageIcon: UIImage,
             voiceRecordIcon: UIImage,
@@ -159,7 +159,7 @@ extension MessageInputViewController: AppearanceProviding {
             mentionUserNameFormatter: any UserFormatting
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
-            self._dividerColor = Trackable(value: dividerColor)
+            self._separatorColor = Trackable(value: separatorColor)
             self._attachmentIcon = Trackable(value: attachmentIcon)
             self._sendMessageIcon = Trackable(value: sendMessageIcon)
             self._voiceRecordIcon = Trackable(value: voiceRecordIcon)
@@ -188,7 +188,7 @@ extension MessageInputViewController: AppearanceProviding {
         public init(
             reference: MessageInputViewController.Appearance,
             backgroundColor: UIColor? = nil,
-            dividerColor: UIColor? = nil,
+            separatorColor: UIColor? = nil,
             attachmentIcon: UIImage? = nil,
             sendMessageIcon: UIImage? = nil,
             voiceRecordIcon: UIImage? = nil,
@@ -214,7 +214,7 @@ extension MessageInputViewController: AppearanceProviding {
             mentionUserNameFormatter: (any UserFormatting)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
-            self._dividerColor = Trackable(reference: reference, referencePath: \.dividerColor)
+            self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
             self._attachmentIcon = Trackable(reference: reference, referencePath: \.attachmentIcon)
             self._sendMessageIcon = Trackable(reference: reference, referencePath: \.sendMessageIcon)
             self._voiceRecordIcon = Trackable(reference: reference, referencePath: \.voiceRecordIcon)
@@ -240,7 +240,7 @@ extension MessageInputViewController: AppearanceProviding {
             self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
-            if let dividerColor { self.dividerColor = dividerColor }
+            if let separatorColor { self.separatorColor = separatorColor }
             if let attachmentIcon { self.attachmentIcon = attachmentIcon }
             if let sendMessageIcon { self.sendMessageIcon = sendMessageIcon }
             if let voiceRecordIcon { self.voiceRecordIcon = voiceRecordIcon }

@@ -208,8 +208,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         addMediaButton.setImage(appearance.attachmentIcon, for: .normal)
         sendButton.setImage(appearance.sendMessageIcon, for: .normal)
         recordButton.image = appearance.voiceRecordIcon
-        separatorViewTop.backgroundColor = appearance.dividerColor
-        separatorViewCenter.backgroundColor = appearance.dividerColor
+        separatorViewTop.backgroundColor = appearance.separatorColor
+        separatorViewCenter.backgroundColor = appearance.separatorColor
         recorderView.parentAppearance = appearance.voiceRecorderAppearance
         recordedView.parentAppearance = appearance.voiceRecordPlaybackAppearance
         selectedMediaView.parentAppearance = appearance.selectedMediaAppearance
