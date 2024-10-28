@@ -51,8 +51,8 @@ extension MenuController {
             selectedBackgroundView?.backgroundColor = appearance.selectedBackgroundColor
             backgroundColor = appearance.backgroundColor
             separatorView.backgroundColor = appearance.separatorColor
-            titleLabel.textColor = appearance.textColor
-            titleLabel.font = appearance.textFont
+            titleLabel.textColor = appearance.labelAppearance.foregroundColor
+            titleLabel.font = appearance.labelAppearance.font
             iconView.tintColor = appearance.imageTintColor
         }
         
@@ -64,9 +64,11 @@ extension MenuController {
                     } else {
                         titleLabel.text = item.title
                         if item.destructive {
-                            titleLabel.textColor = appearance.destructiveTextColor
+                            titleLabel.textColor = appearance.destructiveLabelAppearance.foregroundColor
+                            titleLabel.font = appearance.destructiveLabelAppearance.font
                         } else {
-                            titleLabel.textColor = appearance.textColor
+                            titleLabel.textColor = appearance.labelAppearance.foregroundColor
+                            titleLabel.font = appearance.labelAppearance.font
                         }
                     }
                     iconView.image = item.image?.withRenderingMode(item.imageRenderingMode)

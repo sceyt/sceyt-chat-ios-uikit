@@ -64,7 +64,7 @@ open class ChannelMessageSender: DataProvider {
                   sentMessage.deliveryStatus != .failed
             else {
                 logger.errorIfNotNil(error, "Sent message filed status: \(String(describing: sentMessage?.deliveryStatus)), tid \(message.tid)")
-                if error?.sceytChatCode == .badMessageParam {
+                if error?.sceytChatCode?.isBadParam ?? false {
                     self.database.write {
                         $0.deleteMessage(tid: Int64(message.tid))
                     }
@@ -93,6 +93,7 @@ open class ChannelMessageSender: DataProvider {
         store {
             let chatMessage = ChatMessage(message: message, channelId: self.channelId)
             if self.uploadableAttachments(of: chatMessage).isEmpty {
+                logger.info("The message has no attachments. Sending message with tid \(message.tid)")
                 guard let message = self.willSend(message)
                 else {
                     completion?(nil)
