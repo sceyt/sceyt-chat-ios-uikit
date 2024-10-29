@@ -56,4 +56,28 @@ public class ChannelAvatarRenderer: ChannelAvatarRendering {
         self.size = size
         return render(channel, with: appearance, into: imagePresentable)
     }
+    
+    public func render(
+        _ channel: ChatChannel,
+        completion: @escaping (UIImage?) -> Void
+    ) -> Cancellable? {
+        let avatarRepresentation = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider.provideVisual(for: channel)
+                
+        return switch avatarRepresentation {
+        case .image(let image):
+            Components.avatarBuilder.loadAvatar(
+                for: channel,
+                defaultImage: image,
+                size: size,
+                avatar: completion
+            )
+        case .initialsAppearance(let initialsAppearance):
+            Components.avatarBuilder.loadAvatar(
+                for: channel,
+                appearance: initialsAppearance,
+                size: size,
+                avatar: completion
+            )
+        }
+    }
 }

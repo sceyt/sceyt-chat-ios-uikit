@@ -35,7 +35,7 @@ extension ChannelListViewController {
             .withoutAutoresizingMask
             .contentMode(.center)
         
-        open lazy var avatarView = Components.circleImageView.init()
+        open lazy var avatarView = ImageView.init()
             .withoutAutoresizingMask
         
         open lazy var messageLabel = UILabel()
@@ -227,8 +227,13 @@ extension ChannelListViewController {
                 atView.value = nil
             }
             data.$avatar
-                .sink {[weak self] image in
-                    self?.avatarView.image = image
+                .sink { [weak self] image in
+                    guard let self else { return }
+                    avatarView.image = image
+                    avatarView.shape = appearance.avatarAppearance.shape
+                    avatarView.backgroundColor = appearance.avatarAppearance.backgroundColor
+                    avatarView.clipsToBounds = true
+                    avatarView.contentMode = .scaleAspectFill
                 }.store(in: &subscriptions)
             updateConstraints()
         }

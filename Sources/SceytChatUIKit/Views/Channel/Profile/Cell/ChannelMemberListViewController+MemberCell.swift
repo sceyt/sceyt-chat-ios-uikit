@@ -11,7 +11,7 @@ import UIKit
 extension ChannelMemberListViewController {
     open class MemberCell: TableViewCell {
         
-        open lazy var avatarView = Components.circleImageView
+        open lazy var avatarView = ImageView
             .init()
             .contentMode(.scaleAspectFill)
             .withoutAutoresizingMask
@@ -108,7 +108,7 @@ extension ChannelMemberListViewController {
         
         override open func prepareForReuse() {
             super.prepareForReuse()
-            avatarView.imageView.image = nil
+            avatarView.image = nil
             imageTask?.cancel()
         }
     }

@@ -355,17 +355,8 @@ open class ChannelLayoutModel {
     }
     
     open func loadAvatar() {
-        _ = switch appearance.channelDefaultAvatarProvider.provideVisual(for: channel) {
-        case .image(let image):
-            _ = Components.avatarBuilder.loadAvatar(for: channel,
-                                                    defaultImage: image) {[weak self] image in
-                self?.avatar = image
-            }
-        case .initialsAppearance(let initialsAppearance):
-            _ = Components.avatarBuilder.loadAvatar(for: channel,
-                                                    appearance: initialsAppearance) {[weak self] image in
-                self?.avatar = image
-            }
+        appearance.channelAvatarRenderer.render(channel) { [weak self] image in
+            self?.avatar = image
         }
     }
 }

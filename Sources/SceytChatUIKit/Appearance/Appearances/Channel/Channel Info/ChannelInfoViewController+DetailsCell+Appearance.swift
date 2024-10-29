@@ -38,7 +38,6 @@ extension ChannelInfoViewController.DetailsCell: AppearanceProviding {
         @Trackable<Appearance, any ChannelAvatarRendering>
         public var channelAvatarRenderer: any ChannelAvatarRendering
         
-//        AvatarAppearance standard
         @Trackable<Appearance, AvatarAppearance>
         public var avatarAppearance: AvatarAppearance
 

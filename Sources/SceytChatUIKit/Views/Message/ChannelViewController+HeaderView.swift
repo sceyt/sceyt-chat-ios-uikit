@@ -101,11 +101,5 @@ extension ChannelViewController {
                 typingView.isHidden = false
             }
         }
-        
-//        open override func layoutSubviews() {
-//            super.layoutSubviews()
-//            
-//            profileImageView.layer.cornerRadius = profileImageView.height / 2
-//        }
     }
 }

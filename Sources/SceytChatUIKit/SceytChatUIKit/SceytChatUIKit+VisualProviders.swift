@@ -5,7 +5,7 @@
 //  Created by Arthur Avagyan on 23.09.24.
 //
 
-import UIKit
+import Foundation
 
 extension SceytChatUIKit {
     public struct VisualProviders {
@@ -19,12 +19,5 @@ extension SceytChatUIKit {
         public var connectionStateProvider: any ConnectionStateProviding = ConnectionStateTextProvider()
         public var presenceStateIconProvider: any PresenceStateIconProviding = PresenceStateIconProvider()
         public var defaultMarkerTitleProvider: any DefaultMarkerTitleProviding = DefaultMarkerTitleProvider()
-    }
-}
-
-extension SceytChatUIKit {
-    public struct AvatarRenderers {
-        public var channelAvatarRenderer: any ChannelAvatarRendering = ChannelAvatarRenderer()
-        public var userAvatarRenderer: any UserAvatarRendering = UserAvatarRenderer()
     }
 }

@@ -21,7 +21,7 @@ extension ImagePresentable {
     public var shape: Shape {
         get {
             // Retrieve the associated value or default to `.circle` if nil.
-            return objc_getAssociatedObject(self, &shapeKey) as? Shape ?? .roundedRectangle(cornerRadius: 0)
+            return objc_getAssociatedObject(self, &shapeKey) as? Shape ?? .circle
         }
         set {
             // Set the new value using Objective-C associated objects.
@@ -34,8 +34,6 @@ extension ImageView: ImagePresentable { }
 
 extension ImageButton: ImagePresentable { }
 
-extension CircleImageView: ImagePresentable { }
-
 extension View {
     open override func layoutSubviews() {
         super.layoutSubviews()
@@ -44,8 +42,14 @@ extension View {
             switch (self as! ImagePresentable).shape {
             case .circle:
                 layer.cornerRadius = height / 2
+                layer.cornerCurve = .circular
             case .roundedRectangle(let cornerRadius):
                 layer.cornerRadius = min(height / 2, cornerRadius)
+                layer.cornerCurve = .continuous
+            case .roundedCorners(let maskedCorners, let cornerRadius):
+                layer.cornerRadius = min(height / 2, cornerRadius)
+                layer.maskedCorners = maskedCorners
+                layer.cornerCurve = .continuous
             }
         }
     }
@@ -59,8 +63,14 @@ extension ImageView {
             switch (self as! ImagePresentable).shape {
             case .circle:
                 layer.cornerRadius = height / 2
+                layer.cornerCurve = .circular
             case .roundedRectangle(let cornerRadius):
                 layer.cornerRadius = min(height / 2, cornerRadius)
+                layer.cornerCurve = .continuous
+            case .roundedCorners(let maskedCorners, let cornerRadius):
+                layer.cornerRadius = min(height / 2, cornerRadius)
+                layer.maskedCorners = maskedCorners
+                layer.cornerCurve = .continuous
             }
         }
     }
@@ -74,8 +84,14 @@ extension ImageButton {
             switch (self as! ImagePresentable).shape {
             case .circle:
                 layer.cornerRadius = height / 2
+                layer.cornerCurve = .circular
             case .roundedRectangle(let cornerRadius):
                 layer.cornerRadius = min(height / 2, cornerRadius)
+                layer.cornerCurve = .continuous
+            case .roundedCorners(let maskedCorners, let cornerRadius):
+                layer.cornerRadius = min(height / 2, cornerRadius)
+                layer.maskedCorners = maskedCorners
+                layer.cornerCurve = .continuous
             }
         }
     }

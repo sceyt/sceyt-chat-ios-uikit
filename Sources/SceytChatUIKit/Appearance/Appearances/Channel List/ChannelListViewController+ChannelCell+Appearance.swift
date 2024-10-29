@@ -88,7 +88,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         lastMessageSenderNameFormatter: SceytChatUIKit.shared.formatters.channelLastMessageSenderNameFormatter,
         reactedUserNameFormatter: SceytChatUIKit.shared.formatters.reactedUserNameFormatter,
         attachmentIconProvider: SceytChatUIKit.shared.visualProviders.channelListAttachmentIconProvider,
-        channelDefaultAvatarProvider: SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider,
+        channelAvatarRenderer: SceytChatUIKit.shared.avatarRenderers.channelAvatarRenderer,
+        avatarAppearance: AvatarAppearance.standard,
         presenceStateIconProvider: SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
     )
     
@@ -183,9 +184,12 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         @Trackable<Appearance, any AttachmentIconProviding>
         public var attachmentIconProvider: any AttachmentIconProviding
         
-        @Trackable<Appearance, any ChannelAvatarProviding>
-        public var channelDefaultAvatarProvider: any ChannelAvatarProviding
+        @Trackable<Appearance, any ChannelAvatarRendering>
+        public var channelAvatarRenderer: any ChannelAvatarRendering
         
+        @Trackable<Appearance, AvatarAppearance>
+        public var avatarAppearance: AvatarAppearance
+
         @Trackable<Appearance, any PresenceStateIconProviding>
         public var presenceStateIconProvider: any PresenceStateIconProviding
         
@@ -226,7 +230,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             lastMessageSenderNameFormatter: any ChannelFormatting,
             reactedUserNameFormatter: any ChannelFormatting,
             attachmentIconProvider: any AttachmentIconProviding,
-            channelDefaultAvatarProvider: any ChannelAvatarProviding,
+            channelAvatarRenderer: any ChannelAvatarRendering,
+            avatarAppearance: AvatarAppearance,
             presenceStateIconProvider: any PresenceStateIconProviding
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -264,7 +269,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._lastMessageSenderNameFormatter = Trackable(value: lastMessageSenderNameFormatter)
             self._reactedUserNameFormatter = Trackable(value: reactedUserNameFormatter)
             self._attachmentIconProvider = Trackable(value: attachmentIconProvider)
-            self._channelDefaultAvatarProvider = Trackable(value: channelDefaultAvatarProvider)
+            self._channelAvatarRenderer = Trackable(value: channelAvatarRenderer)
+            self._avatarAppearance = Trackable(value: avatarAppearance)
             self._presenceStateIconProvider = Trackable(value: presenceStateIconProvider)
         }
         
@@ -305,7 +311,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             lastMessageSenderNameFormatter: (any ChannelFormatting)? = nil,
             reactedUserNameFormatter: (any ChannelFormatting)? = nil,
             attachmentIconProvider: (any AttachmentIconProviding)? = nil,
-            channelDefaultAvatarProvider: (any ChannelAvatarProviding)? = nil,
+            channelAvatarRenderer: (any ChannelAvatarRendering)? = nil,
+            avatarAppearance: AvatarAppearance? = nil,
             presenceStateIconProvider: (any PresenceStateIconProviding)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
@@ -337,7 +344,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._lastMessageSenderNameFormatter = Trackable(reference: reference, referencePath: \.lastMessageSenderNameFormatter)
             self._reactedUserNameFormatter = Trackable(reference: reference, referencePath: \.reactedUserNameFormatter)
             self._attachmentIconProvider = Trackable(reference: reference, referencePath: \.attachmentIconProvider)
-            self._channelDefaultAvatarProvider = Trackable(reference: reference, referencePath: \.channelDefaultAvatarProvider)
+            self._channelAvatarRenderer = Trackable(reference: reference, referencePath: \.channelAvatarRenderer)
+            self._avatarAppearance = Trackable(reference: reference, referencePath: \.avatarAppearance)
             self._presenceStateIconProvider = Trackable(reference: reference, referencePath: \.presenceStateIconProvider)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
@@ -369,7 +377,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             if let lastMessageSenderNameFormatter { self.lastMessageSenderNameFormatter = lastMessageSenderNameFormatter }
             if let reactedUserNameFormatter { self.reactedUserNameFormatter = reactedUserNameFormatter }
             if let attachmentIconProvider { self.attachmentIconProvider = attachmentIconProvider }
-            if let channelDefaultAvatarProvider { self.channelDefaultAvatarProvider = channelDefaultAvatarProvider }
+            if let channelAvatarRenderer { self.channelAvatarRenderer = channelAvatarRenderer }
+            if let avatarAppearance { self.avatarAppearance = avatarAppearance }
             if let presenceStateIconProvider { self.presenceStateIconProvider = presenceStateIconProvider }
         }
     }

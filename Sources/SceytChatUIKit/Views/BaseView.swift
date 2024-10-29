@@ -151,17 +151,6 @@ open class Button: UIButton, Configurable {
 open class ImageView: UIImageView, Configurable {
     private var isConfigured = false
     
-//    public required init?(coder: NSCoder) {
-//        super.init(coder: coder)
-//        setup()
-//        setupAppearance()
-//    }
-//    public override init(image: UIImage?) {
-//        super.init(image: image)
-//        setup()
-//        setupAppearance()
-//    }
-    
     public init() {
         super.init(frame: .zero)
     }

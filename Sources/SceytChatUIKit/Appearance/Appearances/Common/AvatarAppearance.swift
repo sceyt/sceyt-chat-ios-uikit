@@ -11,8 +11,8 @@ import UIKit
 public struct AvatarAppearance {
     
     public static var standard = AvatarAppearance(
-        backgroundColor: .red,
-        shape: .roundedRectangle(cornerRadius: 10)
+        backgroundColor: .clear,
+        shape: .circle
     )
     
     public var backgroundColor: UIColor
@@ -25,4 +25,5 @@ public struct AvatarAppearance {
 public enum Shape {
     case circle
     case roundedRectangle(cornerRadius: CGFloat)
+    case roundedCorners(maskedCorners: CACornerMask, cornerRadius: CGFloat)
 }

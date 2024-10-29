@@ -12,7 +12,7 @@ import SceytChat
 extension MessageInputViewController.MentionUsersListViewController {
     open class MentionUserCell: TableViewCell {
         
-        open lazy var avatarView = CircleImageView()
+        open lazy var avatarView = ImageView()
             .withoutAutoresizingMask
         
         open lazy var titleLabel = UILabel()
@@ -66,7 +66,7 @@ extension MessageInputViewController.MentionUsersListViewController {
                 imageTask = appearance.avatarRenderer.render(
                     data,
                     with: appearance.avatarAppearance,
-                    into: avatarView.imageView
+                    into: avatarView
                 )
             }
         }

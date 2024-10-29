@@ -11,7 +11,7 @@ import UIKit
 extension ChannelMemberListViewController {
     open class AddMemberCell: TableViewCell {
         
-        open lazy var iconView = Components.circleImageView
+        open lazy var iconView = ImageView
             .init()
             .contentMode(.center)
             .withoutAutoresizingMask

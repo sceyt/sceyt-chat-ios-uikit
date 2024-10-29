@@ -40,4 +40,9 @@ public protocol ChannelAvatarRendering: AvatarRendering {
         into view: ImagePresentable,
         size: CGSize
     ) -> Cancellable?
+    
+    func render(
+        _ input: ChatChannel,
+        completion: @escaping (UIImage?) -> Void
+    ) -> Cancellable?
 }
