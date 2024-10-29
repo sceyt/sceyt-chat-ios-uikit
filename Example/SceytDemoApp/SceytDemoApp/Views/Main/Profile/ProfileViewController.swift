@@ -217,6 +217,10 @@ extension ProfileViewController: UITableViewDataSource {
             let user = ChatUser(user: SceytChatUIKit.shared.chatClient.user)
             cell.titleLabel.text = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
             cell.subtitleLabel.text = user.username == nil ? nil : "@\(user.username!)"
+            cell.avatarButton.shape = AvatarAppearance.standard.shape
+            cell.avatarButton.backgroundColor = AvatarAppearance.standard.backgroundColor
+            cell.avatarButton.clipsToBounds = true
+            cell.avatarButton.contentMode = .scaleAspectFill
             _ = AvatarBuilder.loadAvatar(into: cell.avatarButton, for: user)
             return cell
         case .options:

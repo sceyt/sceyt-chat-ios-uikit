@@ -25,7 +25,11 @@ class EditProfileViewController: ViewController {
         }
     }
         
-    private var hasAvatar = false
+    private var hasAvatar = false {
+        didSet {
+            updateConnectButton()
+        }
+    }
     
     // MARK: - Views
     lazy var tableView: UITableView = {
@@ -212,7 +216,6 @@ class EditProfileViewController: ViewController {
                     guard let image = image else { return }
                     router.editImage(image) { [unowned self] edited in
                         editedAvatarImage = edited
-                        originalAvatarImage = image
                         hasAvatar = true
                         cell.avatarButton.image = edited
                     }
@@ -226,14 +229,12 @@ class EditProfileViewController: ViewController {
                     guard let image = image else { return }
                     router.editImage(image) { [unowned self] edited in
                         editedAvatarImage = edited
-                        originalAvatarImage = image
                         hasAvatar = true
                         cell.avatarButton.image = edited
                     }
                 }
             case .delete:
                 editedAvatarImage = nil
-                originalAvatarImage = nil
                 hasAvatar = false
                 cell.avatarButton.image = .channelProfileEditAvatar
             default:
@@ -275,6 +276,7 @@ extension EditProfileViewController: UITableViewDelegate, UITableViewDataSource 
             
             _ = AvatarBuilder.loadAvatar(into: cell.avatarButton, for: user, defaultImage: .channelProfileEditAvatar, preferMemCache: false) { [weak self] image in
                 self?.hasAvatar = image != nil
+                self?.originalAvatarImage = image
             }
             cell.selectionStyle = .none
             cell.avatarButton.addTarget(self, action: #selector(avatarButtonTapped(_:)), for: .touchUpInside)
@@ -410,7 +412,9 @@ extension EditProfileViewController {
         let isFirstNameValidChanged = !isFirstNameEmpty && editedFirstName != user.firstName
         let isLastNameValidChanged = !isLastNameEmpty && editedLastName != user.lastName
         
-        navigationItem.rightBarButtonItem?.isEnabled = forceDisable ? false : (isFirstNameValidChanged || isLastNameValidChanged || isUsernameValidAndChanged) && (task == nil)
+        let isAvatarChanged = editedAvatarImage != originalAvatarImage
+        
+        navigationItem.rightBarButtonItem?.isEnabled = forceDisable ? false : (isFirstNameValidChanged || isLastNameValidChanged || isUsernameValidAndChanged || isAvatarChanged) && (task == nil)
     }
 }
 
