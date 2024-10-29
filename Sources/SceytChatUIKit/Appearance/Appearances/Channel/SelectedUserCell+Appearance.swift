@@ -1,71 +1,66 @@
 //
-//  MessageInfoViewController+MarkerCell+Appearance.swift
+//  SelectedUserCell+Appearance.swift
 //  SceytChatUIKit
 //
-//  Created by Arthur Avagyan on 01.10.24
+//  Created by Arthur Avagyan on 29.10.24
 //  Copyright © 2024 Sceyt LLC. All rights reserved.
 //
 
 import UIKit
 
-extension MessageInfoViewController.MarkerCell: AppearanceProviding {
+extension SelectedUserCell: AppearanceProviding {
+    
     public static var appearance = Appearance(
-        backgroundColor: .backgroundSections,
-        titleLabelAppearance: LabelAppearance(
+        backgroundColor: .clear,
+        labelAppearance: .init(
             foregroundColor: .primaryText,
-            font: Fonts.semiBold.withSize(16)
-        ),
-        subtitleLabelAppearance: LabelAppearance(
-            foregroundColor: .secondaryText,
             font: Fonts.regular.withSize(13)
         ),
-        titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
-        subtitleFormatter: AnyDateFormatting(SceytChatUIKit.shared.formatters.messageInfoMarkerDateFormatter),
+        titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userShortNameFormatter),
+        removeIcon: .closeCircle,
         avatarRenderer: AnyUserAvatarRendering(SceytChatUIKit.shared.avatarRenderers.userAvatarRenderer),
         avatarAppearance: AvatarAppearance.standard
     )
     
-    public class Appearance: CellAppearance<AnyUserFormatting, AnyDateFormatting, AnyUserAvatarRendering> {
+    public class Appearance: SelectedCellAppearance<AnyUserFormatting, AnyUserAvatarRendering> {
+        
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
         
         public init(
             backgroundColor: UIColor,
-            titleLabelAppearance: LabelAppearance,
-            subtitleLabelAppearance: LabelAppearance,
+            labelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
-            subtitleFormatter: AnyDateFormatting,
+            removeIcon: UIImage,
             avatarRenderer: AnyUserAvatarRendering,
             avatarAppearance: AvatarAppearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
+            
             super.init(
-                titleLabelAppearance: titleLabelAppearance,
-                subtitleLabelAppearance: subtitleLabelAppearance,
+                labelAppearance: labelAppearance,
                 titleFormatter: titleFormatter,
-                subtitleFormatter: subtitleFormatter,
+                removeIcon: removeIcon,
                 avatarRenderer: avatarRenderer,
                 avatarAppearance: avatarAppearance
             )
         }
         
         public init(
-            reference: MessageInfoViewController.MarkerCell.Appearance,
+            reference: SelectedUserCell.Appearance,
             backgroundColor: UIColor? = nil,
-            titleLabelAppearance: LabelAppearance,
-            subtitleLabelAppearance: LabelAppearance,
+            labelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
-            subtitleFormatter: AnyDateFormatting,
+            removeIcon: UIImage,
             avatarRenderer: AnyUserAvatarRendering,
             avatarAppearance: AvatarAppearance
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             
             super.init(
-                titleLabelAppearance: titleLabelAppearance,
-                subtitleLabelAppearance: subtitleLabelAppearance,
+                labelAppearance: labelAppearance,
                 titleFormatter: titleFormatter,
-                subtitleFormatter: subtitleFormatter,
+                removeIcon: removeIcon,
                 avatarRenderer: avatarRenderer,
                 avatarAppearance: avatarAppearance
             )

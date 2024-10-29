@@ -9,7 +9,7 @@ import UIKit
 
 public class SelectableCellAppearance<T: Formatting,
                                       S: Formatting,
-                                      A: VisualProviding>: CellAppearance<T, S, A> {
+                                      A: AvatarRendering>: CellAppearance<T, S, A> {
     @Trackable<Appearance, CheckBoxView.Appearance>
     public var checkBoxAppearance: CheckBoxView.Appearance
 
@@ -27,7 +27,8 @@ public class SelectableCellAppearance<T: Formatting,
         subtitleLabelAppearance: LabelAppearance,
         titleFormatter: T,
         subtitleFormatter: S,
-        visualProvider: A,
+        avatarRenderer: A,
+        avatarAppearance: AvatarAppearance,
         checkBoxAppearance: CheckBoxView.Appearance
     ) {
         self._checkBoxAppearance = Trackable(value: checkBoxAppearance)
@@ -37,7 +38,8 @@ public class SelectableCellAppearance<T: Formatting,
             subtitleLabelAppearance: subtitleLabelAppearance,
             titleFormatter: titleFormatter,
             subtitleFormatter: subtitleFormatter,
-            visualProvider: visualProvider
+            avatarRenderer: avatarRenderer,
+            avatarAppearance: avatarAppearance
         )
     }
 }

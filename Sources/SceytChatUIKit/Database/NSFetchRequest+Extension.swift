@@ -58,7 +58,7 @@ public extension NSFetchRequest {
     }
 }
 
-private var refreshingKey: UInt8 = 1
+private var refreshingKey: UInt8 = 0
 private extension NSFetchRequest {
     @objc
     var refreshingValue: [String]? {

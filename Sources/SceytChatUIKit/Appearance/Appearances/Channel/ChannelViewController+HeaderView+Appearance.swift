@@ -21,7 +21,8 @@ extension ChannelViewController.HeaderView: AppearanceProviding {
         titleFormatter: SceytChatUIKit.shared.formatters.channelNameFormatter,
         subtitleFormatter: SceytChatUIKit.shared.formatters.channelSubtitleFormatter,
         typingUserNameFormatter: SceytChatUIKit.shared.formatters.typingUserNameFormatter,
-        avatarProvider: SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider
+        avatarRenderer: SceytChatUIKit.shared.avatarRenderers.channelAvatarRenderer,
+        avatarAppearance: AvatarAppearance.standard
     )
     
     public struct Appearance {
@@ -40,23 +41,28 @@ extension ChannelViewController.HeaderView: AppearanceProviding {
         @Trackable<Appearance, any UserFormatting>
         public var typingUserNameFormatter: any UserFormatting
         
-        @Trackable<Appearance, any ChannelAvatarProviding>
-        public var avatarProvider: any ChannelAvatarProviding
+        @Trackable<Appearance, ChannelAvatarRendering>
+        public var avatarRenderer: any ChannelAvatarRendering
         
+        @Trackable<Appearance, AvatarAppearance>
+        public var avatarAppearance: AvatarAppearance
+
         public init(
             titleLabelAppearance: LabelAppearance,
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: any ChannelFormatting,
             subtitleFormatter: any ChannelFormatting,
             typingUserNameFormatter: any UserFormatting,
-            avatarProvider: any ChannelAvatarProviding
+            avatarRenderer: any ChannelAvatarRendering,
+            avatarAppearance: AvatarAppearance
         ) {
             self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
             self._subtitleLabelAppearance = Trackable(value: subtitleLabelAppearance)
             self._titleFormatter = Trackable(value: titleFormatter)
             self._subtitleFormatter = Trackable(value: subtitleFormatter)
             self._typingUserNameFormatter = Trackable(value: typingUserNameFormatter)
-            self._avatarProvider = Trackable(value: avatarProvider)
+            self._avatarRenderer = Trackable(value: avatarRenderer)
+            self._avatarAppearance = Trackable(value: avatarAppearance)
         }
         
         public init(
@@ -66,21 +72,24 @@ extension ChannelViewController.HeaderView: AppearanceProviding {
             titleFormatter: (any ChannelFormatting)? = nil,
             subtitleFormatter: (any ChannelFormatting)? = nil,
             typingUserNameFormatter: (any UserFormatting)? = nil,
-            avatarProvider: (any ChannelAvatarProviding)? = nil
+            avatarRenderer: (any ChannelAvatarRendering)? = nil,
+            avatarAppearance: AvatarAppearance? = nil
         ) {
             self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
             self._subtitleLabelAppearance = Trackable(reference: reference, referencePath: \.subtitleLabelAppearance)
             self._titleFormatter = Trackable(reference: reference, referencePath: \.titleFormatter)
             self._subtitleFormatter = Trackable(reference: reference, referencePath: \.subtitleFormatter)
             self._typingUserNameFormatter = Trackable(reference: reference, referencePath: \.typingUserNameFormatter)
-            self._avatarProvider = Trackable(reference: reference, referencePath: \.avatarProvider)
-            
+            self._avatarRenderer = Trackable(reference: reference, referencePath: \.avatarRenderer)
+            self._avatarAppearance = Trackable(reference: reference, referencePath: \.avatarAppearance)
+
             if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
             if let subtitleLabelAppearance { self.subtitleLabelAppearance = subtitleLabelAppearance }
             if let titleFormatter { self.titleFormatter = titleFormatter }
             if let subtitleFormatter { self.subtitleFormatter = subtitleFormatter }
             if let typingUserNameFormatter { self.typingUserNameFormatter = typingUserNameFormatter }
-            if let avatarProvider { self.avatarProvider = avatarProvider }
+            if let avatarRenderer { self.avatarRenderer = avatarRenderer }
+            if let avatarAppearance { self.avatarAppearance = avatarAppearance }
         }
     }
 }

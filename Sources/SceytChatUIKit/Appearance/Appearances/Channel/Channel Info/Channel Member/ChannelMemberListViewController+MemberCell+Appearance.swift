@@ -26,10 +26,11 @@ extension ChannelMemberListViewController.MemberCell: AppearanceProviding {
         ),
         titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
         subtitleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userPresenceDateFormatter),
-        visualProvider: AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
+        avatarRenderer: AnyUserAvatarRendering(SceytChatUIKit.shared.avatarRenderers.userAvatarRenderer),
+        avatarAppearance: AvatarAppearance.standard
     )
     
-    public class Appearance: CellAppearance<AnyUserFormatting, AnyUserFormatting, AnyUserAvatarProviding> {
+    public class Appearance: CellAppearance<AnyUserFormatting, AnyUserFormatting, AnyUserAvatarRendering> {
         // Trackable properties specific to MemberCell
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -49,7 +50,8 @@ extension ChannelMemberListViewController.MemberCell: AppearanceProviding {
             roleLabelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
             subtitleFormatter: AnyUserFormatting,
-            visualProvider: AnyUserAvatarProviding
+            avatarRenderer: AnyUserAvatarRendering,
+            avatarAppearance: AvatarAppearance
         ) {
             // Initialize Trackable properties with explicit values
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -62,7 +64,8 @@ extension ChannelMemberListViewController.MemberCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance
             )
         }
         
@@ -76,7 +79,8 @@ extension ChannelMemberListViewController.MemberCell: AppearanceProviding {
             roleLabelAppearance: LabelAppearance? = nil,
             titleFormatter: AnyUserFormatting? = nil,
             subtitleFormatter: AnyUserFormatting? = nil,
-            visualProvider: AnyUserAvatarProviding? = nil
+            avatarRenderer: AnyUserAvatarRendering? = nil,
+            avatarAppearance: AvatarAppearance? = nil
         ) {
             // Initialize Trackable properties with references
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
@@ -89,7 +93,8 @@ extension ChannelMemberListViewController.MemberCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance ?? reference.subtitleLabelAppearance,
                 titleFormatter: titleFormatter ?? reference.titleFormatter,
                 subtitleFormatter: subtitleFormatter ?? reference.subtitleFormatter,
-                visualProvider: visualProvider ?? reference.visualProvider
+                avatarRenderer: avatarRenderer ?? reference.avatarRenderer,
+                avatarAppearance: avatarAppearance ?? reference.avatarAppearance
             )
             
             // Apply overrides if provided

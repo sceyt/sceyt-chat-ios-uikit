@@ -102,10 +102,10 @@ extension ChannelViewController {
             }
         }
         
-        open override func layoutSubviews() {
-            super.layoutSubviews()
-            
-            profileImageView.layer.cornerRadius = profileImageView.height / 2
-        }
+//        open override func layoutSubviews() {
+//            super.layoutSubviews()
+//            
+//            profileImageView.layer.cornerRadius = profileImageView.height / 2
+//        }
     }
 }

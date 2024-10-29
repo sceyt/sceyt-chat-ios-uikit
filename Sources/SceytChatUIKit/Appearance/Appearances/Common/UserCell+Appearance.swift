@@ -22,10 +22,11 @@ extension UserCell: AppearanceProviding {
         ),
         titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
         subtitleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userPresenceDateFormatter),
-        visualProvider: AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
+        avatarRenderer: AnyUserAvatarRendering(SceytChatUIKit.shared.avatarRenderers.userAvatarRenderer),
+        avatarAppearance: AvatarAppearance.standard
     )
 
-    public class Appearance: CellAppearance<AnyUserFormatting, AnyUserFormatting, AnyUserAvatarProviding> {
+    public class Appearance: CellAppearance<AnyUserFormatting, AnyUserFormatting, AnyUserAvatarRendering> {
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -40,7 +41,8 @@ extension UserCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
             subtitleFormatter: AnyUserFormatting,
-            visualProvider: AnyUserAvatarProviding
+            avatarRenderer: AnyUserAvatarRendering,
+            avatarAppearance: AvatarAppearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             self._separatorColor = Trackable(value: separatorColor)
@@ -49,7 +51,8 @@ extension UserCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance
             )
         }
         
@@ -61,7 +64,8 @@ extension UserCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
             subtitleFormatter: AnyUserFormatting,
-            visualProvider: AnyUserAvatarProviding
+            avatarRenderer: AnyUserAvatarRendering,
+            avatarAppearance: AvatarAppearance
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
@@ -70,7 +74,8 @@ extension UserCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance
             )
             
             if let backgroundColor { self.backgroundColor = backgroundColor }

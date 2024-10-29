@@ -62,7 +62,7 @@ private extension NSObject {
     /// A unique key used for associating appearance objects with instances.
     ///
     /// The `UInt8` type is used here to ensure a unique memory address.
-    static var parentAppearanceKey: UInt8 = 1
+    static var parentAppearanceKey: UInt8 = 0
     
     /// Retrieves the parent appearance for a specific `AppearanceType`.
     ///

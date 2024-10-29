@@ -22,11 +22,12 @@ extension SelectableUserCell: AppearanceProviding {
         ),
         titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
         subtitleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userPresenceDateFormatter),
-        visualProvider: AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider),
+        avatarRenderer: AnyUserAvatarRendering(SceytChatUIKit.shared.avatarRenderers.userAvatarRenderer),
+        avatarAppearance: AvatarAppearance.standard,
         checkBoxAppearance: CheckBoxView.appearance
     )
     
-    public class Appearance: SelectableCellAppearance<AnyUserFormatting, AnyUserFormatting, AnyUserAvatarProviding> {
+    public class Appearance: SelectableCellAppearance<AnyUserFormatting, AnyUserFormatting, AnyUserAvatarRendering> {
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -41,7 +42,8 @@ extension SelectableUserCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
             subtitleFormatter: AnyUserFormatting,
-            visualProvider: AnyUserAvatarProviding,
+            avatarRenderer: AnyUserAvatarRendering,
+            avatarAppearance: AvatarAppearance,
             checkBoxAppearance: CheckBoxView.Appearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -51,7 +53,8 @@ extension SelectableUserCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider,
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance,
                 checkBoxAppearance: checkBoxAppearance
             )
         }
@@ -64,7 +67,8 @@ extension SelectableUserCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
             subtitleFormatter: AnyUserFormatting,
-            visualProvider: AnyUserAvatarProviding,
+            avatarRenderer: AnyUserAvatarRendering,
+            avatarAppearance: AvatarAppearance,
             checkBoxAppearance: CheckBoxView.Appearance
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
@@ -74,7 +78,8 @@ extension SelectableUserCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider,
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance,
                 checkBoxAppearance: checkBoxAppearance
             )
             

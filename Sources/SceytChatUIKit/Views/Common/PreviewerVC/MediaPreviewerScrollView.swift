@@ -12,7 +12,7 @@ open class MediaPreviewerScrollView: UIScrollView, Configurable, UIScrollViewDel
     open lazy var imageView = {
         $0.contentMode = .scaleAspectFit
         return $0.withoutAutoresizingMask
-    }(UIImageView())
+    }(ImageView())
     
     private var topConstraint: NSLayoutConstraint!
     private var leadingConstraint: NSLayoutConstraint!

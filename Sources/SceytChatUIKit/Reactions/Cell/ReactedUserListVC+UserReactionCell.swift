@@ -11,7 +11,7 @@ import UIKit
 extension ReactedUserListViewController {
     open class UserReactionCell: CollectionViewCell {
         
-        open lazy var avatarView = CircleImageView()
+        open lazy var avatarView = ImageView()
             .withoutAutoresizingMask
         open lazy var userLabel = UILabel()
             .withoutAutoresizingMask
@@ -25,17 +25,11 @@ extension ReactedUserListViewController {
                 userLabel.text = appearance.titleFormatter.format(user)
                 reactionLabel.text = appearance.subtitleFormatter.format(data)
                 
-                let avatarRepresentation = appearance.visualProvider.provideVisual(for: user)
-                imageTask = switch avatarRepresentation {
-                case .image(let image):
-                    Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
-                                             for: user,
-                                             defaultImage: image)
-                case .initialsAppearance(let initialsAppearance):
-                    Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
-                                             for: user,
-                                             appearance: initialsAppearance)
-                }
+                imageTask = appearance.avatarRenderer.render(
+                    user,
+                    with: appearance.avatarAppearance,
+                    into: avatarView
+                )
             }
         }
         

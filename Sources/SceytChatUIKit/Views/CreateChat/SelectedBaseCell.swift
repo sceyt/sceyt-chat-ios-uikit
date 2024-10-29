@@ -9,7 +9,7 @@
 import UIKit
 
 open class SelectedBaseCell: CollectionViewCell {
-    open lazy var avatarView = CircleImageView()
+    open lazy var avatarView = ImageView()
         .withoutAutoresizingMask
     
     open lazy var closeButton: UIButton = {

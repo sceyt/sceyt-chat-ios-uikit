@@ -48,7 +48,7 @@ open class AvatarBuilder {
                                for builder: AvatarBuildable,
                                appearance: InitialsBuilderAppearance? = nil,
                                defaultImage: UIImage? = nil,
-                               size: CGSize = AvatarBuilder.avatarDefaultSize,
+                               size: CGSize = avatarDefaultSize,
                                preferMemCache: Bool = true,
                                completion: ((UIImage?) -> Void)? = nil
     )
@@ -127,7 +127,7 @@ open class AvatarBuilder {
     open class func loadAvatar(for builder: AvatarBuildable,
                                appearance: InitialsBuilderAppearance? = nil,
                                defaultImage: UIImage? = nil,
-                               size: CGSize = AvatarBuilder.avatarDefaultSize,
+                               size: CGSize = SceytChatUIKit.Components.avatarBuilder.avatarDefaultSize,
                                preferMemCache: Bool = true,
                                avatar block: @escaping (UIImage?) -> Void
     ) -> Cancellable? {
@@ -225,10 +225,6 @@ open class AvatarBuilder {
                 })
         }
     }
-}
-
-extension UIImageView: ImagePresentable {
-
 }
 
 extension ChatChannel: AvatarBuildable {

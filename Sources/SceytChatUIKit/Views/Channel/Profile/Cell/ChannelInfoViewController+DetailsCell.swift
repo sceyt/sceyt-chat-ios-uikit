@@ -11,7 +11,7 @@ import UIKit
 extension ChannelInfoViewController {
     open class DetailsCell: TableViewCell {
         
-        open lazy var avatarButton = CircleButton()
+        open lazy var avatarButton = ImageButton()
             .withoutAutoresizingMask
         
         open lazy var titleLabel = UILabel()
@@ -66,17 +66,10 @@ extension ChannelInfoViewController {
         }
         
         open func updateAvatar() {
-            let avatarRepresentation = appearance.channelDefaultAvatarProvider.provideVisual(for: data)
-            imageTask = switch avatarRepresentation {
-            case .image(let image):
-                Components.avatarBuilder.loadAvatar(into: avatarButton,
-                                         for: data,
-                                         defaultImage: image)
-            case .initialsAppearance(let initialsBuilderAppearance):
-                Components.avatarBuilder.loadAvatar(into: avatarButton,
-                                         for: data,
-                                         appearance: initialsBuilderAppearance)
-            }
+            imageTask = appearance.channelAvatarRenderer.render(
+                data,
+                with: appearance.avatarAppearance,
+                into: avatarButton)
         }
         
         open func updateTitle() {

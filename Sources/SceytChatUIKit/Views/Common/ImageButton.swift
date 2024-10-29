@@ -8,7 +8,7 @@
 
 import UIKit
 
-open class ImageButton: Button, ImagePresentable {
+open class ImageButton: Button {
     open var image: UIImage? {
         set {
             setImage(newValue, for: .normal)

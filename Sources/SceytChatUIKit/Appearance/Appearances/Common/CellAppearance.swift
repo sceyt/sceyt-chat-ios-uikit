@@ -10,7 +10,7 @@ import UIKit
 
 public class CellAppearance<T: Formatting,
                             S: Formatting,
-                            V: VisualProviding> {
+                            A: AvatarRendering> {
     
     @Trackable<CellAppearance, LabelAppearance>
     public var titleLabelAppearance: LabelAppearance
@@ -24,8 +24,11 @@ public class CellAppearance<T: Formatting,
     @Trackable<CellAppearance, S>
     public var subtitleFormatter: S
     
-    @Trackable<CellAppearance, V>
-    public var visualProvider: V
+    @Trackable<CellAppearance, A>
+    public var avatarRenderer: A
+    
+    @Trackable<CellAppearance, AvatarAppearance>
+    public var avatarAppearance: AvatarAppearance
 
     /// Initializes a new instance of `CellAppearance` with the provided parameters.
     ///
@@ -34,18 +37,21 @@ public class CellAppearance<T: Formatting,
     ///   - subtitleLabelAppearance: The appearance settings for the subtitle label.
     ///   - titleFormatter: The formatter to use for the title text.
     ///   - subtitleFormatter: The formatter to use for the subtitle text.
-    ///   - visualProvider: The provider for visuals.
+    ///   - avatarRenderer: The avatar renderer.
+    ///   - avatarAppearance: The appearance for avatar renderer.
     public init(
         titleLabelAppearance: LabelAppearance,
         subtitleLabelAppearance: LabelAppearance?,
         titleFormatter: T,
         subtitleFormatter: S,
-        visualProvider: V
+        avatarRenderer: A,
+        avatarAppearance: AvatarAppearance
     ) {
         self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
         self._subtitleLabelAppearance = Trackable(value: subtitleLabelAppearance)
         self._titleFormatter = Trackable(value: titleFormatter)
         self._subtitleFormatter = Trackable(value: subtitleFormatter)
-        self._visualProvider = Trackable(value: visualProvider)
+        self._avatarRenderer = Trackable(value: avatarRenderer)
+        self._avatarAppearance = Trackable(value: avatarAppearance)
     }
 }

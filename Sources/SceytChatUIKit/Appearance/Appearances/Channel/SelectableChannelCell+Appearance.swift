@@ -23,11 +23,12 @@ extension SelectableChannelCell: AppearanceProviding {
         ),
         titleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelNameFormatter),
         subtitleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelSubtitleFormatter),
-        visualProvider: AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider),
+        avatarRenderer: AnyChannelAvatarRendering(SceytChatUIKit.shared.avatarRenderers.channelAvatarRenderer),
+        avatarAppearance: AvatarAppearance.standard,
         checkBoxAppearance: CheckBoxView.appearance
     )
     
-    public class Appearance: SelectableCellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
+    public class Appearance: SelectableCellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarRendering> {
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -42,7 +43,8 @@ extension SelectableChannelCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyChannelFormatting,
             subtitleFormatter: AnyChannelFormatting,
-            visualProvider: AnyChannelAvatarProviding,
+            avatarRenderer: AnyChannelAvatarRendering,
+            avatarAppearance: AvatarAppearance,
             checkBoxAppearance: CheckBoxView.Appearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -52,7 +54,8 @@ extension SelectableChannelCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider,
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance,
                 checkBoxAppearance: checkBoxAppearance
             )
         }
@@ -65,7 +68,8 @@ extension SelectableChannelCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyChannelFormatting,
             subtitleFormatter: AnyChannelFormatting,
-            visualProvider: AnyChannelAvatarProviding,
+            avatarRenderer: AnyChannelAvatarRendering,
+            avatarAppearance: AvatarAppearance,
             checkBoxAppearance: CheckBoxView.Appearance
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
@@ -75,7 +79,8 @@ extension SelectableChannelCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider,
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance,
                 checkBoxAppearance: checkBoxAppearance
             )
             

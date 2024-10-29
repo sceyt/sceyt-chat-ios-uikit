@@ -19,7 +19,8 @@ extension ChannelInfoViewController.DetailsCell: AppearanceProviding {
             foregroundColor: .secondaryText,
             font: Fonts.regular.withSize(16)
         ),
-        channelDefaultAvatarProvider: SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider,
+        channelAvatarRenderer: SceytChatUIKit.shared.avatarRenderers.channelAvatarRenderer,
+        avatarAppearance: AvatarAppearance.standard,
         channelNameFormatter: SceytChatUIKit.shared.formatters.channelNameFormatter,
         channelSubtitleFormatter: SceytChatUIKit.shared.formatters.channelSubtitleFormatter
     )
@@ -34,9 +35,13 @@ extension ChannelInfoViewController.DetailsCell: AppearanceProviding {
         @Trackable<Appearance, LabelAppearance>
         public var subtitleLabelAppearance: LabelAppearance
         
-        @Trackable<Appearance, any ChannelAvatarProviding>
-        public var channelDefaultAvatarProvider: any ChannelAvatarProviding
+        @Trackable<Appearance, any ChannelAvatarRendering>
+        public var channelAvatarRenderer: any ChannelAvatarRendering
         
+//        AvatarAppearance standard
+        @Trackable<Appearance, AvatarAppearance>
+        public var avatarAppearance: AvatarAppearance
+
         @Trackable<Appearance, any ChannelFormatting>
         public var channelNameFormatter: any ChannelFormatting
         
@@ -47,14 +52,16 @@ extension ChannelInfoViewController.DetailsCell: AppearanceProviding {
             backgroundColor: UIColor,
             titleLabelAppearance: LabelAppearance,
             subtitleLabelAppearance: LabelAppearance,
-            channelDefaultAvatarProvider: any ChannelAvatarProviding,
+            channelAvatarRenderer: any ChannelAvatarRendering,
+            avatarAppearance: AvatarAppearance,
             channelNameFormatter: any ChannelFormatting,
             channelSubtitleFormatter: any ChannelFormatting
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
             self._subtitleLabelAppearance = Trackable(value: subtitleLabelAppearance)
-            self._channelDefaultAvatarProvider = Trackable(value: channelDefaultAvatarProvider)
+            self._channelAvatarRenderer = Trackable(value: channelAvatarRenderer)
+            self._avatarAppearance = Trackable(value: avatarAppearance)
             self._channelNameFormatter = Trackable(value: channelNameFormatter)
             self._channelSubtitleFormatter = Trackable(value: channelSubtitleFormatter)
         }
@@ -64,21 +71,24 @@ extension ChannelInfoViewController.DetailsCell: AppearanceProviding {
             backgroundColor: UIColor? = nil,
             titleLabelAppearance: LabelAppearance? = nil,
             subtitleLabelAppearance: LabelAppearance? = nil,
-            channelDefaultAvatarProvider: (any ChannelAvatarProviding)? = nil,
+            channelAvatarRenderer: (any ChannelAvatarRendering)? = nil,
+            avatarAppearance: AvatarAppearance? = nil,
             channelNameFormatter: (any ChannelFormatting)? = nil,
             channelSubtitleFormatter: (any ChannelFormatting)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
             self._subtitleLabelAppearance = Trackable(reference: reference, referencePath: \.subtitleLabelAppearance)
-            self._channelDefaultAvatarProvider = Trackable(reference: reference, referencePath: \.channelDefaultAvatarProvider)
+            self._channelAvatarRenderer = Trackable(reference: reference, referencePath: \.channelAvatarRenderer)
+            self._avatarAppearance = Trackable(reference: reference, referencePath: \.avatarAppearance)
             self._channelNameFormatter = Trackable(reference: reference, referencePath: \.channelNameFormatter)
             self._channelSubtitleFormatter = Trackable(reference: reference, referencePath: \.channelSubtitleFormatter)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
             if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
             if let subtitleLabelAppearance { self.subtitleLabelAppearance = subtitleLabelAppearance }
-            if let channelDefaultAvatarProvider { self.channelDefaultAvatarProvider = channelDefaultAvatarProvider }
+            if let channelAvatarRenderer { self.channelAvatarRenderer = channelAvatarRenderer }
+            if let avatarAppearance { self.avatarAppearance = avatarAppearance }
             if let channelNameFormatter { self.channelNameFormatter = channelNameFormatter }
             if let channelSubtitleFormatter { self.channelSubtitleFormatter = channelSubtitleFormatter }
         }

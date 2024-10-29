@@ -13,16 +13,11 @@ open class SelectedChannelCell: SelectedBaseCell {
         didSet {
             label.text = appearance.titleFormatter.format(channelData)
             presenceView.isHidden = channelData.peer?.presence.state != .online
-            imageTask = switch appearance.visualProvider.provideVisual(for: channelData) {
-            case .image(let image):
-                Components.avatarBuilder.loadAvatar(into: avatarView,
-                                                    for: channelData,
-                                                    defaultImage: image)
-            case .initialsAppearance(let initialsAppearance):
-                Components.avatarBuilder.loadAvatar(into: avatarView,
-                                                    for: channelData,
-                                                    appearance: initialsAppearance)
-            }
+            imageTask = appearance.avatarRenderer.render(
+                channelData,
+                with: appearance.avatarAppearance,
+                into: avatarView
+            )
         }
     }
     

@@ -15,16 +15,11 @@ open class SelectableChannelCell: BaseChannelUserCell {
     
     open var channelData: ChatChannel! {
         didSet {
-            imageTask = switch appearance.visualProvider.provideVisual(for: channelData) {
-            case .image(let image):
-                Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
-                                                    for: channelData,
-                                                    defaultImage: image)
-            case .initialsAppearance(let initialsAppearance):
-                Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
-                                                    for: channelData,
-                                                    appearance: initialsAppearance)
-            }
+            imageTask = appearance.avatarRenderer.render(
+                channelData,
+                with: appearance.avatarAppearance,
+                into: avatarView
+            )
             
             titleLabel.text = appearance.titleFormatter.format(channelData)
             statusLabel.text = appearance.subtitleFormatter.format(channelData)

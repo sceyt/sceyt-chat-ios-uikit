@@ -15,10 +15,12 @@ extension MessageInputViewController.MentionUsersListViewController.MentionUserC
             font: Fonts.semiBold.withSize(16)
         ),
         titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
-        visualProvider: AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
+        avatarRenderer: AnyUserAvatarRendering(SceytChatUIKit.shared.avatarRenderers.userAvatarRenderer),
+        avatarAppearance: AvatarAppearance.standard
     )
     
-    public class Appearance: CellAppearance<AnyUserFormatting, EmptyFormatter, AnyUserAvatarProviding> {
+    public class Appearance: CellAppearance<AnyUserFormatting, EmptyFormatter, AnyUserAvatarRendering> {
+        
         @Trackable<Appearance, any PresenceStateIconProviding>
         public var presenceStateIconProvider: any PresenceStateIconProviding
         
@@ -26,7 +28,8 @@ extension MessageInputViewController.MentionUsersListViewController.MentionUserC
             presenceStateIconProvider: any PresenceStateIconProviding,
             titleLabelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
-            visualProvider: AnyUserAvatarProviding
+            avatarRenderer: AnyUserAvatarRendering,
+            avatarAppearance: AvatarAppearance
         ) {
             self._presenceStateIconProvider = Trackable(value: presenceStateIconProvider)
             super.init(
@@ -34,7 +37,8 @@ extension MessageInputViewController.MentionUsersListViewController.MentionUserC
                 subtitleLabelAppearance: nil,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: EmptyFormatter(),
-                visualProvider: visualProvider
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance
             )
         }
         
@@ -43,7 +47,8 @@ extension MessageInputViewController.MentionUsersListViewController.MentionUserC
             presenceStateIconProvider: (any PresenceStateIconProviding)? = nil,
             titleLabelAppearance: LabelAppearance? = nil,
             titleFormatter: AnyUserFormatting? = nil,
-            visualProvider: AnyUserAvatarProviding? = nil
+            avatarRenderer: AnyUserAvatarRendering? = nil,
+            avatarAppearance: AvatarAppearance? = nil
         ) {
             self._presenceStateIconProvider = Trackable(reference: reference, referencePath: \.presenceStateIconProvider)
             
@@ -52,7 +57,8 @@ extension MessageInputViewController.MentionUsersListViewController.MentionUserC
                 subtitleLabelAppearance: nil,
                 titleFormatter: titleFormatter ?? reference.titleFormatter,
                 subtitleFormatter: EmptyFormatter(),
-                visualProvider: visualProvider ?? reference.visualProvider
+                avatarRenderer: avatarRenderer ?? reference.avatarRenderer,
+                avatarAppearance: avatarAppearance ?? reference.avatarAppearance
             )
 
             if let presenceStateIconProvider { self.presenceStateIconProvider = presenceStateIconProvider }

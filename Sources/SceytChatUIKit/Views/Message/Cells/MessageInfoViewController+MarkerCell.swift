@@ -11,7 +11,7 @@ import UIKit
 extension MessageInfoViewController {
     open class MarkerCell: TableViewCell {
         
-        open lazy var avatarView = Components.circleImageView.init()
+        open lazy var avatarView = ImageView()
             .contentMode(.scaleAspectFill)
         
         open lazy var nameLabel = UILabel()
@@ -30,17 +30,11 @@ extension MessageInfoViewController {
             didSet {
                 guard let data,
                       let user = data.user else { return }
-                let avatarRepresentation = appearance.visualProvider.provideVisual(for: user)
-                imageTask = switch avatarRepresentation {
-                case .image(let image):
-                    Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
-                                                        for: user,
-                                                        defaultImage: image)
-                case .initialsAppearance(let initialsAppearance):
-                    Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
-                                                        for: user,
-                                                        appearance: initialsAppearance)
-                }
+                appearance.avatarRenderer.render(
+                    user,
+                    with: appearance.avatarAppearance,
+                    into: avatarView
+                )
                 
                 nameLabel.text = appearance.titleFormatter.format(user)
                 dateTimeLabel.text = appearance.subtitleFormatter.format(data.createdAt)

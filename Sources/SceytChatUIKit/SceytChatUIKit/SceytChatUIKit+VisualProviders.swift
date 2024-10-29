@@ -21,3 +21,10 @@ extension SceytChatUIKit {
         public var defaultMarkerTitleProvider: any DefaultMarkerTitleProviding = DefaultMarkerTitleProvider()
     }
 }
+
+extension SceytChatUIKit {
+    public struct AvatarRenderers {
+        public var channelAvatarRenderer: any ChannelAvatarRendering = ChannelAvatarRenderer()
+        public var userAvatarRenderer: any UserAvatarRendering = UserAvatarRenderer()
+    }
+}

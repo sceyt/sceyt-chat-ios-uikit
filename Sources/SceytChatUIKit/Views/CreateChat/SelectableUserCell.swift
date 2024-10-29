@@ -20,9 +20,13 @@ open class SelectableUserCell: BaseChannelUserCell {
 
     open var userData: ChatUser! {
         didSet {
-            titleLabel.text = userData.displayName
-            statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(userData)
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: userData)
+            titleLabel.text = appearance.titleFormatter.format(userData)
+            statusLabel.text = appearance.subtitleFormatter.format(userData)
+            imageTask = appearance.avatarRenderer.render(
+                userData,
+                with: appearance.avatarAppearance,
+                into: avatarView
+            )
             subscribeForPresence()
         }
     }

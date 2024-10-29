@@ -11,10 +11,24 @@ import UIKit
 open class SelectedUserCell: SelectedBaseCell {
     open var userData: ChatUser! {
         didSet {
-            label.text = SceytChatUIKit.shared.formatters.userShortNameFormatter.format(userData)
+            
+            label.text = appearance.titleFormatter.format(userData)
             presenceView.isHidden = userData.presence.state != .online
-            avatarView.imageView.image = .deletedUser
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView, for: userData)
+            avatarView.image = .deletedUser
+            imageTask = appearance.avatarRenderer.render(
+                userData,
+                with: appearance.avatarAppearance,
+                into: avatarView
+            )
         }
+    }
+    
+    open override func setupAppearance() {
+        super.setupAppearance()
+        
+        backgroundColor = appearance.backgroundColor
+        label.font = appearance.labelAppearance.font
+        label.textColor = appearance.labelAppearance.foregroundColor
+        closeButton.setImage(appearance.removeIcon, for: .normal)
     }
 }

@@ -8,9 +8,9 @@
 
 import UIKit
 
-open class CircleImageView: View, ImagePresentable {
+open class CircleImageView: View {
 
-    open private(set) var imageView = UIImageView()
+    open private(set) var imageView = ImageView()
         .withoutAutoresizingMask
         .contentMode(.scaleAspectFill)
 

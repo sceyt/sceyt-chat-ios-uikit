@@ -9,7 +9,7 @@
 import UIKit
 
 open class BaseChannelUserCell: TableViewCell {
-    open lazy var avatarView = Components.circleImageView.init()
+    open lazy var avatarView = ImageView()
         .contentMode(.scaleAspectFill)
         .withoutAutoresizingMask
     
