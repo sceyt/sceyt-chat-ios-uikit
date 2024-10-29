@@ -241,7 +241,7 @@ open class ChannelLayoutModel {
                             attributes[.font] = mentionFont
                             attributes[.foregroundColor] = mentionColor
                             attributes[.mention] = userId
-                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + user.displayName,
+                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + appearance.mentionUserNameFormatter.format(user),
                                                              attributes: attributes)
                             text.safeReplaceCharacters(in: range, with: mention)
                         }

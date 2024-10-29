@@ -712,7 +712,7 @@ open class MessageLayoutModel {
                             attributes[.foregroundColor] = mentionColor
                             attributes[.font] = mentionFont
                             attributes[.mention] = userId
-                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + user.displayName,
+                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + appearance.mentionUserNameFormatter.format(user),
                                                              attributes: attributes)
                             text.safeReplaceCharacters(in: range, with: mention)
                             if let rangeEx = Range(range, in: replacedContent) {
