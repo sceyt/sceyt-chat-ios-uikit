@@ -11,7 +11,9 @@ import SceytChat
 
 open class LinkMetadataProvider: DataProvider {
     
-    open var summaryMaxLength = 500 // characters
+    open var titleMaxLength = 100 // characters
+    open var summaryMaxLength = 200 // characters
+    
     public static var `default` = LinkMetadataProvider()
 
     public var cache = defaultCache
@@ -80,6 +82,10 @@ open class LinkMetadataProvider: DataProvider {
         let log_hv = url.absoluteString.hashValue
         logger.verbose("[LOAD LINK] \(log_hv) Will load link Open Graph data from SceytChat url: \(url.absoluteString)")
         if let metadata = cache.object(forKey: url.absoluteString as NSString) {
+            let prefixTitle = metadata.title?.prefix(titleMaxLength)
+            let titleStr = prefixTitle == nil ? nil : String(prefixTitle!)
+            metadata.title = titleStr
+            
             let prefixSummary = metadata.summary?.prefix(summaryMaxLength)
             let summaryStr = prefixSummary == nil ? nil : String(prefixSummary!)
             metadata.summary = summaryStr
@@ -108,6 +114,10 @@ open class LinkMetadataProvider: DataProvider {
                 linkMetadata: metadata,
                 downloadImage: downloadImage,
                 downloadIcon: downloadIcon)
+            let prefixTitle = metadata.title?.prefix(titleMaxLength)
+            let titleStr = prefixTitle == nil ? nil : String(prefixTitle!)
+            metadata.title = titleStr
+            
             let prefixSummary = metadata.summary?.prefix(summaryMaxLength)
             let summaryStr = prefixSummary == nil ? nil : String(prefixSummary!)
             metadata.summary = summaryStr
@@ -124,7 +134,10 @@ open class LinkMetadataProvider: DataProvider {
                 return .failure(error)
             }
             if let link {
-                linkMetadata.title = link.title
+                let prefixTitle = link.title?.prefix(titleMaxLength)
+                let titleStr = prefixTitle == nil ? nil : String(prefixTitle!)
+                linkMetadata.title = titleStr
+                
                 let prefixedInfo = link.info?.prefix(summaryMaxLength)
                 let infoStr = prefixedInfo == nil ? nil : String(prefixedInfo!)
                 linkMetadata.summary = infoStr
