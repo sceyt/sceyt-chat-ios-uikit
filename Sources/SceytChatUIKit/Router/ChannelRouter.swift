@@ -91,12 +91,12 @@ open class ChannelRouter: Router<ChannelViewController> {
     ) -> ReactionsInfoViewController {
         let reactionPageViewController = Components.reactionsInfoViewController.init()
         let reactionScores = message.reactionScores?.sorted(by: { $0.key > $1.key && $0.value > $1.value }) ?? []
-        let reactionScoreViewModel = ReactionScoreViewModel(reactionScores: reactionScores)
+        let reactionScoreViewModel = Components.reactionScoreViewModel.init(reactionScores: reactionScores)
         var userReactionViewModels: [UserReactionViewModel] = .init()
         userReactionViewModels.reserveCapacity(reactionScores.count + 1)
-        userReactionViewModels.append(.init(messageId: message.id, reactionKey: nil))
+        userReactionViewModels.append(Components.userReactionViewModel.init(messageId: message.id, reactionKey: nil))
         reactionScores.forEach { key, _ in
-            userReactionViewModels.append(.init(messageId: message.id, reactionKey: key))
+            userReactionViewModels.append(Components.userReactionViewModel.init(messageId: message.id, reactionKey: key))
         }
         reactionPageViewController.reactionScoreViewModel = reactionScoreViewModel
         reactionPageViewController.userReactionsViewModel = userReactionViewModels

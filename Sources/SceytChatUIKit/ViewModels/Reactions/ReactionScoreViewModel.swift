@@ -8,12 +8,12 @@
 
 import UIKit
 
-public struct ReactionScoreViewModel {
+open class ReactionScoreViewModel {
 
     public let reactionScores: [(key: String, value: Int64)]
-    public var dataSource: [String]
+    open var dataSource: [String]
     
-    public init(reactionScores: [(key: String, value: Int64)]) {
+    public required init(reactionScores: [(key: String, value: Int64)]) {
         self.reactionScores = reactionScores
         let allCount = reactionScores.reduce(0) { $0 + $1.value }
         var dataSource = ["All \(allCount)"]
@@ -23,15 +23,15 @@ public struct ReactionScoreViewModel {
         self.dataSource = dataSource
     }
 
-    public func numberOfItems() -> Int {
+    open func numberOfItems() -> Int {
         dataSource.count
     }
 
-    public func value(at indexPath: IndexPath) -> String {
+    open func value(at indexPath: IndexPath) -> String {
         dataSource[indexPath.item]
     }
 
-    public func width(at indexPath: IndexPath) -> CGFloat {
+    open func width(at indexPath: IndexPath) -> CGFloat {
         let appearance = Components.reactionsInfoHeaderCell.appearance
         let textInsets = Components.reactionsInfoHeaderCell.textInsets ?? .zero
         let containerInsets = Components.reactionsInfoHeaderCell.containerInsets ?? .zero

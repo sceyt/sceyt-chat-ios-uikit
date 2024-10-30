@@ -30,7 +30,7 @@ open class UserReactionViewModel: NSObject {
         ) { $0.convert() }
     }()
 
-    public init(messageId: MessageId, reactionKey: String?) {
+    public required init(messageId: MessageId, reactionKey: String?) {
         self.messageId = messageId
         self.reactionKey = reactionKey
         var queryBuilder = ReactionListQuery

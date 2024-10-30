@@ -17,6 +17,8 @@ open class SelectChannelMembersViewModel: NSObject {
     public private(set) var query: UserListQuery!
     public private(set) var selectedUsers = [ChatUser]()
 
+    required public override init() {}
+    
     private func userListQuery(_ query: String? = nil) -> UserListQuery {
         return UserListQuery
             .Builder()

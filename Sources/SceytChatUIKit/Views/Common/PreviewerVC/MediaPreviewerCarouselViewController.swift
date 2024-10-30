@@ -229,7 +229,7 @@ open class MediaPreviewerCarouselViewController: UIPageViewController,
             .map {
                 let item = $0.viewModel.previewItem
                 if let index = previewDataSource?.indexOfItem(item) {
-                    $0.viewModel = .init(index: index, previewItem: item)
+                    $0.viewModel = Components.previewerViewModel.init(index: index, previewItem: item)
                 }
                 $0.bindPreviewItem()
                 return $0
