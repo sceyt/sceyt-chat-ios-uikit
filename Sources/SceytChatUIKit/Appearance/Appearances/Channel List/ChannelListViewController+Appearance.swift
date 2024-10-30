@@ -31,8 +31,8 @@ extension ChannelListViewController: AppearanceProviding {
         emptyViewAppearance: EmptyStateView.Appearance(
             reference: EmptyStateView.appearance,
             icon: .emptyChannelList,
-            title: "No Chats yet",
-            message: "You haven’t created channels yet, create one for sending messages."
+            title: L10n.Channel.List.NoMessages.title,
+            message: L10n.Channel.List.NoMessages.message
         ),
         cellAppearance: ChannelCell.Appearance(
             reference: ChannelCell.appearance

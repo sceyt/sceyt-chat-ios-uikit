@@ -13,8 +13,8 @@ extension ChannelSearchResultsViewController: AppearanceProviding {
         emptyViewAppearance: EmptyStateView.Appearance(
             reference: EmptyStateView.appearance,
             icon: .noResultsSearch,
-            title: "No Results",
-            message: "There were no results found."
+            title: L10n.Search.NoResults.title,
+            message: L10n.Search.NoResults.message
         ),
         cellAppearance: SearchResultChannelCell.appearance,
         selectableCellAppearance: SelectableChannelCell.appearance,

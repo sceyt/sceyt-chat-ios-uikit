@@ -27,6 +27,8 @@
 "channel.list.action.unmute" = "Unmute";
 "channel.list.action.pin" = "Pin";
 "channel.list.action.unpin" = "Unpin";
+"channel.list.noMessages.title" = "No Chats yet";
+"channel.list.noMessages.message" = "You haven’t created channels yet, create one for sending messages.";
 "channel.message.attachment" = "Attachment";
 "channel.message.lastReaction" = "Reacted %@ to:";
 "channel.join" = "Join";
