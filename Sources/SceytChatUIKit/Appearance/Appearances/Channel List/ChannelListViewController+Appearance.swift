@@ -9,10 +9,20 @@ import UIKit
 
 extension ChannelListViewController: AppearanceProviding {
     public static var appearance = Appearance(
-        navigationBarAppearance: {
-            $0.standardAppearance?.backgroundColor = .surface1
-            return $0
-        }(NavigationBarAppearance.appearance),
+        navigationBarAppearance: .init(
+            reference: NavigationBarAppearance.appearance,
+            standardAppearance: {
+                let appearance = UINavigationBarAppearance()
+                appearance.titleTextAttributes = [
+                    .font: Fonts.bold.withSize(20),
+                    .foregroundColor: UIColor.primaryText
+                ]
+                appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+                appearance.backgroundColor = .surface1
+                appearance.shadowColor = .border
+                return appearance
+            }()
+        ),
         backgroundColor: .background,
         tabBarItemBadgeColor: .stateWarning,
         connectionIndicatorAppearance: ConnectionStateViewAppearance(

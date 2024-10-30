@@ -23,9 +23,6 @@ open class MediaPreviewerNavigationController: NavigationController, PreviewerTr
         transitioningDelegate = imageViewerPresentationDelegate
         modalPresentationStyle = .custom
         modalPresentationCapturesStatusBarAppearance = true
-        navigationBar.isTranslucent = true
-        navigationBar.setBackgroundImage(UIImage(), for: .default)
-        navigationBar.shadowImage = UIImage()
     }
     
     required public init?(coder aDecoder: NSCoder) {

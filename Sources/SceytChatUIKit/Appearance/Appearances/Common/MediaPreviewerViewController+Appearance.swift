@@ -11,14 +11,32 @@ import UIKit
 extension MediaPreviewerViewController: AppearanceProviding {
     public static var appearance = Appearance(
         backgroundColor: DefaultColors.backgroundDark,
-        navigationBarAppearance: {
-            $0.tintColor = .onPrimary
-            $0.standardAppearance?.backgroundColor = DefaultColors.backgroundDark
-            $0.standardAppearance?.shadowColor = .clear
-            $0.scrollEdgeAppearance?.backgroundColor = DefaultColors.backgroundDark
-            $0.scrollEdgeAppearance?.shadowColor = .clear
-            return $0
-        }(NavigationBarAppearance.appearance),
+        navigationBarAppearance: .init(
+            reference: NavigationBarAppearance.appearance,
+            tintColor: .onPrimary,
+            standardAppearance: {
+                let appearance = UINavigationBarAppearance()
+                appearance.titleTextAttributes = [
+                    .font: Fonts.bold.withSize(20),
+                    .foregroundColor: UIColor.primaryText
+                ]
+                appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+                appearance.backgroundColor = DefaultColors.backgroundDark
+                appearance.shadowColor = .clear
+                return appearance
+            }(),
+            scrollEdgeAppearance: {
+                let appearance = UINavigationBarAppearance()
+                appearance.titleTextAttributes = [
+                    .font: Fonts.bold.withSize(20),
+                    .foregroundColor: UIColor.primaryText
+                ]
+                appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+                appearance.backgroundColor = DefaultColors.backgroundDark
+                appearance.shadowColor = .clear
+                return appearance
+            }()
+        ),
         playIcon: .videoPlayerPlay,
         pauseIcon: .videoPlayerPause,
         trackColor: .surface3,

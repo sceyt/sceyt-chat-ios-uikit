@@ -81,7 +81,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         channelNameFormatter: SceytChatUIKit.shared.formatters.channelNameFormatter,
         channelDateFormatter: SceytChatUIKit.shared.formatters.channelDateFormatter,
         unreadCountFormatter: SceytChatUIKit.shared.formatters.unreadCountFormatter,
-        userShortNameFormatter: SceytChatUIKit.shared.formatters.userShortNameFormatter,
         typingUserNameFormatter: SceytChatUIKit.shared.formatters.typingUserNameFormatter,
         mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
         attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
@@ -164,9 +163,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         public var unreadCountFormatter: any UIntFormatting
         
         @Trackable<Appearance, any UserFormatting>
-        public var userShortNameFormatter: any UserFormatting
-        
-        @Trackable<Appearance, any UserFormatting>
         public var typingUserNameFormatter: any UserFormatting
         
         @Trackable<Appearance, any UserFormatting>
@@ -223,7 +219,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             channelNameFormatter: any ChannelFormatting,
             channelDateFormatter: any DateFormatting,
             unreadCountFormatter: any UIntFormatting,
-            userShortNameFormatter: any UserFormatting,
             typingUserNameFormatter: any UserFormatting,
             mentionUserNameFormatter: any UserFormatting,
             attachmentNameFormatter: any AttachmentFormatting,
@@ -262,7 +257,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._channelNameFormatter = Trackable(value: channelNameFormatter)
             self._channelDateFormatter = Trackable(value: channelDateFormatter)
             self._unreadCountFormatter = Trackable(value: unreadCountFormatter)
-            self._userShortNameFormatter = Trackable(value: userShortNameFormatter)
             self._typingUserNameFormatter = Trackable(value: typingUserNameFormatter)
             self._mentionUserNameFormatter = Trackable(value: mentionUserNameFormatter)
             self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
@@ -304,7 +298,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             channelNameFormatter: (any ChannelFormatting)? = nil,
             channelDateFormatter: (any DateFormatting)? = nil,
             unreadCountFormatter: (any UIntFormatting)? = nil,
-            userShortNameFormatter: (any UserFormatting)? = nil,
             typingUserNameFormatter: (any UserFormatting)? = nil,
             mentionUserNameFormatter: (any UserFormatting)? = nil,
             attachmentNameFormatter: (any AttachmentFormatting)? = nil,
@@ -337,7 +330,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._channelNameFormatter = Trackable(reference: reference, referencePath: \.channelNameFormatter)
             self._channelDateFormatter = Trackable(reference: reference, referencePath: \.channelDateFormatter)
             self._unreadCountFormatter = Trackable(reference: reference, referencePath: \.unreadCountFormatter)
-            self._userShortNameFormatter = Trackable(reference: reference, referencePath: \.userShortNameFormatter)
             self._typingUserNameFormatter = Trackable(reference: reference, referencePath: \.typingUserNameFormatter)
             self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
             self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
@@ -370,7 +362,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             if let channelNameFormatter { self.channelNameFormatter = channelNameFormatter }
             if let channelDateFormatter { self.channelDateFormatter = channelDateFormatter }
             if let unreadCountFormatter { self.unreadCountFormatter = unreadCountFormatter }
-            if let userShortNameFormatter { self.userShortNameFormatter = userShortNameFormatter }
             if let typingUserNameFormatter { self.typingUserNameFormatter = typingUserNameFormatter }
             if let mentionUserNameFormatter { self.mentionUserNameFormatter = mentionUserNameFormatter }
             if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }

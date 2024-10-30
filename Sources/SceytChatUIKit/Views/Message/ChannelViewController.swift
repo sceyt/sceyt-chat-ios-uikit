@@ -505,7 +505,7 @@ open class ChannelViewController: ViewController,
             .removeDuplicates()
             .sink { [weak self] value in
                 guard let self else { return }
-                unreadCountView.unreadCount.value = appearance.unreadCountFormatter.format(value)
+                unreadCountView.unreadCount.value = appearance.scrollDownAppearance.unreadCountFormatter.format(value)
             }.store(in: &subscriptions)
         
         channelViewModel
@@ -2368,6 +2368,7 @@ open class ChannelViewController: ViewController,
         SimpleSinglePlayer.stop()
         avatarTask?.cancel()
         navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+        NotificationCenter.default.removeObserver(self)
     }
     
     open func didStartVoiceRecording() {

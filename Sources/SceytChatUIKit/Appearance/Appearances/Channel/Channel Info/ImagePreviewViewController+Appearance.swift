@@ -10,10 +10,10 @@ import UIKit
 
 extension ImagePreviewViewController: AppearanceProviding {
     public static var appearance = Appearance(
-        navigationBarAppearance: {
-            $0.shadowColor = .border
-            return $0
-        }(NavigationBarAppearance.appearance),
+        navigationBarAppearance: .init(
+            reference: NavigationBarAppearance.appearance,
+            shadowColor: .border
+        ),
         backgroundColor: .background,
         channelNameFormatter: SceytChatUIKit.shared.formatters.channelNameFormatter
     )
