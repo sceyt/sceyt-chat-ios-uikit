@@ -22,23 +22,23 @@ public class ChannelAvatarRenderer: ChannelAvatarRendering {
         let avatarRepresentation = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider.provideVisual(for: channel)
         
         if let view = imagePresentable as? UIView {
-            view.backgroundColor = appearance.backgroundColor
             view.clipsToBounds = true
             view.contentMode = .scaleAspectFill
             
             imagePresentable.shape = appearance.shape
         }
         
-        return switch avatarRepresentation {
+        switch avatarRepresentation {
         case .image(let image):
-            Components.avatarBuilder.loadAvatar(
+            return Components.avatarBuilder.loadAvatar(
                 into: imagePresentable,
                 for: channel,
                 defaultImage: image,
                 size: size
             )
-        case .initialsAppearance(let initialsAppearance):
-            Components.avatarBuilder.loadAvatar(
+        case .initialsAppearance(var initialsAppearance):
+            initialsAppearance?.backgroundColor = appearance.backgroundColor
+            return Components.avatarBuilder.loadAvatar(
                 into: imagePresentable,
                 for: channel,
                 appearance: initialsAppearance,
@@ -59,20 +59,22 @@ public class ChannelAvatarRenderer: ChannelAvatarRendering {
     
     public func render(
         _ channel: ChatChannel,
+        with appearance: AvatarAppearance,
         completion: @escaping (UIImage?) -> Void
     ) -> Cancellable? {
         let avatarRepresentation = SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider.provideVisual(for: channel)
                 
-        return switch avatarRepresentation {
+        switch avatarRepresentation {
         case .image(let image):
-            Components.avatarBuilder.loadAvatar(
+            return Components.avatarBuilder.loadAvatar(
                 for: channel,
                 defaultImage: image,
                 size: size,
                 avatar: completion
             )
-        case .initialsAppearance(let initialsAppearance):
-            Components.avatarBuilder.loadAvatar(
+        case .initialsAppearance(var initialsAppearance):
+            initialsAppearance?.backgroundColor = appearance.backgroundColor
+            return Components.avatarBuilder.loadAvatar(
                 for: channel,
                 appearance: initialsAppearance,
                 size: size,

@@ -43,6 +43,7 @@ public protocol ChannelAvatarRendering: AvatarRendering {
     
     func render(
         _ input: ChatChannel,
+        with appearance: AvatarAppearance,
         completion: @escaping (UIImage?) -> Void
     ) -> Cancellable?
 }

@@ -202,15 +202,18 @@ public struct InitialsBuilderAppearance {
         }
     }
     public var color: UIColor
+    public var backgroundColor: UIColor?
     public var size: CGSize
     
     public var adjustsFontSizeToFitWidth = true
     
     public init(
         color: UIColor = .onPrimary,
+        backgroundColor: UIColor? = nil,
         size: CGSize = .init(width: 60, height: 60))
     {
         self.color = color
+        self.backgroundColor = backgroundColor
         self.size = size
     }
 }

@@ -355,7 +355,8 @@ open class ChannelLayoutModel {
     }
     
     open func loadAvatar() {
-        appearance.channelAvatarRenderer.render(channel) { [weak self] image in
+        appearance.avatarAppearance
+        appearance.channelAvatarRenderer.render(channel, with: appearance.avatarAppearance) { [weak self] image in
             self?.avatar = image
         }
     }

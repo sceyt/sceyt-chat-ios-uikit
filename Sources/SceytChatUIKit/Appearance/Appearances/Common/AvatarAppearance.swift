@@ -11,11 +11,11 @@ import UIKit
 public struct AvatarAppearance {
     
     public static var standard = AvatarAppearance(
-        backgroundColor: .clear,
+        backgroundColor: nil,
         shape: .circle
     )
     
-    public var backgroundColor: UIColor
+    public var backgroundColor: UIColor?
     public var shape: Shape
 }
 

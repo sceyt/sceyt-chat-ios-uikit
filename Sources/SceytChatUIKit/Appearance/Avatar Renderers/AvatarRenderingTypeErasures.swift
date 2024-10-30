@@ -61,7 +61,7 @@ public struct AnyChannelAvatarRendering: ChannelAvatarRendering {
     private let _renderWithSize: (ChatChannel, AvatarAppearance, ImagePresentable, CGSize) -> Cancellable?
     
     /// A closure that holds the rendering logic for the completion-based render method.
-    private let _renderWithCompletion: (ChatChannel, @escaping (UIImage?) -> Void) -> Cancellable?
+    private let _renderWithCompletion: (ChatChannel, AvatarAppearance, @escaping (UIImage?) -> Void) -> Cancellable?
     
     /// Creates a type-erased wrapper around a given `ChannelAvatarRendering` instance.
     ///
@@ -110,12 +110,14 @@ public struct AnyChannelAvatarRendering: ChannelAvatarRendering {
     ///
     /// - Parameters:
     ///   - input: The `ChatChannel` instance containing channel-related data for rendering.
+    ///   - appearance: The `AvatarAppearance` instance used to customize the avatar.
     ///   - completion: A closure called with the rendered `UIImage?` result.
     /// - Returns: A `Cancellable?` that can be used to cancel the rendering task, if needed.
     public func render(
         _ input: ChatChannel,
+        with appearance: AvatarAppearance,
         completion: @escaping (UIImage?) -> Void
     ) -> Cancellable? {
-        return _renderWithCompletion(input, completion)
+        return _renderWithCompletion(input, appearance, completion)
     }
 }

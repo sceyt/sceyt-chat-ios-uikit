@@ -27,15 +27,16 @@ public struct UserAvatarRenderer: UserAvatarRendering {
             imagePresentable.shape = appearance.shape
         }
         
-        return switch avatarRepresentation {
+        switch avatarRepresentation {
         case .image(let image):
-            Components.avatarBuilder.loadAvatar(
+            return Components.avatarBuilder.loadAvatar(
                 into: imagePresentable,
                 for: user,
                 defaultImage: image
             )
-        case .initialsAppearance(let initialsAppearance):
-            Components.avatarBuilder.loadAvatar(
+        case .initialsAppearance(var initialsAppearance):
+            initialsAppearance?.backgroundColor = appearance.backgroundColor
+            return Components.avatarBuilder.loadAvatar(
                 into: imagePresentable,
                 for: user,
                 appearance: initialsAppearance

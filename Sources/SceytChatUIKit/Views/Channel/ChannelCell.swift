@@ -231,7 +231,6 @@ extension ChannelListViewController {
                     guard let self else { return }
                     avatarView.image = image
                     avatarView.shape = appearance.avatarAppearance.shape
-                    avatarView.backgroundColor = appearance.avatarAppearance.backgroundColor
                     avatarView.clipsToBounds = true
                     avatarView.contentMode = .scaleAspectFill
                 }.store(in: &subscriptions)
