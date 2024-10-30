@@ -33,7 +33,6 @@ extension MessageInputViewController: AppearanceProviding {
             ),
             backgroundColor: .surface1
         ),
-        selectedAttachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
         closeIcon: .closeIcon,
         linkPreviewAppearance: InputLinkPreviewAppearance(
             reference: InputLinkPreviewAppearance.appearance,
@@ -92,9 +91,6 @@ extension MessageInputViewController: AppearanceProviding {
         @Trackable<Appearance, ButtonAppearance>
         public var joinButtonAppearance: ButtonAppearance
         
-        @Trackable<Appearance, any AttachmentIconProviding>
-        public var selectedAttachmentIconProvider: any AttachmentIconProviding
-        
         @Trackable<Appearance, UIImage>
         public var closeIcon: UIImage
         
@@ -144,7 +140,6 @@ extension MessageInputViewController: AppearanceProviding {
             inputAppearance: InputTextView.Appearance,
             mentionLabelAppearance: LabelAppearance,
             joinButtonAppearance: ButtonAppearance,
-            selectedAttachmentIconProvider: any AttachmentIconProviding,
             closeIcon: UIImage,
             linkPreviewAppearance: InputLinkPreviewAppearance,
             replyMessageAppearance: InputReplyMessageAppearance,
@@ -170,7 +165,6 @@ extension MessageInputViewController: AppearanceProviding {
             self._inputAppearance = Trackable(value: inputAppearance)
             self._mentionLabelAppearance = Trackable(value: mentionLabelAppearance)
             self._joinButtonAppearance = Trackable(value: joinButtonAppearance)
-            self._selectedAttachmentIconProvider = Trackable(value: selectedAttachmentIconProvider)
             self._closeIcon = Trackable(value: closeIcon)
             self._linkPreviewAppearance = Trackable(value: linkPreviewAppearance)
             self._replyMessageAppearance = Trackable(value: replyMessageAppearance)
@@ -199,7 +193,6 @@ extension MessageInputViewController: AppearanceProviding {
             inputAppearance: InputTextView.Appearance? = nil,
             mentionLabelAppearance: LabelAppearance? = nil,
             joinButtonAppearance: ButtonAppearance? = nil,
-            selectedAttachmentIconProvider: (any AttachmentIconProviding)? = nil,
             closeIcon: UIImage? = nil,
             linkPreviewAppearance: InputLinkPreviewAppearance? = nil,
             replyMessageAppearance: InputReplyMessageAppearance? = nil,
@@ -225,7 +218,6 @@ extension MessageInputViewController: AppearanceProviding {
             self._inputAppearance = Trackable(reference: reference, referencePath: \.inputAppearance)
             self._mentionLabelAppearance = Trackable(reference: reference, referencePath: \.mentionLabelAppearance)
             self._joinButtonAppearance = Trackable(reference: reference, referencePath: \.joinButtonAppearance)
-            self._selectedAttachmentIconProvider = Trackable(reference: reference, referencePath: \.selectedAttachmentIconProvider)
             self._closeIcon = Trackable(reference: reference, referencePath: \.closeIcon)
             self._linkPreviewAppearance = Trackable(reference: reference, referencePath: \.linkPreviewAppearance)
             self._replyMessageAppearance = Trackable(reference: reference, referencePath: \.replyMessageAppearance)
@@ -251,7 +243,6 @@ extension MessageInputViewController: AppearanceProviding {
             if let inputAppearance { self.inputAppearance = inputAppearance }
             if let mentionLabelAppearance { self.mentionLabelAppearance = mentionLabelAppearance }
             if let joinButtonAppearance { self.joinButtonAppearance = joinButtonAppearance }
-            if let selectedAttachmentIconProvider { self.selectedAttachmentIconProvider = selectedAttachmentIconProvider }
             if let closeIcon { self.closeIcon = closeIcon }
             if let linkPreviewAppearance { self.linkPreviewAppearance = linkPreviewAppearance }
             if let replyMessageAppearance { self.replyMessageAppearance = replyMessageAppearance }

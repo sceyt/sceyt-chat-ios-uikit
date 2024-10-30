@@ -120,7 +120,7 @@ extension MessageCell: AppearanceProviding {
         //        unreadMessagesSeparatorAppearance: MessageCell.UnreadMessagesSeparatorView.appearance,
         unreadMessagesSeparatorAppearance: UnreadMessagesSeparatorView.Appearance(), // review!!!
         replyMessageAppearance: ReplyMessageAppearance.appearance,
-        checkboxAppearance: CheckBoxView.appearance,
+        selectionCheckboxAppearance: CheckBoxView.appearance,
         voiceWaveformViewAppearance: AudioWaveformView.appearance,
         mediaLoaderAppearance: CircularProgressView.Appearance(
             reference: CircularProgressView.appearance,
@@ -299,7 +299,7 @@ extension MessageCell: AppearanceProviding {
         public var replyMessageAppearance: ReplyMessageAppearance
         
         @Trackable<Appearance, CheckBoxView.Appearance>
-        public var checkboxAppearance: CheckBoxView.Appearance
+        public var selectionCheckboxAppearance: CheckBoxView.Appearance
         
         @Trackable<Appearance, AudioWaveformView.Appearance>
         public var voiceWaveformViewAppearance: AudioWaveformView.Appearance
@@ -402,7 +402,7 @@ extension MessageCell: AppearanceProviding {
             // Other Appearances
             unreadMessagesSeparatorAppearance: MessageCell.UnreadMessagesSeparatorView.Appearance,
             replyMessageAppearance: ReplyMessageAppearance,
-            checkboxAppearance: CheckBoxView.Appearance,
+            selectionCheckboxAppearance: CheckBoxView.Appearance,
             voiceWaveformViewAppearance: AudioWaveformView.Appearance,
             mediaLoaderAppearance: CircularProgressView.Appearance,
             overlayMediaLoaderAppearance: CircularProgressView.Appearance,
@@ -475,7 +475,7 @@ extension MessageCell: AppearanceProviding {
             // Other Appearances
             self._unreadMessagesSeparatorAppearance = Trackable(value: unreadMessagesSeparatorAppearance)
             self._replyMessageAppearance = Trackable(value: replyMessageAppearance)
-            self._checkboxAppearance = Trackable(value: checkboxAppearance)
+            self._selectionCheckboxAppearance = Trackable(value: selectionCheckboxAppearance)
             self._voiceWaveformViewAppearance = Trackable(value: voiceWaveformViewAppearance)
             self._mediaLoaderAppearance = Trackable(value: mediaLoaderAppearance)
             self._overlayMediaLoaderAppearance = Trackable(value: overlayMediaLoaderAppearance)
@@ -552,7 +552,7 @@ extension MessageCell: AppearanceProviding {
             // Other Appearances
             unreadMessagesSeparatorAppearance: MessageCell.UnreadMessagesSeparatorView.Appearance? = nil,
             replyMessageAppearance: ReplyMessageAppearance? = nil,
-            checkboxAppearance: CheckBoxView.Appearance? = nil,
+            selectionCheckboxAppearance: CheckBoxView.Appearance? = nil,
             voiceWaveformViewAppearance: AudioWaveformView.Appearance? = nil,
             mediaLoaderAppearance: CircularProgressView.Appearance? = nil,
             overlayMediaLoaderAppearance: CircularProgressView.Appearance? = nil,
@@ -619,7 +619,7 @@ extension MessageCell: AppearanceProviding {
             self._voicePauseIcon = Trackable(reference: reference, referencePath: \.voicePauseIcon)
             self._unreadMessagesSeparatorAppearance = Trackable(reference: reference, referencePath: \.unreadMessagesSeparatorAppearance)
             self._replyMessageAppearance = Trackable(reference: reference, referencePath: \.replyMessageAppearance)
-            self._checkboxAppearance = Trackable(reference: reference, referencePath: \.checkboxAppearance)
+            self._selectionCheckboxAppearance = Trackable(reference: reference, referencePath: \.selectionCheckboxAppearance)
             self._voiceWaveformViewAppearance = Trackable(reference: reference, referencePath: \.voiceWaveformViewAppearance)
             self._mediaLoaderAppearance = Trackable(reference: reference, referencePath: \.mediaLoaderAppearance)
             self._overlayMediaLoaderAppearance = Trackable(reference: reference, referencePath: \.overlayMediaLoaderAppearance)
@@ -681,7 +681,7 @@ extension MessageCell: AppearanceProviding {
             if let voicePauseIcon { self.voicePauseIcon = voicePauseIcon }
             if let unreadMessagesSeparatorAppearance { self.unreadMessagesSeparatorAppearance = unreadMessagesSeparatorAppearance }
             if let replyMessageAppearance { self.replyMessageAppearance = replyMessageAppearance }
-            if let checkboxAppearance { self.checkboxAppearance = checkboxAppearance }
+            if let selectionCheckboxAppearance { self.selectionCheckboxAppearance = selectionCheckboxAppearance }
             if let voiceWaveformViewAppearance { self.voiceWaveformViewAppearance = voiceWaveformViewAppearance }
             if let mediaLoaderAppearance { self.mediaLoaderAppearance = mediaLoaderAppearance }
             if let overlayMediaLoaderAppearance { self.overlayMediaLoaderAppearance = overlayMediaLoaderAppearance }

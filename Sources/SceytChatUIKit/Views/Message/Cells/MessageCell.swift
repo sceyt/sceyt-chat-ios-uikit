@@ -192,7 +192,7 @@ open class MessageCell: CollectionViewCell,
         infoView.appearance = appearance
         reactionTotalView.appearance = appearance
         unreadMessagesSeparatorView.appearance = appearance
-        checkBoxView.parentAppearance = appearance.checkboxAppearance
+        checkBoxView.parentAppearance = appearance.selectionCheckboxAppearance
         
         if data != nil {
             bind()
