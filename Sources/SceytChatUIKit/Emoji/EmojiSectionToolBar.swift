@@ -28,7 +28,7 @@ open class EmojiSectionToolBar: View {
         }
     }
     
-    open var appearance: EmojiPickerViewController.Appearance = EmojiPickerViewController.appearance
+    open var appearance: EmojiPickerViewController.Appearance = Components.emojiPickerViewController.appearance
 
     open override func setup() {
         super.setup()

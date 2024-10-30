@@ -67,11 +67,14 @@ extension SceytChatUIKit {
         public static var selectUsersViewController: SelectUsersViewController.Type = SelectUsersViewController.self
         public static var sheetViewController: SheetViewController.Type = SheetViewController.self
         public static var startChatViewController: StartChatViewController.Type = StartChatViewController.self
+        public static var channelSearchController: ChannelSearchController.Type = ChannelSearchController.self
         
         // MARK: - Routers
         
+        public static var channelRouter: ChannelRouter.Type = ChannelRouter.self
         public static var channelForwardRouter: ChannelForwardRouter.Type = ChannelForwardRouter.self
         public static var channelListRouter: ChannelListRouter.Type = ChannelListRouter.self
+        public static var channelMemberListRouter: ChannelMemberListRouter.Type = ChannelMemberListRouter.self
         public static var channelProfileRouter: ChannelProfileRouter.Type = ChannelProfileRouter.self
         public static var inputRouter: InputRouter.Type = InputRouter.self
         public static var previewerRouter: PreviewerRouter.Type = PreviewerRouter.self
@@ -142,6 +145,10 @@ extension SceytChatUIKit {
         public static var channelMessagesCollectionView: ChannelViewController.MessagesCollectionView.Type = ChannelViewController.MessagesCollectionView.self
         public static var channelMessagesCollectionViewLayout: ChannelViewController.MessagesCollectionViewLayout.Type = ChannelViewController.MessagesCollectionViewLayout.self
         public static var channelScrollDownView: ChannelViewController.ScrollDownView.Type = ChannelViewController.ScrollDownView.self
+        public static var channelInfoMediaCollectionView: ChannelInfoViewController.MediaCollectionView.Type = ChannelInfoViewController.MediaCollectionView.self
+        public static var channelInfoFileCollectionView: ChannelInfoViewController.FileCollectionView.Type = ChannelInfoViewController.FileCollectionView.self
+        public static var channelInfoLinkCollectionView: ChannelInfoViewController.LinkCollectionView.Type = ChannelInfoViewController.LinkCollectionView.self
+        public static var channelInfoVoiceCollectionView: ChannelInfoViewController.VoiceCollectionView.Type = ChannelInfoViewController.VoiceCollectionView.self
         public static var checkBoxView: CheckBoxView.Type = CheckBoxView.self
         public static var circleButton: CircleButton.Type = CircleButton.self
         public static var circleImageView: CircleImageView.Type = CircleImageView.self
@@ -149,6 +156,8 @@ extension SceytChatUIKit {
         public static var connectionStateView: ConnectionStateView.Type = ConnectionStateView.self
         public static var createChannelDetailsView: CreateChannelViewController.DetailsView.Type = CreateChannelViewController.DetailsView.self
         public static var createGroupDetailsView: CreateGroupViewController.DetailsView.Type = CreateGroupViewController.DetailsView.self
+        
+        public static var emojiPickerSectionHeaderView: EmojiPickerViewController.SectionHeaderView.Type = EmojiPickerViewController.SectionHeaderView.self
         public static var emptyStateView: EmptyStateView.Type = EmptyStateView.self
         public static var mediaPickerAttachButton: MediaPickerViewController.AttachButton.Type = MediaPickerViewController.AttachButton.self
         public static var mediaPickerCollectionView: MediaPickerViewController.MediaPickerCollectionView.Type = MediaPickerViewController.MediaPickerCollectionView.self

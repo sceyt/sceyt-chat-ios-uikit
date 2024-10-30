@@ -28,6 +28,10 @@ open class ChannelAddMembersViewModel: SelectChannelMembersViewModel {
         self.onlyDismissAfterDone = onlyDismissAfterDone
     }
     
+    required public override init() {
+        fatalError("init() has not been implemented")
+    }
+    
     open func addMembers() {
         guard !selectedUsers.isEmpty
         else {
