@@ -11,9 +11,6 @@ import Foundation
 //    channelMessageBodyFormatter:Interface
 //    messageBodyFormatter:Interface
 
-//    messageDateFromatter:Interface
-//    messageMarkerDateFormatter:Interface
-
 extension SceytChatUIKit {
     public struct Formatters {
         public var userNameFormatter: any UserFormatting = UserNameFormatter()
@@ -73,6 +70,18 @@ extension SceytChatUIKit {
         public var channelInfoVoiceSubtitleFormatter: any AttachmentFormatting = ChannelInfoVoiceSubtitleFormatter()
 
         public var logDateFormatter: any DateFormatting = LogDateFormatter()
+        
+        public var messageBodyFormatter: any MessageBodyContentFormatting = MessageBodyFormatter()
+        
+        public var channelLastMessageBodyFormatter: any MessageBodyFormatting = ChannelLastMessageBodyFormatter()
+        
+        public var repliedMessageBodyFormatter: any RepliedMessageBodyFormatting = RepliedMessageBodyFormatter()
+        
+        public var editMessageBodyFormatter: any EditMessageBodyFormatting = EditMessageBodyFormatter()
+        
+        public var replyMessageBodyFormatter: any ReplyMessageBodyFormatting = ReplyMessageBodyFormatter()
+        
+        public var draftMessageBodyFormatter: any DraftMessageBodyFormatting = DraftMessageBodyFormatter()
         
         public init() {}
     }

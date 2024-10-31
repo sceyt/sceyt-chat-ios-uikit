@@ -40,7 +40,8 @@ public class ReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: SceytChatUIKit.shared.formatters.mediaDurationFormatter,
         attachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
         attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
-        senderNameFormatter: SceytChatUIKit.shared.formatters.userNameFormatter
+        senderNameFormatter: SceytChatUIKit.shared.formatters.userNameFormatter,
+        repliedMessageBodyFormatter: SceytChatUIKit.shared.formatters.repliedMessageBodyFormatter
     )
     
     @Trackable<ReplyMessageAppearance, LabelAppearance>
@@ -73,6 +74,9 @@ public class ReplyMessageAppearance: AppearanceProviding {
     @Trackable<ReplyMessageAppearance, any UserFormatting>
     public var senderNameFormatter: any UserFormatting
     
+    @Trackable<ReplyMessageAppearance, any RepliedMessageBodyFormatting>
+    public var repliedMessageBodyFormatter: any RepliedMessageBodyFormatting
+    
     // Initializer with all parameters
     public init(
         titleLabelAppearance: LabelAppearance,
@@ -84,7 +88,8 @@ public class ReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: any TimeIntervalFormatting,
         attachmentIconProvider: any AttachmentIconProviding,
         attachmentNameFormatter: any AttachmentFormatting,
-        senderNameFormatter: any UserFormatting
+        senderNameFormatter: any UserFormatting,
+        repliedMessageBodyFormatter: any RepliedMessageBodyFormatting
     ) {
         self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
         self._subtitleLabelAppearance = Trackable(value: subtitleLabelAppearance)
@@ -96,6 +101,7 @@ public class ReplyMessageAppearance: AppearanceProviding {
         self._attachmentIconProvider = Trackable(value: attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
         self._senderNameFormatter = Trackable(value: senderNameFormatter)
+        self._repliedMessageBodyFormatter = Trackable(value: repliedMessageBodyFormatter)
     }
     
     // Initializer with optional parameters
@@ -110,7 +116,8 @@ public class ReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: (any TimeIntervalFormatting)? = nil,
         attachmentIconProvider: (any AttachmentIconProviding)? = nil,
         attachmentNameFormatter: (any AttachmentFormatting)? = nil,
-        senderNameFormatter: (any UserFormatting)? = nil
+        senderNameFormatter: (any UserFormatting)? = nil,
+        repliedMessageBodyFormatter: (any RepliedMessageBodyFormatting)? = nil
     ) {
         self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
         self._subtitleLabelAppearance = Trackable(reference: reference, referencePath: \.subtitleLabelAppearance)
@@ -122,6 +129,7 @@ public class ReplyMessageAppearance: AppearanceProviding {
         self._attachmentIconProvider = Trackable(reference: reference, referencePath: \.attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
         self._senderNameFormatter = Trackable(reference: reference, referencePath: \.senderNameFormatter)
+        self._repliedMessageBodyFormatter = Trackable(reference: reference, referencePath: \.repliedMessageBodyFormatter)
         
         if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
         if let subtitleLabelAppearance { self.subtitleLabelAppearance = subtitleLabelAppearance }
@@ -133,5 +141,6 @@ public class ReplyMessageAppearance: AppearanceProviding {
         if let attachmentIconProvider { self.attachmentIconProvider = attachmentIconProvider }
         if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }
         if let senderNameFormatter { self.senderNameFormatter = senderNameFormatter }
+        if let repliedMessageBodyFormatter { self.repliedMessageBodyFormatter = repliedMessageBodyFormatter }
     }
 }

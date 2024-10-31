@@ -41,7 +41,8 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: SceytChatUIKit.shared.formatters.mediaDurationFormatter,
         attachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
         attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
-        senderNameFormatter: SceytChatUIKit.shared.formatters.userNameFormatter
+        senderNameFormatter: SceytChatUIKit.shared.formatters.userNameFormatter,
+        replyMessageBodyFormatter: SceytChatUIKit.shared.formatters.replyMessageBodyFormatter
     )
     
     @Trackable<InputReplyMessageAppearance, UIColor>
@@ -77,6 +78,9 @@ public class InputReplyMessageAppearance: AppearanceProviding {
     @Trackable<InputReplyMessageAppearance, any UserFormatting>
     public var senderNameFormatter: any UserFormatting
     
+    @Trackable<InputReplyMessageAppearance, any ReplyMessageBodyFormatting>
+    public var replyMessageBodyFormatter: any ReplyMessageBodyFormatting
+    
     public init(
         backgroundColor: UIColor,
         titleLabelAppearance: LabelAppearance,
@@ -88,7 +92,8 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: any TimeIntervalFormatting,
         attachmentIconProvider: any AttachmentIconProviding,
         attachmentNameFormatter: any AttachmentFormatting,
-        senderNameFormatter: any UserFormatting
+        senderNameFormatter: any UserFormatting,
+        replyMessageBodyFormatter: any ReplyMessageBodyFormatting
     ) {
         self._backgroundColor = Trackable(value: backgroundColor)
         self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
@@ -101,6 +106,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         self._attachmentIconProvider = Trackable(value: attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
         self._senderNameFormatter = Trackable(value: senderNameFormatter)
+        self._replyMessageBodyFormatter = Trackable(value: replyMessageBodyFormatter)
     }
     
     public init(
@@ -115,7 +121,8 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: (any TimeIntervalFormatting)? = nil,
         attachmentIconProvider: (any AttachmentIconProviding)? = nil,
         attachmentNameFormatter: (any AttachmentFormatting)? = nil,
-        senderNameFormatter: (any UserFormatting)? = nil
+        senderNameFormatter: (any UserFormatting)? = nil,
+        replyMessageBodyFormatter: (any ReplyMessageBodyFormatting)? = nil
     ) {
         self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
         self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
@@ -128,6 +135,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         self._attachmentIconProvider = Trackable(reference: reference, referencePath: \.attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
         self._senderNameFormatter = Trackable(reference: reference, referencePath: \.senderNameFormatter)
+        self._replyMessageBodyFormatter = Trackable(reference: reference, referencePath: \.replyMessageBodyFormatter)
         
         if let backgroundColor { self.backgroundColor = backgroundColor }
         if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
@@ -140,5 +148,6 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         if let attachmentIconProvider { self.attachmentIconProvider = attachmentIconProvider }
         if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }
         if let senderNameFormatter { self.senderNameFormatter = senderNameFormatter }
+        if let replyMessageBodyFormatter { self.replyMessageBodyFormatter = replyMessageBodyFormatter }
     }
 }

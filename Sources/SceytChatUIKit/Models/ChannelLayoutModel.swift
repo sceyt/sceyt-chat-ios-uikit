@@ -134,182 +134,56 @@ open class ChannelLayoutModel {
     }
     
     open func attributedBody() -> NSAttributedString {
-        let deletedMessageFont = appearance.deletedLabelAppearance.font
-        let deletedMessageColor = appearance.deletedLabelAppearance.foregroundColor
-        let senderLabelFont = appearance.lastMessageSenderNameLabelAppearance.font
-        let senderLabelTextColor = appearance.lastMessageSenderNameLabelAppearance.foregroundColor
-        let messageLabelFont = appearance.lastMessageLabelAppearance.font
-        let messageLabelTextColor = appearance.lastMessageLabelAppearance.foregroundColor
-        let mentionFont = appearance.mentionLabelAppearance.font
-        let mentionColor = appearance.mentionLabelAppearance.foregroundColor
-        let linkColor = appearance.linkLabelAppearance.foregroundColor
-        let linkFont = appearance.linkLabelAppearance.font
+        guard let message = lastMessage else { return NSAttributedString() }
         
-        guard let message = lastMessage
-        else {
-            return NSAttributedString()
-        }
-        let attributedView: NSAttributedString
+        let attributedString: NSAttributedString
         switch message.state {
         case .deleted:
-            attributedView = NSAttributedString(string: L10n.Message.deleted,
-                                                attributes: [.font: deletedMessageFont,
-                                                             .foregroundColor: deletedMessageColor])
+            attributedString = appearance.lastMessageBodyFormatter.format(
+                .init(
+                    message: message,
+                    lastReaction: hasReaction ? lastReaction: nil,
+                    bodyLabelAppearance: appearance.lastMessageLabelAppearance,
+                    linkLabelAppearance: appearance.linkLabelAppearance,
+                    mentionLabelAppearance: appearance.mentionLabelAppearance,
+                    attachmentNameFormatter: appearance.attachmentNameFormatter,
+                    attachmentIconProvider: appearance.attachmentIconProvider,
+                    mentionUserNameFormatter: appearance.mentionUserNameFormatter,
+                    deletedLabelAppearance: appearance.deletedLabelAppearance,
+                    deletedStateText: appearance.deletedStateText
+                )
+            )
         default:
-            var content = message.body.replacingOccurrences(of: "\n", with: " ")
-            content = content.trimmingCharacters(in: .whitespacesAndNewlines)
-            
-            let text = NSMutableAttributedString(
-                attributedString: NSAttributedString(string: content,
-                                                     attributes: [.font: messageLabelFont,
-                                                                  .foregroundColor: messageLabelTextColor]))
-            
-            let matches = DataDetector.matches(text: content)
-            for match in matches {
-                let linkAttributes: [NSAttributedString.Key : Any] = [
-                    .font: linkFont,
-                    .foregroundColor: linkColor,
-                    .underlineColor: linkColor,
-                    .underlineStyle: NSUnderlineStyle.single.rawValue
-                ]
-                text.addAttributes(linkAttributes, range: match.range)
-            }
-            
-            let mentionedUsers = message.mentionedUsers?.map { ($0.id, appearance.mentionUserNameFormatter.format($0)) }
-            if let mentionedUsers = mentionedUsers, mentionedUsers.count > 0,
-               let metadata = message.metadata?.data(using: .utf8),
-               let ranges = try? JSONDecoder().decode([MentionUserPos].self, from: metadata) {
-                var lengths = 0
-                for pos in ranges.reversed() {
-                    if let user = mentionedUsers.last(where: { $0.0 == pos.id }), pos.loc >= 0 {
-                        let attributes: [NSAttributedString.Key : Any] = [.font: mentionFont,
-                                                                          .foregroundColor: mentionColor,
-                                                                          .mention: pos.id]
-                        let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + user.1,
-                                                         attributes: attributes)
-                        guard text.length >= pos.loc + pos.len else {
-                            logger.debug("Something wrong❗️❗️❗️body: \(text.string) mention: \(mention.string) pos: \(pos.loc) \(pos.len) user: \(pos.id)")
-                            continue
-                        }
-                        text.safeReplaceCharacters(in: .init(location: pos.loc, length: pos.len), with: mention)
-                        lengths += mention.length
-                    }
-                }
-            }
-            
-            if !content.isEmpty, let bodyAttributes = message.bodyAttributes {
-                bodyAttributes.reduce([NSRange: [ChatMessage.BodyAttribute]]()) { partialResult, bodyAttribute in
-                    let location = max(0, min(text.length - 1, bodyAttribute.offset))
-                    let length = max(0, min(text.length - location, bodyAttribute.length))
-                    let range = NSRange(location: location, length: length)
-                    var array = partialResult[range] ?? []
-                    array.append(bodyAttribute)
-                    var partialResult = partialResult
-                    partialResult[range] = array
-                    return partialResult
-                }.forEach { range, value in
-                    var font = messageLabelFont
-                    if value.contains(where: { $0.type == .monospace }) {
-                        font = font.toMonospace
-                    }
-                    if value.contains(where: { $0.type == .bold }) {
-                        font = font.toSemiBold
-                    }
-                    if value.contains(where: { $0.type == .italic }) {
-                        font = font.toItalic
-                    }
-                    if value.contains(where: { $0.type == .strikethrough }) {
-                        text.addAttributes([.strikethroughStyle : NSUnderlineStyle.single.rawValue], range: range)
-                    }
-                    if value.contains(where: { $0.type == .underline }) {
-                        text.addAttributes([.underlineStyle : NSUnderlineStyle.single.rawValue], range: range)
-                    }
-                    text.addAttributes([.font : font], range: range)
-                }
-                
-                bodyAttributes
-                    .filter { $0.type == .mention }
-                    .sorted(by: { $0.offset > $1.offset })
-                    .forEach { bodyAttribute in
-                        let location = max(0, min(text.length - 1, bodyAttribute.offset))
-                        let length = max(0, min(text.length - location, bodyAttribute.length))
-                        let range = NSRange(location: location, length: length)
-                        if
-                            let userId = bodyAttribute.metadata,
-                            let user = message.mentionedUsers?.first(where: { $0.id == userId }) {
-                            var attributes = text.attributes(at: range.location, effectiveRange: nil)
-                            attributes[.font] = mentionFont
-                            attributes[.foregroundColor] = mentionColor
-                            attributes[.mention] = userId
-                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + appearance.mentionUserNameFormatter.format(user),
-                                                             attributes: attributes)
-                            text.safeReplaceCharacters(in: range, with: mention)
-                        }
-                    }
-            }
-            
-            if let attachment = lastMessage?.attachments?.last {
-                let type = appearance.attachmentNameFormatter.format(attachment)
-                var icon = appearance.attachmentIconProvider.provideVisual(for: attachment)
-             
-                if let icon, !type.isEmpty {
-                    let font = Fonts.regular.withSize(15)
-                    let attachment = NSTextAttachment()
-                    attachment.bounds = CGRect(x: 0, y: (font.capHeight - icon.size.height).rounded() / 2, width: icon.size.width, height: icon.size.height)
-                    attachment.image = icon
-                    let attributedAttachmentMessage = NSMutableAttributedString(attachment: attachment)
-                    attributedAttachmentMessage.append(NSAttributedString(
-                        string: " ",
-                        attributes: [.font: font]
-                    ))
-                    if text.isEmpty {
-                        attributedAttachmentMessage.append(NSAttributedString(
-                            string: type,
-                            attributes: [
-                                .font: font,
-                                .foregroundColor: messageLabelTextColor
-                            ]
-                        ))
-                        text.append(attributedAttachmentMessage)
-                    } else {
-                        text.insert(attributedAttachmentMessage, at: 0)
-                        
-                    }
-                }
-            }
-            if hasReaction {
-                let prefix = NSMutableAttributedString(
-                    attributedString: NSAttributedString(string: "\(L10n.Channel.Message.lastReaction(lastReaction?.key ?? "")) ”",
-                                                         attributes: [.font: messageLabelFont,
-                                                                      .foregroundColor: messageLabelTextColor]))
-                let suffix = NSMutableAttributedString(
-                    attributedString: NSAttributedString(string: "”",
-                                                         attributes: [.font: messageLabelFont,
-                                                                      .foregroundColor: messageLabelTextColor]))
-                text.insert(prefix, at: 0)
-                text.append(suffix)
-            }
-            var hasReaction: Bool {
-                if let reaction = channel.lastReaction,
-                   let lastMessage = channel.lastMessage,
-                   reaction.createdAt > lastMessage.createdAt,
-                   reaction.message != nil {
-                    return true
-                }
-                return false
-            }
-            var sender: String = hasReaction ? appearance.lastMessageSenderNameFormatter.format(channel) : appearance.reactedUserNameFormatter.format(channel)
+            let text = appearance.lastMessageBodyFormatter.format(
+                .init(
+                    message: message,
+                    lastReaction: hasReaction ? lastReaction: nil,
+                    bodyLabelAppearance: appearance.lastMessageLabelAppearance,
+                    linkLabelAppearance: appearance.linkLabelAppearance,
+                    mentionLabelAppearance: appearance.mentionLabelAppearance,
+                    attachmentNameFormatter: appearance.attachmentNameFormatter,
+                    attachmentIconProvider: appearance.attachmentIconProvider,
+                    mentionUserNameFormatter: appearance.mentionUserNameFormatter,
+                    deletedLabelAppearance: appearance.deletedLabelAppearance,
+                    deletedStateText: appearance.deletedStateText
+                )
+            )
+            let sender: String = hasReaction ? appearance.reactedUserNameFormatter.format(channel) : appearance.lastMessageSenderNameFormatter.format(channel)
             if !sender.isEmpty {
-                let ms = NSMutableAttributedString(string: sender,
-                                                   attributes: [.font: senderLabelFont,
-                                                                .foregroundColor: senderLabelTextColor])
+                let ms = NSMutableAttributedString(
+                    string: sender,
+                    attributes: [
+                        .font: appearance.lastMessageSenderNameLabelAppearance.font,
+                        .foregroundColor: appearance.lastMessageSenderNameLabelAppearance.foregroundColor
+                    ]
+                )
                 ms.append(text)
-                attributedView = ms
+                attributedString = ms
             } else {
-                attributedView = text
+                attributedString = text
             }
         }
-        return attributedView
+        return attributedString
     }
     
     open func createDraftMessageIfNeeded() -> NSAttributedString? {
@@ -317,24 +191,16 @@ open class ChannelLayoutModel {
               draft.length > 0
         else { return nil }
         
-        let text = NSMutableAttributedString()
-        let title = L10n.Channel.Message.draft
-        let draftString = NSMutableAttributedString(string: "\(title)\n")
-        draftString.addAttributes(
-            [.foregroundColor: appearance.draftPrefixLabelAppearance.foregroundColor,
-             .font: appearance.draftPrefixLabelAppearance.font],
-            range: NSMakeRange(0, title.count))
-        text.append(draftString)
-        
-        let contentString = NSMutableAttributedString(attributedString: draft)
-        contentString.addAttributes(
-            [.foregroundColor: appearance.lastMessageLabelAppearance.foregroundColor,
-             .font: appearance.lastMessageLabelAppearance.font],
-            range: NSMakeRange(0, draft.length))
-        text.append(contentString)
-        return text
+        return appearance.draftMessageBodyFormatter.format(
+            .init(
+                draftMessage: draft,
+                draftPrefixLabelAppearance: appearance.draftPrefixLabelAppearance,
+                draftStateText: appearance.draftStateText,
+                lastMessageLabelAppearance: appearance.lastMessageLabelAppearance
+            )
+        )
     }
-    
+
     open func createFormattedSubject() -> String {
         appearance.channelNameFormatter.format(channel)
     }

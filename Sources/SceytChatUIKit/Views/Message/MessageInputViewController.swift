@@ -674,41 +674,24 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         }
         let message = layoutModel.message
         let title = appearance.replyMessageAppearance.senderNameFormatter.format(message.user)
-        var text = layoutModel.attributedView.content.string.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         var image: UIImage?
         var showPlayIcon = false
         if let attachment = message.attachments?.first {
-            
             switch attachment.type {
             case "image":
-                if text.isEmpty {
-                    text = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = attachment.thumbnailImage
             case "video":
-                if text.isEmpty {
-                    text = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = attachment.thumbnailImage
                 showPlayIcon = true
             case "voice":
-                if text.isEmpty {
-                    text = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             case "link":
                 if let metadata = layoutModel.linkPreviews?.first?.metadata {
                     addOrUpdateLinkPreview(linkDetails: metadata)
                     return
                 }
-                if text.isEmpty {
-                    text = appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = nil
             default:
-                if text.isEmpty {
-                    text = layoutModel.attachments.first?.name ?? appearance.replyMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
         }
@@ -727,35 +710,17 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                 ]))
         actionView.titleLabel.attributedText = titleAttributedString
         
-        let messageAttributedString = NSMutableAttributedString(
-            string: text,
-            attributes: [
-                .font: appearance.replyMessageAppearance.bodyLabelAppearance.font,
-                .foregroundColor: appearance.replyMessageAppearance.bodyLabelAppearance.foregroundColor
-            ])
-        message.bodyAttributes?
-            .filter { $0.type == .mention }
-            .sorted(by: { $0.offset > $1.offset })
-            .forEach { bodyAttribute in
-                let range = NSRange(location: bodyAttribute.offset, length: bodyAttribute.length)
-                var mentionAttributes: [NSAttributedString.Key : Any] = [:]
-                mentionAttributes[.font] = appearance.replyMessageAppearance.mentionLabelAppearance.font
-                mentionAttributes[.foregroundColor] = appearance.replyMessageAppearance.mentionLabelAppearance.foregroundColor
-                
-                if range.location >= 0 && (range.location + range.length) <= messageAttributedString.length {
-                    messageAttributedString.setAttributes(mentionAttributes, range: range)
-                }
-            }
-        if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
-            messageAttributedString.append(.init(
-                string: " " + appearance.replyMessageAppearance.attachmentDurationFormatter.format(TimeInterval(duration)),
-                attributes: [
-                    .font: appearance.replyMessageAppearance.attachmentDurationLabelAppearance.font,
-                    .foregroundColor: appearance.replyMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
-                ]))
-        }
-        actionView.messageLabel.attributedText = messageAttributedString
-        
+        actionView.messageLabel.attributedText = appearance.replyMessageAppearance.replyMessageBodyFormatter.format(
+            .init(
+                layoutModel: layoutModel,
+                bodyLabelAppearance: appearance.replyMessageAppearance.bodyLabelAppearance,
+                mentionLabelAppearance: appearance.replyMessageAppearance.mentionLabelAppearance,
+                attachmentDurationLabelAppearance: appearance.replyMessageAppearance.attachmentDurationLabelAppearance,
+                attachmentDurationFormatter: appearance.replyMessageAppearance.attachmentDurationFormatter,
+                attachmentNameFormatter: appearance.replyMessageAppearance.attachmentNameFormatter
+            )
+        )
+
         actionView.backgroundColor = appearance.replyMessageAppearance.backgroundColor
         actionView.isHidden = false
         separatorViewCenter.isHidden = false
@@ -786,44 +751,30 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             nextState = nil
         }
         currentState = .edit(layoutModel)
+        
         let message = layoutModel.message
         var image: UIImage?
-        var text = layoutModel.attributedView.content.string
         var showPlayIcon = false
         if let attachment = message.attachments?.first {
             switch attachment.type {
             case "image":
-                if text.isEmpty {
-                    text = appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = attachment.thumbnailImage
             case "video":
-                if text.isEmpty {
-                    text = appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = attachment.thumbnailImage
                 showPlayIcon = true
             case "voice":
-                if text.isEmpty {
-                    text = appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = appearance.editMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             case "link":
                 if let metadata = layoutModel.linkPreviews?.first?.metadata {
                     addOrUpdateLinkPreview(linkDetails: metadata)
                     return
                 }
-                if text.isEmpty {
-                    text = appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = nil
             default:
-                if text.isEmpty {
-                    text = layoutModel.attachments.first?.name ?? appearance.editMessageAppearance.attachmentNameFormatter.format(attachment)
-                }
                 image = appearance.editMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
         }
+        
         let titleAttributedString = NSMutableAttributedString(
             string: L10n.Input.edit + ": ",
             attributes: [
@@ -832,34 +783,16 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             ])
         actionView.titleLabel.attributedText = titleAttributedString
         
-        let messageAttributedString = NSMutableAttributedString(
-            string: text,
-            attributes: [
-                .font: appearance.editMessageAppearance.bodyTextStyle.font,
-                .foregroundColor: appearance.editMessageAppearance.bodyTextStyle.foregroundColor
-            ])
-        message.bodyAttributes?
-            .filter { $0.type == .mention }
-            .sorted(by: { $0.offset > $1.offset })
-            .forEach { bodyAttribute in
-                let range = NSRange(location: bodyAttribute.offset, length: bodyAttribute.length)
-                var mentionAttributes: [NSAttributedString.Key : Any] = [:]
-                mentionAttributes[.font] = appearance.editMessageAppearance.mentionLabelAppearance.font
-                mentionAttributes[.foregroundColor] = appearance.editMessageAppearance.mentionLabelAppearance.foregroundColor
-                
-                if range.location >= 0 && (range.location + range.length) <= messageAttributedString.length {
-                    messageAttributedString.setAttributes(mentionAttributes, range: range)
-                }
-            }
-        if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {
-            messageAttributedString.append(.init(
-                string: " " + appearance.editMessageAppearance.attachmentDurationFormatter.format(TimeInterval(duration)),
-                attributes: [
-                    .font: appearance.editMessageAppearance.attachmentDurationLabelAppearance.font,
-                    .foregroundColor: appearance.editMessageAppearance.attachmentDurationLabelAppearance.foregroundColor
-                ]))
-        }
-        actionView.messageLabel.attributedText = messageAttributedString
+        actionView.messageLabel.attributedText = appearance.editMessageAppearance.editMessageBodyFormatter.format(
+            .init(
+                layoutModel: layoutModel,
+                bodyLabelAppearance: appearance.editMessageAppearance.bodyLabelAppearance,
+                mentionLabelAppearance: appearance.editMessageAppearance.mentionLabelAppearance,
+                attachmentDurationLabelAppearance: appearance.editMessageAppearance.attachmentDurationLabelAppearance,
+                attachmentDurationFormatter: appearance.editMessageAppearance.attachmentDurationFormatter,
+                attachmentNameFormatter: appearance.editMessageAppearance.attachmentNameFormatter
+            )
+        )
         
         cachedMessage = inputTextView.attributedText
         actionView.backgroundColor = appearance.editMessageAppearance.backgroundColor

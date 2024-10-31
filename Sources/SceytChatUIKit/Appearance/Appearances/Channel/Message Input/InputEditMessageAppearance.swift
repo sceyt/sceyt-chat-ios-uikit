@@ -21,7 +21,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
             foregroundColor: .accent,
             font: Fonts.semiBold.withSize(13)
         ),
-        bodyTextStyle: LabelAppearance(
+        bodyLabelAppearance: LabelAppearance(
             foregroundColor: .secondaryText,
             font: Fonts.regular.withSize(13)
         ),
@@ -36,7 +36,8 @@ public class InputEditMessageAppearance: AppearanceProviding {
         editIcon: nil,
         attachmentDurationFormatter: SceytChatUIKit.shared.formatters.mediaDurationFormatter,
         attachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
-        attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter
+        attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
+        editMessageBodyFormatter: SceytChatUIKit.shared.formatters.editMessageBodyFormatter
     )
     
     @Trackable<InputEditMessageAppearance, UIColor>
@@ -46,7 +47,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
     public var titleLabelAppearance: LabelAppearance
     
     @Trackable<InputEditMessageAppearance, LabelAppearance>
-    public var bodyTextStyle: LabelAppearance
+    public var bodyLabelAppearance: LabelAppearance
     
     @Trackable<InputEditMessageAppearance, LabelAppearance>
     public var mentionLabelAppearance: LabelAppearance
@@ -66,58 +67,66 @@ public class InputEditMessageAppearance: AppearanceProviding {
     @Trackable<InputEditMessageAppearance, any AttachmentFormatting>
     public var attachmentNameFormatter: any AttachmentFormatting
     
+    @Trackable<InputEditMessageAppearance, any EditMessageBodyFormatting>
+    public var editMessageBodyFormatter: any EditMessageBodyFormatting
+    
     public init(
         backgroundColor: UIColor,
         titleLabelAppearance: LabelAppearance,
-        bodyTextStyle: LabelAppearance,
+        bodyLabelAppearance: LabelAppearance,
         mentionLabelAppearance: LabelAppearance,
         attachmentDurationLabelAppearance: LabelAppearance,
         editIcon: UIImage?,
         attachmentDurationFormatter: any TimeIntervalFormatting,
         attachmentIconProvider: any AttachmentIconProviding,
-        attachmentNameFormatter: any AttachmentFormatting
+        attachmentNameFormatter: any AttachmentFormatting,
+        editMessageBodyFormatter: any EditMessageBodyFormatting
     ) {
         self._backgroundColor = Trackable(value: backgroundColor)
         self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
-        self._bodyTextStyle = Trackable(value: bodyTextStyle)
+        self._bodyLabelAppearance = Trackable(value: bodyLabelAppearance)
         self._mentionLabelAppearance = Trackable(value: mentionLabelAppearance)
         self._attachmentDurationLabelAppearance = Trackable(value: attachmentDurationLabelAppearance)
         self._editIcon = Trackable(value: editIcon)
         self._attachmentDurationFormatter = Trackable(value: attachmentDurationFormatter)
         self._attachmentIconProvider = Trackable(value: attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
+        self._editMessageBodyFormatter = Trackable(value: editMessageBodyFormatter)
     }
     
     public init(
         reference: InputEditMessageAppearance,
         backgroundColor: UIColor? = nil,
         titleLabelAppearance: LabelAppearance? = nil,
-        bodyTextStyle: LabelAppearance? = nil,
+        bodyLabelAppearance: LabelAppearance? = nil,
         mentionLabelAppearance: LabelAppearance? = nil,
         attachmentDurationLabelAppearance: LabelAppearance? = nil,
         editIcon: UIImage? = nil,
         attachmentDurationFormatter: (any TimeIntervalFormatting)? = nil,
         attachmentIconProvider: (any AttachmentIconProviding)? = nil,
-        attachmentNameFormatter: (any AttachmentFormatting)? = nil
+        attachmentNameFormatter: (any AttachmentFormatting)? = nil,
+        editMessageBodyFormatter: (any EditMessageBodyFormatting)? = nil
     ) {
         self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
         self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
-        self._bodyTextStyle = Trackable(reference: reference, referencePath: \.bodyTextStyle)
+        self._bodyLabelAppearance = Trackable(reference: reference, referencePath: \.bodyLabelAppearance)
         self._mentionLabelAppearance = Trackable(reference: reference, referencePath: \.mentionLabelAppearance)
         self._attachmentDurationLabelAppearance = Trackable(reference: reference, referencePath: \.attachmentDurationLabelAppearance)
         self._editIcon = Trackable(reference: reference, referencePath: \.editIcon)
         self._attachmentDurationFormatter = Trackable(reference: reference, referencePath: \.attachmentDurationFormatter)
         self._attachmentIconProvider = Trackable(reference: reference, referencePath: \.attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
+        self._editMessageBodyFormatter = Trackable(reference: reference, referencePath: \.editMessageBodyFormatter)
         
         if let backgroundColor { self.backgroundColor = backgroundColor }
         if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
-        if let bodyTextStyle { self.bodyTextStyle = bodyTextStyle }
+        if let bodyLabelAppearance { self.bodyLabelAppearance = bodyLabelAppearance }
         if let mentionLabelAppearance { self.mentionLabelAppearance = mentionLabelAppearance }
         if let attachmentDurationLabelAppearance { self.attachmentDurationLabelAppearance = attachmentDurationLabelAppearance }
         if let editIcon { self.editIcon = editIcon }
         if let attachmentDurationFormatter { self.attachmentDurationFormatter = attachmentDurationFormatter }
         if let attachmentIconProvider { self.attachmentIconProvider = attachmentIconProvider }
         if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }
+        if let editMessageBodyFormatter { self.editMessageBodyFormatter = editMessageBodyFormatter }
     }
 }

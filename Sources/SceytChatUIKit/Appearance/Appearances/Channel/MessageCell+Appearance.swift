@@ -155,7 +155,8 @@ extension MessageCell: AppearanceProviding {
         messageViewCountFormatter: SceytChatUIKit.shared.formatters.messageViewCountFormatter,
         messageDateFormatter: SceytChatUIKit.shared.formatters.messageDateFormatter,
         mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
-        userDefaultAvatarProvider: SceytChatUIKit.shared.visualProviders.userAvatarProvider
+        userDefaultAvatarProvider: SceytChatUIKit.shared.visualProviders.userAvatarProvider,
+        messageBodyFormatter: SceytChatUIKit.shared.formatters.messageBodyFormatter
     )
     
     public struct Appearance {
@@ -348,6 +349,9 @@ extension MessageCell: AppearanceProviding {
         @Trackable<Appearance, any UserAvatarProviding>
         public var userDefaultAvatarProvider: any UserAvatarProviding
         
+        @Trackable<Appearance, any MessageBodyContentFormatting>
+        public var messageBodyFormatter: any MessageBodyContentFormatting
+        
         // Initializer with all parameters
         public init(
             // Colors
@@ -421,7 +425,8 @@ extension MessageCell: AppearanceProviding {
             messageViewCountFormatter: any UIntFormatting,
             messageDateFormatter: any DateFormatting,
             mentionUserNameFormatter: any UserFormatting,
-            userDefaultAvatarProvider: any UserAvatarProviding
+            userDefaultAvatarProvider: any UserAvatarProviding,
+            messageBodyFormatter: any MessageBodyContentFormatting
         ) {
             // Colors
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -495,6 +500,7 @@ extension MessageCell: AppearanceProviding {
             self._messageDateFormatter = Trackable(value: messageDateFormatter)
             self._mentionUserNameFormatter = Trackable(value: mentionUserNameFormatter)
             self._userDefaultAvatarProvider = Trackable(value: userDefaultAvatarProvider)
+            self._messageBodyFormatter = Trackable(value: messageBodyFormatter)
         }
         
         // Initializer with optional parameters
@@ -571,7 +577,8 @@ extension MessageCell: AppearanceProviding {
             messageViewCountFormatter: (any UIntFormatting)? = nil,
             messageDateFormatter: (any DateFormatting)? = nil,
             mentionUserNameFormatter: (any UserFormatting)? = nil,
-            userDefaultAvatarProvider: (any UserAvatarProviding)? = nil
+            userDefaultAvatarProvider: (any UserAvatarProviding)? = nil,
+            messageBodyFormatter: (any MessageBodyContentFormatting)? = nil
         ) {
             // Colors
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
@@ -635,6 +642,7 @@ extension MessageCell: AppearanceProviding {
             self._messageDateFormatter = Trackable(reference: reference, referencePath: \.messageDateFormatter)
             self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
             self._userDefaultAvatarProvider = Trackable(reference: reference, referencePath: \.userDefaultAvatarProvider)
+            self._messageBodyFormatter = Trackable(reference: reference, referencePath: \.messageBodyFormatter)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
             if let incomingBubbleColor { self.incomingBubbleColor = incomingBubbleColor }
@@ -697,6 +705,7 @@ extension MessageCell: AppearanceProviding {
             if let messageDateFormatter { self.messageDateFormatter = messageDateFormatter }
             if let mentionUserNameFormatter { self.mentionUserNameFormatter = mentionUserNameFormatter }
             if let userDefaultAvatarProvider { self.userDefaultAvatarProvider = userDefaultAvatarProvider }
+            if let messageBodyFormatter { self.messageBodyFormatter = messageBodyFormatter }
         }
     }
 }
