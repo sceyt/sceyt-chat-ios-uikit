@@ -56,7 +56,7 @@ public struct EditMessageBodyFormatterAttributes {
 }
 
 public struct ReplyMessageBodyFormatterAttributes {
-    let layoutModel: MessageLayoutModel
+    let message: ChatMessage
     let bodyLabelAppearance: LabelAppearance
     let mentionLabelAppearance: LabelAppearance
     let attachmentDurationLabelAppearance: LabelAppearance

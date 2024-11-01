@@ -13,7 +13,7 @@ open class ReplyMessageBodyFormatter: ReplyMessageBodyFormatting {
     public init() {}
     
     open func format(_ messageBodyAttributes: ReplyMessageBodyFormatterAttributes) -> NSAttributedString {
-        let message = messageBodyAttributes.layoutModel.message
+        let message = messageBodyAttributes.message
         let bodyLabelAppearance = messageBodyAttributes.bodyLabelAppearance
         let mentionLabelAppearance = messageBodyAttributes.mentionLabelAppearance
         let attachmentDurationLabelAppearance = messageBodyAttributes.attachmentDurationLabelAppearance

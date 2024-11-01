@@ -712,7 +712,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         
         actionView.messageLabel.attributedText = appearance.replyMessageAppearance.replyMessageBodyFormatter.format(
             .init(
-                layoutModel: layoutModel,
+                message: message,
                 bodyLabelAppearance: appearance.replyMessageAppearance.bodyLabelAppearance,
                 mentionLabelAppearance: appearance.replyMessageAppearance.mentionLabelAppearance,
                 attachmentDurationLabelAppearance: appearance.replyMessageAppearance.attachmentDurationLabelAppearance,
