@@ -14,9 +14,9 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
     
     open func format(_ messageBodyAttributes: RepliedMessageBodyFormatterAttributes) -> NSAttributedString {
         let message = messageBodyAttributes.message
-        let attributedBody = messageBodyAttributes.attributedBody
+        let attributedBody = NSAttributedString(string: message.body)// messageBodyAttributes.attributedBody
         
-        if let attributedBody, attributedBody.length > 0 {
+        if attributedBody.length > 0 {
             let attributedBody = attributedBody.mutableCopy() as! NSMutableAttributedString
             
             attributedBody.enumerateAttributes(in: NSRange(location: 0, length: attributedBody.length), using: { attributes, range, _ in
@@ -34,12 +34,15 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
                     .sorted(by: { $0.offset > $1.offset })
                     .forEach { bodyAttribute in
                         let range = NSRange(location: bodyAttribute.offset, length: bodyAttribute.length)
-                        var mentionAttributes: [NSAttributedString.Key : Any] = [:]
-                        mentionAttributes[.font] = messageBodyAttributes.mentionLabelAppearance.font
-                        mentionAttributes[.foregroundColor] = messageBodyAttributes.mentionLabelAppearance.foregroundColor
-                        
-                        if range.location >= 0 && (range.location + range.length) <= attributedBody.length {
-                            attributedBody.setAttributes(mentionAttributes, range: range)
+                        if let userId = bodyAttribute.metadata,
+                           let user = message.mentionedUsers?.first(where: { $0.id == userId }) {
+                            var attributes = attributedBody.attributes(at: range.location, effectiveRange: nil)
+                            attributes[.foregroundColor] = messageBodyAttributes.mentionLabelAppearance.foregroundColor
+                            attributes[.font] = messageBodyAttributes.mentionLabelAppearance.font
+                            attributes[.mention] = userId
+                            let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + messageBodyAttributes.mentionUserNameFormatter.format(user),
+                                                             attributes: attributes)
+                            attributedBody.safeReplaceCharacters(in: range, with: mention)
                         }
                     }
             })

@@ -19,9 +19,10 @@ open class ReplyMessageBodyFormatter: ReplyMessageBodyFormatting {
         let attachmentDurationLabelAppearance = messageBodyAttributes.attachmentDurationLabelAppearance
         let attachmentDurationFormatter = messageBodyAttributes.attachmentDurationFormatter
         let attachmentNameFormatter = messageBodyAttributes.attachmentNameFormatter
+        let mentionUserNameFormatter = messageBodyAttributes.mentionUserNameFormatter
         
+        var text = message.body
         
-        var text = messageBodyAttributes.layoutModel.attributedView.content.string.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
         if let attachment = message.attachments?.first {
             switch attachment.type {
             case "image":
@@ -58,12 +59,15 @@ open class ReplyMessageBodyFormatter: ReplyMessageBodyFormatting {
             .sorted(by: { $0.offset > $1.offset })
             .forEach { bodyAttribute in
                 let range = NSRange(location: bodyAttribute.offset, length: bodyAttribute.length)
-                var mentionAttributes: [NSAttributedString.Key : Any] = [:]
-                mentionAttributes[.font] = mentionLabelAppearance.font
-                mentionAttributes[.foregroundColor] = mentionLabelAppearance.foregroundColor
-                
-                if range.location >= 0 && (range.location + range.length) <= messageAttributedString.length {
-                    messageAttributedString.setAttributes(mentionAttributes, range: range)
+                if let userId = bodyAttribute.metadata,
+                   let user = message.mentionedUsers?.first(where: { $0.id == userId }) {
+                    var attributes = messageAttributedString.attributes(at: range.location, effectiveRange: nil)
+                    attributes[.foregroundColor] = mentionLabelAppearance.foregroundColor
+                    attributes[.font] = mentionLabelAppearance.font
+                    attributes[.mention] = userId
+                    let mention = NSAttributedString(string: SceytChatUIKit.shared.config.mentionTriggerPrefix + mentionUserNameFormatter.format(user),
+                                                     attributes: attributes)
+                    messageAttributedString.safeReplaceCharacters(in: range, with: mention)
                 }
             }
         if let duration = message.attachments?.first?.voiceDecodedMetadata?.duration {

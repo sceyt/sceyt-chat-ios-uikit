@@ -717,7 +717,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                 mentionLabelAppearance: appearance.replyMessageAppearance.mentionLabelAppearance,
                 attachmentDurationLabelAppearance: appearance.replyMessageAppearance.attachmentDurationLabelAppearance,
                 attachmentDurationFormatter: appearance.replyMessageAppearance.attachmentDurationFormatter,
-                attachmentNameFormatter: appearance.replyMessageAppearance.attachmentNameFormatter
+                attachmentNameFormatter: appearance.replyMessageAppearance.attachmentNameFormatter,
+                mentionUserNameFormatter: appearance.replyMessageAppearance.mentionUserNameFormatter
             )
         )
 
@@ -785,12 +786,13 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         
         actionView.messageLabel.attributedText = appearance.editMessageAppearance.editMessageBodyFormatter.format(
             .init(
-                layoutModel: layoutModel,
+                message: message,
                 bodyLabelAppearance: appearance.editMessageAppearance.bodyLabelAppearance,
                 mentionLabelAppearance: appearance.editMessageAppearance.mentionLabelAppearance,
                 attachmentDurationLabelAppearance: appearance.editMessageAppearance.attachmentDurationLabelAppearance,
                 attachmentDurationFormatter: appearance.editMessageAppearance.attachmentDurationFormatter,
-                attachmentNameFormatter: appearance.editMessageAppearance.attachmentNameFormatter
+                attachmentNameFormatter: appearance.editMessageAppearance.attachmentNameFormatter,
+                mentionUserNameFormatter: appearance.editMessageAppearance.mentionUserNameFormatter
             )
         )
         

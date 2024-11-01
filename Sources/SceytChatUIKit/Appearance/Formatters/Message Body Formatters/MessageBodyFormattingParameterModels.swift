@@ -1,5 +1,5 @@
 //
-//  MessageBodyFormattingParameterStructs.swift
+//  MessageBodyFormattingParameterModels.swift
 //  SceytChatUIKit
 //
 //  Created by Arthur Avagyan on 31.10.24
@@ -7,7 +7,6 @@
 //
 
 import Foundation
-// MARK: - MessageBodyFormatting parameter struct
 
 public struct MessageBodyContentFormatterAttributes {
     let message: ChatMessage
@@ -36,7 +35,6 @@ public struct MessageBodyFormatterAttributes {
 
 public struct RepliedMessageBodyFormatterAttributes {
     let message: ChatMessage
-    let attributedBody: NSAttributedString?
     let deletedStateText: String
     let subtitleLabelAppearance: LabelAppearance
     let mentionLabelAppearance: LabelAppearance
@@ -44,15 +42,17 @@ public struct RepliedMessageBodyFormatterAttributes {
     let deletedLabelAppearance: LabelAppearance
     let attachmentDurationFormatter: any TimeIntervalFormatting
     let attachmentNameFormatter: any AttachmentFormatting
+    let mentionUserNameFormatter: any UserFormatting
 }
 
 public struct EditMessageBodyFormatterAttributes {
-    let layoutModel: MessageLayoutModel
+    let message: ChatMessage
     let bodyLabelAppearance: LabelAppearance
     let mentionLabelAppearance: LabelAppearance
     let attachmentDurationLabelAppearance: LabelAppearance
     let attachmentDurationFormatter: any TimeIntervalFormatting
     let attachmentNameFormatter: any AttachmentFormatting
+    let mentionUserNameFormatter: any UserFormatting
 }
 
 public struct ReplyMessageBodyFormatterAttributes {
@@ -62,6 +62,7 @@ public struct ReplyMessageBodyFormatterAttributes {
     let attachmentDurationLabelAppearance: LabelAppearance
     let attachmentDurationFormatter: any TimeIntervalFormatting
     let attachmentNameFormatter: any AttachmentFormatting
+    let mentionUserNameFormatter: any UserFormatting
 }
 
 public struct DraftMessageBodyFormatterAttributes {

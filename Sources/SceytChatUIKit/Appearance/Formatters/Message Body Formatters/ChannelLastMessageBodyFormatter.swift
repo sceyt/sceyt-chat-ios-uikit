@@ -6,7 +6,7 @@
 //  Copyright © 2024 Sceyt LLC. All rights reserved.
 //
 
-import Foundation
+import UIKit
 
 open class ChannelLastMessageBodyFormatter: MessageBodyFormatting {
     

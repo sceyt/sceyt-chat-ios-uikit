@@ -37,6 +37,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: SceytChatUIKit.shared.formatters.mediaDurationFormatter,
         attachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
         attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
+        mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
         editMessageBodyFormatter: SceytChatUIKit.shared.formatters.editMessageBodyFormatter
     )
     
@@ -67,6 +68,9 @@ public class InputEditMessageAppearance: AppearanceProviding {
     @Trackable<InputEditMessageAppearance, any AttachmentFormatting>
     public var attachmentNameFormatter: any AttachmentFormatting
     
+    @Trackable<InputEditMessageAppearance, any UserFormatting>
+    public var mentionUserNameFormatter: any UserFormatting
+    
     @Trackable<InputEditMessageAppearance, any EditMessageBodyFormatting>
     public var editMessageBodyFormatter: any EditMessageBodyFormatting
     
@@ -80,6 +84,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: any TimeIntervalFormatting,
         attachmentIconProvider: any AttachmentIconProviding,
         attachmentNameFormatter: any AttachmentFormatting,
+        mentionUserNameFormatter: any UserFormatting,
         editMessageBodyFormatter: any EditMessageBodyFormatting
     ) {
         self._backgroundColor = Trackable(value: backgroundColor)
@@ -91,6 +96,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         self._attachmentDurationFormatter = Trackable(value: attachmentDurationFormatter)
         self._attachmentIconProvider = Trackable(value: attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
+        self._mentionUserNameFormatter = Trackable(value: mentionUserNameFormatter)
         self._editMessageBodyFormatter = Trackable(value: editMessageBodyFormatter)
     }
     
@@ -105,6 +111,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: (any TimeIntervalFormatting)? = nil,
         attachmentIconProvider: (any AttachmentIconProviding)? = nil,
         attachmentNameFormatter: (any AttachmentFormatting)? = nil,
+        mentionUserNameFormatter: (any UserFormatting)? = nil,
         editMessageBodyFormatter: (any EditMessageBodyFormatting)? = nil
     ) {
         self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
@@ -116,6 +123,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         self._attachmentDurationFormatter = Trackable(reference: reference, referencePath: \.attachmentDurationFormatter)
         self._attachmentIconProvider = Trackable(reference: reference, referencePath: \.attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
+        self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
         self._editMessageBodyFormatter = Trackable(reference: reference, referencePath: \.editMessageBodyFormatter)
         
         if let backgroundColor { self.backgroundColor = backgroundColor }
@@ -127,6 +135,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         if let attachmentDurationFormatter { self.attachmentDurationFormatter = attachmentDurationFormatter }
         if let attachmentIconProvider { self.attachmentIconProvider = attachmentIconProvider }
         if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }
+        if let mentionUserNameFormatter { self.mentionUserNameFormatter = mentionUserNameFormatter }
         if let editMessageBodyFormatter { self.editMessageBodyFormatter = editMessageBodyFormatter }
     }
 }

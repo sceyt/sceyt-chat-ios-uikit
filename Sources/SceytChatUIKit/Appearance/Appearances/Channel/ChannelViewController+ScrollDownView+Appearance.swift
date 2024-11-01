@@ -10,7 +10,7 @@ import UIKit
 
 extension ChannelViewController.ScrollDownView: AppearanceProviding {
     public static var appearance = Appearance(
-        backgroundColor: .background,
+        backgroundColor: .clear,
         unreadCountLabelAppearance: LabelAppearance(
             foregroundColor: .onPrimary,
             font: Fonts.regular.withSize(12),

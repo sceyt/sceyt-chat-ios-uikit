@@ -1201,14 +1201,14 @@ extension MessageLayoutModel {
                 self.attributedBody = appearance.replyMessageAppearance.repliedMessageBodyFormatter.format(
                     .init(
                         message: message,
-                        attributedBody: attributedBody,
                         deletedStateText: appearance.deletedStateText,
                         subtitleLabelAppearance: appearance.replyMessageAppearance.subtitleLabelAppearance,
                         mentionLabelAppearance: appearance.replyMessageAppearance.mentionLabelAppearance,
                         attachmentDurationLabelAppearance: appearance.replyMessageAppearance.attachmentDurationLabelAppearance,
                         deletedLabelAppearance: appearance.replyMessageAppearance.deletedLabelAppearance,
                         attachmentDurationFormatter: appearance.replyMessageAppearance.attachmentDurationFormatter,
-                        attachmentNameFormatter: appearance.replyMessageAppearance.attachmentNameFormatter
+                        attachmentNameFormatter: appearance.replyMessageAppearance.attachmentNameFormatter,
+                        mentionUserNameFormatter: appearance.mentionUserNameFormatter
                     )
                 )
                 icon = makeIcon()
