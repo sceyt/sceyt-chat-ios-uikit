@@ -23,6 +23,19 @@ final class ConnectionService: NSObject, ChatClientDelegate {
         SceytChatUIKit.shared.chatClient.removeDelegate(identifier: String(reflecting: self))
     }
     
+    private var deviceToken: Data?
+    func setDeviceToken( _ deviceToken: Data) {
+        let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
+        let token = tokenParts.joined()
+        print("Device Token: \(token)")
+
+        if ChatClient.shared.connectionState == .connected {
+            ChatClient.shared.registerDevicePushToken(deviceToken)
+        } else {
+            self.deviceToken = deviceToken
+        }
+    }
+
     private var callbacks = [((Error?) -> Void)]()
     func connect(username: String, callback: @escaping (Error?) -> Void) {
         getToken(user: username) { token, error in
@@ -94,6 +107,9 @@ final class ConnectionService: NSObject, ChatClientDelegate {
             SceytChatUIKit.shared.currentUserId = chatClient.user.id
             SceytChatUIKit.shared.chatClient.setPresence(state: .online, status: "I'm online")
             NotificationCenter.default.post(name: NSNotification.Name(rawValue: "userProfileUpdated"), object: nil)
+            if let deviceToken {
+                setDeviceToken(deviceToken)
+            }
         }
         switch state {
         case .connected, .disconnected, .failed:
