@@ -20,7 +20,7 @@ open class ForwardViewController: ViewController,
     
     open lazy var searchController = Components.searchController.init(searchResultsController: searchResultsViewController)
     
-    open lazy var searchResultsViewController = Components.channelSearchResultsViewController.init()
+    open lazy var searchResultsViewController = Components.channelSelectableSearchResultsViewController.init()
     
     open lazy var selectedChannelListView = Components.selectedChannelListView.init()
         .withoutAutoresizingMask

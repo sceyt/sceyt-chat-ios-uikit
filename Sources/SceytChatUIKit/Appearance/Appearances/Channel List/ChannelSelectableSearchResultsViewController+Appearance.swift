@@ -1,5 +1,5 @@
 //
-//  ChannelSearchResultsViewController+Appearance.swift
+//  ChannelSelectableSearchResultsViewController+Appearance.swift
 //  SceytChatUIKit
 //
 //  Created by Arthur Avagyan on 01.11.24
@@ -8,8 +8,7 @@
 
 import UIKit
 
-extension ChannelSearchResultsViewController {
-    
+extension ChannelSelectableSearchResultsViewController {
     public static var defaultAppearance = Appearance(
         backgroundColor: .background,
         emptyViewAppearance: EmptyStateView.Appearance(
@@ -18,22 +17,22 @@ extension ChannelSearchResultsViewController {
             title: L10n.Search.NoResults.title,
             message: L10n.Search.NoResults.message
         ),
-        cellAppearance: SearchResultChannelCell.appearance,
+        selectableCellAppearance: SelectableChannelCell.appearance,
         separatorViewAppearance: SeparatorHeaderView.appearance
     )
     
     public class Appearance: ChannelSearchResultsBaseViewController.Appearance {
         
-        @Trackable<Appearance, SearchResultChannelCell.Appearance>
-        public var cellAppearance: SearchResultChannelCell.Appearance
-
+        @Trackable<Appearance, SelectableChannelCell.Appearance>
+        public var selectableCellAppearance: SelectableChannelCell.Appearance
+        
         public init(
             backgroundColor: UIColor,
             emptyViewAppearance: EmptyStateView.Appearance,
-            cellAppearance: SearchResultChannelCell.Appearance,
+            selectableCellAppearance: SelectableChannelCell.Appearance,
             separatorViewAppearance: SeparatorHeaderView.Appearance
         ) {
-            self._cellAppearance = Trackable(value: cellAppearance)
+            self._selectableCellAppearance = Trackable(value: selectableCellAppearance)
             
             super.init(
                 backgroundColor: backgroundColor,
@@ -41,23 +40,23 @@ extension ChannelSearchResultsViewController {
                 separatorViewAppearance: separatorViewAppearance
             )
         }
-
+        
         public init(
-            reference: ChannelSearchResultsViewController.Appearance,
+            reference: ChannelSelectableSearchResultsViewController.Appearance,
             backgroundColor: UIColor? = nil,
             emptyViewAppearance: EmptyStateView.Appearance? = nil,
-            cellAppearance: SearchResultChannelCell.Appearance? = nil,
+            selectableCellAppearance: SelectableChannelCell.Appearance? = nil,
             separatorViewAppearance: SeparatorHeaderView.Appearance? = nil
         ) {
-            self._cellAppearance = Trackable(reference: reference, referencePath: \.cellAppearance)
-
+            self._selectableCellAppearance = Trackable(reference: reference, referencePath: \.selectableCellAppearance)
+            
             super.init(
                 backgroundColor: backgroundColor ?? reference.backgroundColor,
                 emptyViewAppearance: emptyViewAppearance ?? reference.emptyViewAppearance,
                 separatorViewAppearance: separatorViewAppearance ?? reference.separatorViewAppearance
             )
             
-            if let cellAppearance { self.cellAppearance = cellAppearance }
+            if let selectableCellAppearance { self.selectableCellAppearance = selectableCellAppearance }
         }
     }
 }

@@ -19,7 +19,7 @@ extension ForwardViewController: AppearanceProviding {
                 placeholder: L10n.Channel.List.search
             )
         ),
-        searchResultControllerAppearance: ChannelSearchResultsViewController.appearance,
+        searchResultControllerAppearance: ChannelSelectableSearchResultsViewController.defaultAppearance,
         separatorViewAppearance: SeparatorHeaderView.appearance,
         selectedChannelCellAppearance: SelectedChannelCell.appearance,
         channelCellAppearance: SelectableChannelCell.appearance
@@ -36,8 +36,8 @@ extension ForwardViewController: AppearanceProviding {
         @Trackable<Appearance, SearchController.Appearance>
         public var searchControllerAppearance: SearchController.Appearance
         
-        @Trackable<Appearance, ChannelSearchResultsViewController.Appearance>
-        public var searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance
+        @Trackable<Appearance, ChannelSelectableSearchResultsViewController.Appearance>
+        public var searchResultControllerAppearance: ChannelSelectableSearchResultsViewController.Appearance
 
         @Trackable<Appearance, SeparatorHeaderView.Appearance>
         public var separatorViewAppearance: SeparatorHeaderView.Appearance
@@ -52,7 +52,7 @@ extension ForwardViewController: AppearanceProviding {
             navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             searchControllerAppearance: SearchController.Appearance,
-            searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance,
+            searchResultControllerAppearance: ChannelSelectableSearchResultsViewController.Appearance,
             separatorViewAppearance: SeparatorHeaderView.Appearance,
             selectedChannelCellAppearance: SelectedChannelCell.Appearance,
             channelCellAppearance: SelectableChannelCell.Appearance
@@ -71,7 +71,7 @@ extension ForwardViewController: AppearanceProviding {
             navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             searchControllerAppearance: SearchController.Appearance? = nil,
-            searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance? = nil,
+            searchResultControllerAppearance: ChannelSelectableSearchResultsViewController.Appearance? = nil,
             separatorViewAppearance: SeparatorHeaderView.Appearance? = nil,
             selectedChannelCellAppearance: SelectedChannelCell.Appearance? = nil,
             channelCellAppearance: SelectableChannelCell.Appearance? = nil

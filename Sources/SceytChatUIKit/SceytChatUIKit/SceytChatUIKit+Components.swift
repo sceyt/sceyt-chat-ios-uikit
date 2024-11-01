@@ -44,7 +44,9 @@ extension SceytChatUIKit {
         public static var channelInfoViewController: ChannelInfoViewController.Type = ChannelInfoViewController.self
         public static var channelListViewController: ChannelListViewController.Type = ChannelListViewController.self
         public static var channelMemberListViewController: ChannelMemberListViewController.Type = ChannelMemberListViewController.self
+        public static var channelSearchResultsBaseViewController: ChannelSearchResultsBaseViewController.Type = ChannelSearchResultsBaseViewController.self
         public static var channelSearchResultsViewController: ChannelSearchResultsViewController.Type = ChannelSearchResultsViewController.self
+        public static var channelSelectableSearchResultsViewController: ChannelSelectableSearchResultsViewController.Type = ChannelSelectableSearchResultsViewController.self
         public static var channelViewController: ChannelViewController.Type = ChannelViewController.self
         public static var createChannelViewController: CreateChannelViewController.Type = CreateChannelViewController.self
         public static var createGroupViewController: CreateGroupViewController.Type = CreateGroupViewController.self

@@ -35,9 +35,7 @@ extension ChannelListViewController: AppearanceProviding {
                 placeholder: L10n.Channel.List.search
             )
         ),
-        searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance(
-            reference: ChannelSearchResultsViewController.appearance
-        ),
+        searchResultControllerAppearance: ChannelSearchResultsViewController.defaultAppearance,
         emptyViewAppearance: EmptyStateView.Appearance(
             reference: EmptyStateView.appearance,
             icon: .emptyChannelList,

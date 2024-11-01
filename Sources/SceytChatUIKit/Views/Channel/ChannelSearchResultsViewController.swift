@@ -1,5 +1,5 @@
 //
-//  ChannelSearchResultsViewController.swift
+//  ChannelSearchResultsBaseViewController.swift
 //  SceytChatUIKit
 //
 //  Created by Duc on 24/10/2023.
@@ -12,10 +12,9 @@ public protocol ChannelSearchResultsUpdating: AnyObject {
     var searchResults: ChannelSearchResult { get }
     func isSelected(_ channel: ChatChannel) -> Bool
     func select(_ channel: ChatChannel)
-    var showCheckBox: Bool { get }
 }
 
-open class ChannelSearchResultsViewController: ViewController,
+open class ChannelSearchResultsBaseViewController: ViewController,
     UITableViewDelegate, UITableViewDataSource
 {
     open weak var resultsUpdater: ChannelSearchResultsUpdating!
@@ -36,8 +35,6 @@ open class ChannelSearchResultsViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
-        tableView.register(Components.searchResultChannelCell.self)
-        tableView.register(Components.selectableChannelCell.self)
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -118,24 +115,7 @@ open class ChannelSearchResultsViewController: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        if resultsUpdater.showCheckBox {
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.selectableChannelCell.self)
-            cell.parentAppearance = appearance.selectableCellAppearance
-            cell.separatorView.isHidden = indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1
-            if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
-                cell.channelData = channel
-                cell.checkBoxView.isSelected = resultsUpdater.isSelected(channel)
-            }
-            return cell
-        }
-        
-        let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.searchResultChannelCell.self)
-        cell.parentAppearance = appearance.cellAppearance
-        cell.separatorView.isHidden = indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1
-        if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
-            cell.channelData = channel
-        }
-        return cell
+        fatalError("Override and implement in subclass")
     }
     
     open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
@@ -150,13 +130,5 @@ open class ChannelSearchResultsViewController: ViewController,
         headerView.parentAppearance = appearance.separatorViewAppearance
         headerView.titleLabel.text = header
         return headerView
-    }
-    
-    open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        tableView.deselectRow(at: indexPath, animated: true)
-        if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
-            resultsUpdater.select(channel)
-            tableView.cell(for: indexPath, cellType: Components.selectableChannelCell.self)?.checkBoxView.isSelected = resultsUpdater.isSelected(channel)
-        }
     }
 }

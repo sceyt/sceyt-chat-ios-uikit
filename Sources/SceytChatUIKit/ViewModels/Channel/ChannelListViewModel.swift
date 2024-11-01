@@ -32,7 +32,6 @@ open class ChannelListViewModel: NSObject,
     
     public var query: ChannelListQuery?
     public var fetchPredicate =  NSPredicate(format: "unsubscribed == NO AND NOT (unsynched = YES AND lastMessage == nil)")
-    public var showCheckBox: Bool = false
     private var _selectedChannel: ChatChannel?
     
     @Atomic public private(set) var layoutModels = [ChatChannel: ChannelLayoutModel]()

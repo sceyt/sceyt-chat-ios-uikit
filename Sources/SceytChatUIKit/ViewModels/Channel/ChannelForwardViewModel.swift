@@ -30,8 +30,6 @@ open class ChannelForwardViewModel: NSObject, ChannelSearchResultsUpdating {
     public var query: ChannelListQuery?
     private var _selectedChannel: ChatChannel?
     
-    public var showCheckBox: Bool = true
-    
     open lazy var channelObserver: DatabaseObserver<ChannelDTO, ChatChannel> = {
         DatabaseObserver<ChannelDTO, ChatChannel>(
             request: ChannelDTO.fetchRequest()
