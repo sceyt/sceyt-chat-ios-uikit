@@ -10,7 +10,7 @@ import UIKit
 extension MediaPreviewerViewController: AppearanceProviding {
     public static var appearance = Appearance(
         backgroundColor: DefaultColors.backgroundDark,
-        videoControllerBackgroundColor: DefaultColors.backgroundDark,
+        videoControlsBackgroundColor: DefaultColors.backgroundDark,
         navigationBarAppearance: .init(
             reference: NavigationBarAppearance.appearance,
             tintColor: .onPrimary,
@@ -66,7 +66,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
         public var backgroundColor: UIColor
         
         @Trackable<Appearance, UIColor>
-        public var videoControllerBackgroundColor: UIColor
+        public var videoControlsBackgroundColor: UIColor
         
         @Trackable<Appearance, NavigationBarAppearance>
         public var navigationBarAppearance: NavigationBarAppearance
@@ -109,7 +109,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
         
         public init(
             backgroundColor: UIColor,
-            videoControllerBackgroundColor: UIColor,
+            videoControlsBackgroundColor: UIColor,
             navigationBarAppearance: NavigationBarAppearance,
             playIcon: UIImage,
             pauseIcon: UIImage,
@@ -125,7 +125,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
             durationFormatter: any TimeIntervalFormatting
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
-            self._videoControllerBackgroundColor = Trackable(value: videoControllerBackgroundColor)
+            self._videoControlsBackgroundColor = Trackable(value: videoControlsBackgroundColor)
             self._navigationBarAppearance = Trackable(value: navigationBarAppearance)
             self._playIcon = Trackable(value: playIcon)
             self._pauseIcon = Trackable(value: pauseIcon)
@@ -144,7 +144,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
         public init(
             reference: MediaPreviewerViewController.Appearance,
             backgroundColor: UIColor? = nil,
-            videoControllerBackgroundColor: UIColor? = nil,
+            videoControlsBackgroundColor: UIColor? = nil,
             navigationBarAppearance: NavigationBarAppearance? = nil,
             playIcon: UIImage? = nil,
             pauseIcon: UIImage? = nil,
@@ -160,7 +160,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
             durationFormatter: (any TimeIntervalFormatting)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
-            self._videoControllerBackgroundColor = Trackable(reference: reference, referencePath: \.videoControllerBackgroundColor)
+            self._videoControlsBackgroundColor = Trackable(reference: reference, referencePath: \.videoControlsBackgroundColor)
             self._navigationBarAppearance = Trackable(reference: reference, referencePath: \.navigationBarAppearance)
             self._playIcon = Trackable(reference: reference, referencePath: \.playIcon)
             self._pauseIcon = Trackable(reference: reference, referencePath: \.pauseIcon)
@@ -176,7 +176,7 @@ extension MediaPreviewerViewController: AppearanceProviding {
             self._durationFormatter = Trackable(reference: reference, referencePath: \.durationFormatter)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
-            if let videoControllerBackgroundColor { self.videoControllerBackgroundColor = videoControllerBackgroundColor }
+            if let videoControlsBackgroundColor { self.videoControlsBackgroundColor = videoControlsBackgroundColor }
             if let navigationBarAppearance { self.navigationBarAppearance = navigationBarAppearance }
             if let playIcon { self.playIcon = playIcon }
             if let pauseIcon { self.pauseIcon = pauseIcon }

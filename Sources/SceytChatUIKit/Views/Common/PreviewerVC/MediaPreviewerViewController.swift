@@ -139,7 +139,7 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
         
         view.backgroundColor = .clear
         playerView.backgroundColor = .clear
-        playerControlContainerView.backgroundColor = appearance.videoControllerBackgroundColor
+        playerControlContainerView.backgroundColor = appearance.videoControlsBackgroundColor
         
         navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         
