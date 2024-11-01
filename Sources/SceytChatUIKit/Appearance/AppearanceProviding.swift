@@ -106,6 +106,9 @@ public extension AppearanceProviding where Self: NSObject {
             setParentAppearance(newValue)
             // Conditionally call `setupAppearance` if `self` conforms to `Configurable`
             if let configurableSelf = self as? Configurable {
+                if let viewController = configurableSelf as? UIViewController {
+                    guard viewController.isViewLoaded else { return }
+                }
                 configurableSelf.setupAppearance()
             }
         }

@@ -55,6 +55,7 @@ open class ImageCropperViewController: ViewController {
     }
     
     override open func setup() {
+        super.setup()
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(onPinch))
         view.addGestureRecognizer(pinch)
         
@@ -71,6 +72,7 @@ open class ImageCropperViewController: ViewController {
     }
     
     override open func setupLayout() {
+        super.setupLayout()
         view.addSubview(imageView)
         view.addSubview(mask)
         view.addSubview(buttonsView)
@@ -95,6 +97,7 @@ open class ImageCropperViewController: ViewController {
     }
     
     override open func setupAppearance() {
+        super.setupAppearance()
         view.backgroundColor = appearance.backgroundColor
         
         navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
