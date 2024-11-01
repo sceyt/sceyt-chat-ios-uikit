@@ -8,19 +8,19 @@
 
 import UIKit
 
-open class MessageBodyFormatter: MessageBodyContentFormatting {
+open class MessageBodyFormatter: MessageBodyFormatting {
     
     public init() {}
     
-    open func format(_ messageBodyAttributes: MessageBodyContentFormatterAttributes) -> (NSAttributedString, [MessageLayoutModel.ContentItem]) {
+    open func format(_ messageBodyAttributes: MessageBodyFormatterAttributes) -> (NSAttributedString, [MessageLayoutModel.ContentItem]) {
         let message = messageBodyAttributes.message
         
         switch message.state {
         case .deleted:
             let text = NSAttributedString(string: messageBodyAttributes.deletedStateText,
                                           attributes: [
-                                            .font: messageBodyAttributes.deletedMessageLabelAppearance.font,
-                                            .foregroundColor: messageBodyAttributes.deletedMessageLabelAppearance.foregroundColor
+                                            .font: messageBodyAttributes.deletedLabelAppearance.font,
+                                            .foregroundColor: messageBodyAttributes.deletedLabelAppearance.foregroundColor
                                           ])
             return (text, [])
             

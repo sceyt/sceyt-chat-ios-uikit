@@ -143,14 +143,14 @@ open class ChannelLayoutModel {
                 .init(
                     message: message,
                     lastReaction: hasReaction ? lastReaction: nil,
+                    deletedStateText: appearance.deletedStateText,
                     bodyLabelAppearance: appearance.lastMessageLabelAppearance,
                     linkLabelAppearance: appearance.linkLabelAppearance,
                     mentionLabelAppearance: appearance.mentionLabelAppearance,
+                    deletedLabelAppearance: appearance.deletedLabelAppearance,
                     attachmentNameFormatter: appearance.attachmentNameFormatter,
                     attachmentIconProvider: appearance.attachmentIconProvider,
-                    mentionUserNameFormatter: appearance.mentionUserNameFormatter,
-                    deletedLabelAppearance: appearance.deletedLabelAppearance,
-                    deletedStateText: appearance.deletedStateText
+                    mentionUserNameFormatter: appearance.mentionUserNameFormatter
                 )
             )
         default:
@@ -158,14 +158,14 @@ open class ChannelLayoutModel {
                 .init(
                     message: message,
                     lastReaction: hasReaction ? lastReaction: nil,
+                    deletedStateText: appearance.deletedStateText,
                     bodyLabelAppearance: appearance.lastMessageLabelAppearance,
                     linkLabelAppearance: appearance.linkLabelAppearance,
                     mentionLabelAppearance: appearance.mentionLabelAppearance,
+                    deletedLabelAppearance: appearance.deletedLabelAppearance,
                     attachmentNameFormatter: appearance.attachmentNameFormatter,
                     attachmentIconProvider: appearance.attachmentIconProvider,
-                    mentionUserNameFormatter: appearance.mentionUserNameFormatter,
-                    deletedLabelAppearance: appearance.deletedLabelAppearance,
-                    deletedStateText: appearance.deletedStateText
+                    mentionUserNameFormatter: appearance.mentionUserNameFormatter
                 )
             )
             let sender: String = hasReaction ? appearance.reactedUserNameFormatter.format(channel) : appearance.lastMessageSenderNameFormatter.format(channel)

@@ -71,9 +71,9 @@ extension SceytChatUIKit {
 
         public var logDateFormatter: any DateFormatting = LogDateFormatter()
         
-        public var messageBodyFormatter: any MessageBodyContentFormatting = MessageBodyFormatter()
+        public var messageBodyFormatter: any MessageBodyFormatting = MessageBodyFormatter()
         
-        public var channelLastMessageBodyFormatter: any MessageBodyFormatting = ChannelLastMessageBodyFormatter()
+        public var channelLastMessageBodyFormatter: any LastMessageBodyFormatting = ChannelLastMessageBodyFormatter()
         
         public var repliedMessageBodyFormatter: any RepliedMessageBodyFormatting = RepliedMessageBodyFormatter()
         

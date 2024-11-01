@@ -8,35 +8,34 @@
 
 import Foundation
 
-public struct MessageBodyContentFormatterAttributes {
-    let message: ChatMessage
-    let userSendMessage: UserSendMessage?
-    let bodyLabelAppearance: LabelAppearance
-    let linkLabelAppearance: LabelAppearance
-    let mentionLabelAppearance: LabelAppearance
-    let mentionUserNameFormatter: any UserFormatting
-    let deletedMessageLabelAppearance: LabelAppearance
-    let deletedStateText: String
-}
-
-
 public struct MessageBodyFormatterAttributes {
     let message: ChatMessage
-    let lastReaction: ChatMessage.Reaction?
+    let userSendMessage: UserSendMessage?
+    let deletedStateText: String
     let bodyLabelAppearance: LabelAppearance
     let linkLabelAppearance: LabelAppearance
     let mentionLabelAppearance: LabelAppearance
+    let deletedLabelAppearance: LabelAppearance
+    let mentionUserNameFormatter: any UserFormatting
+}
+
+public struct LastMessageBodyFormatterAttributes {
+    let message: ChatMessage
+    let lastReaction: ChatMessage.Reaction?
+    let deletedStateText: String
+    let bodyLabelAppearance: LabelAppearance
+    let linkLabelAppearance: LabelAppearance
+    let mentionLabelAppearance: LabelAppearance
+    let deletedLabelAppearance: LabelAppearance
     let attachmentNameFormatter: any AttachmentFormatting
     let attachmentIconProvider: any AttachmentIconProviding
     let mentionUserNameFormatter: any UserFormatting
-    let deletedLabelAppearance: LabelAppearance
-    let deletedStateText: String
 }
 
 public struct RepliedMessageBodyFormatterAttributes {
     let message: ChatMessage
     let deletedStateText: String
-    let subtitleLabelAppearance: LabelAppearance
+    let bodyLabelAppearance: LabelAppearance
     let mentionLabelAppearance: LabelAppearance
     let attachmentDurationLabelAppearance: LabelAppearance
     let deletedLabelAppearance: LabelAppearance

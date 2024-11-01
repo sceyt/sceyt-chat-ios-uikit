@@ -21,12 +21,12 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
             
             attributedBody.enumerateAttributes(in: NSRange(location: 0, length: attributedBody.length), using: { attributes, range, _ in
                 var attributes = attributes
-                attributes[.font] = messageBodyAttributes.subtitleLabelAppearance.font
-                attributes[.foregroundColor] = messageBodyAttributes.subtitleLabelAppearance.foregroundColor
+                attributes[.font] = messageBodyAttributes.bodyLabelAppearance.font
+                attributes[.foregroundColor] = messageBodyAttributes.bodyLabelAppearance.foregroundColor
                 if attributes.contains(where: { (key,_) in
                     key == .underlineColor
                 }) {
-                    attributes[.underlineColor] = messageBodyAttributes.subtitleLabelAppearance.foregroundColor
+                    attributes[.underlineColor] = messageBodyAttributes.bodyLabelAppearance.foregroundColor
                 }
                 attributedBody.setAttributes(attributes, range: range)
                 message.bodyAttributes?
@@ -74,8 +74,8 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
                 case .voice:
                     let body = NSMutableAttributedString(string: messageBodyAttributes.attachmentNameFormatter.format(attachment),
                                                          attributes: [
-                                                            .font: messageBodyAttributes.subtitleLabelAppearance.font,
-                                                            .foregroundColor: messageBodyAttributes.subtitleLabelAppearance.foregroundColor
+                                                            .font: messageBodyAttributes.bodyLabelAppearance.font,
+                                                            .foregroundColor: messageBodyAttributes.bodyLabelAppearance.foregroundColor
                                                          ])
                     body.append(.init(string: " \(messageBodyAttributes.attachmentDurationFormatter.format(Double(attachment.voiceDecodedMetadata?.duration ?? 0)))", attributes: [
                         .font: messageBodyAttributes.attachmentDurationLabelAppearance.font,
@@ -87,8 +87,8 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
                 }
             }
             return .init(string: body, attributes: [
-                .font: messageBodyAttributes.subtitleLabelAppearance.font,
-                .foregroundColor: messageBodyAttributes.subtitleLabelAppearance.foregroundColor
+                .font: messageBodyAttributes.bodyLabelAppearance.font,
+                .foregroundColor: messageBodyAttributes.bodyLabelAppearance.foregroundColor
             ])
         }
     }

@@ -43,7 +43,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
         senderNameFormatter: SceytChatUIKit.shared.formatters.userNameFormatter,
         mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
-        replyMessageBodyFormatter: SceytChatUIKit.shared.formatters.replyMessageBodyFormatter
+        messageBodyFormatter: SceytChatUIKit.shared.formatters.replyMessageBodyFormatter
     )
     
     @Trackable<InputReplyMessageAppearance, UIColor>
@@ -83,7 +83,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
     public var mentionUserNameFormatter: any UserFormatting
     
     @Trackable<InputReplyMessageAppearance, any ReplyMessageBodyFormatting>
-    public var replyMessageBodyFormatter: any ReplyMessageBodyFormatting
+    public var messageBodyFormatter: any ReplyMessageBodyFormatting
     
     public init(
         backgroundColor: UIColor,
@@ -98,7 +98,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentNameFormatter: any AttachmentFormatting,
         senderNameFormatter: any UserFormatting,
         mentionUserNameFormatter: any UserFormatting,
-        replyMessageBodyFormatter: any ReplyMessageBodyFormatting
+        messageBodyFormatter: any ReplyMessageBodyFormatting
     ) {
         self._backgroundColor = Trackable(value: backgroundColor)
         self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
@@ -112,7 +112,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
         self._senderNameFormatter = Trackable(value: senderNameFormatter)
         self._mentionUserNameFormatter = Trackable(value: mentionUserNameFormatter)
-        self._replyMessageBodyFormatter = Trackable(value: replyMessageBodyFormatter)
+        self._messageBodyFormatter = Trackable(value: messageBodyFormatter)
     }
     
     public init(
@@ -129,7 +129,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentNameFormatter: (any AttachmentFormatting)? = nil,
         senderNameFormatter: (any UserFormatting)? = nil,
         mentionUserNameFormatter: (any UserFormatting)? = nil,
-        replyMessageBodyFormatter: (any ReplyMessageBodyFormatting)? = nil
+        messageBodyFormatter: (any ReplyMessageBodyFormatting)? = nil
     ) {
         self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
         self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
@@ -143,7 +143,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
         self._senderNameFormatter = Trackable(reference: reference, referencePath: \.senderNameFormatter)
         self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
-        self._replyMessageBodyFormatter = Trackable(reference: reference, referencePath: \.replyMessageBodyFormatter)
+        self._messageBodyFormatter = Trackable(reference: reference, referencePath: \.messageBodyFormatter)
         
         if let backgroundColor { self.backgroundColor = backgroundColor }
         if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
@@ -157,6 +157,6 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }
         if let senderNameFormatter { self.senderNameFormatter = senderNameFormatter }
         if let mentionUserNameFormatter { self.mentionUserNameFormatter = mentionUserNameFormatter }
-        if let replyMessageBodyFormatter { self.replyMessageBodyFormatter = replyMessageBodyFormatter }
+        if let messageBodyFormatter { self.messageBodyFormatter = messageBodyFormatter }
     }
 }

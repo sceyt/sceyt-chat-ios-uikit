@@ -199,8 +199,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         @Trackable<Appearance, any PresenceStateIconProviding>
         public var presenceStateIconProvider: any PresenceStateIconProviding
         
-        @Trackable<Appearance, any MessageBodyFormatting>
-        public var lastMessageBodyFormatter: any MessageBodyFormatting
+        @Trackable<Appearance, any LastMessageBodyFormatting>
+        public var lastMessageBodyFormatter: any LastMessageBodyFormatting
         
         @Trackable<Appearance, any DraftMessageBodyFormatting>
         public var draftMessageBodyFormatter: any DraftMessageBodyFormatting
@@ -246,7 +246,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             channelAvatarRenderer: any ChannelAvatarRendering,
             avatarAppearance: AvatarAppearance,
             presenceStateIconProvider: any PresenceStateIconProviding,
-            lastMessageBodyFormatter: any MessageBodyFormatting,
+            lastMessageBodyFormatter: any LastMessageBodyFormatting,
             draftMessageBodyFormatter: any DraftMessageBodyFormatting
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -333,7 +333,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             channelAvatarRenderer: (any ChannelAvatarRendering)? = nil,
             avatarAppearance: AvatarAppearance? = nil,
             presenceStateIconProvider: (any PresenceStateIconProviding)? = nil,
-            lastMessageBodyFormatter: (any MessageBodyFormatting)? = nil,
+            lastMessageBodyFormatter: (any LastMessageBodyFormatting)? = nil,
             draftMessageBodyFormatter: (any DraftMessageBodyFormatting)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)

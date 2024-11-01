@@ -8,11 +8,11 @@
 
 import UIKit
 
-open class ChannelLastMessageBodyFormatter: MessageBodyFormatting {
+open class ChannelLastMessageBodyFormatter: LastMessageBodyFormatting {
     
     public init() {}
     
-    open func format(_ messageBodyAttributes: MessageBodyFormatterAttributes) -> NSAttributedString {
+    open func format(_ messageBodyAttributes: LastMessageBodyFormatterAttributes) -> NSAttributedString {
         let message = messageBodyAttributes.message
         
         switch message.state {

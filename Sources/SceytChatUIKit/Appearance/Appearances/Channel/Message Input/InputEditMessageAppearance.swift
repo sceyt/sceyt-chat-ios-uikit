@@ -38,7 +38,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         attachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
         attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
         mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
-        editMessageBodyFormatter: SceytChatUIKit.shared.formatters.editMessageBodyFormatter
+        messageBodyFormatter: SceytChatUIKit.shared.formatters.editMessageBodyFormatter
     )
     
     @Trackable<InputEditMessageAppearance, UIColor>
@@ -72,7 +72,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
     public var mentionUserNameFormatter: any UserFormatting
     
     @Trackable<InputEditMessageAppearance, any EditMessageBodyFormatting>
-    public var editMessageBodyFormatter: any EditMessageBodyFormatting
+    public var messageBodyFormatter: any EditMessageBodyFormatting
     
     public init(
         backgroundColor: UIColor,
@@ -85,7 +85,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         attachmentIconProvider: any AttachmentIconProviding,
         attachmentNameFormatter: any AttachmentFormatting,
         mentionUserNameFormatter: any UserFormatting,
-        editMessageBodyFormatter: any EditMessageBodyFormatting
+        messageBodyFormatter: any EditMessageBodyFormatting
     ) {
         self._backgroundColor = Trackable(value: backgroundColor)
         self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
@@ -97,7 +97,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         self._attachmentIconProvider = Trackable(value: attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
         self._mentionUserNameFormatter = Trackable(value: mentionUserNameFormatter)
-        self._editMessageBodyFormatter = Trackable(value: editMessageBodyFormatter)
+        self._messageBodyFormatter = Trackable(value: messageBodyFormatter)
     }
     
     public init(
@@ -112,7 +112,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         attachmentIconProvider: (any AttachmentIconProviding)? = nil,
         attachmentNameFormatter: (any AttachmentFormatting)? = nil,
         mentionUserNameFormatter: (any UserFormatting)? = nil,
-        editMessageBodyFormatter: (any EditMessageBodyFormatting)? = nil
+        messageBodyFormatter: (any EditMessageBodyFormatting)? = nil
     ) {
         self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
         self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
@@ -124,7 +124,7 @@ public class InputEditMessageAppearance: AppearanceProviding {
         self._attachmentIconProvider = Trackable(reference: reference, referencePath: \.attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
         self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
-        self._editMessageBodyFormatter = Trackable(reference: reference, referencePath: \.editMessageBodyFormatter)
+        self._messageBodyFormatter = Trackable(reference: reference, referencePath: \.messageBodyFormatter)
         
         if let backgroundColor { self.backgroundColor = backgroundColor }
         if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
@@ -136,6 +136,6 @@ public class InputEditMessageAppearance: AppearanceProviding {
         if let attachmentIconProvider { self.attachmentIconProvider = attachmentIconProvider }
         if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }
         if let mentionUserNameFormatter { self.mentionUserNameFormatter = mentionUserNameFormatter }
-        if let editMessageBodyFormatter { self.editMessageBodyFormatter = editMessageBodyFormatter }
+        if let messageBodyFormatter { self.messageBodyFormatter = messageBodyFormatter }
     }
 }

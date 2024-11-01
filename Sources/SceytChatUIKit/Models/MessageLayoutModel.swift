@@ -608,12 +608,12 @@ open class MessageLayoutModel {
             .init(
                 message: message,
                 userSendMessage: userSendMessage,
+                deletedStateText: appearance.deletedStateText,
                 bodyLabelAppearance: appearance.bodyLabelAppearance,
                 linkLabelAppearance: appearance.linkLabelAppearance,
                 mentionLabelAppearance: appearance.mentionLabelAppearance,
-                mentionUserNameFormatter: appearance.mentionUserNameFormatter,
-                deletedMessageLabelAppearance: appearance.deletedMessageLabelAppearance,
-                deletedStateText: appearance.deletedStateText
+                deletedLabelAppearance: appearance.deletedMessageLabelAppearance,
+                mentionUserNameFormatter: appearance.mentionUserNameFormatter
             )
         )
         return .init(content: attributedString, items: contentItems)
@@ -1198,11 +1198,11 @@ extension MessageLayoutModel {
                         thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize,
                         appearance: appearance)
                 }
-                self.attributedBody = appearance.replyMessageAppearance.repliedMessageBodyFormatter.format(
+                self.attributedBody = appearance.replyMessageAppearance.messageBodyFormatter.format(
                     .init(
                         message: message,
                         deletedStateText: appearance.deletedStateText,
-                        subtitleLabelAppearance: appearance.replyMessageAppearance.subtitleLabelAppearance,
+                        bodyLabelAppearance: appearance.replyMessageAppearance.subtitleLabelAppearance,
                         mentionLabelAppearance: appearance.replyMessageAppearance.mentionLabelAppearance,
                         attachmentDurationLabelAppearance: appearance.replyMessageAppearance.attachmentDurationLabelAppearance,
                         deletedLabelAppearance: appearance.replyMessageAppearance.deletedLabelAppearance,

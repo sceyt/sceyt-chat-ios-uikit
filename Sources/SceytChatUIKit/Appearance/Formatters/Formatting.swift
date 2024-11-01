@@ -105,21 +105,21 @@ public protocol ReactionFormatting: Formatting {
 // MARK: - Message Body Formatting
 
 /// A protocol that defines formatting behavior for message bodies with content items.
-public protocol MessageBodyContentFormatting: Formatting {
+public protocol MessageBodyFormatting: Formatting {
     /// Formats a message body into an attributed string along with associated content items.
     ///
-    /// - Parameter attributes: The `MessageBodyContentFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Parameter attributes: The `MessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
     /// - Returns: A tuple containing an `NSAttributedString` representing the formatted message body and an array of `MessageLayoutModel.ContentItem`.
-    func format(_ attributes: MessageBodyContentFormatterAttributes) -> (NSAttributedString, [MessageLayoutModel.ContentItem])
+    func format(_ attributes: MessageBodyFormatterAttributes) -> (NSAttributedString, [MessageLayoutModel.ContentItem])
 }
 
 /// A protocol that defines formatting behavior for message bodies.
-public protocol MessageBodyFormatting: Formatting {
+public protocol LastMessageBodyFormatting: Formatting {
     /// Formats a message body into an attributed string.
     ///
-    /// - Parameter attributes: The `MessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Parameter attributes: The `LastMessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
     /// - Returns: An `NSAttributedString` representing the formatted message body.
-    func format(_ attributes: MessageBodyFormatterAttributes) -> NSAttributedString
+    func format(_ attributes: LastMessageBodyFormatterAttributes) -> NSAttributedString
 }
 
 /// A protocol that defines formatting behavior for replied message bodies.

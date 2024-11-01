@@ -349,8 +349,8 @@ extension MessageCell: AppearanceProviding {
         @Trackable<Appearance, any UserAvatarProviding>
         public var userDefaultAvatarProvider: any UserAvatarProviding
         
-        @Trackable<Appearance, any MessageBodyContentFormatting>
-        public var messageBodyFormatter: any MessageBodyContentFormatting
+        @Trackable<Appearance, any MessageBodyFormatting>
+        public var messageBodyFormatter: any MessageBodyFormatting
         
         // Initializer with all parameters
         public init(
@@ -426,7 +426,7 @@ extension MessageCell: AppearanceProviding {
             messageDateFormatter: any DateFormatting,
             mentionUserNameFormatter: any UserFormatting,
             userDefaultAvatarProvider: any UserAvatarProviding,
-            messageBodyFormatter: any MessageBodyContentFormatting
+            messageBodyFormatter: any MessageBodyFormatting
         ) {
             // Colors
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -578,7 +578,7 @@ extension MessageCell: AppearanceProviding {
             messageDateFormatter: (any DateFormatting)? = nil,
             mentionUserNameFormatter: (any UserFormatting)? = nil,
             userDefaultAvatarProvider: (any UserAvatarProviding)? = nil,
-            messageBodyFormatter: (any MessageBodyContentFormatting)? = nil
+            messageBodyFormatter: (any MessageBodyFormatting)? = nil
         ) {
             // Colors
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)

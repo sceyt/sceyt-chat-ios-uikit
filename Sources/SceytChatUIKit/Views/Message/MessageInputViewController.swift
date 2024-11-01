@@ -710,7 +710,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                 ]))
         actionView.titleLabel.attributedText = titleAttributedString
         
-        actionView.messageLabel.attributedText = appearance.replyMessageAppearance.replyMessageBodyFormatter.format(
+        actionView.messageLabel.attributedText = appearance.replyMessageAppearance.messageBodyFormatter.format(
             .init(
                 message: message,
                 bodyLabelAppearance: appearance.replyMessageAppearance.bodyLabelAppearance,
@@ -784,7 +784,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             ])
         actionView.titleLabel.attributedText = titleAttributedString
         
-        actionView.messageLabel.attributedText = appearance.editMessageAppearance.editMessageBodyFormatter.format(
+        actionView.messageLabel.attributedText = appearance.editMessageAppearance.messageBodyFormatter.format(
             .init(
                 message: message,
                 bodyLabelAppearance: appearance.editMessageAppearance.bodyLabelAppearance,
