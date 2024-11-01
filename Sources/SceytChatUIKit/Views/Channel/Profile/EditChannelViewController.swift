@@ -227,7 +227,7 @@ open class EditChannelViewController: ViewController,
             case .camera:
                 self.router.showCamera(mediaTypes: [.image]) { [weak self] picked in
                     guard let self, let picked else { return }
-                    self.router.editImage(picked.thumbnail, appearance: appearance.imageCropperAppearance) { [weak self] edited in
+                    self.router.editImage(picked.thumbnail) { [weak self] edited in
                         guard let self,
                               let jpeg = Components.imageBuilder.init(image: edited).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
                               let url = Components.storage.storeData(jpeg, filePath: picked.url.path)
@@ -238,7 +238,7 @@ open class EditChannelViewController: ViewController,
             case .photoLibrary:
                 self.router.selectPhoto(mediaTypes: [.image]) { [weak self] picked in
                     guard let self, let picked else { return }
-                    self.router.editImage(picked.thumbnail, appearance: appearance.imageCropperAppearance) { [weak self] edited in
+                    self.router.editImage(picked.thumbnail) { [weak self] edited in
                         guard let self,
                               let jpeg = Components.imageBuilder.init(image: edited).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
                               let url = Components.storage.storeData(jpeg, filePath: picked.url.path)

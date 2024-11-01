@@ -23,8 +23,7 @@ extension EditChannelViewController: AppearanceProviding {
                 foregroundColor: .stateWarning,
                 font: Fonts.regular.withSize(13)
             )
-        ),
-        imageCropperAppearance: Components.imageCropperViewController.appearance
+        )
     )
     
     public struct Appearance {
@@ -42,24 +41,19 @@ extension EditChannelViewController: AppearanceProviding {
         
         @Trackable<Appearance, URIValidationAppearance>
         public var uriValidationAppearance: URIValidationAppearance
-        
-        @Trackable<Appearance, ImageCropperViewController.Appearance>
-        public var imageCropperAppearance: ImageCropperViewController.Appearance
-        
+                
         public init(
             backgroundColor: UIColor,
             avatarCellAppearance: EditChannelViewController.AvatarCell.Appearance,
             textFieldCellAppearance: EditChannelViewController.TextFieldCell.Appearance,
             uriCellAppearance: EditChannelViewController.URICell.Appearance,
-            uriValidationAppearance: URIValidationAppearance,
-            imageCropperAppearance: ImageCropperViewController.Appearance
+            uriValidationAppearance: URIValidationAppearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             self._avatarCellAppearance = Trackable(value: avatarCellAppearance)
             self._textFieldCellAppearance = Trackable(value: textFieldCellAppearance)
             self._uriCellAppearance = Trackable(value: uriCellAppearance)
             self._uriValidationAppearance = Trackable(value: uriValidationAppearance)
-            self._imageCropperAppearance = Trackable(value: imageCropperAppearance)
         }
         
         public init(
@@ -68,22 +62,19 @@ extension EditChannelViewController: AppearanceProviding {
             avatarCellAppearance: EditChannelViewController.AvatarCell.Appearance? = nil,
             textFieldCellAppearance: EditChannelViewController.TextFieldCell.Appearance? = nil,
             uriCellAppearance: EditChannelViewController.URICell.Appearance? = nil,
-            uriValidationAppearance: URIValidationAppearance? = nil,
-            imageCropperAppearance: ImageCropperViewController.Appearance? = nil
+            uriValidationAppearance: URIValidationAppearance? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             self._avatarCellAppearance = Trackable(reference: reference, referencePath: \.avatarCellAppearance)
             self._textFieldCellAppearance = Trackable(reference: reference, referencePath: \.textFieldCellAppearance)
             self._uriCellAppearance = Trackable(reference: reference, referencePath: \.uriCellAppearance)
             self._uriValidationAppearance = Trackable(reference: reference, referencePath: \.uriValidationAppearance)
-            self._imageCropperAppearance = Trackable(reference: reference, referencePath: \.imageCropperAppearance)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
             if let avatarCellAppearance { self.avatarCellAppearance = avatarCellAppearance }
             if let textFieldCellAppearance { self.textFieldCellAppearance = textFieldCellAppearance }
             if let uriCellAppearance { self.uriCellAppearance = uriCellAppearance }
             if let uriValidationAppearance { self.uriValidationAppearance = uriValidationAppearance }
-            if let imageCropperAppearance { self.imageCropperAppearance = imageCropperAppearance }
         }
     }
 }

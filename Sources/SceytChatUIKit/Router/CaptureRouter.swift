@@ -74,7 +74,7 @@ public extension Router {
             .showPhotoLibrary(mediaTypes: mediaTypes.map { $0.rawValue }, callback: done)
     }
     
-    func editImage(_ image: UIImage, appearance: ImageCropperViewController.Appearance? = nil, done: @escaping (UIImage) -> Void) {
+    func editImage(_ image: UIImage, done: @escaping (UIImage) -> Void) {
         let viewController = Components.imageCropperViewController.init(
             onComplete: { [weak self] edited in
                 guard let self else { return }
@@ -85,7 +85,6 @@ public extension Router {
                 self?.dismiss()
             }
         )
-        viewController.parentAppearance = appearance
         viewController.viewModel = Components.imageCropperViewModel.init(image: image)
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]

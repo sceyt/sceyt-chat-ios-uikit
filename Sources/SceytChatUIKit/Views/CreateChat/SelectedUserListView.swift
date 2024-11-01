@@ -10,6 +10,9 @@ import Combine
 import UIKit
 
 open class SelectedUserListView: SelectedItemListView<ChatUser> {
+    
+    open var appearance: SelectedUserCell.Appearance = Components.selectedUserCell.appearance
+    
     @Published open private(set) var removeContact: ChatUser?
     
     open func add(user: ChatUser) {
@@ -32,6 +35,7 @@ open class SelectedUserListView: SelectedItemListView<ChatUser> {
     
     override open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.selectedUserCell.self)
+        cell.parentAppearance = appearance
         cell.userData = items[indexPath.item]
         cell.onDelete = { [weak self] cell in
             guard let self,

@@ -142,7 +142,7 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
                         image = UIImage(contentsOfFile: path)
                     }
                     guard let image = image else { return }
-                    router.editImage(image, appearance: appearance.imageCropperAppearance) { [unowned self] edited in
+                    router.editImage(image) { [unowned self] edited in
                         channelAvatarImage = edited
                         detailsView.avatarButton.setImage(channelAvatarImage, for: .normal)
                     }
@@ -154,7 +154,7 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
                         image = UIImage(contentsOfFile: path)
                     }
                     guard let image = image else { return }
-                    router.editImage(image, appearance: appearance.imageCropperAppearance) { [unowned self] edited in
+                    router.editImage(image) { [unowned self] edited in
                         channelAvatarImage = edited
                         detailsView.avatarButton.setImage(channelAvatarImage, for: .normal)
                     }

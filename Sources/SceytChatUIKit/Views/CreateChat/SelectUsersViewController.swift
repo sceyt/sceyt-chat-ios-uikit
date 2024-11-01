@@ -97,6 +97,7 @@ open class SelectUsersViewController: ViewController,
         searchController.parentAppearance = appearance.searchControllerAppearance
         tableView.backgroundColor = .clear
         view.backgroundColor = appearance.backgroundColor
+        selectedUserListView.appearance = appearance.selectedUserCellAppearance
     }
     
     override open func setupDone() {
