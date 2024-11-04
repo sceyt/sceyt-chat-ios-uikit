@@ -8,9 +8,6 @@
 
 import Foundation
 
-//    channelMessageBodyFormatter:Interface
-//    messageBodyFormatter:Interface
-
 extension SceytChatUIKit {
     public struct Formatters {
         public var userNameFormatter: any UserFormatting = UserNameFormatter()
