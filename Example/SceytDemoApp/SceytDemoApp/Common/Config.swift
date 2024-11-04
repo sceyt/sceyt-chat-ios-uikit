@@ -22,7 +22,9 @@ extension Config {
         static let clientIdKey = "__demoapp__client__uuid__"
         static let currentUserIdKey = "__demoapp__currentUserIdKey__"
         static let chatToken = "__demoapp_chat_token__"
+        static let deviceToken = "__demoapp_device_token__"
     }
+    
     @UserDefaultsConfig(UserDefaultsKeys.clientIdKey, defaultValue: UUID().uuidString)
     static var clientId: String?
     
@@ -31,6 +33,9 @@ extension Config {
     
     @UserDefaultsConfig(UserDefaultsKeys.chatToken)
     static var chatToken: String?
+    
+    @UserDefaultsConfig(UserDefaultsKeys.deviceToken)
+    static var deviceToken: Data?
 }
 
 @propertyWrapper

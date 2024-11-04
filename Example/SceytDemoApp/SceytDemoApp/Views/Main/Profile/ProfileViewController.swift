@@ -126,12 +126,13 @@ class ProfileViewController: ViewController {
     }
     
     private func logOut() {
-        Config.currentUserId = nil
-        SceytChatUIKit.shared.currentUserId = nil
-        
-        SceytChatUIKit.shared.chatClient.disconnect()
-        DataProvider.database.deleteAll()
-        AppCoordinator.shared.showAuthFlow()
+        ConnectionService.shared.removeDeviceToken() { didUnregister in
+            Config.currentUserId = nil
+            SceytChatUIKit.shared.currentUserId = nil
+            SceytChatUIKit.shared.chatClient.disconnect()
+            DataProvider.database.deleteAll()
+            AppCoordinator.shared.showAuthFlow()
+        }
     }
 }
 

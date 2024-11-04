@@ -24,15 +24,42 @@ final class ConnectionService: NSObject, ChatClientDelegate {
     }
     
     private var deviceToken: Data?
-    func setDeviceToken( _ deviceToken: Data) {
+    func setDeviceToken(_ deviceToken: Data) {
         let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
         let token = tokenParts.joined()
         print("Device Token: \(token)")
 
-        if ChatClient.shared.connectionState == .connected {
-            ChatClient.shared.registerDevicePushToken(deviceToken)
+        if SceytChatUIKit.shared.chatClient.connectionState == .connected {
+            print("Device Token: Attempting to set \(token)")
+            guard Config.deviceToken != deviceToken else {
+                print("Device Token: Already set. Stored token \((Config.deviceToken ?? Data()).map { data in String(format: "%02.2hhx", data) }.joined() )")
+                return
+            }
+            SceytChatUIKit.shared.chatClient.registerDevicePushToken(deviceToken) { error in
+                if let error {
+                    print("Device Token: Received error while registering \(error)")
+                }
+                print("Device Token: Registered")
+            }
+            
+            Config.deviceToken = deviceToken
+            print("Device Token: Did set \(token)")
         } else {
+            print("Device Token: Saved to set later")
             self.deviceToken = deviceToken
+        }
+    }
+    
+    func removeDeviceToken(completion: @escaping (Bool) -> Void) {
+        print("Device Token: Removing")
+        Config.deviceToken = nil
+        SceytChatUIKit.shared.chatClient.unregisterDevicePushToken() { error in
+            if let error {
+                print("Device Token: Received error while removing \(error)")
+                completion(false)
+            }
+            print("Device Token: Removed")
+            completion(true)
         }
     }
 
@@ -108,6 +135,7 @@ final class ConnectionService: NSObject, ChatClientDelegate {
             SceytChatUIKit.shared.chatClient.setPresence(state: .online, status: "I'm online")
             NotificationCenter.default.post(name: NSNotification.Name(rawValue: "userProfileUpdated"), object: nil)
             if let deviceToken {
+                print("Device Token: Setting saved device token")
                 setDeviceToken(deviceToken)
             }
         }

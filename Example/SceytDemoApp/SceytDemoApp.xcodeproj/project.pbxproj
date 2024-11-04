@@ -3,10 +3,11 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		560E295D2CC6788C003A4A17 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 560E295C2CC6788C003A4A17 /* SceytChatUIKit */; };
 		561169DD2CBD44A300DC1979 /* SplashViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561169DC2CBD44A300DC1979 /* SplashViewController.swift */; };
 		561169DF2CBD460100DC1979 /* LandingViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561169DE2CBD460100DC1979 /* LandingViewController.swift */; };
 		561169E12CBD511500DC1979 /* CustomPresentationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 561169E02CBD511500DC1979 /* CustomPresentationController.swift */; };
@@ -25,7 +26,6 @@
 		5649B9B72CBFB4E600E3B190 /* UIView+Extensiosn.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5649B9B62CBFB4E600E3B190 /* UIView+Extensiosn.swift */; };
 		5649B9B92CBFB62800E3B190 /* UsernameValidation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5649B9B82CBFB62800E3B190 /* UsernameValidation.swift */; };
 		5649B9BB2CBFBA0000E3B190 /* RequestManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5649B9BA2CBFBA0000E3B190 /* RequestManager.swift */; };
-		5672F6B32CC66A32009052AA /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5672F6B22CC66A32009052AA /* SceytChatUIKit */; };
 		5674A3052C7C8E6600C51A07 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5674A3042C7C8E6600C51A07 /* SceytChatUIKit */; };
 		5674A30D2C7CC17E00C51A07 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5674A30C2C7CC17E00C51A07 /* SceytChatUIKit */; };
 		5674A3162C7F670300C51A07 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5674A3152C7F670300C51A07 /* SceytChatUIKit */; };
@@ -67,6 +67,7 @@
 		5649B9B82CBFB62800E3B190 /* UsernameValidation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsernameValidation.swift; sourceTree = "<group>"; };
 		5649B9BA2CBFBA0000E3B190 /* RequestManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RequestManager.swift; sourceTree = "<group>"; };
 		5692FDFF2CC159B300803B3F /* CustomChannelInfoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomChannelInfoViewController.swift; sourceTree = "<group>"; };
+		56D0BBCB2CD4F7AE00FF7208 /* SceytDemoApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SceytDemoApp.entitlements; sourceTree = "<group>"; };
 		56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UserDisplayNameFormatter.swift; sourceTree = "<group>"; };
 		C51C930D2B565C9C0069F9DA /* LoginViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewController.swift; sourceTree = "<group>"; };
 		C51C930F2B5660CB0069F9DA /* ConnectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionService.swift; sourceTree = "<group>"; };
@@ -94,7 +95,7 @@
 				5649B9992CBE5C4400E3B190 /* SceytChatUIKit in Frameworks */,
 				5649B9AD2CBFAADE00E3B190 /* SceytChatUIKit in Frameworks */,
 				5682FA142CBFDBD6007413C1 /* SceytChatUIKit in Frameworks */,
-				5672F6B32CC66A32009052AA /* SceytChatUIKit in Frameworks */,
+				560E295D2CC6788C003A4A17 /* SceytChatUIKit in Frameworks */,
 				5692FDFE2CC1416B00803B3F /* SceytChatUIKit in Frameworks */,
 				5694FF382C664FBA008DA2DC /* SceytChatUIKit in Frameworks */,
 				C5B97EA42B5692070070C913 /* SceytChatUIKit in Frameworks */,
@@ -192,6 +193,7 @@
 		C54DF6B92AECF09100767983 /* SceytDemoApp */ = {
 			isa = PBXGroup;
 			children = (
+				56D0BBCB2CD4F7AE00FF7208 /* SceytDemoApp.entitlements */,
 				C54DF6BA2AECF09100767983 /* AppDelegate.swift */,
 				C54DF6BC2AECF09100767983 /* SceneDelegate.swift */,
 				5649B9BC2CBFBCBF00E3B190 /* Utils */,
@@ -233,7 +235,7 @@
 				5682FA132CBFDBD6007413C1 /* SceytChatUIKit */,
 				5692FDFD2CC1416B00803B3F /* SceytChatUIKit */,
 				56F069CE2CC62D61003D74D8 /* SceytChatUIKit */,
-				5672F6B22CC66A32009052AA /* SceytChatUIKit */,
+				560E295C2CC6788C003A4A17 /* SceytChatUIKit */,
 			);
 			productName = SceytDemoApp;
 			productReference = C54DF6B72AECF09100767983 /* SceytDemoApp.app */;
@@ -265,7 +267,7 @@
 			);
 			mainGroup = C54DF6AE2AECF09100767983;
 			packageReferences = (
-				5672F6B12CC66A32009052AA /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */,
+				560E295B2CC6788C003A4A17 /* XCLocalSwiftPackageReference "../../../../../Packages/sceyt-chat-ios-uikit" */,
 			);
 			productRefGroup = C54DF6B82AECF09100767983 /* Products */;
 			projectDirPath = "";
@@ -469,8 +471,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SceytDemoApp/SceytDemoApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 289SR6UP83;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SceytDemoApp/Info.plist;
@@ -507,8 +510,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = SceytDemoApp/SceytDemoApp.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 4;
 				DEVELOPMENT_TEAM = 289SR6UP83;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = SceytDemoApp/Info.plist;
@@ -563,29 +567,24 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		5672F6B12CC66A32009052AA /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sceyt/sceyt-chat-ios-uikit";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 1.6.0;
-			};
+/* Begin XCLocalSwiftPackageReference section */
+		560E295B2CC6788C003A4A17 /* XCLocalSwiftPackageReference "../../../../../Packages/sceyt-chat-ios-uikit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../../../../Packages/sceyt-chat-ios-uikit";
 		};
-/* End XCRemoteSwiftPackageReference section */
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		560E295C2CC6788C003A4A17 /* SceytChatUIKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SceytChatUIKit;
+		};
 		5649B9982CBE5C4400E3B190 /* SceytChatUIKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = SceytChatUIKit;
 		};
 		5649B9AC2CBFAADE00E3B190 /* SceytChatUIKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			productName = SceytChatUIKit;
-		};
-		5672F6B22CC66A32009052AA /* SceytChatUIKit */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 5672F6B12CC66A32009052AA /* XCRemoteSwiftPackageReference "sceyt-chat-ios-uikit" */;
 			productName = SceytChatUIKit;
 		};
 		5674A3042C7C8E6600C51A07 /* SceytChatUIKit */ = {
