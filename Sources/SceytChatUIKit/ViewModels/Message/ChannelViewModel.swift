@@ -716,9 +716,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     open func createLayoutModels(at indexPaths: [IndexPath]) -> [MessageLayoutModel] {
         var models = [MessageLayoutModel]()
         for indexPath in indexPaths {
-            guard let message = message(at: indexPath),
-                  layoutModels[.init(message: message)] == nil
-            else { continue }
+            guard let message = message(at: indexPath)
+            else {
+                logger.error("[MEESS] not found :CLM: \(indexPaths)")
+                continue
+            }
+            guard layoutModels[.init(message: message)] == nil
+            else {
+                logger.error("[MEESS] not found :CLM: key \(indexPaths), ms: \(message)")
+                continue
+            }
+
             let model = createLayoutModel(for: message)
             models.append(model)
             layoutModels[.init(message: message)] = model
@@ -758,6 +766,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         if let message = messageObserver.itemFromPrevCache(at: indexPath) {
             return message
         }
+        logger.error("[MEESS] not found :M: \(indexPath)")
         return nil
     }
     
@@ -781,7 +790,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func layoutModel(at indexPath: IndexPath) -> MessageLayoutModel? {
         guard let message = message(at: indexPath)
-        else { return nil }
+        else {
+            logger.error("[MEESS] not found :LM: \(indexPath)")
+            return nil
+        }
         return layoutModel(for: message)
     }
     

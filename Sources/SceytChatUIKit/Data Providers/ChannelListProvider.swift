@@ -9,44 +9,50 @@
 import Foundation
 import SceytChat
 
+extension ChannelListProvider {
+    public struct Config {
+        public var types: [String]
+        public var order: ChannelListOrder
+        public var queryLimit: UInt
+        public var queryParam: ChannelQueryParam
+        
+        public static var `default` = Config(
+            types: [],
+            order: SceytChatUIKit.shared.config.channelListOrder,
+            queryLimit: SceytChatUIKit.shared.config.queryLimits.channelListQueryLimit,
+            queryParam: {
+                $0.userMessageReactionCount = 1
+                $0.memberCount = 10
+                return $0
+            }(ChannelQueryParam())
+        )
+    }
+}
+
 open class ChannelListProvider: DataProvider {
-
-    public var queryLimit = SceytChatUIKit.shared.config.queryLimits.channelListQueryLimit
-    public var queryListOrder = SceytChatUIKit.shared.config.channelListOrder
-
+    
+    public var config: Config
+    
     open private(set) var defaultQuery: ChannelListQuery!
-    open var defaultParams: ChannelQueryParam
     
     internal var onStoreChannels: (([Channel]) -> Void)?
     
-    public required override init() {
-        defaultParams = ChannelQueryParam()
-        defaultParams.userMessageReactionCount = 1
-        defaultParams.memberCount = 10
+    public required init(config: Config = .default) {
+        self.config = config
         super.init()
         createDefaultQuery()
     }
-
+    
     open func createDefaultQuery() {
         defaultQuery = ChannelListQuery
             .Builder()
-            .order(queryListOrder)
-            .limit(queryLimit)
-            .requestParams(defaultParams)
+            .types(config.types)
+            .order(config.order)
+            .limit(config.queryLimit)
+            .requestParams(config.queryParam)
             .build()
     }
     
-    open func createDefaultQuery(params: ChannelQueryParam?) {
-        let builder = ChannelListQuery
-            .Builder()
-            .order(queryListOrder)
-            .limit(queryLimit)
-        if let params {
-            builder.requestParams(params)
-        }
-        defaultQuery = builder.build()
-    }
-
     open func reloadChannels(
         query: ChannelListQuery? = nil,
         completion: ((Error?) -> Void)? = nil
@@ -54,7 +60,7 @@ open class ChannelListProvider: DataProvider {
         createDefaultQuery()
         loadChannels(query: query, completion: completion)
     }
-
+    
     open func loadChannels(
         query: ChannelListQuery? = nil,
         completion: ((Error?) -> Void)? = nil
@@ -80,7 +86,7 @@ open class ChannelListProvider: DataProvider {
             completion?(nil)
         }
     }
-
+    
     open func store(
         channels: [Channel],
         completion: ((Error?) -> Void)? = nil
@@ -182,7 +188,7 @@ extension ChannelListProvider {
                    !reactions.isEmpty,
                    let max = reactions.max(by: {$0.id > $1.id}),
                    max.messageId != lastMessage.id,
-                    max.createdAt >= lastMessage.createdAt {
+                   max.createdAt >= lastMessage.createdAt {
                     reactionIds.append(max.id)
                     dict[max.id] = (channel.id, max.messageId)
                 }
