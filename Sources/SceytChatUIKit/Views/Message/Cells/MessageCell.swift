@@ -9,6 +9,8 @@
 import UIKit
 import SceytChat
 
+public typealias SceytImageView = ImageView
+
 open class MessageCell: CollectionViewCell,
                         UITextViewDelegate,
                         MessageCellMeasurable,
@@ -42,7 +44,7 @@ open class MessageCell: CollectionViewCell,
     open lazy var nameLabel = UILabel()
         .withoutAutoresizingMask
     
-    open lazy var avatarView = UIImageView()
+    open lazy var avatarView = SceytImageView()
         .withoutAutoresizingMask
         .contentMode(.scaleAspectFill)
     
@@ -190,7 +192,7 @@ open class MessageCell: CollectionViewCell,
         infoView.appearance = appearance
         reactionTotalView.appearance = appearance
         unreadMessagesSeparatorView.appearance = appearance
-        checkBoxView.parentAppearance = appearance.checkboxAppearance
+        checkBoxView.parentAppearance = appearance.selectionCheckboxAppearance
         
         if data != nil {
             bind()

@@ -8,46 +8,107 @@
 import UIKit
 
 extension BottomSheet: AppearanceProviding {
-    public static var appearance = Appearance()
+    
+    public static var appearance = Appearance(
+        backgroundColor: .background,
+        separatorColor: .border,
+        titleLabelAppearance: .init(
+            foregroundColor: .secondaryText,
+            font: Fonts.semiBold.withSize(14)
+        ),
+        buttonAppearance: .init(
+            labelAppearance: .init(
+                foregroundColor: .primaryText,
+                font: Fonts.regular.withSize(16)
+            ),
+            tintColor: .accent,
+            backgroundColor: .background,
+            highlightedBackgroundColor: .surface2,
+            cornerRadius: 0,
+            cornerCurve: .continuous
+        ),
+        cancelButtonAppearance: .init(
+            labelAppearance: .init(
+                foregroundColor: .accent,
+                font: Fonts.semiBold.withSize(18)
+            ),
+            tintColor: .accent,
+            backgroundColor: .background,
+            highlightedBackgroundColor: .surface2,
+            cornerRadius: 0,
+            cornerCurve: .continuous
+        ),
+        destructiveButtonAppearance: .init(
+            labelAppearance: .init(
+                foregroundColor: .stateWarning,
+                font: Fonts.regular.withSize(16)
+            ),
+            tintColor: .stateWarning,
+            backgroundColor: .background,
+            highlightedBackgroundColor: .surface2,
+            cornerRadius: 0,
+            cornerCurve: .continuous
+        )
+    )
     
     public struct Appearance {
-        public var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background, .surface2)
-        public var titleFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var titleColor: UIColor? = .secondaryText
-        public var buttonFont: UIFont? = Fonts.regular.withSize(16)
-        public var normalTextColor: UIColor? = .primaryText
-        public var normalIconColor: UIColor? = .accent
-        public var destructiveTextColor: UIColor? = .stateWarning
-        public var destructiveIconColor: UIColor? = .stateWarning
-        public var cancelFont: UIFont? = Fonts.semiBold.withSize(18)
-        public var cancelTextColor: UIColor? = .accent
-        public var separatorColor: UIColor? = .border
         
-        // Initializer with default values
+        @Trackable<Appearance, UIColor>
+        public var backgroundColor: UIColor
+        
+        @Trackable<Appearance, UIColor>
+        public var separatorColor: UIColor
+        
+        @Trackable<Appearance, LabelAppearance>
+        public var titleLabelAppearance: LabelAppearance
+        
+        @Trackable<Appearance, ButtonAppearance>
+        public var buttonAppearance: ButtonAppearance
+        
+        @Trackable<Appearance, ButtonAppearance>
+        public var cancelButtonAppearance: ButtonAppearance
+        
+        @Trackable<Appearance, ButtonAppearance>
+        public var destructiveButtonAppearance: ButtonAppearance
+        
         public init(
-            backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background, .surface2),
-            titleFont: UIFont? = Fonts.semiBold.withSize(14),
-            titleColor: UIColor? = .secondaryText,
-            buttonFont: UIFont? = Fonts.regular.withSize(16),
-            normalTextColor: UIColor? = .primaryText,
-            normalIconColor: UIColor? = .accent,
-            destructiveTextColor: UIColor? = .stateWarning,
-            destructiveIconColor: UIColor? = .stateWarning,
-            cancelFont: UIFont? = Fonts.semiBold.withSize(18),
-            cancelTextColor: UIColor? = .accent,
-            separatorColor: UIColor? = .border
+            backgroundColor: UIColor,
+            separatorColor: UIColor,
+            titleLabelAppearance: LabelAppearance,
+            buttonAppearance: ButtonAppearance,
+            cancelButtonAppearance: ButtonAppearance,
+            destructiveButtonAppearance: ButtonAppearance
         ) {
-            self.backgroundColors = backgroundColors
-            self.titleFont = titleFont
-            self.titleColor = titleColor
-            self.buttonFont = buttonFont
-            self.normalTextColor = normalTextColor
-            self.normalIconColor = normalIconColor
-            self.destructiveTextColor = destructiveTextColor
-            self.destructiveIconColor = destructiveIconColor
-            self.cancelFont = cancelFont
-            self.cancelTextColor = cancelTextColor
-            self.separatorColor = separatorColor
+            self._backgroundColor = Trackable(value: backgroundColor)
+            self._separatorColor = Trackable(value: separatorColor)
+            self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
+            self._buttonAppearance = Trackable(value: buttonAppearance)
+            self._cancelButtonAppearance = Trackable(value: cancelButtonAppearance)
+            self._destructiveButtonAppearance = Trackable(value: destructiveButtonAppearance)
+        }
+        
+        public init(
+            reference: BottomSheet.Appearance,
+            backgroundColor: UIColor? = nil,
+            separatorColor: UIColor? = nil,
+            titleLabelAppearance: LabelAppearance? = nil,
+            buttonAppearance: ButtonAppearance? = nil,
+            cancelButtonAppearance: ButtonAppearance? = nil,
+            destructiveButtonAppearance: ButtonAppearance? = nil
+        ) {
+            self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
+            self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
+            self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
+            self._buttonAppearance = Trackable(reference: reference, referencePath: \.buttonAppearance)
+            self._cancelButtonAppearance = Trackable(reference: reference, referencePath: \.cancelButtonAppearance)
+            self._destructiveButtonAppearance = Trackable(reference: reference, referencePath: \.destructiveButtonAppearance)
+            
+            if let backgroundColor { self.backgroundColor = backgroundColor }
+            if let separatorColor { self.separatorColor = separatorColor }
+            if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
+            if let buttonAppearance { self.buttonAppearance = buttonAppearance }
+            if let cancelButtonAppearance { self.cancelButtonAppearance = cancelButtonAppearance }
+            if let destructiveButtonAppearance { self.destructiveButtonAppearance = destructiveButtonAppearance }
         }
     }
 }

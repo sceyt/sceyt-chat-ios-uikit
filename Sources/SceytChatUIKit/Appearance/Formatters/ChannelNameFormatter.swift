@@ -28,5 +28,3 @@ open class ChannelNameFormatter: ChannelFormatting {
         }
     }
 }
-
-

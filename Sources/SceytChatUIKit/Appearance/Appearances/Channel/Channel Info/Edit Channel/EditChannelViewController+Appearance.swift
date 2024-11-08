@@ -41,7 +41,7 @@ extension EditChannelViewController: AppearanceProviding {
         
         @Trackable<Appearance, URIValidationAppearance>
         public var uriValidationAppearance: URIValidationAppearance
-        
+                
         public init(
             backgroundColor: UIColor,
             avatarCellAppearance: EditChannelViewController.AvatarCell.Appearance,

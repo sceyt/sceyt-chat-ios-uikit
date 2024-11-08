@@ -12,7 +12,7 @@ open class UserShortNameFormatter: UserFormatting {
 
     open func format(_ user: ChatUser) -> String {
         if user.state != .active {
-            return format(user)
+            return SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
         }
 
         if user.id == me {

@@ -75,3 +75,5 @@ extension SegmentedControl: AppearanceProviding {
         }
     }
 }
+
+

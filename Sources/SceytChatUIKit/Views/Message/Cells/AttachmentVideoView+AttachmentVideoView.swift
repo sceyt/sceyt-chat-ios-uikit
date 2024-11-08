@@ -60,7 +60,7 @@ extension MessageCell {
             didSet {
                 setupPreviewer()
                 let duration = data.mediaDuration
-                if duration > 0 {
+                if duration >= 0 {
                     timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)
                 }
                 if let filePath = data.attachment.filePath,

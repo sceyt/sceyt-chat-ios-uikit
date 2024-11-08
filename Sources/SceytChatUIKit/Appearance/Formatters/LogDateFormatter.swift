@@ -22,4 +22,3 @@ open class LogDateFormatter: DateFormatting {
         formatter.string(from: date)
     }
 }
-

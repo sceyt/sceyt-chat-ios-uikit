@@ -22,10 +22,11 @@ extension SearchResultChannelCell: AppearanceProviding {
         ),
         titleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelNameFormatter),
         subtitleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelSubtitleFormatter),
-        visualProvider: AnyChannelAvatarProviding(SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider)
+        avatarRenderer: AnyChannelAvatarRendering(SceytChatUIKit.shared.avatarRenderers.channelAvatarRenderer),
+        avatarAppearance: AvatarAppearance.standard
     )
     
-    public class Appearance: CellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarProviding> {
+    public class Appearance: CellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarRendering> {
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -41,7 +42,8 @@ extension SearchResultChannelCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyChannelFormatting,
             subtitleFormatter: AnyChannelFormatting,
-            visualProvider: AnyChannelAvatarProviding
+            avatarRenderer: AnyChannelAvatarRendering,
+            avatarAppearance: AvatarAppearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             self._separatorColor = Trackable(value: separatorColor)
@@ -50,7 +52,8 @@ extension SearchResultChannelCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance
             )
         }
         
@@ -63,7 +66,8 @@ extension SearchResultChannelCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance? = nil,
             titleFormatter: AnyChannelFormatting? = nil,
             subtitleFormatter: AnyChannelFormatting? = nil,
-            visualProvider: AnyChannelAvatarProviding? = nil
+            avatarRenderer: AnyChannelAvatarRendering? = nil,
+            avatarAppearance: AvatarAppearance? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
@@ -72,7 +76,8 @@ extension SearchResultChannelCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance ?? reference.subtitleLabelAppearance,
                 titleFormatter: titleFormatter ?? reference.titleFormatter,
                 subtitleFormatter: subtitleFormatter ?? reference.subtitleFormatter,
-                visualProvider: visualProvider ?? reference.visualProvider
+                avatarRenderer: avatarRenderer ?? reference.avatarRenderer,
+                avatarAppearance: avatarAppearance ?? reference.avatarAppearance
             )
             
             if let backgroundColor { self.backgroundColor = backgroundColor }

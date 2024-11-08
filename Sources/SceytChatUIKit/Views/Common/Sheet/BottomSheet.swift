@@ -91,12 +91,12 @@ open class BottomSheet: View {
         backgroundColor = .clear
         
         if hasTitle {
-            titleLabel.font = appearance.titleFont
+            titleLabel.font = appearance.titleLabelAppearance.font
             titleLabel.textAlignment = .center
-            titleLabel.textColor = appearance.titleColor
+            titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
             titleLabel.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
             titleLabel.layer.cornerRadius = Layouts.cornerRadius
-            titleLabel.backgroundColor = appearance.backgroundColors?.normal
+            titleLabel.backgroundColor = appearance.backgroundColor
             titleLabel.edgeInsets = .init(top: 20, left: 16, bottom: 10, right: 16)
             titleLabel.layer.cornerRadius = Layouts.cornerRadius
             titleLabel.layer.masksToBounds = true
@@ -113,32 +113,31 @@ open class BottomSheet: View {
         }.store(in: &subscriptions)
         button.contentEdgeInsets = .init(top: 18, left: 16 + (action.icon == nil ? 0 : 16), bottom: 18, right: 16)
         button.imageEdgeInsets = .init(top: 0, left: action.icon == nil ? 0 : -16, bottom: 0, right: 0)
-        button.backgroundColors = appearance.backgroundColors
-        button.tintColor = appearance.normalIconColor
         button.layer.maskedCorners = maskedCorners
         button.layer.cornerRadius = Layouts.cornerRadius
         button.layer.masksToBounds = true
         button.setImage(action.icon?.withRenderingMode(.alwaysTemplate), for: .normal)
         button.contentHorizontalAlignment = action.icon == nil ? .center : .leading
-        if action.style == .cancel {
-            button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
-                .font: appearance.cancelFont ?? Fonts.semiBold.withSize(16),
-                .foregroundColor: appearance.cancelTextColor ?? .accent,
-            ]), for: .normal)
-        } else {
-            if action.style == .destructive {
-                button.tintColor = appearance.destructiveIconColor
-                button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
-                    .font: appearance.buttonFont ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.destructiveTextColor ?? .stateWarning,
-                ]), for: .normal)
-            } else {
-                button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
-                    .font: appearance.buttonFont ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.normalTextColor ?? .primaryText,
-                ]), for: .normal)
-            }
+        
+        let buttonAppearance = switch action.style {
+        case .default:
+            appearance.buttonAppearance
+        case .destructive:
+            appearance.destructiveButtonAppearance
+        case .cancel:
+            appearance.cancelButtonAppearance
         }
+
+        button.backgroundColors = (
+            normal: buttonAppearance.backgroundColor,
+            highlighted: buttonAppearance.highlightedBackgroundColor
+        )
+        button.tintColor = buttonAppearance.tintColor
+        button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
+            .font: buttonAppearance.labelAppearance.font,
+            .foregroundColor: buttonAppearance.labelAppearance.foregroundColor
+        ]), for: .normal)
+
         if hasSeparator {
             let separator = UIView()
             separator.backgroundColor = appearance.separatorColor

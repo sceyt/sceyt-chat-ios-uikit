@@ -16,6 +16,8 @@ open class ReactedUserListViewController: ViewController,
 
     open var viewModel: UserReactionViewModel!
     
+    open var appearance: ReactionsInfoViewController.Appearance = ReactionsInfoViewController.appearance
+    
     open lazy var collectionViewLayout = UICollectionViewFlowLayout()
 
     open lazy var collectionView = UICollectionView(frame: .zero, collectionViewLayout: collectionViewLayout)
@@ -79,9 +81,9 @@ open class ReactedUserListViewController: ViewController,
 
     open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.reactedUserReactionCell)
-        if let cellModel = viewModel.cellModel(at: indexPath) {
-            cell.data = cellModel.0
-            cell.reactionLabel.text = cellModel.1
+        cell.parentAppearance = appearance.reactedUserCellAppearance
+        if let reactionModel = viewModel.cellModel(at: indexPath) {
+            cell.data = reactionModel
         }
         if indexPath.item > viewModel.numberOfItems(in: indexPath.section) - 3 {
             viewModel.loadReactions()

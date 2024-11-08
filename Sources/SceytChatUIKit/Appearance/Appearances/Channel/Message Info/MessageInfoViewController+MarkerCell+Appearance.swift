@@ -21,10 +21,11 @@ extension MessageInfoViewController.MarkerCell: AppearanceProviding {
         ),
         titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
         subtitleFormatter: AnyDateFormatting(SceytChatUIKit.shared.formatters.messageInfoMarkerDateFormatter),
-        visualProvider: AnyUserAvatarProviding(SceytChatUIKit.shared.visualProviders.userAvatarProvider)
+        avatarRenderer: AnyUserAvatarRendering(SceytChatUIKit.shared.avatarRenderers.userAvatarRenderer),
+        avatarAppearance: AvatarAppearance.standard
     )
     
-    public class Appearance: CellAppearance<AnyUserFormatting, AnyDateFormatting, AnyUserAvatarProviding> {
+    public class Appearance: CellAppearance<AnyUserFormatting, AnyDateFormatting, AnyUserAvatarRendering> {
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
         
@@ -34,7 +35,8 @@ extension MessageInfoViewController.MarkerCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
             subtitleFormatter: AnyDateFormatting,
-            visualProvider: AnyUserAvatarProviding
+            avatarRenderer: AnyUserAvatarRendering,
+            avatarAppearance: AvatarAppearance
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             super.init(
@@ -42,7 +44,8 @@ extension MessageInfoViewController.MarkerCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance
             )
         }
         
@@ -53,7 +56,8 @@ extension MessageInfoViewController.MarkerCell: AppearanceProviding {
             subtitleLabelAppearance: LabelAppearance,
             titleFormatter: AnyUserFormatting,
             subtitleFormatter: AnyDateFormatting,
-            visualProvider: AnyUserAvatarProviding
+            avatarRenderer: AnyUserAvatarRendering,
+            avatarAppearance: AvatarAppearance
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             
@@ -62,7 +66,8 @@ extension MessageInfoViewController.MarkerCell: AppearanceProviding {
                 subtitleLabelAppearance: subtitleLabelAppearance,
                 titleFormatter: titleFormatter,
                 subtitleFormatter: subtitleFormatter,
-                visualProvider: visualProvider
+                avatarRenderer: avatarRenderer,
+                avatarAppearance: avatarAppearance
             )
             
             if let backgroundColor { self.backgroundColor = backgroundColor }

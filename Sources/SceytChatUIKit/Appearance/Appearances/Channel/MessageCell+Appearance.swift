@@ -1,300 +1,3 @@
-////
-////  MessageCell+Appearance.swift
-////  SceytChatUIKit
-////
-////  Created by Arthur Avagyan on 28.09.24
-////  Copyright © 2024 Sceyt LLC. All rights reserved.
-////
-//
-//import UIKit
-//
-//extension MessageCell: AppearanceProviding {
-//    public static var appearance = Appearance()
-//    
-//    public struct Appearance {
-//        // Static properties
-//        public static var bubbleOutgoing: UIColor = DefaultColors.bubbleOutgoing
-//        public static var bubbleOutgoingSecondary: UIColor = DefaultColors.bubbleOutgoingSecondary
-//        public static var bubbleIncoming: UIColor = DefaultColors.bubbleIncoming
-//        public static var bubbleIncomingSecondary: UIColor = DefaultColors.bubbleIncomingSecondary
-//        public static var bubbleOutgoingHighlighted: UIColor = DefaultColors.bubbleOutgoingHighlighted
-//        public static var bubbleOutgoingHighlightedSecondary: UIColor = DefaultColors.bubbleOutgoingHighlightedSecondary
-//        public static var bubbleIncomingHighlighted: UIColor = DefaultColors.bubbleIncomingHighlighted
-//        public static var bubbleIncomingHighlightedSecondary: UIColor = DefaultColors.bubbleIncomingHighlightedSecondary
-//        
-//        // Colors
-//        public var backgroundColor: UIColor = .clear
-//        public var incomingBubbleColor: UIColor = Self.bubbleIncoming
-//        public var outgoingBubbleColor: UIColor = Self.bubbleOutgoing
-//        public var incomingReplyBackgroundColor: UIColor = Self.bubbleIncomingSecondary
-//        public var outgoingReplyBackgroundColor: UIColor = Self.bubbleOutgoingSecondary
-//        public var incomingLinkPreviewBackgroundColor: UIColor = Self.bubbleIncomingSecondary
-//        public var outgoingLinkPreviewBackgroundColor: UIColor = Self.bubbleOutgoingSecondary
-//        public var incomingHighlightedBubbleColor: UIColor = Self.bubbleIncomingHighlighted
-//        public var outgoingHighlightedBubbleColor: UIColor = Self.bubbleOutgoingHighlighted
-//        public var incomingHighlightedOverlayColor: UIColor = Self.bubbleIncomingHighlightedSecondary
-//        public var outgoingHighlightedOverlayColor: UIColor = Self.bubbleOutgoingHighlightedSecondary
-//        public var incomingHighlightedSearchResultColor: UIColor = Self.bubbleIncomingHighlighted
-//        public var outgoingHighlightedSearchResultColor: UIColor = Self.bubbleOutgoingHighlighted
-//        public var incomingHighlightedOverlaySearchResultColor: UIColor = Self.bubbleIncomingHighlightedSecondary
-//        public var outgoingHighlightedOverlaySearchResultColor: UIColor = Self.bubbleOutgoingHighlightedSecondary
-//        public var overlayColor: UIColor = .overlayBackground2
-//        public var onOverlayColor: UIColor = .onPrimary
-//        public var reactionsContainerBackgroundColor: UIColor = .backgroundSections
-//        public var threadReplyArrowStrokeColor: UIColor = .border
-//        
-//        // Label Appearances
-//        public var senderNameLabelAppearance: LabelAppearance = .init(foregroundColor: nil, // Will use randomized color from initials colors
-//                                                                           font: Fonts.semiBold.withSize(14))
-//        public var bodyLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-//                                                                     font: Fonts.regular.withSize(16))
-//        public var mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
-//                                                                        font: Fonts.regular.withSize(16))
-//        public var deletedMessageLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-//                                                                               font: Fonts.regular.with(traits: .traitItalic).withSize(16))
-//        public var messageDateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-//                                                                            font: Fonts.regular.withSize(12))
-//        public var messageStateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-//                                                                             font: Fonts.regular.with(traits: .traitItalic).withSize(12))
-//        public var linkLabelAppearance: LabelAppearance = .init(foregroundColor: .systemBlue,
-//                                                                     font: Fonts.regular.withSize(16))
-//        public var linkPreviewAppearance: LinkPreviewAppearance = .init(
-//            titleLabelAppearance: .init(foregroundColor: .primaryText,
-//                                        font: Fonts.semiBold.withSize(14)),
-//            descriptionLabelAppearance: .init(foregroundColor: .secondaryText,
-//                                              font: Fonts.regular.withSize(13)),
-//            highlightedLinkBackgroundColor: .footnoteText
-//        )
-//        public var videoDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary,
-//                                                                              font: Fonts.regular.withSize(12))
-//        public var threadReplyCountLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
-//                                                                                 font: Fonts.semiBold.withSize(12))
-//        public var forwardedTitleLabelAppearance: LabelAppearance = .init(foregroundColor: .accent,
-//                                                                               font: Fonts.semiBold.withSize(13))
-//        public var reactionCountLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-//                                                                              font: Fonts.regular.withSize(13))
-//        public var voiceSpeedLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-//                                                                           font: Fonts.semiBold.withSize(12),
-//                                                                           backgroundColor: .background)
-//        public var voiceDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .footnoteText,
-//                                                                              font: Fonts.regular.withSize(11))
-//        public var attachmentFileNameLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText,
-//                                                                                   font: Fonts.semiBold.withSize(16))
-//        public var attachmentFileSizeLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText,
-//                                                                                   font: Fonts.regular.withSize(12))
-//        
-//        // Icons
-//        public var messageDeliveryStatusIcons: MessageDeliveryStatusIcons = .init()
-//        public var viewCountIcon: UIImage = .eye
-//        public var videoIcon: UIImage = .galleryVideoAsset
-//        public var videoPlayIcon: UIImage = .videoPlay
-//        public var swipeToReplyIcon: UIImage = .channelReply
-//        public var forwardedIcon: UIImage = .forwardedMessage
-//        public var voicePlayIcon: UIImage = .audioPlayerPlay
-//        public var voicePauseIcon: UIImage = .audioPlayerPause
-//        
-//        // Other Appearances
-//        public var unreadMessagesSeparatorAppearance: UnreadMessagesSeparatorView.Appearance = .init(backgroundColor: Appearance.bubbleIncoming)
-//        public var replyMessageAppearance: ReplyMessageAppearance = .init()
-//        public var checkboxAppearance: CheckBoxView.Appearance = CheckBoxView.appearance
-//        public var voiceWaveformViewAppearance: AudioWaveformView.Appearance = AudioWaveformView.appearance
-//        public var mediaLoaderAppearance: CircularProgressView.Appearance = .init(progressColor: .onPrimary,
-//                                                                                       trackColor: .clear,
-//                                                                                       backgroundColor: .accent,
-//                                                                                       cancelIcon: nil,
-//                                                                                       uploadIcon: nil,
-//                                                                                       downloadIcon: nil)
-//        public var overlayMediaLoaderAppearance: CircularProgressView.Appearance = .init(progressColor: .onPrimary,
-//                                                                                              trackColor: .clear,
-//                                                                                              backgroundColor: .overlayBackground2,
-//                                                                                              cancelIcon: .attachmentTransferPause,
-//                                                                                              uploadIcon: .attachmentUpload,
-//                                                                                              downloadIcon: .attachmentDownload)
-//        
-//        // Other properties
-//        public var editedStateText: String = L10n.Message.Info.edited
-//        public var deletedStateText: String = L10n.Message.deleted
-//        public var forwardedText: String = L10n.Message.Forward.title
-//        
-//        // Formatters and providers
-//        public var attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.attachmentIconProvider
-//        public var senderNameColorProvider: any UserColorProviding = SceytChatUIKit.shared.visualProviders.senderNameColorProvider
-//        public var senderNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userNameFormatter
-//        public var voiceDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter
-//        public var attachmentFileSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter
-//        public var messageViewCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.messageViewCountFormatter
-//        public var messageDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateFormatter
-//        public var mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter
-//        public var userDefaultAvatarProvider: any UserAvatarProviding = SceytChatUIKit.shared.visualProviders.userAvatarProvider
-//        
-//        public init(
-//            // Colors
-//            backgroundColor: UIColor = .clear,
-//            incomingBubbleColor: UIColor = Appearance.bubbleIncoming,
-//            outgoingBubbleColor: UIColor = Appearance.bubbleOutgoing,
-//            incomingReplyBackgroundColor: UIColor = Appearance.bubbleIncomingSecondary,
-//            outgoingReplyBackgroundColor: UIColor = Appearance.bubbleOutgoingSecondary,
-//            incomingLinkPreviewBackgroundColor: UIColor = Appearance.bubbleIncomingSecondary,
-//            outgoingLinkPreviewBackgroundColor: UIColor = Appearance.bubbleOutgoingSecondary,
-//            incomingHighlightedBubbleColor: UIColor = Appearance.bubbleIncomingHighlighted,
-//            outgoingHighlightedBubbleColor: UIColor = Appearance.bubbleOutgoingHighlighted,
-//            incomingHighlightedOverlayColor: UIColor = Appearance.bubbleIncomingHighlightedSecondary,
-//            outgoingHighlightedOverlayColor: UIColor = Appearance.bubbleOutgoingHighlightedSecondary,
-//            incomingHighlightedSearchResultColor: UIColor = Appearance.bubbleIncomingHighlighted,
-//            outgoingHighlightedSearchResultColor: UIColor = Appearance.bubbleOutgoingHighlighted,
-//            incomingHighlightedOverlaySearchResultColor: UIColor = Appearance.bubbleIncomingHighlightedSecondary,
-//            outgoingHighlightedOverlaySearchResultColor: UIColor = Appearance.bubbleOutgoingHighlightedSecondary,
-//            overlayColor: UIColor = .overlayBackground2,
-//            onOverlayColor: UIColor = .onPrimary,
-//            reactionsContainerBackgroundColor: UIColor = .backgroundSections,
-//            threadReplyArrowStrokeColor: UIColor = .border,
-//            
-//            // Label Appearances
-//            senderNameLabelAppearance: LabelAppearance = .init(foregroundColor: nil, font: Fonts.semiBold.withSize(14)),
-//            bodyLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText, font: Fonts.regular.withSize(16)),
-//            mentionLabelAppearance: LabelAppearance = .init(foregroundColor: .accent, font: Fonts.regular.withSize(16)),
-//            deletedMessageLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.with(traits: .traitItalic).withSize(16)),
-//            messageDateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(12)),
-//            messageStateLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.with(traits: .traitItalic).withSize(12)),
-//            linkLabelAppearance: LabelAppearance = .init(foregroundColor: .systemBlue, font: Fonts.regular.withSize(16)),
-//            linkPreviewAppearance: LinkPreviewAppearance = .init(
-//                titleLabelAppearance: .init(foregroundColor: .primaryText, font: Fonts.semiBold.withSize(14)),
-//                descriptionLabelAppearance: .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(13)),
-//                highlightedLinkBackgroundColor: .footnoteText,
-//                placeholderIcon: nil
-//            ),
-//            videoDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .onPrimary, font: Fonts.regular.withSize(12)),
-//            threadReplyCountLabelAppearance: LabelAppearance = .init(foregroundColor: .accent, font: Fonts.semiBold.withSize(12)),
-//            forwardedTitleLabelAppearance: LabelAppearance = .init(foregroundColor: .accent, font: Fonts.semiBold.withSize(13)),
-//            reactionCountLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText, font: Fonts.regular.withSize(13)),
-//            voiceSpeedLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.semiBold.withSize(12), backgroundColor: .background),
-//            voiceDurationLabelAppearance: LabelAppearance = .init(foregroundColor: .footnoteText, font: Fonts.regular.withSize(11)),
-//            attachmentFileNameLabelAppearance: LabelAppearance = .init(foregroundColor: .primaryText, font: Fonts.semiBold.withSize(16)),
-//            attachmentFileSizeLabelAppearance: LabelAppearance = .init(foregroundColor: .secondaryText, font: Fonts.regular.withSize(12)),
-//            
-//            // Icons
-//            messageDeliveryStatusIcons: MessageDeliveryStatusIcons = .init(),
-//            viewCountIcon: UIImage = .eye,
-//            videoIcon: UIImage = .galleryVideoAsset,
-//            videoPlayIcon: UIImage = .videoPlay,
-//            swipeToReplyIcon: UIImage = .channelReply,
-//            forwardedIcon: UIImage = .forwardedMessage,
-//            voicePlayIcon: UIImage = .audioPlayerPlay,
-//            voicePauseIcon: UIImage = .audioPlayerPause,
-//            
-//            // Other Appearances
-//            unreadMessagesSeparatorAppearance: UnreadMessagesSeparatorView.Appearance = .init(backgroundColor: Appearance.bubbleIncoming),
-//            replyMessageAppearance: ReplyMessageAppearance = .init(),
-//            checkboxAppearance: CheckBoxView.Appearance = CheckBoxView.appearance,
-//            voiceWaveformViewAppearance: AudioWaveformView.Appearance = AudioWaveformView.appearance,
-//            mediaLoaderAppearance: CircularProgressView.Appearance = .init(progressColor: .onPrimary,
-//                                                                           trackColor: .clear,
-//                                                                           backgroundColor: .accent,
-//                                                                           cancelIcon: nil,
-//                                                                           uploadIcon: nil,
-//                                                                           downloadIcon: nil),
-//            overlayMediaLoaderAppearance: CircularProgressView.Appearance = .init(progressColor: .onPrimary,
-//                                                                                  trackColor: .clear,
-//                                                                                  backgroundColor: .overlayBackground2,
-//                                                                                  cancelIcon: .attachmentTransferPause,
-//                                                                                  uploadIcon: .attachmentUpload,
-//                                                                                  downloadIcon: .attachmentDownload),
-//            
-//            // Other properties
-//            editedStateText: String = L10n.Message.Info.edited,
-//            deletedStateText: String = L10n.Message.deleted,
-//            forwardedText: String = L10n.Message.Forward.title,
-//            
-//            // Formatters and providers
-//            attachmentIconProvider: any AttachmentIconProviding = SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
-//            senderNameColorProvider: any UserColorProviding = SceytChatUIKit.shared.visualProviders.senderNameColorProvider,
-//            senderNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.userNameFormatter,
-//            voiceDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter,
-//            attachmentFileSizeFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.attachmentSizeFormatter,
-//            messageViewCountFormatter: any UIntFormatting = SceytChatUIKit.shared.formatters.messageViewCountFormatter,
-//            messageDateFormatter: any DateFormatting = SceytChatUIKit.shared.formatters.messageDateFormatter,
-//            mentionUserNameFormatter: any UserFormatting = SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
-//            userDefaultAvatarProvider: any UserAvatarProviding = SceytChatUIKit.shared.visualProviders.userAvatarProvider
-//        ) {
-//            // Colors
-//            self.backgroundColor = backgroundColor
-//            self.incomingBubbleColor = incomingBubbleColor
-//            self.outgoingBubbleColor = outgoingBubbleColor
-//            self.incomingReplyBackgroundColor = incomingReplyBackgroundColor
-//            self.outgoingReplyBackgroundColor = outgoingReplyBackgroundColor
-//            self.incomingLinkPreviewBackgroundColor = incomingLinkPreviewBackgroundColor
-//            self.outgoingLinkPreviewBackgroundColor = outgoingLinkPreviewBackgroundColor
-//            self.incomingHighlightedBubbleColor = incomingHighlightedBubbleColor
-//            self.outgoingHighlightedBubbleColor = outgoingHighlightedBubbleColor
-//            self.incomingHighlightedOverlayColor = incomingHighlightedOverlayColor
-//            self.outgoingHighlightedOverlayColor = outgoingHighlightedOverlayColor
-//            self.incomingHighlightedSearchResultColor = incomingHighlightedSearchResultColor
-//            self.outgoingHighlightedSearchResultColor = outgoingHighlightedSearchResultColor
-//            self.incomingHighlightedOverlaySearchResultColor = incomingHighlightedOverlaySearchResultColor
-//            self.outgoingHighlightedOverlaySearchResultColor = outgoingHighlightedOverlaySearchResultColor
-//            self.overlayColor = overlayColor
-//            self.onOverlayColor = onOverlayColor
-//            self.reactionsContainerBackgroundColor = reactionsContainerBackgroundColor
-//            self.threadReplyArrowStrokeColor = threadReplyArrowStrokeColor
-//            
-//            // Label Appearances
-//            self.senderNameLabelAppearance = senderNameLabelAppearance
-//            self.bodyLabelAppearance = bodyLabelAppearance
-//            self.mentionLabelAppearance = mentionLabelAppearance
-//            self.deletedMessageLabelAppearance = deletedMessageLabelAppearance
-//            self.messageDateLabelAppearance = messageDateLabelAppearance
-//            self.messageStateLabelAppearance = messageStateLabelAppearance
-//            self.linkLabelAppearance = linkLabelAppearance
-//            self.linkPreviewAppearance = linkPreviewAppearance
-//            self.videoDurationLabelAppearance = videoDurationLabelAppearance
-//            self.threadReplyCountLabelAppearance = threadReplyCountLabelAppearance
-//            self.forwardedTitleLabelAppearance = forwardedTitleLabelAppearance
-//            self.reactionCountLabelAppearance = reactionCountLabelAppearance
-//            self.voiceSpeedLabelAppearance = voiceSpeedLabelAppearance
-//            self.voiceDurationLabelAppearance = voiceDurationLabelAppearance
-//            self.attachmentFileNameLabelAppearance = attachmentFileNameLabelAppearance
-//            self.attachmentFileSizeLabelAppearance = attachmentFileSizeLabelAppearance
-//            
-//            // Icons
-//            self.messageDeliveryStatusIcons = messageDeliveryStatusIcons
-//            self.viewCountIcon = viewCountIcon
-//            self.videoIcon = videoIcon
-//            self.videoPlayIcon = videoPlayIcon
-//            self.swipeToReplyIcon = swipeToReplyIcon
-//            self.forwardedIcon = forwardedIcon
-//            self.voicePlayIcon = voicePlayIcon
-//            self.voicePauseIcon = voicePauseIcon
-//            
-//            // Other Appearances
-//            self.unreadMessagesSeparatorAppearance = unreadMessagesSeparatorAppearance
-//            self.replyMessageAppearance = replyMessageAppearance
-//            self.checkboxAppearance = checkboxAppearance
-//            self.voiceWaveformViewAppearance = voiceWaveformViewAppearance
-//            self.mediaLoaderAppearance = mediaLoaderAppearance
-//            self.overlayMediaLoaderAppearance = overlayMediaLoaderAppearance
-//            
-//            // Other properties
-//            self.editedStateText = editedStateText
-//            self.deletedStateText = deletedStateText
-//            self.forwardedText = forwardedText
-//            
-//            // Formatters and providers
-//            self.attachmentIconProvider = attachmentIconProvider
-//            self.senderNameColorProvider = senderNameColorProvider
-//            self.senderNameFormatter = senderNameFormatter
-//            self.voiceDurationFormatter = voiceDurationFormatter
-//            self.attachmentFileSizeFormatter = attachmentFileSizeFormatter
-//            self.messageViewCountFormatter = messageViewCountFormatter
-//            self.messageDateFormatter = messageDateFormatter
-//            self.mentionUserNameFormatter = mentionUserNameFormatter
-//            self.userDefaultAvatarProvider = userDefaultAvatarProvider
-//        }
-//    }
-//}
-//
-//
-
-
 //
 //  MessageCell+Appearance.swift
 //  SceytChatUIKit
@@ -306,144 +9,6 @@
 import UIKit
 
 extension MessageCell: AppearanceProviding {
-    //    public static var appearance = Appearance(
-    //        backgroundColor: .clear,
-    //        incomingBubbleColor: DefaultColors.bubbleIncoming,
-    //        outgoingBubbleColor: DefaultColors.bubbleOutgoing,
-    //        incomingReplyBackgroundColor: DefaultColors.bubbleIncomingSecondary,
-    //        outgoingReplyBackgroundColor: DefaultColors.bubbleOutgoingSecondary,
-    //        incomingLinkPreviewBackgroundColor: DefaultColors.bubbleIncomingSecondary,
-    //        outgoingLinkPreviewBackgroundColor: DefaultColors.bubbleOutgoingSecondary,
-    //        incomingHighlightedBubbleColor: DefaultColors.bubbleIncomingHighlighted,
-    //        outgoingHighlightedBubbleColor: DefaultColors.bubbleOutgoingHighlighted,
-    //        incomingHighlightedOverlayColor: DefaultColors.bubbleIncomingHighlightedSecondary,
-    //        outgoingHighlightedOverlayColor: DefaultColors.bubbleIncomingHighlightedSecondary,
-    //        incomingHighlightedSearchResultColor: DefaultColors.bubbleIncomingHighlighted,
-    //        outgoingHighlightedSearchResultColor: DefaultColors.bubbleOutgoingHighlighted,
-    //        incomingHighlightedOverlaySearchResultColor: DefaultColors.bubbleIncomingHighlightedSecondary,
-    //        outgoingHighlightedOverlaySearchResultColor: DefaultColors.bubbleOutgoingHighlightedSecondary,
-    //        overlayColor: .overlayBackground2,
-    //        onOverlayColor: .onPrimary,
-    //        reactionsContainerBackgroundColor: .backgroundSections,
-    //        threadReplyArrowStrokeColor: .border,
-    //        senderNameLabelAppearance: LabelAppearance(
-    //            foregroundColor: nil, // Will use randomized color from initials colors
-    //            font: Fonts.semiBold.withSize(14)
-    //        ),
-    //        bodyLabelAppearance: LabelAppearance(
-    //            foregroundColor: .primaryText,
-    //            font: Fonts.regular.withSize(16)
-    //        ),
-    //        mentionLabelAppearance: LabelAppearance(
-    //            foregroundColor: .accent,
-    //            font: Fonts.regular.withSize(16)
-    //        ),
-    //        deletedMessageLabelAppearance: LabelAppearance(
-    //            foregroundColor: .secondaryText,
-    //            font: Fonts.regular.with(traits: .traitItalic).withSize(16)
-    //        ),
-    //        messageDateLabelAppearance: LabelAppearance(
-    //            foregroundColor: .secondaryText,
-    //            font: Fonts.regular.withSize(12)
-    //        ),
-    //        messageStateLabelAppearance: LabelAppearance(
-    //            foregroundColor: .secondaryText,
-    //            font: Fonts.regular.with(traits: .traitItalic).withSize(12)
-    //        ),
-    //        linkLabelAppearance: LabelAppearance(
-    //            foregroundColor: .systemBlue,
-    //            font: Fonts.regular.withSize(16)
-    //        ),
-    //        linkPreviewAppearance: LinkPreviewAppearance(
-    //            titleLabelAppearance: LabelAppearance(
-    //                foregroundColor: .primaryText,
-    //                font: Fonts.semiBold.withSize(14)
-    //            ),
-    //            descriptionLabelAppearance: LabelAppearance(
-    //                foregroundColor: .secondaryText,
-    //                font: Fonts.regular.withSize(13)
-    //            ),
-    //            highlightedLinkBackgroundColor: .footnoteText,
-    //            placeholderIcon: nil
-    //        ),
-    //        videoDurationLabelAppearance: LabelAppearance(
-    //            foregroundColor: .onPrimary,
-    //            font: Fonts.regular.withSize(12)
-    //        ),
-    //        threadReplyCountLabelAppearance: LabelAppearance(
-    //            foregroundColor: .accent,
-    //            font: Fonts.semiBold.withSize(12)
-    //        ),
-    //        forwardedTitleLabelAppearance: LabelAppearance(
-    //            foregroundColor: .accent,
-    //            font: Fonts.semiBold.withSize(13)
-    //        ),
-    //        reactionCountLabelAppearance: LabelAppearance(
-    //            foregroundColor: .primaryText,
-    //            font: Fonts.regular.withSize(13)
-    //        ),
-    //        voiceSpeedLabelAppearance: LabelAppearance(
-    //            foregroundColor: .secondaryText,
-    //            font: Fonts.semiBold.withSize(12),
-    //            backgroundColor: .background
-    //        ),
-    //        voiceDurationLabelAppearance: LabelAppearance(
-    //            foregroundColor: .footnoteText,
-    //            font: Fonts.regular.withSize(11)
-    //        ),
-    //        attachmentFileNameLabelAppearance: LabelAppearance(
-    //            foregroundColor: .primaryText,
-    //            font: Fonts.semiBold.withSize(16)
-    //        ),
-    //        attachmentFileSizeLabelAppearance: LabelAppearance(
-    //            foregroundColor: .secondaryText,
-    //            font: Fonts.regular.withSize(12)
-    //        ),
-    //        messageDeliveryStatusIcons: MessageDeliveryStatusIcons(),
-    //        viewCountIcon: .eye,
-    //        videoIcon: .galleryVideoAsset,
-    //        videoPlayIcon: .videoPlay,
-    //        swipeToReplyIcon: .channelReply,
-    //        forwardedIcon: .forwardedMessage,
-    //        voicePlayIcon: .audioPlayerPlay,
-    //        voicePauseIcon: .audioPlayerPause,
-    //        unreadMessagesSeparatorAppearance: .init(unreadText: ""),
-    //        replyMessageAppearance: ReplyMessageAppearance.appearance,
-    //        checkboxAppearance: CheckBoxView.appearance,
-    //        voiceWaveformViewAppearance: AudioWaveformView.appearance,
-    //        mediaLoaderAppearance: CircularProgressView.Appearance(
-    //            progressColor: .onPrimary,
-    //            trackColor: .clear,
-    //            backgroundColor: .accent,
-    //            cancelIcon: nil,
-    //            uploadIcon: nil,
-    //            downloadIcon: nil
-    //        ),
-    //        overlayMediaLoaderAppearance: CircularProgressView.Appearance(
-    //            progressColor: .onPrimary,
-    //            trackColor: .clear,
-    //            backgroundColor: .overlayBackground2,
-    //            cancelIcon: .attachmentTransferPause,
-    //            uploadIcon: .attachmentUpload,
-    //            downloadIcon: .attachmentDownload
-    //        ),
-    //
-    //        // Other properties
-    //        editedStateText: L10n.Message.Info.edited,
-    //        deletedStateText: L10n.Message.deleted,
-    //        forwardedText: L10n.Message.Forward.title,
-    //
-    //        // Formatters and providers
-    //        attachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
-    //        senderNameColorProvider: SceytChatUIKit.shared.visualProviders.senderNameColorProvider,
-    //        senderNameFormatter: SceytChatUIKit.shared.formatters.userNameFormatter,
-    //        voiceDurationFormatter: SceytChatUIKit.shared.formatters.mediaDurationFormatter,
-    //        attachmentFileSizeFormatter: SceytChatUIKit.shared.formatters.attachmentSizeFormatter,
-    //        messageViewCountFormatter: SceytChatUIKit.shared.formatters.messageViewCountFormatter,
-    //        messageDateFormatter: SceytChatUIKit.shared.formatters.messageDateFormatter,
-    //        mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
-    //        userDefaultAvatarProvider: SceytChatUIKit.shared.visualProviders.userAvatarProvider
-    //    )
     public static var appearance = Appearance(
         // Colors
         backgroundColor: .clear,
@@ -467,7 +32,7 @@ extension MessageCell: AppearanceProviding {
         threadReplyArrowStrokeColor: .border,
         
         // Label Appearances
-        senderNameLabelAppearance: LabelAppearance(
+        senderNameLabelAppearance: OptionalLabelAppearance(
             foregroundColor: nil, // Will use randomized color from initials colors
             font: Fonts.semiBold.withSize(14)
         ),
@@ -555,7 +120,7 @@ extension MessageCell: AppearanceProviding {
         //        unreadMessagesSeparatorAppearance: MessageCell.UnreadMessagesSeparatorView.appearance,
         unreadMessagesSeparatorAppearance: UnreadMessagesSeparatorView.Appearance(), // review!!!
         replyMessageAppearance: ReplyMessageAppearance.appearance,
-        checkboxAppearance: CheckBoxView.appearance,
+        selectionCheckboxAppearance: CheckBoxView.appearance,
         voiceWaveformViewAppearance: AudioWaveformView.appearance,
         mediaLoaderAppearance: CircularProgressView.Appearance(
             reference: CircularProgressView.appearance,
@@ -590,7 +155,8 @@ extension MessageCell: AppearanceProviding {
         messageViewCountFormatter: SceytChatUIKit.shared.formatters.messageViewCountFormatter,
         messageDateFormatter: SceytChatUIKit.shared.formatters.messageDateFormatter,
         mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
-        userDefaultAvatarProvider: SceytChatUIKit.shared.visualProviders.userAvatarProvider
+        userDefaultAvatarProvider: SceytChatUIKit.shared.visualProviders.userAvatarProvider,
+        messageBodyFormatter: SceytChatUIKit.shared.formatters.messageBodyFormatter
     )
     
     public struct Appearance {
@@ -653,8 +219,8 @@ extension MessageCell: AppearanceProviding {
         public var threadReplyArrowStrokeColor: UIColor
         
         // Label Appearances
-        @Trackable<Appearance, LabelAppearance>
-        public var senderNameLabelAppearance: LabelAppearance
+        @Trackable<Appearance, OptionalLabelAppearance>
+        public var senderNameLabelAppearance: OptionalLabelAppearance
         
         @Trackable<Appearance, LabelAppearance>
         public var bodyLabelAppearance: LabelAppearance
@@ -734,7 +300,7 @@ extension MessageCell: AppearanceProviding {
         public var replyMessageAppearance: ReplyMessageAppearance
         
         @Trackable<Appearance, CheckBoxView.Appearance>
-        public var checkboxAppearance: CheckBoxView.Appearance
+        public var selectionCheckboxAppearance: CheckBoxView.Appearance
         
         @Trackable<Appearance, AudioWaveformView.Appearance>
         public var voiceWaveformViewAppearance: AudioWaveformView.Appearance
@@ -783,6 +349,9 @@ extension MessageCell: AppearanceProviding {
         @Trackable<Appearance, any UserAvatarProviding>
         public var userDefaultAvatarProvider: any UserAvatarProviding
         
+        @Trackable<Appearance, any MessageBodyFormatting>
+        public var messageBodyFormatter: any MessageBodyFormatting
+        
         // Initializer with all parameters
         public init(
             // Colors
@@ -807,7 +376,7 @@ extension MessageCell: AppearanceProviding {
             threadReplyArrowStrokeColor: UIColor,
             
             // Label Appearances
-            senderNameLabelAppearance: LabelAppearance,
+            senderNameLabelAppearance: OptionalLabelAppearance,
             bodyLabelAppearance: LabelAppearance,
             mentionLabelAppearance: LabelAppearance,
             deletedMessageLabelAppearance: LabelAppearance,
@@ -837,7 +406,7 @@ extension MessageCell: AppearanceProviding {
             // Other Appearances
             unreadMessagesSeparatorAppearance: MessageCell.UnreadMessagesSeparatorView.Appearance,
             replyMessageAppearance: ReplyMessageAppearance,
-            checkboxAppearance: CheckBoxView.Appearance,
+            selectionCheckboxAppearance: CheckBoxView.Appearance,
             voiceWaveformViewAppearance: AudioWaveformView.Appearance,
             mediaLoaderAppearance: CircularProgressView.Appearance,
             overlayMediaLoaderAppearance: CircularProgressView.Appearance,
@@ -856,7 +425,8 @@ extension MessageCell: AppearanceProviding {
             messageViewCountFormatter: any UIntFormatting,
             messageDateFormatter: any DateFormatting,
             mentionUserNameFormatter: any UserFormatting,
-            userDefaultAvatarProvider: any UserAvatarProviding
+            userDefaultAvatarProvider: any UserAvatarProviding,
+            messageBodyFormatter: any MessageBodyFormatting
         ) {
             // Colors
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -910,7 +480,7 @@ extension MessageCell: AppearanceProviding {
             // Other Appearances
             self._unreadMessagesSeparatorAppearance = Trackable(value: unreadMessagesSeparatorAppearance)
             self._replyMessageAppearance = Trackable(value: replyMessageAppearance)
-            self._checkboxAppearance = Trackable(value: checkboxAppearance)
+            self._selectionCheckboxAppearance = Trackable(value: selectionCheckboxAppearance)
             self._voiceWaveformViewAppearance = Trackable(value: voiceWaveformViewAppearance)
             self._mediaLoaderAppearance = Trackable(value: mediaLoaderAppearance)
             self._overlayMediaLoaderAppearance = Trackable(value: overlayMediaLoaderAppearance)
@@ -930,6 +500,7 @@ extension MessageCell: AppearanceProviding {
             self._messageDateFormatter = Trackable(value: messageDateFormatter)
             self._mentionUserNameFormatter = Trackable(value: mentionUserNameFormatter)
             self._userDefaultAvatarProvider = Trackable(value: userDefaultAvatarProvider)
+            self._messageBodyFormatter = Trackable(value: messageBodyFormatter)
         }
         
         // Initializer with optional parameters
@@ -957,7 +528,7 @@ extension MessageCell: AppearanceProviding {
             threadReplyArrowStrokeColor: UIColor? = nil,
             
             // Label Appearances
-            senderNameLabelAppearance: LabelAppearance? = nil,
+            senderNameLabelAppearance: OptionalLabelAppearance? = nil,
             bodyLabelAppearance: LabelAppearance? = nil,
             mentionLabelAppearance: LabelAppearance? = nil,
             deletedMessageLabelAppearance: LabelAppearance? = nil,
@@ -987,7 +558,7 @@ extension MessageCell: AppearanceProviding {
             // Other Appearances
             unreadMessagesSeparatorAppearance: MessageCell.UnreadMessagesSeparatorView.Appearance? = nil,
             replyMessageAppearance: ReplyMessageAppearance? = nil,
-            checkboxAppearance: CheckBoxView.Appearance? = nil,
+            selectionCheckboxAppearance: CheckBoxView.Appearance? = nil,
             voiceWaveformViewAppearance: AudioWaveformView.Appearance? = nil,
             mediaLoaderAppearance: CircularProgressView.Appearance? = nil,
             overlayMediaLoaderAppearance: CircularProgressView.Appearance? = nil,
@@ -1006,7 +577,8 @@ extension MessageCell: AppearanceProviding {
             messageViewCountFormatter: (any UIntFormatting)? = nil,
             messageDateFormatter: (any DateFormatting)? = nil,
             mentionUserNameFormatter: (any UserFormatting)? = nil,
-            userDefaultAvatarProvider: (any UserAvatarProviding)? = nil
+            userDefaultAvatarProvider: (any UserAvatarProviding)? = nil,
+            messageBodyFormatter: (any MessageBodyFormatting)? = nil
         ) {
             // Colors
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
@@ -1054,7 +626,7 @@ extension MessageCell: AppearanceProviding {
             self._voicePauseIcon = Trackable(reference: reference, referencePath: \.voicePauseIcon)
             self._unreadMessagesSeparatorAppearance = Trackable(reference: reference, referencePath: \.unreadMessagesSeparatorAppearance)
             self._replyMessageAppearance = Trackable(reference: reference, referencePath: \.replyMessageAppearance)
-            self._checkboxAppearance = Trackable(reference: reference, referencePath: \.checkboxAppearance)
+            self._selectionCheckboxAppearance = Trackable(reference: reference, referencePath: \.selectionCheckboxAppearance)
             self._voiceWaveformViewAppearance = Trackable(reference: reference, referencePath: \.voiceWaveformViewAppearance)
             self._mediaLoaderAppearance = Trackable(reference: reference, referencePath: \.mediaLoaderAppearance)
             self._overlayMediaLoaderAppearance = Trackable(reference: reference, referencePath: \.overlayMediaLoaderAppearance)
@@ -1070,6 +642,7 @@ extension MessageCell: AppearanceProviding {
             self._messageDateFormatter = Trackable(reference: reference, referencePath: \.messageDateFormatter)
             self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
             self._userDefaultAvatarProvider = Trackable(reference: reference, referencePath: \.userDefaultAvatarProvider)
+            self._messageBodyFormatter = Trackable(reference: reference, referencePath: \.messageBodyFormatter)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
             if let incomingBubbleColor { self.incomingBubbleColor = incomingBubbleColor }
@@ -1116,7 +689,7 @@ extension MessageCell: AppearanceProviding {
             if let voicePauseIcon { self.voicePauseIcon = voicePauseIcon }
             if let unreadMessagesSeparatorAppearance { self.unreadMessagesSeparatorAppearance = unreadMessagesSeparatorAppearance }
             if let replyMessageAppearance { self.replyMessageAppearance = replyMessageAppearance }
-            if let checkboxAppearance { self.checkboxAppearance = checkboxAppearance }
+            if let selectionCheckboxAppearance { self.selectionCheckboxAppearance = selectionCheckboxAppearance }
             if let voiceWaveformViewAppearance { self.voiceWaveformViewAppearance = voiceWaveformViewAppearance }
             if let mediaLoaderAppearance { self.mediaLoaderAppearance = mediaLoaderAppearance }
             if let overlayMediaLoaderAppearance { self.overlayMediaLoaderAppearance = overlayMediaLoaderAppearance }
@@ -1132,6 +705,7 @@ extension MessageCell: AppearanceProviding {
             if let messageDateFormatter { self.messageDateFormatter = messageDateFormatter }
             if let mentionUserNameFormatter { self.mentionUserNameFormatter = mentionUserNameFormatter }
             if let userDefaultAvatarProvider { self.userDefaultAvatarProvider = userDefaultAvatarProvider }
+            if let messageBodyFormatter { self.messageBodyFormatter = messageBodyFormatter }
         }
     }
 }

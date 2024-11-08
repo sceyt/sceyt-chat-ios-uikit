@@ -19,7 +19,6 @@ extension EditChannelViewController {
         override open func setup() {
             super.setup()
             
-            editButton.setImage(.channelProfileEditAvatar, for: .normal)
             editButton.isUserInteractionEnabled = false
         }
         
@@ -39,6 +38,7 @@ extension EditChannelViewController {
             backgroundColor = .clear
             contentView.backgroundColor = .clear
             avatarButton.backgroundColor = appearance.avatarBackgroundColor
+            editButton.setImage(appearance.avatarPlaceholderIcon, for: .normal)
         }
         
         public var imageTask: Cancellable?
@@ -53,7 +53,7 @@ extension EditChannelViewController {
             guard let data else {
                 return avatarButton.image = nil
             }
-            imageTask = AvatarBuilder.loadAvatar(into: avatarButton, for: data)
+            imageTask = Components.avatarBuilder.loadAvatar(into: avatarButton, for: data)
         }
         
         override open func prepareForReuse() {

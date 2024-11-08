@@ -81,7 +81,7 @@ extension MessageInputViewController.VoiceRecorderView {
             super.setupAppearance()
             
             backgroundColor = appearance.backgroundColor
-            line.backgroundColor = appearance.dividerColor
+            line.backgroundColor = appearance.separatorColor
             durationLabel.font = appearance.durationLabelAppearance.font
             durationLabel.textColor = appearance.durationLabelAppearance.foregroundColor
             dotView.appearance = appearance

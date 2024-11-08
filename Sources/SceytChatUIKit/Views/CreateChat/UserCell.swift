@@ -9,19 +9,20 @@
 import UIKit
 
 open class UserCell: BaseChannelUserCell {
-    override open func setSelected(_ selected: Bool, animated: Bool) {
-        super.setSelected(selected, animated: animated)
-        checkBoxView.isSelected = selected
-    }
     
     open var userData: ChatUser! {
         didSet {
-            titleLabel.text = userData.displayName
-            statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(userData)
-            imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: userData)
+            titleLabel.text = appearance.titleFormatter.format(userData)
+            statusLabel.text = appearance.subtitleFormatter.format(userData)
+            imageTask = appearance.avatarRenderer.render(
+                userData,
+                with: appearance.avatarAppearance,
+                into: avatarView
+            )
             subscribeForPresence()
         }
     }
+    
     open func subscribeForPresence() {
         guard let contact = userData
         else { return }
@@ -30,8 +31,14 @@ open class UserCell: BaseChannelUserCell {
                 PresenceProvider.unsubscribe(userId: contact.id)
                 guard let self, userPresence.userId == self.userData.id
                 else { return }
-                self.statusLabel.text = SceytChatUIKit.shared.formatters.userPresenceDateFormatter.format(.init(user: userPresence.user))
+                self.statusLabel.text = appearance.subtitleFormatter.format(.init(user: userPresence.user))
             }
+    }
+    
+    override open func setupLayout() {
+        super.setupLayout()
+        
+        avatarView.leadingAnchor.pin(to: contentView.leadingAnchor, constant: Layouts.horizontalPadding)
     }
     
     override open func setupAppearance() {

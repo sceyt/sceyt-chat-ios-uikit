@@ -28,8 +28,9 @@ extension EmojiPickerViewController {
         
         open override func setupAppearance() {
             super.setupAppearance()
-            label.textColor = appearance.textColor
-            label.font = appearance.textFont
+            backgroundColor = appearance.backgroundColor
+            label.textColor = appearance.labelAppearance.foregroundColor
+            label.font = appearance.labelAppearance.font
         }
         
         open func bind(_ data: String?) {

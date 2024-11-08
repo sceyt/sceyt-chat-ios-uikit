@@ -5,7 +5,7 @@
 //  Created by Arthur Avagyan on 23.09.24.
 //
 
-import UIKit
+import Foundation
 
 extension SceytChatUIKit {
     public struct VisualProviders {

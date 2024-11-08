@@ -10,10 +10,20 @@ import UIKit
 
 extension ChannelInfoViewController: AppearanceProviding {
     public static var appearance = Appearance(
-        navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+        navigationBarAppearance: .init(
+            reference: NavigationBarAppearance.appearance,
+            standardAppearance: {
+                let appearance = UINavigationBarAppearance()
+                appearance.titleTextAttributes = [
+                    .font: Fonts.bold.withSize(20),
+                    .foregroundColor: UIColor.primaryText
+                ]
+                appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+                appearance.backgroundColor = .surface1
+                appearance.shadowColor = .border
+                return appearance
+            }()
+        ),
         backgroundColor: .backgroundSecondary,
         separatorColor: .border,
         titleLabelAppearance: LabelAppearance(
@@ -47,8 +57,8 @@ extension ChannelInfoViewController: AppearanceProviding {
     )
     
     public struct Appearance {
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -99,7 +109,7 @@ extension ChannelInfoViewController: AppearanceProviding {
         public var moreIcon: UIImage
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             separatorColor: UIColor,
             titleLabelAppearance: LabelAppearance,
@@ -138,7 +148,7 @@ extension ChannelInfoViewController: AppearanceProviding {
         
         public init(
             reference: ChannelInfoViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             separatorColor: UIColor? = nil,
             titleLabelAppearance: LabelAppearance? = nil,

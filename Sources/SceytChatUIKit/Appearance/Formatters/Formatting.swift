@@ -12,11 +12,12 @@ import SceytChat
 /// A generic protocol that defines a method for formatting a given input into a `String`.
 public protocol Formatting {
     associatedtype U
+    associatedtype V
     /// Formats the given input into a `String`.
     ///
     /// - Parameter input: The input to format.
-    /// - Returns: A formatted `String`.
-    func format(_ input: U) -> String
+    /// - Returns: A formatted output.
+    func format(_ input: U) -> V
 }
 
 /// A protocol for formatting `ChatUser` objects.
@@ -90,4 +91,69 @@ public protocol MessageFormatting: Formatting {
     /// - Parameter attachment: The `ChatMessage` instance to format.
     /// - Returns: A `String` representing the formatted attachment.
     func format(_ message: ChatMessage) -> String
+}
+
+/// A protocol that defines formatting behavior for reaction.
+public protocol ReactionFormatting: Formatting {
+    /// Formats a chat message attachment into a string.
+    ///
+    /// - Parameter reaction: The `ChatMessage.Reaction` instance to format.
+    /// - Returns: A `String` representing the formatted reaction.
+    func format(_ reaction: ChatMessage.Reaction) -> String
+}
+
+// MARK: - Message Body Formatting
+
+/// A protocol that defines formatting behavior for message bodies with content items.
+public protocol MessageBodyFormatting: Formatting {
+    /// Formats a message body into an attributed string along with associated content items.
+    ///
+    /// - Parameter attributes: The `MessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Returns: A tuple containing an `NSAttributedString` representing the formatted message body and an array of `MessageLayoutModel.ContentItem`.
+    func format(_ attributes: MessageBodyFormatterAttributes) -> (NSAttributedString, [MessageLayoutModel.ContentItem])
+}
+
+/// A protocol that defines formatting behavior for message bodies.
+public protocol LastMessageBodyFormatting: Formatting {
+    /// Formats a message body into an attributed string.
+    ///
+    /// - Parameter attributes: The `LastMessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Returns: An `NSAttributedString` representing the formatted message body.
+    func format(_ attributes: LastMessageBodyFormatterAttributes) -> NSAttributedString
+}
+
+/// A protocol that defines formatting behavior for replied message bodies.
+public protocol RepliedMessageBodyFormatting: Formatting {
+    /// Formats a replied message body into an attributed string.
+    ///
+    /// - Parameter attributes: The `RepliedMessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Returns: An `NSAttributedString` representing the formatted replied message body.
+    func format(_ attributes: RepliedMessageBodyFormatterAttributes) -> NSAttributedString
+}
+
+/// A protocol that defines formatting behavior for edited message bodies.
+public protocol EditMessageBodyFormatting: Formatting {
+    /// Formats an edited message body into an attributed string.
+    ///
+    /// - Parameter attributes: The `EditMessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Returns: An `NSAttributedString` representing the formatted edited message body.
+    func format(_ attributes: EditMessageBodyFormatterAttributes) -> NSAttributedString
+}
+
+/// A protocol that defines formatting behavior for reply message bodies.
+public protocol ReplyMessageBodyFormatting: Formatting {
+    /// Formats a reply message body into an attributed string.
+    ///
+    /// - Parameter attributes: The `ReplyMessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Returns: An `NSAttributedString` representing the formatted reply message body.
+    func format(_ attributes: ReplyMessageBodyFormatterAttributes) -> NSAttributedString
+}
+
+/// A protocol that defines formatting behavior for draft message bodies.
+public protocol DraftMessageBodyFormatting: Formatting {
+    /// Formats a draft message body into an attributed string.
+    ///
+    /// - Parameter attributes: The `DraftMessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Returns: An `NSAttributedString` representing the formatted draft message body.
+    func format(_ attributes: DraftMessageBodyFormatterAttributes) -> NSAttributedString
 }

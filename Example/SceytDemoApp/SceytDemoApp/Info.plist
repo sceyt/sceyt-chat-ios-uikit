@@ -2,16 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Sceyt Chat requires access to your photo library to view and share your existing photos and videos. Please grant permission to use this feature effectively.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Sceyt Chat needs access to your photo library to let you add photos and videos to your chats. Please enable photo library access to enhance your messaging experience.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>Sceyt Chat requires microphone access to record and send voice messages. Please grant permission to use this feature effectively.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Sceyt Chat needs access to your camera to let you share photos and videos during chats. Please enable camera access to enhance your messaging experience.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSMinimumSystemVersion</key>
+	<string>12.0</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -36,7 +30,9 @@
 			</array>
 		</dict>
 	</dict>
-	<key>LSMinimumSystemVersion</key>
-	<string>12.0</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>

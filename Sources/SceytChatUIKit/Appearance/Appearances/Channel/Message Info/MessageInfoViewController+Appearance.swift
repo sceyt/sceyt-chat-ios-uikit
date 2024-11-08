@@ -12,10 +12,20 @@ public typealias MessageCellAppearance = MessageCell.Appearance
 
 extension MessageInfoViewController: AppearanceProviding {
     public static var appearance = Appearance(
-        navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+        navigationBarAppearance: .init(
+            reference: NavigationBarAppearance.appearance,
+            standardAppearance: {
+                let appearance = UINavigationBarAppearance()
+                appearance.titleTextAttributes = [
+                    .font: Fonts.bold.withSize(20),
+                    .foregroundColor: UIColor.primaryText
+                ]
+                appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+                appearance.backgroundColor = .surface1
+                appearance.shadowColor = .border
+                return appearance
+            }()
+        ),
         backgroundColor: .backgroundSecondary,
         cellBackgroundColor: .backgroundSections,
         messageCellAppearance: SceytChatUIKit.Components.messageCell.appearance,
@@ -41,8 +51,8 @@ extension MessageInfoViewController: AppearanceProviding {
     )
     
     public struct Appearance {
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor?>
         public var backgroundColor: UIColor?
@@ -84,7 +94,7 @@ extension MessageInfoViewController: AppearanceProviding {
         public var markerTitleProvider: any DefaultMarkerTitleProviding
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor?,
             cellBackgroundColor: UIColor?,
             messageCellAppearance: MessageCellAppearance,
@@ -117,7 +127,7 @@ extension MessageInfoViewController: AppearanceProviding {
         
         public init(
             reference: MessageInfoViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             cellBackgroundColor: UIColor? = nil,
             messageCellAppearance: MessageCellAppearance? = nil,

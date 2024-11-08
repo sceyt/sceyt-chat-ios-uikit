@@ -12,7 +12,7 @@ import SceytChat
 extension MessageInputViewController.MentionUsersListViewController {
     open class MentionUserCell: TableViewCell {
         
-        open lazy var avatarView = CircleImageView()
+        open lazy var avatarView = ImageView()
             .withoutAutoresizingMask
         
         open lazy var titleLabel = UILabel()
@@ -63,16 +63,11 @@ extension MessageInputViewController.MentionUsersListViewController {
                 onlineStatusView.image = appearance.presenceStateIconProvider.provideVisual(for: data.presence.state)
                 onlineStatusView.isHidden = data.presence.state != .online
                 
-                imageTask = switch appearance.visualProvider.provideVisual(for: data) {
-                case .image(let image):
-                    Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
-                                                        for: data,
-                                                        defaultImage: image)
-                case .initialsAppearance(let initialsAppearance):
-                    Components.avatarBuilder.loadAvatar(into: avatarView.imageView,
-                                                        for: data,
-                                                        appearance: initialsAppearance)
-                }
+                imageTask = appearance.avatarRenderer.render(
+                    data,
+                    with: appearance.avatarAppearance,
+                    into: avatarView
+                )
             }
         }
         

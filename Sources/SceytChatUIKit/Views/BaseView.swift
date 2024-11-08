@@ -148,6 +148,44 @@ open class Button: UIButton, Configurable {
     open func setupDone() {}
 }
 
+open class ImageView: UIImageView, Configurable {
+    private var isConfigured = false
+    
+    public init() {
+        super.init(frame: .zero)
+    }
+    
+    public override init(frame: CGRect) {
+        super.init(frame: frame)
+        setup()
+        setupAppearance()
+    }
+    
+    public required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+        setupAppearance()
+    }
+    
+    open override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        guard !isConfigured else { return }
+        setupLayout()
+        setupDone()
+        isConfigured = true
+    }
+    
+    open func setup() {}
+    
+    open func setupLayout() {
+        setNeedsLayout()
+    }
+    
+    open func setupAppearance() {}
+    
+    open func setupDone() {}
+}
+
 open class TextView: UITextView, Configurable {
     
     private var isConfigured = false
@@ -511,7 +549,7 @@ open class NavigationController: UINavigationController, Configurable {
     open func setup() {}
     
     open func setupAppearance() {
-        navigationBar.apply(appearance: appearance.barAppearance.appearance)
+        navigationBar.apply(appearance: appearance)
     }
     
     open func setupLayout() {
@@ -606,7 +644,7 @@ public extension AnyCancellableProvider where Self: UIResponder {
 }
 
 private extension UIResponder {
-    static var anyCancellableProviderKey: UInt8 = 1
+    static var anyCancellableProviderKey: UInt8 = 0
     
     class Object: NSObject {
         var cancellable: Set<AnyCancellable>?

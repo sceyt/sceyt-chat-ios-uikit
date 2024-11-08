@@ -5,6 +5,7 @@ extension MediaPickerViewController: AppearanceProviding {
         backgroundColor: .background,
         titleText: L10n.ImagePicker.title,
         confirmButtonAppearance: ButtonAppearance(
+            reference: ButtonAppearance.appearance,
             labelAppearance: LabelAppearance(
                 foregroundColor: .onPrimary,
                 font: Fonts.semiBold.withSize(16)

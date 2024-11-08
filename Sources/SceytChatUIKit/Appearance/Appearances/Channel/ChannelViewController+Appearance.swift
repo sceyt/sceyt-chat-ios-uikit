@@ -10,10 +10,20 @@ import UIKit
 
 extension ChannelViewController: AppearanceProviding {
     public static var appearance = Appearance(
-        navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+        navigationBarAppearance: .init(
+            reference: NavigationBarAppearance.appearance,
+            standardAppearance: {
+                let appearance = UINavigationBarAppearance()
+                appearance.titleTextAttributes = [
+                    .font: Fonts.bold.withSize(20),
+                    .foregroundColor: UIColor.primaryText
+                ]
+                appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+                appearance.backgroundColor = .surface1
+                appearance.shadowColor = .border
+                return appearance
+            }()
+        ),
         backgroundColor: .background,
         headerAppearance: HeaderView.appearance,
         emptyStateAppearance: EmptyStateView.Appearance(
@@ -28,18 +38,18 @@ extension ChannelViewController: AppearanceProviding {
         enableDateSeparator: true,
         enableScrollDownButton: true,
         messageCellAppearance: MessageCell.appearance,
-        searchBarAppearance: SearchBarAppearance.Appearance(
+        searchBarAppearance: SearchBarAppearance(
             reference: SearchBarAppearance.appearance,
+            backgroundColor: .surface1,
             placeholder: L10n.Channel.Search.search
         ),
         messageInputAppearance: MessageInputViewController.appearance,
-        messageShareBodyFormatter: SceytChatUIKit.shared.formatters.messageShareBodyFormatter,
-        unreadCountFormatter: SceytChatUIKit.shared.formatters.unreadCountFormatter
+        messageShareBodyFormatter: SceytChatUIKit.shared.formatters.messageShareBodyFormatter
     )
     
     public struct Appearance {
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         //        public var coverViewBackgroundColor: UIColor? = .clear
         //
@@ -71,8 +81,8 @@ extension ChannelViewController: AppearanceProviding {
         @Trackable<Appearance, MessageCell.Appearance>
         public var messageCellAppearance: MessageCell.Appearance
         
-        @Trackable<Appearance, SearchBarAppearance.Appearance>
-        public var searchBarAppearance: SearchBarAppearance.Appearance
+        @Trackable<Appearance, SearchBarAppearance>
+        public var searchBarAppearance: SearchBarAppearance
         
         @Trackable<Appearance, MessageInputViewController.Appearance>
         public var messageInputAppearance: MessageInputViewController.Appearance
@@ -80,11 +90,9 @@ extension ChannelViewController: AppearanceProviding {
         @Trackable<Appearance, any MessageFormatting>
         public var messageShareBodyFormatter: any MessageFormatting
         
-        @Trackable<Appearance, any UIntFormatting>
-        public var unreadCountFormatter: any UIntFormatting
         
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             headerAppearance: HeaderView.Appearance,
             emptyStateAppearance: EmptyStateView.Appearance,
@@ -94,10 +102,9 @@ extension ChannelViewController: AppearanceProviding {
             enableDateSeparator: Bool,
             enableScrollDownButton: Bool,
             messageCellAppearance: MessageCell.Appearance,
-            searchBarAppearance: SearchBarAppearance.Appearance,
+            searchBarAppearance: SearchBarAppearance,
             messageInputAppearance: MessageInputViewController.Appearance,
-            messageShareBodyFormatter: any MessageFormatting,
-            unreadCountFormatter: any UIntFormatting
+            messageShareBodyFormatter: any MessageFormatting
         ) {
             self._navigationBarAppearance = Trackable(value: navigationBarAppearance)
             self._backgroundColor = Trackable(value: backgroundColor)
@@ -112,12 +119,11 @@ extension ChannelViewController: AppearanceProviding {
             self._searchBarAppearance = Trackable(value: searchBarAppearance)
             self._messageInputAppearance = Trackable(value: messageInputAppearance)
             self._messageShareBodyFormatter = Trackable(value: messageShareBodyFormatter)
-            self._unreadCountFormatter = Trackable(value: unreadCountFormatter)
         }
         
         public init(
             reference: ChannelViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             headerAppearance: HeaderView.Appearance? = nil,
             emptyStateAppearance: EmptyStateView.Appearance? = nil,
@@ -127,10 +133,9 @@ extension ChannelViewController: AppearanceProviding {
             enableDateSeparator: Bool? = nil,
             enableScrollDownButton: Bool? = nil,
             messageCellAppearance: MessageCell.Appearance? = nil,
-            searchBarAppearance: SearchBarAppearance.Appearance? = nil,
+            searchBarAppearance: SearchBarAppearance? = nil,
             messageInputAppearance: MessageInputViewController.Appearance? = nil,
-            messageShareBodyFormatter: (any MessageFormatting)? = nil,
-            unreadCountFormatter: (any UIntFormatting)? = nil
+            messageShareBodyFormatter: (any MessageFormatting)? = nil
         ) {
             self._navigationBarAppearance = Trackable(reference: reference, referencePath: \.navigationBarAppearance)
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
@@ -145,7 +150,6 @@ extension ChannelViewController: AppearanceProviding {
             self._searchBarAppearance = Trackable(reference: reference, referencePath: \.searchBarAppearance)
             self._messageInputAppearance = Trackable(reference: reference, referencePath: \.messageInputAppearance)
             self._messageShareBodyFormatter = Trackable(reference: reference, referencePath: \.messageShareBodyFormatter)
-            self._unreadCountFormatter = Trackable(reference: reference, referencePath: \.unreadCountFormatter)
             
             if let navigationBarAppearance { self.navigationBarAppearance = navigationBarAppearance }
             if let backgroundColor { self.backgroundColor = backgroundColor }
@@ -160,17 +164,9 @@ extension ChannelViewController: AppearanceProviding {
             if let searchBarAppearance { self.searchBarAppearance = searchBarAppearance }
             if let messageInputAppearance { self.messageInputAppearance = messageInputAppearance }
             if let messageShareBodyFormatter { self.messageShareBodyFormatter = messageShareBodyFormatter }
-            if let unreadCountFormatter { self.unreadCountFormatter = unreadCountFormatter }
         }
     }
 }
 
-
-////emptyState: Int, (Android Only)
-////emptyStateForSelfChannel: Int,(Android Only)
-////loadingState: Int,(Android Only)
-
-//enableDateSeparator: Boolean,
 //sameSenderMessageDistance: Int
 //differentSenderMessageDistance: Int
-

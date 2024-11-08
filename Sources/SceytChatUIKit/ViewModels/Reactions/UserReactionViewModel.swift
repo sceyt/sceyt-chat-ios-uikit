@@ -30,7 +30,7 @@ open class UserReactionViewModel: NSObject {
         ) { $0.convert() }
     }()
 
-    public init(messageId: MessageId, reactionKey: String?) {
+    public required init(messageId: MessageId, reactionKey: String?) {
         self.messageId = messageId
         self.reactionKey = reactionKey
         var queryBuilder = ReactionListQuery
@@ -69,11 +69,8 @@ open class UserReactionViewModel: NSObject {
         reactionObserver.numberOfItems(in: section)
     }
 
-    open func cellModel(at indexPath: IndexPath) -> (ChatUser?, String)? {
-        if let item = reactionObserver.item(at: indexPath) {
-            return (item.user, item.key)
-        }
-        return nil
+    open func cellModel(at indexPath: IndexPath) -> ChatMessage.Reaction? {
+        reactionObserver.item(at: indexPath)
     }
 
     open func reaction(at indexPath: IndexPath) -> ChatMessage.Reaction? {

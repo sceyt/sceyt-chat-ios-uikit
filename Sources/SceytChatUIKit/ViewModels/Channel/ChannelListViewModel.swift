@@ -31,8 +31,9 @@ open class ChannelListViewModel: NSObject,
     open lazy var searchResults: ChannelSearchResult = ChannelSearchResultImp()
     
     public var query: ChannelListQuery?
+    open var queryConfig: ChannelListProvider.Config = .default
+    
     public var fetchPredicate =  NSPredicate(format: "unsubscribed == NO AND NOT (unsynched = YES AND lastMessage == nil)")
-    public var showCheckBox: Bool = false
     private var _selectedChannel: ChatChannel?
     
     @Atomic public private(set) var layoutModels = [ChatChannel: ChannelLayoutModel]()
@@ -59,7 +60,7 @@ open class ChannelListViewModel: NSObject,
     }()
     
     override public required init() {
-        provider = Components.channelListProvider.init()
+        provider = Components.channelListProvider.init(config: queryConfig)
         searchService = .init(provider: provider, filter: .all)
         super.init()
         SceytChatUIKit.shared.chatClient.add(delegate: self, identifier: clientDelegateIdentifier)
@@ -68,7 +69,7 @@ open class ChannelListViewModel: NSObject,
     
     public required init(cellAppearance: ChannelListViewController.ChannelCell.Appearance) {
         self.cellAppearance = cellAppearance
-        provider = Components.channelListProvider.init()
+        provider = Components.channelListProvider.init(config: queryConfig)
         searchService = .init(provider: provider, filter: .all)
         super.init()
         SceytChatUIKit.shared.chatClient.add(delegate: self, identifier: clientDelegateIdentifier)

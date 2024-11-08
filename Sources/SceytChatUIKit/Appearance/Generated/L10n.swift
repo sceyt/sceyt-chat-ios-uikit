@@ -340,6 +340,12 @@ public enum L10n {
         /// Unread
         public static let unread = L10n.tr("Localizable", "channel.list.action.unread", fallback: "Unread")
       }
+      public enum NoMessages {
+        /// You haven’t created channels yet, create one for sending messages.
+        public static let message = L10n.tr("Localizable", "channel.list.noMessages.message", fallback: "You haven’t created channels yet, create one for sending messages.")
+        /// No Chats yet
+        public static let title = L10n.tr("Localizable", "channel.list.noMessages.title", fallback: "No Chats yet")
+      }
     }
     public enum Member {
       /// Deleted User

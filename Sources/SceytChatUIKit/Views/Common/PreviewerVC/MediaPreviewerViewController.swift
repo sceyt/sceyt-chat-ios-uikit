@@ -110,7 +110,6 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
         super.setup()
         playerView.isUserInteractionEnabled = true
         playPauseButton.contentEdgeInsets = .init(top: 16, left: 16, bottom: 16, right: 16)
-        playPauseButton.setImage(Images.videoPlayerPlay, for: [])
         playPauseButton.addTarget(self, action: #selector(onTapPlay), for: .touchUpInside)
         
         currentTimeLabel.text = "0:00"
@@ -137,18 +136,24 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     
     override open func setupAppearance() {
         super.setupAppearance()
+        
         view.backgroundColor = .clear
         playerView.backgroundColor = .clear
-        playerControlContainerView.backgroundColor = appearance.backgroundColor
+        playerControlContainerView.backgroundColor = appearance.videoControlsBackgroundColor
         
-        currentTimeLabel.font = appearance.controlFont
-        currentTimeLabel.textColor = appearance.tintColor
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         
-        slider.minimumTrackTintColor = appearance.minimumTrackTintColor
-        slider.maximumTrackTintColor = appearance.maximumTrackTintColor
+        currentTimeLabel.font = appearance.timelineLabelAppearance.font
+        currentTimeLabel.textColor = appearance.timelineLabelAppearance.foregroundColor
         
-        durationLabel.font = appearance.controlFont
-        durationLabel.textColor = appearance.tintColor
+        slider.minimumTrackTintColor = appearance.progressColor
+        slider.maximumTrackTintColor = appearance.trackColor
+        slider.thumbTintColor = appearance.thumbColor
+        
+        durationLabel.font = appearance.timelineLabelAppearance.font
+        durationLabel.textColor = appearance.timelineLabelAppearance.foregroundColor
+        
+        playPauseButton.setImage(appearance.playIcon, for: [])
     }
     
     override open func setupLayout() {
@@ -200,8 +205,12 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
             }
         }
         
-        carouselViewController?.titleLabel.text = viewModel.previewItem.senderTitle
-        carouselViewController?.subtitleLabel.text = SceytChatUIKit.shared.formatters.mediaPreviewDateFormatter.format(viewModel.previewItem.attachment.createdAt)
+        var title = ""
+        if let user = viewModel.previewItem.attachment.user {
+            title = appearance.userNameFormatter.format(user)
+        }
+        carouselViewController?.titleLabel.text = title
+        carouselViewController?.subtitleLabel.text = appearance.mediaDateFormatter.format(viewModel.previewItem.attachment.createdAt)
     }
     
     override open func viewWillDisappear(_ animated: Bool) {
@@ -311,7 +320,7 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
             { [weak self] _ in
                 guard let self else { return }
                 if self.player?.currentItem?.status == .readyToPlay {
-                    self.currentTimeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(self.player!.currentTime().seconds)
+                    self.currentTimeLabel.text = appearance.durationFormatter.format(self.player!.currentTime().seconds)
                     if !self.isSliderDragging {
                         self.slider.setValue(
                             Float(self.player!.currentTime().seconds / playerItem.duration.seconds),
@@ -340,7 +349,7 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
         playerView.contentMode = imageContentMode
         playerView.layer.insertSublayer(playerLayer!, at: 0)
         playerView.image = viewModel.previewItem.attachment.originalImage
-        durationLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(player!.currentItem?.duration.seconds ?? 0)
+        durationLabel.text = appearance.durationFormatter.format(player!.currentItem?.duration.seconds ?? 0)
     }
     
     // MARK: Add Gesture Recognizers
@@ -440,9 +449,9 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
             let newStatus = AVPlayer.TimeControlStatus(rawValue: newValue)
             if newStatus != oldStatus {
                 if newStatus == .playing {
-                    playPauseButton.setImage(.videoPlayerPause, for: [])
+                    playPauseButton.setImage(appearance.pauseIcon, for: [])
                 } else {
-                    playPauseButton.setImage(.videoPlayerPlay, for: [])
+                    playPauseButton.setImage(appearance.playIcon, for: [])
                 }
             }
         }

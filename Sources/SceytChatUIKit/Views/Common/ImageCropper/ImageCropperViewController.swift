@@ -17,21 +17,21 @@ open class ImageCropperViewController: ViewController {
         self.onComplete = onComplete
         self.onCancel = onCancel
     }
-  
+    
     // MARK: Private properties & IBOutlets
-
+    
     open lazy var imageView = UIImageView()
     open lazy var mask = UIView().withoutAutoresizingMask
     open lazy var confirmButton = UIButton().withoutAutoresizingMask
     open lazy var cancelButton = UIButton().withoutAutoresizingMask
     open lazy var buttonsView = UIView().withoutAutoresizingMask
-  
+    
     open var viewModel: ImageCropperViewModel!
     open var onComplete: ((UIImage) -> Void)?
     open var onCancel: (() -> Void)?
-  
+    
     // MARK: Lifecicle
-
+    
     override public func viewDidLoad() {
         super.viewDidLoad()
         set(image: viewModel.image)
@@ -41,7 +41,7 @@ open class ImageCropperViewController: ViewController {
         setupAppearance()
         setupDone()
     }
-  
+    
     override open func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         clearMask()
@@ -51,10 +51,11 @@ open class ImageCropperViewController: ViewController {
             setImageFrame(viewModel.imageInitialFrame)
             viewModel.isInitial = true
         }
-        drawMask(by: viewModel.mask, with: .black.withAlphaComponent(0.5))
+        drawMask(by: viewModel.mask, with: appearance.maskColor)
     }
     
     override open func setup() {
+        super.setup()
         let pinch = UIPinchGestureRecognizer(target: self, action: #selector(onPinch))
         view.addGestureRecognizer(pinch)
         
@@ -71,6 +72,7 @@ open class ImageCropperViewController: ViewController {
     }
     
     override open func setupLayout() {
+        super.setupLayout()
         view.addSubview(imageView)
         view.addSubview(mask)
         view.addSubview(buttonsView)
@@ -95,25 +97,38 @@ open class ImageCropperViewController: ViewController {
     }
     
     override open func setupAppearance() {
+        super.setupAppearance()
         view.backgroundColor = appearance.backgroundColor
-        buttonsView.backgroundColor = appearance.buttonBackgroundColor
         
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: appearance.buttonFont as Any,
-            .foregroundColor: appearance.buttonColor as Any,
-        ]
-        cancelButton.setAttributedTitle(.init(
-            string: L10n.Nav.Bar.cancel,
-            attributes: attributes), for: [])
-        confirmButton.setAttributedTitle(.init(
-            string: L10n.Nav.Bar.confirm,
-            attributes: attributes), for: [])
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
+        buttonsView.backgroundColor = appearance.bottomBarBackgroundColor
+        
+        cancelButton.setAttributedTitle(
+            .init(
+                string: L10n.Nav.Bar.cancel,
+                attributes: [
+                    .font: appearance.cancelButtonAppearance.labelAppearance.font,
+                    .foregroundColor: appearance.cancelButtonAppearance.labelAppearance.foregroundColor
+                ]
+            ),
+            for: []
+        )
+        confirmButton.setAttributedTitle(
+            .init(
+                string: L10n.Nav.Bar.confirm,
+                attributes: [
+                    .font: appearance.confirmButtonAppearance.labelAppearance.font,
+                    .foregroundColor: appearance.confirmButtonAppearance.labelAppearance.foregroundColor
+                ]
+            ),
+            for: []
+        )
     }
-
+    
     @objc func onCancelTapped(_ sender: UIButton) {
         onCancel?()
     }
-  
+    
     @objc func onConfirmTapped(_ sender: UIButton) {
         loader.isLoading = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
@@ -126,23 +141,23 @@ open class ImageCropperViewController: ViewController {
             }
         }
     }
-  
+    
     @objc func onPan(_ sender: UIPanGestureRecognizer) {
         switch sender.state {
         case .began:
             setIsUserInteracting(true)
-      
+            
         case .changed:
             setImageFrame(viewModel.draggingFrame(for: sender.location(in: sender.view!)))
-      
+            
         case .ended:
             setIsUserInteracting(false)
-      
+            
         default:
             return
         }
     }
-  
+    
     @objc func onPinch(_ sender: UIPinchGestureRecognizer) {
         switch sender.state {
         case .began:
@@ -158,32 +173,32 @@ open class ImageCropperViewController: ViewController {
             return
         }
     }
-  
+    
     func distance(from first: CGPoint, to second: CGPoint) -> CGFloat {
         return sqrt(pow(first.x - second.x, 2) + pow(first.y - second.y, 2))
     }
-
+    
     func set(image: UIImage) {
         imageView.image = image
     }
-  
+    
     func setImageFrame(_ frame: CGRect) {
         imageView.frame = frame
     }
-  
+    
     func transformImage(with frame: CGRect) {
         UIView.animate(withDuration: 0.25) {
             self.imageView.frame = frame
         }
     }
-  
+    
     func clearMask() {
         mask.layer.mask = nil
         mask.layer.sublayers?.forEach { sublayer in
             sublayer.removeFromSuperlayer()
         }
     }
-  
+    
     func drawMask(by path: CGPath, with fillColor: UIColor) {
         let hole = CAShapeLayer()
         hole.frame = mask.bounds
@@ -192,7 +207,7 @@ open class ImageCropperViewController: ViewController {
         mask.layer.mask = hole
         mask.backgroundColor = fillColor
     }
-  
+    
     func setIsUserInteracting(_ flag: Bool) {
         let alpha = flag ? 0 : 1
         UIView.animate(withDuration: 0.1) {

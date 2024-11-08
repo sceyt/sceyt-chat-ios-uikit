@@ -11,7 +11,7 @@ import UIKit
 extension ChannelMemberListViewController {
     open class MemberCell: TableViewCell {
         
-        open lazy var avatarView = Components.circleImageView
+        open lazy var avatarView = ImageView
             .init()
             .contentMode(.scaleAspectFill)
             .withoutAutoresizingMask
@@ -97,25 +97,18 @@ extension ChannelMemberListViewController {
                 
                 roleLabel.text = data.roleName == SceytChatUIKit.shared.config.memberRolesConfig.participant ? nil : data.roleName?.localizedCapitalized
                 statusLabel.text = appearance.subtitleFormatter.format(data)
-                
-                let avatarRepresentation = appearance.visualProvider.provideVisual(for: data)
-                
-                imageTask = switch avatarRepresentation {
-                case .image(let image):
-                    AvatarBuilder.loadAvatar(into: avatarView,
-                                             for: data,
-                                             defaultImage: image)
-                case .initialsAppearance(let initialsAppearance):
-                    AvatarBuilder.loadAvatar(into: avatarView,
-                                             for: data,
-                                             appearance: initialsAppearance)
-                }
+
+                imageTask = appearance.avatarRenderer.render(
+                    data,
+                    with: appearance.avatarAppearance,
+                    into: avatarView
+                )
             }
         }
         
         override open func prepareForReuse() {
             super.prepareForReuse()
-            avatarView.imageView.image = nil
+            avatarView.image = nil
             imageTask?.cancel()
         }
     }

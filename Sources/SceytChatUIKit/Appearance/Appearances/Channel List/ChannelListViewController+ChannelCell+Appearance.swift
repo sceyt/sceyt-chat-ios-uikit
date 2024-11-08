@@ -44,10 +44,12 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             foregroundColor: .secondaryText,
             font: Fonts.regular.with(traits: .traitItalic).withSize(15)
         ),
+        deletedStateText: L10n.Message.deleted,
         draftPrefixLabelAppearance: LabelAppearance(
             foregroundColor: DefaultColors.defaultRed,
             font: Fonts.regular.withSize(15)
         ),
+        draftStateText: L10n.Channel.Message.draft,
         typingLabelAppearance: LabelAppearance(
             foregroundColor: .secondaryText,
             font: Fonts.regular.with(traits: .traitItalic).withSize(15)
@@ -81,15 +83,17 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         channelNameFormatter: SceytChatUIKit.shared.formatters.channelNameFormatter,
         channelDateFormatter: SceytChatUIKit.shared.formatters.channelDateFormatter,
         unreadCountFormatter: SceytChatUIKit.shared.formatters.unreadCountFormatter,
-        userShortNameFormatter: SceytChatUIKit.shared.formatters.userShortNameFormatter,
         typingUserNameFormatter: SceytChatUIKit.shared.formatters.typingUserNameFormatter,
         mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
         attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
         lastMessageSenderNameFormatter: SceytChatUIKit.shared.formatters.channelLastMessageSenderNameFormatter,
         reactedUserNameFormatter: SceytChatUIKit.shared.formatters.reactedUserNameFormatter,
         attachmentIconProvider: SceytChatUIKit.shared.visualProviders.channelListAttachmentIconProvider,
-        channelDefaultAvatarProvider: SceytChatUIKit.shared.visualProviders.channelDefaultAvatarProvider,
-        presenceStateIconProvider: SceytChatUIKit.shared.visualProviders.presenceStateIconProvider
+        channelAvatarRenderer: SceytChatUIKit.shared.avatarRenderers.channelAvatarRenderer,
+        avatarAppearance: AvatarAppearance.standard,
+        presenceStateIconProvider: SceytChatUIKit.shared.visualProviders.presenceStateIconProvider,
+        lastMessageBodyFormatter: SceytChatUIKit.shared.formatters.channelLastMessageBodyFormatter,
+        draftMessageBodyFormatter: SceytChatUIKit.shared.formatters.draftMessageBodyFormatter
     )
     
     public struct Appearance {
@@ -124,8 +128,14 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         @Trackable<Appearance, LabelAppearance>
         public var deletedLabelAppearance: LabelAppearance
         
+        @Trackable<Appearance, String>
+        public var deletedStateText: String
+        
         @Trackable<Appearance, LabelAppearance>
         public var draftPrefixLabelAppearance: LabelAppearance
+        
+        @Trackable<Appearance, String>
+        public var draftStateText: String
         
         @Trackable<Appearance, LabelAppearance>
         public var typingLabelAppearance: LabelAppearance
@@ -163,9 +173,6 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         public var unreadCountFormatter: any UIntFormatting
         
         @Trackable<Appearance, any UserFormatting>
-        public var userShortNameFormatter: any UserFormatting
-        
-        @Trackable<Appearance, any UserFormatting>
         public var typingUserNameFormatter: any UserFormatting
         
         @Trackable<Appearance, any UserFormatting>
@@ -183,11 +190,20 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         @Trackable<Appearance, any AttachmentIconProviding>
         public var attachmentIconProvider: any AttachmentIconProviding
         
-        @Trackable<Appearance, any ChannelAvatarProviding>
-        public var channelDefaultAvatarProvider: any ChannelAvatarProviding
+        @Trackable<Appearance, any ChannelAvatarRendering>
+        public var channelAvatarRenderer: any ChannelAvatarRendering
         
+        @Trackable<Appearance, AvatarAppearance>
+        public var avatarAppearance: AvatarAppearance
+
         @Trackable<Appearance, any PresenceStateIconProviding>
         public var presenceStateIconProvider: any PresenceStateIconProviding
+        
+        @Trackable<Appearance, any LastMessageBodyFormatting>
+        public var lastMessageBodyFormatter: any LastMessageBodyFormatting
+        
+        @Trackable<Appearance, any DraftMessageBodyFormatting>
+        public var draftMessageBodyFormatter: any DraftMessageBodyFormatting
         
         // Initializer with all parameters
         public init(
@@ -203,7 +219,9 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             dateLabelAppearance: LabelAppearance,
             lastMessageSenderNameLabelAppearance: LabelAppearance,
             deletedLabelAppearance: LabelAppearance,
+            deletedStateText: String,
             draftPrefixLabelAppearance: LabelAppearance,
+            draftStateText: String,
             typingLabelAppearance: LabelAppearance,
             mentionLabelAppearance: LabelAppearance,
             unreadMentionLabelAppearance: LabelAppearance,
@@ -219,15 +237,17 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             channelNameFormatter: any ChannelFormatting,
             channelDateFormatter: any DateFormatting,
             unreadCountFormatter: any UIntFormatting,
-            userShortNameFormatter: any UserFormatting,
             typingUserNameFormatter: any UserFormatting,
             mentionUserNameFormatter: any UserFormatting,
             attachmentNameFormatter: any AttachmentFormatting,
             lastMessageSenderNameFormatter: any ChannelFormatting,
             reactedUserNameFormatter: any ChannelFormatting,
             attachmentIconProvider: any AttachmentIconProviding,
-            channelDefaultAvatarProvider: any ChannelAvatarProviding,
-            presenceStateIconProvider: any PresenceStateIconProviding
+            channelAvatarRenderer: any ChannelAvatarRendering,
+            avatarAppearance: AvatarAppearance,
+            presenceStateIconProvider: any PresenceStateIconProviding,
+            lastMessageBodyFormatter: any LastMessageBodyFormatting,
+            draftMessageBodyFormatter: any DraftMessageBodyFormatting
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             self._pinnedChannelBackgroundColor = Trackable(value: pinnedChannelBackgroundColor)
@@ -241,7 +261,9 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._dateLabelAppearance = Trackable(value: dateLabelAppearance)
             self._lastMessageSenderNameLabelAppearance = Trackable(value: lastMessageSenderNameLabelAppearance)
             self._deletedLabelAppearance = Trackable(value: deletedLabelAppearance)
+            self._deletedStateText = Trackable(value: deletedStateText)
             self._draftPrefixLabelAppearance = Trackable(value: draftPrefixLabelAppearance)
+            self._draftStateText = Trackable(value: draftStateText)
             self._typingLabelAppearance = Trackable(value: typingLabelAppearance)
             self._mentionLabelAppearance = Trackable(value: mentionLabelAppearance)
             self._unreadMentionLabelAppearance = Trackable(value: unreadMentionLabelAppearance)
@@ -257,15 +279,17 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._channelNameFormatter = Trackable(value: channelNameFormatter)
             self._channelDateFormatter = Trackable(value: channelDateFormatter)
             self._unreadCountFormatter = Trackable(value: unreadCountFormatter)
-            self._userShortNameFormatter = Trackable(value: userShortNameFormatter)
             self._typingUserNameFormatter = Trackable(value: typingUserNameFormatter)
             self._mentionUserNameFormatter = Trackable(value: mentionUserNameFormatter)
             self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
             self._lastMessageSenderNameFormatter = Trackable(value: lastMessageSenderNameFormatter)
             self._reactedUserNameFormatter = Trackable(value: reactedUserNameFormatter)
             self._attachmentIconProvider = Trackable(value: attachmentIconProvider)
-            self._channelDefaultAvatarProvider = Trackable(value: channelDefaultAvatarProvider)
+            self._channelAvatarRenderer = Trackable(value: channelAvatarRenderer)
+            self._avatarAppearance = Trackable(value: avatarAppearance)
             self._presenceStateIconProvider = Trackable(value: presenceStateIconProvider)
+            self._lastMessageBodyFormatter = Trackable(value: lastMessageBodyFormatter)
+            self._draftMessageBodyFormatter = Trackable(value: draftMessageBodyFormatter)
         }
         
         public init(
@@ -282,7 +306,9 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             dateLabelAppearance: LabelAppearance? = nil,
             lastMessageSenderNameLabelAppearance: LabelAppearance? = nil,
             deletedLabelAppearance: LabelAppearance? = nil,
+            deletedStateText: String? = nil,
             draftPrefixLabelAppearance: LabelAppearance? = nil,
+            draftStateText: String? = nil,
             typingLabelAppearance: LabelAppearance? = nil,
             mentionLabelAppearance: LabelAppearance? = nil,
             unreadMentionLabelAppearance: LabelAppearance? = nil,
@@ -298,15 +324,17 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             channelNameFormatter: (any ChannelFormatting)? = nil,
             channelDateFormatter: (any DateFormatting)? = nil,
             unreadCountFormatter: (any UIntFormatting)? = nil,
-            userShortNameFormatter: (any UserFormatting)? = nil,
             typingUserNameFormatter: (any UserFormatting)? = nil,
             mentionUserNameFormatter: (any UserFormatting)? = nil,
             attachmentNameFormatter: (any AttachmentFormatting)? = nil,
             lastMessageSenderNameFormatter: (any ChannelFormatting)? = nil,
             reactedUserNameFormatter: (any ChannelFormatting)? = nil,
             attachmentIconProvider: (any AttachmentIconProviding)? = nil,
-            channelDefaultAvatarProvider: (any ChannelAvatarProviding)? = nil,
-            presenceStateIconProvider: (any PresenceStateIconProviding)? = nil
+            channelAvatarRenderer: (any ChannelAvatarRendering)? = nil,
+            avatarAppearance: AvatarAppearance? = nil,
+            presenceStateIconProvider: (any PresenceStateIconProviding)? = nil,
+            lastMessageBodyFormatter: (any LastMessageBodyFormatting)? = nil,
+            draftMessageBodyFormatter: (any DraftMessageBodyFormatting)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             self._pinnedChannelBackgroundColor = Trackable(reference: reference, referencePath: \.pinnedChannelBackgroundColor)
@@ -318,7 +346,9 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._dateLabelAppearance = Trackable(reference: reference, referencePath: \.dateLabelAppearance)
             self._lastMessageSenderNameLabelAppearance = Trackable(reference: reference, referencePath: \.lastMessageSenderNameLabelAppearance)
             self._deletedLabelAppearance = Trackable(reference: reference, referencePath: \.deletedLabelAppearance)
+            self._deletedStateText = Trackable(reference: reference, referencePath: \.deletedStateText)
             self._draftPrefixLabelAppearance = Trackable(reference: reference, referencePath: \.draftPrefixLabelAppearance)
+            self._draftStateText = Trackable(reference: reference, referencePath: \.draftStateText)
             self._typingLabelAppearance = Trackable(reference: reference, referencePath: \.typingLabelAppearance)
             self._mentionLabelAppearance = Trackable(reference: reference, referencePath: \.mentionLabelAppearance)
             self._unreadMentionLabelAppearance = Trackable(reference: reference, referencePath: \.unreadMentionLabelAppearance)
@@ -330,15 +360,17 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._channelNameFormatter = Trackable(reference: reference, referencePath: \.channelNameFormatter)
             self._channelDateFormatter = Trackable(reference: reference, referencePath: \.channelDateFormatter)
             self._unreadCountFormatter = Trackable(reference: reference, referencePath: \.unreadCountFormatter)
-            self._userShortNameFormatter = Trackable(reference: reference, referencePath: \.userShortNameFormatter)
             self._typingUserNameFormatter = Trackable(reference: reference, referencePath: \.typingUserNameFormatter)
             self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
             self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
             self._lastMessageSenderNameFormatter = Trackable(reference: reference, referencePath: \.lastMessageSenderNameFormatter)
             self._reactedUserNameFormatter = Trackable(reference: reference, referencePath: \.reactedUserNameFormatter)
             self._attachmentIconProvider = Trackable(reference: reference, referencePath: \.attachmentIconProvider)
-            self._channelDefaultAvatarProvider = Trackable(reference: reference, referencePath: \.channelDefaultAvatarProvider)
+            self._channelAvatarRenderer = Trackable(reference: reference, referencePath: \.channelAvatarRenderer)
+            self._avatarAppearance = Trackable(reference: reference, referencePath: \.avatarAppearance)
             self._presenceStateIconProvider = Trackable(reference: reference, referencePath: \.presenceStateIconProvider)
+            self._lastMessageBodyFormatter = Trackable(reference: reference, referencePath: \.lastMessageBodyFormatter)
+            self._draftMessageBodyFormatter = Trackable(reference: reference, referencePath: \.draftMessageBodyFormatter)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
             if let pinnedChannelBackgroundColor { self.pinnedChannelBackgroundColor = pinnedChannelBackgroundColor }
@@ -350,7 +382,9 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             if let dateLabelAppearance { self.dateLabelAppearance = dateLabelAppearance }
             if let lastMessageSenderNameLabelAppearance { self.lastMessageSenderNameLabelAppearance = lastMessageSenderNameLabelAppearance }
             if let deletedLabelAppearance { self.deletedLabelAppearance = deletedLabelAppearance }
+            if let deletedStateText { self.deletedStateText = deletedStateText }
             if let draftPrefixLabelAppearance { self.draftPrefixLabelAppearance = draftPrefixLabelAppearance }
+            if let draftStateText { self.draftStateText = draftStateText }
             if let typingLabelAppearance { self.typingLabelAppearance = typingLabelAppearance }
             if let mentionLabelAppearance { self.mentionLabelAppearance = mentionLabelAppearance }
             if let unreadMentionLabelAppearance { self.unreadMentionLabelAppearance = unreadMentionLabelAppearance }
@@ -362,15 +396,17 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             if let channelNameFormatter { self.channelNameFormatter = channelNameFormatter }
             if let channelDateFormatter { self.channelDateFormatter = channelDateFormatter }
             if let unreadCountFormatter { self.unreadCountFormatter = unreadCountFormatter }
-            if let userShortNameFormatter { self.userShortNameFormatter = userShortNameFormatter }
             if let typingUserNameFormatter { self.typingUserNameFormatter = typingUserNameFormatter }
             if let mentionUserNameFormatter { self.mentionUserNameFormatter = mentionUserNameFormatter }
             if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }
             if let lastMessageSenderNameFormatter { self.lastMessageSenderNameFormatter = lastMessageSenderNameFormatter }
             if let reactedUserNameFormatter { self.reactedUserNameFormatter = reactedUserNameFormatter }
             if let attachmentIconProvider { self.attachmentIconProvider = attachmentIconProvider }
-            if let channelDefaultAvatarProvider { self.channelDefaultAvatarProvider = channelDefaultAvatarProvider }
+            if let channelAvatarRenderer { self.channelAvatarRenderer = channelAvatarRenderer }
+            if let avatarAppearance { self.avatarAppearance = avatarAppearance }
             if let presenceStateIconProvider { self.presenceStateIconProvider = presenceStateIconProvider }
+            if let lastMessageBodyFormatter { self.lastMessageBodyFormatter = lastMessageBodyFormatter }
+            if let draftMessageBodyFormatter { self.draftMessageBodyFormatter = draftMessageBodyFormatter }
         }
     }
 }

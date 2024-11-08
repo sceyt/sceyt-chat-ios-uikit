@@ -20,7 +20,7 @@ open class ForwardViewController: ViewController,
     
     open lazy var searchController = Components.searchController.init(searchResultsController: searchResultsViewController)
     
-    open lazy var searchResultsViewController = Components.channelSearchResultsViewController.init()
+    open lazy var searchResultsViewController = Components.channelSelectableSearchResultsViewController.init()
     
     open lazy var selectedChannelListView = Components.selectedChannelListView.init()
         .withoutAutoresizingMask
@@ -42,7 +42,7 @@ open class ForwardViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
-        tableView.register(Components.searchResultChannelCell.self)
+        tableView.register(Components.selectableChannelCell.self)
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -81,8 +81,12 @@ open class ForwardViewController: ViewController,
     override open func setupAppearance() {
         super.setupAppearance()
         
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         tableView.backgroundColor = .clear
         view.backgroundColor = appearance.backgroundColor
+        searchController.parentAppearance = appearance.searchControllerAppearance
+        searchResultsViewController.parentAppearance = appearance.searchResultControllerAppearance
+        selectedChannelListView.appearance = appearance.selectedChannelCellAppearance
     }
     
     override open func setupDone() {
@@ -172,9 +176,9 @@ open class ForwardViewController: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.searchResultChannelCell.self)
+        let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.selectableChannelCell.self)
+        cell.parentAppearance = appearance.channelCellAppearance
         cell.selectionStyle = .none
-        cell.showCheckBox = true
         if let channel = viewModel.channel(at: indexPath) {
             cell.checkBoxView.isSelected = viewModel.isSelected(channel)
             cell.channelData = channel
@@ -191,6 +195,7 @@ open class ForwardViewController: ViewController,
         else { return nil }
         
         let headerView = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+        headerView.parentAppearance = appearance.separatorViewAppearance
         headerView.titleLabel.text = header
         return headerView
     }
@@ -199,7 +204,7 @@ open class ForwardViewController: ViewController,
         tableView.deselectRow(at: indexPath, animated: true)
         if let channel = viewModel.channel(at: indexPath) {
             viewModel.select(channel)
-            tableView.cell(for: indexPath, cellType: Components.searchResultChannelCell.self)?.checkBoxView.isSelected = viewModel.isSelected(channel)
+            tableView.cell(for: indexPath, cellType: Components.selectableChannelCell.self)?.checkBoxView.isSelected = viewModel.isSelected(channel)
         }
     }
     

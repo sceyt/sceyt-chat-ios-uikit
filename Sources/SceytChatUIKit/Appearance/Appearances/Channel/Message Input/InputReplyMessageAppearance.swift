@@ -41,7 +41,9 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: SceytChatUIKit.shared.formatters.mediaDurationFormatter,
         attachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
         attachmentNameFormatter: SceytChatUIKit.shared.formatters.attachmentNameFormatter,
-        senderNameFormatter: SceytChatUIKit.shared.formatters.userNameFormatter
+        senderNameFormatter: SceytChatUIKit.shared.formatters.userNameFormatter,
+        mentionUserNameFormatter: SceytChatUIKit.shared.formatters.mentionUserNameFormatter,
+        messageBodyFormatter: SceytChatUIKit.shared.formatters.replyMessageBodyFormatter
     )
     
     @Trackable<InputReplyMessageAppearance, UIColor>
@@ -77,6 +79,12 @@ public class InputReplyMessageAppearance: AppearanceProviding {
     @Trackable<InputReplyMessageAppearance, any UserFormatting>
     public var senderNameFormatter: any UserFormatting
     
+    @Trackable<InputReplyMessageAppearance, any UserFormatting>
+    public var mentionUserNameFormatter: any UserFormatting
+    
+    @Trackable<InputReplyMessageAppearance, any ReplyMessageBodyFormatting>
+    public var messageBodyFormatter: any ReplyMessageBodyFormatting
+    
     public init(
         backgroundColor: UIColor,
         titleLabelAppearance: LabelAppearance,
@@ -88,7 +96,9 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: any TimeIntervalFormatting,
         attachmentIconProvider: any AttachmentIconProviding,
         attachmentNameFormatter: any AttachmentFormatting,
-        senderNameFormatter: any UserFormatting
+        senderNameFormatter: any UserFormatting,
+        mentionUserNameFormatter: any UserFormatting,
+        messageBodyFormatter: any ReplyMessageBodyFormatting
     ) {
         self._backgroundColor = Trackable(value: backgroundColor)
         self._titleLabelAppearance = Trackable(value: titleLabelAppearance)
@@ -101,6 +111,8 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         self._attachmentIconProvider = Trackable(value: attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(value: attachmentNameFormatter)
         self._senderNameFormatter = Trackable(value: senderNameFormatter)
+        self._mentionUserNameFormatter = Trackable(value: mentionUserNameFormatter)
+        self._messageBodyFormatter = Trackable(value: messageBodyFormatter)
     }
     
     public init(
@@ -115,7 +127,9 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         attachmentDurationFormatter: (any TimeIntervalFormatting)? = nil,
         attachmentIconProvider: (any AttachmentIconProviding)? = nil,
         attachmentNameFormatter: (any AttachmentFormatting)? = nil,
-        senderNameFormatter: (any UserFormatting)? = nil
+        senderNameFormatter: (any UserFormatting)? = nil,
+        mentionUserNameFormatter: (any UserFormatting)? = nil,
+        messageBodyFormatter: (any ReplyMessageBodyFormatting)? = nil
     ) {
         self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
         self._titleLabelAppearance = Trackable(reference: reference, referencePath: \.titleLabelAppearance)
@@ -128,6 +142,8 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         self._attachmentIconProvider = Trackable(reference: reference, referencePath: \.attachmentIconProvider)
         self._attachmentNameFormatter = Trackable(reference: reference, referencePath: \.attachmentNameFormatter)
         self._senderNameFormatter = Trackable(reference: reference, referencePath: \.senderNameFormatter)
+        self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
+        self._messageBodyFormatter = Trackable(reference: reference, referencePath: \.messageBodyFormatter)
         
         if let backgroundColor { self.backgroundColor = backgroundColor }
         if let titleLabelAppearance { self.titleLabelAppearance = titleLabelAppearance }
@@ -140,5 +156,7 @@ public class InputReplyMessageAppearance: AppearanceProviding {
         if let attachmentIconProvider { self.attachmentIconProvider = attachmentIconProvider }
         if let attachmentNameFormatter { self.attachmentNameFormatter = attachmentNameFormatter }
         if let senderNameFormatter { self.senderNameFormatter = senderNameFormatter }
+        if let mentionUserNameFormatter { self.mentionUserNameFormatter = mentionUserNameFormatter }
+        if let messageBodyFormatter { self.messageBodyFormatter = messageBodyFormatter }
     }
 }

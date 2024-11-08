@@ -8,7 +8,7 @@
 import UIKit
 
 public class SelectedCellAppearance<T: Formatting,
-                                    V: VisualProviding> {
+                                    A: AvatarRendering> {
     
     @Trackable<SelectedCellAppearance, LabelAppearance>
     public var labelAppearance: LabelAppearance
@@ -19,18 +19,23 @@ public class SelectedCellAppearance<T: Formatting,
     @Trackable<SelectedCellAppearance, UIImage>
     public var removeIcon: UIImage
     
-    @Trackable<SelectedCellAppearance, V>
-    public var visualProvider: V
+    @Trackable<SelectedCellAppearance, A>
+    public var avatarRenderer: A
     
+    @Trackable<SelectedCellAppearance, AvatarAppearance>
+    public var avatarAppearance: AvatarAppearance
+
     public init(
         labelAppearance: LabelAppearance,
         titleFormatter: T,
         removeIcon: UIImage,
-        visualProvider: V
+        avatarRenderer: A,
+        avatarAppearance: AvatarAppearance
     ) {
         self._labelAppearance = Trackable(value: labelAppearance)
         self._titleFormatter = Trackable(value: titleFormatter)
         self._removeIcon = Trackable(value: removeIcon)
-        self._visualProvider = Trackable(value: visualProvider)
+        self._avatarRenderer = Trackable(value: avatarRenderer)
+        self._avatarAppearance = Trackable(value: avatarAppearance)
     }
 }

@@ -104,7 +104,7 @@ extension MessageCell {
                 dateLabel.text = appearance.messageDateFormatter.format(message.createdAt)
                 if message.state == .edited {
                     stateLabel.isHidden = false
-                    stateLabel.text = L10n.Message.Info.edited
+                    stateLabel.text = appearance.editedStateText
                     stateLabel.textColor = hasBackground ? appearance.onOverlayColor : appearance.messageStateLabelAppearance.foregroundColor
                 } else {
                     stateLabel.isHidden = true

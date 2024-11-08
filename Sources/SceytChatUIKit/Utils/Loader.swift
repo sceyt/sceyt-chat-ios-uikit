@@ -114,7 +114,7 @@ fileprivate extension URLSessionTask {
         return self
     }
 
-    static var observerKey: UInt8 = 1
+    static var observerKey: UInt8 = 0
 
     var associatedObserverTask: AnyObject? {
         get { objc_getAssociatedObject(self, &Self.observerKey) as? AnyObject }

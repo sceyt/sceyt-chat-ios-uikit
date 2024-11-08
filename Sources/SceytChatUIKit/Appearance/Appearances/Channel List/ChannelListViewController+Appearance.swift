@@ -9,10 +9,20 @@ import UIKit
 
 extension ChannelListViewController: AppearanceProviding {
     public static var appearance = Appearance(
-        navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+        navigationBarAppearance: .init(
+            reference: NavigationBarAppearance.appearance,
+            standardAppearance: {
+                let appearance = UINavigationBarAppearance()
+                appearance.titleTextAttributes = [
+                    .font: Fonts.bold.withSize(20),
+                    .foregroundColor: UIColor.primaryText
+                ]
+                appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+                appearance.backgroundColor = .surface1
+                appearance.shadowColor = .border
+                return appearance
+            }()
+        ),
         backgroundColor: .background,
         tabBarItemBadgeColor: .stateWarning,
         connectionIndicatorAppearance: ConnectionStateViewAppearance(
@@ -25,14 +35,12 @@ extension ChannelListViewController: AppearanceProviding {
                 placeholder: L10n.Channel.List.search
             )
         ),
-        searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance(
-            reference: ChannelSearchResultsViewController.appearance
-        ),
+        searchResultControllerAppearance: ChannelSearchResultsViewController.defaultAppearance,
         emptyViewAppearance: EmptyStateView.Appearance(
             reference: EmptyStateView.appearance,
             icon: .emptyChannelList,
-            title: "No Chats yet",
-            message: "You haven’t created channels yet, create one for sending messages."
+            title: L10n.Channel.List.NoMessages.title,
+            message: L10n.Channel.List.NoMessages.message
         ),
         cellAppearance: ChannelCell.Appearance(
             reference: ChannelCell.appearance
@@ -41,8 +49,8 @@ extension ChannelListViewController: AppearanceProviding {
     
     public class Appearance {
                 
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -67,7 +75,7 @@ extension ChannelListViewController: AppearanceProviding {
         
         // Initializer with default values
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             tabBarItemBadgeColor: UIColor,
             connectionIndicatorAppearance: ConnectionStateViewAppearance,
@@ -88,7 +96,7 @@ extension ChannelListViewController: AppearanceProviding {
         
         public init(
             reference: ChannelListViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             tabBarItemBadgeColor: UIColor? = nil,
             connectionIndicatorAppearance: ConnectionStateViewAppearance? = nil,

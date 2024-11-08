@@ -1,5 +1,5 @@
 //
-//  ReactionsInfoViewController+ReactionScoreCell.swift
+//  ReactionsInfoViewController+HeaderCell.swift
 //  SceytChatUIKit
 //
 //  Created by Hovsep Keropyan on 26.10.23.
@@ -9,7 +9,7 @@
 import UIKit
 
 extension ReactionsInfoViewController {
-    open class ReactionScoreCell: CollectionViewCell {
+    open class HeaderCell: CollectionViewCell {
         
         public static var textInsets: UIEdgeInsets? = .init(top: 6, left: 12, bottom: 6, right: 12)
         public static var containerInsets: UIEdgeInsets? = .init(top: 8, left: 4, bottom: 8, right: 4)
@@ -28,7 +28,8 @@ extension ReactionsInfoViewController {
         
         open override var isSelected: Bool {
             didSet {
-                label.textColor = isSelected ? appearance.selectedTextColor : appearance.textColor
+                label.textColor = isSelected ? appearance.selectedLabelAppearance.foregroundColor : appearance.labelAppearance.foregroundColor
+                label.font = isSelected ? appearance.selectedLabelAppearance.font : appearance.labelAppearance.font
                 container.backgroundColor = isSelected ? appearance.selectedBackgroundColor : appearance.backgroundColor
                 _setCGColors()
             }
@@ -36,11 +37,12 @@ extension ReactionsInfoViewController {
         
         open override func setupAppearance() {
             super.setupAppearance()
-            label.font = appearance.textFont
-            label.textColor = appearance.textColor
+            label.font = appearance.labelAppearance.font
+            label.textColor = appearance.labelAppearance.foregroundColor
             container.backgroundColor = appearance.backgroundColor
-            container.layer.borderWidth = 1
-            container.layer.cornerRadius = 15
+            container.layer.borderWidth = appearance.borderWidth
+            container.layer.cornerRadius = appearance.cornerRadius
+            container.layer.cornerCurve = appearance.cornerCurve
             _setCGColors()
         }
         
@@ -66,8 +68,7 @@ extension ReactionsInfoViewController {
         }
         
         open func _setCGColors() {
-            container.layer.borderColor = isSelected ? appearance.selectedBorderColor?.cgColor : appearance.borderColor?.cgColor
+            container.layer.borderColor = isSelected ? appearance.selectedBorderColor.cgColor : appearance.borderColor.cgColor
         }
-        
     }
 }

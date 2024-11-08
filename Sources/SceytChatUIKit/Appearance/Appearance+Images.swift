@@ -596,6 +596,16 @@ extension UIImage {
     public static var displayedMessage: UIImage { Images.displayedMessage }
     public static var failedMessage: UIImage { Images.failedMessage }
     
+    public static var emojiRecent: UIImage { Images.emojiRecent }
+    public static var emojiSmileys: UIImage { Images.emojiSmileys }
+    public static var emojiAnimalNature: UIImage { Images.emojiAnimalNature }
+    public static var emojiFoodDrink: UIImage { Images.emojiFoodDrink }
+    public static var emojiActivities: UIImage { Images.emojiActivities }
+    public static var emojiTravel: UIImage { Images.emojiTravel }
+    public static var emojiObjects: UIImage { Images.emojiObjects }
+    public static var emojiFlags: UIImage { Images.emojiFlags }
+    public static var emojiSymbols: UIImage { Images.emojiSymbols }
+    
     public static var messageActionInfo: UIImage { Images.messageActionInfo }
     public static var messageActionEdit: UIImage { Images.messageActionEdit }
     public static var messageActionReply: UIImage { Images.messageActionReply }

@@ -62,7 +62,7 @@ private extension NSObject {
     /// A unique key used for associating appearance objects with instances.
     ///
     /// The `UInt8` type is used here to ensure a unique memory address.
-    static var parentAppearanceKey: UInt8 = 1
+    static var parentAppearanceKey: UInt8 = 0
     
     /// Retrieves the parent appearance for a specific `AppearanceType`.
     ///
@@ -92,7 +92,7 @@ private extension NSObject {
 ///
 /// This extension bridges the `parentAppearance` property with the
 /// associated object storage methods defined in the `NSObject` extension.
-public extension AppearanceProviding where Self: NSObject {//}& Configurable {
+public extension AppearanceProviding where Self: NSObject {
     /// The parent appearance configuration, allowing instances to inherit
     /// appearance settings from another source.
     ///
@@ -106,6 +106,9 @@ public extension AppearanceProviding where Self: NSObject {//}& Configurable {
             setParentAppearance(newValue)
             // Conditionally call `setupAppearance` if `self` conforms to `Configurable`
             if let configurableSelf = self as? Configurable {
+                if let viewController = configurableSelf as? UIViewController {
+                    guard viewController.isViewLoaded else { return }
+                }
                 configurableSelf.setupAppearance()
             }
         }
@@ -202,289 +205,18 @@ public struct InitialsBuilderAppearance {
         }
     }
     public var color: UIColor
+    public var backgroundColor: UIColor?
     public var size: CGSize
     
     public var adjustsFontSizeToFitWidth = true
     
     public init(
         color: UIColor = .onPrimary,
+        backgroundColor: UIColor? = nil,
         size: CGSize = .init(width: 60, height: 60))
     {
         self.color = color
+        self.backgroundColor = backgroundColor
         self.size = size
     }
 }
-
-extension MediaPreviewerViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor = DefaultColors.backgroundDark
-        public var minimumTrackTintColor = UIColor.onPrimary
-        public var maximumTrackTintColor = UIColor.surface3
-        public var tintColor = UIColor.onPrimary
-        public var controlFont = Fonts.regular.withSize(13)
-        public var titleFont = Fonts.bold.withSize(16)
-        public var subTitleFont = Fonts.regular.withSize(13)
-        
-        public init() {}
-    }
-}
-
-
-extension ReactionsInfoViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = UIColor.background
-        
-        public init() {}
-    }
-}
-
-extension ReactionsInfoViewController.ReactionScoreCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = UIColor.background
-        public var selectedBackgroundColor: UIColor? = UIColor.accent
-        public var borderColor: UIColor? = .border
-        public var selectedBorderColor: UIColor? = .clear
-        public var textColor: UIColor? = UIColor.secondaryText
-        public var textFont: UIFont? = Fonts.semiBold.withSize(14)
-        public var selectedTextColor: UIColor? = .onPrimary
-        
-        public init() {}
-    }
-}
-
-
-extension EmojiPickerViewController.SectionHeaderView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var textColor: UIColor? = .secondaryText
-        public var textFont: UIFont? = Fonts.regular.withSize(12)
-        
-        public init() {}
-    }
-}
-
-extension ImagePreviewViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var separatorColor: UIColor? = .border
-        
-        public init() {}
-    }
-}
-
-
-extension SheetViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .overlayBackground1
-        public var contentBackgroundColor: UIColor? = .background
-        public var titleFont: UIFont? = Fonts.semiBold.withSize(20)
-        public var titleColor: UIColor? = .secondaryText
-        public var doneFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var doneColor: UIColor? = .accent
-        public var separatorColor: UIColor? = .border
-        
-        public init() {}
-    }
-}
-
-
-extension Alert: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColors: (normal: UIColor, highlighted: UIColor)? = (.background,
-                                                                                 .surface2)
-        public var titleFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var titleColor: UIColor? = .secondaryText
-        public var messageFont: UIFont? = Fonts.regular.withSize(13)
-        public var messageColor: UIColor? = .secondaryText
-        public var buttonFont: UIFont? = Fonts.regular.withSize(16)
-        public var preferedButtonFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var normalTextColor: UIColor? = .accent
-        public var normalIconColor: UIColor? = .accent
-        public var destructiveTextColor: UIColor? = .stateWarning
-        public var destructiveIconColor: UIColor? = .stateWarning
-        public var cancelTextColor: UIColor? = .primaryText
-        public var separatorColor: UIColor? = .border
-        
-        public init() {}
-    }
-}
-
-
-extension SelectUsersViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        
-        public init() {}
-    }
-}
-
-
-
-extension ImageCropperViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        public var buttonBackgroundColor: UIColor? = DefaultColors.backgroundDark
-        public var buttonFont: UIFont? = Fonts.semiBold.withSize(16)
-        public var buttonColor: UIColor? = .onPrimary
-        
-        public init() {}
-    }
-}
-
-extension StartChatViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        
-        public init() {}
-    }
-}
-
-extension StartChatViewController.ActionsView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var font: UIFont? = Fonts.regular.withSize(16)
-        public var color: UIColor? = .accent
-        public var separatorColor: UIColor? = .border
-        
-        public init() {}
-    }
-}
-
-extension CreateGroupViewController.DetailsView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var avatarBackgroundColor: UIColor? = .surface3
-        public var separatorColor: UIColor? = .border
-        public var fieldFont: UIFont? = Fonts.regular.withSize(16)
-        public var fieldTextColor: UIColor? = .primaryText
-        public var fieldPlaceHolderTextColor: UIColor? = .secondaryText
-        public var commentFont: UIFont? = Fonts.regular.withSize(13)
-        public var commentTextColor: UIColor? = .secondaryText
-        public var errorFont: UIFont? = Fonts.regular.withSize(13)
-        public var errorTextColor: UIColor? = .stateWarning
-    }
-}
-
-extension CreateGroupViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public var backgroundColor: UIColor? = .background
-        
-        public init() {}
-    }
-}
-
-extension SelectedBaseCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var font: UIFont? = Fonts.regular.withSize(13)
-        public var textColor: UIColor? = UIColor.primaryText
-    }
-}
-
-extension ReactedUserListViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-    }
-}
-
-extension ReactedUserListViewController.UserReactionCell: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var userLabelFont: UIFont? = Fonts.bold.withSize(16)
-        public var reactionLabelFont: UIFont? = Fonts.bold.withSize(24)
-        public var userLabelColor: UIColor? = .primaryText
-        public var reactionLabelColor: UIColor? = .primaryText
-    }
-}
-
-
-extension ChannelCreatedView: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        
-        public var channelCreatedImage: UIImage? = nil
-        public var labelBackgroundColor: UIColor? = .overlayBackground1
-        public var titleLabelFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var messageLabelFont: UIFont? = Fonts.semiBold.withSize(13)
-        public var titleLabelColor: UIColor? = .onPrimary
-        public var messageLabelColor: UIColor? = .onPrimary
-    }
-}
-
-
-
-extension EmojiSectionToolBar: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-        public var normalColor: UIColor? = .footnoteText
-        public var selectedColor: UIColor? = .accent
-    }
-}
-
-extension EmojiPickerViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-        public var normalColor: UIColor? = .footnoteText
-        public var selectedColor: UIColor? = .accent
-    }
-}
-
-
-
-
-extension ForwardViewController: AppearanceProviding {
-    public static var appearance = Appearance()
-    
-    public struct Appearance {
-        public init() {}
-        
-        public var backgroundColor: UIColor? = .background
-    }
-}
-

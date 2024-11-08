@@ -169,7 +169,10 @@ extension ChannelViewController {
                     bubbleView.trailingAnchor.pin(to: containerView.trailingAnchor, constant: -12),
                     bubbleView.topAnchor.pin(to: containerView.topAnchor),
                     bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.linkViewMeasure.width + 24),
+                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.infoViewMeasure.width + 24),
                     bubbleView.widthAnchor.pin(lessThanOrEqualToConstant: Components.messageLayoutModel.defaults.messageWidth).priority(.required),
+                    
+                    infoView.leadingAnchor.pin(greaterThanOrEqualTo: bubbleView.leadingAnchor, constant: 10),
                     
                     textLabel.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -12),
                     textLabel.topAnchor.pin(to: bubbleViewTopAnchor, constant: 8),

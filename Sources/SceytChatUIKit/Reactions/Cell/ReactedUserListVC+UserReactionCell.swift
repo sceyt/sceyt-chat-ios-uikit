@@ -11,7 +11,7 @@ import UIKit
 extension ReactedUserListViewController {
     open class UserReactionCell: CollectionViewCell {
         
-        open lazy var avatarView = CircleImageView()
+        open lazy var avatarView = ImageView()
             .withoutAutoresizingMask
         open lazy var userLabel = UILabel()
             .withoutAutoresizingMask
@@ -19,15 +19,17 @@ extension ReactedUserListViewController {
             .withoutAutoresizingMask
         open var imageTask: Cancellable?
         
-        open var data: ChatUser! {
+        open var data: ChatMessage.Reaction! {
             didSet {
-                guard let data = data else { return }
-                if data.id == me {
-                    userLabel.text = L10n.User.current
-                } else {
-                    userLabel.text = data.displayName
-                }
-                imageTask = Components.avatarBuilder.loadAvatar(into: avatarView.imageView, for: data)
+                guard let user = data.user else { return }
+                userLabel.text = appearance.titleFormatter.format(user)
+                reactionLabel.text = appearance.subtitleFormatter.format(data)
+                
+                imageTask = appearance.avatarRenderer.render(
+                    user,
+                    with: appearance.avatarAppearance,
+                    into: avatarView
+                )
             }
         }
         
@@ -38,11 +40,12 @@ extension ReactedUserListViewController {
         
         open override func setupAppearance() {
             super.setupAppearance()
-            selectedBackgroundView?.backgroundColor = UIColor.surface2
-            userLabel.font = appearance.userLabelFont
-            reactionLabel.font = appearance.reactionLabelFont
-            userLabel.textColor = appearance.userLabelColor
-            reactionLabel.textColor = appearance.reactionLabelColor
+            backgroundColor = .clear
+            selectedBackgroundView?.backgroundColor = appearance.backgroundColor
+            userLabel.font = appearance.titleLabelAppearance.font
+            userLabel.textColor = appearance.titleLabelAppearance.foregroundColor
+            reactionLabel.font = appearance.subtitleLabelAppearance?.font
+            reactionLabel.textColor = appearance.subtitleLabelAppearance?.foregroundColor
         }
         
         open override func setupLayout() {
@@ -63,6 +66,5 @@ extension ReactedUserListViewController {
             super.prepareForReuse()
             imageTask?.cancel()
         }
-        
     }
 }

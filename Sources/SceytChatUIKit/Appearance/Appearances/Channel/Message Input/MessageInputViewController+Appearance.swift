@@ -10,7 +10,7 @@ import UIKit
 extension MessageInputViewController: AppearanceProviding {
     public static var appearance = Appearance(
         backgroundColor: .background,
-        dividerColor: .border,
+        separatorColor: .border,
         attachmentIcon: .attachment,
         sendMessageIcon: .messageSendAction,
         voiceRecordIcon: .audioPlayerMic,
@@ -26,13 +26,13 @@ extension MessageInputViewController: AppearanceProviding {
             font: Fonts.regular.withSize(16)
         ),
         joinButtonAppearance: ButtonAppearance(
+            reference: ButtonAppearance.appearance,
             labelAppearance: LabelAppearance(
                 foregroundColor: .accent,
                 font: Fonts.semiBold.withSize(16)
             ),
             backgroundColor: .surface1
         ),
-        selectedAttachmentIconProvider: SceytChatUIKit.shared.visualProviders.attachmentIconProvider,
         closeIcon: .closeIcon,
         linkPreviewAppearance: InputLinkPreviewAppearance(
             reference: InputLinkPreviewAppearance.appearance,
@@ -59,7 +59,7 @@ extension MessageInputViewController: AppearanceProviding {
         public var backgroundColor: UIColor
         
         @Trackable<Appearance, UIColor>
-        public var dividerColor: UIColor
+        public var separatorColor: UIColor
         
         @Trackable<Appearance, UIImage>
         public var attachmentIcon: UIImage
@@ -90,9 +90,6 @@ extension MessageInputViewController: AppearanceProviding {
         
         @Trackable<Appearance, ButtonAppearance>
         public var joinButtonAppearance: ButtonAppearance
-        
-        @Trackable<Appearance, any AttachmentIconProviding>
-        public var selectedAttachmentIconProvider: any AttachmentIconProviding
         
         @Trackable<Appearance, UIImage>
         public var closeIcon: UIImage
@@ -132,7 +129,7 @@ extension MessageInputViewController: AppearanceProviding {
         
         public init(
             backgroundColor: UIColor,
-            dividerColor: UIColor,
+            separatorColor: UIColor,
             attachmentIcon: UIImage,
             sendMessageIcon: UIImage,
             voiceRecordIcon: UIImage,
@@ -143,7 +140,6 @@ extension MessageInputViewController: AppearanceProviding {
             inputAppearance: InputTextView.Appearance,
             mentionLabelAppearance: LabelAppearance,
             joinButtonAppearance: ButtonAppearance,
-            selectedAttachmentIconProvider: any AttachmentIconProviding,
             closeIcon: UIImage,
             linkPreviewAppearance: InputLinkPreviewAppearance,
             replyMessageAppearance: InputReplyMessageAppearance,
@@ -158,7 +154,7 @@ extension MessageInputViewController: AppearanceProviding {
             mentionUserNameFormatter: any UserFormatting
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
-            self._dividerColor = Trackable(value: dividerColor)
+            self._separatorColor = Trackable(value: separatorColor)
             self._attachmentIcon = Trackable(value: attachmentIcon)
             self._sendMessageIcon = Trackable(value: sendMessageIcon)
             self._voiceRecordIcon = Trackable(value: voiceRecordIcon)
@@ -169,7 +165,6 @@ extension MessageInputViewController: AppearanceProviding {
             self._inputAppearance = Trackable(value: inputAppearance)
             self._mentionLabelAppearance = Trackable(value: mentionLabelAppearance)
             self._joinButtonAppearance = Trackable(value: joinButtonAppearance)
-            self._selectedAttachmentIconProvider = Trackable(value: selectedAttachmentIconProvider)
             self._closeIcon = Trackable(value: closeIcon)
             self._linkPreviewAppearance = Trackable(value: linkPreviewAppearance)
             self._replyMessageAppearance = Trackable(value: replyMessageAppearance)
@@ -187,7 +182,7 @@ extension MessageInputViewController: AppearanceProviding {
         public init(
             reference: MessageInputViewController.Appearance,
             backgroundColor: UIColor? = nil,
-            dividerColor: UIColor? = nil,
+            separatorColor: UIColor? = nil,
             attachmentIcon: UIImage? = nil,
             sendMessageIcon: UIImage? = nil,
             voiceRecordIcon: UIImage? = nil,
@@ -198,7 +193,6 @@ extension MessageInputViewController: AppearanceProviding {
             inputAppearance: InputTextView.Appearance? = nil,
             mentionLabelAppearance: LabelAppearance? = nil,
             joinButtonAppearance: ButtonAppearance? = nil,
-            selectedAttachmentIconProvider: (any AttachmentIconProviding)? = nil,
             closeIcon: UIImage? = nil,
             linkPreviewAppearance: InputLinkPreviewAppearance? = nil,
             replyMessageAppearance: InputReplyMessageAppearance? = nil,
@@ -213,7 +207,7 @@ extension MessageInputViewController: AppearanceProviding {
             mentionUserNameFormatter: (any UserFormatting)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
-            self._dividerColor = Trackable(reference: reference, referencePath: \.dividerColor)
+            self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
             self._attachmentIcon = Trackable(reference: reference, referencePath: \.attachmentIcon)
             self._sendMessageIcon = Trackable(reference: reference, referencePath: \.sendMessageIcon)
             self._voiceRecordIcon = Trackable(reference: reference, referencePath: \.voiceRecordIcon)
@@ -224,7 +218,6 @@ extension MessageInputViewController: AppearanceProviding {
             self._inputAppearance = Trackable(reference: reference, referencePath: \.inputAppearance)
             self._mentionLabelAppearance = Trackable(reference: reference, referencePath: \.mentionLabelAppearance)
             self._joinButtonAppearance = Trackable(reference: reference, referencePath: \.joinButtonAppearance)
-            self._selectedAttachmentIconProvider = Trackable(reference: reference, referencePath: \.selectedAttachmentIconProvider)
             self._closeIcon = Trackable(reference: reference, referencePath: \.closeIcon)
             self._linkPreviewAppearance = Trackable(reference: reference, referencePath: \.linkPreviewAppearance)
             self._replyMessageAppearance = Trackable(reference: reference, referencePath: \.replyMessageAppearance)
@@ -239,7 +232,7 @@ extension MessageInputViewController: AppearanceProviding {
             self._mentionUserNameFormatter = Trackable(reference: reference, referencePath: \.mentionUserNameFormatter)
             
             if let backgroundColor { self.backgroundColor = backgroundColor }
-            if let dividerColor { self.dividerColor = dividerColor }
+            if let separatorColor { self.separatorColor = separatorColor }
             if let attachmentIcon { self.attachmentIcon = attachmentIcon }
             if let sendMessageIcon { self.sendMessageIcon = sendMessageIcon }
             if let voiceRecordIcon { self.voiceRecordIcon = voiceRecordIcon }
@@ -250,7 +243,6 @@ extension MessageInputViewController: AppearanceProviding {
             if let inputAppearance { self.inputAppearance = inputAppearance }
             if let mentionLabelAppearance { self.mentionLabelAppearance = mentionLabelAppearance }
             if let joinButtonAppearance { self.joinButtonAppearance = joinButtonAppearance }
-            if let selectedAttachmentIconProvider { self.selectedAttachmentIconProvider = selectedAttachmentIconProvider }
             if let closeIcon { self.closeIcon = closeIcon }
             if let linkPreviewAppearance { self.linkPreviewAppearance = linkPreviewAppearance }
             if let replyMessageAppearance { self.replyMessageAppearance = replyMessageAppearance }

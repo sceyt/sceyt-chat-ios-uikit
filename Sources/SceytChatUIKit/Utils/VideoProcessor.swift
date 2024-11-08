@@ -23,7 +23,7 @@ open class VideoProcessor {
     
     open class func copyFrame(
         url: URL,
-        at time: TimeInterval = 0
+        at time: TimeInterval = 1
     ) -> UIImage? {
         let asset = AVAsset(url: url)
         return copyFrame(asset: asset, at: time)
@@ -31,7 +31,7 @@ open class VideoProcessor {
     
     open class func copyFrame(
         asset: AVAsset,
-        at time: TimeInterval = 0
+        at time: TimeInterval = 1
     ) -> UIImage? {
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true

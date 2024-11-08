@@ -1,6 +1,6 @@
 //
-//  File.swift
-//  
+//  LinkMetadataProvider.swift
+//
 //
 //  Created by Hovsep Keropyan on 26.12.23.
 //
@@ -10,6 +10,10 @@ import ImageIO
 import SceytChat
 
 open class LinkMetadataProvider: DataProvider {
+    
+    open var titleMaxLength = 100 // characters
+    open var summaryMaxLength = 200 // characters
+    
     public static var `default` = LinkMetadataProvider()
 
     public var cache = defaultCache
@@ -78,6 +82,13 @@ open class LinkMetadataProvider: DataProvider {
         let log_hv = url.absoluteString.hashValue
         logger.verbose("[LOAD LINK] \(log_hv) Will load link Open Graph data from SceytChat url: \(url.absoluteString)")
         if let metadata = cache.object(forKey: url.absoluteString as NSString) {
+            let prefixTitle = metadata.title?.prefix(titleMaxLength)
+            let titleStr = prefixTitle == nil ? nil : String(prefixTitle!)
+            metadata.title = titleStr
+            
+            let prefixSummary = metadata.summary?.prefix(summaryMaxLength)
+            let summaryStr = prefixSummary == nil ? nil : String(prefixSummary!)
+            metadata.summary = summaryStr
             return .success(metadata)
         }
         
@@ -103,6 +114,13 @@ open class LinkMetadataProvider: DataProvider {
                 linkMetadata: metadata,
                 downloadImage: downloadImage,
                 downloadIcon: downloadIcon)
+            let prefixTitle = metadata.title?.prefix(titleMaxLength)
+            let titleStr = prefixTitle == nil ? nil : String(prefixTitle!)
+            metadata.title = titleStr
+            
+            let prefixSummary = metadata.summary?.prefix(summaryMaxLength)
+            let summaryStr = prefixSummary == nil ? nil : String(prefixSummary!)
+            metadata.summary = summaryStr
             cache.setObject(metadata, forKey: url.absoluteString as NSString)
             return .success(metadata)
         }
@@ -116,8 +134,13 @@ open class LinkMetadataProvider: DataProvider {
                 return .failure(error)
             }
             if let link {
-                linkMetadata.title = link.title
-                linkMetadata.summary = link.info
+                let prefixTitle = link.title?.prefix(titleMaxLength)
+                let titleStr = prefixTitle == nil ? nil : String(prefixTitle!)
+                linkMetadata.title = titleStr
+                
+                let prefixedInfo = link.info?.prefix(summaryMaxLength)
+                let infoStr = prefixedInfo == nil ? nil : String(prefixedInfo!)
+                linkMetadata.summary = infoStr
                 if let urlStr = link.favicon?.url,
                    let url = URL(string: urlStr) {
                     linkMetadata.iconUrl = url

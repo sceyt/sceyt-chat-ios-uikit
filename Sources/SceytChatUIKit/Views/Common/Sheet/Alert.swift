@@ -61,7 +61,7 @@ open class Alert: View {
                 for: $0.element,
                 hasBottomSeparator: actions.count > 2 && $0.offset < actions.count - 1,
                 hasRightSeparator: actions.count <= 2 && $0.offset < actions.count - 1,
-                isPrefered: $0.offset == preferredActionIndex
+                isPreferred: $0.offset == preferredActionIndex
             )
         })
         
@@ -73,23 +73,23 @@ open class Alert: View {
         
         layer.cornerRadius = Layouts.cornerRadius
         layer.masksToBounds = true
-        backgroundColor = appearance.backgroundColors?.normal
+        backgroundColor = appearance.backgroundColor
         titleLabel.numberOfLines = 0
         titleLabel.edgeInsets = .init(top: 20, left: 16, bottom: 8, right: 16)
         titleLabel.textAlignment = .center
-        titleLabel.font = appearance.titleFont
-        titleLabel.textColor = .primaryText
+        titleLabel.font = appearance.titleLabelAppearance.font
+        titleLabel.textColor = appearance.titleLabelAppearance.foregroundColor
         messageLabel.numberOfLines = 0
         messageLabel.textAlignment = .center
         messageLabel.edgeInsets = .init(top: 0, left: 16, bottom: 20, right: 16)
-        messageLabel.font = appearance.messageFont
-        messageLabel.textColor = .secondaryText
+        messageLabel.font = appearance.messageLabelAppearance.font
+        messageLabel.textColor = appearance.messageLabelAppearance.foregroundColor
         separator.backgroundColor = appearance.separatorColor
         buttonsStackView.axis = actions.count <= 2 ? .horizontal : .vertical
         buttonsStackView.distribution = actions.count <= 2 ? .fillEqually : .fill
     }
     
-    open func button(for action: SheetAction, maskedCorners: CACornerMask = [], hasBottomSeparator: Bool = true, hasRightSeparator: Bool = true, isPrefered: Bool = false) -> SheetButton {
+    open func button(for action: SheetAction, maskedCorners: CACornerMask = [], hasBottomSeparator: Bool = true, hasRightSeparator: Bool = true, isPreferred: Bool = false) -> SheetButton {
         let button = SheetButton()
         button.publisher(for: .touchUpInside).sink { [weak self] _ in
             self?.sheet?.dismiss {
@@ -98,32 +98,31 @@ open class Alert: View {
         }.store(in: &subscriptions)
         button.contentEdgeInsets = .init(top: 12, left: 16 + (action.icon == nil ? 0 : 16), bottom: 12, right: 16)
         button.imageEdgeInsets = .init(top: 0, left: action.icon == nil ? 0 : -16, bottom: 0, right: 0)
-        button.backgroundColors = appearance.backgroundColors
-        button.tintColor = appearance.normalIconColor
         button.layer.maskedCorners = maskedCorners
         button.layer.cornerRadius = Layouts.cornerRadius
         button.layer.masksToBounds = true
         button.setImage(action.icon?.withRenderingMode(.alwaysTemplate), for: .normal)
         button.contentHorizontalAlignment = action.icon == nil ? .center : .leading
-        if action.style == .cancel {
-            button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
-                .font: (isPrefered ? appearance.preferedButtonFont : appearance.buttonFont) ?? Fonts.regular.withSize(16),
-                .foregroundColor: appearance.cancelTextColor ?? .accent,
-            ]), for: .normal)
-        } else {
-            if action.style == .destructive {
-                button.tintColor = appearance.destructiveIconColor
-                button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
-                    .font: (isPrefered ? appearance.preferedButtonFont : appearance.buttonFont) ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.destructiveTextColor ?? .stateWarning,
-                ]), for: .normal)
-            } else {
-                button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
-                    .font: (isPrefered ? appearance.preferedButtonFont : appearance.buttonFont) ?? Fonts.regular.withSize(16),
-                    .foregroundColor: appearance.normalTextColor ?? .accent,
-                ]), for: .normal)
-            }
+        
+        let buttonAppearance = switch action.style {
+        case .default:
+            appearance.buttonAppearance
+        case .destructive:
+            appearance.destructiveButtonAppearance
+        case .cancel:
+            appearance.cancelButtonAppearance
         }
+
+        button.backgroundColors = (
+            normal: buttonAppearance.backgroundColor,
+            highlighted: buttonAppearance.highlightedBackgroundColor
+        )
+        button.tintColor = buttonAppearance.tintColor
+        button.setAttributedTitle(NSAttributedString(string: action.title, attributes: [
+            .font: isPreferred ? appearance.preferredActionFont : buttonAppearance.labelAppearance.font,
+            .foregroundColor: buttonAppearance.labelAppearance.foregroundColor
+        ]), for: .normal)
+        
         if hasBottomSeparator {
             let separator = UIView()
             separator.backgroundColor = appearance.separatorColor

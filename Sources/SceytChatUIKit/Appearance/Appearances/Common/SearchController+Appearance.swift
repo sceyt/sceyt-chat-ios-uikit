@@ -18,17 +18,17 @@ extension SearchController: AppearanceProviding {
     )
     
     public struct Appearance {
-        @Trackable<Appearance, SearchBarAppearance.Appearance>
-        public var searchBarAppearance: SearchBarAppearance.Appearance
+        @Trackable<Appearance, SearchBarAppearance>
+        public var searchBarAppearance: SearchBarAppearance
         
         // Initializer with custom searchBarAppearance
-        public init(searchBarAppearance: SearchBarAppearance.Appearance) {
+        public init(searchBarAppearance: SearchBarAppearance) {
             self._searchBarAppearance = Trackable(value: searchBarAppearance)
         }
         
         public init(
             reference: SearchController.Appearance,
-            searchBarAppearance: SearchBarAppearance.Appearance? = nil
+            searchBarAppearance: SearchBarAppearance? = nil
         ) {
             self._searchBarAppearance = Trackable(reference: reference, referencePath: \.searchBarAppearance)
             if let searchBarAppearance { self.searchBarAppearance = searchBarAppearance }

@@ -18,6 +18,7 @@ public class SceytChatUIKit {
     public var theme = SceytChatUIKit.Theme()
     public var formatters = SceytChatUIKit.Formatters()
     public var visualProviders = SceytChatUIKit.VisualProviders()
+    public var avatarRenderers = SceytChatUIKit.AvatarRenderers()
     
     public var chatClient: ChatClient {
         ChatClient.shared

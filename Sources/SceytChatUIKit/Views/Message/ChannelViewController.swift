@@ -505,7 +505,7 @@ open class ChannelViewController: ViewController,
             .removeDuplicates()
             .sink { [weak self] value in
                 guard let self else { return }
-                unreadCountView.unreadCount.value = appearance.unreadCountFormatter.format(value)
+                unreadCountView.unreadCount.value = appearance.scrollDownAppearance.unreadCountFormatter.format(value)
             }.store(in: &subscriptions)
         
         channelViewModel
@@ -739,25 +739,12 @@ open class ChannelViewController: ViewController,
             title: channelViewModel.getTitleForHeader(with: appearance.headerAppearance),
             subTitle: channelViewModel.getSubtitleForHeader(with: appearance.headerAppearance)
         )
-        let avatarRepresentation = appearance.headerAppearance.avatarProvider.provideVisual(for: channelViewModel.channel)
-        
-        switch avatarRepresentation {
-        case .image(let image):
-            avatarTask = Components.avatarBuilder.loadAvatar(
-                into: titleView.profileImageView,
-                for: channelViewModel.channel,
-                defaultImage: image,
-                size: .init(width: 36, height: 36)
-            )
-        case .initialsAppearance(var initialsBuilderAppearance):
-            initialsBuilderAppearance?.size = .init(width: 36, height: 36)
-            avatarTask = Components.avatarBuilder.loadAvatar(
-                into: titleView.profileImageView,
-                for: channelViewModel.channel,
-                appearance: initialsBuilderAppearance,
-                size: .init(width: 36, height: 36)
-            )
-        }
+        appearance.headerAppearance.avatarRenderer.render(
+            channelViewModel.channel,
+            with: appearance.headerAppearance.avatarAppearance,
+            into: titleView.profileImageView,
+            size: .init(width: 36 * UIScreen.main.traitCollection.displayScale, height: 36 * UIScreen.main.traitCollection.displayScale)
+        )
     }
     
     open func showTitle(
@@ -2381,6 +2368,7 @@ open class ChannelViewController: ViewController,
         SimpleSinglePlayer.stop()
         avatarTask?.cancel()
         navigationController?.interactivePopGestureRecognizer?.isEnabled = true
+        NotificationCenter.default.removeObserver(self)
     }
     
     open func didStartVoiceRecording() {

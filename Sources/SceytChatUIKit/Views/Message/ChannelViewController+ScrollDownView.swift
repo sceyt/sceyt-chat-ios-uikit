@@ -38,8 +38,9 @@ extension ChannelViewController {
         override open func setupAppearance() {
             super.setupAppearance()
             
-            bubbleView.image = ImageBuilder.addShadow(to: appearance.icon,
-                                                      blur: 12)
+            backgroundColor = appearance.backgroundColor
+            bubbleView.image = Components.imageBuilder.addShadow(to: appearance.icon,
+                                                                 blur: 12)
             unreadCount.font = appearance.unreadCountLabelAppearance.font
             unreadCount.textColor = appearance.unreadCountLabelAppearance.foregroundColor
             unreadCount.backgroundColor = appearance.unreadCountLabelAppearance.backgroundColor

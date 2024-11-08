@@ -25,8 +25,6 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
     override open func setup() {
         super.setup()
         
-        title = L10n.Channel.New.createPublic
-        view.backgroundColor = .background
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.Nav.Bar.create,
                                                             style: .done,
                                                             target: self,
@@ -69,6 +67,14 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
         view.addSubview(detailsView)
         detailsViewTopConstraint =
         detailsView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading(), .top(), .trailing()])[1]
+    }
+    
+    open override func setupAppearance() {
+        super.setupAppearance()
+        navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
+        title = L10n.Channel.New.createPublic
+        view.backgroundColor = .background
+        detailsView.parentAppearance = appearance.detailsViewAppearance
     }
     
     open func onEvent( _ event: CreatePublicChannelViewModel.Event) {

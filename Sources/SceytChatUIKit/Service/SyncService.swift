@@ -221,7 +221,7 @@ public struct Operations {
         let createChannel = CreateUnSyncChannelsOperation()
         
         let provider = Components.channelListProvider.init()
-        provider.queryLimit = 10
+        provider.config.queryLimit = 10
         let fetchChannels = FetchAllChannelsOperation(query: provider.defaultQuery)
         fetchChannels.onLoad = onLoad
         

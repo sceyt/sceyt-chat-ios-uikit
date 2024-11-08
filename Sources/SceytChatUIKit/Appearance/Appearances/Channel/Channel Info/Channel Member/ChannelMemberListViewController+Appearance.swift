@@ -10,18 +10,28 @@ import UIKit
 
 extension ChannelMemberListViewController: AppearanceProviding {
     public static var appearance = Appearance(
-        navigationBarAppearance: {
-            $0.appearance.standardAppearance?.backgroundColor = .surface1
-            return $0.appearance
-        }(NavigationBarAppearance()),
+        navigationBarAppearance: .init(
+            reference: NavigationBarAppearance.appearance,
+            standardAppearance: {
+                let appearance = UINavigationBarAppearance()
+                appearance.titleTextAttributes = [
+                    .font: Fonts.bold.withSize(20),
+                    .foregroundColor: UIColor.primaryText
+                ]
+                appearance.backgroundEffect = UIBlurEffect(style: .systemMaterial)
+                appearance.backgroundColor = .surface1
+                appearance.shadowColor = .border
+                return appearance
+            }()
+        ),
         backgroundColor: .background,
         cellAppearance: SceytChatUIKit.Components.channelMemberCell.appearance,
         addCellAppearance: SceytChatUIKit.Components.channelAddMemberCell.appearance
     )
     
     public struct Appearance {
-        @Trackable<Appearance, NavigationBarAppearance.Appearance>
-        public var navigationBarAppearance: NavigationBarAppearance.Appearance
+        @Trackable<Appearance, NavigationBarAppearance>
+        public var navigationBarAppearance: NavigationBarAppearance
         
         @Trackable<Appearance, UIColor>
         public var backgroundColor: UIColor
@@ -34,7 +44,7 @@ extension ChannelMemberListViewController: AppearanceProviding {
         
         /// Initializes a new instance of `Appearance` with explicit values.
         public init(
-            navigationBarAppearance: NavigationBarAppearance.Appearance,
+            navigationBarAppearance: NavigationBarAppearance,
             backgroundColor: UIColor,
             cellAppearance: ChannelMemberListViewController.MemberCell.Appearance,
             addCellAppearance: ChannelMemberListViewController.AddMemberCell.Appearance
@@ -48,7 +58,7 @@ extension ChannelMemberListViewController: AppearanceProviding {
         /// Initializes a new instance of `Appearance` with optional overrides.
         public init(
             reference: ChannelMemberListViewController.Appearance,
-            navigationBarAppearance: NavigationBarAppearance.Appearance? = nil,
+            navigationBarAppearance: NavigationBarAppearance? = nil,
             backgroundColor: UIColor? = nil,
             cellAppearance: ChannelMemberListViewController.MemberCell.Appearance? = nil,
             addCellAppearance: ChannelMemberListViewController.AddMemberCell.Appearance? = nil
