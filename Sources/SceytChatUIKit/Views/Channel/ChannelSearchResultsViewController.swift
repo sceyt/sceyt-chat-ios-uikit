@@ -1,134 +1,44 @@
 //
-//  ChannelSearchResultsBaseViewController.swift
+//  ChannelSearchResultsViewController.swift
 //  SceytChatUIKit
 //
-//  Created by Duc on 24/10/2023.
-//  Copyright © 2023 Sceyt LLC. All rights reserved.
+//  Created by Arthur Avagyan on 01.11.24
+//  Copyright © 2024 Sceyt LLC. All rights reserved.
 //
 
 import UIKit
 
-public protocol ChannelSearchResultsUpdating: AnyObject {
-    var searchResults: ChannelSearchResult { get }
-    func isSelected(_ channel: ChatChannel) -> Bool
-    func select(_ channel: ChatChannel)
-}
-
-open class ChannelSearchResultsBaseViewController: ViewController,
-    UITableViewDelegate, UITableViewDataSource
-{
-    open weak var resultsUpdater: ChannelSearchResultsUpdating!
+open class ChannelSearchResultsViewController: ChannelSearchResultsBaseViewController {
     
-    open lazy var tableView = UITableView()
-        .withoutAutoresizingMask
+    public required init() {
+        super.init(nibName: nil, bundle: nil)
+        parentAppearance = ChannelSearchResultsViewController.defaultAppearance
+    }
     
-    open lazy var emptyStateView = Components.emptyStateView
-        .init()
-        .withoutAutoresizingMask
-    
-    public var emptyStateViewBottom: NSLayoutConstraint!
+    public required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        parentAppearance = ChannelSearchResultsViewController.defaultAppearance
+    }
     
     override open func setup() {
         super.setup()
-        
-        tableView.delegate = self
-        tableView.dataSource = self
-        tableView.separatorStyle = .none
-        tableView.allowsMultipleSelection = true
-        tableView.register(Components.separatorHeaderView.self)
-        tableView.contentInsetAdjustmentBehavior = .automatic
-        tableView.tableFooterView = UIView()
-        tableView.estimatedRowHeight = 56
-        if #available(iOS 15.0, *) {
-            tableView.sectionHeaderTopPadding = 0
+        tableView.register(Components.searchResultChannelCell.self)
+    }
+    
+    open override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.searchResultChannelCell.self)
+        cell.parentAppearance = (appearance as! ChannelSearchResultsViewController.Appearance).cellAppearance
+        cell.separatorView.isHidden = indexPath.row == tableView.numberOfRows(inSection: indexPath.section) - 1
+        if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
+            cell.channelData = channel
         }
-        
-        KeyboardObserver()
-            .willShow { [weak self] in
-                self?.adjustTableViewToKeyboard(notification: $0)
-            }.willHide { [weak self] in
-                self?.adjustTableViewToKeyboard(notification: $0)
-            }
+        return cell
     }
     
-    override open func setupLayout() {
-        super.setupLayout()
-        
-        view.addSubview(tableView)
-        view.addSubview(emptyStateView)
-        tableView.pin(to: view)
-        emptyStateViewBottom = emptyStateView.pin(to: view.safeAreaLayoutGuide, anchors: [.bottom, .top, .leading, .trailing])[0]
-    }
-    
-    open override func setupAppearance() {
-        super.setupAppearance()
-        
-        tableView.backgroundColor = appearance.backgroundColor
-        view.backgroundColor = appearance.backgroundColor
-        emptyStateView.parentAppearance = appearance.emptyViewAppearance
-    }
-    
-    override open func setupDone() {
-        super.setupDone()
-        
-        showEmptyViewIfNeeded()
-    }
-    
-    // MARK: - Actions
-    
-    func reloadData() {
-        tableView.reloadData()
-        showEmptyViewIfNeeded()
-    }
-    
-    open func showEmptyViewIfNeeded() {
-        emptyStateView.isHidden = !resultsUpdater.searchResults.isEmpty
-    }
-    
-    func adjustTableViewToKeyboard(notification: Notification) {
-        guard let keyboardFrame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect,
-              let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? TimeInterval,
-              let curve = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
-        else { return }
-
-        tableView.adjustInsetsToKeyboard(notification: notification, container: view)
-        if notification.name == UIResponder.keyboardWillHideNotification {
-            emptyStateViewBottom.constant = 0
-        } else if notification.name == UIResponder.keyboardWillShowNotification {
-            emptyStateViewBottom.constant = -keyboardFrame.height/2
+    open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        if let channel = resultsUpdater.searchResults.channel(at: indexPath) {
+            resultsUpdater.select(channel)
         }
-        UIView.animate(withDuration: duration,
-                       delay: 0,
-                       options: .init(rawValue: curve),
-                       animations: view.layoutIfNeeded, 
-                       completion: nil)
-    }
-    
-    // MARK: - UITableViewDataSource, UITableViewDelegate
-
-    open func numberOfSections(in tableView: UITableView) -> Int {
-        resultsUpdater.searchResults.numberOfSections
-    }
-    
-    open func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        resultsUpdater.searchResults.numberOfChannels(in: section)
-    }
-    
-    open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        fatalError("Override and implement in subclass")
-    }
-    
-    open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        resultsUpdater.searchResults.header(for: section) != nil ? Components.separatorHeaderView.Layouts.height : 0
-    }
-    
-    open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        guard let header = resultsUpdater.searchResults.header(for: section)
-            else { return nil }
-        
-        let headerView = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
-        headerView.parentAppearance = appearance.separatorViewAppearance
-        headerView.titleLabel.text = header
-        return headerView
     }
 }

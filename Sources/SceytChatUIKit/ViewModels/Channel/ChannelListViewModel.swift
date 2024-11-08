@@ -31,9 +31,33 @@ open class ChannelListViewModel: NSObject,
     open lazy var searchResults: ChannelSearchResult = ChannelSearchResultImp()
     
     public var query: ChannelListQuery?
-    open var queryConfig: ChannelListProvider.Config = .default
+    open var queryConfig: ChannelListProvider.Config = ChannelListProvider.Config(
+        types: [],
+        order: SceytChatUIKit.shared.config.channelListOrder,
+        queryLimit: SceytChatUIKit.shared.config.queryLimits.channelListQueryLimit,
+        queryParam: {
+            $0.userMessageReactionCount = 1
+            $0.memberCount = 10
+            return $0
+        }(ChannelQueryParam())
+    )//.default
     
-    public var fetchPredicate =  NSPredicate(format: "unsubscribed == NO AND NOT (unsynched = YES AND lastMessage == nil)")
+    public var fetchPredicate: NSPredicate {
+        // Base predicates
+        var predicates = [
+            NSPredicate(format: "unsubscribed == NO"),
+            NSPredicate(format: "NOT (unsynched == YES AND lastMessage == nil)")
+        ]
+        
+        // Add type predicate if config.types is not empty
+        if !queryConfig.types.isEmpty {
+            predicates.append(NSPredicate(format: "type IN %@", queryConfig.types))
+        }
+        
+        // Combine all predicates with AND
+        return NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+    }
+
     private var _selectedChannel: ChatChannel?
     
     @Atomic public private(set) var layoutModels = [ChatChannel: ChannelLayoutModel]()
