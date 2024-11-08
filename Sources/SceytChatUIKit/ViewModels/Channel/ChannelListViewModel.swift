@@ -31,7 +31,7 @@ open class ChannelListViewModel: NSObject,
     open lazy var searchResults: ChannelSearchResult = ChannelSearchResultImp()
     
     public var query: ChannelListQuery?
-    open var queryConfig: ChannelListProvider.Configuration = .default
+    open var queryConfig: ChannelListProvider.Config = .default
     
     public var fetchPredicate =  NSPredicate(format: "unsubscribed == NO AND NOT (unsynched = YES AND lastMessage == nil)")
     private var _selectedChannel: ChatChannel?
