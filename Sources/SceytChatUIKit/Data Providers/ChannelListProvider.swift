@@ -16,6 +16,13 @@ extension ChannelListProvider {
         public var queryLimit: UInt
         public var queryParam: ChannelQueryParam
         
+        public init(types: [String], order: ChannelListOrder, queryLimit: UInt, queryParam: ChannelQueryParam) {
+            self.types = types
+            self.order = order
+            self.queryLimit = queryLimit
+            self.queryParam = queryParam
+        }
+        
         public static var `default` = Config(
             types: [],
             order: SceytChatUIKit.shared.config.channelListOrder,

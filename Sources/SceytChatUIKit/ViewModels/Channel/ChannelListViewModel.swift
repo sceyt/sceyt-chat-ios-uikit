@@ -31,16 +31,7 @@ open class ChannelListViewModel: NSObject,
     open lazy var searchResults: ChannelSearchResult = ChannelSearchResultImp()
     
     public var query: ChannelListQuery?
-    open var queryConfig: ChannelListProvider.Config = ChannelListProvider.Config(
-        types: [],
-        order: SceytChatUIKit.shared.config.channelListOrder,
-        queryLimit: SceytChatUIKit.shared.config.queryLimits.channelListQueryLimit,
-        queryParam: {
-            $0.userMessageReactionCount = 1
-            $0.memberCount = 10
-            return $0
-        }(ChannelQueryParam())
-    )//.default
+    open var queryConfig: ChannelListProvider.Config = ChannelListProvider.Config.default
     
     public var fetchPredicate: NSPredicate {
         // Base predicates
