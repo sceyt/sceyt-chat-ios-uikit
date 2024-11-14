@@ -344,7 +344,7 @@ open class ChannelListViewController: ViewController,
     
     // MARK: - UISearchResultsUpdating
     
-    private var lastSearchText: String?
+    public var lastSearchText: String?
     public func updateSearchResults(for searchController: UISearchController) {
         NSObject.cancelPreviousPerformRequests(withTarget: channelListViewModel, selector: #selector(ChannelListViewModel.search(query:)), object: lastSearchText)
         let text = searchController.searchBar.text
