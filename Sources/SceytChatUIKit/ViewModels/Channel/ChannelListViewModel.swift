@@ -33,11 +33,11 @@ open class ChannelListViewModel: NSObject,
     public var query: ChannelListQuery?
     open var queryConfig: ChannelListProvider.Config = ChannelListProvider.Config.default
     
-    public var fetchPredicate: NSPredicate {
+    open var fetchPredicate: NSPredicate {
         // Base predicates
         var predicates = [
             NSPredicate(format: "unsubscribed == NO"),
-            NSPredicate(format: "NOT (unsynched == YES AND lastMessage == nil)")
+            NSPredicate(format: "lastMessage != nil")
         ]
         
         // Add type predicate if config.types is not empty

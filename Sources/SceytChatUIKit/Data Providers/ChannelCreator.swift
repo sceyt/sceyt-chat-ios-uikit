@@ -11,7 +11,7 @@ import SceytChat
 import CoreData
 
 open class ChannelCreator: DataProvider {
-        
+    
     public required override init() {
         super.init()
     }
@@ -48,11 +48,11 @@ open class ChannelCreator: DataProvider {
                     logger.errorIfNotNil(error, "Store created channel in db")
                     completion?(chatChannel, nil)
                 }
-        }
+            }
     }
     
     open func create(channel: ChatChannel,
-        completion: ((ChatChannel?, Error?) -> Void)? = nil
+                     completion: ((ChatChannel?, Error?) -> Void)? = nil
     ) {
         Channel
             .create(
@@ -84,7 +84,7 @@ open class ChannelCreator: DataProvider {
                     logger.errorIfNotNil(error, "Store created channel in db")
                     completion?(chatChannel, nil)
                 }
-        }
+            }
     }
     
     open func create(
@@ -109,9 +109,83 @@ open class ChannelCreator: DataProvider {
             completion: completion)
     }
     
-    open func createLocalChannel(
+    open func createLocalChannelByMembers(
         type: String,
         uri: String? = nil,
+        subject: String? = nil,
+        metadata: String? = nil,
+        avatarUrl: String? = nil,
+        members: [ChatChannelMember],
+        completion: ((ChatChannel?, Error?) -> Void)? = nil
+    ) {
+        var channelId: Int64 = Crypto.hash(value: members.map { $0.id }.sorted().joined(separator: "$"))
+        if channelId < 0 {
+            channelId *= -1
+        }
+        
+        self.database.read {
+            UserDTO.fetch(ids: members.map { $0.id } ?? [], context: $0).map { $0.convert() }
+        } completion: { result in
+            let newMembers: [ChatChannelMember]
+            if let users = try? result.get() {
+                var group = [UserId: ChatChannelMember]()
+                for m in members {
+                    group[m.id] = m
+                }
+                newMembers = group.values.map { ChatChannelMember(user: $0, roleName: $0.roleName)}
+            } else {
+                newMembers = members
+            }
+            
+            let channel = ChatChannel(
+                id: ChannelId(channelId),
+                type: type,
+                createdAt: Date(),
+                memberCount: Int64(newMembers.count),
+                subject: subject,
+                metadata: metadata,
+                avatarUrl: avatarUrl,
+                uri: "",
+                members: newMembers,
+                userRole: SceytChatUIKit.shared.config.memberRolesConfig.owner,
+                draftMessage: nil
+            )
+            
+            self.database.read {
+                ChannelDTO.fetchChannelByMembers(channel: channel, context: $0)
+            } completion: { result in
+                if let chatChannel = try? result.get() {
+                    logger.info("Found channel with id: \(channelId) for members \(String(describing: members.map { $0.id}))")
+                    completion?(chatChannel, nil)
+                } else {
+                    self.database.write {
+                        $0.createOrUpdate(channel: channel)
+                            .unsynched = true
+                    } completion: { error in
+                        logger.errorIfNotNil(error, "Store created channel in db")
+                        self.database.read {
+                            ChannelDTO.fetch(id: ChannelId(channelId), context: $0)?
+                                .convert()
+                        } completion: { result in
+                            switch result {
+                            case .success(let chatChannel):
+                                logger.info("Get channel after store with id: \(channelId)")
+                                completion?(chatChannel, nil)
+                            case .failure(let error):
+                                completion?(channel, error)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /// When a channel with given URI exists, it will be returned, and given members will be ignored
+    /// If a channel does not exist, it will be created with the given members
+    open func createLocalChannelByURI(
+        type: String,
+        uri: String,
         subject: String? = nil,
         metadata: String? = nil,
         avatarUrl: String? = nil,
@@ -146,14 +220,14 @@ open class ChannelCreator: DataProvider {
                 subject: subject,
                 metadata: metadata,
                 avatarUrl: avatarUrl,
-                uri: "",
+                uri: uri,
                 members: newMembers,
                 userRole: SceytChatUIKit.shared.config.memberRolesConfig.owner,
                 draftMessage: nil
             )
             
             self.database.read {
-                ChannelDTO.fetchChannelByMembers(channel: channel, context: $0)
+                ChannelDTO.fetchChannelByURI(channel: channel, context: $0)
             } completion: { result in
                 if let chatChannel = try? result.get() {
                     logger.info("Found channel with id: \(channelId) for members \(String(describing: members?.map { $0.id}))")
@@ -184,7 +258,7 @@ open class ChannelCreator: DataProvider {
     }
     
     open func createChannelOnServerIfNeeded(channelId: ChannelId,
-                                  completion: ((ChatChannel?, Error?) -> Void)? = nil
+                                            completion: ((ChatChannel?, Error?) -> Void)? = nil
     ) {
         database.read {
             ChannelDTO.fetch(id: channelId, context: $0)?.convert()
@@ -235,7 +309,7 @@ open class ChannelCreator: DataProvider {
 }
 
 extension ChannelDTO {
- 
+    
     class func fetchChannelByMembers(channel: ChatChannel, context: NSManagedObjectContext) -> ChatChannel? {
         let request = ChannelDTO.fetchRequest()
         request.predicate = NSPredicate(format: "type == %@", channel.type)
@@ -254,5 +328,12 @@ extension ChannelDTO {
             }
         }
         return nil
+    }
+    
+    class func fetchChannelByURI(channel: ChatChannel, context: NSManagedObjectContext) -> ChatChannel? {
+        let request = ChannelDTO.fetchRequest()
+        request.predicate = NSPredicate(format: "type == %@ AND uri == %@", channel.type, channel.uri)
+        let channelDtos = ChannelDTO.fetch(request: request, context: context)
+        return channelDtos.first?.convert()
     }
 }

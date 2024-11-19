@@ -1092,7 +1092,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             "com.apple.menu.replace"
         ])
         
-        let suggestedActions = suggestedActions.filter {
+        let filteredSuggestedActions = suggestedActions.filter {
             if let action = $0 as? UIMenu, filteredActions.contains(action.identifier.rawValue) {
                 return false
             } else {
@@ -1101,8 +1101,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         }
         
         guard !textView.attributedText.string.isEmpty,
-              textView.selectedRange.length > 0
-        else { return UIMenu(children: suggestedActions) }
+              textView.selectedRange.length > 0,
+              appearance.enableTextStyling else {
+            return UIMenu(children: filteredSuggestedActions)
+        }
         
         let actions: [UIAction] = [
             UIAction(title: AttributeType.bold.string, image: nil) { [weak self] action in
