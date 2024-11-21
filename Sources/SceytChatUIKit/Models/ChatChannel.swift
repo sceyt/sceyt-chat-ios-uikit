@@ -147,6 +147,13 @@ public class ChatChannel {
         }
     }
     
+    public convenience init?(channel: Channel?) {
+        guard let channel else {
+            return nil
+        }
+        self.init(channel: channel)
+    }
+    
     public convenience init(channel: Channel) {
         self.init(
             id: channel.id,

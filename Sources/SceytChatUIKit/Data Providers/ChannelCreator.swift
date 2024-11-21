@@ -192,10 +192,7 @@ open class ChannelCreator: DataProvider {
         members: [ChatChannelMember]? = nil,
         completion: ((ChatChannel?, Error?) -> Void)? = nil
     ) {
-        var channelId: Int64 = Crypto.hash(value: (members ?? []).map { $0.id }.sorted().joined(separator: "$"))
-        if channelId < 0 {
-            channelId *= -1
-        }
+        let channelId = 0
         
         self.database.read {
             UserDTO.fetch(ids: members?.map { $0.id } ?? [], context: $0).map { $0.convert() }
@@ -234,7 +231,6 @@ open class ChannelCreator: DataProvider {
                     completion?(chatChannel, nil)
                 } else {
                     self.database.write {
-                        
                         $0.createOrUpdate(channel: channel)
                             .unsynched = true
                     } completion: { error in

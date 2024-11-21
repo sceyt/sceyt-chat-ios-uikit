@@ -37,7 +37,7 @@ open class ChannelListViewModel: NSObject,
         // Base predicates
         var predicates = [
             NSPredicate(format: "unsubscribed == NO"),
-            NSPredicate(format: "lastMessage != nil")
+            NSPredicate(format: "NOT (unsynched == YES AND lastMessage == nil)")
         ]
         
         // Add type predicate if config.types is not empty

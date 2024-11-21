@@ -74,8 +74,8 @@ open class ChannelListSearchService {
     }
 
     private func sort(chats: [ChatChannel]) -> [ChatChannel] {
-        return chats.sorted { v1, v2 in
-            (v1.lastMessage?.createdAt ?? v1.createdAt) > (v2.lastMessage?.createdAt ?? v1.createdAt)
+        chats.sorted {
+            ($0.lastMessage?.createdAt ?? $0.createdAt) > ($1.lastMessage?.createdAt ?? $1.createdAt)
         }
     }
     
