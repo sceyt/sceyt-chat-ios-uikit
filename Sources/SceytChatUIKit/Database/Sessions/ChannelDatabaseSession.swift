@@ -98,6 +98,58 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         }
         return dto
     }
+
+    @discardableResult
+    public func createOrUpdateByURI(channel: Channel) -> ChannelDTO {
+        let dto = (ChannelDTO.fetchChannelByURI(channel: ChatChannel(channel: channel), context: self) ?? ChannelDTO.fetchOrCreate(id: channel.id, context: self)).map(channel)
+        
+        dto.id = Int64(channel.id)
+        
+        if channel.newMessageCount > 0 {
+            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfPendingMarkers(name: DefaultMarker.displayed.rawValue, in: dto))
+        }
+        if let createBy = channel.createdBy {
+            dto.createdBy = createOrUpdate(user: createBy)
+        }
+        
+        var lastReaction: ReactionDTO?
+        if let reactions = channel.lastReactions {
+            let reactionDTOs = createOrUpdate(reactions: reactions)
+            lastReaction = reactionDTOs.max(by: { $0.id < $1.id })
+            if dto.lastReaction == nil {
+                dto.lastReaction = lastReaction
+            } else if let lid = dto.lastReaction?.id,
+                      let nlid = lastReaction?.id,
+                      nlid != lid {
+                dto.lastReaction = lastReaction
+            }
+        } else {
+            dto.lastReaction = nil
+        }
+        
+        
+        if let message = channel.lastMessage {
+            createOrUpdate(message: message, channelId: channel.id)
+        }
+        
+        if let messages = channel.messages {
+            createOrUpdate(messages: messages, channelId: channel.id)
+        }
+        if let members = channel.members {
+            createOrUpdate(members: members, channelId: channel.id)
+        }
+        
+        if let role = channel.userRole {
+            dto.userRole = RoleDTO.fetchOrCreate(name: role, context: self)
+        }
+        if let messagesClearedAt = channel.messagesClearedAt {
+            try? deleteAllMessages(
+                channelId: channel.id,
+                before: messagesClearedAt
+            )
+        }
+        return dto
+    }
     
     @discardableResult
     public func createOrUpdate(channel: ChatChannel) -> ChannelDTO {

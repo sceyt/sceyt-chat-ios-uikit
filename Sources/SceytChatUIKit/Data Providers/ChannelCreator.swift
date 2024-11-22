@@ -224,7 +224,7 @@ open class ChannelCreator: DataProvider {
             )
             
             self.database.read {
-                ChannelDTO.fetchChannelByURI(channel: channel, context: $0)
+                ChannelDTO.fetchChannelByURI(channel: channel, context: $0)?.convert()
             } completion: { result in
                 if let chatChannel = try? result.get() {
                     logger.info("Found channel with id: \(channelId) for members \(String(describing: members?.map { $0.id}))")
@@ -326,10 +326,10 @@ extension ChannelDTO {
         return nil
     }
     
-    class func fetchChannelByURI(channel: ChatChannel, context: NSManagedObjectContext) -> ChatChannel? {
+    class func fetchChannelByURI(channel: ChatChannel, context: NSManagedObjectContext) -> ChannelDTO? {
         let request = ChannelDTO.fetchRequest()
         request.predicate = NSPredicate(format: "type == %@ AND uri == %@", channel.type, channel.uri)
         let channelDtos = ChannelDTO.fetch(request: request, context: context)
-        return channelDtos.first?.convert()
+        return channelDtos.first
     }
 }

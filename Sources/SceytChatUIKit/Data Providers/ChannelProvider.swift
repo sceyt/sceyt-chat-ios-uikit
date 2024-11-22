@@ -529,7 +529,7 @@ open class ChannelProvider: DataProvider {
         }
     }
     
-    public static func getChannelByURI(_ uri: String, completion: @escaping (ChatChannel?, SceytError?) -> Void) {
+    public static func getChannelByURI(_ uri: String, completion: @escaping (ChatChannel?, Error?) -> Void) {
         let query = ChannelListQuery.Builder()
             .limit(1)
             .filterKey(.URI)
@@ -538,7 +538,21 @@ open class ChannelProvider: DataProvider {
             .build()
         
         query.loadNext { _, channels, error in
-            completion(ChatChannel(channel: channels?.first), error)
+            guard let channel = channels?.first else {
+                completion(nil, error)
+                return
+            }
+            
+            SceytChatUIKit.shared.database.write {
+                $0.createOrUpdateByURI(channel: channel)
+                    .unsynched = false
+            } completion: { error in
+                if let error {
+                    logger.debug("[WAAFI] getChannelByURI database.write error: \(error)")
+                }
+                
+                completion(ChatChannel(channel: channel), error)
+            }
         }
     }
 }
