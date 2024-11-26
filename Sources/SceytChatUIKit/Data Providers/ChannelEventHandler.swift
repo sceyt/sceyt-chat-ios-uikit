@@ -128,8 +128,8 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         }
     }
     
-    open func channel(channelId: ChannelId, didReceive marker: MessageListMarker) {
-        logger.debug("[MARKER CHECK] didReceive in cid \(channelId) mark: \(marker.name) for \(marker.messageIds) in channelId:\(marker.channelId)")
+    open func channel(_ channel: Channel, didReceive marker: MessageListMarker) {
+        logger.debug("[MARKER CHECK] didReceive in cid \(channel.id) mark: \(marker.name) for \(marker.messageIds) in channelId:\(marker.channelId)")
         database.write {
             $0.update(messageMarkers: marker)
         }
