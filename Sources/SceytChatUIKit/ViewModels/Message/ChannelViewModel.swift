@@ -2069,7 +2069,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                         completion?(channel, nil)
                     } else {
                         self.channelCreator
-                            .createLocalChannel(
+                            .createLocalChannelByMembers(
                                 type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
                                 members: [userId, me].map { ChatChannelMember(id: $0, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner)},
                                 completion: completion
@@ -2094,7 +2094,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                             roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner
                         )
                         self.channelCreator
-                            .createLocalChannel(
+                            .createLocalChannelByMembers(
                                 type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
                                 members: [ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner), member],
                                 completion: completion

@@ -17,27 +17,27 @@ open class Router<ViewController: UIViewController>: NSObject {
     }
     
     @objc
-    func pop(animated: Bool = true) {
+    public func pop(animated: Bool = true) {
         rootViewController.navigationController?.popViewController(animated: animated)
     }
     
     @objc
-    func popToRoot(animated: Bool = true) {
+    public func popToRoot(animated: Bool = true) {
         rootViewController.navigationController?.popToRootViewController(animated: animated)
     }
     
     @objc
-    func popTo(_ viewController: UIViewController, animated: Bool = true) {
+    public func popTo(_ viewController: UIViewController, animated: Bool = true) {
         rootViewController.navigationController?.popToViewController(viewController, animated: animated)
     }
     
     @objc
-    func setViewControllers(_ viewControllers: [UIViewController], animated: Bool = true) {
+    public func setViewControllers(_ viewControllers: [UIViewController], animated: Bool = true) {
         rootViewController.navigationController?.setViewControllers(viewControllers, animated: animated)
     }
     
     @objc
-    func dismiss(animated: Bool = true, completion: (() -> Void)? = nil) {
+    public func dismiss(animated: Bool = true, completion: (() -> Void)? = nil) {
         if let nav = rootViewController.navigationController {
             nav.dismiss(animated: animated, completion: completion)
         } else {

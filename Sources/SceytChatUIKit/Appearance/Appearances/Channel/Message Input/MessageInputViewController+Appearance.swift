@@ -18,6 +18,7 @@ extension MessageInputViewController: AppearanceProviding {
         enableVoiceRecord: true,
         enableSendAttachment: true,
         enableMention: true,
+        enableTextStyling: true,
         inputAppearance: InputTextView.Appearance(
             reference: InputTextView.appearance
         ),
@@ -82,6 +83,9 @@ extension MessageInputViewController: AppearanceProviding {
         @Trackable<Appearance, Bool>
         public var enableMention: Bool
         
+        @Trackable<Appearance, Bool>
+        public var enableTextStyling: Bool
+        
         @Trackable<Appearance, InputTextView.Appearance>
         public var inputAppearance: InputTextView.Appearance
         
@@ -137,6 +141,7 @@ extension MessageInputViewController: AppearanceProviding {
             enableVoiceRecord: Bool,
             enableSendAttachment: Bool,
             enableMention: Bool,
+            enableTextStyling: Bool,
             inputAppearance: InputTextView.Appearance,
             mentionLabelAppearance: LabelAppearance,
             joinButtonAppearance: ButtonAppearance,
@@ -162,6 +167,7 @@ extension MessageInputViewController: AppearanceProviding {
             self._enableVoiceRecord = Trackable(value: enableVoiceRecord)
             self._enableSendAttachment = Trackable(value: enableSendAttachment)
             self._enableMention = Trackable(value: enableMention)
+            self._enableTextStyling = Trackable(value: enableTextStyling)
             self._inputAppearance = Trackable(value: inputAppearance)
             self._mentionLabelAppearance = Trackable(value: mentionLabelAppearance)
             self._joinButtonAppearance = Trackable(value: joinButtonAppearance)
@@ -190,6 +196,7 @@ extension MessageInputViewController: AppearanceProviding {
             enableVoiceRecord: Bool? = nil,
             enableSendAttachment: Bool? = nil,
             enableMention: Bool? = nil,
+            enableTextStyling: Bool? = nil,
             inputAppearance: InputTextView.Appearance? = nil,
             mentionLabelAppearance: LabelAppearance? = nil,
             joinButtonAppearance: ButtonAppearance? = nil,
@@ -215,6 +222,7 @@ extension MessageInputViewController: AppearanceProviding {
             self._enableVoiceRecord = Trackable(reference: reference, referencePath: \.enableVoiceRecord)
             self._enableSendAttachment = Trackable(reference: reference, referencePath: \.enableSendAttachment)
             self._enableMention = Trackable(reference: reference, referencePath: \.enableMention)
+            self._enableTextStyling = Trackable(reference: reference, referencePath: \.enableTextStyling)
             self._inputAppearance = Trackable(reference: reference, referencePath: \.inputAppearance)
             self._mentionLabelAppearance = Trackable(reference: reference, referencePath: \.mentionLabelAppearance)
             self._joinButtonAppearance = Trackable(reference: reference, referencePath: \.joinButtonAppearance)
@@ -240,6 +248,7 @@ extension MessageInputViewController: AppearanceProviding {
             if let enableVoiceRecord { self.enableVoiceRecord = enableVoiceRecord }
             if let enableSendAttachment { self.enableSendAttachment = enableSendAttachment }
             if let enableMention { self.enableMention = enableMention }
+            if let enableTextStyling { self.enableTextStyling = enableTextStyling }
             if let inputAppearance { self.inputAppearance = inputAppearance }
             if let mentionLabelAppearance { self.mentionLabelAppearance = mentionLabelAppearance }
             if let joinButtonAppearance { self.joinButtonAppearance = joinButtonAppearance }

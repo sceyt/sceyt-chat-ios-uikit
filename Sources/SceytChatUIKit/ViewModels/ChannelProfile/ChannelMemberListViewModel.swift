@@ -195,7 +195,7 @@ open class ChannelMemberListViewModel: NSObject {
         let members = [ChatChannelMember(user: m, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner),
                        ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner)]
         ChannelCreator()
-            .createLocalChannel(type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
+            .createLocalChannelByMembers(type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
                                 members: members) { channel, error in
                 completion?(channel, error)
             }

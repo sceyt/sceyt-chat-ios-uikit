@@ -73,7 +73,7 @@ open class CreateNewChannelViewModel: NSObject {
     open func createDirectChannel(peer: ChatUser) {
         
         Components.channelCreator.init()
-            .createLocalChannel(type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
+            .createLocalChannelByMembers(type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
                                 members: [ChatChannelMember(user: peer, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner),
                                           ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner)])
         { [weak self] channel, error in

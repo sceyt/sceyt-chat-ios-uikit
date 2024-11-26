@@ -242,31 +242,19 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         let registeredObjects = context.registeredObjects
         
         if !insertedObjects.isEmpty {
-            logger.info("[DATABASE] Inserted Objects:")
-            for object in insertedObjects {
-                logger.info(object.description)
-            }
+            logger.info("[DATABASE] Inserted Objects: \(insertedObjects.count)")
         }
         
         if !updatedObjects.isEmpty {
-            logger.info("[DATABASE] Updated Objects:")
-            for object in updatedObjects {
-                logger.info(object.description)
-            }
+            logger.info("[DATABASE] Updated Objects: \(updatedObjects.count)")
         }
         
         if !deletedObjects.isEmpty {
-            logger.info("[DATABASE] Deleted Objects:")
-            for object in deletedObjects {
-                logger.info(object.description)
-            }
+            logger.info("[DATABASE] Deleted Objects: \(deletedObjects.count)")
         }
         
         if !registeredObjects.isEmpty {
-            logger.info("[DATABASE] Registered Objects:")
-            for object in registeredObjects {
-                logger.info(object.description)
-            }
+            logger.info("[DATABASE] Registered Objects: \(registeredObjects.count)")
         }
     }
     
