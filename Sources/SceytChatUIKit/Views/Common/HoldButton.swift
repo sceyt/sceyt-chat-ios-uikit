@@ -10,12 +10,6 @@ import UIKit
 
 open class HoldButton: Control {
     
-    public lazy var appearance = HoldButton.appearance {
-        didSet {
-            setupAppearance()
-        }
-    }
-
    open lazy var imageView = UIImageView()
         .contentMode(.center)
         .withoutAutoresizingMask
