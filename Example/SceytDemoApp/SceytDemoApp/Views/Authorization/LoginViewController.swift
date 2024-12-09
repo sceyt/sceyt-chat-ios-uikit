@@ -29,14 +29,14 @@ class LoginViewController: ViewController {
     
     lazy var titleLabel: UILabel = {
         $0.font = Appearance.Fonts.semiBold.withSize(24)
-        $0.textColor = .primaryText.light
+        $0.textColor = .primaryText
         $0.text = "Create Account"
         return $0.withoutAutoresizingMask
     }(UILabel())
     
     lazy var subtitleLabel: UILabel = {
         $0.font = Appearance.Fonts.regular.withSize(16)
-        $0.textColor = .secondaryText.light
+        $0.textColor = .secondaryText
         $0.text = "Create an account by completing these details."
         $0.numberOfLines = 0
         return $0.withoutAutoresizingMask
@@ -44,10 +44,10 @@ class LoginViewController: ViewController {
     
     lazy var firstNameTextField: UITextField = {
         $0.font = Appearance.Fonts.regular.withSize(16)
-        $0.textColor = .primaryText.light
+        $0.textColor = .primaryText
         $0.textContentType = .givenName
         $0.borderStyle = .none
-        $0.backgroundColor = .surface1.light
+        $0.backgroundColor = .surface1
         $0.layer.cornerRadius = 12
         $0.layer.cornerCurve = .continuous
         
@@ -59,7 +59,7 @@ class LoginViewController: ViewController {
         $0.attributedPlaceholder = NSAttributedString(
             string: "First name",
             attributes: [
-                .foregroundColor: UIColor.secondaryText.light
+                .foregroundColor: UIColor.secondaryText
             ]
         )
         return $0.withoutAutoresizingMask
@@ -67,10 +67,10 @@ class LoginViewController: ViewController {
     
     lazy var lastNameTextField: UITextField = {
         $0.font = Appearance.Fonts.regular.withSize(16)
-        $0.textColor = .primaryText.light
+        $0.textColor = .primaryText
         $0.textContentType = .familyName
         $0.borderStyle = .none
-        $0.backgroundColor = .surface1.light
+        $0.backgroundColor = .surface1
         $0.layer.cornerRadius = 12
         $0.layer.cornerCurve = .continuous
         
@@ -81,14 +81,14 @@ class LoginViewController: ViewController {
         
         $0.attributedPlaceholder = NSAttributedString(
             string: "Last name",
-            attributes: [.foregroundColor: UIColor.secondaryText.light]
+            attributes: [.foregroundColor: UIColor.secondaryText]
         )
         return $0.withoutAutoresizingMask
     }(UITextField())
     
     lazy var usernameTextField: UITextField = {
         $0.font = Appearance.Fonts.regular.withSize(16)
-        $0.textColor = .primaryText.light
+        $0.textColor = .primaryText
         $0.autocapitalizationType = .none
         $0.autocorrectionType = .no
         $0.spellCheckingType = .no
@@ -96,14 +96,14 @@ class LoginViewController: ViewController {
             $0.inlinePredictionType = .no
         }
         $0.borderStyle = .none
-        $0.backgroundColor = .surface1.light
+        $0.backgroundColor = .surface1
         $0.layer.cornerRadius = 12
         $0.layer.cornerCurve = .continuous
         
         let label = UILabel()
         label.text = "@"
         label.font = Appearance.Fonts.regular.withSize(16)
-        label.textColor = .primaryText.light
+        label.textColor = .primaryText
         let view = UIView(frame: CGRect(x: 0, y: 0, width: 16, height: 0)).withoutAutoresizingMask
         view.resize(anchors: [.width(16)])
         let stackView = UIStackView(arrangedSubviews: [view, label])
@@ -117,7 +117,7 @@ class LoginViewController: ViewController {
         
         $0.attributedPlaceholder = NSAttributedString(
             string: "username",
-            attributes: [.foregroundColor: UIColor.secondaryText.light]
+            attributes: [.foregroundColor: UIColor.secondaryText]
         )
         return $0.withoutAutoresizingMask
     }(UITextField())
@@ -132,7 +132,7 @@ class LoginViewController: ViewController {
     
     lazy var subTitleLabel: UILabel = {
         $0.font = Appearance.Fonts.regular.withSize(13)
-        $0.textColor = .secondaryText.light
+        $0.textColor = .secondaryText
         $0.attributedText = UsernameValidation.attributedDescription
         $0.numberOfLines = 0
         return $0.withoutAutoresizingMask
@@ -152,8 +152,8 @@ class LoginViewController: ViewController {
             ),
             for: .normal
         )
-        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.accent.light), for: .normal)
-        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.accent.light.withAlphaComponent(0.5)), for: .disabled)
+        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.accent), for: .normal)
+        $0.setBackgroundImage(ImageBuilder.build(fillColor: UIColor.accent.withAlphaComponent(0.5)), for: .disabled)
         $0.layer.cornerRadius = 8
         $0.layer.masksToBounds = true
         return $0.withoutAutoresizingMask
@@ -168,7 +168,7 @@ class LoginViewController: ViewController {
     // MARK: - Lifecycle
     override func setupAppearance() {
         super.setupAppearance()
-        view.backgroundColor = .background.light
+        view.backgroundColor = .background
         connectButton.isEnabled = false
     }
     

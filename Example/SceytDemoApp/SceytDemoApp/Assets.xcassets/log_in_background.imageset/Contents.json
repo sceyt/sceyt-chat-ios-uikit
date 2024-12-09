@@ -3,6 +3,16 @@
     {
       "filename" : "log_in_background.svg",
       "idiom" : "universal"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "log_in_background_dark.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

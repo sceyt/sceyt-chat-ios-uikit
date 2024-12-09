@@ -16,5 +16,5 @@ Pod::Spec.new do |s|
   s.ios.frameworks = ["UIKit", "Foundation", "CoreData"]
   s.user_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'arm64' }
   s.pod_target_xcconfig = { 'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'arm64' }
-  s.dependency "SceytChat", ">= 1.5.9"
+  s.dependency "SceytChat", "1.5.9"
 end
