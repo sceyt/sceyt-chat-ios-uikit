@@ -11,7 +11,7 @@ import UIKit
 public extension ChannelViewController {
     open class MessagesCollectionViewLayout: UICollectionViewFlowLayout {
         
-        public var isInsertingItemsToTop = false
+//        public var isInsertingItemsToTop = false
         
         public required override init() {
             super.init()
@@ -27,17 +27,16 @@ public extension ChannelViewController {
         
         open override func prepare() {
             super.prepare()
-            if isInsertingItemsToTop == true {
-                if let collectionView = collectionView {
-                    UIView.performWithoutAnimation {
-                        let newContentSizeHeight = self.collectionViewContentSize.height
-                        let contentOffsetY = collectionView.contentOffset.y + (newContentSizeHeight - collectionView.contentSize.height)
-                        let newOffset = CGPoint(x: collectionView.contentOffset.x, y: contentOffsetY)
-                        collectionView.contentOffset = newOffset
-                    }
-                }
-                isInsertingItemsToTop = false
-            }
+//            if isInsertingItemsToTop == true {
+//                if let collectionView = collectionView {
+//                    let newContentSizeHeight = self.collectionViewContentSize.height
+//                    let contentOffsetY = collectionView.contentOffset.y + (newContentSizeHeight - collectionView.contentSize.height)
+//                    let newOffset = CGPoint(x: collectionView.contentOffset.x, y: contentOffsetY)
+//                    
+//                    collectionView.contentOffset = newOffset
+//                }
+//                isInsertingItemsToTop = false
+//            }
         }
         
         open override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {

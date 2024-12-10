@@ -943,9 +943,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadNextMessageId = messageId
         isFetchingData = true
-        DispatchQueue.main
-            .asyncAfter(deadline: .now() + 1)
-        {[weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.resetFetchState()
         }
         func fetchNext() {
@@ -963,7 +961,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         ) { [weak self] error in
             fetchNext()
             self?.resetFetchState()
-            logger.errorIfNotNil(error, "on loadPrevMessages")
+            logger.errorIfNotNil(error, "on loadNextMessages")
         }
         
     }

@@ -12,8 +12,8 @@ extension MessageInputViewController.MessageSearchControlsView: AppearanceProvid
     public static var appearance = Appearance(
         separatorColor: .border,
         backgroundColor: .background,
-        previousIcon: .chevronUp,
-        nextIcon: .chevronDown,
+        previousIcon: .chevronDown,
+        nextIcon: .chevronUp,
         resultLabelAppearance: LabelAppearance(
             foregroundColor: .primaryText,
             font: Fonts.regular.withSize(16)

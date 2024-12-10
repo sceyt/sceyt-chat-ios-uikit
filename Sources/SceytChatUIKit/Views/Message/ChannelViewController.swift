@@ -1075,7 +1075,7 @@ open class ChannelViewController: ViewController,
         switch scrollDirection {
         case .up:
             let indexPath = collectionView.indexPathsForVisibleItems.min()
-            if let indexPath, force || collectionView.contentOffset.y < 500 {
+            if let indexPath, force || collectionView.contentOffset.y < 1500 {
                 loadPrevMessages(beforeMessageAt: indexPath)
             }
             return indexPath
@@ -1124,7 +1124,8 @@ open class ChannelViewController: ViewController,
         targetContentOffset: UnsafeMutablePointer<CGPoint>
     ) {
         self.scrollDirection = self.scrollDirectionForVelocity(scrollView.panGestureRecognizer.velocity(in: scrollView))
-        self.addMoreMessage(scrollDirection: self.scrollDirection, force: true)
+        self.addMoreMessage(scrollDirection: self.scrollDirection, force: false)
+//        self.addMoreMessage(scrollDirection: self.scrollDirection, force: true)
     }
     
     open func scrollViewWillBeginDecelerating(_ scrollView: UIScrollView) {
@@ -1138,8 +1139,9 @@ open class ChannelViewController: ViewController,
         }
         
         if lastScrollDirection == .down,
-           let indexPath = addMoreMessage(scrollDirection: lastScrollDirection, force: true) {
-            RunLoop.current.perform { [weak self] in
+           let indexPath = addMoreMessage(scrollDirection: lastScrollDirection, force: false) {
+//           let indexPath = addMoreMessage(scrollDirection: lastScrollDirection, force: true) {
+            DispatchQueue.main.async { [weak self] in
                 self?.loadNextMessages(afterMessageAt: indexPath)
             }
         }
@@ -1164,6 +1166,7 @@ open class ChannelViewController: ViewController,
         updateUnreadViewVisibility()
         updateLastNavigatedIndexPath()
         updatePinnedHeaderVisibility()
+        self.addMoreMessage(scrollDirection: self.lastScrollDirection, force: false)
     }
     
     open func scrollViewDidScrollToTop(_ scrollView: UIScrollView) {
@@ -1818,20 +1821,24 @@ open class ChannelViewController: ViewController,
             
             if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
-                layout.isInsertingItemsToTop = false
+                //                layout.isInsertingItemsToTop = false
                 collectionView.reloadDataAndScrollToBottom()
                 updateUnreadViewVisibility()
                 return
             }
-            
-            if continuesOptions.isEmpty || 
-                continuesOptions.contains(.top) ||
-                continuesOptions.contains(.middle) ||
-                channelViewModel.isSearching {
-                layout.isInsertingItemsToTop = true
+            var isInsertingItemsToTop = false
+            //            if !channelViewModel.isSearching {
+//            if continuesOptions.isEmpty ||
+                if continuesOptions.contains(.top) {// ||
+//                continuesOptions.contains(.middle) {//||
+                //                    channelViewModel.isSearching {
+                //                    layout.isInsertingItemsToTop = true
+                isInsertingItemsToTop = true
             } else {
-                layout.isInsertingItemsToTop = false
+                //                    layout.isInsertingItemsToTop = false
+                isInsertingItemsToTop = false
             }
+            //            }
             
             var isInsertLastIndexPath: Bool {
                 var isOneItem: Bool {
@@ -1862,48 +1869,75 @@ open class ChannelViewController: ViewController,
                 needsToScrollBottom = false
             }
             
-            UIView.performWithoutAnimation {
-                isCollectionViewUpdating = true
-                collectionView.performUpdates {
-                    if !sectionInserts.isEmpty {
-                        collectionView.insertSections(sectionInserts)
-                    }
-                    if !sectionDeletes.isEmpty {
-                        collectionView.deleteSections(sectionDeletes)
-                    }
-                    collectionView.insertItems(at: inserts)
-                    collectionView.reloadItems(at: reloads)
-                    collectionView.deleteItems(at: deletes)
-                    moves.forEach { from, to in
-                        collectionView.moveItem(at: from, to: to)
-                    }
-                } completion: { [weak self] _ in
-                    var scrollBottom = false
-                    defer {
-                        if let self = self {
-                            self.isCollectionViewUpdating = false
-                            if scrollBottom {
-                                self.scrollToBottom(animated: animatedScroll)
-                            }
+            let offsetBeforeInsertion = collectionView.contentOffset.y
+            let contentHeightBeforeInsertion = collectionView.contentSize.height
+            
+            //            UIView.performWithoutAnimation {
+            isCollectionViewUpdating = true
+            //            UIView.setAnimationsEnabled(false)
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            
+            collectionView.performUpdates {
+                //                    UIView.performWithoutAnimation {
+                if !sectionInserts.isEmpty {
+                    collectionView.insertSections(sectionInserts)
+                }
+                if !sectionDeletes.isEmpty {
+                    collectionView.deleteSections(sectionDeletes)
+                }
+                collectionView.insertItems(at: inserts)
+                collectionView.reloadItems(at: reloads)
+                collectionView.deleteItems(at: deletes)
+                moves.forEach { from, to in
+                    collectionView.moveItem(at: from, to: to)
+                }
+                //                    }
+            } completion: { [weak self] _ in
+                //                    UIView.setAnimationsEnabled(true)
+                CATransaction.commit()
+                //                    UIView.performWithoutAnimation {
+                var scrollBottom = false
+                defer {
+                    if let self = self {
+                        self.isCollectionViewUpdating = false
+                        if scrollBottom {
+                            self.scrollToBottom(animated: animatedScroll)
                         }
-                    }
-                    guard let self = self else { return }
-                    UIView.performWithoutAnimation {
-                        let reloads = paths.reloads + moves.map(\.to)
-                        if !reloads.isEmpty {
-                            self.collectionView.performUpdates {
-                                self.collectionView.reloadItems(at: reloads)
-                            }
-                        }
-                    }
-                    
-                    if needsToScrollBottom, !(self.collectionView.isDragging || self.collectionView.isDecelerating) {
-                        scrollBottom = true
-                    } else {
-                        self.updateUnreadViewVisibility()
                     }
                 }
+                guard let self = self else { return }
+                if isInsertingItemsToTop {
+                    //                            UIView.performWithoutAnimation {
+                    
+                    let contentHeightAfterInsertion = self.collectionView.contentSize.height
+                    let heightDifference = contentHeightAfterInsertion - contentHeightBeforeInsertion
+                    
+                    // 5. Adjust the content offset by the height difference
+                    // This effectively keeps the user's scroll position "in place"
+                    let newOffsetY = offsetBeforeInsertion + heightDifference
+                    //                                                        self.collectionView.setContentOffset(CGPoint(x: 0, y: newOffsetY), animated: true)
+                    
+                    self.collectionView.contentOffset.y = newOffsetY
+                    //                            }
+                }
+                UIView.performWithoutAnimation {
+                    let reloads = paths.reloads + moves.map(\.to)
+                    if !reloads.isEmpty {
+                        self.collectionView.performUpdates {
+                            self.collectionView.reloadItems(at: reloads)
+                        }
+                    }
+                }
+                
+                if needsToScrollBottom, !(self.collectionView.isDragging || self.collectionView.isDecelerating) {
+                    scrollBottom = true
+                } else {
+                    self.updateUnreadViewVisibility()
+                }
+                //                    }
             }
+            //            }
             
         case .updateDeliveryStatus(let model, let indexPath):
             if let cell = collectionView.cell(for: indexPath, cellType: MessageCell.self),
@@ -1955,7 +1989,7 @@ open class ChannelViewController: ViewController,
                 }
             }
         case .changePresence(let userPresence):
-            RunLoop.main.perform { [weak self] in
+            DispatchQueue.main.async { [weak self] in
                 guard let self
                 else { return }
                 switch self.titleView.mode {
