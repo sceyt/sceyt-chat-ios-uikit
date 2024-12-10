@@ -542,48 +542,47 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     private func resetStateAfterChangeEvent() {
-        DispatchQueue.main
-            .asyncAfter(deadline: .now() + 1) {[weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
                 guard let self else { return }
                 self.scrollToRepliedMessageId = 0
                 self.isRestartingMessageObserver = .none
             }
     }
     
-    open func scrollToItemIfNeeded(items: ChangeItem) {
-        
-        if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
-            updateStateAfterChangeEvent(for: indexPath)
-            if isSearching {
-                updateLastNavigatedIndexPath(indexPath: indexPath)
-                scrollToMessageIdIfSearching = 0
-                searchDirection = .none
-                isSearchResultsLoading = false
-                isRestartingMessageObserver = .none
-            } else {
-                isRestartingMessageObserver = .none
-            }
-            scroll(to: indexPath, messageId: mid)
-        }
-    }
+//    open func scrollToItemIfNeeded(items: ChangeItem) {
+//        
+//        if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
+//            updateStateAfterChangeEvent(for: indexPath)
+//            if isSearching {
+//                updateLastNavigatedIndexPath(indexPath: indexPath)
+//                scrollToMessageIdIfSearching = 0
+//                searchDirection = .none
+//                isSearchResultsLoading = false
+//                isRestartingMessageObserver = .none
+//            } else {
+//                isRestartingMessageObserver = .none
+//            }
+//            scroll(to: indexPath, messageId: mid)
+//        }
+//    }
     
     open func onDidChangeEvent(
         isInitial: Bool,
         items: ChangeItem,
         events: [Event]) {
-            var needToScroll = true
-            defer {
-                if needToScroll {
-                    scrollToItemIfNeeded(items: items)
-                }
-            }
+//            var needToScroll = true
+//            defer {
+//                if needToScroll {
+//                    scrollToItemIfNeeded(items: items) // review why is this logic needed
+//                }
+//            }
             if isInitial {
                 let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId : lastDisplayedMessageId
                 if messageId != 0,
                    let indexPath = items.changeItems
                     .first(where: {$0.item?.id == messageId})?
                     .indexPath {
-                    needToScroll = false
+//                    needToScroll = false
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: scrollToRepliedMessageId != 0, pos: .centeredVertically)
                     resetStateAfterChangeEvent()
                 } else {
@@ -598,7 +597,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                         }
                         event = .scrollAndSelect(indexPath: indexPath, messageId: messageId)
                         resetStateAfterChangeEvent()
-                        needToScroll = false
+//                        needToScroll = false
                     } else {
                         event = .reloadDataAndScrollToBottom
                         if isInitialLoad {
@@ -624,7 +623,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                 return
             case .reloadAndSelect:
                 if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
-                    needToScroll = false
+//                    needToScroll = false
                     event = .reloadDataAndSelect(indexPath: indexPath, messageId: mid)
                     updateStateAfterChangeEvent(for: indexPath)
                 } else {
