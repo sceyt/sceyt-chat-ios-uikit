@@ -816,7 +816,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     //MARK: Typing
     
     open var isTyping = false {
-        didSet { isTyping ? provider.channelOperator.startTyping() : provider.channelOperator.stopTyping() }
+        didSet { isTyping ? provider.channelOperator.sendEvent(ChannelEvent.startTyping) : provider.channelOperator.sendEvent(ChannelEvent.stopTyping) }
     }
     
     //MARK: load messages
@@ -1905,32 +1905,44 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         
     }
     
-    // MARK: Channel Delegate
-    
-    open func channel(_ channel: Channel, didStartTyping member: Member) {
-        guard self.channel.id == channel.id,
-              member.id != me
-        else { return }
-        
-        event = .typing(isTyping: true, user: .init(user: member))
-        peerPresence = member.presence
-        schedulers[member.id]?.stop()
-        schedulers[member.id] = nil
-        schedulers[member.id] = Scheduler.new(deadline: .now() + 3) { [weak self] _ in
-            guard let self else { return }
-            self.schedulers[member.id] = nil
-            self.event = .typing(isTyping: false, user: .init(user: member))
+    //MARK: ChatClient delegate: Channel events
+    open func channel(_ channel: Channel, didReceive channelEvent: ChannelEvent) {
+        channelEvent.user
+        switch channelEvent.name {
+        case ChannelEvent.startTyping:
+            handleChannel(channel, didStartTyping: channelEvent.user)
+        case ChannelEvent.stopTyping:
+            handleChannel(channel, didStopTyping: channelEvent.user)
+        default:
+            break
         }
     }
     
-    open func channel(_ channel: Channel, didStopTyping member: Member) {
+    //MARK: Channel typing event handlers
+    open func handleChannel(_ channel: Channel, didStartTyping user: User) {
         guard self.channel.id == channel.id,
-              member.id != me
+              user.id != me
         else { return }
-        event = .typing(isTyping: false, user: .init(user: member))
-        peerPresence = member.presence
-        schedulers[member.id]?.stop()
-        schedulers[member.id] = nil
+        
+        event = .typing(isTyping: true, user: .init(user: user))
+        peerPresence = user.presence
+        schedulers[user.id]?.stop()
+        schedulers[user.id] = nil
+        schedulers[user.id] = Scheduler.new(deadline: .now() + 3) { [weak self] _ in
+            guard let self else { return }
+            self.schedulers[user.id] = nil
+            self.event = .typing(isTyping: false, user: .init(user: user))
+        }
+    }
+    
+    open func handleChannel(_ channel: Channel, didStopTyping user: User) {
+        guard self.channel.id == channel.id,
+              user.id != me
+        else { return }
+        event = .typing(isTyping: false, user: .init(user: user))
+        peerPresence = user.presence
+        schedulers[user.id]?.stop()
+        schedulers[user.id] = nil
     }
     
     // MARK: ChatClient delegate
