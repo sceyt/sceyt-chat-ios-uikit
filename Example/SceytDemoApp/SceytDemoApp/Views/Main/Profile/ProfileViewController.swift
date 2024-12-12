@@ -43,7 +43,20 @@ class ProfileViewController: ViewController {
         if !users.contains(SceytChatUIKit.shared.chatClient.user.id) {
             navigationItem.rightBarButtonItem = UIBarButtonItem(barButtonSystemItem: .edit, target: self, action: #selector(edit(_:)))
         }
+        
+#if DEBUG
+        navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "trash"), style: .done, target: self, action: #selector(deleteCaches(_:)))
+#endif
     }
+    
+#if DEBUG
+    @objc
+    private func deleteCaches(_ sender: UIBarButtonItem) {
+        SceytChatUIKit.shared.database.deleteAll()
+        Storage.storingKey.removeStorageFolder()
+        showAlert(title: "Caches deleted")
+    }
+#endif
     
     override func setupAppearance() {
         super.setupAppearance()
