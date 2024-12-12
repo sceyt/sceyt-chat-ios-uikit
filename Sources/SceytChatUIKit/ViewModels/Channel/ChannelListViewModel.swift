@@ -109,7 +109,7 @@ open class ChannelListViewModel: NSObject,
             event = .change(items)
         }
         Components.channelListProvider
-            .totalUnreadMessagesCount { [weak self] sum in
+            .totalUnreadMessagesCount(types: queryConfig.types) { [weak self] sum in
                 DispatchQueue.main.async {
                     self?.event = .unreadMessagesCount(sum)
                 }

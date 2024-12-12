@@ -251,7 +251,7 @@ extension ChannelDTO {
 //Helper:
 extension ChannelDTO {
     
-    public static func totalUnreadMessageCount(context: NSManagedObjectContext) -> Int {
+    public static func totalUnreadMessageCount(types: [String], context: NSManagedObjectContext) -> Int {
         let expressionDescription = NSExpressionDescription()
         expressionDescription.name = "sumOfUnreadMessageCount"
         expressionDescription.expression = NSExpression(forFunction: "sum:",
@@ -260,6 +260,10 @@ extension ChannelDTO {
         let fetchRequest = NSFetchRequest<NSDictionary>(entityName: ChannelDTO.entityName)
         fetchRequest.propertiesToFetch = [expressionDescription]
         fetchRequest.resultType = .dictionaryResultType
+        if !types.isEmpty {
+            // check if ChannelDTO.type is in types
+            fetchRequest.predicate = NSPredicate(format: "type IN %@", types)
+        }
         
         do {
             let results = try context.fetch(fetchRequest)

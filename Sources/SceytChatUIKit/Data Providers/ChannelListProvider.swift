@@ -122,9 +122,9 @@ open class ChannelListProvider: DataProvider {
 
 public extension ChannelListProvider {
     
-    static func totalUnreadMessagesCount(_ completion: @escaping (Int) -> Void) {
+    static func totalUnreadMessagesCount(types: [String], _ completion: @escaping (Int) -> Void) {
         database.performBgTask {
-            ChannelDTO.totalUnreadMessageCount(context: $0)
+            ChannelDTO.totalUnreadMessageCount(types: types, context: $0)
         } completion: { result in
             switch result {
             case let .failure(error):
