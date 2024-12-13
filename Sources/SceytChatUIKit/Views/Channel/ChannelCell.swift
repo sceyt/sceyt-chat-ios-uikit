@@ -257,11 +257,11 @@ extension ChannelListViewController {
             appearance.unreadCountFormatter.format(channel.newMessageCount)
         }
         
-        open func didStartTyping(member: ChatChannelMember) {
+        open func didStartTyping(user: ChatUser) {
             let message = NSMutableAttributedString(string: "")
             if !data.channel.isDirect {
                 message.append(NSAttributedString(
-                    string: "\(Components.typingView.display(typer: appearance.typingUserNameFormatter.format(member), split: .firstWord)): ",
+                    string: "\(Components.typingView.display(typer: appearance.typingUserNameFormatter.format(user), split: .firstWord)): ",
                     attributes: [
                         .font: appearance.lastMessageSenderNameLabelAppearance.font,
                         .foregroundColor: appearance.lastMessageSenderNameLabelAppearance.foregroundColor
@@ -279,7 +279,7 @@ extension ChannelListViewController {
             messageLabel.layoutIfNeeded()
         }
         
-        open func didStopTyping(member: ChatChannelMember) {
+        open func didStopTyping(user: ChatUser) {
             update(messageText: data.attributedView)
             messageLabel.setNeedsLayout()
             messageLabel.layoutIfNeeded()

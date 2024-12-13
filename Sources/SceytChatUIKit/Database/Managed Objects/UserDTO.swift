@@ -66,7 +66,28 @@ public class UserDTO: NSManagedObject {
         id = map.id
         firstName = map.firstName
         lastName = map.lastName
+        username = map.username
         avatarUrl = map.avatarUrl
+        
+        // Remove existing metadata entries
+        if let existingEntries = metadataEntries {
+            for entry in existingEntries {
+                managedObjectContext?.delete(entry)
+            }
+        }
+        
+        if let metadataDict = map.metadataMap {
+            var newEntries = Set<UserMetadataDTO>()
+            for (key, value) in metadataDict {
+                let entry = UserMetadataDTO(context: managedObjectContext!)
+                entry.key = key
+                entry.value = value
+                entry.user = self
+                newEntries.insert(entry)
+            }
+            metadataEntries = newEntries
+        }
+
         blocked = map.blocked
         state = Int16(map.state.rawValue)
         presenceState = Int16(map.presence.state.rawValue)

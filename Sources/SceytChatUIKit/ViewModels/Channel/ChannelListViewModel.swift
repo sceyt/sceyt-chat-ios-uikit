@@ -109,7 +109,7 @@ open class ChannelListViewModel: NSObject,
             event = .change(items)
         }
         Components.channelListProvider
-            .totalUnreadMessagesCount { [weak self] sum in
+            .totalUnreadMessagesCount(types: queryConfig.types) { [weak self] sum in
                 DispatchQueue.main.async {
                     self?.event = .unreadMessagesCount(sum)
                 }
@@ -310,17 +310,30 @@ open class ChannelListViewModel: NSObject,
         event = .connection(state)
     }
     
-    //MARK: Channel typing events
-    open func channel(_ channel: Channel, didStartTyping member: Member) {
-        guard member.id != me
+    //MARK: ChatClient delegate: Channel events
+    open func channel(_ channel: Channel, didReceive channelEvent: ChannelEvent) {
+        channelEvent.user
+        switch channelEvent.name {
+        case ChannelEvent.startTyping:
+            handleChannel(channel, didStartTyping: channelEvent.user)
+        case ChannelEvent.stopTyping:
+            handleChannel(channel, didStopTyping: channelEvent.user)
+        default:
+            break
+        }
+    }
+
+    //MARK: Channel typing event handlers
+    open func handleChannel(_ channel: Channel, didStartTyping user: User) {
+        guard user.id != me
         else { return }
-        event = .typing(true, .init(member: member), .init(channel: channel))
+        event = .typing(true, .init(user: user), .init(channel: channel))
     }
     
-    open func channel(_ channel: Channel, didStopTyping member: Member) {
-        guard member.id != me
+    open func handleChannel(_ channel: Channel, didStopTyping user: User) {
+        guard user.id != me
         else { return }
-        event = .typing(false, .init(member: member), .init(channel: channel))
+        event = .typing(false, .init(user: user), .init(channel: channel))
     }
     
     //MARK: Select channel
@@ -353,7 +366,7 @@ public extension ChannelListViewModel {
         case reload
         case reloadSearch
         case unreadMessagesCount(Int)
-        case typing(Bool, ChatChannelMember, ChatChannel)
+        case typing(Bool, ChatUser, ChatChannel)
         case connection(ConnectionState)
         case showChannel(ChatChannel)
     }

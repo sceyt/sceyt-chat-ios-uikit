@@ -680,7 +680,7 @@ open class ChannelInfoViewController: ViewController,
                     icon: .chatDelete,
                     style: .destructive,
                     handler: { [unowned self] in
-                        block()
+                        delete()
                     })
             ]
            

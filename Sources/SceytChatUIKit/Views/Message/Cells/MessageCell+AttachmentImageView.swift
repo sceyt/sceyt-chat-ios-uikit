@@ -43,7 +43,7 @@ extension MessageCell {
                         logger.verbose("[Attachment] onLoadThumbnail self is nil")
                         return
                     }
-                    self.imageView.image = thumbnail
+                    self.imageView.image = data.attachment.thumbnailImage ?? thumbnail
                 }
             }
         }

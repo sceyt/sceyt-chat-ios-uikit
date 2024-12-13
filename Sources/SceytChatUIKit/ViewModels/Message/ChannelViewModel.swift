@@ -542,48 +542,23 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     private func resetStateAfterChangeEvent() {
-        DispatchQueue.main
-            .asyncAfter(deadline: .now() + 1) {[weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
                 guard let self else { return }
                 self.scrollToRepliedMessageId = 0
                 self.isRestartingMessageObserver = .none
             }
     }
     
-    open func scrollToItemIfNeeded(items: ChangeItem) {
-        
-        if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
-            updateStateAfterChangeEvent(for: indexPath)
-            if isSearching {
-                updateLastNavigatedIndexPath(indexPath: indexPath)
-                scrollToMessageIdIfSearching = 0
-                searchDirection = .none
-                isSearchResultsLoading = false
-                isRestartingMessageObserver = .none
-            } else {
-                isRestartingMessageObserver = .none
-            }
-            scroll(to: indexPath, messageId: mid)
-        }
-    }
-    
     open func onDidChangeEvent(
         isInitial: Bool,
         items: ChangeItem,
         events: [Event]) {
-            var needToScroll = true
-            defer {
-                if needToScroll {
-                    scrollToItemIfNeeded(items: items)
-                }
-            }
             if isInitial {
                 let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId : lastDisplayedMessageId
                 if messageId != 0,
                    let indexPath = items.changeItems
                     .first(where: {$0.item?.id == messageId})?
                     .indexPath {
-                    needToScroll = false
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: scrollToRepliedMessageId != 0, pos: .centeredVertically)
                     resetStateAfterChangeEvent()
                 } else {
@@ -598,7 +573,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                         }
                         event = .scrollAndSelect(indexPath: indexPath, messageId: messageId)
                         resetStateAfterChangeEvent()
-                        needToScroll = false
                     } else {
                         event = .reloadDataAndScrollToBottom
                         if isInitialLoad {
@@ -624,7 +598,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                 return
             case .reloadAndSelect:
                 if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
-                    needToScroll = false
                     event = .reloadDataAndSelect(indexPath: indexPath, messageId: mid)
                     updateStateAfterChangeEvent(for: indexPath)
                 } else {
@@ -843,7 +816,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     //MARK: Typing
     
     open var isTyping = false {
-        didSet { isTyping ? provider.channelOperator.startTyping() : provider.channelOperator.stopTyping() }
+        didSet { isTyping ? provider.channelOperator.sendEvent(ChannelEvent.startTyping) : provider.channelOperator.sendEvent(ChannelEvent.stopTyping) }
     }
     
     //MARK: load messages
@@ -943,9 +916,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         else { return }
         lastLoadNextMessageId = messageId
         isFetchingData = true
-        DispatchQueue.main
-            .asyncAfter(deadline: .now() + 1)
-        {[weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.resetFetchState()
         }
         func fetchNext() {
@@ -963,7 +934,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         ) { [weak self] error in
             fetchNext()
             self?.resetFetchState()
-            logger.errorIfNotNil(error, "on loadPrevMessages")
+            logger.errorIfNotNil(error, "on loadNextMessages")
         }
         
     }
@@ -1934,32 +1905,44 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         
     }
     
-    // MARK: Channel Delegate
-    
-    open func channel(_ channel: Channel, didStartTyping member: Member) {
-        guard self.channel.id == channel.id,
-              member.id != me
-        else { return }
-        
-        event = .typing(isTyping: true, user: .init(user: member))
-        peerPresence = member.presence
-        schedulers[member.id]?.stop()
-        schedulers[member.id] = nil
-        schedulers[member.id] = Scheduler.new(deadline: .now() + 3) { [weak self] _ in
-            guard let self else { return }
-            self.schedulers[member.id] = nil
-            self.event = .typing(isTyping: false, user: .init(user: member))
+    //MARK: ChatClient delegate: Channel events
+    open func channel(_ channel: Channel, didReceive channelEvent: ChannelEvent) {
+        channelEvent.user
+        switch channelEvent.name {
+        case ChannelEvent.startTyping:
+            handleChannel(channel, didStartTyping: channelEvent.user)
+        case ChannelEvent.stopTyping:
+            handleChannel(channel, didStopTyping: channelEvent.user)
+        default:
+            break
         }
     }
     
-    open func channel(_ channel: Channel, didStopTyping member: Member) {
+    //MARK: Channel typing event handlers
+    open func handleChannel(_ channel: Channel, didStartTyping user: User) {
         guard self.channel.id == channel.id,
-              member.id != me
+              user.id != me
         else { return }
-        event = .typing(isTyping: false, user: .init(user: member))
-        peerPresence = member.presence
-        schedulers[member.id]?.stop()
-        schedulers[member.id] = nil
+        
+        event = .typing(isTyping: true, user: .init(user: user))
+        peerPresence = user.presence
+        schedulers[user.id]?.stop()
+        schedulers[user.id] = nil
+        schedulers[user.id] = Scheduler.new(deadline: .now() + 3) { [weak self] _ in
+            guard let self else { return }
+            self.schedulers[user.id] = nil
+            self.event = .typing(isTyping: false, user: .init(user: user))
+        }
+    }
+    
+    open func handleChannel(_ channel: Channel, didStopTyping user: User) {
+        guard self.channel.id == channel.id,
+              user.id != me
+        else { return }
+        event = .typing(isTyping: false, user: .init(user: user))
+        peerPresence = user.presence
+        schedulers[user.id]?.stop()
+        schedulers[user.id] = nil
     }
     
     // MARK: ChatClient delegate

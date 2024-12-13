@@ -19,7 +19,7 @@ class AccountPickerViewController: ViewController {
     lazy var titleLabel = {
         $0.text = "Select Account"
         $0.font = .systemFont(ofSize: .init(15), weight: .semibold)
-        $0.textColor = .secondaryText.light
+        $0.textColor = .secondaryText
         return $0.withoutAutoresizingMask
     }(UILabel())
     
@@ -37,7 +37,7 @@ class AccountPickerViewController: ViewController {
     override func setupAppearance() {
         super.setupAppearance()
         
-        view.backgroundColor = .white
+        view.backgroundColor = .background
         tableView.backgroundColor = .clear
     }
     
@@ -72,13 +72,13 @@ extension AccountPickerViewController: UITableViewDataSource {
         let cell = tableView.dequeueReusableCell(for: indexPath, cellType: UITableViewCell.self)
         
         let bgColorView = UIView()
-        bgColorView.backgroundColor = .surface1.light
+        bgColorView.backgroundColor = .surface1
         cell.selectedBackgroundView = bgColorView
         
         cell.backgroundColor = .clear
         cell.textLabel?.text = "@\(userIds[indexPath.row])"
         cell.textLabel?.font = .systemFont(ofSize: .init(16), weight: .semibold)
-        cell.textLabel?.textColor = .primaryText.light
+        cell.textLabel?.textColor = .primaryText
         cell.imageView?.image = .defaultAvatar
         cell.accessoryView = UIImageView(image: .radio)
         return cell

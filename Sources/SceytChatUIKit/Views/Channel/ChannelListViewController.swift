@@ -175,14 +175,14 @@ open class ChannelListViewController: ViewController,
             updateUnreadMessages(count: count)
         case let .connection(state):
             updateConnectionState(state)
-        case let .typing(isTyping, member, channel):
+        case let .typing(isTyping, user, channel):
             for cell in tableView.visibleCells where cell is ChannelCell {
                 let channelCell = (cell as! ChannelCell)
                 if channelCell.data.channel.id == channel.id {
                     if isTyping {
-                        channelCell.didStartTyping(member: member)
+                        channelCell.didStartTyping(user: user)
                     } else {
-                        channelCell.didStopTyping(member: member)
+                        channelCell.didStopTyping(user: user)
                     }
                     return
                 }
