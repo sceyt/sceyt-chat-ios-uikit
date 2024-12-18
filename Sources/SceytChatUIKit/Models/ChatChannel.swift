@@ -137,7 +137,13 @@ public class ChatChannel {
             unSynched: dto.unsynched
         )
         if self.channelType == .direct {
-            members = MemberDTO.fetch(channelId: ChannelId(dto.id), context: SceytChatUIKit.shared.database.viewContext).map { $0.convert() }
+            if let context = dto.managedObjectContext {
+                members = MemberDTO.fetch(channelId: ChannelId(dto.id), context: context).map { $0.convert() }
+            } else {
+                #if DEBUG
+                fatalError("ChannelDTO managedObjectContext is nil")
+                #endif
+            }
         }
     }
     
