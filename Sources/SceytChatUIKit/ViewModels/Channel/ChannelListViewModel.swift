@@ -51,7 +51,7 @@ open class ChannelListViewModel: NSObject,
 
     private var _selectedChannel: ChatChannel?
     
-    @Atomic public private(set) var layoutModels = [ChatChannel: ChannelLayoutModel]()
+    @Atomic public var layoutModels = [ChatChannel: ChannelLayoutModel]()
       
     open lazy var channelObserver: LazyDatabaseObserver<ChannelDTO, ChatChannel> = {
         return LazyDatabaseObserver<ChannelDTO, ChatChannel>(
