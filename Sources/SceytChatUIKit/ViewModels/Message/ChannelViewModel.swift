@@ -1286,21 +1286,28 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         
         if channel.unSynched {
-            Task {
+            logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched")
+            Task { // may need priority
+                logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched task started")
                 do {
                     if let channel = try await self.channelCreator.createChannelOnServerIfNeeded(channelId: self.channel.id) {
                         self.updateLocalChannel(channel) {
+                            logger.verbose("[MESSAGE SEND] sendUserMessage local channel updated")
                             send(storeBeforeSend: true)
                         }
                     } else {
+                        logger.verbose("[MESSAGE SEND] sendUserMessage channel exists")
                         send()
                     }
                 } catch {
+                    logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched error \(error)")
                     provider.storePending(message: message)
                 }
             }
         } else {
+            logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched")
             provider.storePending(message: message) { _ in
+                logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched send")
                 send()
             }
         }
@@ -2011,7 +2018,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     private func updateLocalChannel(_ channel: ChatChannel, completion: (() -> Void)? = nil) {
-        DispatchQueue.main.async { [weak self] in
+        logger.verbose("[MESSAGE SEND] sendUserMessage updateLocalChannel start")
+        DispatchQueue.main.async { [weak self] in // why main queue?
+            logger.verbose("[MESSAGE SEND] sendUserMessage updateLocalChannel start main queue entered")
             defer {
                 completion?()
             }

@@ -277,16 +277,19 @@ open class ChannelCreator: DataProvider {
     }
     
     open func createChannelOnServerIfNeeded(channelId: ChannelId) async throws -> ChatChannel? {
+        logger.verbose("[MESSAGE SEND] createChannelOnServerIfNeeded")
         return try await withCheckedThrowingContinuation { continuation in
             database.read {
                 ChannelDTO.fetch(id: channelId, context: $0)?.convert()
             } completion: { result in
                 switch result {
                 case .failure(let error):
+                    logger.verbose("[MESSAGE SEND] createChannelOnServerIfNeeded failed")
                     logger.errorIfNotNil(error, "Get channel for db \(channelId)")
                     continuation.resume(throwing: error)
                 case .success(let channel):
                     if let channel, channel.unSynched {
+                        logger.verbose("[MESSAGE SEND] createChannelOnServerIfNeeded success \(channelId) unSynched")
                         self.create(channel: channel)
                         { channel, error in
                             if let error {
@@ -296,6 +299,7 @@ open class ChannelCreator: DataProvider {
                             }
                         }
                     } else {
+                        logger.verbose("[MESSAGE SEND] createChannelOnServerIfNeeded success \(channelId) synched")
                         continuation.resume(returning: nil)
                     }
                 }
