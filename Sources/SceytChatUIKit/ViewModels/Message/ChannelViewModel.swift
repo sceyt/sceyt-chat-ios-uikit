@@ -1269,14 +1269,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             logger.verbose("[MESSAGE SEND] sendUserMessage messageSender \(message.body)")
             switch action {
             case .send, .reply, .forward:
+                logger.verbose("[MESSAGE SEND] sendUserMessage messageSender send reply forward")
                 messageSender.sendMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
+                    logger.verbose("[MESSAGE SEND] sendUserMessage messageSender send reply forward completion")
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
                     }
                 }
             case .edit:
+                logger.verbose("[MESSAGE SEND] sendUserMessage messageSender edit")
                 messageSender.editMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
+                    logger.verbose("[MESSAGE SEND] sendUserMessage messageSender edit completion")
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
@@ -1305,9 +1309,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                 }
             }
         } else {
-            logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched")
+            logger.verbose("[MESSAGE SEND] sendUserMessage channel synched")
             provider.storePending(message: message) { _ in
-                logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched send")
+                logger.verbose("[MESSAGE SEND] sendUserMessage channel synched send")
                 send()
             }
         }
