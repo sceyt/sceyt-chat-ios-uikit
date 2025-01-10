@@ -15,7 +15,7 @@ open class ChannelLastMessageSenderNameFormatter: ChannelFormatting {
 
         if channel.lastMessage?.state == .deleted || channel.isSelfChannel {
             // don't display sender
-        } else if (user.id == me) || (user.id.isEmpty && channel.lastMessage?.incoming == false) {
+        } else if (user.id == SceytChatUIKit.shared.currentUserId) || (user.id.isEmpty && channel.lastMessage?.incoming == false) {
             return "\(L10n.User.current): "
         } else if !channel.isDirect {
             return "\(SceytChatUIKit.shared.formatters.userShortNameFormatter.format(user)): "

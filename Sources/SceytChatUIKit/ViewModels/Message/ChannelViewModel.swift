@@ -1092,7 +1092,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             guard let self else { return }
             let filteredMessages = messages.filter {
                 return !$0.incoming ? false :
-                $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == marker.rawValue } ) == true ? false : true
+                $0.userMarkers?.contains(where: { $0.user?.id == SceytChatUIKit.shared.currentUserId && $0.name == marker.rawValue } ) == true ? false : true
             }
             guard !filteredMessages.isEmpty,
                     let max = filteredMessages.max(by: { $0.id < $1.id }),
@@ -1123,7 +1123,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             
             let message = messages.filter {
                 return !$0.incoming ? false :
-                $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == DefaultMarker.displayed.rawValue } ) == true ? false : true
+                $0.userMarkers?.contains(where: { $0.user?.id == SceytChatUIKit.shared.currentUserId && $0.name == DefaultMarker.displayed.rawValue } ) == true ? false : true
             }.max(by: { $0.id < $1.id })
             
             guard let message, self.lasMarkDisplayedMessageId != message.id
@@ -1961,7 +1961,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     //MARK: Channel typing event handlers
     open func handleChannel(_ channel: Channel, didStartTyping user: User) {
         guard self.channel.id == channel.id,
-              user.id != me
+              user.id != SceytChatUIKit.shared.currentUserId
         else { return }
         
         event = .typing(isTyping: true, user: .init(user: user))
@@ -1977,7 +1977,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func handleChannel(_ channel: Channel, didStopTyping user: User) {
         guard self.channel.id == channel.id,
-              user.id != me
+              user.id != SceytChatUIKit.shared.currentUserId
         else { return }
         event = .typing(isTyping: false, user: .init(user: user))
         peerPresence = user.presence
@@ -2084,6 +2084,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         }
     
     open func directChannel(userId: String, completion: ((ChatChannel?, Error?) -> Void)? = nil) {
+        guard let me = SceytChatUIKit.shared.currentUserId else { return }
         guard userId != me else { return }
         
         channelProvider
@@ -2105,6 +2106,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func directChannel(user: ChatUser,
                             completion: ((ChatChannel?, Error?) -> Void)? = nil) {
+        guard let me = SceytChatUIKit.shared.currentUserId else { return }
         guard user.id != me else { return }
         
         channelProvider

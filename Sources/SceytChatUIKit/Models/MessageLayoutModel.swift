@@ -166,7 +166,7 @@ open class MessageLayoutModel {
             ).textSize
             replyLayout = Components.messageReplyLayoutModel.init(
                 message: parent,
-                byMe: message.user.id == me,
+                byMe: message.user.id == SceytChatUIKit.shared.currentUserId,
                 channel: channel,
                 thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
                 attributedBody: parentAttributedView.content,
@@ -405,7 +405,7 @@ open class MessageLayoutModel {
             }
             replyLayout = Components.messageReplyLayoutModel.init(
                 message: parent, 
-                byMe: message.user.id == me,
+                byMe: message.user.id == SceytChatUIKit.shared.currentUserId,
                 channel: channel,
                 thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
                 attributedBody: parentAttributedView?.content,
@@ -504,7 +504,7 @@ open class MessageLayoutModel {
     
     @discardableResult
     open func createReactions(message: ChatMessage) -> [ReactionInfo] {
-        var selfReactions = message.userReactions?.compactMap { me == $0.user?.id ? $0.key : nil } ?? []
+        var selfReactions = message.userReactions?.compactMap { SceytChatUIKit.shared.currentUserId == $0.user?.id ? $0.key : nil } ?? []
         var reactions = [ReactionInfo]()
         if let reactionScores = message.reactionScores, !reactionScores.isEmpty {
             estimatedReactionsNumberPerRow = estimateReactionsNumberPerRow()

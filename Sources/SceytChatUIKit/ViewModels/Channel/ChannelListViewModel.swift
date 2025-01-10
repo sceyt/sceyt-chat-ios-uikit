@@ -303,10 +303,6 @@ open class ChannelListViewModel: NSObject,
         didChange state: ConnectionState,
         error: SceytError?
     ) {
-        if state == .connected,
-            SceytChatUIKit.shared.config.syncChannelsAfterConnect {
-            SyncService.syncChannels()
-        }
         event = .connection(state)
     }
     
@@ -325,13 +321,13 @@ open class ChannelListViewModel: NSObject,
 
     //MARK: Channel typing event handlers
     open func handleChannel(_ channel: Channel, didStartTyping user: User) {
-        guard user.id != me
+        guard user.id != SceytChatUIKit.shared.currentUserId
         else { return }
         event = .typing(true, .init(user: user), .init(channel: channel))
     }
     
     open func handleChannel(_ channel: Channel, didStopTyping user: User) {
-        guard user.id != me
+        guard user.id != SceytChatUIKit.shared.currentUserId
         else { return }
         event = .typing(false, .init(user: user), .init(channel: channel))
     }

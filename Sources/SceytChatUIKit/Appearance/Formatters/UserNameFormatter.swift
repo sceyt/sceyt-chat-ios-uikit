@@ -22,7 +22,7 @@ open class UserNameFormatter: UserFormatting {
             break
         }
         
-        if user.id == me {
+        if user.id == SceytChatUIKit.shared.currentUserId {
             return L10n.User.current
         }
         

@@ -10,11 +10,11 @@ import Foundation
 import SceytChat
 import SceytChatUIKit
 
-final class ConnectionService: NSObject, ChatClientDelegate {
+final class ConnectionService: ClientConnectionHandler {
     
     static let shared = ConnectionService()
     
-    private override init() {
+    required init() {
         super.init()
         SceytChatUIKit.shared.chatClient.add(delegate: self, identifier: String(reflecting: self))
     }
@@ -50,17 +50,9 @@ final class ConnectionService: NSObject, ChatClientDelegate {
         }
     }
     
-    func removeDeviceToken(completion: @escaping (Bool) -> Void) {
+    func removeDeviceToken() {
         print("Device Token: Removing")
         Config.deviceToken = nil
-        SceytChatUIKit.shared.chatClient.unregisterDevicePushToken() { error in
-            if let error {
-                print("Device Token: Received error while removing \(error)")
-                completion(false)
-            }
-            print("Device Token: Removed")
-            completion(true)
-        }
     }
 
     private var callbacks = [((Error?) -> Void)]()
@@ -128,10 +120,10 @@ final class ConnectionService: NSObject, ChatClientDelegate {
         }
     }
     
-    func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
+    override func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
+        super.chatClient(chatClient, didChange: state, error: error)
         if state == .connected {
             Config.currentUserId = chatClient.user.id
-            SceytChatUIKit.shared.currentUserId = chatClient.user.id
             SceytChatUIKit.shared.chatClient.setPresence(state: .online, status: "I'm online")
             NotificationCenter.default.post(name: NSNotification.Name(rawValue: "userProfileUpdated"), object: nil)
             if let deviceToken {

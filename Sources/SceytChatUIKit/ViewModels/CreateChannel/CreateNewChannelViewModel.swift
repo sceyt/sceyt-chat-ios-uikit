@@ -75,7 +75,7 @@ open class CreateNewChannelViewModel: NSObject {
         Components.channelCreator.init()
             .createLocalChannelByMembers(type: SceytChatUIKit.shared.config.channelTypesConfig.direct,
                                 members: [ChatChannelMember(user: peer, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner),
-                                          ChatChannelMember(id: me, roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner)])
+                                          ChatChannelMember(id: SceytChatUIKit.shared.currentUserId ?? "", roleName: SceytChatUIKit.shared.config.memberRolesConfig.owner)])
         { [weak self] channel, error in
             DispatchQueue.main.async {
                 if let error = error {

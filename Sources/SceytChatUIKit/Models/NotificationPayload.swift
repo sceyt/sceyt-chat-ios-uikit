@@ -56,9 +56,8 @@ struct NotificationPayload {
                 if let data = metadata.data(using: .utf8),
                    let usersPos = try? JSONDecoder().decode([MentionUserPos].self, from: data) {
                     let user = SceytChatUIKit.shared.chatClient.user
-                    let me = me
                     self.mentionedUsers = usersPos.map {
-                        if $0.id == me {
+                        if $0.id == SceytChatUIKit.shared.currentUserId {
                             return .init(
                                 id: $0.id,
                                 firstName: user.firstName ?? "",

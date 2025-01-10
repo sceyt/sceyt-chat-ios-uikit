@@ -80,9 +80,6 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
 
         SceytChatUIKit.initialize(apiUrl: apiUrl, appId: appId)
         
-        // Set the current user's ID.
-        SceytChatUIKit.shared.currentUserId = "CURRENT_USER_ID"
-
         return true
     }
 ```
@@ -115,9 +112,6 @@ func application(_ application: UIApplication, didFinishLaunchingWithOptions lau
         ...
 
         SceytChatUIKit.initialize(apiUrl: apiUrl, appId: appId)
-
-        // Set the current user's ID.
-        SceytChatUIKit.shared.currentUserId = "CURRENT_USER_ID"
 
         ...
 

@@ -92,7 +92,7 @@ extension ChannelMemberListViewController {
             didSet {
                 guard let data else { return }
                 
-                selectionStyle = me == data.id ? .none : .default
+                selectionStyle = SceytChatUIKit.shared.currentUserId == data.id ? .none : .default
                 titleLabel.text = appearance.titleFormatter.format(data)
                 
                 roleLabel.text = data.roleName == SceytChatUIKit.shared.config.memberRolesConfig.participant ? nil : data.roleName?.localizedCapitalized
