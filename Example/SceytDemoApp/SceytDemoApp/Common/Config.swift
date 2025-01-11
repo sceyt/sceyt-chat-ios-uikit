@@ -25,7 +25,7 @@ extension Config {
         static let deviceToken = "__demoapp_device_token__"
     }
     
-    @UserDefaultsConfig(UserDefaultsKeys.clientIdKey, defaultValue: UUID().uuidString)
+    @UserDefaultsConfig(UserDefaultsKeys.clientIdKey)
     static var clientId: String?
     
     @UserDefaultsConfig(UserDefaultsKeys.currentUserIdKey)
@@ -56,6 +56,10 @@ struct UserDefaultsConfig<T> {
 
 
 func configureSceytChatUIKit() {
+    if Config.clientId == nil {
+        let uuidString = UUID().uuidString
+        Config.clientId = uuidString
+    }
     SceytChatUIKit.initialize(apiUrl: Config.sceytApiURL,
                               appId: Config.sceytAppId,
                               clientId: Config.clientId!)
