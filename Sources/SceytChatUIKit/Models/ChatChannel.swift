@@ -137,15 +137,12 @@ public class ChatChannel {
             unSynched: dto.unsynched
         )
         if self.channelType == .direct {
-            let result = SceytChatUIKit.shared.database.read {
-                MemberDTO.fetch(channelId: ChannelId(dto.id), context: $0).map { $0.convert() }
-            }
-            
-            switch result {
-            case .success(let result):
-                members = result
-            case .failure(let error):
-                logger.errorIfNotNil(error, "channelType == .direct but failed to fetch members")
+            if let context = dto.managedObjectContext {
+                members = MemberDTO.fetch(channelId: ChannelId(dto.id), context: context).map { $0.convert() }
+            } else {
+                #if DEBUG
+                fatalError("ChannelDTO managedObjectContext is nil")
+                #endif
             }
         }
     }
