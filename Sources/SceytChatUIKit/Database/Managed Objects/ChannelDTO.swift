@@ -105,8 +105,6 @@ public class ChannelDTO: NSManagedObject {
             key = "subject"
         case .URI:
             key = "uri"
-        case .member:
-            key = "peer"
         @unknown default:
             key = "subject"
         }
