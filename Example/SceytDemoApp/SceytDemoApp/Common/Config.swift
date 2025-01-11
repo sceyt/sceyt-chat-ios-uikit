@@ -56,9 +56,6 @@ struct UserDefaultsConfig<T> {
 
 
 func configureSceytChatUIKit() {
-    if let currentUserId = Config.currentUserId {
-        SceytChatUIKit.shared.currentUserId = currentUserId
-    }
     SceytChatUIKit.initialize(apiUrl: Config.sceytApiURL,
                               appId: Config.sceytAppId,
                               clientId: Config.clientId!)
@@ -68,6 +65,7 @@ func configureSceytChatUIKit() {
     }
     
     // Set customized component subclass
+    SceytChatUIKit.Components.clientConnectionHandler = ConnectionService.self
     SceytChatUIKit.Components.channelInfoViewController = CustomChannelInfoViewController.self
     
     // Set customized subclass for formatters

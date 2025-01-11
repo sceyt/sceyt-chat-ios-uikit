@@ -14,7 +14,7 @@ open class MentioningUserListViewModel: NSObject {
 
     public let channelId: ChannelId
     public let provider: ChannelMemberListProvider
-    public lazy var defaultPredicate = NSPredicate(format: "channelId == %lld AND user.id != %@", channelId, me)
+    public lazy var defaultPredicate = NSPredicate(format: "channelId == %lld AND user.id != %@", channelId, SceytChatUIKit.shared.currentUserId ?? "")
     
     @Published public var event: Event?
     public var isSearching = false

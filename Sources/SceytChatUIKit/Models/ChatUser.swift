@@ -28,8 +28,12 @@ public class ChatUser {
         username = dto.username
         avatarUrl = dto.avatarUrl
         var metadataDict = [String: String]()
-        if let entries = dto.metadataEntries {
-            for entry in entries {
+        if let entries = dto.metadataEntries as? Set<UserMetadataDTO> {
+            for entry in entries where entry is UserMetadataDTO {
+                guard !entry.key.isEmpty else {
+                    logger.error("[ChatUser] User metadata entry has an empty key, value \(entry.value) is ignored")
+                    continue
+                }
                 metadataDict[entry.key] = entry.value
             }
         }

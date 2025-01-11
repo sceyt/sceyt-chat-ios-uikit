@@ -9,13 +9,6 @@
 import UIKit
 import SceytChat
 
-var me: UserId {
-    if !SceytChatUIKit.shared.chatClient.user.id.isEmpty {
-        return SceytChatUIKit.shared.chatClient.user.id
-    } else {
-        return SceytChatUIKit.shared.currentUserId ?? ""
-    }
-}
 
 extension ConnectionState: CustomStringConvertible {
     public var description: String {

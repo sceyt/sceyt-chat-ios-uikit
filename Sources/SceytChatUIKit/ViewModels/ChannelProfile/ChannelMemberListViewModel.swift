@@ -143,7 +143,7 @@ open class ChannelMemberListViewModel: NSObject {
         }
         
         guard let member = member(at: indexPath) else { return false }
-        return isCurrentUserOwner && member.id != me
+        return isCurrentUserOwner && member.id != SceytChatUIKit.shared.currentUserId
     }
 
     open func changeOwner(
@@ -188,7 +188,8 @@ open class ChannelMemberListViewModel: NSObject {
     }
     
     open func createChannel(userAt indexPath: IndexPath, completion: ((ChatChannel?, Error?) -> Void)? = nil) {
-        guard let m = member(at: indexPath), m.id != me else {
+        guard let me = SceytChatUIKit.shared.currentUserId,
+                let m = member(at: indexPath), m.id != me else {
             return
         }
         

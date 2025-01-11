@@ -45,6 +45,7 @@ public class SceytChatUIKit {
 
     public static func initialize(apiUrl: String, appId: String, clientId: String = "") {
         ChatClient.initialize(apiUrl: apiUrl, appId: appId, clientId: clientId)
+        SceytChatUIKit.shared.chatClient.add(delegate: Components.clientConnectionHandler.default, identifier: String(reflecting: ClientConnectionHandler.self))
         shared.channelEventHandler.startEventHandler()
     }
     
@@ -68,8 +69,23 @@ public class SceytChatUIKit {
         chatClient.registerDevicePushToken(pushToken, completion: completion)
     }
     
-    public func unregisterDevicePushToken(_ pushToken: Data, completion: ((Error?) -> Void)? ) {
+    public func unregisterDevicePushToken(completion: ((Error?) -> Void)? ) {
         chatClient.unregisterDevicePushToken(completion: completion)
+    }
+    
+    public func logout(completion: @escaping (Bool) -> Void) {
+        unregisterDevicePushToken() { [weak self] error in
+            if let error {
+                logger.debug("Device Token: Received error while removing \(error)")
+                completion(false)
+            }
+            
+            logger.debug("Device Token: Removed")
+            self?.disconnect()
+            UserDefaults.currentUserId = nil
+            DataProvider.database.deleteAll()
+            completion(true)
+        }
     }
     
     public lazy var channelEventHandler: ChannelEventHandler = {
@@ -80,7 +96,13 @@ public class SceytChatUIKit {
             )
     }()
     
-    public var currentUserId: UserId?
+    public var currentUserId: UserId? {
+        if !SceytChatUIKit.shared.chatClient.user.id.isEmpty {
+            SceytChatUIKit.shared.chatClient.user.id
+        } else {
+            UserDefaults.currentUserId
+        }
+    }
     
     // MARK: - Log Level
     

@@ -156,7 +156,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
     }
 
     static func senderTitle(attachment: ChatMessage.Attachment) -> String {
-        if me == attachment.userId {
+        if SceytChatUIKit.shared.currentUserId == attachment.userId {
             return L10n.User.current
         } else if let user = attachment.user {
             return SceytChatUIKit.shared.formatters.userNameFormatter.format(user)

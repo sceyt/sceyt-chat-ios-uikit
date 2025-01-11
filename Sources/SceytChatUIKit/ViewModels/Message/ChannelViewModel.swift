@@ -549,16 +549,40 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             }
     }
     
+    open func scrollToItemIfNeeded(items: ChangeItem) {
+        if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
+            updateStateAfterChangeEvent(for: indexPath)
+            if isSearching {
+                updateLastNavigatedIndexPath(indexPath: indexPath)
+                scrollToMessageIdIfSearching = 0
+                searchDirection = .none
+                isSearchResultsLoading = false
+                isRestartingMessageObserver = .none
+            } else {
+                isRestartingMessageObserver = .none
+            }
+            scroll(to: indexPath, messageId: mid)
+        }
+    }
+
     open func onDidChangeEvent(
         isInitial: Bool,
         items: ChangeItem,
         events: [Event]) {
+            var needToScroll = true
+            defer {
+                if needToScroll {
+                    scrollToItemIfNeeded(items: items) 
+                }
+            }
+
             if isInitial {
                 let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId : lastDisplayedMessageId
                 if messageId != 0,
                    let indexPath = items.changeItems
                     .first(where: {$0.item?.id == messageId})?
                     .indexPath {
+                    needToScroll = false
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: scrollToRepliedMessageId != 0, pos: .centeredVertically)
                     resetStateAfterChangeEvent()
                 } else {
@@ -573,6 +597,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                         }
                         event = .scrollAndSelect(indexPath: indexPath, messageId: messageId)
                         resetStateAfterChangeEvent()
+                        needToScroll = false
                     } else {
                         event = .reloadDataAndScrollToBottom
                         if isInitialLoad {
@@ -598,6 +623,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
                 return
             case .reloadAndSelect:
                 if let (indexPath, mid) = needsToScrollAtIndexPath(items: items) {
+                    needToScroll = false
                     event = .reloadDataAndSelect(indexPath: indexPath, messageId: mid)
                     updateStateAfterChangeEvent(for: indexPath)
                 } else {
@@ -816,7 +842,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     //MARK: Typing
     
     open var isTyping = false {
-        didSet { isTyping ? provider.channelOperator.sendEvent(ChannelEvent.startTyping) : provider.channelOperator.sendEvent(ChannelEvent.stopTyping) }
+        didSet {
+            guard !channel.unSynched else { return }
+            isTyping ? provider.channelOperator.sendEvent(ChannelEvent.startTyping) : provider.channelOperator.sendEvent(ChannelEvent.stopTyping)
+        }
     }
     
     //MARK: load messages
@@ -1063,7 +1092,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             guard let self else { return }
             let filteredMessages = messages.filter {
                 return !$0.incoming ? false :
-                $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == marker.rawValue } ) == true ? false : true
+                $0.userMarkers?.contains(where: { $0.user?.id == SceytChatUIKit.shared.currentUserId && $0.name == marker.rawValue } ) == true ? false : true
             }
             guard !filteredMessages.isEmpty,
                     let max = filteredMessages.max(by: { $0.id < $1.id }),
@@ -1094,7 +1123,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             
             let message = messages.filter {
                 return !$0.incoming ? false :
-                $0.userMarkers?.contains(where: { $0.user?.id == me && $0.name == DefaultMarker.displayed.rawValue } ) == true ? false : true
+                $0.userMarkers?.contains(where: { $0.user?.id == SceytChatUIKit.shared.currentUserId && $0.name == DefaultMarker.displayed.rawValue } ) == true ? false : true
             }.max(by: { $0.id < $1.id })
             
             guard let message, self.lasMarkDisplayedMessageId != message.id
@@ -1240,14 +1269,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             logger.verbose("[MESSAGE SEND] sendUserMessage messageSender \(message.body)")
             switch action {
             case .send, .reply, .forward:
+                logger.verbose("[MESSAGE SEND] sendUserMessage messageSender send reply forward")
                 messageSender.sendMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
+                    logger.verbose("[MESSAGE SEND] sendUserMessage messageSender send reply forward completion")
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
                     }
                 }
             case .edit:
+                logger.verbose("[MESSAGE SEND] sendUserMessage messageSender edit")
                 messageSender.editMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
+                    logger.verbose("[MESSAGE SEND] sendUserMessage messageSender edit completion")
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
@@ -1257,21 +1290,28 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         }
         
         if channel.unSynched {
-            Task {
+            logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched")
+            Task { // may need priority
+                logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched task started")
                 do {
                     if let channel = try await self.channelCreator.createChannelOnServerIfNeeded(channelId: self.channel.id) {
                         self.updateLocalChannel(channel) {
+                            logger.verbose("[MESSAGE SEND] sendUserMessage local channel updated")
                             send(storeBeforeSend: true)
                         }
                     } else {
+                        logger.verbose("[MESSAGE SEND] sendUserMessage channel exists")
                         send()
                     }
                 } catch {
+                    logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched error \(error)")
                     provider.storePending(message: message)
                 }
             }
         } else {
+            logger.verbose("[MESSAGE SEND] sendUserMessage channel synched")
             provider.storePending(message: message) { _ in
+                logger.verbose("[MESSAGE SEND] sendUserMessage channel synched send")
                 send()
             }
         }
@@ -1921,7 +1961,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     //MARK: Channel typing event handlers
     open func handleChannel(_ channel: Channel, didStartTyping user: User) {
         guard self.channel.id == channel.id,
-              user.id != me
+              user.id != SceytChatUIKit.shared.currentUserId
         else { return }
         
         event = .typing(isTyping: true, user: .init(user: user))
@@ -1937,7 +1977,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func handleChannel(_ channel: Channel, didStopTyping user: User) {
         guard self.channel.id == channel.id,
-              user.id != me
+              user.id != SceytChatUIKit.shared.currentUserId
         else { return }
         event = .typing(isTyping: false, user: .init(user: user))
         peerPresence = user.presence
@@ -1982,7 +2022,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     }
     
     private func updateLocalChannel(_ channel: ChatChannel, completion: (() -> Void)? = nil) {
-        DispatchQueue.main.async { [weak self] in
+        logger.verbose("[MESSAGE SEND] sendUserMessage updateLocalChannel start")
+        DispatchQueue.main.async { [weak self] in // why main queue?
+            logger.verbose("[MESSAGE SEND] sendUserMessage updateLocalChannel start main queue entered")
             defer {
                 completion?()
             }
@@ -2042,6 +2084,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         }
     
     open func directChannel(userId: String, completion: ((ChatChannel?, Error?) -> Void)? = nil) {
+        guard let me = SceytChatUIKit.shared.currentUserId else { return }
         guard userId != me else { return }
         
         channelProvider
@@ -2063,6 +2106,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
     
     open func directChannel(user: ChatUser,
                             completion: ((ChatChannel?, Error?) -> Void)? = nil) {
+        guard let me = SceytChatUIKit.shared.currentUserId else { return }
         guard user.id != me else { return }
         
         channelProvider

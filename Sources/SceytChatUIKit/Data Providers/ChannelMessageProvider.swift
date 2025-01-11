@@ -239,7 +239,7 @@ open class ChannelMessageProvider: DataProvider {
         message: Message,
         completion: ((Error?) -> Void)? = nil
     ) {
-        database.write ({
+        database.performWriteTask ({
             $0.createOrUpdate(
                 message: message,
                 channelId: self.channelId

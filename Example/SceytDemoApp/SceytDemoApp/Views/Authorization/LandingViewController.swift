@@ -102,7 +102,6 @@ class LandingViewController: ViewController {
         guard let vc = storyboard.instantiateViewController(withIdentifier: "AccountPickerViewController") as? AccountPickerViewController else { return }
         
         vc.onUserIdSelected = { userId in
-            SceytChatUIKit.shared.currentUserId = userId
             Config.currentUserId = userId
             AppCoordinator.shared.showMainFlow()
         }

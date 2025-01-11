@@ -46,7 +46,7 @@ public class ChatMessage {
     public let bodyAttributes: [BodyAttribute]?
 
     var hasDisplayedFromMe: Bool {
-        userMarkers?.contains(where: { $0.user?.id == me && $0.name == DeliveryStatus.displayed.rawValue} ) == true
+        userMarkers?.contains(where: { $0.user?.id == SceytChatUIKit.shared.currentUserId && $0.name == DeliveryStatus.displayed.rawValue} ) == true
     }
     
     public init(id: MessageId,

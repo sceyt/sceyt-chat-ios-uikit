@@ -198,6 +198,13 @@ extension SceytChatUIKit {
         
         // MARK: - Providers
         
+        
+        public static var clientConnectionHandler: ClientConnectionHandler.Type = ClientConnectionHandler.self
+        {
+            didSet {
+                
+            }
+        }
         public static var attachmentTransfer: AttachmentTransfer.Type = AttachmentTransfer.self
         public static var channelAttachmentProvider: ChannelAttachmentProvider.Type = ChannelAttachmentProvider.self
         public static var channelCreator: ChannelCreator.Type = ChannelCreator.self

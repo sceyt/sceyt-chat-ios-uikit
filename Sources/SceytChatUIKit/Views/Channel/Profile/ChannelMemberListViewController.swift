@@ -164,7 +164,7 @@ open class ChannelMemberListViewController: ViewController,
         let location = longPressGesture.location(in: tableView)
         guard let indexPath = self.tableView.indexPathForRow(at: location),
               longPressGesture.state == .began, let member = memberListViewModel.member(at: indexPath),
-              member.id != me else { return }
+              member.id != SceytChatUIKit.shared.currentUserId else { return }
         if member.roleName == SceytChatUIKit.shared.config.memberRolesConfig.owner {
             return
         }

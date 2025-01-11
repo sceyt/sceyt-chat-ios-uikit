@@ -613,7 +613,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         messages.forEach {
             $0.deliveryStatus = Int16(status.preferredStatus(for: Int($0.deliveryStatus)).intValue)
         }
-        if messageMarkers.user.id == me {
+        if messageMarkers.user.id == SceytChatUIKit.shared.currentUserId {
             update(messageSelfMarkers: messageMarkers)
         } else {
             createOrUpdate(messageMarkers: messageMarkers)
@@ -623,7 +623,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     public func update(customMessageMarkers messageMarkers: MessageListMarker) -> [MessageDTO] {
         guard !messageMarkers.messageIds.isEmpty else { return [] }
-        if messageMarkers.user.id == me {
+        if messageMarkers.user.id == SceytChatUIKit.shared.currentUserId {
             return update(messageSelfMarkers: messageMarkers)
         } else {
             return createOrUpdate(messageMarkers: messageMarkers)
@@ -726,7 +726,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         rDto.reason = reason
         rDto.messageId = Int64(messageId)
         rDto.pending = true
-        if !me.isEmpty {
+        if let me = SceytChatUIKit.shared.currentUserId,
+           !me.isEmpty {
             rDto.user = UserDTO.fetch(id: me, context: self)
         }
         dto.pendingReactions?.insert(rDto)

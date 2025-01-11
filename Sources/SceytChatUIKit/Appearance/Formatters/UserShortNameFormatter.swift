@@ -15,7 +15,7 @@ open class UserShortNameFormatter: UserFormatting {
             return SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
         }
 
-        if user.id == me {
+        if user.id == SceytChatUIKit.shared.currentUserId {
             return L10n.User.current
         }
 
