@@ -575,7 +575,7 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/sceyt/sceyt-chat-ios-uikit";
 			requirement = {
-				branch = "bugfix/current-user-id-issue";
+				branch = "bugfix/new-chat-peer-appears-deleted";
 				kind = branch;
 			};
 		};
