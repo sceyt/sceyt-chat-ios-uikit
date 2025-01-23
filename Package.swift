@@ -15,7 +15,7 @@ let package = Package(
             targets: ["SceytChatUIKit"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/sceyt/sceyt-chat-ios-sdk.git", branch: "master"),
+        .package(url: "https://github.com/sceyt/sceyt-chat-ios-sdk.git", branch: "update_sdk"),
 //        .package(url: "https://github.com/sceyt/sceyt-chat-ios-sdk.git", exact: "1.5.10"),
     ],
     targets: [
