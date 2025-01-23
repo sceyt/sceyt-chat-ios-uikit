@@ -1576,7 +1576,10 @@ open class ChannelViewController: ViewController,
             isScrollingBottom = true
 
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                self.scrollToBottom(animated: true)
+                // Prevents scrolling when the first message is sent.
+                if self.channelViewModel.numberOfSections != 0 {
+                    self.scrollToBottom(animated: true)
+                }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
                     self?.canShowUnreadCountView = canShowUnread
                 }

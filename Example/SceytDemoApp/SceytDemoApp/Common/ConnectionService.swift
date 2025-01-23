@@ -9,6 +9,7 @@
 import Foundation
 import SceytChat
 import SceytChatUIKit
+import UIKit
 
 final class ConnectionService: ClientConnectionHandler {
     
@@ -51,7 +52,8 @@ final class ConnectionService: ClientConnectionHandler {
     }
     
     func removeDeviceToken() {
-        print("Device Token: Removing")
+        print("Device Token: Removing and unregustering for push notifications")
+        UIApplication.shared.unregisterForRemoteNotifications()
         Config.deviceToken = nil
     }
 
@@ -127,8 +129,8 @@ final class ConnectionService: ClientConnectionHandler {
             SceytChatUIKit.shared.chatClient.setPresence(state: .online, status: "I'm online")
             NotificationCenter.default.post(name: NSNotification.Name(rawValue: "userProfileUpdated"), object: nil)
             if let deviceToken {
-                print("Device Token: Setting saved device token")
-                setDeviceToken(deviceToken)
+                print("Device Token: Setting saved device token and registering for push notifications")
+                (UIApplication.shared.delegate as? AppDelegate)?.registerForPushNotifications()
             }
         }
         switch state {
