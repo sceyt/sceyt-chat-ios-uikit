@@ -2046,7 +2046,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             self.channelObserver.stopObserver()
             self.messageObserver = createMessageObserver()
             isRestartingMessageObserver = .reload
-            
+
+            updateChannelObserver()
             startDatabaseObserver {[weak self] in
                 self?.isRestartingMessageObserver = .none
             }
@@ -2055,7 +2056,16 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
             }
         }
     }
-    
+
+    private func updateChannelObserver(){
+        channelObserver = DatabaseObserver<ChannelDTO, ChatChannel>(
+            request: ChannelDTO.fetchRequest()
+                .fetch(predicate: .init(format: "id == %lld", channel.id))
+                .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)]),
+            context: SceytChatUIKit.shared.database.viewContext
+        ) { $0.convert() }
+    }
+
     private func messagesCount(after id: MessageId) -> Int {
         let afterPredicate = messageObserver.fetchPredicate
             .and(predicate: .init(format: "id > %lld", lastDisplayedMessageId))
