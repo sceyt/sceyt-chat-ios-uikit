@@ -1112,7 +1112,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate {
         }
     }
     
-    open func markMessageAsDisplayed(_ messages: [ChatMessage]) {return;
+    open func markMessageAsDisplayed(_ messages: [ChatMessage]) {
         guard !markMessagesTaskStarted,
                 !messages.isEmpty
         else { return }
