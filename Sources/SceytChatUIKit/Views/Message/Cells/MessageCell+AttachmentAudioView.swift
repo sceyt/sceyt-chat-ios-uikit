@@ -35,14 +35,7 @@ extension MessageCell {
         
         var speed = Speed.x1 {
             didSet {
-                switch speed {
-                case .x1:
-                    SimpleSinglePlayer.setRate(1)
-                case .x1_5:
-                    SimpleSinglePlayer.setRate(1.5)
-                case .x2:
-                    SimpleSinglePlayer.setRate(2)
-                }
+                setPlayerSpeed(speed)
                 speedLabel.text = speed.rawValue + "x"
             }
         }
@@ -154,6 +147,7 @@ extension MessageCell {
             case .stopped:
                 state = .playing
                 SimpleSinglePlayer.play(fileUrl, durationBlock: setDuration, stopBlock: stop)
+                setPlayerSpeed(speed)
                 onPlayed(fileUrl)
             case .playing:
                 state = .paused
@@ -161,6 +155,7 @@ extension MessageCell {
             case .paused:
                 state = .playing
                 SimpleSinglePlayer.play(fileUrl, durationBlock: setDuration, stopBlock: stop)
+                setPlayerSpeed(speed)
             }
         }
         
@@ -178,6 +173,17 @@ extension MessageCell {
                 speed = .x2
             case .x2:
                 speed = .x1
+            }
+        }
+        
+        func setPlayerSpeed(_ playerSpeed: Speed) {
+            switch playerSpeed {
+            case .x1:
+                SimpleSinglePlayer.setRate(1)
+            case .x1_5:
+                SimpleSinglePlayer.setRate(1.5)
+            case .x2:
+                SimpleSinglePlayer.setRate(2)
             }
         }
         
