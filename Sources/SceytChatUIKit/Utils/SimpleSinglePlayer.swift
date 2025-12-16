@@ -105,15 +105,12 @@ internal class SimpleSinglePlayer: NSObject {
         }
     }
     
-    static func setRate(_ rate: Float, for url: URL? = nil) {
-        if let url = url {
-            // Store speed preference for this URL
-            speedForAudio[url.absoluteString] = rate
+    static func setRate(_ rate: Float, for url: URL) {
+        speedForAudio[url.absoluteString] = rate
 
-            // Only apply to current player if this URL is currently playing
-            guard url == self.url else { return }
-        }
-
+        // Only apply to current player if this URL is currently playing
+        guard url == self.url else { return }
+        
         guard currentPlayer?.rate != rate
         else { return }
         

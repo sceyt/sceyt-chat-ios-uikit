@@ -131,6 +131,22 @@ extension MessageCell {
                 } else {
                     state = .stopped
                 }
+
+                // Load stored speed for this recording on cell reuse
+                if let fileUrl = data.attachment.fileUrl,
+                   let storedSpeed = SimpleSinglePlayer.getSpeed(for: fileUrl) {
+                    // Update speed property and UI without triggering didSet
+                    switch storedSpeed {
+                    case 1.5:
+                        speed = .x1_5
+                    case 2:
+                        speed = .x2
+                    default:
+                        speed = .x1
+                    }
+                } else {
+                    speed = .x1
+                }
             }
         }
         
@@ -177,13 +193,16 @@ extension MessageCell {
         }
         
         func setPlayerSpeed(_ playerSpeed: Speed) {
+            // Guard against nil data (can happen during setup before data is assigned)
+            guard let fileUrl = data?.attachment.fileUrl else { return }
+
             switch playerSpeed {
             case .x1:
-                SimpleSinglePlayer.setRate(1)
+                SimpleSinglePlayer.setRate(1, for: fileUrl)
             case .x1_5:
-                SimpleSinglePlayer.setRate(1.5)
+                SimpleSinglePlayer.setRate(1.5, for: fileUrl)
             case .x2:
-                SimpleSinglePlayer.setRate(2)
+                SimpleSinglePlayer.setRate(2, for: fileUrl)
             }
         }
         
