@@ -210,6 +210,9 @@ extension MessageCell {
                     }
                     self?.data.update(attachment: done.attachment)
                     DispatchQueue.main.async {
+                        if let thumbnail = self?.data?.thumbnail {
+                            self?.imageView.image = thumbnail
+                        }
                         self?.update(status: done.attachment.status)
                         self?.setCompletion(done)
                     }

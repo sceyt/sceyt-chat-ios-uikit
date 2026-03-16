@@ -1269,6 +1269,8 @@ extension MessageLayoutModel {
             if !isThumbnailLoadedFromFile {
                 isLoadedThumbnail = false
                 loadThumbnail()
+            } else {
+                logger.debug("[Attachment] update(attachment:) SKIPPED loadThumbnail because isThumbnailLoadedFromFile=true")
             }
         }
         
