@@ -615,7 +615,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             return
         }
 
-        LinkMetadataProvider.default.fetch(url: url) { [weak self] result in
+        LinkMetadataProvider.default.fetch(url: url, forceFetch: true) { [weak self] result in
             guard let self else { return }
 
             switch result {
