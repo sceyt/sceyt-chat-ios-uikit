@@ -205,12 +205,13 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         guard isObserverStarted || isObserverRestarting
         else { return nil }
         let caches = currentCaches
-        guard caches.mainCache.indices.contains(indexPath.section),
-              caches.mainCache[indexPath.section].indices.contains(indexPath.row)
+        let mainCache = caches.mainCache
+        guard mainCache.indices.contains(indexPath.section),
+              mainCache[indexPath.section].indices.contains(indexPath.row)
         else {
             return nil
         }
-        let dto = caches.mainCache[indexPath.section][indexPath.row]
+        let dto = mainCache[indexPath.section][indexPath.row]
         
         if let item = _item(for: dto.objectID) {
             return item
@@ -249,12 +250,13 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         guard isObserverStarted || isObserverRestarting
         else { return nil }
         let caches = isObserverStarted ? mainCaches : tmpCaches
-        guard caches.workingCache.indices.contains(indexPath.section),
-              caches.workingCache[indexPath.section].indices.contains(indexPath.row)
+        let workingCache = caches.workingCache
+        guard workingCache.indices.contains(indexPath.section),
+              workingCache[indexPath.section].indices.contains(indexPath.row)
         else {
             return nil
         }
-        let dto = caches.workingCache[indexPath.section][indexPath.row]
+        let dto = workingCache[indexPath.section][indexPath.row]
         if let item = readCache({ caches.mapItems[dto.objectID] ?? caches.mapDeletedItems[dto.objectID] }) {
             return item
         }

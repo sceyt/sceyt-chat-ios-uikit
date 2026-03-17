@@ -72,10 +72,7 @@ public extension Database {
         resetStalenessInterval: Bool = true,
         completion: (() -> Void)? = nil
     ) {
-        let group = DispatchGroup()
-
-        group.enter()
-        self.backgroundPerformContext.perform {
+        backgroundPerformContext.perform {
             if resetStalenessInterval {
                 self.backgroundPerformContext.stalenessInterval = 0
             }
@@ -83,11 +80,9 @@ public extension Database {
             if resetStalenessInterval {
                 self.backgroundPerformContext.stalenessInterval = -1
             }
-            group.leave()
         }
 
-        group.enter()
-        self.backgroundReadOnlyObservableContext.perform {
+        backgroundReadOnlyObservableContext.perform {
             if resetStalenessInterval {
                 self.backgroundReadOnlyObservableContext.stalenessInterval = 0
             }
@@ -95,24 +90,16 @@ public extension Database {
             if resetStalenessInterval {
                 self.backgroundReadOnlyObservableContext.stalenessInterval = -1
             }
-            group.leave()
-        }
-
-        group.enter()
-        self.viewContext.perform {
-            if resetStalenessInterval {
-                self.viewContext.stalenessInterval = 0
-            }
-            self.viewContext.refreshAllObjects()
-            if resetStalenessInterval {
-                self.viewContext.stalenessInterval = -1
-            }
-            group.leave()
-        }
-
-        if let completion {
-            group.notify(queue: .main) {
-                completion()
+            
+            DispatchQueue.main.async {
+                if resetStalenessInterval {
+                    self.viewContext.stalenessInterval = 0
+                }
+                self.viewContext.refreshAllObjects()
+                if resetStalenessInterval {
+                    self.viewContext.stalenessInterval = -1
+                }
+                completion?()
             }
         }
     }
