@@ -43,6 +43,8 @@ extension MessageCell {
                 setupAppearance()
             }
         }
+
+        private var thumbnailDownloadTask: URLSessionDataTask?
         
         open override func setup() {
             super.setup()
@@ -102,6 +104,8 @@ extension MessageCell {
 
         open var data: MessageLayoutModel.ReplyLayout? {
             didSet {
+                thumbnailDownloadTask?.cancel()
+                thumbnailDownloadTask = nil
                 stackViewH.removeArrangedSubview(imageView)
                 stackViewH2.removeArrangedSubview(iconView)
                 imageView.removeFromSuperview()
@@ -137,7 +141,27 @@ extension MessageCell {
                 guard let attachment = data.attachment
                 else { return }
                 imageView.image = attachment.thumbnail
-                guard imageView.image != nil else { return }
+                
+                var willLoadLinkImage = false
+                if attachment.type == .link,
+                   let urlString = attachment.attachment.url,
+                   let linkUrl = URL(string: urlString) {
+                    // Use the same image LinkPreviewView shows
+                    if let metadata = LinkMetadataProvider.default.metadata(for: linkUrl) {
+                        imageView.image = metadata.thumbnail ?? metadata.image
+                    } else {
+                        // Not cached yet — fetch async and update once ready
+                        willLoadLinkImage = true
+                        LinkMetadataProvider.default.fetch(url: linkUrl) { [weak self] result in
+                            guard case .success(let metadata) = result else { return }
+                            let image = metadata.thumbnail ?? metadata.image
+                            DispatchQueue.main.async {
+                                self?.imageView.image = image
+                            }
+                        }
+                    }
+                }
+                guard imageView.image != nil || willLoadLinkImage else { return }
                 messageLabel.numberOfLines = 1
                 stackViewV.distribution = .fillEqually
                 stackViewH.insertArrangedSubview(imageView, at: 1)
