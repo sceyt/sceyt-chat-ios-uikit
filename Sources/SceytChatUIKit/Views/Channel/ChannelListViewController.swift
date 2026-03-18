@@ -244,7 +244,7 @@ open class ChannelListViewController: ViewController,
         case let .typing(isTyping, user, channel):
             for cell in tableView.visibleCells where cell is ChannelCell {
                 let channelCell = (cell as! ChannelCell)
-                if channelCell.data.channel.id == channel.id {
+                if channelCell.data?.channel.id == channel.id {
                     if isTyping {
                         channelCell.didStartTyping(user: user)
                     } else {
@@ -256,7 +256,7 @@ open class ChannelListViewController: ViewController,
         case let .recording(isRecording, user, channel):
             for cell in tableView.visibleCells where cell is ChannelCell {
                 let channelCell = (cell as! ChannelCell)
-                if channelCell.data.channel.id == channel.id {
+                if channelCell.data?.channel.id == channel.id {
                     if isRecording {
                         channelCell.didStartRecording(user: user)
                     } else {
