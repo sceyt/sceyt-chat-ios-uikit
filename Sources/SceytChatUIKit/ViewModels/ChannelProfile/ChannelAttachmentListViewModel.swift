@@ -71,6 +71,9 @@ open class ChannelAttachmentListViewModel: NSObject {
                 ])
         }
 
+        let channel = self.channel
+        let thumbnailSize = self.thumbnailSize
+        let appearance = self.appearance
         return LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>(
             context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \AttachmentDTO.createdAt, ascending: false),
@@ -78,9 +81,9 @@ open class ChannelAttachmentListViewModel: NSObject {
             sectionNameKeyPath: sectionNameKeyPath,
             fetchPredicate: predicate,
             relationshipKeyPathsObserver: []
-        ) { [unowned self] in
+        ) { [weak self] in
             let attachment = $0.convert()
-            if let prevItem = self.attachmentObserver.item(for: $0.objectID) {
+            if let prevItem = self?.attachmentObserver.item(for: $0.objectID) {
                 prevItem.update(attachment: attachment)
                 if let message = $0.message?.convert() {
                     prevItem.updateMessageIfNeeded(ownerMessage: message)
@@ -91,13 +94,13 @@ open class ChannelAttachmentListViewModel: NSObject {
                 .AttachmentLayout(
                     attachment: attachment,
                     ownerMessage: $0.message?.convert(),
-                    ownerChannel: self.channel,
-                    thumbnailSize: self.thumbnailSize,
+                    ownerChannel: channel,
+                    thumbnailSize: thumbnailSize,
                     onLoadThumbnail: { [weak self] in
                         self?.cacheThumbnail($0, for: attachment)
                     },
                     asyncLoadThumbnail: true,
-                    appearance: self.appearance
+                    appearance: appearance
                 )
         }
 
