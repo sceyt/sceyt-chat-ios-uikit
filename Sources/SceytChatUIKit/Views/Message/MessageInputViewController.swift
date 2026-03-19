@@ -346,7 +346,11 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         }
 
         if !selectedMediaView.items.isEmpty, lastDetectedLinkMetadata != nil {
-            removeActionView()
+            if case .reply = currentState {
+                findLink()
+            } else {
+                removeActionView()
+            }
         } else if selectedMediaView.items.isEmpty {
             findLink()
         }
