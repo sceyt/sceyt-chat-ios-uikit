@@ -124,6 +124,7 @@ open class LinkMetadataProvider: DataProvider {
                         return
                     }
 
+                    metadata.loadImages()
                     self.downloadImagesIfNeeded(
                         linkMetadata: metadata,
                         downloadImage: downloadImage,
