@@ -31,6 +31,7 @@ internal class SimpleSinglePlayer: NSObject {
             if !isPlaying {
                 isPlaying = true
                 currentId = id
+                try? Components.audioSession.configure(category: .playback)
                 currentPlayer?.play()
                 // Apply stored speed if available
                 if let storedRate = speedForPlayer[id], id != 0 {
