@@ -143,24 +143,28 @@ extension MessageCell {
                 imageView.image = attachment.thumbnail
                 
                 var willLoadLinkImage = false
-                if attachment.type == .link,
-                   let urlString = attachment.attachment.url,
-                   let linkUrl = URL(string: urlString) {
-                    // Use the same image LinkPreviewView shows
-                    if let metadata = LinkMetadataProvider.default.metadata(for: linkUrl) {
-                        imageView.image = metadata.thumbnail ?? metadata.image
-                    } else {
-                        // Not cached yet — fetch async and update once ready
-                        willLoadLinkImage = true
-                        LinkMetadataProvider.default.fetch(url: linkUrl) { [weak self] result in
-                            guard case .success(let metadata) = result else { return }
-                            let image = metadata.thumbnail ?? metadata.image
-                            DispatchQueue.main.async {
-                                self?.imageView.image = image
+                if attachment.type == .link {
+                    willLoadLinkImage = true
+                    imageView.image = traitCollection.userInterfaceStyle == .dark ? Images.replyLinkPlaceholderDark : Images.replyLinkPlaceholder
+                    if let urlString = attachment.attachment.url,
+                       let linkUrl = URL(string: urlString) {
+                        // Use the same image LinkPreviewView shows
+                        if let metadata = LinkMetadataProvider.default.metadata(for: linkUrl) {
+                            imageView.image = metadata.thumbnail ?? metadata.image
+                        } else {
+                            // Not cached yet — fetch async and update once ready
+                            willLoadLinkImage = true
+                            LinkMetadataProvider.default.fetch(url: linkUrl) { [weak self] result in
+                                guard case .success(let metadata) = result else { return }
+                                let image = metadata.thumbnail ?? metadata.image
+                                DispatchQueue.main.async {
+                                    self?.imageView.image = image
+                                }
                             }
                         }
                     }
                 }
+                
                 guard imageView.image != nil || willLoadLinkImage else { return }
                 messageLabel.numberOfLines = 1
                 stackViewV.distribution = .fillEqually

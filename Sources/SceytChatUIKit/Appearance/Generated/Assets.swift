@@ -153,6 +153,8 @@ internal enum Assets {
   internal static let noFiles = ImageAsset(name: "no_files")
   internal static let noGroups = ImageAsset(name: "no_groups")
   internal static let noLink = ImageAsset(name: "no_link")
+  internal static let replyLinkPlaceholder = ImageAsset(name: "reply_link_placeholder")
+  internal static let replyLinkPlaceholderDark = ImageAsset(name: "reply_link_placeholder_dark")
   internal static let noMedia = ImageAsset(name: "no_media")
   internal static let noMember = ImageAsset(name: "no_member")
   internal static let noMessages = ImageAsset(name: "no_messages")
