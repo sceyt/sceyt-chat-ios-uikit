@@ -78,6 +78,14 @@ extension UIImageView {
                 return
             }
         } else {
+            if let item = sender.item {
+                let attachment = item.attachment
+                guard attachment.status == .done || fileProvider.filePath(attachment: attachment) != nil
+                else {
+                    logger.verbose("[Attachment] showImageViewer blocked — attachment not downloaded yet, status=\(attachment.status) id=\(attachment.id)")
+                    return
+                }
+            }
             guard let previewer = sender.previewer?(),
                   previewer.canShowPreviewer()
             else { return }
