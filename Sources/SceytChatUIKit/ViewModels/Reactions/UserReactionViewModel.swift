@@ -16,7 +16,10 @@ open class UserReactionViewModel: NSObject {
     public let provider: MessageReactionProvider
     public let messageId: MessageId
     public let reactionKey: String?
-    
+
+    public private(set) var reactions: [ChatMessage.Reaction] = []
+    private var pendingInserts: (indexPaths: [IndexPath], items: [ChatMessage.Reaction])?
+
     public private(set) lazy var reactionObserver: DatabaseObserver<ReactionDTO, ChatMessage.Reaction> = {
         var predicate = NSPredicate(format: "message.id == %lld", messageId)
         if let reactionKey {
@@ -58,25 +61,63 @@ open class UserReactionViewModel: NSObject {
     }
 
     open func onDidChangeEvent(items: DBChangeItemPaths) {
-        if reactionObserver.isEmpty || items.inserts.isEmpty {
+        if reactionObserver.isEmpty || items.inserts.isEmpty || !items.deletes.isEmpty || !items.moves.isEmpty {
+            syncReactions()
             event = .reloadData
             return
         }
-        event = .insert(items.inserts)
+        let pairs = items.inserts.compactMap { indexPath -> (IndexPath, ChatMessage.Reaction)? in
+            guard let item = reactionObserver.item(at: indexPath) else { return nil }
+            return (indexPath, item)
+        }
+        guard !pairs.isEmpty else {
+            syncReactions()
+            event = .reloadData
+            return
+        }
+        pendingInserts = (indexPaths: pairs.map { $0.0 }, items: pairs.map { $0.1 })
+        event = .insert(pairs.map { $0.0 })
+    }
+
+    open func applyPendingInserts() -> [IndexPath] {
+        guard let pending = pendingInserts else { return [] }
+        defer { pendingInserts = nil }
+        let sorted = zip(pending.indexPaths, pending.items).sorted { $0.0 < $1.0 }
+        var existingUserKeys = Set(reactions.compactMap { r -> String? in
+            guard let uid = r.user?.id else { return nil }
+            return "\(uid)_\(r.key)"
+        })
+        var insertedPaths: [IndexPath] = []
+        for (indexPath, item) in sorted {
+            let userKey = "\(item.user?.id ?? "")_\(item.key)"
+            guard !existingUserKeys.contains(userKey) else { continue }
+            existingUserKeys.insert(userKey)
+            let index = min(indexPath.item, reactions.count)
+            reactions.insert(item, at: index)
+            insertedPaths.append(indexPath)
+        }
+        return insertedPaths
+    }
+
+    private func syncReactions() {
+        reactions = (0..<reactionObserver.numberOfItems(in: 0))
+            .compactMap { reactionObserver.item(at: IndexPath(item: $0, section: 0)) }
     }
 
     open func numberOfItems(in section: Int) -> Int {
-        reactionObserver.numberOfItems(in: section)
+        reactions.count
     }
 
     open func cellModel(at indexPath: IndexPath) -> ChatMessage.Reaction? {
-        reactionObserver.item(at: indexPath)
+        guard indexPath.item < reactions.count else { return nil }
+        return reactions[indexPath.item]
     }
 
     open func reaction(at indexPath: IndexPath) -> ChatMessage.Reaction? {
-        reactionObserver.item(at: indexPath)
+        guard indexPath.item < reactions.count else { return nil }
+        return reactions[indexPath.item]
     }
-    
+
     open func loadReactions() {
         provider.loadReactions()
     }
