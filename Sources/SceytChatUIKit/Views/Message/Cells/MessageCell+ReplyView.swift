@@ -141,7 +141,7 @@ extension MessageCell {
                 guard let attachment = data.attachment
                 else { return }
                 imageView.image = attachment.thumbnail
-                
+
                 var willLoadLinkImage = false
                 if attachment.type == .link {
                     willLoadLinkImage = true
@@ -150,21 +150,32 @@ extension MessageCell {
                        let linkUrl = URL(string: urlString) {
                         // Use the same image LinkPreviewView shows
                         if let metadata = LinkMetadataProvider.default.metadata(for: linkUrl) {
-                            imageView.image = metadata.thumbnail ?? metadata.image
+                            let cachedImage = metadata.thumbnail ?? metadata.image
+                            if let cachedImage {
+                                imageView.image = cachedImage
+                            }
                         } else {
                             // Not cached yet — fetch async and update once ready
                             willLoadLinkImage = true
+                            let capturedData = data
                             LinkMetadataProvider.default.fetch(url: linkUrl) { [weak self] result in
                                 guard case .success(let metadata) = result else { return }
                                 let image = metadata.thumbnail ?? metadata.image
                                 DispatchQueue.main.async {
-                                    self?.imageView.image = image
+                                    guard let self else { return }
+                                    guard self.data === capturedData else {
+                                        logger.debug("[ReplyView] async link fetch — data changed after scroll, skipping")
+                                        return
+                                    }
+                                    if let image {
+                                        self.imageView.image = image
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                
+
                 guard imageView.image != nil || willLoadLinkImage else { return }
                 messageLabel.numberOfLines = 1
                 stackViewV.distribution = .fillEqually
@@ -180,7 +191,8 @@ extension MessageCell {
         
         open func setProgressHandler() {
             guard let data = data,
-                  let attachment = data.attachment
+                  let attachment = data.attachment,
+                  attachment.type != .link  // link images are managed via LinkMetadataProvider, not fileProvider
             else { return }
             let message = data.message
             fileProvider
