@@ -169,6 +169,7 @@ extension ChannelListViewController {
             super.setupAppearance()
             
             backgroundColor = appearance.backgroundColor
+            backgroundView?.backgroundColor = appearance.backgroundColor
             unreadCount.font = appearance.unreadCountLabelAppearance.font
             unreadCount.textColor = appearance.unreadCountLabelAppearance.foregroundColor
             atView.font = appearance.unreadMentionLabelAppearance.font
@@ -283,6 +284,9 @@ extension ChannelListViewController {
             dateLabel.text = data.formattedDate
             pinView.isHidden = data.channel.pinnedAt == nil
             backgroundColor = data.channel.pinnedAt == nil ? .clear : appearance.backgroundColor
+            backgroundView = UIView()
+            backgroundView?.backgroundColor = appearance.backgroundColor
+            
             ticksView.image = deliveryStatusImage(message: data.lastMessage)
             ticksView.isHidden = !data.shouldShowDeliveryTick
             unreadCount.value = data.formattedUnreadCount
