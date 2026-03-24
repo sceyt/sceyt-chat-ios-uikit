@@ -1273,6 +1273,15 @@ extension MessageLayoutModel {
                 logger.debug("[Attachment] update(attachment:) SKIPPED loadThumbnail because isThumbnailLoadedFromFile=true")
             }
         }
+
+        open func resetThumbnail() {
+            thumbnail = nil
+            isThumbnailLoadedFromFile = false
+            isLoadedThumbnail = false
+            DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+                self?.loadThumbnail()
+            }
+        }
         
         @discardableResult
         open func updateMessageIfNeeded(ownerMessage: ChatMessage) -> Bool {

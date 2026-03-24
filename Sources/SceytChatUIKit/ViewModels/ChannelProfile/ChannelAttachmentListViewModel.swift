@@ -20,7 +20,21 @@ open class ChannelAttachmentListViewModel: NSObject {
     @Published public var event: Event?
     private let downloadQueue = DispatchQueue(label: "com.sceytchat.uikit.attachments", qos: .userInitiated)
 
-    public var thumbnailSize: CGSize = .init(width: 40, height: 40)
+    public var thumbnailSize: CGSize = .init(width: 40, height: 40) {
+        didSet {
+            guard thumbnailSize != oldValue,
+                  attachmentObserver.isObserverStarted else { return }
+            thumbnailCache.removeAll()
+            for section in 0..<attachmentObserver.numberOfSections {
+                for row in 0..<attachmentObserver.numberOfItems(in: section) {
+                    if let layout = attachmentObserver.item(at: IndexPath(row: row, section: section)) {
+                        layout.thumbnailSize = thumbnailSize
+                        layout.resetThumbnail()
+                    }
+                }
+            }
+        }
+    }
     public var minAutoDownloadSize = 3_000_000
     
     private let thumbnailCache = {
@@ -72,7 +86,6 @@ open class ChannelAttachmentListViewModel: NSObject {
         }
 
         let channel = self.channel
-        let thumbnailSize = self.thumbnailSize
         let appearance = self.appearance
         return LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>(
             context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
@@ -95,7 +108,7 @@ open class ChannelAttachmentListViewModel: NSObject {
                     attachment: attachment,
                     ownerMessage: $0.message?.convert(),
                     ownerChannel: channel,
-                    thumbnailSize: thumbnailSize,
+                    thumbnailSize: self?.thumbnailSize ?? CGSize(width: 40, height: 40),
                     onLoadThumbnail: { [weak self] in
                         self?.cacheThumbnail($0, for: attachment)
                     },
