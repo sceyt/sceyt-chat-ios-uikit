@@ -191,6 +191,7 @@ open class ChannelAttachmentListViewModel: NSObject {
                   minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
                   attachment.status != .done,
                   attachment.status != .failedDownloading,
+                  attachment.status != .pauseDownloading,
                   attachment.status != .failedUploading
             else {
                 DispatchQueue.main.async {
@@ -243,8 +244,11 @@ open class ChannelAttachmentListViewModel: NSObject {
         let attachment = layout.attachment
         guard attachment.status == .downloading,
               fileProvider.filePath(attachment: attachment) == nil
-        else { return }
-        
+        else {
+            logger.debug("[MediaGallery] pauseDownload GUARD FAILED id=\(attachment.id) status=\(attachment.status)")
+            return
+        }
+
         getMessage(layout) { message in
             if let message {
                 fileProvider.stopTransfer(message: message, attachment: attachment) {
