@@ -24,7 +24,6 @@ extension ChannelInfoViewController {
             .withoutAutoresizingMask
 
         open var lastAttachmentTransferProgress: AttachmentTransfer.AttachmentProgress?
-        open var pauseRequested = false
 
         open var overlayLoaderAppearance = CircularProgressView.Appearance(
             reference: CircularProgressView.appearance,
@@ -122,6 +121,7 @@ extension ChannelInfoViewController {
                 self?.pauseButton.isHidden = true
                 self?.progressView.transform = .identity
                 self?.pauseButton.transform = .identity
+                self?.data.loadThumbnail()
             }
         }
 
@@ -148,13 +148,6 @@ extension ChannelInfoViewController {
                     data.update(attachment: done.attachment)
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { return }
-                        // Guard against task.stop() race: if the user requested a pause but
-                        // the download completed anyway before the cancellation took effect,
-                        // keep the paused UI state instead of showing done.
-                        if self.pauseRequested, done.error == nil, done.attachment.status == .done {
-                            self.pauseRequested = false
-                            return
-                        }
                         if let thumbnail = self.data?.thumbnail {
                             self.imageView.image = thumbnail
                         }
@@ -165,8 +158,11 @@ extension ChannelInfoViewController {
 
         override open func prepareForReuse() {
             super.prepareForReuse()
-            pauseRequested = false
             lastAttachmentTransferProgress = nil
+            progressView.isHidden = true
+            pauseButton.isHidden = true
+            progressView.isHiddenProgress = false
+            progressView.progress = 0
         }
 
         @objc open func pauseButtonTapped() {

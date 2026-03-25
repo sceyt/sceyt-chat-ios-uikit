@@ -165,6 +165,20 @@ open class ChannelInfoViewController: ViewController,
             .sink { [weak self] in
                 self?.onEvent($0)
             }.store(in: &subscriptions)
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.mediaListViewController.visibleCells
+                        .compactMap { $0 as? ChannelInfoViewController.AttachmentCell }
+                        .filter { !$0.progressView.isHidden }
+                        .forEach {
+                            $0.progressView.removeRotateZAnimation()
+                            $0.progressView.createRotateZAnimation()
+                        }
+                }
+            }.store(in: &subscriptions)
     }
     
     override open func setupAppearance() {
