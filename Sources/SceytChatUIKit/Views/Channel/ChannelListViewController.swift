@@ -316,7 +316,7 @@ open class ChannelListViewController: ViewController,
                     if let openIndexPath = swipeOpenIndexPath, paths.updates.contains(openIndexPath) {
                         applyDiffableUpdatesOnly(at: paths.updates)
                     } else {
-                        applyCurrentSnapshot(animation: true)
+                        applyCurrentSnapshot(animation: false)
                     }
                 } else {
                     let hasDraftChange = paths.updates.contains { indexPath in
