@@ -655,13 +655,19 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     
     @objc
     open func actionViewCancelAction() {
-        if lastDetectedLinkMetadata != nil {
+        let isEditState: Bool
+        if case .edit = currentState { isEditState = true }
+        else if case .edit = nextState { isEditState = true }
+        else { isEditState = false }
+
+        if !isEditState, lastDetectedLinkMetadata != nil {
             cachedMessage = inputTextView.attributedText
         }
         self.didUserDismissLinkPreview = true
-        if case .edit = currentState {
+        if isEditState {
             inputTextView.attributedText = cachedMessage
             cachedMessage = nil
+            nextState = nil
         }
         isViewOnceEnabled = false
         removeActionView()
