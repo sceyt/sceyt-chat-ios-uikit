@@ -99,37 +99,35 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             self.fetchOffset = max(0, fetchOffset)
             self.fetchLimit = max(0, fetchLimit)
             self.currentFetchOffset = self.fetchOffset
-            if let request = DTO.fetchRequest() as? NSFetchRequest<DTO> {
+            context.perform {
+                logger.debug("[MESS] STARTED PERFORM")
+                guard let request = DTO.fetchRequest() as? NSFetchRequest<DTO> else { return }
                 var changeItems = [ChangeItem]()
                 var changeSections = [ChangeSection]()
-                request.sortDescriptors = sortDescriptors
-                request.predicate = fetchPredicate ?? self.fetchPredicate
+                request.sortDescriptors = self.sortDescriptors
+                request.predicate = self.fetchPredicate
                 request.fetchLimit = self.fetchLimit
                 request.fetchOffset = self.fetchOffset
-                
-                context.perform {
-                    logger.debug("[MESS] STARTED PERFORM")
-                    self.clearCache()
-                    var insertCache = self.mainCaches.workingCache
-                    self.fetchObjects(context: self.context,
-                                      request: request,
-                                      in: &insertCache,
-                                      changeItems: &changeItems,
-                                      changeSections: &changeSections)
-                    self.isObserverStarted = true
-                    self.mainCaches.workingCache = insertCache
-                    let path = ChangeItemPaths(changeItems: changeItems, changeSections: changeSections)
-                    let userInfo = self.onWillChange?(self.mainCaches.workingCache, path)
-                    self.queue {
-                        logger.debug("[MESS] STARTED EVENT")
-                        self.mainCaches.mainCache = insertCache
-                        self.isObserverRestarting = false
-                        self.onDidChange?(true, path, userInfo)
-                        completion?()
-                    }
+                self.clearCache()
+                var insertCache = self.mainCaches.workingCache
+                self.fetchObjects(context: self.context,
+                                  request: request,
+                                  in: &insertCache,
+                                  changeItems: &changeItems,
+                                  changeSections: &changeSections)
+                self.isObserverStarted = true
+                self.mainCaches.workingCache = insertCache
+                let path = ChangeItemPaths(changeItems: changeItems, changeSections: changeSections)
+                let userInfo = self.onWillChange?(self.mainCaches.workingCache, path)
+                self.queue {
+                    logger.debug("[MESS] STARTED EVENT")
+                    self.mainCaches.mainCache = insertCache
+                    self.isObserverRestarting = false
+                    self.onDidChange?(true, path, userInfo)
+                    completion?()
                 }
-                addObservers()
             }
+            addObservers()
         }
     
     open func stopObserver() {
@@ -161,7 +159,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     
     open func update(predicate: NSPredicate, fetchOffset: Int = Int.max) {
-        readCache {
+        writeCache {
             self.fetchPredicate = predicate
             self.currentFetchOffset = max(0, fetchOffset == Int.max ? self.currentFetchOffset : fetchOffset)
         }
@@ -466,13 +464,15 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         fetched: @escaping (Int) -> Void,
         done: (() -> Void)? = nil
     ) {
+        let resolvedPredicate = readCache { predicate ?? self.fetchPredicate }
+
         func perform(context: NSManagedObjectContext) {
             if let request = DTO.fetchRequest() as? NSFetchRequest<DTO> {
                 var insertCache = mainCaches.workingCache
                 var changeItems = [ChangeItem]()
                 var changeSections = [ChangeSection]()
                 request.sortDescriptors = sortDescriptors
-                request.predicate = predicate ?? fetchPredicate
+                request.predicate = resolvedPredicate
                 request.fetchLimit = limit
                 request.fetchOffset = offset
                 let count = fetchObjects(context: context,
@@ -489,7 +489,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                     done: done)
             }
         }
-        
+
         self.perform {
             perform(context: self.context)
         }
