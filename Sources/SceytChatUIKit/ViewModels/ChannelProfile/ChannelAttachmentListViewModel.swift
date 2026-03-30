@@ -242,23 +242,15 @@ open class ChannelAttachmentListViewModel: NSObject {
 
     open func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
-        guard attachment.status == .downloading,
-              fileProvider.filePath(attachment: attachment) == nil
-        else {
-            logger.debug("[MediaGallery] pauseDownload GUARD FAILED id=\(attachment.id) status=\(attachment.status)")
-            return
-        }
 
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) {
-                    if $0 {
-                        DataProvider.database.write {
-                            let attachmentDTO = AttachmentDTO.fetch(id: attachment.id, context: $0)
-                            attachmentDTO?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue
-                        } completion: { error in
-                            logger.errorIfNotNil(error, "")
-                        }
+                fileProvider.stopTransfer(message: message, attachment: attachment) { _ in
+                    DataProvider.database.write {
+                        let attachmentDTO = AttachmentDTO.fetch(id: attachment.id, context: $0)
+                        attachmentDTO?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue
+                    } completion: { error in
+                        logger.errorIfNotNil(error, "")
                     }
                 }
             }
