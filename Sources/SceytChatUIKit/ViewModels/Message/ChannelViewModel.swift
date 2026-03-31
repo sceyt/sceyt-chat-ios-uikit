@@ -1055,7 +1055,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         completion: ((Error?) -> Void)? = nil
     ) {
         if chatClient.connectionState == .connected {
-            provider.loadNearMessages(near: id) { [weak self] error in
+            provider.loadNearMessages(near: id) { [weak self] _, error in
                 if error == nil {
                     self?.messageObserver.restartToNear(at: id)
                 }
@@ -1068,19 +1068,25 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open func loadNearMessagesOfRepliedMessage(
         id: MessageId,
-        completion: ((Error?) -> Void)? = nil
+        completion: (([Message]?, Error?) -> Void)? = nil
     ) {
         if chatClient.connectionState == .connected {
-            provider.loadNearMessages(near: id) { [weak self] error in
+            provider.loadNearMessages(near: id) { [weak self] messages, error in
+                guard let self else { return }
                 if error == nil {
-                    self?.messageObserver.restartToNear(at: id)
+                    
+                    if messages?.first(where: { $0.id == id }) == nil {
+                        return
+                    }
+                    
+                    self.messageObserver.restartToNear(at: id)
                 }
-                completion?(error)
+                completion?(messages, error)
             }
         } else {
-            completion?(SceytChatError.notConnect)
+            completion?(nil, SceytChatError.notConnect)
         }
-        
+
     }
     
     open func loadNearMessagesOfUnreadMention(
@@ -1088,7 +1094,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         completion: ((Error?) -> Void)? = nil
     ) {
         if chatClient.connectionState == .connected {
-            provider.loadNearMessages(near: id) { [weak self] error in
+            provider.loadNearMessages(near: id) { [weak self] _, error in
                 if error == nil {
                     self?.messageObserver.restartToNear(at: id)
                 }
@@ -2361,12 +2367,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         {[weak self] ranges in
             guard let self else { return }
             if !ranges.isEmpty {
-                let sectionsCount = self.numberOfSections
-                self.messageObserver.restartToNear(at: messageId) {[weak self] isDone in
-                    guard let self else { return }
-                    if !isDone {
-                        self.loadNearMessagesOfRepliedMessage(id: messageId)
+                self.loadNearMessagesOfRepliedMessage(id: messageId) { messages, error in
+                    if messages?.first(where: { $0.id == messageId }) == nil {
+                        return
                     }
+                    self.messageObserver.restartToNear(at: messageId)
                 }
             } else {
                 self.loadNearMessagesOfRepliedMessage(id: messageId)
