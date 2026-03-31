@@ -80,8 +80,16 @@ extension UIImageView {
         } else {
             if let item = sender.item {
                 let attachment = item.attachment
-                guard attachment.status == .done || fileProvider.filePath(attachment: attachment) != nil
-                else {
+                if fileProvider.filePath(attachment: attachment) != nil {
+                    if attachment.status != .done {
+                        attachment.status = .done
+                        DataProvider.database.write {
+                            AttachmentDTO.fetch(id: attachment.id, context: $0)?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+                        } completion: { error in
+                            logger.errorIfNotNil(error, "")
+                        }
+                    }
+                } else if attachment.status != .done {
                     logger.verbose("[Attachment] showImageViewer blocked — attachment not downloaded yet, status=\(attachment.status) id=\(attachment.id)")
                     return
                 }
