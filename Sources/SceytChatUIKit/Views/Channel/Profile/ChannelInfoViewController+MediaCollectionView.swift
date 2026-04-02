@@ -151,10 +151,11 @@ extension ChannelInfoViewController {
                     let status = progressStatus ?? dataStatus
                     switch status {
                     case .pauseDownloading, .failedDownloading:
+                        logger.debug("[MediaGallery] onPauseAction → resumeDownload")
                         cell.update(status: .downloading)
                         cell.setProgressHandler()
                         self.mediaViewModel.resumeDownload(data)
-                    case .downloading:
+                    case .downloading, .pending:
                         cell.update(status: .pauseDownloading)
                         self.mediaViewModel.pauseDownload(data)
                     default:
