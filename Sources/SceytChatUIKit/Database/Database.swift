@@ -91,15 +91,25 @@ public extension Database {
                 self.backgroundReadOnlyObservableContext.stalenessInterval = -1
             }
             
-            DispatchQueue.main.async {
+            backgroundReadOnlyContext.perform {
                 if resetStalenessInterval {
-                    self.viewContext.stalenessInterval = 0
+                    self.backgroundReadOnlyContext.stalenessInterval = 0
                 }
-                self.viewContext.refreshAllObjects()
+                self.backgroundReadOnlyContext.refreshAllObjects()
                 if resetStalenessInterval {
-                    self.viewContext.stalenessInterval = -1
+                    self.backgroundReadOnlyContext.stalenessInterval = -1
                 }
-                completion?()
+                
+                DispatchQueue.main.async {
+                    if resetStalenessInterval {
+                        self.viewContext.stalenessInterval = 0
+                    }
+                    self.viewContext.refreshAllObjects()
+                    if resetStalenessInterval {
+                        self.viewContext.stalenessInterval = -1
+                    }
+                    completion?()
+                }
             }
         }
     }
