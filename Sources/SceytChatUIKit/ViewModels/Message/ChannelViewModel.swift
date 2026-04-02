@@ -153,13 +153,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         self.channel = channel
         self.threadMessage = threadMessage
         if let lastMessage = channel.lastMessage {
+            logger.verbose("[ChannelViewModel] init lastMessage.id: \(lastMessage.id), channel.lastDisplayedMessageId: \(channel.lastDisplayedMessageId), lastMessage.incoming: \(lastMessage.incoming)")
             if channel.lastDisplayedMessageId == lastMessage.id || !lastMessage.incoming {
                 lastDisplayedMessageId = 0
+                logger.verbose("[ChannelViewModel] init lastDisplayedMessageId set to 0 (lastDisplayedMessageId == lastMessage.id: \(channel.lastDisplayedMessageId == lastMessage.id), incoming: \(lastMessage.incoming))")
             } else {
                 lastDisplayedMessageId = channel.lastDisplayedMessageId
+                logger.verbose("[ChannelViewModel] init lastDisplayedMessageId set to \(channel.lastDisplayedMessageId)")
             }
         } else {
             lastDisplayedMessageId = 0
+            logger.verbose("[ChannelViewModel] init lastDisplayedMessageId set to 0 (no lastMessage)")
         }
         super.init()
         SceytChatUIKit.shared.chatClient.add(
@@ -874,7 +878,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
               message.incoming
         else { return }
         
-        lastDisplayedMessageId = lastMessage.id
+//        lastDisplayedMessageId = lastMessage.id
+        lastDisplayedMessageId = 0
         
         let model = Components.messageLayoutModel
             .init(
