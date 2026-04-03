@@ -136,7 +136,14 @@ extension ChannelInfoViewController {
                        let progress = fileProvider.currentProgressPercent(message: message, attachment: model.attachment) {
                         cell.setProgress(progress)
                     } else if fileProvider.filePath(attachment: model.attachment) == nil {
-                        cell.setProgress(0.0001)
+                        let willAutoDownload = model.attachment.status == .downloading
+                            || mediaViewModel.minAutoDownloadSize <= 0
+                            || model.attachment.uploadedFileSize <= mediaViewModel.minAutoDownloadSize
+                        if willAutoDownload {
+                            cell.setProgress(0.0001)
+                        } else {
+                            cell.update(status: .pauseDownloading)
+                        }
                     }
                 case .done:
                     cell.setProgress(0)
@@ -155,9 +162,19 @@ extension ChannelInfoViewController {
                         cell.update(status: .downloading)
                         cell.setProgressHandler()
                         self.mediaViewModel.resumeDownload(data)
-                    case .downloading, .pending:
+                    case .downloading:
                         cell.update(status: .pauseDownloading)
                         self.mediaViewModel.pauseDownload(data)
+                    case .pending:
+                        if let message = data.ownerMessage,
+                           fileProvider.currentProgressPercent(message: message, attachment: data.attachment) != nil {
+                            cell.update(status: .pauseDownloading)
+                            self.mediaViewModel.pauseDownload(data)
+                        } else {
+                            cell.update(status: .downloading)
+                            cell.setProgressHandler()
+                            self.mediaViewModel.resumeDownload(data)
+                        }
                     default:
                         logger.debug("[MediaGallery] pauseButton tapped but status=\(status) — no action taken")
                         break
