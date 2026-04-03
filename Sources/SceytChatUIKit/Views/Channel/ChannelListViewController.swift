@@ -273,6 +273,7 @@ open class ChannelListViewController: ViewController,
 
     open func reloadTableView() {
         if dataSourceMode == .diffable {
+            channelFingerprints = [:]
             applyCurrentSnapshot()
         } else {
             tableView.reloadData()
