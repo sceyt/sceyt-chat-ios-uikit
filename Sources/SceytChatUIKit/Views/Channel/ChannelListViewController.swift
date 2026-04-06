@@ -236,6 +236,8 @@ open class ChannelListViewController: ViewController,
         case .reload:
             reloadTableView()
             showEmptyViewIfNeeded()
+        case .resetFingerprints:
+            channelFingerprints = [:]
         case .reloadSearch:
             searchResultsViewController.reloadData()
         case let .unreadMessagesCount(count):
@@ -273,7 +275,6 @@ open class ChannelListViewController: ViewController,
 
     open func reloadTableView() {
         if dataSourceMode == .diffable {
-            channelFingerprints = [:]
             applyCurrentSnapshot()
         } else {
             tableView.reloadData()
