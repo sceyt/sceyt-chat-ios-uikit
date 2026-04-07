@@ -20,7 +20,7 @@ extension ChannelInfoViewController {
                                               lineSpacing: 0,
                                               sectionHeadersPinToVisibleBounds: true)
         
-        open var fileViewModel: ChannelAttachmentListViewModel!
+        open var fileViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
         
         open var layout: Layout? { collectionViewLayout as? Layout }
         
@@ -57,7 +57,7 @@ extension ChannelInfoViewController {
                 self?.fileViewModel.startDatabaseObserver()
             }
             
-            fileViewModel.$event
+            fileViewModel.eventPublisher
                 .compactMap { $0 }
                 .sink { [weak self] in
                     self?.onEvent($0)

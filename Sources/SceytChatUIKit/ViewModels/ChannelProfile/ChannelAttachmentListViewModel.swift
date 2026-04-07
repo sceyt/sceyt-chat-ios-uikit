@@ -282,3 +282,80 @@ public extension ChannelAttachmentListViewModel {
         case change(ChangeItemPaths)
     }
 }
+
+// MARK: - Protocol
+
+public protocol ChannelAttachmentListViewModelProviding: AnyObject {
+    var numberOfSections: Int { get }
+    func numberOfAttachments(in section: Int) -> Int
+    var thumbnailSize: CGSize { get set }
+    var minAutoDownloadSize: Int { get }
+    func startDatabaseObserver()
+    func loadAttachments()
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?,
+        onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout?
+    func downloadAttachmentIfNeeded(
+        _ layout: MessageLayoutModel.AttachmentLayout,
+        completion: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+    )
+    func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout)
+    func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout)
+    var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> { get }
+}
+
+public extension ChannelAttachmentListViewModelProviding {
+    func attachmentLayout(at indexPath: IndexPath) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: nil, onLoadLinkMetadata: nil)
+    }
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: onLoadThumbnail, onLoadLinkMetadata: nil)
+    }
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: nil, onLoadLinkMetadata: onLoadLinkMetadata)
+    }
+    func downloadAttachmentIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
+        downloadAttachmentIfNeeded(layout, completion: nil)
+    }
+}
+
+extension ChannelAttachmentListViewModel: ChannelAttachmentListViewModelProviding {
+    public var eventPublisher: AnyPublisher<Event?, Never> { $event.eraseToAnyPublisher() }
+}
+
+// MARK: - Empty default
+
+public extension ChannelAttachmentListViewModel {
+    final class Empty: NSObject, ChannelAttachmentListViewModelProviding {
+        public var numberOfSections: Int { 0 }
+        public func numberOfAttachments(in section: Int) -> Int { 0 }
+        public var thumbnailSize: CGSize = .zero
+        public var minAutoDownloadSize: Int = 0
+        public func startDatabaseObserver() {}
+        public func loadAttachments() {}
+        public func attachmentLayout(
+            at indexPath: IndexPath,
+            onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?,
+            onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+        ) -> MessageLayoutModel.AttachmentLayout? { nil }
+        public func downloadAttachmentIfNeeded(
+            _ layout: MessageLayoutModel.AttachmentLayout,
+            completion: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+        ) {}
+        public func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {}
+        public func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout) {}
+
+        private let eventSubject = PassthroughSubject<ChannelAttachmentListViewModel.Event?, Never>()
+        public var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> {
+            eventSubject.eraseToAnyPublisher()
+        }
+    }
+}

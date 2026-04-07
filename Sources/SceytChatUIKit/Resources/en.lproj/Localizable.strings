@@ -370,6 +370,13 @@
 "search.noResults.title" = "No Results";
 "search.noResults.message" = "There were no results found.";
 
+"search.category.chats" = "Chats";
+"search.category.channels" = "Channels";
+"search.category.media" = "Media";
+"search.category.voice" = "Voice";
+"search.category.files" = "Files";
+"search.category.links" = "Links";
+
 "channel.noMessages.title" = "No Messages yet";
 "channel.noMessages.message" = "No messages yet, start the chat";
 "channel.created.title" = "You created a channel";

@@ -871,6 +871,20 @@ public enum L10n {
     }
   }
   public enum Search {
+    public enum Category {
+      /// Chats
+      public static let chats = L10n.tr("Localizable", "search.category.chats", fallback: "Chats")
+      /// Channels
+      public static let channels = L10n.tr("Localizable", "search.category.channels", fallback: "Channels")
+      /// Media
+      public static let media = L10n.tr("Localizable", "search.category.media", fallback: "Media")
+      /// Voice
+      public static let voice = L10n.tr("Localizable", "search.category.voice", fallback: "Voice")
+      /// Files
+      public static let files = L10n.tr("Localizable", "search.category.files", fallback: "Files")
+      /// Links
+      public static let links = L10n.tr("Localizable", "search.category.links", fallback: "Links")
+    }
     public enum NoResults {
       /// There were no results found.
       public static let message = L10n.tr("Localizable", "search.noResults.message", fallback: "There were no results found.")

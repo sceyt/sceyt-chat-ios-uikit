@@ -19,7 +19,7 @@ extension ChannelInfoViewController {
                                               lineSpacing: 0,
                                               sectionHeadersPinToVisibleBounds: true)
         
-        open var voiceViewModel: ChannelAttachmentListViewModel!
+        open var voiceViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
         
         open var layout: Layout? { collectionViewLayout as? Layout }
         
@@ -57,7 +57,7 @@ extension ChannelInfoViewController {
             RunLoop.main.perform {[weak self] in
                 self?.voiceViewModel.startDatabaseObserver()
             }
-            voiceViewModel.$event
+            voiceViewModel.eventPublisher
                 .compactMap { $0 }
                 .sink { [weak self] in
                     self?.onEvent($0)

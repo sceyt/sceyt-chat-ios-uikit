@@ -44,11 +44,18 @@ open class ChannelListViewController: ViewController,
         .init()
         .withoutAutoresizingMask
 
+    open var globalSearchEnabled: Bool = false
+
     open lazy var searchController = Components.channelSearchController
         .init(searchResultsController: searchResultsViewController)
 
-    open lazy var searchResultsViewController = Components.channelSearchResultsViewController
-        .init()
+    open lazy var searchResultsViewController: ChannelSearchResultsBaseViewController = {
+        if globalSearchEnabled {
+            return Components.globalSearchResultsViewController.init()
+        } else {
+            return Components.channelSearchResultsViewController.init()
+        }
+    }()
 
     private var isViewDidAppear = false
 
@@ -72,6 +79,10 @@ open class ChannelListViewController: ViewController,
         searchResultsViewController.resultsUpdater = channelListViewModel
         navigationItem.searchController = searchController
         searchController.searchResultsUpdater = self
+        
+        if globalSearchEnabled {
+            searchController.showsSearchResultsController = true
+        }
 
         definesPresentationContext = true
 
@@ -164,7 +175,11 @@ open class ChannelListViewController: ViewController,
         tableView.backgroundColor = .clear
         emptyView.parentAppearance = appearance.emptyViewAppearance
         searchController.parentAppearance = appearance.searchControllerAppearance
-        searchResultsViewController.parentAppearance = appearance.searchResultControllerAppearance
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            globalVC.parentAppearance = appearance.globalSearchControllerAppearance
+        } else {
+            searchResultsViewController.parentAppearance = appearance.searchResultControllerAppearance
+        }
     }
 
     open override func setupDone() {
