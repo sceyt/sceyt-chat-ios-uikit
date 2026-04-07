@@ -222,10 +222,20 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         guard completed,
               let currentVC = pageViewController.viewControllers?.first,
               let index = pages.firstIndex(of: currentVC)
-        else { return }
+        else {
+            // Swipe cancelled — snap indicator back to the current page
+            categoryTabBar.setSelectedIndex(currentIndex, animated: true)
+            return
+        }
 
         currentIndex = index
+        // Block the UIPageViewController internal scroll-view reset from
+        // triggering a spurious progress update with the new currentIndex.
+        isAnimatingPageTransition = true
         categoryTabBar.setSelectedIndex(index, animated: true)
+        DispatchQueue.main.async { [weak self] in
+            self?.isAnimatingPageTransition = false
+        }
     }
 
     // MARK: - Live scroll progress
@@ -464,6 +474,8 @@ extension GlobalSearchResultsViewController {
             }
 
             guard tabButtons.indices.contains(fromIndex), tabButtons.indices.contains(toIndex) else { return }
+            // At the first or last page the indices clamp to the same value — nothing to animate.
+            guard fromIndex != toIndex else { return }
 
             let fromBtn = tabButtons[fromIndex]
             let toBtn = tabButtons[toIndex]
@@ -476,17 +488,28 @@ extension GlobalSearchResultsViewController {
             indicatorLeading.constant = fromX + (toX - fromX) * t
             indicatorWidth.constant = fromW + (toW - fromW) * t
 
-            // Interpolate label colours
-            let selected = appearance.selectedTabColor
-            let unselected = appearance.unselectedTabColor
+            // Interpolate text colour, background colour and border colour
+            let selectedText = appearance.selectedTabColor
+            let unselectedText = appearance.unselectedTabColor
+            let selectedBg: UIColor = appearance.selectedTabBackgroundColor ?? .clear
+            // Keep both endpoints in the same colour space so getRed succeeds
+            let clearBg = selectedBg.withAlphaComponent(0)
+            let unselectedBorder = appearance.unselectedTabBorderColor
+            let clearBorder = unselectedBorder.withAlphaComponent(0)
 
             tabButtons.enumerated().forEach { idx, btn in
                 if idx == fromIndex {
-                    btn.setTitleColor(selected.interpolated(to: unselected, fraction: t), for: .normal)
+                    btn.setTitleColor(selectedText.interpolated(to: unselectedText, fraction: t), for: .normal)
+                    btn.backgroundColor = selectedBg.interpolated(to: clearBg, fraction: t)
+                    btn.layer.borderColor = clearBorder.interpolated(to: unselectedBorder, fraction: t).cgColor
                 } else if idx == toIndex {
-                    btn.setTitleColor(unselected.interpolated(to: selected, fraction: t), for: .normal)
+                    btn.setTitleColor(unselectedText.interpolated(to: selectedText, fraction: t), for: .normal)
+                    btn.backgroundColor = clearBg.interpolated(to: selectedBg, fraction: t)
+                    btn.layer.borderColor = unselectedBorder.interpolated(to: clearBorder, fraction: t).cgColor
                 } else {
-                    btn.setTitleColor(unselected, for: .normal)
+                    btn.setTitleColor(unselectedText, for: .normal)
+                    btn.backgroundColor = nil
+                    btn.layer.borderColor = unselectedBorder.cgColor
                 }
             }
         }
@@ -519,6 +542,15 @@ extension GlobalSearchResultsViewController {
 
         private func scrollToVisible(index: Int, animated: Bool) {
             guard tabButtons.indices.contains(index) else { return }
+            if index == 0 {
+                scrollView.setContentOffset(CGPoint(x: -scrollView.contentInset.left, y: 0), animated: animated)
+                return
+            }
+            if index == tabButtons.count - 1 {
+                let maxX = scrollView.contentSize.width - scrollView.bounds.width + scrollView.contentInset.right
+                scrollView.setContentOffset(CGPoint(x: max(-scrollView.contentInset.left, maxX), y: 0), animated: animated)
+                return
+            }
             let btn = tabButtons[index]
             let rect = btn.convert(btn.bounds, to: scrollView)
             scrollView.scrollRectToVisible(rect.insetBy(dx: -16, dy: 0), animated: animated)
