@@ -627,6 +627,48 @@ extension GlobalSearchResultsViewController {
             tableView.backgroundColor = .clear
         }
 
+        private static var currentKeyboardInset: CGFloat = 0
+
+        override open func setupDone() {
+            super.setupDone()
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(keyboardWillChangeFrame(_:)),
+                name: UIResponder.keyboardWillChangeFrameNotification,
+                object: nil
+            )
+        }
+
+        override open func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            let inset = ChannelTablePageViewController.currentKeyboardInset
+            tableView.contentInset.bottom = inset
+            tableView.verticalScrollIndicatorInsets.bottom = inset
+        }
+
+        @objc private func keyboardWillChangeFrame(_ notification: Notification) {
+            guard
+                let info = notification.userInfo,
+                let endFrame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
+                let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
+                let curveRaw = info[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt,
+                isViewLoaded, let window = view.window
+            else { return }
+
+            let keyboardFrameInView = window.convert(endFrame, to: view)
+            let overlap = max(0, view.bounds.maxY - keyboardFrameInView.minY)
+            let safeBottom = view.safeAreaInsets.bottom
+            let inset = max(0, overlap - safeBottom)
+
+            ChannelTablePageViewController.currentKeyboardInset = inset
+
+            let options = UIView.AnimationOptions(rawValue: curveRaw << 16)
+            UIView.animate(withDuration: duration, delay: 0, options: options) {
+                self.tableView.contentInset.bottom = inset
+                self.tableView.verticalScrollIndicatorInsets.bottom = inset
+            }
+        }
+
         open func reloadData() {
             tableView.reloadData()
             emptyStateView.isHidden = !channels.isEmpty
