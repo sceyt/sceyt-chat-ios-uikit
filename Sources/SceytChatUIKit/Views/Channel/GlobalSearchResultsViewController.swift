@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Combine
 import SceytChat
 
 open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewController,
@@ -136,8 +137,9 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
 
     override open func setupAppearance() {
         view.backgroundColor = appearance.backgroundColor
-        if let tabAppearance = (appearance as? Appearance)?.tabBarAppearance {
-            categoryTabBar.appearance = tabAppearance
+        if let appearance = appearance as? Appearance {
+            categoryTabBar.appearance = appearance.tabBarAppearance
+            chatsPage.cellAppearance = appearance.cellAppearance
         }
     }
 
@@ -151,27 +153,12 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
 
     // MARK: - Public API
 
+    @objc open func search(query: String?) {
+        chatsPage.viewModel.search(query: query)
+        channelsPage.viewModel.search(query: query)
+    }
+
     override open func reloadData() {
-        let result = resultsUpdater.searchResults
-
-        // Chats: direct + group channels (section 0 in ChannelSearchResultImp)
-        var chatChannels: [ChatChannel] = []
-        var broadcastChannels: [ChatChannel] = []
-
-        for section in 0..<result.numberOfSections {
-            for row in 0..<result.numberOfChannels(in: section) {
-                guard let ch = result.channel(at: IndexPath(row: row, section: section)) else { continue }
-                switch ch.channelType {
-                case .direct, .group:
-                    chatChannels.append(ch)
-                case .broadcast:
-                    broadcastChannels.append(ch)
-                }
-            }
-        }
-
-        chatsPage.channels = chatChannels
-        channelsPage.channels = broadcastChannels
         chatsPage.reloadData()
         channelsPage.reloadData()
     }
@@ -664,11 +651,88 @@ extension GlobalSearchResultsViewController {
 
     // MARK: Chats Page
 
-    open class ChatsPageViewController: ChannelTablePageViewController {}
+    open class ChatsPageViewController: ChannelTablePageViewController {
+
+        open var cellAppearance: ChannelListViewController.ChannelCell.Appearance = Components.channelCell.appearance
+
+        private var layoutModels: [ChatChannel: ChannelLayoutModel] = [:]
+
+        open lazy var viewModel: GlobalSearchViewModel = {
+            let vm = Components.globalSearchViewModel.init()
+            let config = SceytChatUIKit.shared.config.channelTypesConfig
+            vm.channelTypes = [config.direct, config.group]
+            return vm
+        }()
+
+        override open func setup() {
+            super.setup()
+            tableView.register(Components.channelCell)
+        }
+
+        override open func setupDone() {
+            super.setupDone()
+            viewModel.startDatabaseObserver()
+            viewModel.$event
+                .compactMap { $0 }
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    guard let self else { return }
+                    channels = viewModel.channels
+                    reloadData()
+                }
+                .store(in: &subscriptions)
+        }
+
+        override open func reloadData() {
+            var updated: [ChatChannel: ChannelLayoutModel] = [:]
+            for channel in channels {
+                if let existing = layoutModels[channel] {
+                    _ = existing.update(channel: channel)
+                    updated[channel] = existing
+                } else {
+                    updated[channel] = Components.channelLayoutModel.init(
+                        channel: channel,
+                        appearance: cellAppearance
+                    )
+                }
+            }
+            layoutModels = updated
+            super.reloadData()
+        }
+
+        override public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelCell)
+            cell.parentAppearance = cellAppearance
+            let channel = channels[indexPath.row]
+            cell.data = layoutModels[channel]
+            return cell
+        }
+    }
 
     // MARK: Channels Page
 
-    open class ChannelsPageViewController: ChannelTablePageViewController {}
+    open class ChannelsPageViewController: ChannelTablePageViewController {
+
+        open lazy var viewModel: GlobalSearchViewModel = {
+            let vm = Components.globalSearchViewModel.init()
+            vm.channelTypes = [SceytChatUIKit.shared.config.channelTypesConfig.broadcast]
+            return vm
+        }()
+
+        override open func setupDone() {
+            super.setupDone()
+            viewModel.startDatabaseObserver()
+            viewModel.$event
+                .compactMap { $0 }
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    guard let self else { return }
+                    channels = viewModel.channels
+                    reloadData()
+                }
+                .store(in: &subscriptions)
+        }
+    }
 
     // MARK: Base Attachment Page
 
@@ -795,23 +859,5 @@ extension GlobalSearchResultsViewController {
         open func configure(linkViewModel: ChannelAttachmentListViewModel) {
             collectionView.linkViewModel = linkViewModel
         }
-    }
-}
-
-// MARK: - UIColor interpolation helper
-
-private extension UIColor {
-    func interpolated(to other: UIColor, fraction: CGFloat) -> UIColor {
-        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
-        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
-        getRed(&r1, green: &g1, blue: &b1, alpha: &a1)
-        other.getRed(&r2, green: &g2, blue: &b2, alpha: &a2)
-        let t = max(0, min(1, fraction))
-        return UIColor(
-            red: r1 + (r2 - r1) * t,
-            green: g1 + (g2 - g1) * t,
-            blue: b1 + (b2 - b1) * t,
-            alpha: a1 + (a2 - a1) * t
-        )
     }
 }

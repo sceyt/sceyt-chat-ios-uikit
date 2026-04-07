@@ -510,10 +510,16 @@ open class ChannelListViewController: ViewController,
 
     public var lastSearchText: String?
     public func updateSearchResults(for searchController: UISearchController) {
-        NSObject.cancelPreviousPerformRequests(withTarget: channelListViewModel, selector: #selector(ChannelListViewModel.search(query:)), object: lastSearchText)
         let text = searchController.searchBar.text
-        lastSearchText = text
-        channelListViewModel.perform(#selector(ChannelListViewModel.search(query:)), with: text, afterDelay: 0.01)
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            NSObject.cancelPreviousPerformRequests(withTarget: globalVC, selector: #selector(GlobalSearchResultsViewController.search(query:)), object: lastSearchText)
+            lastSearchText = text
+            globalVC.perform(#selector(GlobalSearchResultsViewController.search(query:)), with: text)
+        } else {
+            NSObject.cancelPreviousPerformRequests(withTarget: channelListViewModel, selector: #selector(ChannelListViewModel.search(query:)), object: lastSearchText)
+            lastSearchText = text
+            channelListViewModel.perform(#selector(ChannelListViewModel.search(query:)), with: text, afterDelay: 0.01)
+        }
     }
 }
 
