@@ -140,6 +140,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         if let appearance = appearance as? Appearance {
             categoryTabBar.appearance = appearance.tabBarAppearance
             chatsPage.cellAppearance = appearance.cellAppearance
+            chatsPage.separatorViewAppearance = appearance.separatorViewAppearance
+            channelsPage.separatorViewAppearance = appearance.channelsSeparatorViewAppearance
         }
     }
 
@@ -664,9 +666,22 @@ extension GlobalSearchResultsViewController {
             return vm
         }()
 
+        open var separatorViewAppearance: SeparatorHeaderView.Appearance = Components.separatorHeaderView.appearance
+
         override open func setup() {
             super.setup()
             tableView.register(Components.channelCell)
+            tableView.register(Components.separatorHeaderView.self)
+        }
+
+        open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+            let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+            header.parentAppearance = separatorViewAppearance
+            return header
+        }
+
+        open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+            channels.isEmpty ? 0 : Components.separatorHeaderView.Layouts.height
         }
 
         override open func setupDone() {
@@ -713,11 +728,28 @@ extension GlobalSearchResultsViewController {
 
     open class ChannelsPageViewController: ChannelTablePageViewController {
 
+        open var separatorViewAppearance: SeparatorHeaderView.Appearance = Components.separatorHeaderView.appearance
+
         open lazy var viewModel: GlobalSearchViewModel = {
             let vm = Components.globalSearchViewModel.init()
             vm.channelTypes = [SceytChatUIKit.shared.config.channelTypesConfig.broadcast]
             return vm
         }()
+
+        override open func setup() {
+            super.setup()
+            tableView.register(Components.separatorHeaderView.self)
+        }
+
+        open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+            let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+            header.parentAppearance = separatorViewAppearance
+            return header
+        }
+
+        open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+            channels.isEmpty ? 0 : Components.separatorHeaderView.Layouts.height
+        }
 
         override open func setupDone() {
             super.setupDone()
