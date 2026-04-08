@@ -64,10 +64,15 @@ open class GlobalSearchUserBarCell: CollectionViewCell {
         super.setupAppearance()
         contentView.backgroundColor = appearance.backgroundColor
         contentView.layer.cornerRadius = Layouts.cornerRadius
-        contentView.layer.borderWidth = 1
+        contentView.layer.borderWidth = 0.5
         contentView.layer.borderColor = appearance.borderColor.cgColor
         contentView.clipsToBounds = true
         backgroundColor = .clear
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOffset = CGSize(width: 0, height: 8)
+        layer.shadowRadius = 20
+        layer.shadowOpacity = 0.12
+        clipsToBounds = false
         avatarView.layer.cornerRadius = Layouts.avatarSize / 2
         avatarView.clipsToBounds = true
         titleLabel.font = appearance.titleLabelAppearance.font

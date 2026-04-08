@@ -13,7 +13,7 @@ import UIKit
 extension GlobalSearchUserBarCell: AppearanceProviding {
 
     public static var appearance = Appearance(
-        backgroundColor: .clear,
+        backgroundColor: .background,
         borderColor: DefaultColors.border,
         titleLabelAppearance: LabelAppearance(
             foregroundColor: .primaryText,
