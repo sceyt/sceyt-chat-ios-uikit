@@ -23,6 +23,7 @@ extension SceytChatUIKit {
         public static var channelForwardViewModel: ChannelForwardViewModel.Type = ChannelForwardViewModel.self
         public static var channelListViewModel: ChannelListViewModel.Type = ChannelListViewModel.self
         public static var globalSearchViewModel: GlobalSearchViewModel.Type = GlobalSearchViewModel.self
+        public static var globalSearchUserBarViewModel: GlobalSearchUserBarViewModel.Type = GlobalSearchUserBarViewModel.self
         public static var channelMemberListViewModel: ChannelMemberListViewModel.Type = ChannelMemberListViewModel.self
         public static var channelMemberRolesViewModel: ChannelMemberRolesViewModel.Type = ChannelMemberRolesViewModel.self
         public static var channelInviteLinkViewModel: ChannelInviteLinkViewModel.Type = ChannelInviteLinkViewModel.self
@@ -151,6 +152,7 @@ extension SceytChatUIKit {
         public static var menuCell: MenuController.MenuCell.Type = MenuController.MenuCell.self
         public static var reactedUserReactionCell: ReactedUserListViewController.UserReactionCell.Type = ReactedUserListViewController.UserReactionCell.self
         public static var reactionsInfoHeaderCell: ReactionsInfoViewController.HeaderCell.Type = ReactionsInfoViewController.HeaderCell.self
+        public static var globalSearchUserBarCell: GlobalSearchUserBarCell.Type = GlobalSearchUserBarCell.self
         public static var searchResultChannelCell: SearchResultChannelCell.Type = SearchResultChannelCell.self
         public static var selectableChannelCell: SelectableChannelCell.Type = SelectableChannelCell.self
         public static var selectableUserCell: SelectableUserCell.Type = SelectableUserCell.self
@@ -221,6 +223,7 @@ extension SceytChatUIKit {
         public static var textLabel: TextLabel.Type = TextLabel.self
         public static var timeLabel: TimeLabel.Type = TimeLabel.self
         public static var channelEventView: ChannelEventView.Type = ChannelEventView.self
+        public static var globalSearchUserBarView: GlobalSearchUserBarView.Type = GlobalSearchUserBarView.self
         public static var selectedUserListView: SelectedUserListView.Type = SelectedUserListView.self
         public static var selectedChannelListView: SelectedChannelListView.Type = SelectedChannelListView.self
         

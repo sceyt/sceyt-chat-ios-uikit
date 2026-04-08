@@ -53,6 +53,11 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     open lazy var pageContainerView = UIView()
         .withoutAutoresizingMask
 
+    open lazy var searchUserBarView = Components.globalSearchUserBarView.init()
+        .withoutAutoresizingMask
+
+    private var userBarBottom: NSLayoutConstraint!
+
     // MARK: - Pages
 
     open lazy var chatsPage: ChatsPageViewController = {
@@ -109,13 +114,18 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         pageViewController.setViewControllers([chatsPage], direction: .forward, animated: false)
 
         addChild(pageViewController)
+
+        // searchUserBarView.onSelect can be customized by subclasses or the presenting VC
     }
 
     override open func setupLayout() {
         view.addSubview(pageContainerView)
+        view.addSubview(searchUserBarView)
         view.addSubview(categoryTabBar) // added last so it stays on top
 
         pageContainerView.addSubview(pageViewController.view.withoutAutoresizingMask)
+
+        userBarBottom = searchUserBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
 
         NSLayoutConstraint.activate([
             categoryTabBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -131,7 +141,12 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             pageViewController.view.topAnchor.constraint(equalTo: pageContainerView.topAnchor),
             pageViewController.view.leadingAnchor.constraint(equalTo: pageContainerView.leadingAnchor),
             pageViewController.view.trailingAnchor.constraint(equalTo: pageContainerView.trailingAnchor),
-            pageViewController.view.bottomAnchor.constraint(equalTo: pageContainerView.bottomAnchor)
+            pageViewController.view.bottomAnchor.constraint(equalTo: pageContainerView.bottomAnchor),
+
+            searchUserBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            searchUserBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            searchUserBarView.heightAnchor.constraint(equalToConstant: GlobalSearchUserBarView.Layouts.height),
+            userBarBottom
         ])
     }
 
@@ -142,6 +157,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             chatsPage.cellAppearance = appearance.cellAppearance
             chatsPage.separatorViewAppearance = appearance.separatorViewAppearance
             channelsPage.separatorViewAppearance = appearance.channelsSeparatorViewAppearance
+            searchUserBarView.parentAppearance = appearance.userBarAppearance
         }
     }
 
@@ -150,6 +166,34 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         // Attach live scroll sync after layout
         DispatchQueue.main.async { [weak self] in
             self?.attachPageScrollObservation()
+        }
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(keyboardWillChangeFrame(_:)),
+            name: UIResponder.keyboardWillChangeFrameNotification,
+            object: nil
+        )
+    }
+
+    @objc private func keyboardWillChangeFrame(_ notification: Notification) {
+        guard
+            let info = notification.userInfo,
+            let endFrame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
+            let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
+            let curveRaw = info[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt,
+            isViewLoaded, let window = view.window
+        else { return }
+
+        let frameInView = window.convert(endFrame, to: view)
+        let overlap = max(0, view.bounds.maxY - frameInView.minY)
+        userBarBottom.constant = -overlap
+
+        UIView.animate(
+            withDuration: duration,
+            delay: 0,
+            options: UIView.AnimationOptions(rawValue: curveRaw << 16)
+        ) {
+            self.view.layoutIfNeeded()
         }
     }
 

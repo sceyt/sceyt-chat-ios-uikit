@@ -27,7 +27,8 @@ extension GlobalSearchResultsViewController {
             title: L10n.Search.Category.channels
         ),
         tabBarAppearance: CategoryTabBar.Appearance(),
-        cellAppearance: ChannelListViewController.ChannelCell.Appearance(reference: ChannelListViewController.ChannelCell.appearance)
+        cellAppearance: ChannelListViewController.ChannelCell.Appearance(reference: ChannelListViewController.ChannelCell.appearance),
+        userBarAppearance: GlobalSearchUserBarView.Appearance(reference: GlobalSearchUserBarView.appearance)
     )
 
     public class Appearance: ChannelSearchResultsBaseViewController.Appearance {
@@ -41,17 +42,22 @@ extension GlobalSearchResultsViewController {
         @Trackable<Appearance, ChannelListViewController.ChannelCell.Appearance>
         public var cellAppearance: ChannelListViewController.ChannelCell.Appearance
 
+        @Trackable<Appearance, GlobalSearchUserBarView.Appearance>
+        public var userBarAppearance: GlobalSearchUserBarView.Appearance
+
         public init(
             backgroundColor: UIColor?,
             emptyViewAppearance: EmptyStateView.Appearance,
             separatorViewAppearance: SeparatorHeaderView.Appearance,
             channelsSeparatorViewAppearance: SeparatorHeaderView.Appearance,
             tabBarAppearance: CategoryTabBar.Appearance,
-            cellAppearance: ChannelListViewController.ChannelCell.Appearance
+            cellAppearance: ChannelListViewController.ChannelCell.Appearance,
+            userBarAppearance: GlobalSearchUserBarView.Appearance
         ) {
             self._channelsSeparatorViewAppearance = Trackable(value: channelsSeparatorViewAppearance)
             self._tabBarAppearance = Trackable(value: tabBarAppearance)
             self._cellAppearance = Trackable(value: cellAppearance)
+            self._userBarAppearance = Trackable(value: userBarAppearance)
             super.init(
                 backgroundColor: backgroundColor,
                 emptyViewAppearance: emptyViewAppearance,
@@ -66,11 +72,13 @@ extension GlobalSearchResultsViewController {
             separatorViewAppearance: SeparatorHeaderView.Appearance? = nil,
             channelsSeparatorViewAppearance: SeparatorHeaderView.Appearance? = nil,
             tabBarAppearance: CategoryTabBar.Appearance? = nil,
-            cellAppearance: ChannelListViewController.ChannelCell.Appearance? = nil
+            cellAppearance: ChannelListViewController.ChannelCell.Appearance? = nil,
+            userBarAppearance: GlobalSearchUserBarView.Appearance? = nil
         ) {
             self._channelsSeparatorViewAppearance = Trackable(reference: reference, referencePath: \.channelsSeparatorViewAppearance)
             self._tabBarAppearance = Trackable(reference: reference, referencePath: \.tabBarAppearance)
             self._cellAppearance = Trackable(reference: reference, referencePath: \.cellAppearance)
+            self._userBarAppearance = Trackable(reference: reference, referencePath: \.userBarAppearance)
             super.init(
                 backgroundColor: backgroundColor ?? reference.backgroundColor,
                 emptyViewAppearance: emptyViewAppearance ?? reference.emptyViewAppearance,
@@ -79,6 +87,7 @@ extension GlobalSearchResultsViewController {
             if let channelsSeparatorViewAppearance { self.channelsSeparatorViewAppearance = channelsSeparatorViewAppearance }
             if let tabBarAppearance { self.tabBarAppearance = tabBarAppearance }
             if let cellAppearance { self.cellAppearance = cellAppearance }
+            if let userBarAppearance { self.userBarAppearance = userBarAppearance }
         }
     }
 }
