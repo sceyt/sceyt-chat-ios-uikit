@@ -159,7 +159,9 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             categoryTabBar.appearance = appearance.tabBarAppearance
             chatsPage.cellAppearance = appearance.cellAppearance
             chatsPage.separatorViewAppearance = appearance.separatorViewAppearance
+            chatsPage.messagesSeparatorViewAppearance = appearance.messagesSeparatorViewAppearance
             channelsPage.separatorViewAppearance = appearance.channelsSeparatorViewAppearance
+            channelsPage.messagesSeparatorViewAppearance = appearance.messagesSeparatorViewAppearance
             searchUserBarView.parentAppearance = appearance.userBarAppearance
         }
     }
@@ -211,8 +213,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     // MARK: - Public API
 
     @objc open func search(query: String?) {
-        chatsPage.viewModel.search(query: query)
-        channelsPage.viewModel.search(query: query)
+        chatsPage.search(query: query)
+        channelsPage.search(query: query)
         searchUserBarView.viewModel.search(query: query)
         let hasQuery = !(query ?? "").isEmpty
         if !hasQuery { setUserBarVisible(false, animated: true) }
@@ -230,11 +232,15 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     open func setUserBarVisible(_ visible: Bool, animated: Bool) {
         let targetAlpha: CGFloat = visible ? 1 : 0
         guard searchUserBarView.alpha != targetAlpha else { return }
-        if visible { searchUserBarView.isHidden = false }
+        if visible {
+            searchUserBarView.isHidden = false
+            searchUserBarView.isUserInteractionEnabled = true
+        }
         UIView.animate(withDuration: animated ? 0.2 : 0, animations: {
             self.searchUserBarView.alpha = targetAlpha
         }, completion: { _ in
             self.searchUserBarView.isHidden = !visible
+            self.searchUserBarView.isUserInteractionEnabled = visible
         })
     }
 
@@ -733,7 +739,7 @@ extension GlobalSearchResultsViewController {
 
             let options = UIView.AnimationOptions(rawValue: curveRaw << 16)
             UIView.animate(withDuration: duration, delay: 0, options: options) {
-                self.tableView.contentInset.bottom = inset
+                self.tableView.contentInset.bottom = inset + 60.0
                 self.tableView.verticalScrollIndicatorInsets.bottom = inset
             }
         }
@@ -766,10 +772,18 @@ extension GlobalSearchResultsViewController {
 
     open class ChatsPageViewController: ChannelTablePageViewController {
 
+        // MARK: - Properties
+
         open var cellAppearance: ChannelListViewController.ChannelCell.Appearance = Components.channelCell.appearance
 
         private var layoutModels: [ChatChannel: ChannelLayoutModel] = [:]
 
+        /// Stable snapshot used by both numberOfRowsInSection and cellForRowAt.
+        /// Captured atomically inside reloadData() before tableView.reloadData() is called,
+        /// preventing index-out-of-range crashes caused by async updates racing with cell dequeue.
+        private var chatMessagesSnapshot: [ChatMessage] = []
+
+        /// Section 0: matching chat channels (by subject).
         open lazy var viewModel: GlobalSearchViewModel = {
             let vm = Components.globalSearchViewModel.init()
             let config = SceytChatUIKit.shared.config.channelTypesConfig
@@ -777,7 +791,19 @@ extension GlobalSearchResultsViewController {
             return vm
         }()
 
+        /// Section 1: matching messages (by body text) inside chat channels.
+        open lazy var messagesViewModel: GlobalSearchMessagesViewModel =
+            Components.globalSearchMessagesViewModel.init()
+
         open var separatorViewAppearance: SeparatorHeaderView.Appearance = Components.separatorHeaderView.appearance
+        open var messagesSeparatorViewAppearance: SeparatorHeaderView.Appearance = Components.separatorHeaderView.appearance
+
+        private var showMessagesSection = false
+
+        /// Called when the user taps a message search result.
+        public var onSelectMessage: ((ChatMessage) -> Void)?
+
+        // MARK: - Setup
 
         override open func setup() {
             super.setup()
@@ -785,18 +811,10 @@ extension GlobalSearchResultsViewController {
             tableView.register(Components.separatorHeaderView.self)
         }
 
-        open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-            let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
-            header.parentAppearance = separatorViewAppearance
-            return header
-        }
-
-        open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-            channels.isEmpty ? 0 : Components.separatorHeaderView.Layouts.height
-        }
-
         override open func setupDone() {
             super.setupDone()
+
+            // Section 0 – channel results
             viewModel.startDatabaseObserver()
             viewModel.$event
                 .compactMap { $0 }
@@ -807,7 +825,28 @@ extension GlobalSearchResultsViewController {
                     reloadData()
                 }
                 .store(in: &subscriptions)
+
+            // Section 1 – message results
+            messagesViewModel.startDatabaseObserver()
+            messagesViewModel.$event
+                .compactMap { $0 }
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.reloadData()
+                }
+                .store(in: &subscriptions)
         }
+
+        // MARK: - Search
+
+        @objc open func search(query: String?) {
+            let trimmed = (query ?? "").trimmingCharacters(in: .whitespaces)
+            showMessagesSection = trimmed.count > 1
+            viewModel.search(query: query)
+            messagesViewModel.search(query: showMessagesSection ? query : nil)
+        }
+
+        // MARK: - Reload
 
         override open func reloadData() {
             var updated: [ChatChannel: ChannelLayoutModel] = [:]
@@ -823,15 +862,83 @@ extension GlobalSearchResultsViewController {
                 }
             }
             layoutModels = updated
-            super.reloadData()
+            // Snapshot before reloadData() so numberOfRowsInSection and cellForRowAt
+            // always see the same array, even if the VM updates concurrently.
+            chatMessagesSnapshot = messagesViewModel.chatMessages
+            tableView.reloadData()
+            emptyStateView.isHidden = !channels.isEmpty || !chatMessagesSnapshot.isEmpty
+        }
+
+        // MARK: - UITableViewDataSource
+
+        public func numberOfSections(in tableView: UITableView) -> Int { 2 }
+
+        override public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+            switch section {
+            case 0: return channels.count
+            case 1: return showMessagesSection ? chatMessagesSnapshot.count : 0
+            default: return 0
+            }
         }
 
         override public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelCell)
-            cell.parentAppearance = cellAppearance
-            let channel = channels[indexPath.row]
-            cell.data = layoutModels[channel]
-            return cell
+            switch indexPath.section {
+            case 0:
+                let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelCell)
+                cell.parentAppearance = cellAppearance
+                let channel = channels[indexPath.row]
+                cell.data = layoutModels[channel]
+                return cell
+            default:
+                guard chatMessagesSnapshot.indices.contains(indexPath.row) else {
+                    return UITableViewCell()
+                }
+                let message = chatMessagesSnapshot[indexPath.row]
+                let cell = tableView.dequeueReusableCell(withIdentifier: "MessageSearchCell")
+                    ?? UITableViewCell(style: .subtitle, reuseIdentifier: "MessageSearchCell")
+                let channel = messagesViewModel.chatMessageChannels[message.channelId]
+                cell.textLabel?.text = channel.map { SceytChatUIKit.shared.formatters.channelNameFormatter.format($0) }
+                cell.detailTextLabel?.text = message.body
+                cell.detailTextLabel?.numberOfLines = 1
+                return cell
+            }
+        }
+
+        public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+            switch section {
+            case 0:
+                guard !channels.isEmpty else { return nil }
+                let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+                header.parentAppearance = separatorViewAppearance
+                return header
+            case 1:
+                guard showMessagesSection, !chatMessagesSnapshot.isEmpty else { return nil }
+                let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+                header.parentAppearance = messagesSeparatorViewAppearance
+                return header
+            default:
+                return nil
+            }
+        }
+
+        public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+            switch section {
+            case 0: return channels.isEmpty ? 0 : Components.separatorHeaderView.Layouts.height
+            case 1: return (showMessagesSection && !chatMessagesSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
+            default: return 0
+            }
+        }
+
+        // MARK: - UITableViewDelegate
+
+        override public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+            tableView.deselectRow(at: indexPath, animated: true)
+            switch indexPath.section {
+            case 0: onSelect?(channels[indexPath.row])
+            default:
+                guard chatMessagesSnapshot.indices.contains(indexPath.row) else { return }
+                onSelectMessage?(chatMessagesSnapshot[indexPath.row])
+            }
         }
     }
 
@@ -839,31 +946,41 @@ extension GlobalSearchResultsViewController {
 
     open class ChannelsPageViewController: ChannelTablePageViewController {
 
-        open var separatorViewAppearance: SeparatorHeaderView.Appearance = Components.separatorHeaderView.appearance
+        // MARK: - Properties
 
+        open var separatorViewAppearance: SeparatorHeaderView.Appearance = Components.separatorHeaderView.appearance
+        open var messagesSeparatorViewAppearance: SeparatorHeaderView.Appearance = Components.separatorHeaderView.appearance
+
+        private var showMessagesSection = false
+
+        /// Section 0: matching broadcast channels (by subject).
         open lazy var viewModel: GlobalSearchViewModel = {
             let vm = Components.globalSearchViewModel.init()
             vm.channelTypes = [SceytChatUIKit.shared.config.channelTypesConfig.broadcast]
             return vm
         }()
 
+        /// Section 1: matching messages (by body text) inside broadcast channels.
+        open lazy var messagesViewModel: GlobalSearchMessagesViewModel =
+            Components.globalSearchMessagesViewModel.init()
+
+        /// Stable snapshot used by both numberOfRowsInSection and cellForRowAt.
+        private var channelMessagesSnapshot: [ChatMessage] = []
+
+        /// Called when the user taps a message search result.
+        public var onSelectMessage: ((ChatMessage) -> Void)?
+
+        // MARK: - Setup
+
         override open func setup() {
             super.setup()
             tableView.register(Components.separatorHeaderView.self)
         }
 
-        open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-            let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
-            header.parentAppearance = separatorViewAppearance
-            return header
-        }
-
-        open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-            channels.isEmpty ? 0 : Components.separatorHeaderView.Layouts.height
-        }
-
         override open func setupDone() {
             super.setupDone()
+
+            // Section 0 – channel results
             viewModel.startDatabaseObserver()
             viewModel.$event
                 .compactMap { $0 }
@@ -874,6 +991,104 @@ extension GlobalSearchResultsViewController {
                     reloadData()
                 }
                 .store(in: &subscriptions)
+
+            // Section 1 – message results
+            messagesViewModel.startDatabaseObserver()
+            messagesViewModel.$event
+                .compactMap { $0 }
+                .receive(on: DispatchQueue.main)
+                .sink { [weak self] _ in
+                    self?.reloadData()
+                }
+                .store(in: &subscriptions)
+        }
+
+        // MARK: - Search
+
+        @objc open func search(query: String?) {
+            let trimmed = (query ?? "").trimmingCharacters(in: .whitespaces)
+            showMessagesSection = trimmed.count > 1
+            viewModel.search(query: query)
+            messagesViewModel.search(query: showMessagesSection ? query : nil)
+        }
+
+        // MARK: - Reload
+
+        override open func reloadData() {
+            channelMessagesSnapshot = messagesViewModel.channelMessages
+            tableView.reloadData()
+            emptyStateView.isHidden = !channels.isEmpty || !channelMessagesSnapshot.isEmpty
+        }
+
+        // MARK: - UITableViewDataSource
+
+        public func numberOfSections(in tableView: UITableView) -> Int { 2 }
+
+        override public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+            switch section {
+            case 0: return channels.count
+            case 1: return showMessagesSection ? channelMessagesSnapshot.count : 0
+            default: return 0
+            }
+        }
+
+        override public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+            switch indexPath.section {
+            case 0:
+                let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.searchResultChannelCell.self)
+                cell.separatorView.isHidden = indexPath.row == channels.count - 1
+                cell.channelData = channels[indexPath.row]
+                return cell
+            default:
+                guard channelMessagesSnapshot.indices.contains(indexPath.row) else {
+                    return UITableViewCell()
+                }
+                let message = channelMessagesSnapshot[indexPath.row]
+                let cell = tableView.dequeueReusableCell(withIdentifier: "ChannelMessageSearchCell")
+                    ?? UITableViewCell(style: .subtitle, reuseIdentifier: "ChannelMessageSearchCell")
+                let channel = messagesViewModel.channelMessageChannels[message.channelId]
+                cell.textLabel?.text = channel.map { SceytChatUIKit.shared.formatters.channelNameFormatter.format($0) }
+                cell.detailTextLabel?.text = message.body
+                cell.detailTextLabel?.numberOfLines = 2
+                return cell
+            }
+        }
+
+        public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+            switch section {
+            case 0:
+                guard !channels.isEmpty else { return nil }
+                let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+                header.parentAppearance = separatorViewAppearance
+                return header
+            case 1:
+                guard showMessagesSection, !channelMessagesSnapshot.isEmpty else { return nil }
+                let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
+                header.parentAppearance = messagesSeparatorViewAppearance
+                return header
+            default:
+                return nil
+            }
+        }
+
+        public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+            switch section {
+            case 0: return channels.isEmpty ? 0 : Components.separatorHeaderView.Layouts.height
+            case 1: return (showMessagesSection && !channelMessagesSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
+            default: return 0
+            }
+        }
+
+        // MARK: - UITableViewDelegate
+
+        override public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+            tableView.deselectRow(at: indexPath, animated: true)
+            switch indexPath.section {
+            case 0: onSelect?(channels[indexPath.row])
+            default:
+                guard channelMessagesSnapshot.indices.contains(indexPath.row) else { return }
+                onSelectMessage?(channelMessagesSnapshot[indexPath.row])
+            }
         }
     }
 

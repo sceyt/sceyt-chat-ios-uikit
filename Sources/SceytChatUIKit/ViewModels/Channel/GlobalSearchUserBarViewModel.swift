@@ -17,7 +17,7 @@ open class GlobalSearchUserBarViewModel: NSObject {
 
     @Atomic public var users: [ChatUser] = []
     @Atomic var allUsers: [ChatUser] = []
-    private var searchQuery: String?
+    var searchQuery: String?
 
     open lazy var channelObserver: LazyDatabaseObserver<ChannelDTO, ChatChannel> = {
         let config = SceytChatUIKit.shared.config.channelTypesConfig
@@ -87,7 +87,7 @@ open class GlobalSearchUserBarViewModel: NSObject {
         applyFilter()
     }
 
-    private func applyFilter() {
+    public func applyFilter() {
         let query = (searchQuery ?? "")
             .components(separatedBy: .whitespaces)
             .filter { !$0.isEmpty }

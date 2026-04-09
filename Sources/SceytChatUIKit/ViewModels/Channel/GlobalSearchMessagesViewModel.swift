@@ -1,0 +1,200 @@
+//
+//  GlobalSearchMessagesViewModel.swift
+//  SceytChatUIKit
+//
+//  Created by SceytChatUIKit on 09.04.26
+//  Copyright © 2026 Sceyt LLC. All rights reserved.
+//
+
+import Foundation
+import Combine
+import CoreData
+import SceytChat
+
+open class GlobalSearchMessagesViewModel: NSObject {
+
+    // MARK: - Section
+
+    public enum Section: Int, CaseIterable {
+        case chats    = 0  // messages from direct / group channels
+        case channels = 1  // messages from broadcast channels
+    }
+
+    // MARK: - Event
+
+    public enum Event {
+        case reload
+    }
+
+    // MARK: - Published state
+
+    @Published public var event: Event?
+
+    // MARK: - Data
+
+    /// Messages from direct / group channels (section 0).
+    @Atomic public var chatMessages: [ChatMessage] = []
+    /// Messages from broadcast channels (section 1).
+    @Atomic public var channelMessages: [ChatMessage] = []
+
+    /// Channels keyed by channelId for chat message results (section 0).
+    @Atomic public var chatMessageChannels: [ChannelId: ChatChannel] = [:]
+    /// Channels keyed by channelId for channel message results (section 1).
+    @Atomic public var channelMessageChannels: [ChannelId: ChatChannel] = [:]
+
+    /// Flat ordered union: chats first, then channels.
+    /// Convenient for tests and index-based access.
+    public var messages: [ChatMessage] { chatMessages + channelMessages }
+    public var numberOfMessages: Int { messages.count }
+
+    /// Current search query – internal so testable subclasses can read/write it.
+    var searchQuery: String?
+
+    private var currentSearchTask: Task<Void, Never>?
+
+    // MARK: - Init
+
+    public override required init() {
+        super.init()
+    }
+
+    // MARK: - Observer
+
+    /// No persistent observer is needed – results are fetched on demand.
+    open func startDatabaseObserver() {}
+
+    // MARK: - Search
+
+    open func search(query: String?) {
+        searchQuery = query
+        applyFilter()
+    }
+
+    // MARK: - Section accessors
+
+    public func numberOfMessages(in section: Section) -> Int {
+        switch section {
+        case .chats:    return chatMessages.count
+        case .channels: return channelMessages.count
+        }
+    }
+
+    public func message(at indexPath: IndexPath) -> ChatMessage? {
+        guard let section = Section(rawValue: indexPath.section) else { return nil }
+        let list = messages(in: section)
+        guard list.indices.contains(indexPath.row) else { return nil }
+        return list[indexPath.row]
+    }
+
+    /// Flat index access – used by tests and single-section callers.
+    public func message(at index: Int) -> ChatMessage? {
+        let all = messages
+        guard all.indices.contains(index) else { return nil }
+        return all[index]
+    }
+
+    public func messages(in section: Section) -> [ChatMessage] {
+        switch section {
+        case .chats:    return chatMessages
+        case .channels: return channelMessages
+        }
+    }
+
+    // MARK: - Filter
+
+    /// Override in testable subclasses to do in-memory filtering instead of a DB query.
+    public func applyFilter() {
+        let tokens = (searchQuery ?? "")
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+
+        guard !tokens.isEmpty else {
+            chatMessages = []
+            channelMessages = []
+            chatMessageChannels = [:]
+            channelMessageChannels = [:]
+            DispatchQueue.main.async { [weak self] in self?.event = .reload }
+            return
+        }
+
+        let config = SceytChatUIKit.shared.config.channelTypesConfig
+
+        // Every token must match as a prefix or suffix of a word (AND semantics, case-insensitive).
+        // Mid-word substrings (e.g. "oo" inside "good") are excluded.
+        let basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates:
+            tokens.map { token in
+                let escaped = NSRegularExpression.escapedPattern(for: token)
+                let pattern = "(?i)(?s).*(\\b\(escaped)|\(escaped)\\b).*"
+                return NSPredicate(format: "body MATCHES %@", pattern)
+            } + [
+                NSPredicate(format: "state != 2"),       // exclude deleted
+                NSPredicate(format: "body.length > 0"),  // exclude empty body
+                NSPredicate(format: "transient == NO")   // exclude transient
+            ]
+        )
+
+        currentSearchTask?.cancel()
+        currentSearchTask = Task(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+
+            async let chatResult    = fetchMessages(basePredicate: basePredicate,
+                                                    channelTypes: [config.direct, config.group])
+            async let channelResult = fetchMessages(basePredicate: basePredicate,
+                                                    channelTypes: [config.broadcast])
+            let (chatsResult, channelsResult) = await (chatResult, channelResult)
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                chatMessages            = chatsResult.0
+                channelMessages         = channelsResult.0
+                chatMessageChannels     = chatsResult.1
+                channelMessageChannels  = channelsResult.1
+                event = .reload
+            }
+        }
+    }
+
+    // MARK: - DB fetch
+
+    private func fetchMessages(basePredicate: NSPredicate,
+                               channelTypes: [String]) async -> ([ChatMessage], [ChannelId: ChatChannel]) {
+        await withCheckedContinuation { cont in
+            SceytChatUIKit.shared.database.read { [basePredicate, channelTypes] context in
+                // 1. Resolve channel IDs for the requested types.
+                let channelRequest = ChannelDTO.fetchRequest()
+                channelRequest.predicate = NSPredicate(format: "type IN %@", channelTypes)
+                let channelDTOs = ChannelDTO.fetch(request: channelRequest, context: context)
+                let channelIds: [Int64] = channelDTOs.map { $0.id }
+
+                guard !channelIds.isEmpty else { return ([ChatMessage](), [:]) }
+
+                // 2. Fetch messages matching the body tokens within those channels.
+                let msgRequest = MessageDTO.fetchRequest()
+                msgRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                    basePredicate,
+                    NSPredicate(format: "channelId IN %@", channelIds)
+                ])
+                msgRequest.sortDescriptors = [
+                    NSSortDescriptor(keyPath: \MessageDTO.createdAt, ascending: false)
+                ]
+                msgRequest.fetchLimit = 100
+
+                let messages = (try? context.fetch(msgRequest))?.map { $0.convert() } ?? []
+
+                // 3. Build channelId → ChatChannel map for only the channels that have results.
+                let resultChannelIds = Set(messages.map { $0.channelId })
+                let channelMap: [ChannelId: ChatChannel] = channelDTOs.reduce(into: [:]) { map, dto in
+                    let id = ChannelId(dto.id)
+                    guard resultChannelIds.contains(id) else { return }
+                    map[id] = dto.convert()
+                }
+
+                return (messages, channelMap)
+            } completion: { result in
+                cont.resume(returning: (try? result.get()) ?? ([], [:]))
+            }
+        }
+    }
+}

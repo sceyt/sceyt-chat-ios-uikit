@@ -23,6 +23,7 @@ extension SceytChatUIKit {
         public static var channelForwardViewModel: ChannelForwardViewModel.Type = ChannelForwardViewModel.self
         public static var channelListViewModel: ChannelListViewModel.Type = ChannelListViewModel.self
         public static var globalSearchViewModel: GlobalSearchViewModel.Type = GlobalSearchViewModel.self
+        public static var globalSearchMessagesViewModel: GlobalSearchMessagesViewModel.Type = GlobalSearchMessagesViewModel.self
         public static var globalSearchUserBarViewModel: GlobalSearchUserBarViewModel.Type = GlobalSearchUserBarViewModel.self
         public static var channelMemberListViewModel: ChannelMemberListViewModel.Type = ChannelMemberListViewModel.self
         public static var channelMemberRolesViewModel: ChannelMemberRolesViewModel.Type = ChannelMemberRolesViewModel.self

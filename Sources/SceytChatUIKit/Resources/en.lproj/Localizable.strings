@@ -376,6 +376,7 @@
 "search.category.voice" = "Voice";
 "search.category.files" = "Files";
 "search.category.links" = "Links";
+"search.category.messages" = "Messages";
 
 "channel.noMessages.title" = "No Messages yet";
 "channel.noMessages.message" = "No messages yet, start the chat";

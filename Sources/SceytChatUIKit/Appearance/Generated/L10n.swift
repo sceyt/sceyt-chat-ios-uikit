@@ -884,6 +884,8 @@ public enum L10n {
       public static let files = L10n.tr("Localizable", "search.category.files", fallback: "Files")
       /// Links
       public static let links = L10n.tr("Localizable", "search.category.links", fallback: "Links")
+      /// Messages
+      public static let messages = L10n.tr("Localizable", "search.category.messages", fallback: "Messages")
     }
     public enum NoResults {
       /// There were no results found.
