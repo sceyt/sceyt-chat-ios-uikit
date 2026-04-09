@@ -145,8 +145,7 @@ open class GlobalSearchUserBarView: View, UICollectionViewDataSource, UICollecti
 
     override open func setupAppearance() {
         super.setupAppearance()
-//        backgroundColor = appearance.backgroundColor
-        backgroundColor = .clear
+        backgroundColor = appearance.backgroundColor
         collectionView.backgroundColor = .clear
         separatorLine.backgroundColor = appearance.separatorColor
     }

@@ -91,7 +91,7 @@ extension GlobalSearchUserBarCell: AppearanceProviding {
 extension GlobalSearchUserBarView: AppearanceProviding {
 
     public static var appearance = Appearance(
-        backgroundColor: .background,
+        backgroundColor: .clear,
         separatorColor: DefaultColors.border,
         cellAppearance: GlobalSearchUserBarCell.appearance
     )

@@ -149,8 +149,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             userBarBottom
         ])
 
-        searchUserBarView.isHidden = true
         searchUserBarView.alpha = 0
+        searchUserBarView.isUserInteractionEnabled = false
     }
 
     override open func setupAppearance() {
@@ -176,6 +176,14 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             name: UIResponder.keyboardWillChangeFrameNotification,
             object: nil
         )
+        searchUserBarView.viewModel.$event
+            .compactMap { $0 }
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                setUserBarVisible(!searchUserBarView.viewModel.users.isEmpty, animated: true)
+            }
+            .store(in: &subscriptions)
     }
 
     @objc private func keyboardWillChangeFrame(_ notification: Notification) {
@@ -207,7 +215,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         channelsPage.viewModel.search(query: query)
         searchUserBarView.viewModel.search(query: query)
         let hasQuery = !(query ?? "").isEmpty
-        setUserBarVisible(hasQuery, animated: true)
+        if !hasQuery { setUserBarVisible(false, animated: true) }
     }
 
     override open func reloadData() {
