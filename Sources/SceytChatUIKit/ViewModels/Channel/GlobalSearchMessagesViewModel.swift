@@ -119,12 +119,12 @@ open class GlobalSearchMessagesViewModel: NSObject {
 
         let config = SceytChatUIKit.shared.config.channelTypesConfig
 
-        // Every token must match as a prefix or suffix of a word (AND semantics, case-insensitive).
-        // Mid-word substrings (e.g. "oo" inside "good") are excluded.
+        // Every token must match as a prefix of a word (AND semantics, case-insensitive).
+        // Suffix and mid-word matches (e.g. "ord" inside "world") are excluded.
         let basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates:
             tokens.map { token in
                 let escaped = NSRegularExpression.escapedPattern(for: token)
-                let pattern = "(?i)(?s).*(\\b\(escaped)|\(escaped)\\b).*"
+                let pattern = "(?i)(?s).*\\b\(escaped).*"
                 return NSPredicate(format: "body MATCHES %@", pattern)
             } + [
                 NSPredicate(format: "state != 2"),       // exclude deleted

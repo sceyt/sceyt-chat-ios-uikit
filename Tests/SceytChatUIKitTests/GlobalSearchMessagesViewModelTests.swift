@@ -57,7 +57,7 @@ final class TestableGlobalSearchMessagesViewModel: GlobalSearchMessagesViewModel
                 let body = message.body.lowercased()
                 return tokens.allSatisfy { token in
                     let escaped = NSRegularExpression.escapedPattern(for: token)
-                    let pattern = "(\\b\(escaped)|\(escaped)\\b)"
+                    let pattern = "\\b\(escaped)"
                     return body.range(of: pattern, options: .regularExpression) != nil
                 }
             }
@@ -134,13 +134,34 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
     }
 
     func testSearchByPartialBodyText() {
+        // "Hell" is a prefix of "Hello" → should match (prefix-only search)
+        viewModel.inject(messages: [
+            makeMessage(id: 1, body: "Hello world"),
+            makeMessage(id: 2, body: "Goodbye"),
+        ])
+        viewModel.search(query: "Hell")
+        XCTAssertEqual(viewModel.messages.count, 1)
+        XCTAssertEqual(viewModel.messages.first?.id, 1)
+    }
+
+    func testSearchBySuffixBodyTextShouldNotMatch() {
+        // "ord" is a suffix of "world" → must NOT match (suffix-only matches are excluded)
+        viewModel.inject(messages: [
+            makeMessage(id: 1, body: "Hello world"),
+            makeMessage(id: 2, body: "Goodbye"),
+        ])
+        viewModel.search(query: "ord")
+        XCTAssertTrue(viewModel.messages.isEmpty, "Suffix-only token 'ord' must not match 'world'")
+    }
+
+    func testSearchByMidWordBodyTextShouldNotMatch() {
+        // "ello" is a mid/suffix match of "Hello" → must NOT match
         viewModel.inject(messages: [
             makeMessage(id: 1, body: "Hello world"),
             makeMessage(id: 2, body: "Goodbye"),
         ])
         viewModel.search(query: "ello")
-        XCTAssertEqual(viewModel.messages.count, 1)
-        XCTAssertEqual(viewModel.messages.first?.id, 1)
+        XCTAssertTrue(viewModel.messages.isEmpty, "Mid-word token 'ello' must not match 'Hello'")
     }
 
     func testSearchBodyTextCaseInsensitive() {
@@ -342,8 +363,9 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             makeMessage(id: 2, body: "Banana"),
         ])
         viewModel.search(query: "a")
-        // Both "Apple" and "Banana" contain 'a'
-        XCTAssertEqual(viewModel.messages.count, 2)
+        // Only "Apple" starts with 'a' (prefix-only matching; "Banana" starts with 'B')
+        XCTAssertEqual(viewModel.messages.count, 1)
+        XCTAssertEqual(viewModel.messages.first?.id, 1)
     }
 
     // MARK: - Event publishing

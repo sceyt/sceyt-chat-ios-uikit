@@ -89,7 +89,7 @@ open class GlobalSearchMessageCell: TableViewCell {
             let fullRange = NSRange(location: 0, length: (snippet as NSString).length)
             for token in tokens {
                 let escaped = NSRegularExpression.escapedPattern(for: token)
-                guard let regex = try? NSRegularExpression(pattern: "(?i)(?:\\b\(escaped)|\(escaped)\\b)") else { continue }
+                guard let regex = try? NSRegularExpression(pattern: "(?i)\\b\(escaped)") else { continue }
                 for match in regex.matches(in: snippet, range: fullRange) {
                     let range = NSRange(location: bodyStart + match.range.location, length: match.range.length)
                     result.addAttributes([
@@ -116,7 +116,7 @@ open class GlobalSearchMessageCell: TableViewCell {
 
         for token in tokens {
             let escaped = NSRegularExpression.escapedPattern(for: token)
-            guard let regex = try? NSRegularExpression(pattern: "(?i)(?:\\b\(escaped)|\(escaped)\\b)") else { continue }
+            guard let regex = try? NSRegularExpression(pattern: "(?i)\\b\(escaped)") else { continue }
             let fullRange = NSRange(body.startIndex..., in: body)
             if let match = regex.firstMatch(in: body, range: fullRange),
                let matchRange = Range(match.range, in: body) {
