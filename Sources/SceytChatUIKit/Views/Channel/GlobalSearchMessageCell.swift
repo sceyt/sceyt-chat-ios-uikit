@@ -74,9 +74,11 @@ open class GlobalSearchMessageCell: TableViewCell {
                 ]
             ))
         }
+
+        let snippet = makeSnippet(body: message.body, query: searchQuery)
         let bodyStart = result.length
         result.append(NSAttributedString(
-            string: message.body,
+            string: snippet,
             attributes: [.font: bodyFont, .foregroundColor: bodyColor]
         ))
 
@@ -84,12 +86,11 @@ open class GlobalSearchMessageCell: TableViewCell {
             let tokens = query
                 .components(separatedBy: .whitespaces)
                 .filter { !$0.isEmpty }
-            let body = message.body
-            let fullRange = NSRange(body.startIndex..., in: body)
+            let fullRange = NSRange(location: 0, length: (snippet as NSString).length)
             for token in tokens {
                 let escaped = NSRegularExpression.escapedPattern(for: token)
                 guard let regex = try? NSRegularExpression(pattern: "(?i)(?:\\b\(escaped)|\(escaped)\\b)") else { continue }
-                for match in regex.matches(in: body, range: fullRange) {
+                for match in regex.matches(in: snippet, range: fullRange) {
                     let range = NSRange(location: bodyStart + match.range.location, length: match.range.length)
                     result.addAttributes([
                         .foregroundColor: appearance.highlightedBodyLabelAppearance.foregroundColor,
@@ -100,6 +101,46 @@ open class GlobalSearchMessageCell: TableViewCell {
         }
 
         return result
+    }
+
+    /// Returns a snippet of `body` that includes the first search match.
+    /// If the match is far from the start, the body is trimmed and prefixed with "…"
+    /// so the matched text appears near the beginning of the snippet.
+    private func makeSnippet(body: String, query: String?) -> String {
+        let contextBefore = 30
+
+        guard let query = query, !query.isEmpty else { return body }
+
+        let tokens = query.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+        var firstMatchStart: String.Index?
+
+        for token in tokens {
+            let escaped = NSRegularExpression.escapedPattern(for: token)
+            guard let regex = try? NSRegularExpression(pattern: "(?i)(?:\\b\(escaped)|\(escaped)\\b)") else { continue }
+            let fullRange = NSRange(body.startIndex..., in: body)
+            if let match = regex.firstMatch(in: body, range: fullRange),
+               let matchRange = Range(match.range, in: body) {
+                if firstMatchStart == nil || matchRange.lowerBound < firstMatchStart! {
+                    firstMatchStart = matchRange.lowerBound
+                }
+            }
+        }
+
+        guard let matchStart = firstMatchStart else { return body }
+        let matchOffset = body.distance(from: body.startIndex, to: matchStart)
+        guard matchOffset > contextBefore else { return body }
+
+        let cutIndex = body.index(body.startIndex, offsetBy: matchOffset - contextBefore)
+        // Advance to the nearest word boundary so we don't cut mid-word
+        var snippetStart = cutIndex
+        if let spaceIdx = body[cutIndex...].firstIndex(of: " ") {
+            let afterSpace = body.index(after: spaceIdx)
+            if afterSpace < matchStart {
+                snippetStart = afterSpace
+            }
+        }
+
+        return "…" + String(body[snippetStart...])
     }
 
     override open func setupLayout() {
