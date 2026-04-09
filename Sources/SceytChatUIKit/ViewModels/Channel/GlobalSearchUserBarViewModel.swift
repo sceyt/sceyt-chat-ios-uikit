@@ -16,7 +16,7 @@ open class GlobalSearchUserBarViewModel: NSObject {
     @Published public var event: Event?
 
     @Atomic public var users: [ChatUser] = []
-    @Atomic private var allUsers: [ChatUser] = []
+    @Atomic var allUsers: [ChatUser] = []
     private var searchQuery: String?
 
     open lazy var channelObserver: LazyDatabaseObserver<ChannelDTO, ChatChannel> = {
@@ -88,7 +88,11 @@ open class GlobalSearchUserBarViewModel: NSObject {
     }
 
     private func applyFilter() {
-        let query = searchQuery?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+        let query = (searchQuery ?? "")
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .lowercased()
         if query.isEmpty {
             users = []
         } else {
