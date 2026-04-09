@@ -809,6 +809,7 @@ extension GlobalSearchResultsViewController {
             super.setup()
             tableView.register(Components.channelCell)
             tableView.register(Components.separatorHeaderView.self)
+            tableView.register(Components.globalSearchMessageCell.self)
         }
 
         override open func setupDone() {
@@ -894,12 +895,9 @@ extension GlobalSearchResultsViewController {
                     return UITableViewCell()
                 }
                 let message = chatMessagesSnapshot[indexPath.row]
-                let cell = tableView.dequeueReusableCell(withIdentifier: "MessageSearchCell")
-                    ?? UITableViewCell(style: .subtitle, reuseIdentifier: "MessageSearchCell")
+                let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.globalSearchMessageCell.self)
                 let channel = messagesViewModel.chatMessageChannels[message.channelId]
-                cell.textLabel?.text = channel.map { SceytChatUIKit.shared.formatters.channelNameFormatter.format($0) }
-                cell.detailTextLabel?.text = message.body
-                cell.detailTextLabel?.numberOfLines = 1
+                cell.messageData = channel.map { ($0, message) }
                 return cell
             }
         }
@@ -975,6 +973,7 @@ extension GlobalSearchResultsViewController {
         override open func setup() {
             super.setup()
             tableView.register(Components.separatorHeaderView.self)
+            tableView.register(Components.globalSearchMessageCell.self)
         }
 
         override open func setupDone() {
@@ -1044,12 +1043,9 @@ extension GlobalSearchResultsViewController {
                     return UITableViewCell()
                 }
                 let message = channelMessagesSnapshot[indexPath.row]
-                let cell = tableView.dequeueReusableCell(withIdentifier: "ChannelMessageSearchCell")
-                    ?? UITableViewCell(style: .subtitle, reuseIdentifier: "ChannelMessageSearchCell")
+                let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.globalSearchMessageCell.self)
                 let channel = messagesViewModel.channelMessageChannels[message.channelId]
-                cell.textLabel?.text = channel.map { SceytChatUIKit.shared.formatters.channelNameFormatter.format($0) }
-                cell.detailTextLabel?.text = message.body
-                cell.detailTextLabel?.numberOfLines = 2
+                cell.messageData = channel.map { ($0, message) }
                 return cell
             }
         }
