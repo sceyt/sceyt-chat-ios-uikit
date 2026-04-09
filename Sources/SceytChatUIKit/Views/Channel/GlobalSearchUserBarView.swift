@@ -69,8 +69,8 @@ open class GlobalSearchUserBarCell: CollectionViewCell {
         contentView.clipsToBounds = true
         backgroundColor = .clear
         layer.shadowColor = UIColor.black.cgColor
-        layer.shadowOffset = CGSize(width: 0, height: 8)
-        layer.shadowRadius = 20
+        layer.shadowOffset = CGSize(width: 0, height: 2)
+        layer.shadowRadius = 4
         layer.shadowOpacity = 0.12
         clipsToBounds = false
         avatarView.layer.cornerRadius = Layouts.avatarSize / 2

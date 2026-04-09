@@ -90,17 +90,17 @@ open class GlobalSearchUserBarViewModel: NSObject {
     private func applyFilter() {
         let query = searchQuery?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
         if query.isEmpty {
-            users = allUsers
+            users = []
         } else {
             users = allUsers.filter { user in
                 let first = user.firstName?.lowercased() ?? ""
                 let last = user.lastName?.lowercased() ?? ""
                 let username = user.username?.lowercased() ?? ""
                 let full = "\(first) \(last)".trimmingCharacters(in: .whitespaces)
-                return first.hasPrefix(query)
-                    || last.hasPrefix(query)
-                    || username.hasPrefix(query)
-                    || full.hasPrefix(query)
+                return first.contains(query)
+                    || last.contains(query)
+                    || username.contains(query)
+                    || full.contains(query)
             }
         }
         DispatchQueue.main.async { [weak self] in self?.event = .reload }

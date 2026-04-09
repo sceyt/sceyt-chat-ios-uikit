@@ -125,7 +125,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
 
         pageContainerView.addSubview(pageViewController.view.withoutAutoresizingMask)
 
-        userBarBottom = searchUserBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        userBarBottom = searchUserBarView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
 
         NSLayoutConstraint.activate([
             categoryTabBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
@@ -148,6 +148,9 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             searchUserBarView.heightAnchor.constraint(equalToConstant: GlobalSearchUserBarView.Layouts.height),
             userBarBottom
         ])
+
+        searchUserBarView.isHidden = true
+        searchUserBarView.alpha = 0
     }
 
     override open func setupAppearance() {
@@ -186,7 +189,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
 
         let frameInView = window.convert(endFrame, to: view)
         let overlap = max(0, view.bounds.maxY - frameInView.minY)
-        userBarBottom.constant = -overlap
+        userBarBottom.constant = -max(0, overlap - view.safeAreaInsets.bottom)
 
         UIView.animate(
             withDuration: duration,
@@ -203,6 +206,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         chatsPage.viewModel.search(query: query)
         channelsPage.viewModel.search(query: query)
         searchUserBarView.viewModel.search(query: query)
+        let hasQuery = !(query ?? "").isEmpty
+        setUserBarVisible(hasQuery, animated: true)
     }
 
     override open func reloadData() {
