@@ -31,6 +31,8 @@ open class GlobalSearchMessageCell: TableViewCell {
 
     open var imageTask: Cancellable?
 
+    open var searchQuery: String?
+
     open var messageData: (channel: ChatChannel, message: ChatMessage)? {
         didSet {
             guard let (channel, message) = messageData else { return }
@@ -59,6 +61,9 @@ open class GlobalSearchMessageCell: TableViewCell {
 
     private func attributedStatus(channel: ChatChannel, message: ChatMessage) -> NSAttributedString {
         let prefix = senderPrefix(channel: channel, message: message)
+        let bodyFont = appearance.subtitleLabelAppearance?.font ?? Fonts.regular.withSize(15)
+        let bodyColor = appearance.subtitleLabelAppearance?.foregroundColor ?? UIColor.secondaryText
+
         let result = NSMutableAttributedString()
         if !prefix.isEmpty {
             result.append(NSAttributedString(
@@ -69,13 +74,31 @@ open class GlobalSearchMessageCell: TableViewCell {
                 ]
             ))
         }
+        let bodyStart = result.length
         result.append(NSAttributedString(
             string: message.body,
-            attributes: [
-                .font: appearance.subtitleLabelAppearance?.font ?? Fonts.regular.withSize(15),
-                .foregroundColor: appearance.subtitleLabelAppearance?.foregroundColor ?? UIColor.secondaryText
-            ]
+            attributes: [.font: bodyFont, .foregroundColor: bodyColor]
         ))
+
+        if let query = searchQuery, !query.isEmpty {
+            let tokens = query
+                .components(separatedBy: .whitespaces)
+                .filter { !$0.isEmpty }
+            let body = message.body
+            let fullRange = NSRange(body.startIndex..., in: body)
+            for token in tokens {
+                let escaped = NSRegularExpression.escapedPattern(for: token)
+                guard let regex = try? NSRegularExpression(pattern: "(?i)(?:\\b\(escaped)|\(escaped)\\b)") else { continue }
+                for match in regex.matches(in: body, range: fullRange) {
+                    let range = NSRange(location: bodyStart + match.range.location, length: match.range.length)
+                    result.addAttributes([
+                        .foregroundColor: appearance.highlightedBodyLabelAppearance.foregroundColor,
+                        .font: appearance.highlightedBodyLabelAppearance.font
+                    ], range: range)
+                }
+            }
+        }
+
         return result
     }
 
@@ -124,6 +147,7 @@ open class GlobalSearchMessageCell: TableViewCell {
         statusLabel.attributedText = nil
         timeLabel.text = nil
         imageTask?.cancel()
+        searchQuery = nil
         messageData = nil
     }
 }

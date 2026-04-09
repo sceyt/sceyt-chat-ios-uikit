@@ -897,6 +897,7 @@ extension GlobalSearchResultsViewController {
                 let message = chatMessagesSnapshot[indexPath.row]
                 let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.globalSearchMessageCell.self)
                 let channel = messagesViewModel.chatMessageChannels[message.channelId]
+                cell.searchQuery = messagesViewModel.searchQuery
                 cell.messageData = channel.map { ($0, message) }
                 return cell
             }
@@ -1045,6 +1046,7 @@ extension GlobalSearchResultsViewController {
                 let message = channelMessagesSnapshot[indexPath.row]
                 let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.globalSearchMessageCell.self)
                 let channel = messagesViewModel.channelMessageChannels[message.channelId]
+                cell.searchQuery = messagesViewModel.searchQuery
                 cell.messageData = channel.map { ($0, message) }
                 return cell
             }
