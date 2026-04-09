@@ -138,7 +138,7 @@ open class GlobalSearchUserBarView: View, UICollectionViewDataSource, UICollecti
         addSubview(collectionView)
 
         separatorLine.pin(to: self, anchors: [.top(), .leading(), .trailing()])
-        separatorLine.heightAnchor.pin(constant: 1)
+        separatorLine.heightAnchor.pin(constant: 0)
         collectionView.topAnchor.pin(to: separatorLine.bottomAnchor)
         collectionView.pin(to: self, anchors: [.leading(), .trailing(), .bottom()])
     }

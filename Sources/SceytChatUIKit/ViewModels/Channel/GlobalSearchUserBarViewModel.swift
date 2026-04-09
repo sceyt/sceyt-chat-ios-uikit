@@ -16,6 +16,8 @@ open class GlobalSearchUserBarViewModel: NSObject {
     @Published public var event: Event?
 
     @Atomic public var users: [ChatUser] = []
+    @Atomic private var allUsers: [ChatUser] = []
+    private var searchQuery: String?
 
     open lazy var channelObserver: LazyDatabaseObserver<ChannelDTO, ChatChannel> = {
         let config = SceytChatUIKit.shared.config.channelTypesConfig
@@ -50,8 +52,8 @@ open class GlobalSearchUserBarViewModel: NSObject {
         }
 
         guard !channelIds.isEmpty else {
-            users = []
-            DispatchQueue.main.async { [weak self] in self?.event = .reload }
+            allUsers = []
+            applyFilter()
             return
         }
 
@@ -75,9 +77,33 @@ open class GlobalSearchUserBarViewModel: NSObject {
             return result
         } completion: { [weak self] fetchResult in
             guard let self else { return }
-            users = (try? fetchResult.get()) ?? []
-            DispatchQueue.main.async { [weak self] in self?.event = .reload }
+            allUsers = (try? fetchResult.get()) ?? []
+            applyFilter()
         }
+    }
+
+    open func search(query: String?) {
+        searchQuery = query
+        applyFilter()
+    }
+
+    private func applyFilter() {
+        let query = searchQuery?.trimmingCharacters(in: .whitespaces).lowercased() ?? ""
+        if query.isEmpty {
+            users = allUsers
+        } else {
+            users = allUsers.filter { user in
+                let first = user.firstName?.lowercased() ?? ""
+                let last = user.lastName?.lowercased() ?? ""
+                let username = user.username?.lowercased() ?? ""
+                let full = "\(first) \(last)".trimmingCharacters(in: .whitespaces)
+                return first.hasPrefix(query)
+                    || last.hasPrefix(query)
+                    || username.hasPrefix(query)
+                    || full.hasPrefix(query)
+            }
+        }
+        DispatchQueue.main.async { [weak self] in self?.event = .reload }
     }
 }
 

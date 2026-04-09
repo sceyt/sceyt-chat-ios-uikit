@@ -84,6 +84,12 @@ open class ChannelListViewController: ViewController,
             searchController.showsSearchResultsController = true
         }
 
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            globalVC.searchUserBarView.onSelect = { [weak self] user in
+                self?.addUserSearchToken(user)
+            }
+        }
+
         definesPresentationContext = true
 
         emptyView.isHidden = true
@@ -512,6 +518,8 @@ open class ChannelListViewController: ViewController,
     public func updateSearchResults(for searchController: UISearchController) {
         let text = searchController.searchBar.text
         if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            let hasTokens = !searchController.searchBar.searchTextField.tokens.isEmpty
+            globalVC.setUserBarVisible(!hasTokens, animated: true)
             NSObject.cancelPreviousPerformRequests(withTarget: globalVC, selector: #selector(GlobalSearchResultsViewController.search(query:)), object: lastSearchText)
             lastSearchText = text
             globalVC.perform(#selector(GlobalSearchResultsViewController.search(query:)), with: text)
@@ -520,6 +528,16 @@ open class ChannelListViewController: ViewController,
             lastSearchText = text
             channelListViewModel.perform(#selector(ChannelListViewModel.search(query:)), with: text, afterDelay: 0.01)
         }
+    }
+
+    open func addUserSearchToken(_ user: ChatUser) {
+        let textField = searchController.searchBar.searchTextField
+        let name = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
+        let token = UISearchToken(icon: nil, text: name)
+        token.representedObject = user
+        textField.insertToken(token, at: textField.tokens.count)
+        textField.text = nil
+        updateSearchResults(for: searchController)
     }
 }
 

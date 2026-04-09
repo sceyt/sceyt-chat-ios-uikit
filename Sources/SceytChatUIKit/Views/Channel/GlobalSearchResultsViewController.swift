@@ -202,6 +202,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     @objc open func search(query: String?) {
         chatsPage.viewModel.search(query: query)
         channelsPage.viewModel.search(query: query)
+        searchUserBarView.viewModel.search(query: query)
     }
 
     override open func reloadData() {
@@ -211,6 +212,17 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
 
     override open func showEmptyViewIfNeeded() {
         // Per-page empty state is handled by each page VC
+    }
+
+    open func setUserBarVisible(_ visible: Bool, animated: Bool) {
+        let targetAlpha: CGFloat = visible ? 1 : 0
+        guard searchUserBarView.alpha != targetAlpha else { return }
+        if visible { searchUserBarView.isHidden = false }
+        UIView.animate(withDuration: animated ? 0.2 : 0, animations: {
+            self.searchUserBarView.alpha = targetAlpha
+        }, completion: { _ in
+            self.searchUserBarView.isHidden = !visible
+        })
     }
 
     // MARK: - Page Navigation
