@@ -50,6 +50,11 @@ open class GlobalSearchMessagesViewModel: NSObject {
     /// Current search query – internal so testable subclasses can read/write it.
     var searchQuery: String?
 
+    /// When set, message results are scoped to channels that include this user.
+    /// - Direct channels with this user: all messages matching the query are shown.
+    /// - Group channels with this user: only messages sent by this user are shown.
+    public var filterUser: ChatUser?
+
     private var currentSearchTask: Task<Void, Never>?
 
     // MARK: - Init
@@ -137,21 +142,47 @@ open class GlobalSearchMessagesViewModel: NSObject {
         currentSearchTask = Task(priority: .userInitiated) { [weak self] in
             guard let self else { return }
 
-            async let chatResult    = fetchMessages(basePredicate: basePredicate,
-                                                    channelTypes: [config.direct, config.group])
-            async let channelResult = fetchMessages(basePredicate: basePredicate,
-                                                    channelTypes: [config.broadcast])
-            let (chatsResult, channelsResult) = await (chatResult, channelResult)
+            if let filterUser = filterUser {
+                // Direct channels containing this user: show all matching messages (both parties).
+                // Group channels containing this user: show only messages from this user.
+                let userPredicate = NSPredicate(format: "user.id == %@", filterUser.id)
+                let groupPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [basePredicate, userPredicate])
 
-            guard !Task.isCancelled else { return }
+                async let directResult = fetchMessages(basePredicate: basePredicate,
+                                                       channelTypes: [config.direct],
+                                                       memberUserId: filterUser.id)
+                async let groupResult  = fetchMessages(basePredicate: groupPredicate,
+                                                       channelTypes: [config.group],
+                                                       memberUserId: filterUser.id)
+                let (direct, group) = await (directResult, groupResult)
 
-            await MainActor.run { [weak self] in
-                guard let self else { return }
-                chatMessages            = chatsResult.0
-                channelMessages         = channelsResult.0
-                chatMessageChannels     = chatsResult.1
-                channelMessageChannels  = channelsResult.1
-                event = .reload
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    chatMessages           = direct.0 + group.0
+                    channelMessages        = []
+                    chatMessageChannels    = direct.1.merging(group.1) { $1 }
+                    channelMessageChannels = [:]
+                    event = .reload
+                }
+            } else {
+                async let chatResult    = fetchMessages(basePredicate: basePredicate,
+                                                        channelTypes: [config.direct, config.group])
+                async let channelResult = fetchMessages(basePredicate: basePredicate,
+                                                        channelTypes: [config.broadcast])
+                let (chatsResult, channelsResult) = await (chatResult, channelResult)
+
+                guard !Task.isCancelled else { return }
+
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    chatMessages            = chatsResult.0
+                    channelMessages         = channelsResult.0
+                    chatMessageChannels     = chatsResult.1
+                    channelMessageChannels  = channelsResult.1
+                    event = .reload
+                }
             }
         }
     }
@@ -159,12 +190,25 @@ open class GlobalSearchMessagesViewModel: NSObject {
     // MARK: - DB fetch
 
     private func fetchMessages(basePredicate: NSPredicate,
-                               channelTypes: [String]) async -> ([ChatMessage], [ChannelId: ChatChannel]) {
+                               channelTypes: [String],
+                               memberUserId: UserId? = nil) async -> ([ChatMessage], [ChannelId: ChatChannel]) {
         await withCheckedContinuation { cont in
-            SceytChatUIKit.shared.database.read { [basePredicate, channelTypes] context in
-                // 1. Resolve channel IDs for the requested types.
+            SceytChatUIKit.shared.database.read { [basePredicate, channelTypes, memberUserId] context in
+                // 1. Resolve channel IDs for the requested types,
+                //    optionally restricted to channels containing a specific member.
                 let channelRequest = ChannelDTO.fetchRequest()
-                channelRequest.predicate = NSPredicate(format: "type IN %@", channelTypes)
+                if let memberUserId {
+                    let memberRequest = MemberDTO.fetchRequest()
+                    memberRequest.predicate = NSPredicate(format: "user.id == %@", memberUserId)
+                    let memberDTOs = MemberDTO.fetch(request: memberRequest, context: context)
+                    let memberChannelIds = memberDTOs.map { $0.channelId }
+                    channelRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                        NSPredicate(format: "type IN %@", channelTypes),
+                        NSPredicate(format: "id IN %@", memberChannelIds)
+                    ])
+                } else {
+                    channelRequest.predicate = NSPredicate(format: "type IN %@", channelTypes)
+                }
                 let channelDTOs = ChannelDTO.fetch(request: channelRequest, context: context)
                 let channelIds: [Int64] = channelDTOs.map { $0.id }
 

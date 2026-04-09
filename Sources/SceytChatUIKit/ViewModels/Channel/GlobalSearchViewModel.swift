@@ -19,6 +19,10 @@ open class GlobalSearchViewModel: NSObject {
     /// Empty means all types. Set before calling `startDatabaseObserver()`.
     open var channelTypes: [String] = []
 
+    /// When set, channel results are restricted to direct/group channels that include this user.
+    /// The text query is ignored for channel name matching while this is active.
+    public var filterUser: ChatUser?
+
     @Atomic public var channels: [ChatChannel] = []
 
     private var isSearchActive = false
@@ -79,6 +83,20 @@ open class GlobalSearchViewModel: NSObject {
     // MARK: - Local search
 
     @objc open func search(query: String?) {
+        if let filterUser = filterUser {
+            isSearchActive = true
+            Task(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
+                let result = await fetchChannels(forMember: filterUser)
+                await MainActor.run { [weak self] in
+                    guard let self, isSearchActive else { return }
+                    channels = result
+                    event = .reloadSearch
+                }
+            }
+            return
+        }
+
         guard let query, !query.isEmpty else {
             isSearchActive = false
             rebuildChannels()
@@ -146,6 +164,36 @@ open class GlobalSearchViewModel: NSObject {
                     SceytChatUIKit.shared.config.channelTypesConfig.broadcast, query, " \(query)"
                 )
                 return ChannelDTO.fetch(request: request, context: context)
+                    .compactMap { ChatChannel(dto: $0) }
+            } completion: { result in
+                cont.resume(returning: (try? result.get()) ?? [])
+            }
+        }
+    }
+
+    private func fetchChannels(forMember user: ChatUser) async -> [ChatChannel] {
+        let userId = user.id
+        let types = channelTypes.isEmpty
+            ? [SceytChatUIKit.shared.config.channelTypesConfig.direct,
+               SceytChatUIKit.shared.config.channelTypesConfig.group]
+            : channelTypes
+        return await withCheckedContinuation { cont in
+            SceytChatUIKit.shared.database.read { [userId, types] context in
+                let memberRequest = MemberDTO.fetchRequest()
+                memberRequest.predicate = NSPredicate(format: "user.id == %@", userId)
+                let memberDTOs = MemberDTO.fetch(request: memberRequest, context: context)
+                let channelIds = memberDTOs.map { $0.channelId }
+
+                guard !channelIds.isEmpty else { return [ChatChannel]() }
+
+                let channelRequest = ChannelDTO.fetchRequest()
+                channelRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                    NSPredicate(format: "id IN %@", channelIds),
+                    NSPredicate(format: "type IN %@", types),
+                    NSPredicate(format: "unsubscribed == NO")
+                ])
+                channelRequest.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.sortingKey, ascending: false)
+                return ChannelDTO.fetch(request: channelRequest, context: context)
                     .compactMap { ChatChannel(dto: $0) }
             } completion: { result in
                 cont.resume(returning: (try? result.get()) ?? [])

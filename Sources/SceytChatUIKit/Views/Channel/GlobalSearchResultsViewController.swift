@@ -58,6 +58,12 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
 
     private var userBarBottom: NSLayoutConstraint!
 
+    public var hasSearchToken: Bool = false
+
+    /// When set, message results are scoped to channels that include this user.
+    /// Passed down to the chats page's messagesViewModel before each search.
+    public var filterUser: ChatUser?
+
     // MARK: - Pages
 
     open lazy var chatsPage: ChatsPageViewController = {
@@ -183,7 +189,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self else { return }
-                setUserBarVisible(!searchUserBarView.viewModel.users.isEmpty, animated: true)
+                setUserBarVisible(!hasSearchToken && !searchUserBarView.viewModel.users.isEmpty, animated: true)
             }
             .store(in: &subscriptions)
     }
@@ -213,6 +219,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     // MARK: - Public API
 
     @objc open func search(query: String?) {
+        chatsPage.viewModel.filterUser = filterUser
+        chatsPage.messagesViewModel.filterUser = filterUser
         chatsPage.search(query: query)
         channelsPage.search(query: query)
         searchUserBarView.viewModel.search(query: query)

@@ -519,6 +519,8 @@ open class ChannelListViewController: ViewController,
         let text = searchController.searchBar.text
         if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
             let hasTokens = !searchController.searchBar.searchTextField.tokens.isEmpty
+            globalVC.hasSearchToken = hasTokens
+            if !hasTokens { globalVC.filterUser = nil }
             globalVC.setUserBarVisible(!hasTokens, animated: true)
             NSObject.cancelPreviousPerformRequests(withTarget: globalVC, selector: #selector(GlobalSearchResultsViewController.search(query:)), object: lastSearchText)
             lastSearchText = text
@@ -537,6 +539,9 @@ open class ChannelListViewController: ViewController,
         token.representedObject = user
         textField.insertToken(token, at: textField.tokens.count)
         textField.text = nil
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            globalVC.filterUser = user
+        }
         updateSearchResults(for: searchController)
     }
 }
