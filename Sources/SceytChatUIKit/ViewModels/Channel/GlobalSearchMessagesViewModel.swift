@@ -143,15 +143,15 @@ open class GlobalSearchMessagesViewModel: NSObject {
             guard let self else { return }
 
             if let filterUser = filterUser {
-                // Direct channels containing this user: show all matching messages (both parties).
-                // Group channels containing this user: show only messages from this user.
+                // When a user is selected, show only messages sent by that user
+                // regardless of channel type (direct or group).
                 let userPredicate = NSPredicate(format: "user.id == %@", filterUser.id)
-                let groupPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [basePredicate, userPredicate])
+                let userFilteredPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [basePredicate, userPredicate])
 
-                async let directResult = fetchMessages(basePredicate: basePredicate,
+                async let directResult = fetchMessages(basePredicate: userFilteredPredicate,
                                                        channelTypes: [config.direct],
                                                        memberUserId: filterUser.id)
-                async let groupResult  = fetchMessages(basePredicate: groupPredicate,
+                async let groupResult  = fetchMessages(basePredicate: userFilteredPredicate,
                                                        channelTypes: [config.group],
                                                        memberUserId: filterUser.id)
                 let (direct, group) = await (directResult, groupResult)

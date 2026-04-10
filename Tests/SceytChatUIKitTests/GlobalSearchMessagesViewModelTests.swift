@@ -66,16 +66,14 @@ final class TestableGlobalSearchMessagesViewModel: GlobalSearchMessagesViewModel
         let bodyFiltered = allMessages.filter(bodyMatches)
 
         if let filterUser = filterUser {
-            // Direct channels containing this user: all messages matching the query.
-            // Group channels containing this user: only messages sent by this user.
-            let directMessages = bodyFiltered.filter {
-                allChannelTypes[$0.channelId] == "direct"
-            }
-            let groupMessages = bodyFiltered.filter {
-                allChannelTypes[$0.channelId] == "group"
+            // When a user is selected, show only messages sent by that user
+            // regardless of channel type (direct or group).
+            // Channel must be in allChannelTypes, meaning the user is a member.
+            let filteredMessages = bodyFiltered.filter {
+                allChannelTypes[$0.channelId] != nil
                     && $0.user?.id == filterUser.id
             }
-            chatMessages = directMessages + groupMessages
+            chatMessages = filteredMessages
             channelMessages = []
         } else {
             chatMessages = bodyFiltered
@@ -458,8 +456,8 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
 
     // MARK: - filterUser: direct channel
 
-    func testFilterUser_directChannel_showsAllMatchingMessages() {
-        // In a direct channel both the current user's and the selected user's messages must appear.
+    func testFilterUser_directChannel_showsOnlyFilterUserMessages() {
+        // When a user is selected, only their messages appear — even in a direct channel.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
@@ -470,10 +468,12 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             channelTypes: [10: "direct"]
         )
         viewModel.search(query: "Hello")
-        XCTAssertEqual(viewModel.messages.count, 2, "Direct channel: both parties' messages must appear")
+        XCTAssertEqual(viewModel.messages.count, 1, "Direct channel: only the selected user's messages must appear")
+        XCTAssertEqual(viewModel.messages.first?.id, 2)
     }
 
-    func testFilterUser_directChannel_excludesNonMatchingQuery() {
+    func testFilterUser_directChannel_excludesMyOwnMessages() {
+        // "me" sent a matching message, but only alice's messages should appear.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
@@ -484,12 +484,11 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             channelTypes: [10: "direct"]
         )
         viewModel.search(query: "Hello")
-        XCTAssertEqual(viewModel.messages.count, 1)
-        XCTAssertEqual(viewModel.messages.first?.id, 1)
+        XCTAssertTrue(viewModel.messages.isEmpty, "My own messages must not appear when filterUser is set")
     }
 
-    func testFilterUser_directChannel_allMessagesByEitherPartyIncluded() {
-        // Five messages in one direct channel; query matches all — all five must appear.
+    func testFilterUser_directChannel_onlyFilterUserMessagesIncluded() {
+        // Five messages alternating between "me" and "alice"; only alice's (even ids) must appear.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
@@ -500,7 +499,10 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             channelTypes: [10: "direct"]
         )
         viewModel.search(query: "meeting")
-        XCTAssertEqual(viewModel.messages.count, 5)
+        XCTAssertEqual(viewModel.messages.count, 2, "Only alice's messages (ids 2, 4) should be included")
+        let ids = Set(viewModel.messages.map { $0.id })
+        XCTAssertTrue(ids.contains(2))
+        XCTAssertTrue(ids.contains(4))
     }
 
     // MARK: - filterUser: group channel
@@ -551,13 +553,12 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
 
     func testFilterUser_mixedChannels_correctResults() {
         // Channel 10 = direct, channel 20 = group.
-        // Direct: both users' messages appear.
-        // Group: only alice's messages appear.
+        // Both direct and group: only alice's messages appear.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
             messages: [
-                makeMessage(id: 1, channelId: 10, body: "Hello from me",    userId: "me"),    // direct ✓
+                makeMessage(id: 1, channelId: 10, body: "Hello from me",    userId: "me"),    // direct ✗ (not alice)
                 makeMessage(id: 2, channelId: 10, body: "Hello from alice", userId: "alice"), // direct ✓
                 makeMessage(id: 3, channelId: 20, body: "Hello alice group", userId: "alice"), // group ✓
                 makeMessage(id: 4, channelId: 20, body: "Hello bob group",   userId: "bob"),  // group ✗
@@ -565,9 +566,9 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             channelTypes: [10: "direct", 20: "group"]
         )
         viewModel.search(query: "Hello")
-        XCTAssertEqual(viewModel.messages.count, 3)
+        XCTAssertEqual(viewModel.messages.count, 2)
         let ids = Set(viewModel.messages.map { $0.id })
-        XCTAssertTrue(ids.contains(1))
+        XCTAssertFalse(ids.contains(1))
         XCTAssertTrue(ids.contains(2))
         XCTAssertTrue(ids.contains(3))
         XCTAssertFalse(ids.contains(4))
