@@ -23,6 +23,10 @@ open class GlobalSearchViewModel: NSObject {
     /// The text query is ignored for channel name matching while this is active.
     public var filterUser: ChatUser?
 
+    /// Returns false when a user filter is active — the channel list section should be hidden
+    /// in that case, showing only message results scoped to that user.
+    public var shouldShowChannelSection: Bool { filterUser == nil }
+
     @Atomic public var channels: [ChatChannel] = []
 
     private var isSearchActive = false

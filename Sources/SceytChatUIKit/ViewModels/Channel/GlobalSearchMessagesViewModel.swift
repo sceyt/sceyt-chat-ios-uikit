@@ -55,6 +55,15 @@ open class GlobalSearchMessagesViewModel: NSObject {
     /// - Group channels with this user: only messages sent by this user are shown.
     public var filterUser: ChatUser?
 
+    /// Returns true when the messages section should be visible:
+    /// - Always true when a user filter is active (show all their messages, or filter by >= 1 char).
+    /// - True only when the query has >= 2 characters otherwise.
+    public var shouldShowMessagesSection: Bool {
+        if filterUser != nil { return true }
+        let trimmed = (searchQuery ?? "").trimmingCharacters(in: .whitespaces)
+        return trimmed.count >= 2
+    }
+
     private var currentSearchTask: Task<Void, Never>?
 
     /// Override in test subclasses to inject an in-memory database.
@@ -112,64 +121,94 @@ open class GlobalSearchMessagesViewModel: NSObject {
 
     /// Override in testable subclasses to do in-memory filtering instead of a DB query.
     public func applyFilter() {
-        let tokens = (searchQuery ?? "")
+        let trimmed = (searchQuery ?? "").trimmingCharacters(in: .whitespaces)
+        let tokens = trimmed
             .components(separatedBy: .whitespaces)
             .filter { !$0.isEmpty }
 
-        guard !tokens.isEmpty else {
-            chatMessages = []
-            channelMessages = []
-            chatMessageChannels = [:]
-            channelMessageChannels = [:]
-            DispatchQueue.main.async { [weak self] in self?.event = .reload }
-            return
-        }
-
         let config = SceytChatUIKit.shared.config.channelTypesConfig
 
-        // Every token must match as a prefix of a word (AND semantics, case-insensitive).
-        // Suffix and mid-word matches (e.g. "ord" inside "world") are excluded.
-        let basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates:
-            tokens.map { token in
-                let escaped = NSRegularExpression.escapedPattern(for: token)
-                let pattern = "(?i)(?s).*\\b\(escaped).*"
-                return NSPredicate(format: "body MATCHES %@", pattern)
-            } + [
-                NSPredicate(format: "state != 2"),       // exclude deleted
-                NSPredicate(format: "body.length > 0"),  // exclude empty body
-                NSPredicate(format: "transient == NO")   // exclude transient
-            ]
-        )
+        if let filterUser = filterUser {
+            // User filter active:
+            //   - Empty query  → show all messages from that user (no body filter).
+            //   - Any query    → filter their messages by tokens (1+ char is enough).
+            let basePredicate: NSPredicate
+            if tokens.isEmpty {
+                basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                    NSPredicate(format: "state != 2"),
+                    NSPredicate(format: "body.length > 0"),
+                    NSPredicate(format: "transient == NO"),
+                    NSPredicate(format: "user.id == %@", filterUser.id)
+                ])
+            } else {
+                basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates:
+                    tokens.map { token in
+                        let escaped = NSRegularExpression.escapedPattern(for: token)
+                        let pattern = "(?i)(?s).*\\b\(escaped).*"
+                        return NSPredicate(format: "body MATCHES %@", pattern)
+                    } + [
+                        NSPredicate(format: "state != 2"),
+                        NSPredicate(format: "body.length > 0"),
+                        NSPredicate(format: "transient == NO"),
+                        NSPredicate(format: "user.id == %@", filterUser.id)
+                    ]
+                )
+            }
 
-        currentSearchTask?.cancel()
-        currentSearchTask = Task(priority: .userInitiated) { [weak self] in
-            guard let self else { return }
+            currentSearchTask?.cancel()
+            currentSearchTask = Task(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
 
-            if let filterUser = filterUser {
-                // When a user is selected, show only messages sent by that user
-                // regardless of channel type (direct or group).
-                let userPredicate = NSPredicate(format: "user.id == %@", filterUser.id)
-                let userFilteredPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [basePredicate, userPredicate])
-
-                async let directResult = fetchMessages(basePredicate: userFilteredPredicate,
-                                                       channelTypes: [config.direct],
-                                                       memberUserId: filterUser.id)
-                async let groupResult  = fetchMessages(basePredicate: userFilteredPredicate,
-                                                       channelTypes: [config.group],
-                                                       memberUserId: filterUser.id)
-                let (direct, group) = await (directResult, groupResult)
+                async let directResult    = fetchMessages(basePredicate: basePredicate,
+                                                          channelTypes: [config.direct],
+                                                          memberUserId: filterUser.id)
+                async let groupResult     = fetchMessages(basePredicate: basePredicate,
+                                                          channelTypes: [config.group],
+                                                          memberUserId: filterUser.id)
+                async let broadcastResult = fetchMessages(basePredicate: basePredicate,
+                                                          channelTypes: [config.broadcast],
+                                                          memberUserId: filterUser.id)
+                let (direct, group, broadcast) = await (directResult, groupResult, broadcastResult)
 
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run { [weak self] in
                     guard let self else { return }
                     chatMessages           = direct.0 + group.0
-                    channelMessages        = []
+                    channelMessages        = broadcast.0
                     chatMessageChannels    = direct.1.merging(group.1) { $1 }
-                    channelMessageChannels = [:]
+                    channelMessageChannels = broadcast.1
                     event = .reload
                 }
-            } else {
+            }
+        } else {
+            // No user filter: require >= 2 characters before searching.
+            guard trimmed.count >= 2, !tokens.isEmpty else {
+                chatMessages = []
+                channelMessages = []
+                chatMessageChannels = [:]
+                channelMessageChannels = [:]
+                DispatchQueue.main.async { [weak self] in self?.event = .reload }
+                return
+            }
+
+            // Every token must match as a prefix of a word (AND semantics, case-insensitive).
+            let basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates:
+                tokens.map { token in
+                    let escaped = NSRegularExpression.escapedPattern(for: token)
+                    let pattern = "(?i)(?s).*\\b\(escaped).*"
+                    return NSPredicate(format: "body MATCHES %@", pattern)
+                } + [
+                    NSPredicate(format: "state != 2"),
+                    NSPredicate(format: "body.length > 0"),
+                    NSPredicate(format: "transient == NO")
+                ]
+            )
+
+            currentSearchTask?.cancel()
+            currentSearchTask = Task(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
+
                 async let chatResult    = fetchMessages(basePredicate: basePredicate,
                                                         channelTypes: [config.direct, config.group])
                 async let channelResult = fetchMessages(basePredicate: basePredicate,

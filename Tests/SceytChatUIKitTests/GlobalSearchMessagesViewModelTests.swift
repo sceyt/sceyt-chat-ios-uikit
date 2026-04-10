@@ -42,16 +42,11 @@ final class TestableGlobalSearchMessagesViewModel: GlobalSearchMessagesViewModel
     override public func applyFilter() {
         defer { event = .reload }
 
-        let tokens = (searchQuery ?? "")
+        let trimmed = (searchQuery ?? "").trimmingCharacters(in: .whitespaces)
+        let tokens = trimmed
             .components(separatedBy: .whitespaces)
             .filter { !$0.isEmpty }
             .map { $0.lowercased() }
-
-        guard !tokens.isEmpty else {
-            chatMessages = []
-            channelMessages = []
-            return
-        }
 
         let bodyMatches: (ChatMessage) -> Bool = { message in
             guard message.state != .deleted, !message.body.isEmpty else { return false }
@@ -63,20 +58,28 @@ final class TestableGlobalSearchMessagesViewModel: GlobalSearchMessagesViewModel
             }
         }
 
-        let bodyFiltered = allMessages.filter(bodyMatches)
-
         if let filterUser = filterUser {
-            // When a user is selected, show only messages sent by that user
-            // regardless of channel type (direct or group).
-            // Channel must be in allChannelTypes, meaning the user is a member.
-            let filteredMessages = bodyFiltered.filter {
+            // User filter active:
+            //   - Empty query  → show all messages from that user (no body filter).
+            //   - Any query    → filter their messages by tokens (1+ char is enough).
+            // Broadcast channels go to channelMessages; direct/group go to chatMessages.
+            let userMessages = allMessages.filter {
                 allChannelTypes[$0.channelId] != nil
                     && $0.user?.id == filterUser.id
+                    && $0.state != .deleted
+                    && !$0.body.isEmpty
             }
-            chatMessages = filteredMessages
-            channelMessages = []
+            let filtered = tokens.isEmpty ? userMessages : userMessages.filter(bodyMatches)
+            chatMessages    = filtered.filter { allChannelTypes[$0.channelId] != "broadcast" }
+            channelMessages = filtered.filter { allChannelTypes[$0.channelId] == "broadcast" }
         } else {
-            chatMessages = bodyFiltered
+            // No user filter: require >= 2 characters before searching.
+            guard trimmed.count >= 2, !tokens.isEmpty else {
+                chatMessages = []
+                channelMessages = []
+                return
+            }
+            chatMessages = allMessages.filter(bodyMatches)
             channelMessages = []
         }
     }
@@ -125,7 +128,7 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
         ChatUser(id: id)
     }
 
-    // MARK: - Empty / blank query
+    // MARK: - Empty / blank query (no filterUser)
 
     func testEmptyQueryReturnsNoMessages() {
         viewModel.inject(messages: [makeMessage(id: 1, body: "Hello world")])
@@ -145,7 +148,31 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.messages.isEmpty, "Whitespace-only query should return no messages")
     }
 
-    // MARK: - Body text matching
+    // MARK: - Character count threshold (no filterUser)
+
+    func testSingleCharacterQuery_noFilter_returnsEmpty() {
+        // Without a user filter, a 1-character query is below the 2-char threshold.
+        viewModel.inject(messages: [
+            makeMessage(id: 1, body: "Apple"),
+            makeMessage(id: 2, body: "Banana"),
+        ])
+        viewModel.search(query: "a")
+        XCTAssertTrue(viewModel.messages.isEmpty, "1-char query without filterUser must return nothing (threshold is >= 2)")
+    }
+
+    func testTwoCharacterQuery_noFilter_returnsResults() {
+        viewModel.inject(messages: [
+            makeMessage(id: 1, body: "Apple"),
+            makeMessage(id: 2, body: "Ant"),
+            makeMessage(id: 3, body: "Banana"),
+        ])
+        viewModel.search(query: "an")
+        // "Ant" starts with "an"; "Banana" does not start with "an" (mid-word only). Only "Ant" matches.
+        XCTAssertEqual(viewModel.messages.count, 1)
+        XCTAssertEqual(viewModel.messages.first?.id, 2)
+    }
+
+    // MARK: - Body text matching (no filterUser, >= 2 chars)
 
     func testSearchByExactBodyText() {
         viewModel.inject(messages: [
@@ -174,8 +201,8 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             makeMessage(id: 1, body: "Hello world"),
             makeMessage(id: 2, body: "Goodbye"),
         ])
-        viewModel.search(query: "ord")
-        XCTAssertTrue(viewModel.messages.isEmpty, "Suffix-only token 'ord' must not match 'world'")
+        viewModel.search(query: "or")
+        XCTAssertTrue(viewModel.messages.isEmpty, "Suffix-only token 'or' must not match 'world'")
     }
 
     func testSearchByMidWordBodyTextShouldNotMatch() {
@@ -184,8 +211,8 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             makeMessage(id: 1, body: "Hello world"),
             makeMessage(id: 2, body: "Goodbye"),
         ])
-        viewModel.search(query: "ello")
-        XCTAssertTrue(viewModel.messages.isEmpty, "Mid-word token 'ello' must not match 'Hello'")
+        viewModel.search(query: "el")
+        XCTAssertTrue(viewModel.messages.isEmpty, "Mid-word token 'el' must not match 'Hello'")
     }
 
     func testSearchBodyTextCaseInsensitive() {
@@ -317,8 +344,7 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             makeMessage(id: 1, body: ""),
             makeMessage(id: 2, body: "Has content"),
         ])
-        // A single-space query should NOT match an empty body
-        viewModel.search(query: "c")
+        viewModel.search(query: "co")
         XCTAssertEqual(viewModel.messages.count, 1)
         XCTAssertEqual(viewModel.messages.first?.id, 2)
     }
@@ -377,19 +403,6 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
     func testNumberOfMessagesIsZeroBeforeSearch() {
         viewModel.inject(messages: [makeMessage(id: 1, body: "Hello")])
         XCTAssertEqual(viewModel.numberOfMessages, 0, "No results until search() is called")
-    }
-
-    // MARK: - Single character query
-
-    func testSingleCharacterQuery() {
-        viewModel.inject(messages: [
-            makeMessage(id: 1, body: "Apple"),
-            makeMessage(id: 2, body: "Banana"),
-        ])
-        viewModel.search(query: "a")
-        // Only "Apple" starts with 'a' (prefix-only matching; "Banana" starts with 'B')
-        XCTAssertEqual(viewModel.messages.count, 1)
-        XCTAssertEqual(viewModel.messages.first?.id, 1)
     }
 
     // MARK: - Event publishing
@@ -454,10 +467,128 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
         wait(for: [expectation], timeout: 1.0)
     }
 
+    // MARK: - shouldShowMessagesSection
+
+    func testShouldShowMessagesSection_noFilter_emptyQuery_isFalse() {
+        viewModel.search(query: "")
+        XCTAssertFalse(viewModel.shouldShowMessagesSection)
+    }
+
+    func testShouldShowMessagesSection_noFilter_oneChar_isFalse() {
+        viewModel.search(query: "a")
+        XCTAssertFalse(viewModel.shouldShowMessagesSection, "1 char without filterUser is below threshold")
+    }
+
+    func testShouldShowMessagesSection_noFilter_twoChars_isTrue() {
+        viewModel.search(query: "ab")
+        XCTAssertTrue(viewModel.shouldShowMessagesSection, "2 chars without filterUser meets threshold")
+    }
+
+    func testShouldShowMessagesSection_filterUser_emptyQuery_isTrue() {
+        viewModel.filterUser = makeUser(id: "alice")
+        viewModel.search(query: "")
+        XCTAssertTrue(viewModel.shouldShowMessagesSection, "filterUser active → always show messages section")
+    }
+
+    func testShouldShowMessagesSection_filterUser_oneChar_isTrue() {
+        viewModel.filterUser = makeUser(id: "alice")
+        viewModel.search(query: "h")
+        XCTAssertTrue(viewModel.shouldShowMessagesSection, "filterUser active → 1 char is enough to show section")
+    }
+
+    func testShouldShowMessagesSection_filterUser_nilQuery_isTrue() {
+        viewModel.filterUser = makeUser(id: "alice")
+        viewModel.search(query: nil)
+        XCTAssertTrue(viewModel.shouldShowMessagesSection, "filterUser active → nil query still shows section")
+    }
+
+    // MARK: - filterUser: empty query shows all user messages
+
+    func testFilterUser_emptyQuery_showsAllUserMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 10, body: "Good morning",  userId: "alice"),
+                makeMessage(id: 2, channelId: 10, body: "How are you",   userId: "alice"),
+                makeMessage(id: 3, channelId: 10, body: "See you later", userId: "me"),
+            ],
+            channelTypes: [10: "direct"]
+        )
+        viewModel.search(query: "")
+        XCTAssertEqual(viewModel.messages.count, 2, "Empty query with filterUser should show all user messages")
+        let ids = Set(viewModel.messages.map { $0.id })
+        XCTAssertTrue(ids.contains(1))
+        XCTAssertTrue(ids.contains(2))
+        XCTAssertFalse(ids.contains(3))
+    }
+
+    func testFilterUser_nilQuery_showsAllUserMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 10, body: "Hello", userId: "alice"),
+                makeMessage(id: 2, channelId: 10, body: "Hi",    userId: "me"),
+            ],
+            channelTypes: [10: "direct"]
+        )
+        viewModel.search(query: nil)
+        XCTAssertEqual(viewModel.messages.count, 1)
+        XCTAssertEqual(viewModel.messages.first?.id, 1)
+    }
+
+    func testFilterUser_emptyQuery_excludesDeletedMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 10, body: "Hello",   userId: "alice", state: .none),
+                makeMessage(id: 2, channelId: 10, body: "Deleted", userId: "alice", state: .deleted),
+            ],
+            channelTypes: [10: "direct"]
+        )
+        viewModel.search(query: "")
+        XCTAssertEqual(viewModel.messages.count, 1, "Deleted messages must be excluded even with empty query")
+        XCTAssertEqual(viewModel.messages.first?.id, 1)
+    }
+
+    func testFilterUser_emptyQuery_excludesEmptyBodyMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 10, body: "Hello", userId: "alice"),
+                makeMessage(id: 2, channelId: 10, body: "",       userId: "alice"),
+            ],
+            channelTypes: [10: "direct"]
+        )
+        viewModel.search(query: "")
+        XCTAssertEqual(viewModel.messages.count, 1, "Empty body messages must be excluded even with empty query")
+        XCTAssertEqual(viewModel.messages.first?.id, 1)
+    }
+
+    // MARK: - filterUser: 1-char query filters user messages
+
+    func testFilterUser_singleCharQuery_filtersUserMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 10, body: "Apple",  userId: "alice"),
+                makeMessage(id: 2, channelId: 10, body: "Banana", userId: "alice"),
+                makeMessage(id: 3, channelId: 10, body: "Other",  userId: "me"),
+            ],
+            channelTypes: [10: "direct"]
+        )
+        viewModel.search(query: "a")
+        XCTAssertEqual(viewModel.messages.count, 1, "filterUser active: 1-char query should filter results")
+        XCTAssertEqual(viewModel.messages.first?.id, 1)
+    }
+
     // MARK: - filterUser: direct channel
 
     func testFilterUser_directChannel_showsOnlyFilterUserMessages() {
-        // When a user is selected, only their messages appear — even in a direct channel.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
@@ -473,12 +604,11 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
     }
 
     func testFilterUser_directChannel_excludesMyOwnMessages() {
-        // "me" sent a matching message, but only alice's messages should appear.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
             messages: [
-                makeMessage(id: 1, channelId: 10, body: "Hello", userId: "me"),
+                makeMessage(id: 1, channelId: 10, body: "Hello",   userId: "me"),
                 makeMessage(id: 2, channelId: 10, body: "Goodbye", userId: "alice"),
             ],
             channelTypes: [10: "direct"]
@@ -488,7 +618,6 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
     }
 
     func testFilterUser_directChannel_onlyFilterUserMessagesIncluded() {
-        // Five messages alternating between "me" and "alice"; only alice's (even ids) must appear.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
@@ -512,7 +641,7 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
         viewModel.filterUser = alice
         viewModel.inject(
             messages: [
-                makeMessage(id: 1, channelId: 20, body: "project update", userId: "alice"),
+                makeMessage(id: 1, channelId: 20, body: "project update",   userId: "alice"),
                 makeMessage(id: 2, channelId: 20, body: "project deadline", userId: "bob"),
             ],
             channelTypes: [20: "group"]
@@ -552,8 +681,6 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
     // MARK: - filterUser: mixed direct + group
 
     func testFilterUser_mixedChannels_correctResults() {
-        // Channel 10 = direct, channel 20 = group.
-        // Both direct and group: only alice's messages appear.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
@@ -590,34 +717,9 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.messages.count, 3, "No filterUser: all matching messages returned")
     }
 
-    // MARK: - filterUser with empty query
-
-    func testFilterUser_emptyQuery_returnsNoMessages() {
-        let alice = makeUser(id: "alice")
-        viewModel.filterUser = alice
-        viewModel.inject(
-            messages: [makeMessage(id: 1, channelId: 10, body: "Hello", userId: "alice")],
-            channelTypes: [10: "direct"]
-        )
-        viewModel.search(query: "")
-        XCTAssertTrue(viewModel.messages.isEmpty, "Empty query returns nothing even with filterUser set")
-    }
-
-    func testFilterUser_nilQuery_returnsNoMessages() {
-        let alice = makeUser(id: "alice")
-        viewModel.filterUser = alice
-        viewModel.inject(
-            messages: [makeMessage(id: 1, channelId: 10, body: "Hello", userId: "alice")],
-            channelTypes: [10: "direct"]
-        )
-        viewModel.search(query: nil)
-        XCTAssertTrue(viewModel.messages.isEmpty)
-    }
-
     // MARK: - filterUser: channel type unknown / unregistered
 
     func testFilterUser_channelWithUnknownType_excluded() {
-        // Message in a channel with no registered type — should be excluded when filterUser is set.
         let alice = makeUser(id: "alice")
         viewModel.filterUser = alice
         viewModel.inject(
@@ -626,5 +728,103 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
         )
         viewModel.search(query: "Hello")
         XCTAssertTrue(viewModel.messages.isEmpty, "Messages in channels with unknown type must be excluded")
+    }
+
+    func testFilterUser_channelWithUnknownType_excludedEvenWithEmptyQuery() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [makeMessage(id: 1, channelId: 99, body: "Hello", userId: "alice")],
+            channelTypes: [:]
+        )
+        viewModel.search(query: "")
+        XCTAssertTrue(viewModel.messages.isEmpty, "Unknown-type channel excluded even when query is empty")
+    }
+
+    // MARK: - filterUser: broadcast channel messages
+
+    func testFilterUser_broadcastChannel_emptyQuery_showsAllUserMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 30, body: "Announcement", userId: "alice"),
+                makeMessage(id: 2, channelId: 30, body: "Update",       userId: "alice"),
+                makeMessage(id: 3, channelId: 30, body: "Other news",   userId: "admin"),
+            ],
+            channelTypes: [30: "broadcast"]
+        )
+        viewModel.search(query: "")
+        XCTAssertTrue(viewModel.chatMessages.isEmpty, "Broadcast messages must not appear in chatMessages")
+        XCTAssertEqual(viewModel.channelMessages.count, 2, "Both alice's broadcast messages shown with empty query")
+        let ids = Set(viewModel.channelMessages.map { $0.id })
+        XCTAssertTrue(ids.contains(1))
+        XCTAssertTrue(ids.contains(2))
+    }
+
+    func testFilterUser_broadcastChannel_queryFiltersUserMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 30, body: "Announcement today", userId: "alice"),
+                makeMessage(id: 2, channelId: 30, body: "Update available",   userId: "alice"),
+                makeMessage(id: 3, channelId: 30, body: "Announcement notes", userId: "admin"),
+            ],
+            channelTypes: [30: "broadcast"]
+        )
+        viewModel.search(query: "Announcement")
+        XCTAssertEqual(viewModel.channelMessages.count, 1)
+        XCTAssertEqual(viewModel.channelMessages.first?.id, 1)
+    }
+
+    func testFilterUser_broadcastChannel_singleCharQuery_filtersUserMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 30, body: "Alert",  userId: "alice"),
+                makeMessage(id: 2, channelId: 30, body: "Update", userId: "alice"),
+            ],
+            channelTypes: [30: "broadcast"]
+        )
+        viewModel.search(query: "a")
+        XCTAssertEqual(viewModel.channelMessages.count, 1, "filterUser + 1-char query filters broadcast messages")
+        XCTAssertEqual(viewModel.channelMessages.first?.id, 1)
+    }
+
+    func testFilterUser_mixedAllChannelTypes_correctSplit() {
+        // Messages split correctly across chatMessages (direct/group) and channelMessages (broadcast).
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 10, body: "Hello direct",    userId: "alice"), // direct → chat
+                makeMessage(id: 2, channelId: 20, body: "Hello group",     userId: "alice"), // group → chat
+                makeMessage(id: 3, channelId: 30, body: "Hello broadcast", userId: "alice"), // broadcast → channel
+                makeMessage(id: 4, channelId: 10, body: "Hello from me",   userId: "me"),    // direct, wrong user
+                makeMessage(id: 5, channelId: 30, body: "Hello from admin",userId: "admin"), // broadcast, wrong user
+            ],
+            channelTypes: [10: "direct", 20: "group", 30: "broadcast"]
+        )
+        viewModel.search(query: "")
+        XCTAssertEqual(viewModel.chatMessages.count, 2)
+        XCTAssertEqual(viewModel.channelMessages.count, 1)
+        XCTAssertEqual(Set(viewModel.chatMessages.map { $0.id }), [1, 2])
+        XCTAssertEqual(viewModel.channelMessages.first?.id, 3)
+    }
+
+    func testFilterUser_broadcastChannel_nilQuery_showsAllUserMessages() {
+        let alice = makeUser(id: "alice")
+        viewModel.filterUser = alice
+        viewModel.inject(
+            messages: [
+                makeMessage(id: 1, channelId: 30, body: "News item", userId: "alice"),
+            ],
+            channelTypes: [30: "broadcast"]
+        )
+        viewModel.search(query: nil)
+        XCTAssertEqual(viewModel.channelMessages.count, 1)
+        XCTAssertEqual(viewModel.channelMessages.first?.id, 1)
     }
 }

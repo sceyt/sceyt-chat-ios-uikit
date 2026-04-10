@@ -271,6 +271,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         chatsPage.viewModel.filterUser = filterUser
         chatsPage.messagesViewModel.filterUser = filterUser
         chatsPage.search(query: query)
+        channelsPage.viewModel.filterUser = filterUser
+        channelsPage.messagesViewModel.filterUser = filterUser
         channelsPage.search(query: query)
         searchUserBarView.viewModel.search(query: query)
         let hasQuery = !(query ?? "").isEmpty
@@ -898,10 +900,9 @@ extension GlobalSearchResultsViewController {
         // MARK: - Search
 
         @objc open func search(query: String?) {
-            let trimmed = (query ?? "").trimmingCharacters(in: .whitespaces)
-            showMessagesSection = trimmed.count > 1
             viewModel.search(query: query)
-            messagesViewModel.search(query: showMessagesSection ? query : nil)
+            messagesViewModel.search(query: query)
+            showMessagesSection = messagesViewModel.shouldShowMessagesSection
         }
 
         // MARK: - Reload
@@ -924,7 +925,8 @@ extension GlobalSearchResultsViewController {
             // always see the same array, even if the VM updates concurrently.
             chatMessagesSnapshot = messagesViewModel.chatMessages
             tableView.reloadData()
-            emptyStateView.isHidden = !channels.isEmpty || !chatMessagesSnapshot.isEmpty
+            let hasVisibleChannels = viewModel.shouldShowChannelSection && !channels.isEmpty
+            emptyStateView.isHidden = hasVisibleChannels || !chatMessagesSnapshot.isEmpty
         }
 
         // MARK: - UITableViewDataSource
@@ -933,7 +935,7 @@ extension GlobalSearchResultsViewController {
 
         override public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
             switch section {
-            case 0: return channels.count
+            case 0: return viewModel.shouldShowChannelSection ? channels.count : 0
             case 1: return showMessagesSection ? chatMessagesSnapshot.count : 0
             default: return 0
             }
@@ -963,7 +965,7 @@ extension GlobalSearchResultsViewController {
         public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
             switch section {
             case 0:
-                guard !channels.isEmpty else { return nil }
+                guard viewModel.shouldShowChannelSection, !channels.isEmpty else { return nil }
                 let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
                 header.parentAppearance = separatorViewAppearance
                 return header
@@ -979,7 +981,7 @@ extension GlobalSearchResultsViewController {
 
         public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
             switch section {
-            case 0: return channels.isEmpty ? 0 : Components.separatorHeaderView.Layouts.height
+            case 0: return (viewModel.shouldShowChannelSection && !channels.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
             case 1: return (showMessagesSection && !chatMessagesSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
             default: return 0
             }
@@ -1065,10 +1067,9 @@ extension GlobalSearchResultsViewController {
         // MARK: - Search
 
         @objc open func search(query: String?) {
-            let trimmed = (query ?? "").trimmingCharacters(in: .whitespaces)
-            showMessagesSection = trimmed.count > 1
             viewModel.search(query: query)
-            messagesViewModel.search(query: showMessagesSection ? query : nil)
+            messagesViewModel.search(query: query)
+            showMessagesSection = messagesViewModel.shouldShowMessagesSection
         }
 
         // MARK: - Reload
@@ -1076,7 +1077,8 @@ extension GlobalSearchResultsViewController {
         override open func reloadData() {
             channelMessagesSnapshot = messagesViewModel.channelMessages
             tableView.reloadData()
-            emptyStateView.isHidden = !channels.isEmpty || !channelMessagesSnapshot.isEmpty
+            let hasVisibleChannels = viewModel.shouldShowChannelSection && !channels.isEmpty
+            emptyStateView.isHidden = hasVisibleChannels || !channelMessagesSnapshot.isEmpty
         }
 
         // MARK: - UITableViewDataSource
@@ -1085,7 +1087,7 @@ extension GlobalSearchResultsViewController {
 
         override public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
             switch section {
-            case 0: return channels.count
+            case 0: return viewModel.shouldShowChannelSection ? channels.count : 0
             case 1: return showMessagesSection ? channelMessagesSnapshot.count : 0
             default: return 0
             }
@@ -1114,7 +1116,7 @@ extension GlobalSearchResultsViewController {
         public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
             switch section {
             case 0:
-                guard !channels.isEmpty else { return nil }
+                guard viewModel.shouldShowChannelSection, !channels.isEmpty else { return nil }
                 let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
                 header.parentAppearance = separatorViewAppearance
                 return header
@@ -1130,7 +1132,7 @@ extension GlobalSearchResultsViewController {
 
         public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
             switch section {
-            case 0: return channels.isEmpty ? 0 : Components.separatorHeaderView.Layouts.height
+            case 0: return (viewModel.shouldShowChannelSection && !channels.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
             case 1: return (showMessagesSection && !channelMessagesSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
             default: return 0
             }
