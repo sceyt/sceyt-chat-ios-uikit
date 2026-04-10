@@ -40,7 +40,7 @@ extension ChannelInfoViewController {
         
         open var data: MessageLayoutModel.AttachmentLayout!
 
-        open var previewer: (() -> AttachmentPreviewDataSource?)?
+        open var previewer: (() -> (any PreviewDataSource)?)?
 
         override open func setup() {
             super.setup()

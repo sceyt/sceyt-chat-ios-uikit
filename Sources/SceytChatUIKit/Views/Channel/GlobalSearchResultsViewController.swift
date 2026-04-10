@@ -87,6 +87,13 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     open lazy var filesPage = FilesPageViewController()
     open lazy var linksPage = LinksPageViewController()
 
+    /// Loads all image/video attachments across every channel for the Media tab initial (no-query) state.
+    open lazy var allMediaViewModel: any ChannelAttachmentListViewModelProviding =
+        Components.globalSearchAllMediaViewModel.init(
+            attachmentTypes: ["image", "video"],
+            appearance: MessageCell.appearance
+        )
+
     public var pages: [UIViewController] {
         [chatsPage, channelsPage, mediaPage, voicePage, filesPage, linksPage]
     }
@@ -120,6 +127,11 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         pageViewController.setViewControllers([chatsPage], direction: .forward, animated: false)
 
         addChild(pageViewController)
+
+        mediaPage.configure(mediaViewModel: allMediaViewModel)
+        mediaPage.collectionView.previewer = {
+            Components.globalSearchMediaPreviewDataSource.init()
+        }
 
         // searchUserBarView.onSelect can be customized by subclasses or the presenting VC
     }
@@ -1153,7 +1165,7 @@ extension GlobalSearchResultsViewController {
             embedAttachmentView(collectionView)
         }
 
-        open func configure(mediaViewModel: ChannelAttachmentListViewModel) {
+        open func configure(mediaViewModel: any ChannelAttachmentListViewModelProviding) {
             collectionView.mediaViewModel = mediaViewModel
         }
     }

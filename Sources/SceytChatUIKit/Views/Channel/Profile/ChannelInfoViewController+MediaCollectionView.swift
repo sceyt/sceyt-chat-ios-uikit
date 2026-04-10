@@ -206,7 +206,7 @@ extension ChannelInfoViewController {
             }
         }
         
-        open var previewer: (() -> AttachmentPreviewDataSource?)?
+        open var previewer: (() -> (any PreviewDataSource)?)?
     }
 }
 

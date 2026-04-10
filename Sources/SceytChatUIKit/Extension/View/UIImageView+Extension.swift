@@ -25,7 +25,7 @@ extension UIImageView {
     }
     
     func setup(
-        previewer: (() -> AttachmentPreviewDataSource?)?,
+        previewer: (() -> (any PreviewDataSource)?)?,
         item: PreviewItem?,
         from: UIViewController? = nil,
         viewOnce: Bool = false,
