@@ -104,8 +104,8 @@ open class GlobalSearchMessageCell: TableViewCell {
     }
 
     /// Returns a snippet of `body` that includes the first search match.
-    /// If the match is far from the start, the body is trimmed and prefixed with "…"
-    /// so the matched text appears near the beginning of the snippet.
+    /// If the match is on a later line or far from the start by characters, the body is
+    /// trimmed and prefixed with "…" so the matched text appears near the beginning of the snippet.
     private func makeSnippet(body: String, query: String?) -> String {
         let contextBefore = 30
 
@@ -127,11 +127,33 @@ open class GlobalSearchMessageCell: TableViewCell {
         }
 
         guard let matchStart = firstMatchStart else { return body }
-        let matchOffset = body.distance(from: body.startIndex, to: matchStart)
-        guard matchOffset > contextBefore else { return body }
 
-        let cutIndex = body.index(body.startIndex, offsetBy: matchOffset - contextBefore)
-        // Advance to the nearest word boundary so we don't cut mid-word
+        // Find the start of the line that contains the match.
+        // This handles multiline bodies where the match may be on a later line
+        // but still within `contextBefore` characters from the body start.
+        let lineStart: String.Index
+        if let lastNewline = body[..<matchStart].lastIndex(of: "\n") {
+            lineStart = body.index(after: lastNewline)
+        } else {
+            lineStart = body.startIndex
+        }
+
+        // Measure how far the match is from the start of its own line.
+        let matchOffsetInLine = body.distance(from: lineStart, to: matchStart)
+
+        // If the match is on the first line and close to the start, return the full body.
+        if lineStart == body.startIndex && matchOffsetInLine <= contextBefore {
+            return body
+        }
+
+        // If the match is near the start of its line, trim at the line boundary.
+        if matchOffsetInLine <= contextBefore {
+            return "…" + String(body[lineStart...])
+        }
+
+        // Match is far into its line — apply character-based trimming within the line.
+        let cutIndex = body.index(lineStart, offsetBy: matchOffsetInLine - contextBefore)
+        // Advance to the nearest word boundary so we don't cut mid-word.
         var snippetStart = cutIndex
         if let spaceIdx = body[cutIndex...].firstIndex(of: " ") {
             let afterSpace = body.index(after: spaceIdx)
