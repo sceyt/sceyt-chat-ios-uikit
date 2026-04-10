@@ -2130,7 +2130,9 @@ open class ChannelViewController: ViewController,
             
             if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
-                collectionView.reloadDataAndScrollToBottom()
+                if channelViewModel.scrollToRepliedMessageId == 0 {
+                    collectionView.reloadDataAndScrollToBottom()
+                }
                 updateUnreadViewVisibility()
                 return
             }

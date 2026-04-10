@@ -57,6 +57,9 @@ open class GlobalSearchMessagesViewModel: NSObject {
 
     private var currentSearchTask: Task<Void, Never>?
 
+    /// Override in test subclasses to inject an in-memory database.
+    open var database: Database { SceytChatUIKit.shared.database }
+
     // MARK: - Init
 
     public override required init() {
@@ -193,7 +196,7 @@ open class GlobalSearchMessagesViewModel: NSObject {
                                channelTypes: [String],
                                memberUserId: UserId? = nil) async -> ([ChatMessage], [ChannelId: ChatChannel]) {
         await withCheckedContinuation { cont in
-            SceytChatUIKit.shared.database.read { [basePredicate, channelTypes, memberUserId] context in
+            database.read { [basePredicate, channelTypes, memberUserId] context in
                 // 1. Resolve channel IDs for the requested types,
                 //    optionally restricted to channels containing a specific member.
                 let channelRequest = ChannelDTO.fetchRequest()

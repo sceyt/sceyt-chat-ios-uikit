@@ -88,6 +88,9 @@ open class ChannelListViewController: ViewController,
             globalVC.searchUserBarView.onSelect = { [weak self] user in
                 self?.addUserSearchToken(user)
             }
+            globalVC.onSelectMessage = { [weak self] message, channel in
+                self?.channelListRouter.showChannelViewController(channel: channel, scrollToMessageId: message.id)
+            }
         }
 
         definesPresentationContext = true

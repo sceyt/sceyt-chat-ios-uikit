@@ -66,10 +66,18 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
 
     // MARK: - Pages
 
+    /// Called when the user taps a message search result from any page.
+    /// Receives the message and its parent channel so the caller can open the channel and scroll to the message.
+    public var onSelectMessage: ((ChatMessage, ChatChannel) -> Void)?
+
     open lazy var chatsPage: ChatsPageViewController = {
         let vc = ChatsPageViewController()
         vc.onSelect = { [weak self] channel in
             self?.resultsUpdater.select(channel)
+        }
+        vc.onSelectMessage = { [weak self] message, channel in
+            guard let channel else { return }
+            self?.onSelectMessage?(message, channel)
         }
         return vc
     }()
@@ -78,6 +86,10 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         let vc = ChannelsPageViewController()
         vc.onSelect = { [weak self] channel in
             self?.resultsUpdater.select(channel)
+        }
+        vc.onSelectMessage = { [weak self] message, channel in
+            guard let channel else { return }
+            self?.onSelectMessage?(message, channel)
         }
         return vc
     }()
@@ -845,8 +857,8 @@ extension GlobalSearchResultsViewController {
 
         private var showMessagesSection = false
 
-        /// Called when the user taps a message search result.
-        public var onSelectMessage: ((ChatMessage) -> Void)?
+        /// Called when the user taps a message search result. Provides both the message and its channel.
+        public var onSelectMessage: ((ChatMessage, ChatChannel?) -> Void)?
 
         // MARK: - Setup
 
@@ -981,7 +993,9 @@ extension GlobalSearchResultsViewController {
             case 0: onSelect?(channels[indexPath.row])
             default:
                 guard chatMessagesSnapshot.indices.contains(indexPath.row) else { return }
-                onSelectMessage?(chatMessagesSnapshot[indexPath.row])
+                let message = chatMessagesSnapshot[indexPath.row]
+                let channel = messagesViewModel.chatMessageChannels[message.channelId]
+                onSelectMessage?(message, channel)
             }
         }
     }
@@ -1011,8 +1025,8 @@ extension GlobalSearchResultsViewController {
         /// Stable snapshot used by both numberOfRowsInSection and cellForRowAt.
         private var channelMessagesSnapshot: [ChatMessage] = []
 
-        /// Called when the user taps a message search result.
-        public var onSelectMessage: ((ChatMessage) -> Void)?
+        /// Called when the user taps a message search result. Provides both the message and its channel.
+        public var onSelectMessage: ((ChatMessage, ChatChannel?) -> Void)?
 
         // MARK: - Setup
 
@@ -1130,7 +1144,9 @@ extension GlobalSearchResultsViewController {
             case 0: onSelect?(channels[indexPath.row])
             default:
                 guard channelMessagesSnapshot.indices.contains(indexPath.row) else { return }
-                onSelectMessage?(channelMessagesSnapshot[indexPath.row])
+                let message = channelMessagesSnapshot[indexPath.row]
+                let channel = messagesViewModel.channelMessageChannels[message.channelId]
+                onSelectMessage?(message, channel)
             }
         }
     }
