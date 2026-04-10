@@ -543,8 +543,8 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
         viewModel.filterUser = alice
         viewModel.inject(
             messages: [
-                makeMessage(id: 1, channelId: 10, body: "Hello",   userId: "alice", state: .none),
-                makeMessage(id: 2, channelId: 10, body: "Deleted", userId: "alice", state: .deleted),
+                makeMessage(id: 1, channelId: 10, body: "Hello",   state: .none,    userId: "alice"),
+                makeMessage(id: 2, channelId: 10, body: "Deleted", state: .deleted, userId: "alice"),
             ],
             channelTypes: [10: "direct"]
         )

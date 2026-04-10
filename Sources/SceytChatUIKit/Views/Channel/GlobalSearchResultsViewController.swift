@@ -505,7 +505,7 @@ extension GlobalSearchResultsViewController {
                 separatorLine.leadingAnchor.constraint(equalTo: leadingAnchor),
                 separatorLine.trailingAnchor.constraint(equalTo: trailingAnchor),
                 separatorLine.bottomAnchor.constraint(equalTo: bottomAnchor),
-                separatorLine.heightAnchor.constraint(equalToConstant: 1),
+                separatorLine.heightAnchor.constraint(equalToConstant: 0),
 
                 stackView.topAnchor.constraint(equalTo: scrollView.topAnchor),
                 stackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
