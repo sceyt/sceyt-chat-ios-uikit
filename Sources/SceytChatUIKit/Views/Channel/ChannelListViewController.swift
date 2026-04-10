@@ -537,7 +537,8 @@ open class ChannelListViewController: ViewController,
 
     open func addUserSearchToken(_ user: ChatUser) {
         let textField = searchController.searchBar.searchTextField
-        let name = SceytChatUIKit.shared.formatters.userNameFormatter.format(user)
+        let fullName = SceytChatUIKit.shared.formatters.userShortNameFormatter.format(user)
+        let name = fullName.count > 12 ? String(fullName.prefix(12)) : fullName
         let token = UISearchToken(icon: nil, text: name)
         token.representedObject = user
         textField.insertToken(token, at: textField.tokens.count)
