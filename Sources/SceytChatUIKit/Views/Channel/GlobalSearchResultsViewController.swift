@@ -21,8 +21,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         case chats
         case channels
         case media
-        case voice
         case files
+        case voice
         case links
 
         public var title: String {
@@ -94,8 +94,29 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             appearance: MessageCell.appearance
         )
 
+    /// Loads all voice attachments across every channel for the Voice tab initial (no-query) state.
+    open lazy var allVoiceViewModel: any ChannelAttachmentListViewModelProviding =
+        Components.globalSearchAllVoiceViewModel.init(
+            attachmentTypes: ["voice"],
+            appearance: MessageCell.appearance
+        )
+
+    /// Loads all file attachments across every channel for the Files tab initial (no-query) state.
+    open lazy var allFilesViewModel: any ChannelAttachmentListViewModelProviding =
+        Components.globalSearchAllFilesViewModel.init(
+            attachmentTypes: ["file"],
+            appearance: MessageCell.appearance
+        )
+
+    /// Loads all link attachments across every channel for the Links tab initial (no-query) state.
+    open lazy var allLinksViewModel: any ChannelAttachmentListViewModelProviding =
+        Components.globalSearchAllLinksViewModel.init(
+            attachmentTypes: ["link"],
+            appearance: MessageCell.appearance
+        )
+
     public var pages: [UIViewController] {
-        [chatsPage, channelsPage, mediaPage, voicePage, filesPage, linksPage]
+        [chatsPage, channelsPage, mediaPage, filesPage, voicePage, linksPage]
     }
 
     // MARK: - State
@@ -132,6 +153,10 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         mediaPage.collectionView.previewer = {
             Components.globalSearchMediaPreviewDataSource.init()
         }
+
+        voicePage.configure(voiceViewModel: allVoiceViewModel)
+        filesPage.configure(fileViewModel: allFilesViewModel)
+        linksPage.configure(linkViewModel: allLinksViewModel)
 
         // searchUserBarView.onSelect can be customized by subclasses or the presenting VC
     }
@@ -1187,7 +1212,7 @@ extension GlobalSearchResultsViewController {
             embedAttachmentView(collectionView)
         }
 
-        open func configure(voiceViewModel: ChannelAttachmentListViewModel) {
+        open func configure(voiceViewModel: any ChannelAttachmentListViewModelProviding) {
             collectionView.voiceViewModel = voiceViewModel
         }
     }
@@ -1209,7 +1234,7 @@ extension GlobalSearchResultsViewController {
             embedAttachmentView(collectionView)
         }
 
-        open func configure(fileViewModel: ChannelAttachmentListViewModel, onSelect: ((IndexPath) -> Void)? = nil) {
+        open func configure(fileViewModel: any ChannelAttachmentListViewModelProviding, onSelect: ((IndexPath) -> Void)? = nil) {
             collectionView.fileViewModel = fileViewModel
             collectionView.onSelect = onSelect
         }
@@ -1232,7 +1257,7 @@ extension GlobalSearchResultsViewController {
             embedAttachmentView(collectionView)
         }
 
-        open func configure(linkViewModel: ChannelAttachmentListViewModel) {
+        open func configure(linkViewModel: any ChannelAttachmentListViewModelProviding) {
             collectionView.linkViewModel = linkViewModel
         }
     }

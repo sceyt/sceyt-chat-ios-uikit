@@ -25,6 +25,9 @@ extension SceytChatUIKit {
         public static var globalSearchViewModel: GlobalSearchViewModel.Type = GlobalSearchViewModel.self
         public static var globalSearchMessagesViewModel: GlobalSearchMessagesViewModel.Type = GlobalSearchMessagesViewModel.self
         public static var globalSearchAllMediaViewModel: GlobalSearchAllMediaViewModel.Type = GlobalSearchAllMediaViewModel.self
+        public static var globalSearchAllVoiceViewModel: GlobalSearchAllVoiceViewModel.Type = GlobalSearchAllVoiceViewModel.self
+        public static var globalSearchAllFilesViewModel: GlobalSearchAllFilesViewModel.Type = GlobalSearchAllFilesViewModel.self
+        public static var globalSearchAllLinksViewModel: GlobalSearchAllLinksViewModel.Type = GlobalSearchAllLinksViewModel.self
         public static var globalSearchMediaPreviewDataSource: GlobalSearchMediaPreviewDataSource.Type = GlobalSearchMediaPreviewDataSource.self
         public static var globalSearchUserBarViewModel: GlobalSearchUserBarViewModel.Type = GlobalSearchUserBarViewModel.self
         public static var channelMemberListViewModel: ChannelMemberListViewModel.Type = ChannelMemberListViewModel.self
