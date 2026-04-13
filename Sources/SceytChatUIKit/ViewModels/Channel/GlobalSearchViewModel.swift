@@ -194,7 +194,7 @@ open class GlobalSearchViewModel: NSObject {
                 // Broad DB filter: subject contains the query anywhere (case-insensitive).
                 // Swift filter below narrows to prefix/suffix-only word matches.
                 request.predicate = NSPredicate(
-                    format: "type = %@ AND subject CONTAINS[c] %@ AND unsubscribed == NO",
+                    format: "type = %@ AND subject CONTAINS[c] %@",
                     SceytChatUIKit.shared.config.channelTypesConfig.broadcast, query
                 )
                 return ChannelDTO.fetch(request: request, context: context)

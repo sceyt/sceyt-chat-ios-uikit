@@ -94,6 +94,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         return vc
     }()
 
+    private let channelListProvider = ChannelListProvider()
+
     open lazy var mediaPage = MediaPageViewController()
     open lazy var voicePage = VoicePageViewController()
     open lazy var filesPage = FilesPageViewController()
@@ -135,6 +137,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
 
     private var currentIndex: Int = 0
     private var isAnimatingPageTransition = false
+    private var serverSearchWorkItem: DispatchWorkItem?
 
     // MARK: - Init
 
@@ -277,6 +280,26 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         searchUserBarView.viewModel.search(query: query)
         let hasQuery = !(query ?? "").isEmpty
         if !hasQuery { setUserBarVisible(false, animated: true) }
+        serverSearchWorkItem?.cancel()
+        if let trimmed = query?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty, trimmed.count > 1 {
+            let workItem = DispatchWorkItem { [weak self] in
+                self?.fetchChannelsFromServer(query: trimmed)
+            }
+            serverSearchWorkItem = workItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
+        }
+    }
+
+    private func fetchChannelsFromServer(query: String) {
+        let channelListQuery = ChannelListQuery
+            .Builder()
+            .order(SceytChatUIKit.shared.config.channelListOrder)
+            .filterKey(.subject)
+            .search(.contains)
+            .limit(SceytChatUIKit.shared.config.queryLimits.channelListQueryLimit)
+            .query(query)
+            .build()
+        channelListProvider.loadChannels(query: channelListQuery)
     }
 
     override open func reloadData() {
