@@ -16,8 +16,8 @@ open class GlobalSearchUserBarViewModel: NSObject {
     @Published public var event: Event?
 
     @Atomic public var users: [ChatUser] = []
-    @Atomic var allUsers: [ChatUser] = []
-    var searchQuery: String?
+    @Atomic public var allUsers: [ChatUser] = []
+    public var searchQuery: String?
 
     open lazy var channelObserver: LazyDatabaseObserver<ChannelDTO, ChatChannel> = {
         let config = SceytChatUIKit.shared.config.channelTypesConfig

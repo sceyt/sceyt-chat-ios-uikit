@@ -67,7 +67,7 @@ extension ChannelInfoViewController {
         
         open override func layoutSubviews() {
             super.layoutSubviews()
-            
+            guard width > 0 else { return }
             layout?.itemSize = .init(width: width,
                                      height: Layouts.iconSize + Layouts.verticalPadding * 2)
         }

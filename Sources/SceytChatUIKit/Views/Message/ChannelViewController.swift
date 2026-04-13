@@ -2174,11 +2174,33 @@ open class ChannelViewController: ViewController,
             
             let offsetBeforeInsertion = collectionView.contentOffset.y
             let contentHeightBeforeInsertion = collectionView.contentSize.height
-            
+
+            // TODO: Improve this part
+            // Pre-validate data source consistency before batch update.
+            // If the collection view's current count + the diff's inserts/deletes
+            // doesn't match the view model's current count, the data source has
+            // advanced past this diff — fall back to reloadData to avoid a crash.
+            for section in 0..<collectionView.numberOfSections {
+                guard !sectionDeletes.contains(section) else { continue }
+                let cvCount = collectionView.numberOfItems(inSection: section)
+                let insertsInSection = inserts.filter { $0.section == section }.count
+                let deletesInSection = deletes.filter { $0.section == section }.count
+                let dsCount = channelViewModel.numberOfMessages(in: section)
+                if cvCount + insertsInSection - deletesInSection != dsCount {
+                    let savedOffset = collectionView.contentOffset
+                    let savedContentHeight = collectionView.contentSize.height
+                    collectionView.reloadData()
+                    collectionView.layoutIfNeeded()
+                    let heightDiff = collectionView.contentSize.height - savedContentHeight
+                    collectionView.contentOffset.y = savedOffset.y + heightDiff
+                    return
+                }
+            }
+
             isCollectionViewUpdating = true
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            
+
             collectionView.performUpdates {
                 if !sectionInserts.isEmpty {
                     collectionView.insertSections(sectionInserts)

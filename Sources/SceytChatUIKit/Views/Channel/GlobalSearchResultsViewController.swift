@@ -822,7 +822,7 @@ extension GlobalSearchResultsViewController {
             let options = UIView.AnimationOptions(rawValue: curveRaw << 16)
             UIView.animate(withDuration: duration, delay: 0, options: options) {
                 self.tableView.contentInset.bottom = inset + 60.0
-                self.tableView.verticalScrollIndicatorInsets.bottom = inset
+                self.tableView.verticalScrollIndicatorInsets.bottom = inset + 60.0
             }
         }
 
