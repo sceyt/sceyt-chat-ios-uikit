@@ -71,7 +71,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     public var onSelectMessage: ((ChatMessage, ChatChannel) -> Void)?
 
     open lazy var chatsPage: ChatsPageViewController = {
-        let vc = ChatsPageViewController()
+        let vc = Components.globalSearchChatsPageViewController.init()
         vc.onSelect = { [weak self] channel in
             self?.resultsUpdater.select(channel)
         }
