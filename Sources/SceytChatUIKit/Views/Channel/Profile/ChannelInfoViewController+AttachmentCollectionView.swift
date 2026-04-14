@@ -75,7 +75,18 @@ extension ChannelInfoViewController {
         open func updateCollectionView(paths: ChannelAttachmentListViewModel.ChangeItemPaths) {
             if superview == nil || visibleCells.isEmpty {
                 reloadData()
-            } else if !paths.isEmpty {
+            } else if paths.isEmpty {
+                // restartObserver (triggered by search) delivers an empty ChangeItemPaths when
+                // the new result set has no overlap with the previous one (e.g. going from N
+                // results to 0 after narrowing a query). There are no diff operations to apply,
+                // but the collection view still holds stale cells. Reload whenever the
+                // data-source section count no longer matches what the collection view has.
+                let currentSections = numberOfSections
+                let newSections = dataSource?.numberOfSections?(in: self) ?? 0
+                if currentSections != newSections {
+                    reloadData()
+                }
+            } else {
                 // Guard against observer-restart scenarios: when restartObserver fires,
                 // it delivers all new items as insertions while UICollectionView's internal
                 // count still reflects the old data. Applying those inserts would make UIKit

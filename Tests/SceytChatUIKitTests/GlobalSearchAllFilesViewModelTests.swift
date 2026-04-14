@@ -56,6 +56,12 @@ final class TestableGlobalSearchAllFilesViewModel: GlobalSearchAllFilesViewModel
     func simulateChange(_ paths: ChangeItemPaths) {
         onDidChangeEvent(items: paths)
     }
+
+    /// Stores query and filterUser without touching the database observer.
+    override func search(query: String?, filterUser: ChatUser?) {
+        self.filterUser = filterUser
+        self.query = query
+    }
 }
 
 // MARK: - Tests
@@ -217,6 +223,155 @@ final class GlobalSearchAllFilesViewModelTests: XCTestCase {
 
     func testConformsToChannelAttachmentListViewModelProviding() {
         let _: any ChannelAttachmentListViewModelProviding = viewModel
+    }
+
+    // MARK: - search(query:filterUser:) – find file by name
+
+    func testSearchStoresQuery() {
+        viewModel.search(query: "annual_report", filterUser: nil)
+        XCTAssertEqual(viewModel.query, "annual_report")
+    }
+
+    func testSearchStoresNilQueryAndNilUser() {
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.query)
+        XCTAssertNil(viewModel.filterUser)
+    }
+
+    func testSearchClearsQueryWhenNilPassed() {
+        viewModel.search(query: "invoice", filterUser: nil)
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.query)
+    }
+
+    func testSearchStoresFilterUser() {
+        let user = ChatUser(id: "u1")
+        viewModel.search(query: nil, filterUser: user)
+        XCTAssertEqual(viewModel.filterUser?.id, "u1")
+    }
+
+    func testSearchClearsFilterUserWhenNilPassed() {
+        let user = ChatUser(id: "u1")
+        viewModel.search(query: nil, filterUser: user)
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.filterUser)
+    }
+
+    func testSearchStoresBothQueryAndUser() {
+        let user = ChatUser(id: "u2")
+        viewModel.search(query: "contract.pdf", filterUser: user)
+        XCTAssertEqual(viewModel.query, "contract.pdf")
+        XCTAssertEqual(viewModel.filterUser?.id, "u2")
+    }
+
+    // MARK: - isFiltered
+
+    func testIsFiltered_withFileNameQuery_returnsTrue() {
+        viewModel.search(query: "report", filterUser: nil)
+        XCTAssertTrue(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_emptyQuery_returnsFalse() {
+        viewModel.search(query: "", filterUser: nil)
+        XCTAssertFalse(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_whitespaceOnlyQuery_returnsFalse() {
+        viewModel.search(query: "   ", filterUser: nil)
+        XCTAssertFalse(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_withFilterUser_returnsTrue() {
+        let user = ChatUser(id: "u3")
+        viewModel.search(query: nil, filterUser: user)
+        XCTAssertTrue(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_noQueryNoUser_returnsFalse() {
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertFalse(viewModel.isFiltered)
+    }
+
+    // MARK: - buildPredicate() – file name search
+
+    func testBuildPredicateNoFilters_doesNotContainNameOrUserId() {
+        let predicate = viewModel.buildPredicate()
+        let format = predicate.predicateFormat
+        XCTAssertFalse(format.contains("name"), "Unfiltered predicate should not include name clause")
+        XCTAssertFalse(format.contains("userId"), "Unfiltered predicate should not include userId clause")
+    }
+
+    func testBuildPredicateWithFileNameQuery_containsNameClause() {
+        // When searching for a file by name the predicate filters on the attachment's name field
+        viewModel.search(query: "invoice_2025", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("name"),
+            "File name query should add a name CONTAINS[cd] clause"
+        )
+    }
+
+    func testBuildPredicateWithFileNameQuery_containsQueryValue() {
+        viewModel.search(query: "invoice_2025", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("invoice_2025"),
+            "Predicate format should embed the query value"
+        )
+    }
+
+    func testBuildPredicateIgnoresWhitespaceOnlyQuery() {
+        viewModel.search(query: "   ", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertFalse(predicate.predicateFormat.contains("name CONTAINS"))
+    }
+
+    func testBuildPredicateIgnoresEmptyQuery() {
+        viewModel.search(query: "", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertFalse(predicate.predicateFormat.contains("name CONTAINS"))
+    }
+
+    // MARK: - buildPredicate() – all files from selected user
+
+    func testBuildPredicateWithFilterUser_containsUserIdClause() {
+        let user = ChatUser(id: "abc123")
+        viewModel.search(query: nil, filterUser: user)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("userId"),
+            "User filter should add a userId == clause"
+        )
+    }
+
+    func testBuildPredicateWithFilterUser_containsUserIdValue() {
+        let user = ChatUser(id: "abc123")
+        viewModel.search(query: nil, filterUser: user)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("abc123"),
+            "Predicate format should embed the user id value"
+        )
+    }
+
+    func testBuildPredicateWithBothFileNameAndUserFilter() {
+        let user = ChatUser(id: "u4")
+        viewModel.search(query: "contract.pdf", filterUser: user)
+        let predicate = viewModel.buildPredicate()
+        let format = predicate.predicateFormat
+        XCTAssertTrue(format.contains("userId"), "Combined filter should include userId clause")
+        XCTAssertTrue(format.contains("name"), "Combined filter should include name CONTAINS[cd] clause")
+    }
+
+    func testBuildPredicateWithNilUserAfterPreviousUser_doesNotContainUserId() {
+        let user = ChatUser(id: "u5")
+        viewModel.search(query: nil, filterUser: user)
+        viewModel.search(query: nil, filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertFalse(
+            predicate.predicateFormat.contains("userId"),
+            "Clearing filterUser should remove the userId clause"
+        )
     }
 }
 

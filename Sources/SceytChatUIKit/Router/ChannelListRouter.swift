@@ -85,6 +85,15 @@ open class ChannelListRouter: Router<ChannelListViewController> {
         }
     }
     
+    open func showAttachment(_ attachment: ChatMessage.Attachment) {
+        let items = AttachmentModel.items(attachments: [attachment])
+        guard !items.isEmpty else { return }
+        let preview = FilePreviewController(
+            items: items.map { .init(title: $0.name, url: $0.url) }
+        )
+        preview.present(on: rootViewController)
+    }
+
     open func showNewChannel() {
         let viewController = Components.startChatViewController.init()
         viewController.viewModel = Components.createNewChannelViewModel.init()

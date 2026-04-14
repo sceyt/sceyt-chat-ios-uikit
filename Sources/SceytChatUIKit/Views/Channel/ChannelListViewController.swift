@@ -91,6 +91,9 @@ open class ChannelListViewController: ViewController,
             globalVC.onSelectMessage = { [weak self] message, channel in
                 self?.channelListRouter.showChannelViewController(channel: channel, scrollToMessageId: message.id)
             }
+            globalVC.onSelectAttachment = { [weak self] attachment in
+                self?.channelListRouter.showAttachment(attachment)
+            }
         }
 
         definesPresentationContext = true

@@ -89,7 +89,8 @@ open class GlobalSearchAllFilesViewModel: NSObject {
         }
 
         if let trimmed = query?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty {
-            predicates.append(NSPredicate(format: "message.body CONTAINS[cd] %@", trimmed))
+            logger.debug("[GlobalSearchAllFilesViewModel] buildPredicate — querying name CONTAINS[cd] '\(trimmed)'")
+            predicates.append(NSPredicate(format: "name CONTAINS[cd] %@", trimmed))
         }
 
         return predicates.count == 1
@@ -144,15 +145,50 @@ open class GlobalSearchAllFilesViewModel: NSObject {
     }
 
     open func onDidChangeEvent(items: ChangeItemPaths) {
+        let total = (0..<attachmentObserver.numberOfSections)
+            .reduce(0) { $0 + attachmentObserver.numberOfItems(in: $1) }
+        logger.debug("[GlobalSearchAllFilesViewModel] onDidChangeEvent — total visible items: \(total), query: \(query ?? "<nil>"), filterUser: \(filterUser?.id ?? "<nil>")")
+        for section in 0..<attachmentObserver.numberOfSections {
+            for row in 0..<attachmentObserver.numberOfItems(in: section) {
+                if let layout = attachmentObserver.item(at: IndexPath(row: row, section: section)) {
+                    let a = layout.attachment
+                    // 'storedName' is what the predicate searches; 'displayedName' is what the cell shows.
+                    // If storedName is nil the cell falls back to originUrl.lastPathComponent —
+                    // those files will never match a name-based predicate.
+                    let storedName = a.name ?? "<nil>"
+                    let displayedName = a.name ?? a.originUrl.lastPathComponent
+                    let nameMatch = storedName == displayedName ? "✓" : "⚠️ mismatch (predicate won't match)"
+                    logger.debug("[GlobalSearchAllFilesViewModel]   [\(section):\(row)] storedName: '\(storedName)'  displayedName: '\(displayedName)'  \(nameMatch)  userId: \(a.userId ?? "<nil>")")
+                }
+            }
+        }
         event = .change(items)
     }
 
     /// Filters displayed attachments by sender and/or message body text.
     /// Calling with both nil clears all filters and shows every attachment.
     open func search(query: String?, filterUser: ChatUser?) {
+        // Log every loaded item BEFORE the new predicate is applied so we can
+        // compare what is currently in the observer against what the query expects.
+        let preTotal = (0..<attachmentObserver.numberOfSections)
+            .reduce(0) { $0 + attachmentObserver.numberOfItems(in: $1) }
+        logger.debug("[GlobalSearchAllFilesViewModel] search — PRE-FILTER items: \(preTotal), incoming query: '\(query ?? "<nil>")', filterUser: \(filterUser?.id ?? "<nil>")")
+        for section in 0..<attachmentObserver.numberOfSections {
+            for row in 0..<attachmentObserver.numberOfItems(in: section) {
+                if let layout = attachmentObserver.item(at: IndexPath(row: row, section: section)) {
+                    let a = layout.attachment
+                    let storedName = a.name ?? "<nil>"
+                    let displayedName = a.name ?? a.originUrl.lastPathComponent
+                    logger.debug("[GlobalSearchAllFilesViewModel]   PRE [\(section):\(row)] storedName: '\(storedName)'  displayedName: '\(displayedName)'  url: '\(a.originUrl)'")
+                }
+            }
+        }
+
         self.filterUser = filterUser
         self.query = query
-        attachmentObserver.restartObserver(fetchPredicate: buildPredicate())
+        let predicate = buildPredicate()
+        logger.debug("[GlobalSearchAllFilesViewModel] search — query: \(query ?? "<nil>"), filterUser: \(filterUser?.id ?? "<nil>"), predicate: \(predicate)")
+        attachmentObserver.restartObserver(fetchPredicate: predicate)
     }
 
     open func loadAttachments() {

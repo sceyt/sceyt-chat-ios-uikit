@@ -70,6 +70,9 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     /// Receives the message and its parent channel so the caller can open the channel and scroll to the message.
     public var onSelectMessage: ((ChatMessage, ChatChannel) -> Void)?
 
+    /// Called when the user taps a file attachment in the Files tab.
+    public var onSelectAttachment: ((ChatMessage.Attachment) -> Void)?
+
     open lazy var chatsPage: ChatsPageViewController = {
         let vc = Components.globalSearchChatsPageViewController.init()
         vc.onSelect = { [weak self] channel in
@@ -174,7 +177,12 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         }
 
         voicePage.configure(voiceViewModel: allVoiceViewModel)
-        filesPage.configure(fileViewModel: allFilesViewModel)
+        filesPage.configure(fileViewModel: allFilesViewModel) { [weak self] indexPath in
+            guard let self,
+                  let attachment = self.allFilesViewModel.attachmentLayout(at: indexPath)?.attachment
+            else { return }
+            self.onSelectAttachment?(attachment)
+        }
         linksPage.configure(linkViewModel: allLinksViewModel)
 
         // searchUserBarView.onSelect can be customized by subclasses or the presenting VC
