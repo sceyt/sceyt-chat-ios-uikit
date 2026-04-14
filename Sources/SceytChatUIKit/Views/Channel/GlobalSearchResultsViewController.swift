@@ -870,6 +870,13 @@ extension GlobalSearchResultsViewController {
 
         private var layoutModels: [ChatChannel: ChannelLayoutModel] = [:]
 
+        /// Clears all cached layout models so the next `reloadData()` call recreates them from scratch.
+        /// Call this when something external to the channel (e.g. contact names) has changed so that
+        /// `attributedView` is rebuilt with up-to-date formatter output.
+        open func invalidateLayoutModels() {
+            layoutModels.removeAll()
+        }
+
         /// Stable snapshot used by both numberOfRowsInSection and cellForRowAt.
         /// Captured atomically inside reloadData() before tableView.reloadData() is called,
         /// preventing index-out-of-range crashes caused by async updates racing with cell dequeue.
