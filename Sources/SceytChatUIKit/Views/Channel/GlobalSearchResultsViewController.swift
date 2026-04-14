@@ -1381,7 +1381,11 @@ extension GlobalSearchResultsViewController {
             guard let vm = _mediaViewModel else { return }
             let filtered = vm.isFiltered
             setFiltered(filtered)
-            guard filtered else { return }
+            guard filtered else {
+                searchLayouts = []
+                searchTableView.reloadData()
+                return
+            }
 
             var layouts: [MessageLayoutModel.AttachmentLayout] = []
             var rowsPerSection: [Int] = []
