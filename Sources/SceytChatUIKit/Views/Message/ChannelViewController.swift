@@ -159,6 +159,7 @@ open class ChannelViewController: ViewController,
     private var shouldAnimateEditing: Bool = false
     private var lastAnimatedIndexPath: IndexPath? = nil
     private var selectMessageId: MessageId?
+    private var pinnedScrollMessageId: MessageId = 0
     private let impactFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     
     override open func viewWillAppear(_ animated: Bool) {
@@ -1219,6 +1220,7 @@ open class ChannelViewController: ViewController,
     
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         isStartedDragging = true
+        pinnedScrollMessageId = 0
     }
     
     open func scrollViewWillEndDragging(
@@ -2130,7 +2132,7 @@ open class ChannelViewController: ViewController,
             
             if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
-                if channelViewModel.scrollToRepliedMessageId == 0 {
+                if channelViewModel.scrollToRepliedMessageId == 0, pinnedScrollMessageId == 0 {
                     collectionView.reloadDataAndScrollToBottom()
                 }
                 updateUnreadViewVisibility()
@@ -2191,8 +2193,13 @@ open class ChannelViewController: ViewController,
                     let savedContentHeight = collectionView.contentSize.height
                     collectionView.reloadData()
                     collectionView.layoutIfNeeded()
-                    let heightDiff = collectionView.contentSize.height - savedContentHeight
-                    collectionView.contentOffset.y = savedOffset.y + heightDiff
+                    if pinnedScrollMessageId != 0,
+                       let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
+                        collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                    } else {
+                        let heightDiff = collectionView.contentSize.height - savedContentHeight
+                        collectionView.contentOffset.y = savedOffset.y + heightDiff
+                    }
                     return
                 }
             }
@@ -2229,31 +2236,38 @@ open class ChannelViewController: ViewController,
                 guard let self = self else { return }
 
                 if isInsertingItemsToTop {
-                    // Get content height after new items were inserted
-                    let contentHeightAfterInsertion = self.collectionView.contentSize.height
+                    // If a specific message is pinned (e.g. navigated from global search),
+                    // keep it centered instead of using raw offset math.
+                    if self.pinnedScrollMessageId != 0,
+                       let pinnedIndexPath = self.channelViewModel.indexPathOf(messageId: self.pinnedScrollMessageId) {
+                        self.collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                    } else {
+                        // Get content height after new items were inserted
+                        let contentHeightAfterInsertion = self.collectionView.contentSize.height
 
-                    // Calculate how much the content height has grown
-                    let heightDifference = contentHeightAfterInsertion - contentHeightBeforeInsertion
+                        // Calculate how much the content height has grown
+                        let heightDifference = contentHeightAfterInsertion - contentHeightBeforeInsertion
 
-                    // Preserve scroll position by adjusting offset based on height increase
-                    var newOffsetY = offsetBeforeInsertion + heightDifference
+                        // Preserve scroll position by adjusting offset based on height increase
+                        var newOffsetY = offsetBeforeInsertion + heightDifference
 
-                    // Handle special case: initial load when collectionView was empty
-                    if contentHeightBeforeInsertion == 0 && offsetBeforeInsertion == 0 {
+                        // Handle special case: initial load when collectionView was empty
+                        if contentHeightBeforeInsertion == 0 && offsetBeforeInsertion == 0 {
 
-                        // If content doesn't fill the screen, no need to scroll - just keep offset at top
-                        if collectionView.frame.height > collectionView.contentSize.height {
-                            newOffsetY = 0.0
-                        } else {
-                            // If content is scrollable, subtract visible height (excluding bottom inset)
-                            // to align first inserted items with the top of the visible area
-                            let visibleHeight = collectionView.bounds.height - collectionView.adjustedContentInset.bottom
-                            newOffsetY -= visibleHeight
+                            // If content doesn't fill the screen, no need to scroll - just keep offset at top
+                            if collectionView.frame.height > collectionView.contentSize.height {
+                                newOffsetY = 0.0
+                            } else {
+                                // If content is scrollable, subtract visible height (excluding bottom inset)
+                                // to align first inserted items with the top of the visible area
+                                let visibleHeight = collectionView.bounds.height - collectionView.adjustedContentInset.bottom
+                                newOffsetY -= visibleHeight
+                            }
                         }
-                    }
 
-                    // Apply the adjusted offset to maintain scroll position smoothly
-                    self.collectionView.contentOffset.y = newOffsetY
+                        // Apply the adjusted offset to maintain scroll position smoothly
+                        self.collectionView.contentOffset.y = newOffsetY
+                    }
                 }
 
                 UIView.performWithoutAnimation {
@@ -2381,6 +2395,7 @@ open class ChannelViewController: ViewController,
                 break
             }
         case let .scrollAndSelect(indexPath, messageId, mentionMode):
+            pinnedScrollMessageId = messageId
             if selectMessageId == messageId,
                 lastAnimatedIndexPath == indexPath,
                collectionView.visibleAttributes.contains(where: {$0.indexPath == indexPath}) {
