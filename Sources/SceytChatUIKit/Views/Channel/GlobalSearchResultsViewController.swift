@@ -794,7 +794,7 @@ extension GlobalSearchResultsViewController {
             tableView.backgroundColor = .clear
         }
 
-        private static var currentKeyboardInset: CGFloat = 0
+        fileprivate static var currentKeyboardInset: CGFloat = 0
 
         override open func setupDone() {
             super.setupDone()
@@ -808,7 +808,7 @@ extension GlobalSearchResultsViewController {
 
         override open func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
-            let inset = ChannelTablePageViewController.currentKeyboardInset
+            let inset = ChannelTablePageViewController.currentKeyboardInset + GlobalSearchUserBarView.Layouts.height
             tableView.contentInset.bottom = inset
             tableView.verticalScrollIndicatorInsets.bottom = inset
         }
@@ -831,8 +831,8 @@ extension GlobalSearchResultsViewController {
 
             let options = UIView.AnimationOptions(rawValue: curveRaw << 16)
             UIView.animate(withDuration: duration, delay: 0, options: options) {
-                self.tableView.contentInset.bottom = inset + 60.0
-                self.tableView.verticalScrollIndicatorInsets.bottom = inset + 60.0
+                self.tableView.contentInset.bottom = inset + GlobalSearchUserBarView.Layouts.height
+                self.tableView.verticalScrollIndicatorInsets.bottom = inset + GlobalSearchUserBarView.Layouts.height
             }
         }
 
@@ -1213,6 +1213,9 @@ extension GlobalSearchResultsViewController {
             view.backgroundColor = .background
         }
 
+        /// Override in subclasses to return the scroll views whose bottom inset should track keyboard + user bar height.
+        open var scrollViewsToAdjust: [UIScrollView] { [] }
+
         open func embedAttachmentView(_ attachmentView: UIView) {
             view.insertSubview(attachmentView.withoutAutoresizingMask, belowSubview: emptyStateView)
             attachmentView.pin(to: view)
@@ -1222,12 +1225,57 @@ extension GlobalSearchResultsViewController {
         open func updateEmptyState() {
             // Override in subclasses if needed
         }
+
+        override open func setupDone() {
+            super.setupDone()
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(keyboardWillChangeFrame(_:)),
+                name: UIResponder.keyboardWillChangeFrameNotification,
+                object: nil
+            )
+        }
+
+        override open func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            let inset = ChannelTablePageViewController.currentKeyboardInset + GlobalSearchUserBarView.Layouts.height
+            scrollViewsToAdjust.forEach {
+                $0.contentInset.bottom = inset
+                $0.verticalScrollIndicatorInsets.bottom = inset
+            }
+        }
+
+        @objc private func keyboardWillChangeFrame(_ notification: Notification) {
+            guard
+                let info = notification.userInfo,
+                let endFrame = (info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue,
+                let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
+                let curveRaw = info[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt,
+                isViewLoaded, let window = view.window
+            else { return }
+
+            let keyboardFrameInView = window.convert(endFrame, to: view)
+            let overlap = max(0, view.bounds.maxY - keyboardFrameInView.minY)
+            let safeBottom = view.safeAreaInsets.bottom
+            let inset = max(0, overlap - safeBottom)
+
+            let options = UIView.AnimationOptions(rawValue: curveRaw << 16)
+            UIView.animate(withDuration: duration, delay: 0, options: options) {
+                let bottomInset = inset + GlobalSearchUserBarView.Layouts.height
+                self.scrollViewsToAdjust.forEach {
+                    $0.contentInset.bottom = bottomInset
+                    $0.verticalScrollIndicatorInsets.bottom = bottomInset
+                }
+            }
+        }
     }
 
     // MARK: Media Page
 
     open class MediaPageViewController: AttachmentPageViewController {
         open lazy var collectionView = Components.channelInfoMediaCollectionView.init()
+
+        override open var scrollViewsToAdjust: [UIScrollView] { [collectionView, searchTableView] }
 
         open lazy var searchTableView: UITableView = {
             let tv = UITableView()
@@ -1356,6 +1404,8 @@ extension GlobalSearchResultsViewController {
             embedAttachmentView(collectionView)
         }
 
+        override open var scrollViewsToAdjust: [UIScrollView] { [collectionView] }
+
         open func configure(voiceViewModel: any ChannelAttachmentListViewModelProviding) {
             collectionView.voiceViewModel = voiceViewModel
         }
@@ -1377,6 +1427,8 @@ extension GlobalSearchResultsViewController {
             super.setupLayout()
             embedAttachmentView(collectionView)
         }
+
+        override open var scrollViewsToAdjust: [UIScrollView] { [collectionView] }
 
         open func configure(fileViewModel: any ChannelAttachmentListViewModelProviding, onSelect: ((IndexPath) -> Void)? = nil) {
             collectionView.fileViewModel = fileViewModel
@@ -1400,6 +1452,8 @@ extension GlobalSearchResultsViewController {
             super.setupLayout()
             embedAttachmentView(collectionView)
         }
+
+        override open var scrollViewsToAdjust: [UIScrollView] { [collectionView] }
 
         open func configure(linkViewModel: any ChannelAttachmentListViewModelProviding) {
             collectionView.linkViewModel = linkViewModel
