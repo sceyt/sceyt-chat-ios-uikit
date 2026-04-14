@@ -24,7 +24,7 @@ open class GlobalSearchMediaCell: TableViewCell {
     open lazy var timeLabel = UILabel()
         .withoutAutoresizingMask
 
-    open lazy var thumbnailView = ImageView()
+    open lazy var thumbnailView = UIImageView()
         .contentMode(.scaleAspectFill)
         .withoutAutoresizingMask
 

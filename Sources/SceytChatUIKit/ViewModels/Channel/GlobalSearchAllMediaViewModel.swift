@@ -179,10 +179,6 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     }
 
     open func loadAttachments() {
-        let before = loadedItemCount()
-        attachmentObserver.loadNext { [weak self] in
-            guard let self else { return }
-        }
     }
 
     open var numberOfSections: Int {
@@ -275,13 +271,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     }
 
     open func getMessage(_ layout: MessageLayoutModel.AttachmentLayout, completion: @escaping (ChatMessage?) -> Void) {
-        if let message = layout.ownerMessage {
-            completion(message)
-        } else {
-            ChannelMessageProvider.fetchMessage(id: layout.attachment.messageId) { message in
-                completion(message)
-            }
-        }
+        completion(layout.ownerMessage)
     }
 
     private func loadedItemCount() -> Int {

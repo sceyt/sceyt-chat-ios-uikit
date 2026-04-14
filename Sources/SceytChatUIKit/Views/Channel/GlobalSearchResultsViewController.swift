@@ -1349,15 +1349,26 @@ extension GlobalSearchResultsViewController {
             collectionView.mediaViewModel = mediaViewModel
         }
 
+        open func setFiltered(_ filtered: Bool) {
+            if filtered {
+                searchEmptyStateView.isHidden = true
+            } else {
+                collectionView.reloadData()
+                collectionView.layoutIfNeeded()
+                searchEmptyStateView.isHidden = true
+            }
+            
+            DispatchQueue.main.async {
+                self.collectionView.isHidden = filtered
+                self.searchTableView.isHidden = !filtered
+            }
+        }
+
         open func reloadSearchTable() {
             guard let vm = _mediaViewModel else { return }
             let filtered = vm.isFiltered
-            collectionView.isHidden = filtered
-            searchTableView.isHidden = !filtered
-            guard filtered else {
-                searchEmptyStateView.isHidden = true
-                return
-            }
+            setFiltered(filtered)
+            guard filtered else { return }
 
             var layouts: [MessageLayoutModel.AttachmentLayout] = []
             var rowsPerSection: [Int] = []
