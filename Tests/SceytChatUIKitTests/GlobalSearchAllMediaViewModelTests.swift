@@ -29,6 +29,12 @@ final class TestableGlobalSearchAllMediaViewModel: GlobalSearchAllMediaViewModel
 
     override func loadAttachments() {}
 
+    /// Stores properties without touching the database observer.
+    override func search(query: String?, filterUser: ChatUser?) {
+        self.filterUser = filterUser
+        self.query = query
+    }
+
     // MARK: Data accessors (in-memory)
 
     override var numberOfSections: Int {
@@ -218,6 +224,116 @@ final class GlobalSearchAllMediaViewModelTests: XCTestCase {
 
     func testConformsToChannelAttachmentListViewModelProviding() {
         let _: any ChannelAttachmentListViewModelProviding = viewModel
+    }
+
+    // MARK: - search(query:filterUser:)
+
+    func testSearchStoresNilQueryAndNilUser() {
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.query)
+        XCTAssertNil(viewModel.filterUser)
+    }
+
+    func testSearchStoresQuery() {
+        viewModel.search(query: "hello", filterUser: nil)
+        XCTAssertEqual(viewModel.query, "hello")
+    }
+
+    func testSearchClearsQueryWhenNilPassed() {
+        viewModel.search(query: "hello", filterUser: nil)
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.query)
+    }
+
+    func testSearchStoresFilterUser() {
+        let user = ChatUser(id:"u1")
+        viewModel.search(query: nil, filterUser: user)
+        XCTAssertEqual(viewModel.filterUser?.id, "u1")
+    }
+
+    func testSearchClearsFilterUserWhenNilPassed() {
+        let user = ChatUser(id:"u1")
+        viewModel.search(query: nil, filterUser: user)
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.filterUser)
+    }
+
+    func testSearchStoresBothQueryAndUser() {
+        let user = ChatUser(id:"u2")
+        viewModel.search(query: "photo", filterUser: user)
+        XCTAssertEqual(viewModel.query, "photo")
+        XCTAssertEqual(viewModel.filterUser?.id, "u2")
+    }
+
+    // MARK: - isFiltered threshold (Media-specific: >= 1 char)
+
+    func testIsFiltered_noUser_oneCharacterQuery_returnsTrue() {
+        viewModel.search(query: "a", filterUser: nil)
+        XCTAssertTrue(viewModel.isFiltered, "Media filtering should activate from 1 character query")
+    }
+
+    func testIsFiltered_noUser_emptyQuery_returnsFalse() {
+        viewModel.search(query: "", filterUser: nil)
+        XCTAssertFalse(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_noUser_whitespaceOnlyQuery_returnsFalse() {
+        viewModel.search(query: "   ", filterUser: nil)
+        XCTAssertFalse(viewModel.isFiltered)
+    }
+
+    // MARK: - buildPredicate()
+
+    func testBuildPredicateNoFilters() {
+        // No filterUser, no query → predicate should only contain type + viewOnce clauses
+        let predicate = viewModel.buildPredicate()
+        // Should not contain userId or message.body
+        let format = predicate.predicateFormat
+        XCTAssertFalse(format.contains("userId"))
+        XCTAssertFalse(format.contains("body"))
+    }
+
+    func testBuildPredicateWithUserFilter() {
+        let user = ChatUser(id:"abc123")
+        viewModel.search(query: nil, filterUser: user)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(predicate.predicateFormat.contains("userId"))
+    }
+
+    func testBuildPredicateWithQueryFilter() {
+        viewModel.search(query: "photo", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(predicate.predicateFormat.contains("body"))
+    }
+
+    func testBuildPredicateWithSingleCharacterQueryFilter() {
+        viewModel.search(query: "a", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("body"),
+            "Media body predicate should be applied from 1 character query"
+        )
+    }
+
+    func testBuildPredicateWithBothFilters() {
+        let user = ChatUser(id:"u3")
+        viewModel.search(query: "video", filterUser: user)
+        let predicate = viewModel.buildPredicate()
+        let format = predicate.predicateFormat
+        XCTAssertTrue(format.contains("userId"))
+        XCTAssertTrue(format.contains("body"))
+    }
+
+    func testBuildPredicateIgnoresWhitespaceOnlyQuery() {
+        viewModel.search(query: "   ", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertFalse(predicate.predicateFormat.contains("body"))
+    }
+
+    func testBuildPredicateIgnoresEmptyQuery() {
+        viewModel.search(query: "", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertFalse(predicate.predicateFormat.contains("body"))
     }
 }
 

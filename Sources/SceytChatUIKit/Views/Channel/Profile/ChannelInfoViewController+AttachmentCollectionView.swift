@@ -76,6 +76,20 @@ extension ChannelInfoViewController {
             if superview == nil || visibleCells.isEmpty {
                 reloadData()
             } else if !paths.isEmpty {
+                // Guard against observer-restart scenarios: when restartObserver fires,
+                // it delivers all new items as insertions while UICollectionView's internal
+                // count still reflects the old data. Applying those inserts would make UIKit
+                // expect (oldCount + inserts) sections, but the data source already reports
+                // the new (smaller) count → crash. Detect the inconsistency and reload instead.
+                let expectedSectionCount = numberOfSections
+                    + paths.sectionInserts.count
+                    - paths.sectionDeletes.count
+                let actualSectionCount = dataSource?.numberOfSections?(in: self) ?? 0
+                guard expectedSectionCount == actualSectionCount else {
+                    reloadData()
+                    updateNoItems()
+                    return
+                }
                 UIView.performWithoutAnimation {
                     performBatchUpdates {
                         if !paths.sectionInserts.isEmpty {
@@ -90,7 +104,7 @@ extension ChannelInfoViewController {
                     }
                 }
             }
-            
+
             updateNoItems()
         }
         

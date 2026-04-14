@@ -304,9 +304,18 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
     func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout)
     func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout)
     var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> { get }
+    /// Filters the attachment list by text query and/or sender. Both filters are applied together when provided.
+    /// - Parameters:
+    ///   - query: Optional text to match against the owning message's body (case- and diacritic-insensitive).
+    ///   - filterUser: When set, only attachments sent by this user are shown.
+    func search(query: String?, filterUser: ChatUser?)
+    /// Returns true when any filter (user or query) is currently active.
+    var isFiltered: Bool { get }
 }
 
 public extension ChannelAttachmentListViewModelProviding {
+    func search(query: String?, filterUser: ChatUser?) {}
+    var isFiltered: Bool { false }
     func attachmentLayout(at indexPath: IndexPath) -> MessageLayoutModel.AttachmentLayout? {
         attachmentLayout(at: indexPath, onLoadThumbnail: nil, onLoadLinkMetadata: nil)
     }

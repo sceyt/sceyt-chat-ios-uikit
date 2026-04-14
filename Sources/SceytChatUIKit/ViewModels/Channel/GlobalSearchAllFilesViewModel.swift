@@ -49,6 +49,15 @@ open class GlobalSearchAllFilesViewModel: NSObject {
         return $0
     }(Cache<AttachmentId, UIImage?>())
 
+    /// When set, only attachments sent by this user are included in results.
+    open var filterUser: ChatUser?
+    /// When non-empty, only attachments whose owning message body contains this text are included.
+    open var query: String?
+
+    public var isFiltered: Bool {
+        filterUser != nil || !(query?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
+    }
+
     public required init(
         attachmentTypes: [String],
         sectionNameKeyPath: String? = "createdYearMonth",
@@ -62,22 +71,34 @@ open class GlobalSearchAllFilesViewModel: NSObject {
 
     public typealias ChangeItemPaths = LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>.ChangeItemPaths
 
-    open lazy var attachmentObserver: LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout> = {
-        let predicate: NSPredicate
+    /// Builds the fetch predicate based on `attachmentTypes`, `filterUser`, and `query`.
+    open func buildPredicate() -> NSPredicate {
+        var predicates: [NSPredicate] = []
+
         if attachmentTypes.isEmpty {
-            predicate = NSPredicate(
-                format: "message.type != %@",
-                ChatMessage.MessageType.viewOnce
-            )
+            predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
         } else {
-            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-                NSCompoundPredicate(orPredicateWithSubpredicates:
-                    attachmentTypes.map { NSPredicate(format: "type = %@", $0) }
-                ),
-                NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce)
-            ])
+            predicates.append(NSCompoundPredicate(orPredicateWithSubpredicates:
+                attachmentTypes.map { NSPredicate(format: "type = %@", $0) }
+            ))
+            predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
         }
 
+        if let userId = filterUser?.id {
+            predicates.append(NSPredicate(format: "userId == %@", userId))
+        }
+
+        if let trimmed = query?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty {
+            predicates.append(NSPredicate(format: "message.body CONTAINS[cd] %@", trimmed))
+        }
+
+        return predicates.count == 1
+            ? predicates[0]
+            : NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+    }
+
+    open lazy var attachmentObserver: LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout> = {
+        let predicate = buildPredicate()
         let appearance = self.appearance
         return LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>(
             context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
@@ -124,6 +145,14 @@ open class GlobalSearchAllFilesViewModel: NSObject {
 
     open func onDidChangeEvent(items: ChangeItemPaths) {
         event = .change(items)
+    }
+
+    /// Filters displayed attachments by sender and/or message body text.
+    /// Calling with both nil clears all filters and shows every attachment.
+    open func search(query: String?, filterUser: ChatUser?) {
+        self.filterUser = filterUser
+        self.query = query
+        attachmentObserver.restartObserver(fetchPredicate: buildPredicate())
     }
 
     open func loadAttachments() {
