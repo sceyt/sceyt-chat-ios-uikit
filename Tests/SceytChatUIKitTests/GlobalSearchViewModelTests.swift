@@ -54,17 +54,14 @@ final class GlobalSearchViewModelTests: XCTestCase {
     // MARK: - subjectMatches: prefix matching
 
     func testSubjectMatches_prefixOfFirstWord() {
-        // "Gro" is a prefix of "Group"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "Gro"))
     }
 
     func testSubjectMatches_fullWordMatch() {
-        // "Group" exactly matches the first word
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "Group"))
     }
 
     func testSubjectMatches_prefixOfSecondWord() {
-        // "Fo" is a prefix of "For"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "New Group For", query: "Fo"))
     }
 
@@ -77,9 +74,7 @@ final class GlobalSearchViewModelTests: XCTestCase {
     // MARK: - subjectMatches: suffix matching
 
     func testSubjectMatches_suffixOfWord() {
-        // "oup" is a suffix of "Group"
-        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "New Group For", query: "oup"),
-                      "suffix of a word should match")
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "New Group For", query: "oup"))
     }
 
     func testSubjectMatches_suffixCaseInsensitive() {
@@ -88,36 +83,32 @@ final class GlobalSearchViewModelTests: XCTestCase {
     }
 
     func testSubjectMatches_suffixOfLastWord() {
-        // "or" is a suffix of "For"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "New Group For", query: "or"))
     }
 
-    // MARK: - subjectMatches: middle-only (should NOT match)
+    // MARK: - subjectMatches: middle-of-word matching (contains)
 
-    func testSubjectMatches_middleOfWord_noMatch() {
-        // "ou" is in the middle of "Group" (g-r-o-u-p), not a prefix or suffix
-        XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "Group New", query: "ou"),
-                       "middle-of-word should not match")
+    func testSubjectMatches_middleOfWord_matches() {
+        // "ou" is in the middle of "Group" — contains match
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group New", query: "ou"))
     }
 
-    func testSubjectMatches_middleOfWord_multipleWords_noMatch() {
-        // "rou" is a middle slice of "Group" — not prefix, not suffix
-        XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "Group Chat", query: "rou"))
+    func testSubjectMatches_middleOfWord_multipleWords_matches() {
+        // "rou" is a middle slice of "Group" — contains match
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group Chat", query: "rou"))
     }
 
     // MARK: - subjectMatches: whitespace trimming
 
     func testSubjectMatches_queryWithLeadingTrailingSpaces() {
-        // "    Group    " should behave the same as "Group" — but trimming happens
-        // upstream in search(query:), so subjectMatches receives the already-trimmed token.
-        // This test documents the contract: trimmed query matches.
+        // trimming happens upstream in search(query:); subjectMatches receives the already-trimmed token
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "Group"))
     }
 
     func testSubjectMatches_subjectWithExtraSpaces() {
-        // Extra spaces between words in subject should not cause false negatives
+        // Extra spaces between words should not cause false negatives
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "New  Group  For", query: "oup"))
-        XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "New  Group  For", query: "ou"))
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "New  Group  For", query: "ou"))
     }
 
     // MARK: - subjectMatches: edge cases
@@ -130,28 +121,25 @@ final class GlobalSearchViewModelTests: XCTestCase {
         XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "", query: "Group"))
     }
 
-    func testSubjectMatches_queryLongerThanAnyWord_noMatch() {
-        // "GroupName" is longer than both "Group" and "1"
+    func testSubjectMatches_queryLongerThanSubject_noMatch() {
+        // "GroupName" is not contained in "Group 1"
         XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "GroupName"))
     }
 
     func testSubjectMatches_singleCharacterQuery_prefix() {
-        // "G" is a prefix of "Group"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "G"))
     }
 
     func testSubjectMatches_singleCharacterQuery_suffix() {
-        // "p" is a suffix of "Group"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "p"))
     }
 
-    func testSubjectMatches_singleCharacterQuery_noMatch() {
-        // "r" is in the middle of "Group", not prefix or suffix
-        XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "r"))
+    func testSubjectMatches_singleCharacterQuery_middleOfWord_matches() {
+        // "r" appears in "Group" — contains match
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "r"))
     }
 
     func testSubjectMatches_queryMatchesEntireWord() {
-        // Exact word match is both prefix and suffix simultaneously
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "New Group For", query: "Group"))
     }
 
@@ -159,34 +147,29 @@ final class GlobalSearchViewModelTests: XCTestCase {
     // Direct channels are filtered by building "firstName lastName" and running subjectMatches.
 
     func testDirectChannel_firstNamePrefix_matches() {
-        // peer: firstName "John", lastName "Doe" → "John Doe"
-        // query "Jo" → prefix of "John"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "John Doe", query: "Jo"))
     }
 
     func testDirectChannel_lastNamePrefix_matches() {
-        // query "Do" → prefix of "Doe"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "John Doe", query: "Do"))
     }
 
     func testDirectChannel_firstNameSuffix_matches() {
-        // query "hn" → suffix of "John"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "John Doe", query: "hn"))
     }
 
     func testDirectChannel_lastNameSuffix_matches() {
-        // query "oe" → suffix of "Doe"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "John Doe", query: "oe"))
     }
 
-    func testDirectChannel_middleOfFirstName_noMatch() {
-        // query "oh" → middle of "John" (j-o-h-n), not prefix or suffix
-        XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "John Doe", query: "oh"))
+    func testDirectChannel_middleOfFirstName_matches() {
+        // "oh" is contained in "John"
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "John Doe", query: "oh"))
     }
 
-    func testDirectChannel_middleOfLastName_noMatch() {
-        // "o" is in the middle of "Doe" (d-o-e): not a prefix ("d") and not a suffix ("e", "oe")
-        XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "John Doe", query: "o"))
+    func testDirectChannel_middleOfLastName_matches() {
+        // "o" is contained in both "John" and "Doe"
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "John Doe", query: "o"))
     }
 
     func testDirectChannel_fullFirstName_matches() {
@@ -204,29 +187,26 @@ final class GlobalSearchViewModelTests: XCTestCase {
     }
 
     func testDirectChannel_onlyFirstName_prefix() {
-        // peer has no lastName → subject is just "Alice"
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Alice", query: "Ali"))
     }
 
-    func testDirectChannel_onlyFirstName_middleNoMatch() {
-        XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "Alice", query: "lic"))
+    func testDirectChannel_onlyFirstName_middleMatch() {
+        // "lic" is contained in "Alice"
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Alice", query: "lic"))
     }
 
     // MARK: - subjectMatches: user-described scenarios
 
     func testUserScenario_groupWithSpaces_findsByTrimmedQuery() {
-        // Subject "Group 1", user types "    Group    " → trimmed to "Group" upstream,
-        // "Group" is prefix of "Group" → should find
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group 1", query: "Group"))
     }
 
     func testUserScenario_suffixSearch_finds() {
-        // Subject "New Group For", query "oup" → suffix of "Group" → should find
         XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "New Group For", query: "oup"))
     }
 
-    func testUserScenario_middleSearch_doesNotFind() {
-        // Subject "Group New", query "ou" → middle of "Group" → should NOT find
-        XCTAssertFalse(GlobalSearchViewModel.subjectMatches(subject: "Group New", query: "ou"))
+    func testUserScenario_middleSearch_finds() {
+        // "ou" is contained in "Group" — should find with contains matching
+        XCTAssertTrue(GlobalSearchViewModel.subjectMatches(subject: "Group New", query: "ou"))
     }
 }

@@ -132,20 +132,10 @@ open class GlobalSearchViewModel: NSObject {
         }
     }
 
-    /// Returns true if `query` is a prefix **or** suffix of any whitespace-separated word in
-    /// `subject` (case-insensitive). Pure middle-of-word matches are rejected.
-    ///
-    /// Examples:
-    /// - subject "Group 1",     query "Group" → true  (prefix of "Group")
-    /// - subject "New Group For", query "oup"  → true  (suffix of "Group")
-    /// - subject "Group New",   query "ou"    → false ("ou" is neither prefix nor suffix of any word)
+    /// Returns true if `subject` contains `query` as a substring (case-insensitive).
     static func subjectMatches(subject: String, query: String) -> Bool {
-        let q = query.lowercased()
-        guard !q.isEmpty else { return false }
-        let words = subject.lowercased()
-            .components(separatedBy: .whitespaces)
-            .filter { !$0.isEmpty }
-        return words.contains { $0.hasPrefix(q) || $0.hasSuffix(q) }
+        guard !query.isEmpty else { return false }
+        return subject.range(of: query, options: [.caseInsensitive]) != nil
     }
 
     // MARK: - Private DB helpers
@@ -171,15 +161,12 @@ open class GlobalSearchViewModel: NSObject {
             SceytChatUIKit.shared.database.read { [query] context in
                 let request = NSFetchRequest<ChannelDTO>(entityName: ChannelDTO.entityName)
                 request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
-                // Broad DB filter: subject contains the query anywhere (case-insensitive).
-                // Swift filter below narrows to prefix/suffix-only word matches.
                 request.predicate = NSPredicate(
                     format: "type = %@ AND subject CONTAINS[c] %@",
                     SceytChatUIKit.shared.config.channelTypesConfig.group, query
                 )
                 return ChannelDTO.fetch(request: request, context: context)
                     .compactMap { ChatChannel(dto: $0) }
-                    .filter { GlobalSearchViewModel.subjectMatches(subject: $0.subject ?? "", query: query) }
             } completion: { result in
                 cont.resume(returning: (try? result.get()) ?? [])
             }
@@ -191,15 +178,12 @@ open class GlobalSearchViewModel: NSObject {
             SceytChatUIKit.shared.database.read { [query] context in
                 let request = NSFetchRequest<ChannelDTO>(entityName: ChannelDTO.entityName)
                 request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
-                // Broad DB filter: subject contains the query anywhere (case-insensitive).
-                // Swift filter below narrows to prefix/suffix-only word matches.
                 request.predicate = NSPredicate(
                     format: "type = %@ AND subject CONTAINS[c] %@",
                     SceytChatUIKit.shared.config.channelTypesConfig.broadcast, query
                 )
                 return ChannelDTO.fetch(request: request, context: context)
                     .compactMap { ChatChannel(dto: $0) }
-                    .filter { GlobalSearchViewModel.subjectMatches(subject: $0.subject ?? "", query: query) }
             } completion: { result in
                 cont.resume(returning: (try? result.get()) ?? [])
             }
