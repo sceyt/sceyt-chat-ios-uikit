@@ -1280,6 +1280,9 @@ extension GlobalSearchResultsViewController {
     // MARK: Media Page
 
     open class MediaPageViewController: AttachmentPageViewController {
+        
+        private var _isFiltered: Bool?
+        
         open lazy var collectionView = Components.channelInfoMediaCollectionView.init()
 
         override open var scrollViewsToAdjust: [UIScrollView] { [collectionView, searchTableView] }
@@ -1357,6 +1360,9 @@ extension GlobalSearchResultsViewController {
         }
 
         open func setFiltered(_ filtered: Bool) {
+            guard _isFiltered != filtered else { return }
+            _isFiltered = filtered
+
             if filtered {
                 searchEmptyStateView.isHidden = true
             } else {
@@ -1364,7 +1370,7 @@ extension GlobalSearchResultsViewController {
                 collectionView.layoutIfNeeded()
                 searchEmptyStateView.isHidden = true
             }
-            
+
             DispatchQueue.main.async {
                 self.collectionView.isHidden = filtered
                 self.searchTableView.isHidden = !filtered

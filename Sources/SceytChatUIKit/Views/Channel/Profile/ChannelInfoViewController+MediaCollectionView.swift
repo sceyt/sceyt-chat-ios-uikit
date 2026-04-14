@@ -107,8 +107,12 @@ extension ChannelInfoViewController {
         
         open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
             let model = mediaViewModel.attachmentLayout(at: indexPath)
-            if indexPath.row > mediaViewModel.numberOfAttachments(in: indexPath.section) - 3 {
-                mediaViewModel.loadAttachments()
+            let lastSection = mediaViewModel.numberOfSections - 1
+            if indexPath.section == lastSection {
+                let count = mediaViewModel.numberOfAttachments(in: lastSection)
+                if count >= 3 && indexPath.row >= count - 3 {
+                    mediaViewModel.loadAttachments()
+                }
             }
             let cell: ChannelInfoViewController.AttachmentCell
 

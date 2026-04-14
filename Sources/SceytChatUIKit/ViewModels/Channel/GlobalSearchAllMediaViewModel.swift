@@ -88,6 +88,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
             ))
             predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
         }
+        predicates.append(NSPredicate(format: "message.unlisted == false"))
 
         if let userId = filterUser?.id {
             predicates.append(NSPredicate(format: "userId == %@", userId))
@@ -152,8 +153,11 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         }
     }()
 
+    private var isLoadingNext = false
+
     open func startDatabaseObserver() {
         attachmentObserver.onDidChange = { [weak self] _, paths, _ in
+            self?.isLoadingNext = false
             self?.onDidChangeEvent(items: paths)
         }
         do {
@@ -170,6 +174,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     /// Filters displayed attachments by sender and/or message body text.
     /// Calling with both nil clears all filters and shows every attachment.
     open func search(query: String?, filterUser: ChatUser?) {
+        guard query != self.query || filterUser?.id != self.filterUser?.id else { return }
         self.filterUser = filterUser
         self.query = query
         let predicate = buildPredicate()
@@ -179,6 +184,9 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     }
 
     open func loadAttachments() {
+        guard !isLoadingNext else { return }
+        isLoadingNext = true
+        attachmentObserver.loadNext()
     }
 
     open var numberOfSections: Int {
