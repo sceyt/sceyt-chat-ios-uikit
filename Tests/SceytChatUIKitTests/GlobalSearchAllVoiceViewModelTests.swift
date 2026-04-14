@@ -56,6 +56,12 @@ final class TestableGlobalSearchAllVoiceViewModel: GlobalSearchAllVoiceViewModel
     func simulateChange(_ paths: ChangeItemPaths) {
         onDidChangeEvent(items: paths)
     }
+
+    /// Stores query and filterUser without touching the database observer.
+    override func search(query: String?, filterUser: ChatUser?) {
+        self.filterUser = filterUser
+        self.query = query
+    }
 }
 
 // MARK: - Tests
@@ -217,6 +223,168 @@ final class GlobalSearchAllVoiceViewModelTests: XCTestCase {
 
     func testConformsToChannelAttachmentListViewModelProviding() {
         let _: any ChannelAttachmentListViewModelProviding = viewModel
+    }
+
+    // MARK: - search(query:filterUser:) – find voice by message body
+
+    func testSearchStoresQuery() {
+        viewModel.search(query: "hello world", filterUser: nil)
+        XCTAssertEqual(viewModel.query, "hello world")
+    }
+
+    func testSearchStoresNilQueryAndNilUser() {
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.query)
+        XCTAssertNil(viewModel.filterUser)
+    }
+
+    func testSearchClearsQueryWhenNilPassed() {
+        viewModel.search(query: "meeting notes", filterUser: nil)
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.query)
+    }
+
+    func testSearchStoresFilterUser() {
+        let user = ChatUser(id: "u1")
+        viewModel.search(query: nil, filterUser: user)
+        XCTAssertEqual(viewModel.filterUser?.id, "u1")
+    }
+
+    func testSearchClearsFilterUserWhenNilPassed() {
+        let user = ChatUser(id: "u1")
+        viewModel.search(query: nil, filterUser: user)
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertNil(viewModel.filterUser)
+    }
+
+    func testSearchStoresBothQueryAndUser() {
+        let user = ChatUser(id: "u2")
+        viewModel.search(query: "standup", filterUser: user)
+        XCTAssertEqual(viewModel.query, "standup")
+        XCTAssertEqual(viewModel.filterUser?.id, "u2")
+    }
+
+    // MARK: - isFiltered
+
+    func testIsFiltered_withSenderNameQuery_returnsTrue() {
+        viewModel.search(query: "John", filterUser: nil)
+        XCTAssertTrue(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_emptyQuery_returnsFalse() {
+        viewModel.search(query: "", filterUser: nil)
+        XCTAssertFalse(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_whitespaceOnlyQuery_returnsFalse() {
+        viewModel.search(query: "   ", filterUser: nil)
+        XCTAssertFalse(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_withFilterUser_returnsTrue() {
+        let user = ChatUser(id: "u3")
+        viewModel.search(query: nil, filterUser: user)
+        XCTAssertTrue(viewModel.isFiltered)
+    }
+
+    func testIsFiltered_noQueryNoUser_returnsFalse() {
+        viewModel.search(query: nil, filterUser: nil)
+        XCTAssertFalse(viewModel.isFiltered)
+    }
+
+    // MARK: - buildPredicate() – sender name search
+
+    func testBuildPredicateNoFilters_doesNotContainNameOrUserId() {
+        let predicate = viewModel.buildPredicate()
+        let format = predicate.predicateFormat
+        XCTAssertFalse(format.contains("firstName"), "Unfiltered predicate should not include firstName clause")
+        XCTAssertFalse(format.contains("lastName"), "Unfiltered predicate should not include lastName clause")
+        XCTAssertFalse(format.contains("userId"), "Unfiltered predicate should not include userId clause")
+    }
+
+    func testBuildPredicateWithSenderNameQuery_containsFirstNameClause() {
+        // Voice attachments are searched by the sender's first name
+        viewModel.search(query: "John", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("firstName"),
+            "Sender name query should add a message.user.firstName CONTAINS[cd] clause"
+        )
+    }
+
+    func testBuildPredicateWithSenderNameQuery_containsLastNameClause() {
+        // Voice attachments are also searched by the sender's last name
+        viewModel.search(query: "Doe", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("lastName"),
+            "Sender name query should add a message.user.lastName CONTAINS[cd] clause"
+        )
+    }
+
+    func testBuildPredicateWithSenderNameQuery_containsQueryValue() {
+        viewModel.search(query: "standup", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("standup"),
+            "Predicate format should embed the query value"
+        )
+    }
+
+    func testBuildPredicateIgnoresWhitespaceOnlyQuery() {
+        viewModel.search(query: "   ", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertFalse(predicate.predicateFormat.contains("firstName CONTAINS"))
+        XCTAssertFalse(predicate.predicateFormat.contains("lastName CONTAINS"))
+    }
+
+    func testBuildPredicateIgnoresEmptyQuery() {
+        viewModel.search(query: "", filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertFalse(predicate.predicateFormat.contains("firstName CONTAINS"))
+        XCTAssertFalse(predicate.predicateFormat.contains("lastName CONTAINS"))
+    }
+
+    // MARK: - buildPredicate() – all voices from selected user
+
+    func testBuildPredicateWithFilterUser_containsUserIdClause() {
+        let user = ChatUser(id: "abc123")
+        viewModel.search(query: nil, filterUser: user)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("userId"),
+            "User filter should add a userId == clause"
+        )
+    }
+
+    func testBuildPredicateWithFilterUser_containsUserIdValue() {
+        let user = ChatUser(id: "abc123")
+        viewModel.search(query: nil, filterUser: user)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("abc123"),
+            "Predicate format should embed the user id value"
+        )
+    }
+
+    func testBuildPredicateWithBothSenderNameAndUserFilter() {
+        let user = ChatUser(id: "u4")
+        viewModel.search(query: "John", filterUser: user)
+        let predicate = viewModel.buildPredicate()
+        let format = predicate.predicateFormat
+        XCTAssertTrue(format.contains("userId"), "Combined filter should include userId clause")
+        XCTAssertTrue(format.contains("firstName"), "Combined filter should include firstName CONTAINS[cd] clause")
+    }
+
+    func testBuildPredicateWithNilUserAfterPreviousUser_doesNotContainUserId() {
+        let user = ChatUser(id: "u5")
+        viewModel.search(query: nil, filterUser: user)
+        viewModel.search(query: nil, filterUser: nil)
+        let predicate = viewModel.buildPredicate()
+        XCTAssertFalse(
+            predicate.predicateFormat.contains("userId"),
+            "Clearing filterUser should remove the userId clause"
+        )
     }
 }
 

@@ -89,7 +89,10 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         }
 
         if let trimmed = query?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty {
-            predicates.append(NSPredicate(format: "message.body CONTAINS[cd] %@", trimmed))
+            predicates.append(NSCompoundPredicate(orPredicateWithSubpredicates: [
+                NSPredicate(format: "message.user.firstName CONTAINS[cd] %@", trimmed),
+                NSPredicate(format: "message.user.lastName CONTAINS[cd] %@", trimmed)
+            ]))
         }
 
         return predicates.count == 1
