@@ -215,12 +215,14 @@ open class GlobalSearchAllMediaViewModel: NSObject {
 
     open func startDatabaseObserver() {
         allAttachmentsObserver.onDidChange = { [weak self] _, paths, _ in
-            self?.isLoadingNext = false
-            self?.onDidChangeEvent(items: paths)
+            guard let self, !self.isFiltered else { return }
+            self.isLoadingNext = false
+            self.onDidChangeEvent(items: paths)
         }
         searchObserver.onDidChange = { [weak self] _, paths, _ in
-            self?.isLoadingNext = false
-            self?.onDidChangeEvent(items: paths)
+            guard let self, self.isFiltered else { return }
+            self.isLoadingNext = false
+            self.onDidChangeEvent(items: paths)
         }
         do {
             try allAttachmentsObserver.startObserver(fetchLimit: 20)

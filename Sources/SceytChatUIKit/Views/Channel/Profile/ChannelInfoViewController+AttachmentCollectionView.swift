@@ -101,6 +101,20 @@ extension ChannelInfoViewController {
                     updateNoItems()
                     return
                 }
+                // Guard against item-count inconsistency (e.g. event from the inactive
+                // observer when GlobalSearchAllMediaViewModel switches between
+                // allAttachmentsObserver and searchObserver). Sections matched, but
+                // per-section item counts may still be wrong → verify the net item delta.
+                let currentTotal = (0..<numberOfSections).reduce(0) { $0 + numberOfItems(inSection: $1) }
+                let expectedTotal = currentTotal + paths.inserts.count - paths.deletes.count
+                let actualTotal = (0..<actualSectionCount).reduce(0) {
+                    $0 + (dataSource?.collectionView(self, numberOfItemsInSection: $1) ?? 0)
+                }
+                guard expectedTotal == actualTotal else {
+                    reloadData()
+                    updateNoItems()
+                    return
+                }
                 UIView.performWithoutAnimation {
                     performBatchUpdates {
                         if !paths.sectionInserts.isEmpty {
