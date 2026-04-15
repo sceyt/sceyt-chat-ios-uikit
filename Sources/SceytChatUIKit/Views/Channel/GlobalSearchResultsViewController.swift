@@ -1377,6 +1377,7 @@ extension GlobalSearchResultsViewController {
             } else {
                 collectionView.reloadData()
                 collectionView.layoutIfNeeded()
+                collectionView.updateNoItems()
                 searchEmptyStateView.isHidden = true
             }
 
