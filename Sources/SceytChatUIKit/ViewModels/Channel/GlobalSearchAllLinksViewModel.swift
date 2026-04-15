@@ -111,7 +111,9 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             predicates.append(NSPredicate(format: "userId == %@", userId))
         }
         if let trimmed = query?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty {
-            predicates.append(NSPredicate(format: "message.body CONTAINS[cd] %@", trimmed))
+            let bodyPredicate = NSPredicate(format: "message.body CONTAINS[cd] %@", trimmed)
+            let summaryPredicate = NSPredicate(format: "message.linkMetadatas.summary CONTAINS[cd] %@", trimmed)
+            predicates.append(NSCompoundPredicate(orPredicateWithSubpredicates: [bodyPredicate, summaryPredicate]))
         }
         return predicates.count == 1
             ? predicates[0]
