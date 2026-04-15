@@ -311,9 +311,12 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
     func search(query: String?, filterUser: ChatUser?)
     /// Returns true when any filter (user or query) is currently active.
     var isFiltered: Bool { get }
+    /// Returns false when the last load returned no new items (end of data reached).
+    var hasMore: Bool { get }
 }
 
 public extension ChannelAttachmentListViewModelProviding {
+    var hasMore: Bool { true }
     func search(query: String?, filterUser: ChatUser?) {}
     var isFiltered: Bool { false }
     func attachmentLayout(at indexPath: IndexPath) -> MessageLayoutModel.AttachmentLayout? {

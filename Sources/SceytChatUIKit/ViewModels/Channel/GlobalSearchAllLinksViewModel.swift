@@ -11,8 +11,9 @@ import Foundation
 import SceytChat
 import UIKit
 
-/// Loads all link attachments across every channel for the
-/// global-search Links tab initial state (no query active).
+/// Loads all link attachments across every channel for the global-search Links tab.
+/// - `allLinksObserver`: always-on, no text/user filter, paginated – drives the table view.
+/// - `searchObserver`: restarted on each `search(query:filterUser:)` call – drives filtered results.
 open class GlobalSearchAllLinksViewModel: NSObject {
 
     public let attachmentTypes: [String]
@@ -28,14 +29,16 @@ open class GlobalSearchAllLinksViewModel: NSObject {
 
     public var thumbnailSize: CGSize = .init(width: 40, height: 40) {
         didSet {
-            guard thumbnailSize != oldValue,
-                  attachmentObserver.isObserverStarted else { return }
+            guard thumbnailSize != oldValue else { return }
             thumbnailCache.removeAll()
-            for section in 0..<attachmentObserver.numberOfSections {
-                for row in 0..<attachmentObserver.numberOfItems(in: section) {
-                    if let layout = attachmentObserver.item(at: IndexPath(row: row, section: section)) {
-                        layout.thumbnailSize = thumbnailSize
-                        layout.resetThumbnail()
+            for observer in [allLinksObserver, searchObserver] {
+                guard observer.isObserverStarted else { continue }
+                for section in 0..<observer.numberOfSections {
+                    for row in 0..<observer.numberOfItems(in: section) {
+                        if let layout = observer.item(at: IndexPath(row: row, section: section)) {
+                            layout.thumbnailSize = thumbnailSize
+                            layout.resetThumbnail()
+                        }
                     }
                 }
             }
@@ -49,14 +52,18 @@ open class GlobalSearchAllLinksViewModel: NSObject {
         return $0
     }(Cache<AttachmentId, UIImage?>())
 
-    /// When set, only attachments sent by this user are included in results.
+    /// When set, only attachments sent by this user are included in search results.
     open var filterUser: ChatUser?
-    /// When non-empty, only attachments whose owning message body contains this text are included.
+    /// Text query used for message-body matching in search results.
     open var query: String?
 
     public var isFiltered: Bool {
         filterUser != nil || !(query?.trimmingCharacters(in: .whitespaces).isEmpty ?? true)
     }
+
+    private var isLoadingNext = false
+    public private(set) var hasMore = true
+    private var countBeforeLoad = 0
 
     public required init(
         attachmentTypes: [String],
@@ -71,10 +78,10 @@ open class GlobalSearchAllLinksViewModel: NSObject {
 
     public typealias ChangeItemPaths = LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>.ChangeItemPaths
 
-    /// Builds the fetch predicate based on `attachmentTypes`, `filterUser`, and `query`.
-    open func buildPredicate() -> NSPredicate {
-        var predicates: [NSPredicate] = []
+    // MARK: - Base predicate (type filter only, no text/user) — used by allLinksObserver
 
+    open func buildBasePredicate() -> NSPredicate {
+        var predicates: [NSPredicate] = []
         if attachmentTypes.isEmpty {
             predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
         } else {
@@ -83,21 +90,74 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             ))
             predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
         }
-
-        if let userId = filterUser?.id {
-            predicates.append(NSPredicate(format: "userId == %@", userId))
-        }
-
-        if let trimmed = query?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty {
-            predicates.append(NSPredicate(format: "message.body CONTAINS[cd] %@", trimmed))
-        }
-
         return predicates.count == 1
             ? predicates[0]
             : NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
     }
 
-    open lazy var attachmentObserver: LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout> = {
+    // MARK: - Search predicate (includes text and user filters) — used by searchObserver
+
+    open func buildPredicate() -> NSPredicate {
+        var predicates: [NSPredicate] = []
+        if attachmentTypes.isEmpty {
+            predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
+        } else {
+            predicates.append(NSCompoundPredicate(orPredicateWithSubpredicates:
+                attachmentTypes.map { NSPredicate(format: "type = %@", $0) }
+            ))
+            predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
+        }
+        if let userId = filterUser?.id {
+            predicates.append(NSPredicate(format: "userId == %@", userId))
+        }
+        if let trimmed = query?.trimmingCharacters(in: .whitespaces), !trimmed.isEmpty {
+            predicates.append(NSPredicate(format: "message.body CONTAINS[cd] %@", trimmed))
+        }
+        return predicates.count == 1
+            ? predicates[0]
+            : NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+    }
+
+    // MARK: - All links observer (no search filter, paginated) — drives table view
+
+    open lazy var allLinksObserver: LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout> = {
+        let predicate = buildBasePredicate()
+        let appearance = self.appearance
+        return LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>(
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
+            sortDescriptors: [
+                .init(keyPath: \AttachmentDTO.createdAt, ascending: false),
+                .init(keyPath: \AttachmentDTO.id, ascending: false)
+            ],
+            sectionNameKeyPath: sectionNameKeyPath,
+            fetchPredicate: predicate,
+            relationshipKeyPathsObserver: []
+        ) { [weak self] dto in
+            let attachment = dto.convert()
+            if let prevItem = self?.allLinksObserver.item(for: dto.objectID) {
+                prevItem.update(attachment: attachment)
+                if let message = dto.message?.convert() {
+                    prevItem.updateMessageIfNeeded(ownerMessage: message)
+                }
+                return prevItem
+            }
+            return MessageLayoutModel.AttachmentLayout(
+                attachment: attachment,
+                ownerMessage: dto.message?.convert(),
+                ownerChannel: nil,
+                thumbnailSize: self?.thumbnailSize ?? CGSize(width: 40, height: 40),
+                onLoadThumbnail: { [weak self] in
+                    self?.cacheThumbnail($0, for: attachment)
+                },
+                asyncLoadThumbnail: true,
+                appearance: appearance
+            )
+        }
+    }()
+
+    // MARK: - Search observer (text/user filter) — drives filtered results
+
+    open lazy var searchObserver: LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout> = {
         let predicate = buildPredicate()
         let appearance = self.appearance
         return LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>(
@@ -111,7 +171,7 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             relationshipKeyPathsObserver: []
         ) { [weak self] dto in
             let attachment = dto.convert()
-            if let prevItem = self?.attachmentObserver.item(for: dto.objectID) {
+            if let prevItem = self?.searchObserver.item(for: dto.objectID) {
                 prevItem.update(attachment: attachment)
                 if let message = dto.message?.convert() {
                     prevItem.updateMessageIfNeeded(ownerMessage: message)
@@ -133,13 +193,27 @@ open class GlobalSearchAllLinksViewModel: NSObject {
     }()
 
     open func startDatabaseObserver() {
-        attachmentObserver.onDidChange = { [weak self] _, paths, _ in
+        allLinksObserver.onDidChange = { [weak self] _, paths, _ in
+            guard let self else { return }
+            let newCount = (0..<allLinksObserver.numberOfSections)
+                .reduce(0) { $0 + self.allLinksObserver.numberOfItems(in: $1) }
+            hasMore = newCount > countBeforeLoad
+            isLoadingNext = false
+            onDidChangeEvent(items: paths)
+        }
+        searchObserver.onDidChange = { [weak self] _, paths, _ in
+            self?.isLoadingNext = false
             self?.onDidChangeEvent(items: paths)
         }
         do {
-            try attachmentObserver.startObserver(fetchLimit: 20)
+            try allLinksObserver.startObserver(fetchLimit: 20)
         } catch {
-            logger.errorIfNotNil(error, "GlobalSearchAllLinksViewModel observer.startObserver")
+            logger.errorIfNotNil(error, "GlobalSearchAllLinksViewModel allLinksObserver.startObserver")
+        }
+        do {
+            try searchObserver.startObserver(fetchLimit: 0)
+        } catch {
+            logger.errorIfNotNil(error, "GlobalSearchAllLinksViewModel searchObserver.startObserver")
         }
     }
 
@@ -147,24 +221,38 @@ open class GlobalSearchAllLinksViewModel: NSObject {
         event = .change(items)
     }
 
-    /// Filters displayed attachments by sender and/or message body text.
-    /// Calling with both nil clears all filters and shows every attachment.
+    /// Filters search results by sender and/or message body text.
+    /// Calling with both nil clears all filters.
     open func search(query: String?, filterUser: ChatUser?) {
+        guard query != self.query || filterUser?.id != self.filterUser?.id else { return }
         self.filterUser = filterUser
         self.query = query
-        attachmentObserver.restartObserver(fetchPredicate: buildPredicate())
+        isLoadingNext = false
+        hasMore = true
+        countBeforeLoad = 0
+        searchObserver.restartObserver(fetchPredicate: buildPredicate())
     }
 
     open func loadAttachments() {
-        attachmentObserver.loadNext()
+        guard !isLoadingNext else { return }
+        isLoadingNext = true
+        if isFiltered {
+            searchObserver.loadNext()
+        } else {
+            countBeforeLoad = (0..<allLinksObserver.numberOfSections)
+                .reduce(0) { $0 + allLinksObserver.numberOfItems(in: $1) }
+            allLinksObserver.loadNext()
+        }
     }
 
     open var numberOfSections: Int {
-        attachmentObserver.numberOfSections
+        isFiltered ? searchObserver.numberOfSections : allLinksObserver.numberOfSections
     }
 
     open func numberOfAttachments(in section: Int) -> Int {
-        attachmentObserver.numberOfItems(in: section)
+        isFiltered
+            ? searchObserver.numberOfItems(in: section)
+            : allLinksObserver.numberOfItems(in: section)
     }
 
     open func attachmentLayout(
@@ -172,12 +260,30 @@ open class GlobalSearchAllLinksViewModel: NSObject {
         onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)? = nil,
         onLoadLinkMetadata: ((LinkMetadata?) -> Void)? = nil
     ) -> MessageLayoutModel.AttachmentLayout? {
-        let layout = attachmentObserver.item(at: indexPath)
-        if let layout, let onLoadThumbnail {
+        let observer = isFiltered ? searchObserver : allLinksObserver
+        let layout = observer.item(at: indexPath)
+        if let layout {
             let attachment = layout.attachment
-            layout.onLoadThumbnail = { [weak self] in
-                self?.cacheThumbnail($0, for: attachment)
-                onLoadThumbnail(layout)
+            if let onLoadThumbnail {
+                layout.onLoadThumbnail = { [weak self] in
+                    self?.cacheThumbnail($0, for: attachment)
+                    onLoadThumbnail(layout)
+                }
+            }
+            if let onLoadLinkMetadata,
+               let urlStr = attachment.url,
+               let url = URL(string: urlStr)?.normalizedURL {
+                if let cached = layout.linkMetadata {
+                    onLoadLinkMetadata(cached)
+                } else if let metadata = LinkMetadataProvider.default.metadata(for: url) {
+                    layout.linkMetadata = metadata
+                    onLoadLinkMetadata(metadata)
+                } else {
+                    LinkMetadataProvider.default.fetchFromCacheOrDB(url: url) { [weak layout] metadata in
+                        layout?.linkMetadata = metadata ?? LinkMetadata(url: url)
+                        onLoadLinkMetadata(metadata)
+                    }
+                }
             }
         }
         return layout

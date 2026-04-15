@@ -163,6 +163,7 @@ extension SceytChatUIKit {
         public static var searchResultChannelCell: SearchResultChannelCell.Type = SearchResultChannelCell.self
         public static var globalSearchMessageCell: GlobalSearchMessageCell.Type = GlobalSearchMessageCell.self
         public static var globalSearchMediaCell: GlobalSearchMediaCell.Type = GlobalSearchMediaCell.self
+        public static var globalSearchLinkCell: GlobalSearchLinkCell.Type = GlobalSearchLinkCell.self
         public static var selectableChannelCell: SelectableChannelCell.Type = SelectableChannelCell.self
         public static var selectableUserCell: SelectableUserCell.Type = SelectableUserCell.self
         public static var selectedBaseCell: SelectedBaseCell.Type = SelectedBaseCell.self

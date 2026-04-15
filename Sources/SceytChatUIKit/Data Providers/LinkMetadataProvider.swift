@@ -69,6 +69,41 @@ open class LinkMetadataProvider: DataProvider {
         fetchCache.contains(url)
     }
 
+    /// Resolves metadata from in-memory cache or the local DB only — never makes a network request.
+    /// Calls `completion` with the metadata, or `nil` if not found in either store.
+    open func fetchFromCacheOrDB(
+        url: URL,
+        downloadImage: Bool = true,
+        downloadIcon: Bool = true,
+        completion: @escaping (LinkMetadata?) -> Void
+    ) {
+        // 1. In-memory cache
+        if let metadata = cache.object(forKey: url.absoluteString as NSString) {
+            completion(metadata)
+            return
+        }
+
+        // 2. Database — no network fallback
+        database.performBgTask { context in
+            LinkMetadataDTO.fetch(url: url, context: context)?.convert()
+        } completion: { [weak self] result in
+            guard let self else { completion(nil); return }
+            guard case .success(let metadata) = result, let metadata else {
+                completion(nil)
+                return
+            }
+            metadata.loadImages()
+            self.downloadImagesIfNeeded(
+                linkMetadata: metadata,
+                downloadImage: downloadImage,
+                downloadIcon: downloadIcon
+            ) {
+                self.cache.setObject(metadata, forKey: url.absoluteString as NSString)
+                completion(metadata)
+            }
+        }
+    }
+
     @discardableResult
     open func fetch(
         url: URL,
