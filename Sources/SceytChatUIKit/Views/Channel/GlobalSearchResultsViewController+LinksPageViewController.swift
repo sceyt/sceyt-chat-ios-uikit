@@ -28,6 +28,10 @@ extension GlobalSearchResultsViewController {
 
         open var linkSearchCellAppearance: GlobalSearchLinkCell.Appearance?
 
+        /// The active search query forwarded to each cell so matches in the title/URL/
+        /// summary are re-coloured in `.primaryText`, surfacing which part was hit.
+        open var searchQuery: String?
+
         open lazy var searchEmptyStateView = EmptyStateStackView()
             .withoutAutoresizingMask
 
@@ -208,6 +212,8 @@ extension GlobalSearchResultsViewController.LinksPageViewController: UITableView
         }
         guard indexPath.row < searchItems.count else { return cell }
         let item = searchItems[indexPath.row]
+        // Set searchQuery before data/metadata so their `didSet` highlight passes pick it up.
+        cell.searchQuery = searchQuery
         cell.data = item.layout
 
         if item.layout.attachment.imageDecodedMetadata?.hideLinkDetails != true,

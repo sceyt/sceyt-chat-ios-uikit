@@ -322,6 +322,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         allFilesViewModel.search(query: query, filterUser: filterUser)
         allLinksViewModel.search(query: query, filterUser: filterUser)
         mediaPage.searchQuery = query
+        linksPage.searchQuery = query
         if mediaPage.isViewLoaded { mediaPage.reloadSearchTable() }
         if linksPage.isViewLoaded { linksPage.reloadSearchTable() }
         searchUserBarView.viewModel.search(query: query)

@@ -35,10 +35,20 @@ open class GlobalSearchLinkCell: TableViewCell {
     open lazy var separatorView = UIView()
         .withoutAutoresizingMask
 
+    /// The active search query forwarded from the page VC. Substring matches in any of
+    /// the cell's text labels (title/URL/summary) are re-coloured to `.primaryText` so
+    /// the user can see *which part* of the link the search hit.
+    open var searchQuery: String?
+
     open var data: MessageLayoutModel.AttachmentLayout? {
         didSet {
             guard let data else { return }
-            linkLabel.text = data.attachment.url
+            applyHighlightedText(
+                linkLabel,
+                plain: data.attachment.url,
+                baseColor: appearance.linkLabelAppearance.foregroundColor,
+                baseFont: appearance.linkLabelAppearance.font
+            )
             titleLabel.text = nil
             detailLabel.text = nil
             titleLabel.isHidden = true
@@ -57,10 +67,20 @@ open class GlobalSearchLinkCell: TableViewCell {
                 detailLabel.isHidden = true
                 iconView.image = appearance.linkPreviewAppearance.placeholderIcon
             } else {
-                titleLabel.text = metadata.title
-                titleLabel.isHidden = (titleLabel.text ?? "").isEmpty
-                detailLabel.text = metadata.summary
-                detailLabel.isHidden = (detailLabel.text ?? "").isEmpty
+                applyHighlightedText(
+                    titleLabel,
+                    plain: metadata.title,
+                    baseColor: appearance.linkPreviewAppearance.titleLabelAppearance.foregroundColor,
+                    baseFont: appearance.linkPreviewAppearance.titleLabelAppearance.font
+                )
+                titleLabel.isHidden = (metadata.title ?? "").isEmpty
+                applyHighlightedText(
+                    detailLabel,
+                    plain: metadata.summary,
+                    baseColor: appearance.linkPreviewAppearance.descriptionLabelAppearance.foregroundColor,
+                    baseFont: appearance.linkPreviewAppearance.descriptionLabelAppearance.font
+                )
+                detailLabel.isHidden = (metadata.summary ?? "").isEmpty
                 if let image = metadata.image {
                     iconView.image = image
                 } else {
@@ -68,6 +88,44 @@ open class GlobalSearchLinkCell: TableViewCell {
                 }
             }
         }
+    }
+
+    /// Renders `plain` into `label` and re-colours any `searchQuery` substring matches
+    /// with `.primaryText`, mirroring the case-insensitive `CONTAINS[cd]` predicate the
+    /// links view-model uses so the on-screen highlight aligns with what was matched.
+    private func applyHighlightedText(
+        _ label: UILabel,
+        plain: String?,
+        baseColor: UIColor,
+        baseFont: UIFont
+    ) {
+        guard let plain, !plain.isEmpty else {
+            label.attributedText = nil
+            label.text = nil
+            return
+        }
+        let baseAttrs: [NSAttributedString.Key: Any] = [
+            .font: baseFont,
+            .foregroundColor: baseColor
+        ]
+        let trimmed = searchQuery?.trimmingCharacters(in: .whitespaces) ?? ""
+        guard !trimmed.isEmpty else {
+            label.attributedText = NSAttributedString(string: plain, attributes: baseAttrs)
+            return
+        }
+        let result = NSMutableAttributedString(string: plain, attributes: baseAttrs)
+        let fullRange = NSRange(location: 0, length: (plain as NSString).length)
+        let tokens = trimmed
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+        for token in tokens {
+            let escaped = NSRegularExpression.escapedPattern(for: token)
+            guard let regex = try? NSRegularExpression(pattern: "(?i)\(escaped)") else { continue }
+            for match in regex.matches(in: plain, range: fullRange) {
+                result.addAttribute(.foregroundColor, value: UIColor.primaryText, range: match.range)
+            }
+        }
+        label.attributedText = result
     }
 
     // MARK: - Setup
@@ -118,12 +176,16 @@ open class GlobalSearchLinkCell: TableViewCell {
 
     override open func prepareForReuse() {
         super.prepareForReuse()
+        titleLabel.attributedText = nil
+        linkLabel.attributedText = nil
+        detailLabel.attributedText = nil
         titleLabel.text = nil
         linkLabel.text = nil
         detailLabel.text = nil
         iconView.image = appearance.linkPreviewAppearance.placeholderIcon
         titleLabel.isHidden = true
         detailLabel.isHidden = true
+        searchQuery = nil
         metadata = nil
         data = nil
     }
