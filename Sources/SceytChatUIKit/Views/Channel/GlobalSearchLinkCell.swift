@@ -47,7 +47,8 @@ open class GlobalSearchLinkCell: TableViewCell {
                 linkLabel,
                 plain: data.attachment.url,
                 baseColor: appearance.linkLabelAppearance.foregroundColor,
-                baseFont: appearance.linkLabelAppearance.font
+                baseFont: appearance.linkLabelAppearance.font,
+                dimOnMatch: false
             )
             titleLabel.text = nil
             detailLabel.text = nil
@@ -90,40 +91,58 @@ open class GlobalSearchLinkCell: TableViewCell {
         }
     }
 
-    /// Renders `plain` into `label` and re-colours any `searchQuery` substring matches
-    /// with `.primaryText`, mirroring the case-insensitive `CONTAINS[cd]` predicate the
-    /// links view-model uses so the on-screen highlight aligns with what was matched.
+    /// Renders `plain` into `label` with context-aware colouring:
+    /// - No query → entire text in `baseColor`.
+    /// - Query active, no match → entire text stays in `baseColor` (unchanged).
+    /// - Query active, match found → matched ranges re-coloured to `.primaryText`;
+    ///   when `dimOnMatch` is `true` non-matched chars are dimmed to `.secondaryText`,
+    ///   otherwise they keep `baseColor`.
     private func applyHighlightedText(
         _ label: UILabel,
         plain: String?,
         baseColor: UIColor,
-        baseFont: UIFont
+        baseFont: UIFont,
+        dimOnMatch: Bool = true
     ) {
         guard let plain, !plain.isEmpty else {
             label.attributedText = nil
             label.text = nil
             return
         }
-        let baseAttrs: [NSAttributedString.Key: Any] = [
-            .font: baseFont,
-            .foregroundColor: baseColor
-        ]
         let trimmed = searchQuery?.trimmingCharacters(in: .whitespaces) ?? ""
         guard !trimmed.isEmpty else {
-            label.attributedText = NSAttributedString(string: plain, attributes: baseAttrs)
+            label.attributedText = NSAttributedString(
+                string: plain,
+                attributes: [.font: baseFont, .foregroundColor: baseColor]
+            )
             return
         }
-        let result = NSMutableAttributedString(string: plain, attributes: baseAttrs)
+
+        let tokens = trimmed.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
         let fullRange = NSRange(location: 0, length: (plain as NSString).length)
-        let tokens = trimmed
-            .components(separatedBy: .whitespaces)
-            .filter { !$0.isEmpty }
+        var matchRanges: [NSRange] = []
         for token in tokens {
             let escaped = NSRegularExpression.escapedPattern(for: token)
             guard let regex = try? NSRegularExpression(pattern: "(?i)\(escaped)") else { continue }
-            for match in regex.matches(in: plain, range: fullRange) {
-                result.addAttribute(.foregroundColor, value: UIColor.primaryText, range: match.range)
-            }
+            matchRanges += regex.matches(in: plain, range: fullRange).map(\.range)
+        }
+
+        // No match — keep base colour, no dimming.
+        guard !matchRanges.isEmpty else {
+            label.attributedText = NSAttributedString(
+                string: plain,
+                attributes: [.font: baseFont, .foregroundColor: baseColor]
+            )
+            return
+        }
+
+        // Match found: optionally dim whole text to secondary, then re-highlight matched ranges.
+        let result = NSMutableAttributedString(
+            string: plain,
+            attributes: [.font: baseFont, .foregroundColor: dimOnMatch ? UIColor.secondaryText : baseColor]
+        )
+        for range in matchRanges {
+            result.addAttribute(.foregroundColor, value: UIColor.primaryText, range: range)
         }
         label.attributedText = result
     }
