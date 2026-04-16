@@ -92,6 +92,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         predicates.append(NSPredicate(format: "message.unlisted == false"))
         // Drop attachments whose parent message has been soft-deleted remotely.
         predicates.append(NSPredicate(format: "message.state != %d", MessageState.deleted.rawValue))
+        predicates.append(buildRoleQualifiedChannelPredicate())
         return predicates.count == 1
             ? predicates[0]
             : NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
@@ -113,6 +114,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         predicates.append(NSPredicate(format: "message.unlisted == false"))
         // Drop attachments whose parent message has been soft-deleted remotely.
         predicates.append(NSPredicate(format: "message.state != %d", MessageState.deleted.rawValue))
+        predicates.append(buildRoleQualifiedChannelPredicate())
 
         if let userId = filterUser?.id {
             predicates.append(NSPredicate(format: "userId == %@", userId))
@@ -230,7 +232,17 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     /// skip that snapshot so we don't restart the observers on first fetch.
     private var didReceiveInitialDeletionSnapshot = false
 
+    /// Tracks channels currently visible to the user (`userRole != nil`).
+    private var roleQualifiedChannelIds = Set<ChannelId>()
+    private var didLoadRoleQualifiedChannelIds = false
+    private var channelRoleObserver: DatabaseObserver<ChannelDTO, ChannelId>?
+
+    /// Initial role observer callback replays existing channels. We pre-load
+    /// `roleQualifiedChannelIds` before starting the observer, so skip that snapshot.
+    private var didReceiveInitialChannelRoleSnapshot = false
+
     open func startDatabaseObserver() {
+        _ = refreshRoleQualifiedChannelIds()
         allAttachmentsObserver.onDidChange = { [weak self] _, paths, _ in
             guard let self, !self.isFiltered else { return }
             self.isLoadingNext = false
@@ -252,6 +264,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
             logger.errorIfNotNil(error, "GlobalSearchAllMediaViewModel searchObserver.startObserver")
         }
         startDeletedMessageObserver()
+        startChannelRoleObserver()
     }
 
     /// Starts a lightweight observer on MessageDTOs with `state == deleted`. When a
@@ -293,6 +306,87 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         } catch {
             logger.errorIfNotNil(error, "GlobalSearchAllMediaViewModel deletedMessageObserver.startObserver")
         }
+    }
+
+    /// Starts an observer on channels and reloads attachment observers when
+    /// `userRole` visibility changes.
+    private func startChannelRoleObserver() {
+        guard channelRoleObserver == nil else { return }
+        let request = ChannelDTO.fetchRequest()
+            .sort(descriptors: [.init(keyPath: \ChannelDTO.id, ascending: false)])
+            .fetch(predicate: NSPredicate(value: true))
+            .relationshipKeyPathsFor(refreshing: [#keyPath(ChannelDTO.userRole)])
+        let observer = DatabaseObserver<ChannelDTO, ChannelId>(
+            request: request,
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
+            itemCreator: { ChannelId($0.id) }
+        )
+        observer.onDidChange = { [weak self] _ in
+            guard let self else { return }
+            guard didReceiveInitialChannelRoleSnapshot else {
+                didReceiveInitialChannelRoleSnapshot = true
+                return
+            }
+            guard refreshRoleQualifiedChannelIds() else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.restartAttachmentObserversForRoleChange()
+            }
+        }
+        channelRoleObserver = observer
+        do {
+            try observer.startObserver()
+        } catch {
+            logger.errorIfNotNil(error, "GlobalSearchAllMediaViewModel channelRoleObserver.startObserver")
+        }
+    }
+
+    private func restartAttachmentObserversForRoleChange() {
+        if searchObserver.isObserverStarted {
+            searchObserver.restartObserver(fetchPredicate: buildPredicate())
+        }
+        if allAttachmentsObserver.isObserverStarted {
+            allAttachmentsObserver.restartObserver(fetchPredicate: buildBasePredicate())
+        }
+    }
+
+    open func loadRoleQualifiedChannelIds() -> Set<ChannelId> {
+        let context = SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext
+        var channelIds = Set<ChannelId>()
+        context.performAndWait {
+            let request = ChannelDTO.fetchRequest()
+                .sort(descriptors: [.init(keyPath: \ChannelDTO.id, ascending: false)])
+                .fetch(predicate: NSPredicate(format: "userRole != nil"))
+            let channels = ChannelDTO.fetch(request: request, context: context)
+            channelIds = Set(channels.map { ChannelId($0.id) })
+        }
+        return channelIds
+    }
+
+    @discardableResult
+    private func refreshRoleQualifiedChannelIds() -> Bool {
+        let newValue = loadRoleQualifiedChannelIds()
+        let didChange = newValue != roleQualifiedChannelIds
+        roleQualifiedChannelIds = newValue
+        didLoadRoleQualifiedChannelIds = true
+        return didChange
+    }
+
+    private func effectiveRoleQualifiedChannelIds() -> Set<ChannelId> {
+        guard didLoadRoleQualifiedChannelIds else {
+            let loaded = loadRoleQualifiedChannelIds()
+            roleQualifiedChannelIds = loaded
+            didLoadRoleQualifiedChannelIds = true
+            return loaded
+        }
+        return roleQualifiedChannelIds
+    }
+
+    private func buildRoleQualifiedChannelPredicate() -> NSPredicate {
+        let channelIds = Array(effectiveRoleQualifiedChannelIds())
+        guard !channelIds.isEmpty else {
+            return NSPredicate(value: false)
+        }
+        return NSPredicate(format: "channelId IN %@", channelIds)
     }
 
     /// Checks each observer's currently-cached rows for attachments whose owner message
@@ -454,3 +548,4 @@ extension GlobalSearchAllMediaViewModel: ChannelAttachmentListViewModelProviding
         $event.eraseToAnyPublisher()
     }
 }
+

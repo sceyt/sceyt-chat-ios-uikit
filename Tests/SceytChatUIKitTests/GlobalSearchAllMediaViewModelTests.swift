@@ -6,6 +6,7 @@
 @testable import SceytChatUIKit
 import XCTest
 import Combine
+import SceytChat
 
 // MARK: - Testable subclass
 
@@ -18,6 +19,7 @@ final class TestableGlobalSearchAllMediaViewModel: GlobalSearchAllMediaViewModel
     // MARK: Injected data
 
     private var injectedSections: [[MessageLayoutModel.AttachmentLayout]] = []
+    var injectedRoleQualifiedChannelIds: Set<ChannelId> = [101]
 
     func inject(sections: [[MessageLayoutModel.AttachmentLayout]]) {
         injectedSections = sections
@@ -28,6 +30,10 @@ final class TestableGlobalSearchAllMediaViewModel: GlobalSearchAllMediaViewModel
     override func startDatabaseObserver() {}
 
     override func loadAttachments() {}
+
+    override func loadRoleQualifiedChannelIds() -> Set<ChannelId> {
+        injectedRoleQualifiedChannelIds
+    }
 
     /// Stores properties without touching the database observer.
     override func search(query: String?, filterUser: ChatUser?) {
@@ -284,6 +290,23 @@ final class GlobalSearchAllMediaViewModelTests: XCTestCase {
 
     // MARK: - buildPredicate()
 
+    func testBuildBasePredicateIncludesRoleQualifiedChannelConstraint() {
+        let predicate = viewModel.buildBasePredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("channelId IN"),
+            "Base media predicate should be scoped to channels with non-nil userRole"
+        )
+    }
+
+    func testBuildBasePredicateWithNoRoleQualifiedChannelsContainsFalsePredicate() {
+        viewModel.injectedRoleQualifiedChannelIds = []
+        let predicate = viewModel.buildBasePredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("FALSEPREDICATE"),
+            "When no channels have userRole, media predicate should evaluate to false"
+        )
+    }
+
     func testBuildPredicateNoFilters() {
         // No filterUser, no query → predicate should only contain type + viewOnce clauses
         let predicate = viewModel.buildPredicate()
@@ -291,6 +314,14 @@ final class GlobalSearchAllMediaViewModelTests: XCTestCase {
         let format = predicate.predicateFormat
         XCTAssertFalse(format.contains("userId"))
         XCTAssertFalse(format.contains("body"))
+    }
+
+    func testBuildPredicateIncludesRoleQualifiedChannelConstraint() {
+        let predicate = viewModel.buildPredicate()
+        XCTAssertTrue(
+            predicate.predicateFormat.contains("channelId IN"),
+            "Search media predicate should be scoped to channels with non-nil userRole"
+        )
     }
 
     func testBuildPredicateWithUserFilter() {
