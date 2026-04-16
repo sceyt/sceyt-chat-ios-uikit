@@ -337,6 +337,7 @@
 "previewer.sharePhoto" = "Share Photo";
 "previewer.saveVideo" = "Save Video";
 "previewer.shareVideo" = "Share Video";
+"previewer.showInChat" = "Show in Chat";
 "previewer.videoSaved" = "Your video was successfully saved";
 "previewer.photoSaved" = "Your photo was successfully saved";
 

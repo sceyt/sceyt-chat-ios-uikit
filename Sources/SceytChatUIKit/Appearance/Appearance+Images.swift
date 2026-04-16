@@ -552,6 +552,10 @@ public extension Appearance {
             AssetComposer.shared.compose(from: .init(image: Assets.chatShare.image,
                                                      renderingMode: .template(.accent)))!
         }()
+        public static var chatShowInChat: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.chatShowInChat.image,
+                                                     renderingMode: .template(.accent)))!
+        }()
         public static var chatEdit: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.chatEdit.image,
                                                      renderingMode: .template(.accent)))!
@@ -795,6 +799,7 @@ extension UIImage {
     public static var chatSavePhoto: UIImage { Images.chatSavePhoto }
     public static var chatForward: UIImage { Images.chatForward }
     public static var chatShare: UIImage { Images.chatShare }
+    public static var chatShowInChat: UIImage { Images.chatShowInChat }
     public static var chatEdit: UIImage { Images.chatEdit }
     public static var chatRevoke: UIImage { Images.chatRevoke }
     

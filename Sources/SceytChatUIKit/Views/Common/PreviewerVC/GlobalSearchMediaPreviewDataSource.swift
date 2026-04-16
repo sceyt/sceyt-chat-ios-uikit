@@ -7,10 +7,11 @@
 //
 
 import UIKit
+import SceytChat
 
 /// `PreviewDataSource` for the global-search Media tab initial state.
 /// Observes all image/video attachments across every channel — no channelId filter.
-open class GlobalSearchMediaPreviewDataSource: PreviewDataSource {
+open class GlobalSearchMediaPreviewDataSource: PreviewDataSource, PreviewShareActionProviding {
 
     public let attachmentTypes: [String]
     private let ascending: Bool
@@ -21,6 +22,7 @@ open class GlobalSearchMediaPreviewDataSource: PreviewDataSource {
     private var observersCache = [PreviewItem: PreviewDataSourceItemObservable]()
     private var onLoading: ((Bool) -> Void)?
     private var onReload: (() -> Void)?
+    open var onShowInChat: ((ChatMessage, ChatChannel) -> Void)?
 
     open lazy var attachmentObserver: DatabaseObserver<AttachmentDTO, ChatMessage.Attachment> = {
         let predicate: NSPredicate
@@ -133,6 +135,34 @@ open class GlobalSearchMediaPreviewDataSource: PreviewDataSource {
     public func observe(_ observable: PreviewDataSourceItemObservable) {
         observersCache[observable.previewItem] = observable
         downloadAttachmentIfNeeded(observable.previewItem.attachment)
+    }
+
+    /// Override in a custom GlobalSearch preview data source to inject actions
+    /// between "Save" and "Forward" for GlobalSearch preview only.
+    open func previewShareTopActions(previewItem: PreviewItem) -> [SheetAction] {
+        guard onShowInChat != nil else { return [] }
+        return [
+            .init(
+                title: L10n.Previewer.showInChat,
+                icon: .chatShowInChat,
+                style: .default
+            ) { [weak self] in
+                self?.showInChat(previewItem: previewItem)
+            }
+        ]
+    }
+
+    open func showInChat(previewItem: PreviewItem) {
+        guard let (message, channel): (ChatMessage, ChatChannel) = try? DataProvider.database.read({ context in
+            guard let messageDTO = MessageDTO.fetch(id: previewItem.attachment.messageId, context: context),
+                  let channelDTO = ChannelDTO.fetch(id: ChannelId(messageDTO.channelId), context: context)
+            else { return nil }
+            return (messageDTO.convert(), channelDTO.convert())
+        }).get() else {
+            logger.error("[GlobalSearchMediaPreviewDataSource] showInChat failed to resolve message/channel")
+            return
+        }
+        onShowInChat?(message, channel)
     }
 
     open func downloadAttachmentIfNeeded(_ attachment: ChatMessage.Attachment) {

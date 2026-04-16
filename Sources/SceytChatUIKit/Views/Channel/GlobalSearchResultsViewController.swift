@@ -168,8 +168,12 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         addChild(pageViewController)
 
         mediaPage.configure(mediaViewModel: allMediaViewModel)
-        mediaPage.collectionView.previewer = {
-            Components.globalSearchMediaPreviewDataSource.init()
+        mediaPage.collectionView.previewer = { [weak self] in
+            let dataSource = Components.globalSearchMediaPreviewDataSource.init()
+            dataSource.onShowInChat = { [weak self] message, channel in
+                self?.showInChatFromPreview(message: message, channel: channel)
+            }
+            return dataSource
         }
         mediaPage.onSelectAttachment = { [weak self] message, channel in
             guard let channel else { return }
@@ -256,6 +260,30 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
                 setUserBarVisible(!hasSearchToken && !searchUserBarView.viewModel.users.isEmpty, animated: true)
             }
             .store(in: &subscriptions)
+    }
+
+    open func showInChatFromPreview(message: ChatMessage, channel: ChatChannel) {
+        let openInChat = { [weak self] in
+            self?.onSelectMessage?(message, channel)
+        }
+
+        guard let root = view.window?.rootViewController else {
+            openInChat()
+            return
+        }
+
+        var topPresented: UIViewController = root
+        while let presented = topPresented.presentedViewController {
+            topPresented = presented
+        }
+
+        if topPresented is MediaPreviewerNavigationController {
+            topPresented.dismiss(animated: true) {
+                openInChat()
+            }
+        } else {
+            openInChat()
+        }
     }
 
     @objc private func keyboardWillChangeFrame(_ notification: Notification) {

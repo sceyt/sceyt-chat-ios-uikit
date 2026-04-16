@@ -30,6 +30,12 @@ public protocol PreviewDataSourceItemObservable: AnyObject {
     func didUpdate(previewItem: PreviewItem)
 }
 
+/// Optional hook for data sources that need to inject context-specific
+/// actions between "Save" and "Forward" in the preview share sheet.
+public protocol PreviewShareActionProviding: AnyObject {
+    func previewShareTopActions(previewItem: PreviewItem) -> [SheetAction]
+}
+
 open class SingleItemPreviewDataSource: PreviewDataSource {
     private let item: PreviewItem
     public weak var delegate: AttachmentPreviewDataSourceDelegate?
