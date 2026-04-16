@@ -69,6 +69,15 @@ open class GlobalSearchMessagesViewModel: NSObject {
     /// Override in test subclasses to inject an in-memory database.
     open var database: Database { SceytChatUIKit.shared.database }
 
+    /// Observes messages transitioning to the `deleted` state so rows disappear from the
+    /// on-screen results without requiring the user to re-search. We only care about the
+    /// state flipping to `deleted`, so the predicate is narrow and the observer is cheap.
+    private var deletedMessageObserver: DatabaseObserver<MessageDTO, ChatMessage>?
+
+    /// The initial `onDidChange` invocation replays every historically-deleted message as
+    /// an `insert`; skip that snapshot so we don't do needless work at startup.
+    private var didReceiveInitialDeletionSnapshot = false
+
     // MARK: - Init
 
     public override required init() {
@@ -77,8 +86,52 @@ open class GlobalSearchMessagesViewModel: NSObject {
 
     // MARK: - Observer
 
-    /// No persistent observer is needed – results are fetched on demand.
-    open func startDatabaseObserver() {}
+    /// Starts observing message deletions so the search results drop rows when another
+    /// user (or the current user from a different device) deletes a message that's in view.
+    open func startDatabaseObserver() {
+        guard deletedMessageObserver == nil else { return }
+        let request = MessageDTO.fetchRequest()
+            .sort(descriptors: [.init(keyPath: \MessageDTO.id, ascending: false)])
+            .fetch(predicate: NSPredicate(format: "state == %d", MessageState.deleted.rawValue))
+        let observer = DatabaseObserver<MessageDTO, ChatMessage>(
+            request: request,
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
+            itemCreator: { $0.convert() }
+        )
+        observer.onDidChange = { [weak self] paths in
+            guard let self else { return }
+            // Ignore the initial historical snapshot – the displayed arrays are
+            // populated later via search, and those results already filter state==2.
+            guard didReceiveInitialDeletionSnapshot else {
+                didReceiveInitialDeletionSnapshot = true
+                return
+            }
+            var deletedIds = Set<MessageId>()
+            for ip in paths.inserts {
+                if let m: ChatMessage = paths.item(at: ip) { deletedIds.insert(m.id) }
+            }
+            for ip in paths.updates {
+                if let m: ChatMessage = paths.item(at: ip) { deletedIds.insert(m.id) }
+            }
+            guard !deletedIds.isEmpty else { return }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let beforeChat = chatMessages.count
+                let beforeChannel = channelMessages.count
+                chatMessages = chatMessages.filter { !deletedIds.contains($0.id) }
+                channelMessages = channelMessages.filter { !deletedIds.contains($0.id) }
+                if chatMessages.count != beforeChat || channelMessages.count != beforeChannel {
+                    event = .reload
+                }
+            }
+        }
+        deletedMessageObserver = observer
+        do {
+            try observer.startObserver()
+        } catch {
+            logger.errorIfNotNil(error, "GlobalSearchMessagesViewModel deletedMessageObserver.startObserver")
+        }
+    }
 
     // MARK: - Search
 
