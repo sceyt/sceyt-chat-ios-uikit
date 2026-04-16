@@ -90,6 +90,8 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             ))
             predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
         }
+        // Drop attachments whose parent message has been soft-deleted remotely.
+        predicates.append(NSPredicate(format: "message.state != %d", MessageState.deleted.rawValue))
         return predicates.count == 1
             ? predicates[0]
             : NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
@@ -107,6 +109,8 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             ))
             predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
         }
+        // Drop attachments whose parent message has been soft-deleted remotely.
+        predicates.append(NSPredicate(format: "message.state != %d", MessageState.deleted.rawValue))
         if let userId = filterUser?.id {
             predicates.append(NSPredicate(format: "userId == %@", userId))
         }
@@ -133,7 +137,8 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             ],
             sectionNameKeyPath: sectionNameKeyPath,
             fetchPredicate: predicate,
-            relationshipKeyPathsObserver: []
+            // Watch message.state so FRC re-evaluates when a parent message is soft-deleted.
+            relationshipKeyPathsObserver: [#keyPath(AttachmentDTO.message.state)]
         ) { [weak self] dto in
             let attachment = dto.convert()
             if let prevItem = self?.allLinksObserver.item(for: dto.objectID) {
@@ -170,7 +175,8 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             ],
             sectionNameKeyPath: sectionNameKeyPath,
             fetchPredicate: predicate,
-            relationshipKeyPathsObserver: []
+            // Watch message.state so FRC re-evaluates when a parent message is soft-deleted.
+            relationshipKeyPathsObserver: [#keyPath(AttachmentDTO.message.state)]
         ) { [weak self] dto in
             let attachment = dto.convert()
             if let prevItem = self?.searchObserver.item(for: dto.objectID) {
@@ -193,6 +199,15 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             )
         }
     }()
+
+    /// Watches messages transitioning into `.deleted` so on-screen link cells drop
+    /// immediately when the parent message is removed remotely. Mirrors the pattern used
+    /// by GlobalSearchMessagesViewModel / GlobalSearchAllMediaViewModel.
+    private var deletedMessageObserver: DatabaseObserver<MessageDTO, ChatMessage>?
+
+    /// Initial `onDidChange` replays every historically-deleted message as an insert;
+    /// skip that snapshot so we don't restart the observers on first fetch.
+    private var didReceiveInitialDeletionSnapshot = false
 
     open func startDatabaseObserver() {
         allLinksObserver.onDidChange = { [weak self] _, paths, _ in
@@ -217,10 +232,76 @@ open class GlobalSearchAllLinksViewModel: NSObject {
         } catch {
             logger.errorIfNotNil(error, "GlobalSearchAllLinksViewModel searchObserver.startObserver")
         }
+        startDeletedMessageObserver()
     }
 
     open func onDidChangeEvent(items: ChangeItemPaths) {
         event = .change(items)
+    }
+
+    /// Starts a lightweight observer on MessageDTOs with `state == deleted`. When a
+    /// message transitions into the deleted state and any of our visible rows references
+    /// it, we restart the affected attachment observer so the predicate re-runs and the
+    /// stale row drops out.
+    private func startDeletedMessageObserver() {
+        guard deletedMessageObserver == nil else { return }
+        let request = MessageDTO.fetchRequest()
+            .sort(descriptors: [.init(keyPath: \MessageDTO.id, ascending: false)])
+            .fetch(predicate: NSPredicate(format: "state == %d", MessageState.deleted.rawValue))
+        let observer = DatabaseObserver<MessageDTO, ChatMessage>(
+            request: request,
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
+            itemCreator: { $0.convert() }
+        )
+        observer.onDidChange = { [weak self] paths in
+            guard let self else { return }
+            guard didReceiveInitialDeletionSnapshot else {
+                didReceiveInitialDeletionSnapshot = true
+                return
+            }
+            var deletedIds = Set<MessageId>()
+            for ip in paths.inserts {
+                if let m: ChatMessage = paths.item(at: ip) { deletedIds.insert(m.id) }
+            }
+            for ip in paths.updates {
+                if let m: ChatMessage = paths.item(at: ip) { deletedIds.insert(m.id) }
+            }
+            guard !deletedIds.isEmpty else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.restartObserversIfNeeded(forDeletedMessageIds: deletedIds)
+            }
+        }
+        deletedMessageObserver = observer
+        do {
+            try observer.startObserver()
+        } catch {
+            logger.errorIfNotNil(error, "GlobalSearchAllLinksViewModel deletedMessageObserver.startObserver")
+        }
+    }
+
+    private func restartObserversIfNeeded(forDeletedMessageIds deletedIds: Set<MessageId>) {
+        if observerContainsDeletedMessage(observer: searchObserver, deletedIds: deletedIds) {
+            searchObserver.restartObserver(fetchPredicate: buildPredicate())
+        }
+        if observerContainsDeletedMessage(observer: allLinksObserver, deletedIds: deletedIds) {
+            allLinksObserver.restartObserver(fetchPredicate: buildBasePredicate())
+        }
+    }
+
+    private func observerContainsDeletedMessage(
+        observer: LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>,
+        deletedIds: Set<MessageId>
+    ) -> Bool {
+        for section in 0..<observer.numberOfSections {
+            for row in 0..<observer.numberOfItems(in: section) {
+                if let layout = observer.item(at: IndexPath(row: row, section: section)),
+                   let msgId = layout.ownerMessage?.id,
+                   deletedIds.contains(msgId) {
+                    return true
+                }
+            }
+        }
+        return false
     }
 
     /// Filters search results by sender and/or message body text.

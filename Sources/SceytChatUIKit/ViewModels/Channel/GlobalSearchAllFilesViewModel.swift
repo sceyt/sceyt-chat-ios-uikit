@@ -83,6 +83,8 @@ open class GlobalSearchAllFilesViewModel: NSObject {
             ))
             predicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
         }
+        // Drop attachments whose parent message has been soft-deleted remotely.
+        predicates.append(NSPredicate(format: "message.state != %d", MessageState.deleted.rawValue))
 
         if let userId = filterUser?.id {
             predicates.append(NSPredicate(format: "userId == %@", userId))
@@ -109,7 +111,8 @@ open class GlobalSearchAllFilesViewModel: NSObject {
             ],
             sectionNameKeyPath: sectionNameKeyPath,
             fetchPredicate: predicate,
-            relationshipKeyPathsObserver: []
+            // Watch message.state so FRC re-evaluates when a parent message is soft-deleted.
+            relationshipKeyPathsObserver: [#keyPath(AttachmentDTO.message.state)]
         ) { [weak self] dto in
             let attachment = dto.convert()
             if let prevItem = self?.attachmentObserver.item(for: dto.objectID) {
@@ -133,6 +136,15 @@ open class GlobalSearchAllFilesViewModel: NSObject {
         }
     }()
 
+    /// Watches messages transitioning into `.deleted` so on-screen file cells drop
+    /// immediately when the parent message is removed remotely. Mirrors the pattern used
+    /// by GlobalSearchMessagesViewModel / GlobalSearchAllMediaViewModel.
+    private var deletedMessageObserver: DatabaseObserver<MessageDTO, ChatMessage>?
+
+    /// Initial `onDidChange` replays every historically-deleted message as an insert;
+    /// skip that snapshot so we don't restart the observer on first fetch.
+    private var didReceiveInitialDeletionSnapshot = false
+
     open func startDatabaseObserver() {
         attachmentObserver.onDidChange = { [weak self] _, paths, _ in
             self?.onDidChangeEvent(items: paths)
@@ -141,6 +153,60 @@ open class GlobalSearchAllFilesViewModel: NSObject {
             try attachmentObserver.startObserver(fetchLimit: 20)
         } catch {
             logger.errorIfNotNil(error, "GlobalSearchAllFilesViewModel observer.startObserver")
+        }
+        startDeletedMessageObserver()
+    }
+
+    /// Starts a lightweight observer on MessageDTOs with `state == deleted`. When a
+    /// message transitions into the deleted state and any of our visible rows references
+    /// it, we restart the attachment observer so the predicate re-runs and the stale row
+    /// drops out.
+    private func startDeletedMessageObserver() {
+        guard deletedMessageObserver == nil else { return }
+        let request = MessageDTO.fetchRequest()
+            .sort(descriptors: [.init(keyPath: \MessageDTO.id, ascending: false)])
+            .fetch(predicate: NSPredicate(format: "state == %d", MessageState.deleted.rawValue))
+        let observer = DatabaseObserver<MessageDTO, ChatMessage>(
+            request: request,
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
+            itemCreator: { $0.convert() }
+        )
+        observer.onDidChange = { [weak self] paths in
+            guard let self else { return }
+            guard didReceiveInitialDeletionSnapshot else {
+                didReceiveInitialDeletionSnapshot = true
+                return
+            }
+            var deletedIds = Set<MessageId>()
+            for ip in paths.inserts {
+                if let m: ChatMessage = paths.item(at: ip) { deletedIds.insert(m.id) }
+            }
+            for ip in paths.updates {
+                if let m: ChatMessage = paths.item(at: ip) { deletedIds.insert(m.id) }
+            }
+            guard !deletedIds.isEmpty else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.restartObserverIfNeeded(forDeletedMessageIds: deletedIds)
+            }
+        }
+        deletedMessageObserver = observer
+        do {
+            try observer.startObserver()
+        } catch {
+            logger.errorIfNotNil(error, "GlobalSearchAllFilesViewModel deletedMessageObserver.startObserver")
+        }
+    }
+
+    private func restartObserverIfNeeded(forDeletedMessageIds deletedIds: Set<MessageId>) {
+        for section in 0..<attachmentObserver.numberOfSections {
+            for row in 0..<attachmentObserver.numberOfItems(in: section) {
+                if let layout = attachmentObserver.item(at: IndexPath(row: row, section: section)),
+                   let msgId = layout.ownerMessage?.id,
+                   deletedIds.contains(msgId) {
+                    attachmentObserver.restartObserver(fetchPredicate: buildPredicate())
+                    return
+                }
+            }
         }
     }
 
