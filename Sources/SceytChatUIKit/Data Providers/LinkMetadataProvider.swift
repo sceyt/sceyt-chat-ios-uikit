@@ -69,6 +69,70 @@ open class LinkMetadataProvider: DataProvider {
         fetchCache.contains(url)
     }
 
+    /// Resolves metadata for many URLs in a single Core Data round-trip — never hits the network.
+    /// In-memory cache hits are returned synchronously; the rest is fetched once on a bg context.
+    /// Completion is delivered on the main queue with a `[URL: LinkMetadata]` map of resolved URLs only
+    /// (URLs absent from the map were not found in cache or DB).
+    open func fetchManyFromCacheOrDB(
+        urls: [URL],
+        downloadImage: Bool = true,
+        downloadIcon: Bool = true,
+        completion: @escaping ([URL: LinkMetadata]) -> Void
+    ) {
+        var resolved: [URL: LinkMetadata] = [:]
+        var missing: [URL] = []
+        // 1. In-memory cache pass
+        for url in urls {
+            if let metadata = cache.object(forKey: url.absoluteString as NSString) {
+                resolved[url] = metadata
+            } else {
+                missing.append(url)
+            }
+        }
+
+        guard !missing.isEmpty else {
+            completion(resolved)
+            return
+        }
+
+        // 2. One DB query for everything still missing
+        database.performBgTask { context in
+            LinkMetadataDTO.fetch(urls: missing, context: context).map { $0.convert() }
+        } completion: { [weak self] result in
+            guard let self else { completion(resolved); return }
+            guard case .success(let metadatas) = result else {
+                completion(resolved)
+                return
+            }
+
+            guard !metadatas.isEmpty else {
+                completion(resolved)
+                return
+            }
+
+            // 3. Hydrate images (disk + optional remote download) in parallel, then cache + return.
+            let group = DispatchGroup()
+            for metadata in metadatas {
+                metadata.loadImages()
+                group.enter()
+                self.downloadImagesIfNeeded(
+                    linkMetadata: metadata,
+                    downloadImage: downloadImage,
+                    downloadIcon: downloadIcon
+                ) {
+                    self.cache.setObject(metadata, forKey: metadata.url.absoluteString as NSString)
+                    group.leave()
+                }
+            }
+            group.notify(queue: .main) {
+                for metadata in metadatas {
+                    resolved[metadata.url] = metadata
+                }
+                completion(resolved)
+            }
+        }
+    }
+
     /// Resolves metadata from in-memory cache or the local DB only — never makes a network request.
     /// Calls `completion` with the metadata, or `nil` if not found in either store.
     open func fetchFromCacheOrDB(

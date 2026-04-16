@@ -34,7 +34,9 @@ extension GlobalSearchResultsViewController {
         private var _linkViewModel: (any ChannelAttachmentListViewModelProviding)?
         private var searchItems: [(indexPath: IndexPath, layout: MessageLayoutModel.AttachmentLayout)] = []
         private var cancellables = Set<AnyCancellable>()
-        private var heightUpdateWork: DispatchWorkItem?
+        /// URLs we've already issued a batch DB lookup for (success or miss). Prevents
+        /// re-querying the same URLs on every paginated `reloadSearchTable`.
+        private var requestedMetadataURLs = Set<URL>()
 
         override open func setup() {
             super.setup()
@@ -61,17 +63,19 @@ extension GlobalSearchResultsViewController {
 
         override open func setupDone() {
             super.setupDone()
-            RunLoop.main.perform { [weak self] in
-                self?._linkViewModel?.startDatabaseObserver()
-            }
-            _linkViewModel?.loadAttachments()
             _linkViewModel?.eventPublisher
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in
-                    print("called reloadSearchTable()")
                     self?.reloadSearchTable()
                 }
                 .store(in: &cancellables)
+            // Start the observer first so `loadAttachments()` actually has somewhere to
+            // dispatch into; otherwise the very first `loadNext()` runs against an
+            // un-started observer and is wasted, delaying initial content.
+            RunLoop.main.perform { [weak self] in
+                self?._linkViewModel?.startDatabaseObserver()
+                self?._linkViewModel?.loadAttachments()
+            }
             reloadSearchTable()
         }
 
@@ -79,28 +83,6 @@ extension GlobalSearchResultsViewController {
 
         open func configure(linkViewModel: any ChannelAttachmentListViewModelProviding) {
             _linkViewModel = linkViewModel
-        }
-
-        func prefetchLinkMetadata() {
-            guard let vm = _linkViewModel else { return }
-            for item in searchItems where item.layout.linkMetadata == nil {
-                guard item.layout.attachment.imageDecodedMetadata?.hideLinkDetails != true else { continue }
-                _ = vm.attachmentLayout(at: item.indexPath, onLoadLinkMetadata: { [weak self] metadata in
-                    item.layout.linkMetadata = metadata
-                    self?.setNeedsHeightUpdate()
-                })
-            }
-        }
-
-        func setNeedsHeightUpdate() {
-            print("setNeedsHeightUpdate() called")
-            heightUpdateWork?.cancel()
-            let work = DispatchWorkItem { [weak self] in
-                self?.searchTableView.beginUpdates()
-                self?.searchTableView.endUpdates()
-            }
-            heightUpdateWork = work
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
         }
 
         open func reloadSearchTable() {
@@ -117,7 +99,11 @@ extension GlobalSearchResultsViewController {
                 }
             }
             searchItems = items
-            prefetchLinkMetadata()
+
+            // Sync pass: pull anything already in the in-memory cache so the first
+            // `cellForRowAt` paints title/summary/icon immediately — no async race.
+            resolveCachedLinkMetadata()
+
             searchTableView.reloadData()
 
             let isEmpty = searchItems.isEmpty
@@ -129,6 +115,77 @@ extension GlobalSearchResultsViewController {
                 searchEmptyStateView.isHidden = true
                 emptyStateView.isHidden = !isEmpty
                 searchTableView.isHidden = isEmpty
+            }
+
+            // Async pass: one batched DB lookup for the URLs still missing metadata.
+            loadMissingLinkMetadata()
+        }
+
+        /// Pulls metadata that's already in `LinkMetadataProvider`'s in-memory cache and
+        /// assigns it to layouts before the table reloads — no DB hop, no flicker.
+        private func resolveCachedLinkMetadata() {
+            for item in searchItems where item.layout.linkMetadata == nil {
+                let attachment = item.layout.attachment
+                guard attachment.imageDecodedMetadata?.hideLinkDetails != true,
+                      let urlStr = attachment.url,
+                      let url = URL(string: urlStr)?.normalizedURL,
+                      let metadata = LinkMetadataProvider.default.metadata(for: url)
+                else { continue }
+                item.layout.linkMetadata = metadata
+            }
+        }
+
+        /// Issues a single batched DB query for any visible link whose metadata isn't yet
+        /// in the layout, then surgically updates only the still-visible cells. Avoids the
+        /// N+1 fetch pattern and the full `reloadData()` shuffle that breaks scrolling.
+        private func loadMissingLinkMetadata() {
+            var urlsToFetch = [URL]()
+            var seen = Set<URL>()
+            for item in searchItems where item.layout.linkMetadata == nil {
+                let attachment = item.layout.attachment
+                guard attachment.imageDecodedMetadata?.hideLinkDetails != true,
+                      let urlStr = attachment.url,
+                      let url = URL(string: urlStr)?.normalizedURL,
+                      !requestedMetadataURLs.contains(url),
+                      seen.insert(url).inserted
+                else { continue }
+                urlsToFetch.append(url)
+            }
+            guard !urlsToFetch.isEmpty else { return }
+
+            requestedMetadataURLs.formUnion(urlsToFetch)
+            LinkMetadataProvider.default.fetchManyFromCacheOrDB(urls: urlsToFetch) { [weak self] resolved in
+                guard let self, !resolved.isEmpty else { return }
+                self.applyLinkMetadata(resolved)
+            }
+        }
+
+        /// Assigns resolved metadata back to its layout and live-updates only the
+        /// cells currently on screen, then asks the table to recompute their heights.
+        private func applyLinkMetadata(_ resolved: [URL: LinkMetadata]) {
+            var didTouchVisibleCell = false
+            let visibleIndexPaths = Set(searchTableView.indexPathsForVisibleRows ?? [])
+            for (i, item) in searchItems.enumerated() {
+                guard item.layout.linkMetadata == nil,
+                      let urlStr = item.layout.attachment.url,
+                      let url = URL(string: urlStr)?.normalizedURL,
+                      let metadata = resolved[url]
+                else { continue }
+                item.layout.linkMetadata = metadata
+                let cellIP = IndexPath(row: i, section: 0)
+                if visibleIndexPaths.contains(cellIP),
+                   let cell = searchTableView.cellForRow(at: cellIP) as? GlobalSearchLinkCell {
+                    cell.metadata = metadata
+                    didTouchVisibleCell = true
+                }
+            }
+            if didTouchVisibleCell {
+                // No-op row updates that flush the auto-row-height layout pass for the
+                // cells we just mutated — content stays put, no animations, smooth.
+                UIView.performWithoutAnimation {
+                    searchTableView.beginUpdates()
+                    searchTableView.endUpdates()
+                }
             }
         }
     }
