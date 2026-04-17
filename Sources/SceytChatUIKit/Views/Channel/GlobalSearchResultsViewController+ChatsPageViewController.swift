@@ -46,6 +46,12 @@ extension GlobalSearchResultsViewController {
 
         private var showMessagesSection = false
 
+        /// Counts how many VM responses are still outstanding for the current search query.
+        /// Set to 2 when a new search starts; each VM response decrements it.
+        /// The empty state is suppressed while this is > 0 to avoid a flash of "no results"
+        /// before all VMs have had a chance to return data.
+        private var pendingResponseCount = 0
+
         /// Called when the user taps a message search result. Provides both the message and its channel.
         public var onSelectMessage: ((ChatMessage, ChatChannel?) -> Void)?
 
@@ -69,6 +75,7 @@ extension GlobalSearchResultsViewController {
                 .sink { [weak self] _ in
                     guard let self else { return }
                     channels = viewModel.channels
+                    if pendingResponseCount > 0 { pendingResponseCount -= 1 }
                     reloadData()
                 }
                 .store(in: &subscriptions)
@@ -79,7 +86,9 @@ extension GlobalSearchResultsViewController {
                 .compactMap { $0 }
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in
-                    self?.reloadData()
+                    guard let self else { return }
+                    if pendingResponseCount > 0 { pendingResponseCount -= 1 }
+                    reloadData()
                 }
                 .store(in: &subscriptions)
         }
@@ -87,6 +96,7 @@ extension GlobalSearchResultsViewController {
         // MARK: - Search
 
         @objc open func search(query: String?) {
+            pendingResponseCount = 2
             viewModel.search(query: query)
             messagesViewModel.search(query: query)
             showMessagesSection = messagesViewModel.shouldShowMessagesSection
@@ -113,7 +123,7 @@ extension GlobalSearchResultsViewController {
             chatMessagesSnapshot = messagesViewModel.chatMessages
             tableView.reloadData()
             let hasVisibleChannels = viewModel.shouldShowChannelSection && !channels.isEmpty
-            emptyStateView.isHidden = hasVisibleChannels || !chatMessagesSnapshot.isEmpty
+            emptyStateView.isHidden = pendingResponseCount > 0 || hasVisibleChannels || !chatMessagesSnapshot.isEmpty
         }
 
         // MARK: - UITableViewDataSource
