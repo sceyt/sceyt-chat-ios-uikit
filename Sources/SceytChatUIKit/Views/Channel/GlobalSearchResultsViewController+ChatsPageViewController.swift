@@ -53,7 +53,7 @@ extension GlobalSearchResultsViewController {
 
         override open func setup() {
             super.setup()
-            tableView.register(Components.channelCell)
+            tableView.register(Components.globalSearchChatsChannelCell)
             tableView.register(Components.separatorHeaderView.self)
             tableView.register(Components.globalSearchMessageCell.self)
         }
@@ -131,7 +131,7 @@ extension GlobalSearchResultsViewController {
         override public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
             switch indexPath.section {
             case 0:
-                let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelCell)
+                let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.globalSearchChatsChannelCell)
                 cell.parentAppearance = cellAppearance
                 let channel = channels[indexPath.row]
                 cell.data = layoutModels[channel]

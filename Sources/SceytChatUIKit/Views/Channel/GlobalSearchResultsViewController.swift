@@ -262,6 +262,17 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             .store(in: &subscriptions)
     }
 
+    override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard isViewLoaded else { return }
+
+        if let appearance = appearance as? Appearance {
+            categoryTabBar.appearance = appearance.tabBarAppearance
+        } else {
+            categoryTabBar.setupAppearance()
+        }
+    }
+
     open func showInChatFromPreview(message: ChatMessage, channel: ChatChannel) {
         let openInChat = { [weak self] in
             self?.onSelectMessage?(message, channel)

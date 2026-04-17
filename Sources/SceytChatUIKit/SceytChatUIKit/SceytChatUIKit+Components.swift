@@ -161,6 +161,7 @@ extension SceytChatUIKit {
         public static var reactionsInfoHeaderCell: ReactionsInfoViewController.HeaderCell.Type = ReactionsInfoViewController.HeaderCell.self
         public static var globalSearchUserBarCell: GlobalSearchUserBarCell.Type = GlobalSearchUserBarCell.self
         public static var searchResultChannelCell: SearchResultChannelCell.Type = SearchResultChannelCell.self
+        public static var globalSearchChatsChannelCell: GlobalSearchResultsViewController.ChatsPageViewController.ChannelCell.Type = GlobalSearchResultsViewController.ChatsPageViewController.ChannelCell.self
         public static var globalSearchMessageCell: GlobalSearchMessageCell.Type = GlobalSearchMessageCell.self
         public static var globalSearchMediaCell: GlobalSearchMediaCell.Type = GlobalSearchMediaCell.self
         public static var globalSearchLinkCell: GlobalSearchLinkCell.Type = GlobalSearchLinkCell.self

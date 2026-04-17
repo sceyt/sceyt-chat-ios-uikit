@@ -81,6 +81,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         // Icons
         mutedIcon: .mute,
         pinIcon: .channelPin,
+        retentionBadgeImage: Assets.chatClock.image,
         messageDeliveryStatusIcons: MessageDeliveryStatusIcons(),
         
         // Formatters and Providers
@@ -166,6 +167,9 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         
         @Trackable<Appearance, UIImage>
         public var pinIcon: UIImage
+
+        @Trackable<Appearance, UIImage>
+        public var retentionBadgeImage: UIImage
         
         @Trackable<Appearance, MessageDeliveryStatusIcons>
         public var messageDeliveryStatusIcons: MessageDeliveryStatusIcons
@@ -242,6 +246,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             // Icons
             mutedIcon: UIImage,
             pinIcon: UIImage,
+            retentionBadgeImage: UIImage? = nil,
             messageDeliveryStatusIcons: MessageDeliveryStatusIcons,
             
             // Formatters and Providers
@@ -285,6 +290,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             // Icons
             self._mutedIcon = Trackable(value: mutedIcon)
             self._pinIcon = Trackable(value: pinIcon)
+            self._retentionBadgeImage = Trackable(value: retentionBadgeImage ?? Assets.chatClock.image)
             self._messageDeliveryStatusIcons = Trackable(value: messageDeliveryStatusIcons)
             
             // Formatters and Providers
@@ -331,6 +337,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             // Icons
             mutedIcon: UIImage? = nil,
             pinIcon: UIImage? = nil,
+            retentionBadgeImage: UIImage? = nil,
             messageDeliveryStatusIcons: MessageDeliveryStatusIcons? = nil,
             
             // Formatters and Providers
@@ -371,6 +378,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._phoneNumberLabelAppearance = Trackable(reference: reference, referencePath: \.phoneNumberLabelAppearance)
             self._mutedIcon = Trackable(reference: reference, referencePath: \.mutedIcon)
             self._pinIcon = Trackable(reference: reference, referencePath: \.pinIcon)
+            self._retentionBadgeImage = Trackable(reference: reference, referencePath: \.retentionBadgeImage)
             self._messageDeliveryStatusIcons = Trackable(reference: reference, referencePath: \.messageDeliveryStatusIcons)
             self._channelNameFormatter = Trackable(reference: reference, referencePath: \.channelNameFormatter)
             self._channelDateFormatter = Trackable(reference: reference, referencePath: \.channelDateFormatter)
@@ -409,6 +417,7 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             if let phoneNumberLabelAppearance { self.phoneNumberLabelAppearance = phoneNumberLabelAppearance }
             if let mutedIcon { self.mutedIcon = mutedIcon }
             if let pinIcon { self.pinIcon = pinIcon }
+            if let retentionBadgeImage { self.retentionBadgeImage = retentionBadgeImage }
             if let messageDeliveryStatusIcons { self.messageDeliveryStatusIcons = messageDeliveryStatusIcons }
             if let channelNameFormatter { self.channelNameFormatter = channelNameFormatter }
             if let channelDateFormatter { self.channelDateFormatter = channelDateFormatter }
