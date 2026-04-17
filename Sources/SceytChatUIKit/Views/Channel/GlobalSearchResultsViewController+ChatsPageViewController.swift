@@ -46,7 +46,14 @@ extension GlobalSearchResultsViewController {
 
         private var showMessagesSection = false
 
-        /// Counts how many VM responses are still outstanding for the current search query.
+        /// Monotonically increasing counter bumped on every `search()` call.
+        /// Sinks record the generation they last handled; if it differs from the current
+        /// generation the response is stale and must not decrement `pendingResponseCount`.
+        private var searchGeneration = 0
+        private var channelsLastHandledGeneration = -1
+        private var messagesLastHandledGeneration = -1
+
+        /// Counts how many VM responses are still outstanding for the current search generation.
         /// Set to 2 when a new search starts; each VM response decrements it.
         /// The empty state is suppressed while this is > 0 to avoid a flash of "no results"
         /// before all VMs have had a chance to return data.
@@ -74,9 +81,19 @@ extension GlobalSearchResultsViewController {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in
                     guard let self else { return }
-                    channels = viewModel.channels
-                    if pendingResponseCount > 0 { pendingResponseCount -= 1 }
-                    reloadData()
+                    if pendingResponseCount > 0 {
+                        // Active search: deduplicate per generation to discard stale Task results
+                        // from the previous query (viewModel does not cancel old Tasks).
+                        guard channelsLastHandledGeneration != searchGeneration else { return }
+                        channelsLastHandledGeneration = searchGeneration
+                        channels = viewModel.channels
+                        pendingResponseCount -= 1
+                        if pendingResponseCount == 0 { reloadData() }
+                    } else {
+                        // Search already settled — this is a live DB observer update; reload immediately.
+                        channels = viewModel.channels
+                        reloadData()
+                    }
                 }
                 .store(in: &subscriptions)
 
@@ -87,8 +104,16 @@ extension GlobalSearchResultsViewController {
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in
                     guard let self else { return }
-                    if pendingResponseCount > 0 { pendingResponseCount -= 1 }
-                    reloadData()
+                    if pendingResponseCount > 0 {
+                        // Active search: deduplicate per generation to avoid double-counting.
+                        guard messagesLastHandledGeneration != searchGeneration else { return }
+                        messagesLastHandledGeneration = searchGeneration
+                        pendingResponseCount -= 1
+                        if pendingResponseCount == 0 { reloadData() }
+                    } else {
+                        // Search already settled — live DB observer update (e.g. deleted message); reload immediately.
+                        reloadData()
+                    }
                 }
                 .store(in: &subscriptions)
         }
@@ -96,6 +121,7 @@ extension GlobalSearchResultsViewController {
         // MARK: - Search
 
         @objc open func search(query: String?) {
+            searchGeneration &+= 1
             pendingResponseCount = 2
             viewModel.search(query: query)
             messagesViewModel.search(query: query)
