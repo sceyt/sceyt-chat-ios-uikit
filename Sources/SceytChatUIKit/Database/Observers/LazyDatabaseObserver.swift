@@ -144,7 +144,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         fetchPredicate: NSPredicate,
         offset: Int? = nil,
         completion: (() -> Void)? = nil) {
-            logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver | old: \(self.fetchPredicate) | new: \(fetchPredicate)")
+            logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver | new: \(fetchPredicate)")
             if isObserverRestarting {
                 logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver SKIPPED (already restarting)")
                 return
@@ -165,7 +165,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     
     open func update(predicate: NSPredicate, fetchOffset: Int = Int.max) {
-        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] update(predicate:) | old: \(self.fetchPredicate) | new: \(predicate)")
+        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] update(predicate:) | new: \(predicate)")
         writeCache {
             self.fetchPredicate = predicate
             self.currentFetchOffset = max(0, fetchOffset == Int.max ? self.currentFetchOffset : fetchOffset)
