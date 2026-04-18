@@ -145,6 +145,14 @@ extension GlobalSearchResultsViewController {
 
         // MARK: - UITableViewDelegate
 
+        public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+            guard indexPath.section == 1,
+                  messagesViewModel.hasMoreChannelMessages,
+                  indexPath.row >= channelMessagesSnapshot.count - 3
+            else { return }
+            messagesViewModel.loadMoreMessages(in: .channels)
+        }
+
         override public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
             tableView.deselectRow(at: indexPath, animated: true)
             switch indexPath.section {

@@ -65,6 +65,18 @@ open class GlobalSearchMessagesViewModel: NSObject {
     }
 
     private var currentSearchTask: Task<Void, Never>?
+    private var loadMoreTask: Task<Void, Never>?
+
+    public static let pageSize = 20
+
+    private var chatMessagesOffset = 0
+    private var channelMessagesOffset = 0
+    @Atomic public private(set) var hasMoreChatMessages = false
+    @Atomic public private(set) var hasMoreChannelMessages = false
+
+    /// Stored search parameters for `loadMoreMessages(in:)`.
+    private var currentBasePredicate: NSPredicate?
+    private var currentMemberUserId: UserId?
 
     /// Override in test subclasses to inject an in-memory database.
     open var database: Database { SceytChatUIKit.shared.database }
@@ -208,29 +220,38 @@ open class GlobalSearchMessagesViewModel: NSObject {
                 )
             }
 
+            currentBasePredicate = basePredicate
+            currentMemberUserId = filterUser.id
+            chatMessagesOffset = 0
+            channelMessagesOffset = 0
+
             currentSearchTask?.cancel()
+            loadMoreTask?.cancel()
             currentSearchTask = Task(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
 
-                async let directResult    = fetchMessages(basePredicate: basePredicate,
-                                                          channelTypes: [config.direct],
-                                                          memberUserId: filterUser.id)
-                async let groupResult     = fetchMessages(basePredicate: basePredicate,
-                                                          channelTypes: [config.group],
-                                                          memberUserId: filterUser.id)
+                async let chatResult      = fetchMessages(basePredicate: basePredicate,
+                                                          channelTypes: [config.direct, config.group],
+                                                          memberUserId: filterUser.id,
+                                                          offset: 0,
+                                                          limit: Self.pageSize)
                 async let broadcastResult = fetchMessages(basePredicate: basePredicate,
                                                           channelTypes: [config.broadcast],
-                                                          memberUserId: filterUser.id)
-                let (direct, group, broadcast) = await (directResult, groupResult, broadcastResult)
+                                                          memberUserId: filterUser.id,
+                                                          offset: 0,
+                                                          limit: Self.pageSize)
+                let (chats, broadcast) = await (chatResult, broadcastResult)
 
                 guard !Task.isCancelled else { return }
 
                 await MainActor.run { [weak self] in
                     guard let self else { return }
-                    chatMessages           = direct.0 + group.0
+                    chatMessages           = chats.0
                     channelMessages        = broadcast.0
-                    chatMessageChannels    = direct.1.merging(group.1) { $1 }
+                    chatMessageChannels    = chats.1
                     channelMessageChannels = broadcast.1
+                    hasMoreChatMessages    = chats.0.count >= Self.pageSize
+                    hasMoreChannelMessages = broadcast.0.count >= Self.pageSize
                     event = .reload
                 }
             }
@@ -241,6 +262,10 @@ open class GlobalSearchMessagesViewModel: NSObject {
                 channelMessages = []
                 chatMessageChannels = [:]
                 channelMessageChannels = [:]
+                hasMoreChatMessages = false
+                hasMoreChannelMessages = false
+                currentBasePredicate = nil
+                currentMemberUserId = nil
                 DispatchQueue.main.async { [weak self] in self?.event = .reload }
                 return
             }
@@ -258,14 +283,24 @@ open class GlobalSearchMessagesViewModel: NSObject {
                 ]
             )
 
+            currentBasePredicate = basePredicate
+            currentMemberUserId = nil
+            chatMessagesOffset = 0
+            channelMessagesOffset = 0
+
             currentSearchTask?.cancel()
+            loadMoreTask?.cancel()
             currentSearchTask = Task(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
 
                 async let chatResult    = fetchMessages(basePredicate: basePredicate,
-                                                        channelTypes: [config.direct, config.group])
+                                                        channelTypes: [config.direct, config.group],
+                                                        offset: 0,
+                                                        limit: Self.pageSize)
                 async let channelResult = fetchMessages(basePredicate: basePredicate,
-                                                        channelTypes: [config.broadcast])
+                                                        channelTypes: [config.broadcast],
+                                                        offset: 0,
+                                                        limit: Self.pageSize)
                 let (chatsResult, channelsResult) = await (chatResult, channelResult)
 
                 guard !Task.isCancelled else { return }
@@ -276,6 +311,67 @@ open class GlobalSearchMessagesViewModel: NSObject {
                     channelMessages         = channelsResult.0
                     chatMessageChannels     = chatsResult.1
                     channelMessageChannels  = channelsResult.1
+                    hasMoreChatMessages     = chatsResult.0.count >= Self.pageSize
+                    hasMoreChannelMessages  = channelsResult.0.count >= Self.pageSize
+                    event = .reload
+                }
+            }
+        }
+    }
+
+    // MARK: - Load more
+
+    open func loadMoreMessages(in section: Section) {
+        guard let basePredicate = currentBasePredicate else { return }
+        let config = SceytChatUIKit.shared.config.channelTypesConfig
+
+        switch section {
+        case .chats:
+            guard hasMoreChatMessages else { return }
+            let newOffset = chatMessagesOffset + Self.pageSize
+
+            loadMoreTask?.cancel()
+            loadMoreTask = Task(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
+                let result = await fetchMessages(
+                    basePredicate: basePredicate,
+                    channelTypes: [config.direct, config.group],
+                    memberUserId: currentMemberUserId,
+                    offset: newOffset,
+                    limit: Self.pageSize
+                )
+                guard !Task.isCancelled else { return }
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    chatMessagesOffset = newOffset
+                    chatMessages += result.0
+                    chatMessageChannels.merge(result.1) { _, new in new }
+                    hasMoreChatMessages = result.0.count >= Self.pageSize
+                    event = .reload
+                }
+            }
+
+        case .channels:
+            guard hasMoreChannelMessages else { return }
+            let newOffset = channelMessagesOffset + Self.pageSize
+
+            loadMoreTask?.cancel()
+            loadMoreTask = Task(priority: .userInitiated) { [weak self] in
+                guard let self else { return }
+                let result = await fetchMessages(
+                    basePredicate: basePredicate,
+                    channelTypes: [config.broadcast],
+                    memberUserId: currentMemberUserId,
+                    offset: newOffset,
+                    limit: Self.pageSize
+                )
+                guard !Task.isCancelled else { return }
+                await MainActor.run { [weak self] in
+                    guard let self else { return }
+                    channelMessagesOffset = newOffset
+                    channelMessages += result.0
+                    channelMessageChannels.merge(result.1) { _, new in new }
+                    hasMoreChannelMessages = result.0.count >= Self.pageSize
                     event = .reload
                 }
             }
@@ -286,7 +382,9 @@ open class GlobalSearchMessagesViewModel: NSObject {
 
     private func fetchMessages(basePredicate: NSPredicate,
                                channelTypes: [String],
-                               memberUserId: UserId? = nil) async -> ([ChatMessage], [ChannelId: ChatChannel]) {
+                               memberUserId: UserId? = nil,
+                               offset: Int = 0,
+                               limit: Int = pageSize) async -> ([ChatMessage], [ChannelId: ChatChannel]) {
         await withCheckedContinuation { cont in
             database.read { [basePredicate, channelTypes, memberUserId] context in
                 // 1. Resolve channel IDs for the requested types,
@@ -318,7 +416,8 @@ open class GlobalSearchMessagesViewModel: NSObject {
                 msgRequest.sortDescriptors = [
                     NSSortDescriptor(keyPath: \MessageDTO.createdAt, ascending: false)
                 ]
-                msgRequest.fetchLimit = 100
+                msgRequest.fetchOffset = offset
+                msgRequest.fetchLimit = limit
 
                 let messages = (try? context.fetch(msgRequest))?.map { $0.convert() } ?? []
 
