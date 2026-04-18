@@ -17,7 +17,7 @@ extension GlobalSearchUserBarCell: AppearanceProviding {
         borderColor: DefaultColors.border,
         titleLabelAppearance: LabelAppearance(
             foregroundColor: .primaryText,
-            font: Fonts.semiBold.withSize(14)
+            font: Fonts.regular.withSize(14)
         ),
         titleFormatter: AnyUserFormatting(SceytChatUIKit.shared.formatters.userNameFormatter),
         avatarRenderer: AnyUserAvatarRendering(SceytChatUIKit.shared.avatarRenderers.userAvatarRenderer),

@@ -87,11 +87,11 @@ open class GlobalSearchUserBarCell: CollectionViewCell {
 
 public extension GlobalSearchUserBarCell {
     enum Layouts {
-        public static var avatarSize: CGFloat = 28
-        public static var cornerRadius: CGFloat = 22
+        public static var avatarSize: CGFloat = 20
+        public static var cornerRadius: CGFloat = 17
         public static var horizontalPadding: CGFloat = 8
-        public static var verticalPadding: CGFloat = 8
-        public static var avatarToLabelSpacing: CGFloat = 8
+        public static var verticalPadding: CGFloat = 7
+        public static var avatarToLabelSpacing: CGFloat = 4
         public static var trailingPadding: CGFloat = 12
     }
 }

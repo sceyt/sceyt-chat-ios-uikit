@@ -138,9 +138,9 @@ open class GlobalSearchViewModel: NSObject {
         return subject.range(of: query, options: [.caseInsensitive]) != nil
     }
 
-    // MARK: - Private DB helpers
+    // MARK: - DB helpers
 
-    private func fetchDirectChats(query: String) async -> [ChatChannel] {
+    open func fetchDirectChats(query: String) async -> [ChatChannel] {
         await withCheckedContinuation { cont in
             Components.channelListProvider.fetchChannels(query: query) { channels in
                 let filtered = channels.filter { channel in
