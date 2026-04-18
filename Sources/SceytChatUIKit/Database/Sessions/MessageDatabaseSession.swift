@@ -730,6 +730,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         )
         
         messages.forEach {
+            // Skip if the marker is already confirmed locally
+            if $0.userMarkers?.contains(where: { $0.name == markerName }) == true { return }
             if $0.pendingMarkerNames == nil {
                 $0.pendingMarkerNames = .init(arrayLiteral: markerName)
             } else if !$0.pendingMarkerNames!.contains(markerName) {
