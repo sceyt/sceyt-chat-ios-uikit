@@ -2182,6 +2182,21 @@ open class ChannelViewController: ViewController,
             // If the collection view's current count + the diff's inserts/deletes
             // doesn't match the view model's current count, the data source has
             // advanced past this diff — fall back to reloadData to avoid a crash.
+            let expectedSectionCount = collectionView.numberOfSections + sectionInserts.count - sectionDeletes.count
+            if expectedSectionCount != channelViewModel.numberOfSections {
+                let savedOffset = collectionView.contentOffset
+                let savedContentHeight = collectionView.contentSize.height
+                collectionView.reloadData()
+                collectionView.layoutIfNeeded()
+                if pinnedScrollMessageId != 0,
+                   let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
+                    collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                } else {
+                    let heightDiff = collectionView.contentSize.height - savedContentHeight
+                    collectionView.contentOffset.y = savedOffset.y + heightDiff
+                }
+                return
+            }
             for section in 0..<collectionView.numberOfSections {
                 guard !sectionDeletes.contains(section) else { continue }
                 let cvCount = collectionView.numberOfItems(inSection: section)
@@ -2273,8 +2288,23 @@ open class ChannelViewController: ViewController,
                 UIView.performWithoutAnimation {
                     let reloads = paths.reloads + moves.map(\.to)
                     if !reloads.isEmpty {
-                        self.collectionView.performUpdates {
-                            self.collectionView.reloadItems(at: reloads)
+                        // Validate that all reload index paths reference existing sections/items
+                        // to avoid Invalid_Number_Of_Sections crash from data source changes
+                        // between the parent batch update and this nested one.
+                        let sectionCount = self.channelViewModel.numberOfSections
+                        let validReloads = reloads.filter { indexPath in
+                            guard indexPath.section < sectionCount else { return false }
+                            return indexPath.item < self.channelViewModel.numberOfMessages(in: indexPath.section)
+                        }
+                        if !validReloads.isEmpty {
+                            if sectionCount == self.collectionView.numberOfSections {
+                                self.collectionView.performUpdates {
+                                    self.collectionView.reloadItems(at: validReloads)
+                                }
+                            } else {
+                                // Section count mismatch — safe fallback
+                                self.collectionView.reloadData()
+                            }
                         }
                     }
                 }
