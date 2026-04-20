@@ -116,10 +116,6 @@ open class ChannelListProvider: DataProvider {
                 if !message.incoming || channel.userRole == nil || alreadyReceived {
                     return
                 }
-                let hasReceivedMarkerTotal = message.markerTotals?.contains { $0.name == DefaultMarker.received.rawValue } == true
-                if hasReceivedMarkerTotal {
-                    return
-                }
                 Components.channelMessageProvider.init(channelId: channel.id)
                     .markMessagesAsReceived(ids: [message.id])
             }

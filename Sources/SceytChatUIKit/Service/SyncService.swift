@@ -227,17 +227,35 @@ public final class SyncService: NSObject {
             
             let channelSyncQueue = OperationQueue()
             channelSyncQueue.maxConcurrentOperationCount = 1
+            let messageSyncQueue = OperationQueue()
+            messageSyncQueue.maxConcurrentOperationCount = 10
 
             let completionOperator = Operation()
             let channelCompletionOperator = Operation()
 
             let results = try? DataProvider.database.read { context in
+                let result1 = context.fetchChannelsToSyncMessages()
                 let result2 = context.fetchPendingMarkerToSyncMessages()
                 let result3 = context.fetchChannelsForPendingMessages()
-                return (result2, result3)
+                return (result1, result2, result3)
             }.get()
 
-            let operations = Operations.syncChannelOperations(undeleteChannelIds: results?.1 ?? [])
+            let channelsResult = results?.0
+            let operations = Operations.syncChannelOperations(undeleteChannelIds: results?.2 ?? []) { channels in
+                for channel in channels where channel.lastDisplayedMessageId != 0  {
+                    let cachedId = channelsResult?[channel.id] ?? 0
+                    let minDisplayId = cachedId != 0 ? min(cachedId, channel.lastDisplayedMessageId) : channel.lastDisplayedMessageId
+                    guard minDisplayId != channel.lastMessage?.id,
+                          minDisplayId > 0
+                    else { continue }
+                    let operation = Operations.syncChannelMessagesOperations(
+                        startMessageId: minDisplayId - 1,
+                        channelId: channel.id
+                    )
+                    completionOperator.addDependency(operation)
+                    messageSyncQueue.addOperation(operation)
+                }
+            }
             if let createChannel = operations.first(where: {$0 is CreateUnSyncChannelsOperation}) as? CreateUnSyncChannelsOperation {
                 createChannel.completionBlock = {
                     Self.sendPendingMessages()
@@ -249,7 +267,7 @@ public final class SyncService: NSObject {
                 completion?(true)
                 return
             }
-            let markerResult = results?.0
+            let markerResult = results?.1
             let markerOperations = Operations.syncMessageMarkersOperations(markersGroup: markerResult ?? [:])
             
             let lastOperation: Operation = markerOperations.last ?? operations.last!
@@ -261,6 +279,7 @@ public final class SyncService: NSObject {
             if let task {
                 task.expirationHandler = {
                     channelSyncQueue.cancelAllOperations()
+                    messageSyncQueue.cancelAllOperations()
                     Self.isSyncing = false
                 }
                 
@@ -281,7 +300,7 @@ public final class SyncService: NSObject {
 
 public struct Operations {
     
-    public static func syncChannelOperations(undeleteChannelIds: [ChannelId] = []) -> [Operation] {
+    public static func syncChannelOperations(undeleteChannelIds: [ChannelId] = [], onLoad: (([Channel]) -> Void)? = nil) -> [Operation] {
         let createChannel = CreateUnSyncChannelsOperation()
 
         let provider = Components.channelListProvider.init()

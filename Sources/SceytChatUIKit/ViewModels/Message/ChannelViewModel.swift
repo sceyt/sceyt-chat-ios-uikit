@@ -2462,6 +2462,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     //MARK: Link preview
     open func updateLinkPreviewsForLayoutModelIfNeeded(model: MessageLayoutModel) {
+        guard scrollToRepliedMessageId == 0,
+              scrollToMessageIdIfSearching == 0
+        else { return }
         let matches = DataDetector.matches(text: model.message.body)
         guard !matches.isEmpty
         else { return }

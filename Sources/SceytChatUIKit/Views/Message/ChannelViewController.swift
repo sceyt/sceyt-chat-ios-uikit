@@ -2170,7 +2170,7 @@ open class ChannelViewController: ViewController,
                 needsToScrollBottom = false
             }
             
-            if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil {
+            if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil || pinnedScrollMessageId != 0 {
                 needsToScrollBottom = false
             }
             
@@ -2296,6 +2296,17 @@ open class ChannelViewController: ViewController,
         case .reloadData:
             if let selectMessageId, let indexPath = channelViewModel.indexPathOf(messageId: selectMessageId) {
                 onEvent(.reloadDataAndSelect(indexPath: indexPath, messageId: selectMessageId))
+            } else if pinnedScrollMessageId != 0 {
+                let savedOffset = collectionView.contentOffset
+                let savedContentHeight = collectionView.contentSize.height
+                collectionView.reloadData()
+                collectionView.layoutIfNeeded()
+                if let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
+                    collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                } else {
+                    let heightDiff = collectionView.contentSize.height - savedContentHeight
+                    collectionView.contentOffset.y = savedOffset.y + heightDiff
+                }
             } else {
                 collectionView.reloadData()
             }
@@ -2309,7 +2320,12 @@ open class ChannelViewController: ViewController,
             }
             showEmptyViewIfNeeded()
         case .reloadDataAndScrollToBottom:
-            collectionView.reloadDataAndScrollToBottom()
+            if pinnedScrollMessageId != 0,
+               let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
+                collectionView.reloadDataAndScrollTo(indexPath: pinnedIndexPath, pos: .centeredVertically, animated: false)
+            } else {
+                collectionView.reloadDataAndScrollToBottom()
+            }
         case let .reloadDataAndScroll(indexPath, animated, pos):
             collectionView.reloadDataAndScrollTo(
                 indexPath: indexPath,
