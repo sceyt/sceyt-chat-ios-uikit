@@ -225,6 +225,15 @@ open class ChannelAttachmentListViewModel: NSObject {
         let attachment = layout.attachment
         guard attachment.type != "link"
         else { return }
+        if fileProvider.filePath(attachment: attachment) != nil {
+            DataProvider.database.write {
+                let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
+                dto?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+            } completion: { error in
+                logger.errorIfNotNil(error, "")
+            }
+            return
+        }
         getMessage(layout) { message in
             if let message {
                 fileProvider.resumeTransfer(message: message, attachment: attachment) {
