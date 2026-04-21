@@ -12,7 +12,14 @@ open class ChannelInfoVoiceSubtitleFormatter: AttachmentFormatting {
     
     public init() {}
     
+    open lazy var dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
     public func format(_ attachment: ChatMessage.Attachment) -> String {
-        SceytChatUIKit.shared.formatters.channelInfoAttachmentDateFormatter.format(attachment.createdAt)
+        return dateFormatter.string(from: attachment.createdAt)
     }
 }
