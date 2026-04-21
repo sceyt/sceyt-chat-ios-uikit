@@ -92,6 +92,9 @@ extension GlobalSearchResultsViewController {
         open func reloadSearchTable() {
             guard let vm = _linkViewModel else { return }
             let filtered = vm.isFiltered
+            // Reset so new layout objects (e.g. from searchObserver) can re-query
+            // the DB for metadata that may have been evicted from the in-memory cache.
+            requestedMetadataURLs.removeAll()
 
             var items: [(indexPath: IndexPath, layout: MessageLayoutModel.AttachmentLayout)] = []
             for section in 0..<vm.numberOfSections {
