@@ -181,6 +181,10 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         }
 
         voicePage.configure(voiceViewModel: allVoiceViewModel)
+        voicePage.onSelectVoice = { [weak self] message, channel in
+            guard let channel else { return }
+            self?.onSelectMessage?(message, channel)
+        }
         filesPage.configure(fileViewModel: allFilesViewModel) { [weak self] indexPath in
             guard let self,
                   let attachment = self.allFilesViewModel.attachmentLayout(at: indexPath)?.attachment

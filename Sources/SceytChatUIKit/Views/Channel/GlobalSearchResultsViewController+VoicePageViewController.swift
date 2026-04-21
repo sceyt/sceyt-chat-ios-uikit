@@ -15,6 +15,9 @@ extension GlobalSearchResultsViewController {
         open lazy var searchEmptyStateView = EmptyStateStackView()
             .withoutAutoresizingMask
 
+        /// Called when the user taps a voice cell. Provides the owning message and channel.
+        open var onSelectVoice: ((ChatMessage, ChatChannel?) -> Void)?
+
         private var _voiceViewModel: (any ChannelAttachmentListViewModelProviding)?
         private var cancellables = Set<AnyCancellable>()
 
@@ -46,6 +49,9 @@ extension GlobalSearchResultsViewController {
         open func configure(voiceViewModel: any ChannelAttachmentListViewModelProviding) {
             _voiceViewModel = voiceViewModel
             collectionView.voiceViewModel = voiceViewModel
+            collectionView.onSelectVoice = { [weak self] message, channel in
+                self?.onSelectVoice?(message, channel)
+            }
             voiceViewModel.eventPublisher
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] _ in
