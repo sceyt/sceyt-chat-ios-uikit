@@ -60,9 +60,19 @@ open class GlobalSearchMessageCell: TableViewCell {
     }
 
     private func attributedStatus(channel: ChatChannel, message: ChatMessage) -> NSAttributedString {
-        let prefix = senderPrefix(channel: channel, message: message)
         let bodyFont = appearance.subtitleLabelAppearance?.font ?? Fonts.regular.withSize(15)
         let bodyColor = appearance.subtitleLabelAppearance?.foregroundColor ?? UIColor.secondaryText
+
+        // System messages: show formatted text same as ChannelCell
+        if message.isSystemMessage {
+            let formattedText = SceytChatUIKit.shared.formatters.systemMessageBodyFormatter.format(message)
+            return NSAttributedString(
+                string: formattedText,
+                attributes: [.font: bodyFont, .foregroundColor: bodyColor]
+            )
+        }
+
+        let prefix = senderPrefix(channel: channel, message: message)
 
         let result = NSMutableAttributedString()
         if !prefix.isEmpty {
