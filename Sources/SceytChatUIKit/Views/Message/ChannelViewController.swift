@@ -1365,10 +1365,23 @@ open class ChannelViewController: ViewController,
         willDisplay cell: UICollectionViewCell,
         forItemAt indexPath: IndexPath
     ) {
+        if let systemCell = cell as? SystemMessageCell, systemCell.data != nil {
+            var repliedMessageId: MessageId {
+                channelViewModel.scrollToRepliedMessageId
+            }
+            if repliedMessageId != 0,
+               systemCell.data.message.id == repliedMessageId {
+                animateHighlightCell(systemCell, mode: .reply)
+            } else if systemCell.highlightMode != .none {
+                systemCell.highlightMode = .none
+            }
+            return
+        }
+
         guard let cell = cell as? MessageCell,
               cell.data != nil
         else { return }
-        
+
         var repliedMessageId: MessageId {
             channelViewModel.scrollToRepliedMessageId
         }
@@ -1380,7 +1393,7 @@ open class ChannelViewController: ViewController,
         } else if cell.highlightMode != .none {
             cell.highlightMode = .none
         }
-       
+
         if shouldAnimateEditing, cell.isEditing, cell.checkBoxView.transform != .identity {
             cell.contentView.alpha = 1
             UIView.animate(withDuration: 0.3) { [weak self] in
@@ -2070,12 +2083,21 @@ open class ChannelViewController: ViewController,
                 guard let self else { return }
                 if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
                     self.animateHighlightCell(cell, mode: .reply)
+                } else if let systemCell = self.collectionView.cellForItem(at: indexPath) as? SystemMessageCell {
+                    self.animateHighlightCell(systemCell, mode: .reply)
                 }
             }
         }
     }
     
     open func animateHighlightCell(_ cell: MessageCell, mode: MessageCell.HighlightMode) {
+        cell.highlightMode = mode
+        UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak cell] in
+            cell?.highlightMode = .none
+        }
+    }
+
+    open func animateHighlightCell(_ cell: SystemMessageCell, mode: MessageCell.HighlightMode) {
         cell.highlightMode = mode
         UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak cell] in
             cell?.highlightMode = .none

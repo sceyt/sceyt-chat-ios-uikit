@@ -13,6 +13,17 @@ extension ChannelViewController {
 
         public static var titleContentInsets: UIEdgeInsets = .init(top: 2, left: 8, bottom: 2, right: 8)
 
+        open var highlightMode: MessageCell.HighlightMode = .none {
+            didSet {
+                switch highlightMode {
+                case .reply, .mention, .search:
+                    titleContentView.backgroundColor = UIColor.black.withAlphaComponent(0.2)
+                case .none:
+                    titleContentView.backgroundColor = .clear
+                }
+            }
+        }
+
         open lazy var unreadView: MessageCell.UnreadMessagesSeparatorView = {
             return $0.withoutAutoresizingMask
         }(MessageCell.UnreadMessagesSeparatorView())
