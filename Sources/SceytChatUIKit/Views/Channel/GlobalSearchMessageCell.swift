@@ -75,12 +75,60 @@ open class GlobalSearchMessageCell: TableViewCell {
             ))
         }
 
-        let snippet = makeSnippet(body: message.body, query: searchQuery)
+        let (snippet, bodyUTF16Offset, prefixLength) = makeSnippet(body: message.body, query: searchQuery)
         let bodyStart = result.length
         result.append(NSAttributedString(
             string: snippet,
             attributes: [.font: bodyFont, .foregroundColor: bodyColor]
         ))
+
+        // Apply body attributes (bold, italic, monospace, strikethrough, underline)
+        if let bodyAttributes = message.bodyAttributes, !snippet.isEmpty {
+            let snippetNSLength = (snippet as NSString).length
+
+            bodyAttributes.reduce([NSRange: [ChatMessage.BodyAttribute]]()) { partialResult, bodyAttribute in
+                // Adjust attribute offset relative to the snippet
+                let originalStart = bodyAttribute.offset
+                let originalEnd = originalStart + bodyAttribute.length
+
+                // Calculate the range within the snippet (accounting for trimmed prefix and "…")
+                let snippetContentStart = originalStart - bodyUTF16Offset + prefixLength
+                let snippetContentEnd = originalEnd - bodyUTF16Offset + prefixLength
+
+                let clampedStart = max(prefixLength, snippetContentStart)
+                let clampedEnd = min(snippetNSLength, snippetContentEnd)
+
+                guard clampedStart < clampedEnd else { return partialResult }
+
+                let range = NSRange(location: clampedStart, length: clampedEnd - clampedStart)
+                var array = partialResult[range] ?? []
+                array.append(bodyAttribute)
+                var partialResult = partialResult
+                partialResult[range] = array
+                return partialResult
+            }.forEach { range, value in
+                let adjustedRange = NSRange(location: bodyStart + range.location, length: range.length)
+                guard adjustedRange.location + adjustedRange.length <= result.length else { return }
+
+                var font = bodyFont
+                if value.contains(where: { $0.type == .monospace }) {
+                    font = font.toMonospace
+                }
+                if value.contains(where: { $0.type == .bold }) {
+                    font = font.toSemiBold
+                }
+                if value.contains(where: { $0.type == .italic }) {
+                    font = font.toItalic
+                }
+                if value.contains(where: { $0.type == .strikethrough }) {
+                    result.addAttributes([.strikethroughStyle: NSUnderlineStyle.single.rawValue], range: adjustedRange)
+                }
+                if value.contains(where: { $0.type == .underline }) {
+                    result.addAttributes([.underlineStyle: NSUnderlineStyle.single.rawValue], range: adjustedRange)
+                }
+                result.addAttributes([.font: font], range: adjustedRange)
+            }
+        }
 
         if let query = searchQuery, !query.isEmpty {
             let tokens = query
@@ -103,13 +151,14 @@ open class GlobalSearchMessageCell: TableViewCell {
         return result
     }
 
-    /// Returns a snippet of `body` that includes the first search match.
+    /// Returns a snippet of `body` that includes the first search match,
+    /// along with the UTF-16 offset into the original body where the snippet starts.
     /// If the match is on a later line or far from the start by characters, the body is
     /// trimmed and prefixed with "…" so the matched text appears near the beginning of the snippet.
-    private func makeSnippet(body: String, query: String?) -> String {
+    private func makeSnippet(body: String, query: String?) -> (snippet: String, bodyUTF16Offset: Int, prefixLength: Int) {
         let contextBefore = 30
 
-        guard let query = query, !query.isEmpty else { return body }
+        guard let query = query, !query.isEmpty else { return (body, 0, 0) }
 
         let tokens = query.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
         var firstMatchStart: String.Index?
@@ -126,11 +175,9 @@ open class GlobalSearchMessageCell: TableViewCell {
             }
         }
 
-        guard let matchStart = firstMatchStart else { return body }
+        guard let matchStart = firstMatchStart else { return (body, 0, 0) }
 
         // Find the start of the line that contains the match.
-        // This handles multiline bodies where the match may be on a later line
-        // but still within `contextBefore` characters from the body start.
         let lineStart: String.Index
         if let lastNewline = body[..<matchStart].lastIndex(of: "\n") {
             lineStart = body.index(after: lastNewline)
@@ -138,22 +185,23 @@ open class GlobalSearchMessageCell: TableViewCell {
             lineStart = body.startIndex
         }
 
-        // Measure how far the match is from the start of its own line.
         let matchOffsetInLine = body.distance(from: lineStart, to: matchStart)
 
-        // If the match is on the first line and close to the start, return the full body.
         if lineStart == body.startIndex && matchOffsetInLine <= contextBefore {
-            return body
+            return (body, 0, 0)
         }
 
-        // If the match is near the start of its line, trim at the line boundary.
+        let prefix = "…"
+        let prefixUTF16Length = (prefix as NSString).length
+
         if matchOffsetInLine <= contextBefore {
-            return "…" + String(body[lineStart...])
+            let utf16Offset = (body as NSString).substring(to: body.distance(from: body.startIndex, to: lineStart)).count == 0
+                ? 0
+                : NSRange(body.startIndex..<lineStart, in: body).length
+            return (prefix + String(body[lineStart...]), utf16Offset, prefixUTF16Length)
         }
 
-        // Match is far into its line — apply character-based trimming within the line.
         let cutIndex = body.index(lineStart, offsetBy: matchOffsetInLine - contextBefore)
-        // Advance to the nearest word boundary so we don't cut mid-word.
         var snippetStart = cutIndex
         if let spaceIdx = body[cutIndex...].firstIndex(of: " ") {
             let afterSpace = body.index(after: spaceIdx)
@@ -162,7 +210,8 @@ open class GlobalSearchMessageCell: TableViewCell {
             }
         }
 
-        return "…" + String(body[snippetStart...])
+        let utf16Offset = NSRange(body.startIndex..<snippetStart, in: body).length
+        return (prefix + String(body[snippetStart...]), utf16Offset, prefixUTF16Length)
     }
 
     override open func setupLayout() {
