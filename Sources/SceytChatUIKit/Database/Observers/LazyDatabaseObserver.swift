@@ -1007,7 +1007,7 @@ private extension LazyDatabaseObserver {
     func writeCache( _ block: @escaping () -> Void) {
         // Synchronous barrier keeps mapItems/mapDeletedItems consistent with emitted observer events.
         // Using async here can publish onDidChange before map updates are visible, causing forEach/item lookups to skip valid rows.
-        cacheQueue.sync(flags: .barrier) {
+        cacheQueue.async(flags: .barrier) {
             block()
         }
     }

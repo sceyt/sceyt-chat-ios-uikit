@@ -27,7 +27,9 @@ final class MockDatabase: Database {
 
         container = NSPersistentContainer(name: "SceytChatModel", managedObjectModel: model)
         let desc = NSPersistentStoreDescription()
-        desc.type = NSInMemoryStoreType
+        // Use SQLite-backed in-memory store (same as production) so that
+        // fetch indexes and SQLite query optimizations are exercised.
+        desc.url = URL(fileURLWithPath: "/dev/null")
         container.persistentStoreDescriptions = [desc]
         container.loadPersistentStores { _, error in
             if let error { fatalError("MockDatabase: store load failed: \(error)") }

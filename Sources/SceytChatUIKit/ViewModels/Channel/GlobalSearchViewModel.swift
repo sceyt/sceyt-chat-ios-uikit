@@ -63,20 +63,42 @@ open class GlobalSearchViewModel: NSObject {
     }
 
     open func startDatabaseObserver() {
-        channelObserver.onDidChange = { [weak self] _, _, _ in
-            self?.rebuildChannels()
+        channelObserver.onDidChange = { [weak self] _, paths, _ in
+            self?.rebuildChannels(changeItems: paths.changeItems)
         }
         channelObserver.startObserver()
     }
 
     // MARK: - Browse mode
 
-    private func rebuildChannels() {
+    private func rebuildChannels(changeItems: [LazyDatabaseObserver<ChannelDTO, ChatChannel>.ChangeItem] = []) {
         guard !isSearchActive else { return }
         var result: [ChatChannel] = []
         channelObserver.forEach { _, channel in
             result.append(channel)
             return false
+        }
+        // Async writeCache race: forEach may miss channels whose mapItems entry hasn't been
+        // written yet (writeCache is async but onDidChange fires on a different queue).
+        // Recover by merging items from the change paths that forEach skipped.
+        let observerTotalCount = (0..<channelObserver.numberOfSections).reduce(0) { $0 + channelObserver.numberOfItems(in: $1) }
+        if result.count < observerTotalCount {
+            var resultIds = Set(result.map { $0.id })
+            for changeItem in changeItems {
+                switch changeItem {
+                case .insert(let ip, let item), .update(let ip, let item), .move(_, let ip, let item):
+                    guard !resultIds.contains(item.id) else { continue }
+                    // Insert at the position the observer computed, translated to flat index.
+                    var flatIndex = ip.row
+                    for s in 0..<ip.section {
+                        flatIndex += channelObserver.numberOfItems(in: s)
+                    }
+                    result.insert(item, at: min(flatIndex, result.count))
+                    resultIds.insert(item.id)
+                default:
+                    break
+                }
+            }
         }
         channels = result
         DispatchQueue.main.async { [weak self] in
