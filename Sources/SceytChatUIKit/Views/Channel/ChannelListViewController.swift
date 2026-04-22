@@ -45,6 +45,8 @@ open class ChannelListViewController: ViewController,
         .withoutAutoresizingMask
 
     open var globalSearchEnabled: Bool = false
+    
+    open var pendingOpenChannel: ChatChannel? = nil
 
     open lazy var searchController = Components.channelSearchController
         .init(searchResultsController: searchResultsViewController)
@@ -82,6 +84,7 @@ open class ChannelListViewController: ViewController,
         
         if globalSearchEnabled {
             searchController.showsSearchResultsController = true
+            searchController.delegate = self
         }
 
         if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
@@ -296,7 +299,14 @@ open class ChannelListViewController: ViewController,
                 }
             }
         case .showChannel(let channel):
-            channelListRouter.showChannelViewController(channel: channel)
+            if searchController.isActive {
+                pendingOpenChannel = channel
+                UIView.performWithoutAnimation {
+                    searchController.isActive = false
+                }
+            } else {
+                channelListRouter.showChannelViewController(channel: channel)
+            }
         }
     }
 
@@ -621,5 +631,15 @@ private extension ChannelListViewController {
             lastReactionId: channel.lastReaction?.id,
             lastReactionKey: channel.lastReaction?.key
         )
+    }
+}
+
+extension ChannelListViewController: UISearchControllerDelegate {
+    public func didDismissSearchController(_ searchController: UISearchController) {
+        print("didDismissSearchController")
+        if let channel = pendingOpenChannel {
+            channelListRouter.showChannelViewController(channel: channel)
+            pendingOpenChannel = nil
+        }
     }
 }
