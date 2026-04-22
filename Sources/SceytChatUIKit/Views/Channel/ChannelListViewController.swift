@@ -636,7 +636,6 @@ private extension ChannelListViewController {
 
 extension ChannelListViewController: UISearchControllerDelegate {
     public func didDismissSearchController(_ searchController: UISearchController) {
-        print("didDismissSearchController")
         if let channel = pendingOpenChannel {
             channelListRouter.showChannelViewController(channel: channel)
             pendingOpenChannel = nil
