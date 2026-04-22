@@ -62,6 +62,8 @@ open class GlobalSearchMessageCell: TableViewCell {
     private func attributedStatus(channel: ChatChannel, message: ChatMessage) -> NSAttributedString {
         let bodyFont = appearance.subtitleLabelAppearance?.font ?? Fonts.regular.withSize(15)
         let bodyColor = appearance.subtitleLabelAppearance?.foregroundColor ?? UIColor.secondaryText
+        let mentionFont = appearance.senderNameLabelAppearance.font
+        let mentionColor = appearance.senderNameLabelAppearance.foregroundColor
 
         // System messages: show formatted text same as ChannelCell
         if message.isSystemMessage {
@@ -85,18 +87,38 @@ open class GlobalSearchMessageCell: TableViewCell {
             ))
         }
 
-        let (snippet, bodyUTF16Offset, prefixLength) = makeSnippet(body: message.body, query: searchQuery)
+        let resolvedBody = resolveBodyWithMentions(message: message)
+        let (snippet, bodyUTF16Offset, prefixLength) = makeSnippet(body: resolvedBody, query: searchQuery)
         let bodyStart = result.length
         result.append(NSAttributedString(
             string: snippet,
             attributes: [.font: bodyFont, .foregroundColor: bodyColor]
         ))
 
-        // Apply body attributes (bold, italic, monospace, strikethrough, underline)
+        // Apply mention styling within the snippet
+        if let mentionedUsers = message.mentionedUsers, !mentionedUsers.isEmpty, !snippet.isEmpty {
+            let mentionPrefix = SceytChatUIKit.shared.config.mentionTriggerPrefix
+            for user in mentionedUsers {
+                let displayName = mentionPrefix + SceytChatUIKit.shared.formatters.userShortNameFormatter.format(user)
+                let searchRange = NSRange(location: 0, length: (snippet as NSString).length)
+                let escaped = NSRegularExpression.escapedPattern(for: displayName)
+                guard let regex = try? NSRegularExpression(pattern: "(?i)\(escaped)") else { continue }
+                for match in regex.matches(in: snippet, range: searchRange) {
+                    let range = NSRange(location: bodyStart + match.range.location, length: match.range.length)
+                    guard range.location + range.length <= result.length else { continue }
+                    result.addAttributes([
+                        .font: mentionFont,
+                        .foregroundColor: mentionColor
+                    ], range: range)
+                }
+            }
+        }
+
+        // Apply body attributes (bold, italic, monospace, strikethrough, underline) — skip mentions
         if let bodyAttributes = message.bodyAttributes, !snippet.isEmpty {
             let snippetNSLength = (snippet as NSString).length
 
-            bodyAttributes.reduce([NSRange: [ChatMessage.BodyAttribute]]()) { partialResult, bodyAttribute in
+            bodyAttributes.filter({ $0.type != .mention }).reduce([NSRange: [ChatMessage.BodyAttribute]]()) { partialResult, bodyAttribute in
                 // Adjust attribute offset relative to the snippet
                 let originalStart = bodyAttribute.offset
                 let originalEnd = originalStart + bodyAttribute.length
@@ -159,6 +181,52 @@ open class GlobalSearchMessageCell: TableViewCell {
         }
 
         return result
+    }
+
+    /// Resolves mention placeholders in the message body, replacing them with `@DisplayName`.
+    private func resolveBodyWithMentions(message: ChatMessage) -> String {
+        var body = message.body
+        let mentionPrefix = SceytChatUIKit.shared.config.mentionTriggerPrefix
+        let nameFormatter = SceytChatUIKit.shared.formatters.userShortNameFormatter
+
+        // Handle metadata-based mentions (legacy)
+        if let mentionedUsers = message.mentionedUsers,
+           !mentionedUsers.isEmpty,
+           let metadata = message.metadata?.data(using: .utf8),
+           let ranges = try? JSONDecoder().decode([MentionUserPos].self, from: metadata) {
+            let nsBody = NSMutableString(string: body)
+            for pos in ranges.sorted(by: { $0.loc > $1.loc }) {
+                guard let user = mentionedUsers.first(where: { $0.id == pos.id }),
+                      pos.loc >= 0,
+                      pos.loc + pos.len <= nsBody.length else { continue }
+                let replacement = mentionPrefix + nameFormatter.format(user)
+                nsBody.replaceCharacters(in: NSRange(location: pos.loc, length: pos.len), with: replacement)
+            }
+            body = nsBody as String
+        }
+
+        // Handle bodyAttributes-based mentions
+        if let bodyAttributes = message.bodyAttributes {
+            let mentionAttrs = bodyAttributes
+                .filter { $0.type == .mention }
+                .sorted(by: { $0.offset > $1.offset })
+
+            if !mentionAttrs.isEmpty {
+                let nsBody = NSMutableString(string: body)
+                for attr in mentionAttrs {
+                    guard let userId = attr.metadata,
+                          let user = message.mentionedUsers?.first(where: { $0.id == userId }) else { continue }
+                    let location = max(0, min(nsBody.length - 1, attr.offset))
+                    let length = max(0, min(nsBody.length - location, attr.length))
+                    guard location + length <= nsBody.length else { continue }
+                    let replacement = mentionPrefix + nameFormatter.format(user)
+                    nsBody.replaceCharacters(in: NSRange(location: location, length: length), with: replacement)
+                }
+                body = nsBody as String
+            }
+        }
+
+        return body
     }
 
     /// Returns a snippet of `body` that includes the first search match,
