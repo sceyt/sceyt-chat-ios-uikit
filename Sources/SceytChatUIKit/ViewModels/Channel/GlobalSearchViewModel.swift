@@ -63,16 +63,21 @@ open class GlobalSearchViewModel: NSObject {
     }
 
     open func startDatabaseObserver() {
+        guard !channelObserver.isObserverStarted else { return }
         channelObserver.onDidChange = { [weak self] _, paths, _ in
             self?.rebuildChannels(changeItems: paths.changeItems)
         }
         channelObserver.startObserver()
     }
 
+    open func stopDatabaseObserver() {
+        channelObserver.stopObserver()
+    }
+
     // MARK: - Browse mode
 
     private func rebuildChannels(changeItems: [LazyDatabaseObserver<ChannelDTO, ChatChannel>.ChangeItem] = []) {
-        guard !isSearchActive else { return }
+        guard !isSearchActive, channelObserver.isObserverStarted else { return }
         var result: [ChatChannel] = []
         channelObserver.forEach { _, channel in
             result.append(channel)

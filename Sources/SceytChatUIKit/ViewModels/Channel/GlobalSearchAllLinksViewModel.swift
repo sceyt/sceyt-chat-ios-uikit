@@ -209,6 +209,14 @@ open class GlobalSearchAllLinksViewModel: NSObject {
     /// skip that snapshot so we don't restart the observers on first fetch.
     private var didReceiveInitialDeletionSnapshot = false
 
+    open func stopDatabaseObserver() {
+        allLinksObserver.stopObserver()
+        searchObserver.stopObserver()
+        deletedMessageObserver?.stopObserver()
+        deletedMessageObserver = nil
+        didReceiveInitialDeletionSnapshot = false
+    }
+
     open func startDatabaseObserver() {
         allLinksObserver.onDidChange = { [weak self] _, paths, _ in
             guard let self else { return }

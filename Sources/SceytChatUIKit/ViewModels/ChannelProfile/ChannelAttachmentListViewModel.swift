@@ -300,6 +300,7 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
     var thumbnailSize: CGSize { get set }
     var minAutoDownloadSize: Int { get }
     func startDatabaseObserver()
+    func stopDatabaseObserver()
     func loadAttachments()
     func attachmentLayout(
         at indexPath: IndexPath,
@@ -327,6 +328,7 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
 public extension ChannelAttachmentListViewModelProviding {
     var hasMore: Bool { true }
     func search(query: String?, filterUser: ChatUser?) {}
+    func stopDatabaseObserver() {}
     var isFiltered: Bool { false }
     func attachmentLayout(at indexPath: IndexPath) -> MessageLayoutModel.AttachmentLayout? {
         attachmentLayout(at: indexPath, onLoadThumbnail: nil, onLoadLinkMetadata: nil)

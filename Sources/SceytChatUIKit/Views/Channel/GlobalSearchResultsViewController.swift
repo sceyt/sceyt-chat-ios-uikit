@@ -42,11 +42,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     open lazy var categoryTabBar = CategoryTabBar(categories: Category.allCases.map { $0.title })
         .withoutAutoresizingMask
 
-    open lazy var pageViewController = UIPageViewController(
-        transitionStyle: .scroll,
-        navigationOrientation: .horizontal,
-        options: nil
-    )
+    open var pageViewController: UIPageViewController!
 
     /// Container that owns the pageViewController's view, so UIPageViewController's
     /// internal layout doesn't conflict with our categoryTabBar constraints.
@@ -73,64 +69,20 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     /// Called when the user taps a file attachment in the Files tab.
     public var onSelectAttachment: ((ChatMessage.Attachment) -> Void)?
 
-    open lazy var chatsPage: ChatsPageViewController = {
-        let vc = Components.globalSearchChatsPageViewController.init()
-        vc.onSelect = { [weak self] channel in
-            self?.resultsUpdater.select(channel)
-        }
-        vc.onSelectMessage = { [weak self] message, channel in
-            guard let channel else { return }
-            self?.onSelectMessage?(message, channel)
-        }
-        return vc
-    }()
-
-    open lazy var channelsPage: ChannelsPageViewController = {
-        let vc = ChannelsPageViewController()
-        vc.onSelect = { [weak self] channel in
-            self?.resultsUpdater.select(channel)
-        }
-        vc.onSelectMessage = { [weak self] message, channel in
-            guard let channel else { return }
-            self?.onSelectMessage?(message, channel)
-        }
-        return vc
-    }()
+    open var chatsPage: ChatsPageViewController!
+    open var channelsPage: ChannelsPageViewController!
 
     private let channelListProvider = ChannelListProvider()
 
-    open lazy var mediaPage = MediaPageViewController()
-    open lazy var voicePage = VoicePageViewController()
-    open lazy var filesPage = FilesPageViewController()
-    open lazy var linksPage = LinksPageViewController()
+    open var mediaPage: MediaPageViewController!
+    open var voicePage: VoicePageViewController!
+    open var filesPage: FilesPageViewController!
+    open var linksPage: LinksPageViewController!
 
-    /// Loads all image/video attachments across every channel for the Media tab initial (no-query) state.
-    open lazy var allMediaViewModel: any ChannelAttachmentListViewModelProviding =
-        Components.globalSearchAllMediaViewModel.init(
-            attachmentTypes: ["image", "video"],
-            appearance: MessageCell.appearance
-        )
-
-    /// Loads all voice attachments across every channel for the Voice tab initial (no-query) state.
-    open lazy var allVoiceViewModel: any ChannelAttachmentListViewModelProviding =
-        Components.globalSearchAllVoiceViewModel.init(
-            attachmentTypes: ["voice"],
-            appearance: MessageCell.appearance
-        )
-
-    /// Loads all file attachments across every channel for the Files tab initial (no-query) state.
-    open lazy var allFilesViewModel: any ChannelAttachmentListViewModelProviding =
-        Components.globalSearchAllFilesViewModel.init(
-            attachmentTypes: ["file"],
-            appearance: MessageCell.appearance
-        )
-
-    /// Loads all link attachments across every channel for the Links tab initial (no-query) state.
-    open lazy var allLinksViewModel: any ChannelAttachmentListViewModelProviding =
-        Components.globalSearchAllLinksViewModel.init(
-            attachmentTypes: ["link"],
-            appearance: MessageCell.appearance
-        )
+    open var allMediaViewModel: (any ChannelAttachmentListViewModelProviding)!
+    open var allVoiceViewModel: (any ChannelAttachmentListViewModelProviding)!
+    open var allFilesViewModel: (any ChannelAttachmentListViewModelProviding)!
+    open var allLinksViewModel: (any ChannelAttachmentListViewModelProviding)!
 
     public var pages: [UIViewController] {
         [chatsPage, channelsPage, mediaPage, filesPage, voicePage, linksPage]
@@ -141,6 +93,13 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     private var currentIndex: Int = 0
     private var isAnimatingPageTransition = false
     private var serverSearchWorkItem: DispatchWorkItem?
+
+    /// The last query passed to `search(query:)`. Stored so that when the user
+    /// switches tabs we can apply it to the newly-visible page on demand.
+    private var pendingSearchQuery: String?
+    /// Tracks which category tabs have already been searched with the current query
+    /// so we don't re-search them when swiping back.
+    private var searchedCategories: Set<Int> = []
 
     // MARK: - Init
 
@@ -160,12 +119,59 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         categoryTabBar.onSelect = { [weak self] index in
             self?.selectPage(at: index, animated: true)
         }
+        buildPages()
+    }
 
-        pageViewController.dataSource = self
-        pageViewController.delegate = self
-        pageViewController.setViewControllers([chatsPage], direction: .forward, animated: false)
+    /// Creates fresh page VCs, view models, and the pageViewController,
+    /// then adds it as a child and wires everything up.
+    open func buildPages() {
+        // View models
+        allMediaViewModel = Components.globalSearchAllMediaViewModel.init(
+            attachmentTypes: ["image", "video"],
+            appearance: MessageCell.appearance
+        )
+        allVoiceViewModel = Components.globalSearchAllVoiceViewModel.init(
+            attachmentTypes: ["voice"],
+            appearance: MessageCell.appearance
+        )
+        allFilesViewModel = Components.globalSearchAllFilesViewModel.init(
+            attachmentTypes: ["file"],
+            appearance: MessageCell.appearance
+        )
+        allLinksViewModel = Components.globalSearchAllLinksViewModel.init(
+            attachmentTypes: ["link"],
+            appearance: MessageCell.appearance
+        )
 
-        addChild(pageViewController)
+        // Page VCs
+        chatsPage = {
+            let vc = Components.globalSearchChatsPageViewController.init()
+            vc.onSelect = { [weak self] channel in
+                self?.resultsUpdater.select(channel)
+            }
+            vc.onSelectMessage = { [weak self] message, channel in
+                guard let channel else { return }
+                self?.onSelectMessage?(message, channel)
+            }
+            return vc
+        }()
+
+        channelsPage = {
+            let vc = ChannelsPageViewController()
+            vc.onSelect = { [weak self] channel in
+                self?.resultsUpdater.select(channel)
+            }
+            vc.onSelectMessage = { [weak self] message, channel in
+                guard let channel else { return }
+                self?.onSelectMessage?(message, channel)
+            }
+            return vc
+        }()
+
+        mediaPage = MediaPageViewController()
+        voicePage = VoicePageViewController()
+        filesPage = FilesPageViewController()
+        linksPage = LinksPageViewController()
 
         mediaPage.configure(mediaViewModel: allMediaViewModel)
         mediaPage.collectionView.previewer = { [weak self] in
@@ -193,7 +199,64 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         }
         linksPage.configure(linkViewModel: allLinksViewModel)
 
-        // searchUserBarView.onSelect can be customized by subclasses or the presenting VC
+        // Page view controller
+        pageViewController = UIPageViewController(
+            transitionStyle: .scroll,
+            navigationOrientation: .horizontal,
+            options: nil
+        )
+        pageViewController.dataSource = self
+        pageViewController.delegate = self
+        pageViewController.setViewControllers([chatsPage], direction: .forward, animated: false)
+        addChild(pageViewController)
+
+        if isViewLoaded {
+            // Re-adding after a teardown — re-embed in the container
+            pageContainerView.addSubview(pageViewController.view.withoutAutoresizingMask)
+            pageViewController.view.pin(to: pageContainerView)
+            pageViewController.didMove(toParent: self)
+            applyPageAppearance()
+            DispatchQueue.main.async { [weak self] in
+                self?.attachPageScrollObservation()
+            }
+        }
+    }
+
+    /// Removes the pageViewController and all its children, releasing page VCs
+    /// and view models so observers and listeners stop.
+    open func tearDownPages() {
+        pageScrollObservation?.invalidate()
+        pageScrollObservation = nil
+
+        pageViewController?.willMove(toParent: nil)
+        pageViewController?.view.removeFromSuperview()
+        pageViewController?.removeFromParent()
+        pageViewController = nil
+
+        chatsPage = nil
+        channelsPage = nil
+        mediaPage = nil
+        voicePage = nil
+        filesPage = nil
+        linksPage = nil
+        allMediaViewModel = nil
+        allVoiceViewModel = nil
+        allFilesViewModel = nil
+        allLinksViewModel = nil
+
+        currentIndex = 0
+        pendingSearchQuery = nil
+        searchedCategories.removeAll()
+    }
+
+    private func applyPageAppearance() {
+        if let appearance = appearance as? Appearance {
+            chatsPage?.cellAppearance = appearance.cellAppearance
+            chatsPage?.separatorViewAppearance = appearance.separatorViewAppearance
+            chatsPage?.messagesSeparatorViewAppearance = appearance.messagesSeparatorViewAppearance
+            channelsPage?.separatorViewAppearance = appearance.channelsSeparatorViewAppearance
+            channelsPage?.messagesSeparatorViewAppearance = appearance.messagesSeparatorViewAppearance
+        }
     }
 
     override open func setupLayout() {
@@ -216,16 +279,13 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             pageContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             pageContainerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
 
-            pageViewController.view.topAnchor.constraint(equalTo: pageContainerView.topAnchor),
-            pageViewController.view.leadingAnchor.constraint(equalTo: pageContainerView.leadingAnchor),
-            pageViewController.view.trailingAnchor.constraint(equalTo: pageContainerView.trailingAnchor),
-            pageViewController.view.bottomAnchor.constraint(equalTo: pageContainerView.bottomAnchor),
-
             searchUserBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             searchUserBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             searchUserBarView.heightAnchor.constraint(equalToConstant: GlobalSearchUserBarView.Layouts.height),
             userBarBottom
         ])
+
+        pageViewController.view.pin(to: pageContainerView)
 
         searchUserBarView.alpha = 0
         searchUserBarView.isUserInteractionEnabled = false
@@ -235,13 +295,9 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         view.backgroundColor = appearance.backgroundColor
         if let appearance = appearance as? Appearance {
             categoryTabBar.appearance = appearance.tabBarAppearance
-            chatsPage.cellAppearance = appearance.cellAppearance
-            chatsPage.separatorViewAppearance = appearance.separatorViewAppearance
-            chatsPage.messagesSeparatorViewAppearance = appearance.messagesSeparatorViewAppearance
-            channelsPage.separatorViewAppearance = appearance.channelsSeparatorViewAppearance
-            channelsPage.messagesSeparatorViewAppearance = appearance.messagesSeparatorViewAppearance
             searchUserBarView.parentAppearance = appearance.userBarAppearance
         }
+        applyPageAppearance()
     }
 
     override open func setupDone() {
@@ -326,20 +382,9 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     // MARK: - Public API
 
     @objc open func search(query: String?) {
-        chatsPage.viewModel.filterUser = filterUser
-        chatsPage.messagesViewModel.filterUser = filterUser
-        chatsPage.search(query: query)
-        channelsPage.viewModel.filterUser = filterUser
-        channelsPage.messagesViewModel.filterUser = filterUser
-        channelsPage.search(query: query)
-        allMediaViewModel.search(query: query, filterUser: filterUser)
-        allVoiceViewModel.search(query: query, filterUser: filterUser)
-        allFilesViewModel.search(query: query, filterUser: filterUser)
-        allLinksViewModel.search(query: query, filterUser: filterUser)
-        mediaPage.searchQuery = query
-        linksPage.searchQuery = query
-        if mediaPage.isViewLoaded { mediaPage.reloadSearchTable() }
-        if linksPage.isViewLoaded { linksPage.reloadSearchTable() }
+        guard pageViewController != nil else { return }
+        pendingSearchQuery = query
+        searchedCategories.removeAll()
         searchUserBarView.viewModel.search(query: query)
         let hasQuery = !(query ?? "").isEmpty
         if !hasQuery { setUserBarVisible(false, animated: true) }
@@ -350,6 +395,38 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             }
             serverSearchWorkItem = workItem
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
+        }
+        applySearchForCategory(currentIndex)
+    }
+
+    /// Applies the current `pendingSearchQuery` to the given category index
+    /// if it hasn't been applied yet.
+    open func applySearchForCategory(_ categoryIndex: Int) {
+        guard !searchedCategories.contains(categoryIndex) else { return }
+        searchedCategories.insert(categoryIndex)
+        let query = pendingSearchQuery
+        guard let category = Category(rawValue: categoryIndex) else { return }
+        switch category {
+        case .chats:
+            chatsPage.viewModel.filterUser = filterUser
+            chatsPage.messagesViewModel.filterUser = filterUser
+            chatsPage.search(query: query)
+        case .channels:
+            channelsPage.viewModel.filterUser = filterUser
+            channelsPage.messagesViewModel.filterUser = filterUser
+            channelsPage.search(query: query)
+        case .media:
+            allMediaViewModel.search(query: query, filterUser: filterUser)
+            mediaPage.searchQuery = query
+            if mediaPage.isViewLoaded { mediaPage.reloadSearchTable() }
+        case .files:
+            allFilesViewModel.search(query: query, filterUser: filterUser)
+        case .voice:
+            allVoiceViewModel.search(query: query, filterUser: filterUser)
+        case .links:
+            allLinksViewModel.search(query: query, filterUser: filterUser)
+            linksPage.searchQuery = query
+            if linksPage.isViewLoaded { linksPage.reloadSearchTable() }
         }
     }
 
@@ -366,8 +443,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     }
 
     override open func reloadData() {
-        chatsPage.reloadData()
-        channelsPage.reloadData()
+        chatsPage?.reloadData()
+        channelsPage?.reloadData()
     }
 
     override open func showEmptyViewIfNeeded() {
@@ -392,7 +469,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     // MARK: - Page Navigation
 
     open func selectPage(at index: Int, animated: Bool) {
-        guard index != currentIndex, pages.indices.contains(index) else { return }
+        guard pageViewController != nil, index != currentIndex, pages.indices.contains(index) else { return }
         let direction: UIPageViewController.NavigationDirection = index > currentIndex ? .forward : .reverse
         isAnimatingPageTransition = true
         pageViewController.setViewControllers([pages[index]], direction: direction, animated: animated) { [weak self] _ in
@@ -400,6 +477,7 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         }
         categoryTabBar.setSelectedIndex(index, animated: animated)
         currentIndex = index
+        applySearchForCategory(index)
     }
 
     // MARK: - UIPageViewControllerDataSource
@@ -421,6 +499,16 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     }
 
     // MARK: - UIPageViewControllerDelegate
+
+    open func pageViewController(
+        _ pageViewController: UIPageViewController,
+        willTransitionTo pendingViewControllers: [UIViewController]
+    ) {
+        guard let pendingVC = pendingViewControllers.first,
+              let index = pages.firstIndex(of: pendingVC)
+        else { return }
+        applySearchForCategory(index)
+    }
 
     open func pageViewController(
         _ pageViewController: UIPageViewController,
@@ -452,7 +540,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     private var pageScrollObservation: NSKeyValueObservation?
 
     private func attachPageScrollObservation() {
-        guard let scrollView = pageViewController.view.subviews.compactMap({ $0 as? UIScrollView }).first
+        guard let pageVC = pageViewController,
+              let scrollView = pageVC.view.subviews.compactMap({ $0 as? UIScrollView }).first
         else { return }
 
         pageScrollObservation = scrollView.observe(\.contentOffset, options: [.new]) { [weak self] sv, _ in

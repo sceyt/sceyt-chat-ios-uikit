@@ -241,6 +241,17 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     /// `roleQualifiedChannelIds` before starting the observer, so skip that snapshot.
     private var didReceiveInitialChannelRoleSnapshot = false
 
+    open func stopDatabaseObserver() {
+        allAttachmentsObserver.stopObserver()
+        searchObserver.stopObserver()
+        deletedMessageObserver?.stopObserver()
+        deletedMessageObserver = nil
+        didReceiveInitialDeletionSnapshot = false
+        channelRoleObserver?.stopObserver()
+        channelRoleObserver = nil
+        didReceiveInitialChannelRoleSnapshot = false
+    }
+
     open func startDatabaseObserver() {
         _ = refreshRoleQualifiedChannelIds()
         allAttachmentsObserver.onDidChange = { [weak self] _, paths, _ in

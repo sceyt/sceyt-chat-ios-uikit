@@ -147,6 +147,13 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
     /// skip that snapshot so we don't restart the observer on first fetch.
     private var didReceiveInitialDeletionSnapshot = false
 
+    open func stopDatabaseObserver() {
+        attachmentObserver.stopObserver()
+        deletedMessageObserver?.stopObserver()
+        deletedMessageObserver = nil
+        didReceiveInitialDeletionSnapshot = false
+    }
+
     open func startDatabaseObserver() {
         attachmentObserver.onDidChange = { [weak self] _, paths, _ in
             self?.onDidChangeEvent(items: paths)

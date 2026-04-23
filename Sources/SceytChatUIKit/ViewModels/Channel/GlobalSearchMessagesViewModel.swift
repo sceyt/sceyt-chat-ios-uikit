@@ -98,6 +98,14 @@ open class GlobalSearchMessagesViewModel: NSObject {
 
     // MARK: - Observer
 
+    open func stopDatabaseObserver() {
+        deletedMessageObserver?.stopObserver()
+        deletedMessageObserver = nil
+        didReceiveInitialDeletionSnapshot = false
+        currentSearchTask?.cancel()
+        loadMoreTask?.cancel()
+    }
+
     /// Starts observing message deletions so the search results drop rows when another
     /// user (or the current user from a different device) deletes a message that's in view.
     open func startDatabaseObserver() {

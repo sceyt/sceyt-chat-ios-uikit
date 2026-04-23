@@ -637,11 +637,17 @@ private extension ChannelListViewController {
 extension ChannelListViewController: UISearchControllerDelegate {
     public func willPresentSearchController(_ searchController: UISearchController) {
         if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
-            globalVC.selectPage(at: 0, animated: false)
+            if globalVC.pageViewController == nil {
+                globalVC.buildPages()
+                globalVC.categoryTabBar.setSelectedIndex(0, animated: false)
+            }
         }
     }
 
     public func didDismissSearchController(_ searchController: UISearchController) {
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            globalVC.tearDownPages()
+        }
         if let channel = pendingOpenChannel {
             channelListRouter.showChannelViewController(channel: channel)
             pendingOpenChannel = nil
