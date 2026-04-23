@@ -306,6 +306,7 @@ public struct Operations {
         let provider = Components.channelListProvider.init()
         provider.config.queryLimit = 10
         let fetchChannels = FetchAllChannelsOperation(query: provider.defaultQuery)
+        fetchChannels.onLoad = onLoad
 
         let deleteChannels = DeleteChannelsOperation(database: DataProvider.database, channelIds: undeleteChannelIds)
         
