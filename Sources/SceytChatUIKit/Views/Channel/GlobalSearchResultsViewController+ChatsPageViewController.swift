@@ -28,6 +28,7 @@ extension GlobalSearchResultsViewController {
         /// Captured atomically inside reloadData() before tableView.reloadData() is called,
         /// preventing index-out-of-range crashes caused by async updates racing with cell dequeue.
         private var chatMessagesSnapshot: [ChatMessage] = []
+        private var channelsSnapshot: [ChatChannel] = []
 
         /// Section 0: matching chat channels (by subject).
         open lazy var viewModel: GlobalSearchViewModel = {
@@ -144,11 +145,12 @@ extension GlobalSearchResultsViewController {
                 }
             }
             layoutModels = updated
-            // Snapshot before reloadData() so numberOfRowsInSection and cellForRowAt
-            // always see the same array, even if the VM updates concurrently.
+            // Snapshot both arrays before reloadData() so numberOfRowsInSection and cellForRowAt
+            // always see the same data, even if the VM updates concurrently.
+            channelsSnapshot = channels
             chatMessagesSnapshot = messagesViewModel.chatMessages
             tableView.reloadData()
-            let hasVisibleChannels = viewModel.shouldShowChannelSection && !channels.isEmpty
+            let hasVisibleChannels = viewModel.shouldShowChannelSection && !channelsSnapshot.isEmpty
             emptyStateView.isHidden = pendingResponseCount > 0 || hasVisibleChannels || !chatMessagesSnapshot.isEmpty
         }
 
@@ -158,7 +160,7 @@ extension GlobalSearchResultsViewController {
 
         override public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
             switch section {
-            case 0: return viewModel.shouldShowChannelSection ? channels.count : 0
+            case 0: return viewModel.shouldShowChannelSection ? channelsSnapshot.count : 0
             case 1: return showMessagesSection ? chatMessagesSnapshot.count : 0
             default: return 0
             }
@@ -167,9 +169,12 @@ extension GlobalSearchResultsViewController {
         override public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
             switch indexPath.section {
             case 0:
+                guard channelsSnapshot.indices.contains(indexPath.row) else {
+                    return UITableViewCell()
+                }
                 let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.globalSearchChatsChannelCell)
                 cell.parentAppearance = cellAppearance
-                let channel = channels[indexPath.row]
+                let channel = channelsSnapshot[indexPath.row]
                 cell.data = layoutModels[channel]
                 return cell
             default:
@@ -188,7 +193,7 @@ extension GlobalSearchResultsViewController {
         public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
             switch section {
             case 0:
-                guard viewModel.shouldShowChannelSection, !channels.isEmpty else { return nil }
+                guard viewModel.shouldShowChannelSection, !channelsSnapshot.isEmpty else { return nil }
                 let header = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)
                 header.parentAppearance = separatorViewAppearance
                 return header
@@ -204,7 +209,7 @@ extension GlobalSearchResultsViewController {
 
         public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
             switch section {
-            case 0: return (viewModel.shouldShowChannelSection && !channels.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
+            case 0: return (viewModel.shouldShowChannelSection && !channelsSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
             case 1: return (showMessagesSection && !chatMessagesSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
             default: return 0
             }
@@ -223,7 +228,9 @@ extension GlobalSearchResultsViewController {
         override public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
             tableView.deselectRow(at: indexPath, animated: true)
             switch indexPath.section {
-            case 0: onSelect?(channels[indexPath.row])
+            case 0:
+                guard channelsSnapshot.indices.contains(indexPath.row) else { return }
+                onSelect?(channelsSnapshot[indexPath.row])
             default:
                 guard chatMessagesSnapshot.indices.contains(indexPath.row) else { return }
                 let message = chatMessagesSnapshot[indexPath.row]
