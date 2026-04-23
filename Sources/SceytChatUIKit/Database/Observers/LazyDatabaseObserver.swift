@@ -86,6 +86,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         } else {
             keyPaths = .init()
         }
+        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] init | predicate: \(fetchPredicate)")
     }
     
     open func startObserver(
@@ -95,13 +96,14 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         completion: (() -> Void)? = nil
     ) {
         let effectivePredicate = fetchPredicate ?? self.fetchPredicate
-        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] startObserver")
+        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] startObserver | predicate: \(effectivePredicate)")
+        logger.debug("[MESS] STARTED")
             self.fetchPredicate = fetchPredicate ?? self.fetchPredicate
             self.fetchOffset = max(0, fetchOffset)
             self.fetchLimit = max(0, fetchLimit)
             self.currentFetchOffset = self.fetchOffset
             context.perform {
-                logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] fetchRequest | limit: \(self.fetchLimit) | offset: \(self.fetchOffset)")
+                logger.debug("[MESS] STARTED PERFORM")
                 guard let request = DTO.fetchRequest() as? NSFetchRequest<DTO> else { return }
                 var changeItems = [ChangeItem]()
                 var changeSections = [ChangeSection]()
@@ -109,6 +111,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 request.predicate = self.fetchPredicate
                 request.fetchLimit = self.fetchLimit
                 request.fetchOffset = self.fetchOffset
+                logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] fetchRequest | predicate: \(self.fetchPredicate) | limit: \(self.fetchLimit) | offset: \(self.fetchOffset)")
                 self.clearCache()
                 var insertCache = self.mainCaches.workingCache
                 self.fetchObjects(context: self.context,
@@ -141,7 +144,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         fetchPredicate: NSPredicate,
         offset: Int? = nil,
         completion: (() -> Void)? = nil) {
-            logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver")
+            logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver | new: \(fetchPredicate)")
             if isObserverRestarting {
                 logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver SKIPPED (already restarting)")
                 return
@@ -162,6 +165,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     
     open func update(predicate: NSPredicate, fetchOffset: Int = Int.max) {
+        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] update(predicate:) | new: \(predicate)")
         writeCache {
             self.fetchPredicate = predicate
             self.currentFetchOffset = max(0, fetchOffset == Int.max ? self.currentFetchOffset : fetchOffset)
