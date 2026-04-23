@@ -34,6 +34,7 @@ extension GlobalSearchResultsViewController {
             emptyStateView.title = L10n.Search.NoResults.title
             emptyStateView.message = L10n.Search.NoResults.message
             emptyStateView.icon = .noResultsSearch
+            emptyStateView.isHidden = true
         }
 
         override open func setupLayout() {
