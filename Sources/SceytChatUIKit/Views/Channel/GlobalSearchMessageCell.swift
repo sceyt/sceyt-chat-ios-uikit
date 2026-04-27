@@ -99,7 +99,7 @@ open class GlobalSearchMessageCell: TableViewCell {
         if let mentionedUsers = message.mentionedUsers, !mentionedUsers.isEmpty, !snippet.isEmpty {
             let mentionPrefix = SceytChatUIKit.shared.config.mentionTriggerPrefix
             for user in mentionedUsers {
-                let displayName = mentionPrefix + SceytChatUIKit.shared.formatters.userShortNameFormatter.format(user)
+                let displayName = mentionPrefix + mentionDisplayName(for: user)
                 let searchRange = NSRange(location: 0, length: (snippet as NSString).length)
                 let escaped = NSRegularExpression.escapedPattern(for: displayName)
                 guard let regex = try? NSRegularExpression(pattern: "(?i)\(escaped)") else { continue }
@@ -183,11 +183,25 @@ open class GlobalSearchMessageCell: TableViewCell {
         return result
     }
 
+    /// Returns the user's display name for mentions.
+    /// For the current user, returns the real name instead of "You".
+    private func mentionDisplayName(for user: ChatUser) -> String {
+        if user.id == SceytChatUIKit.shared.currentUserId {
+            let displayName = [user.firstName, user.lastName]
+                .compactMap {
+                    let name = $0?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    return name.isEmpty ? nil : name
+                }
+                .joined(separator: " ")
+            return displayName.isEmpty ? user.id : displayName
+        }
+        return SceytChatUIKit.shared.formatters.userShortNameFormatter.format(user)
+    }
+
     /// Resolves mention placeholders in the message body, replacing them with `@DisplayName`.
     private func resolveBodyWithMentions(message: ChatMessage) -> String {
         var body = message.body
         let mentionPrefix = SceytChatUIKit.shared.config.mentionTriggerPrefix
-        let nameFormatter = SceytChatUIKit.shared.formatters.userShortNameFormatter
 
         // Handle metadata-based mentions (legacy)
         if let mentionedUsers = message.mentionedUsers,
@@ -199,7 +213,7 @@ open class GlobalSearchMessageCell: TableViewCell {
                 guard let user = mentionedUsers.first(where: { $0.id == pos.id }),
                       pos.loc >= 0,
                       pos.loc + pos.len <= nsBody.length else { continue }
-                let replacement = mentionPrefix + nameFormatter.format(user)
+                let replacement = mentionPrefix + mentionDisplayName(for: user)
                 nsBody.replaceCharacters(in: NSRange(location: pos.loc, length: pos.len), with: replacement)
             }
             body = nsBody as String
@@ -219,7 +233,7 @@ open class GlobalSearchMessageCell: TableViewCell {
                     let location = max(0, min(nsBody.length - 1, attr.offset))
                     let length = max(0, min(nsBody.length - location, attr.length))
                     guard location + length <= nsBody.length else { continue }
-                    let replacement = mentionPrefix + nameFormatter.format(user)
+                    let replacement = mentionPrefix + mentionDisplayName(for: user)
                     nsBody.replaceCharacters(in: NSRange(location: location, length: length), with: replacement)
                 }
                 body = nsBody as String
