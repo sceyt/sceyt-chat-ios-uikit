@@ -179,7 +179,7 @@ extension ChannelListViewController {
 
             retentionBadgeView.image = appearance.retentionBadgeImage
             retentionBadgeView.contentMode = .scaleAspectFit
-            retentionBadgeView.layer.borderColor = DefaultColors.background.cgColor
+            retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
             retentionBadgeView.layer.borderWidth = 2
             retentionBadgeView.layer.cornerRadius = 11
             retentionBadgeView.clipsToBounds = true
@@ -192,7 +192,13 @@ extension ChannelListViewController {
             pinView.isHidden = true
             muteView.isHidden = true
         }
-        
+
+        override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+            guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
+            retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
+        }
+
         // MARK: - Event Management Methods
         private func addEvent(_ event: ChannelEventView.Event, for user: ChatUser) {
             let model = ChannelEventModel(

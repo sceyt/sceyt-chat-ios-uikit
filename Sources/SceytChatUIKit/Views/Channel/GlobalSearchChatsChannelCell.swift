@@ -171,7 +171,7 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
 
             retentionBadgeView.image = appearance.retentionBadgeImage
             retentionBadgeView.contentMode = .scaleAspectFit
-            retentionBadgeView.layer.borderColor = DefaultColors.background.cgColor
+            retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
             retentionBadgeView.layer.borderWidth = 2
             retentionBadgeView.layer.cornerRadius = 11
             retentionBadgeView.clipsToBounds = true
@@ -184,7 +184,13 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
             pinView.isHidden = true
             muteView.isHidden = true
         }
-        
+
+        override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+            guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
+            retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
+        }
+
         private func updateConstraint() {
             if !unreadCount.isHidden {
                 unreadCountWidthAnchorConstraint?.constant = 20

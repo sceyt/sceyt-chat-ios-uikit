@@ -757,6 +757,11 @@ extension GlobalSearchResultsViewController {
         open func updateIndicatorProgress(progress: CGFloat, currentIndex: Int, pageCount: Int) {
             guard !tabButtons.isEmpty else { return }
 
+            guard abs(progress) > 0.01 else {
+                updateTabStates()
+                return
+            }
+
             let fromIndex = max(0, min(currentIndex, tabButtons.count - 1))
             let toIndex: Int
             let t: CGFloat  // 0…1
@@ -764,11 +769,9 @@ extension GlobalSearchResultsViewController {
             if progress < 0 {
                 toIndex = max(0, fromIndex - 1)
                 t = -progress
-            } else if progress > 0 {
+            } else {
                 toIndex = min(pageCount - 1, fromIndex + 1)
                 t = progress
-            } else {
-                return
             }
 
             guard tabButtons.indices.contains(fromIndex), tabButtons.indices.contains(toIndex) else { return }
@@ -786,13 +789,15 @@ extension GlobalSearchResultsViewController {
             indicatorLeading.constant = fromX + (toX - fromX) * t
             indicatorWidth.constant = fromW + (toW - fromW) * t
 
-            // Interpolate text colour, background colour and border colour
-            let selectedText = appearance.selectedTabColor
-            let unselectedText = appearance.unselectedTabColor
-            let selectedBg: UIColor = appearance.selectedTabBackgroundColor ?? .clear
-            // Keep both endpoints in the same colour space so getRed succeeds
+            // Resolve dynamic colours against the view's own trait collection so that
+            // KVO callbacks (which may not have UITraitCollection.current set correctly)
+            // still produce the right light/dark variant.
+            let tc = traitCollection
+            let selectedText = appearance.selectedTabColor.resolvedColor(with: tc)
+            let unselectedText = appearance.unselectedTabColor.resolvedColor(with: tc)
+            let selectedBg = (appearance.selectedTabBackgroundColor ?? .clear).resolvedColor(with: tc)
             let clearBg = selectedBg.withAlphaComponent(0)
-            let unselectedBorder = appearance.unselectedTabBorderColor
+            let unselectedBorder = appearance.unselectedTabBorderColor.resolvedColor(with: tc)
             let clearBorder = unselectedBorder.withAlphaComponent(0)
 
             tabButtons.enumerated().forEach { idx, btn in
@@ -830,11 +835,12 @@ extension GlobalSearchResultsViewController {
         }
 
         private func updateTabStates() {
+            let resolvedBorderColor = appearance.unselectedTabBorderColor.resolvedColor(with: traitCollection).cgColor
             tabButtons.enumerated().forEach { idx, btn in
                 let isSelected = idx == selectedIndex
                 btn.setTitleColor(isSelected ? appearance.selectedTabColor : appearance.unselectedTabColor, for: .normal)
                 btn.backgroundColor = isSelected ? appearance.selectedTabBackgroundColor : nil
-                btn.layer.borderColor = isSelected ? UIColor.clear.cgColor : appearance.unselectedTabBorderColor.cgColor
+                btn.layer.borderColor = isSelected ? UIColor.clear.cgColor : resolvedBorderColor
             }
         }
 
@@ -860,6 +866,7 @@ extension GlobalSearchResultsViewController {
             indicatorView.backgroundColor = appearance.indicatorColor
             stackView.spacing = appearance.tabSpacing
             scrollView.contentInset = appearance.scrollViewContentInset
+            let resolvedBorderColor = appearance.unselectedTabBorderColor.resolvedColor(with: traitCollection).cgColor
             tabButtons.enumerated().forEach { idx, btn in
                 let isSelected = idx == selectedIndex
                 btn.titleLabel?.font = appearance.tabFont
@@ -867,7 +874,7 @@ extension GlobalSearchResultsViewController {
                 btn.backgroundColor = isSelected ? appearance.selectedTabBackgroundColor : nil
                 btn.layer.cornerRadius = appearance.tabCornerRadius
                 btn.layer.borderWidth = 1
-                btn.layer.borderColor = isSelected ? UIColor.clear.cgColor : appearance.unselectedTabBorderColor.cgColor
+                btn.layer.borderColor = isSelected ? UIColor.clear.cgColor : resolvedBorderColor
                 btn.contentEdgeInsets = UIEdgeInsets(
                     top: appearance.tabVerticalPadding,
                     left: appearance.tabHorizontalPadding,
@@ -875,6 +882,12 @@ extension GlobalSearchResultsViewController {
                     right: appearance.tabHorizontalPadding
                 )
             }
+        }
+
+        override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+            guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
+            updateTabStates()
         }
 
         override open func layoutSubviews() {
