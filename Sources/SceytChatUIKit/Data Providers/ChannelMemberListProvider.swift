@@ -48,10 +48,16 @@ open class ChannelMemberListProvider: DataProvider {
     }()
 
     private lazy var othersQuery: MemberListQuery = {
-        MemberListQuery.Builder(channelId: channelId)
+        let channelType = try? database.read {
+            ChannelDTO.fetch(id: self.channelId, context: $0)?.type
+        }.get()
+        let role = channelType == SceytChatUIKit.shared.config.channelTypesConfig.broadcast
+            ? SceytChatUIKit.shared.config.memberRolesConfig.subscriber
+            : SceytChatUIKit.shared.config.memberRolesConfig.participant
+        return MemberListQuery.Builder(channelId: channelId)
             .order(queryOrder)
             .limit(UInt(queryLimit))
-            .queryRole(SceytChatUIKit.shared.config.memberRolesConfig.participant)
+            .queryRole(role)
             .build()
     }()
 
