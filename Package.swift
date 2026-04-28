@@ -23,7 +23,8 @@ let package = Package(
         .target(
             name: "SceytChatUIKit",
             dependencies: [.product(name: "SceytChat", package: "sceyt-chat-ios-sdk")],
-            resources: [.copy("Database/SceytChatModel.xcdatamodeld"), .process("Resources")]
+            resources: [.copy("Database/SceytChatModel.xcdatamodeld"), .process("Resources")],
+            linkerSettings: [.linkedLibrary("sqlite3")]
         ),
         
         .testTarget(

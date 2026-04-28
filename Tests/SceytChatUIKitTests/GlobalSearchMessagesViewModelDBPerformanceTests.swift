@@ -83,23 +83,48 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
     private func seedChannel(id: ChannelId, type: String, ctx: NSManagedObjectContext) {
         let (ch, _) = ChannelDTO.fetchOrCreate(id: id, context: ctx)
         ch.type = type
+        // Distinct sortingKey per channel to avoid the model's uniqueness
+        // constraint trump-merging seeded channels into each other.
+        ch.createdAt = Date(timeIntervalSinceReferenceDate: TimeInterval(id)).bridgeDate
     }
 
-    /// Bulk-inserts `count` messages into `ctx` in batches of `batchSize` to keep
-    /// peak memory low. `matchRate` fraction of messages will contain `targetWord`.
+    /// Bulk-inserts `count` messages into FTS, and a bounded subset into Core
+    /// Data. Per-row Core Data inserts dominate seed time at large scales (the
+    /// uniqueness constraint on MessageDTO forces a conflict-resolution pass
+    /// per save), so we cap the number of MessageDTO rows that actually get
+    /// written via `coreDataLimit`. The FTS sidecar — which is what the
+    /// benchmark is actually exercising — is always populated in full so
+    /// search timing reflects the real index size.
+    ///
+    /// The viewModel's search resolves the top-N matching messageIds back to
+    /// `MessageDTO` objects to construct ChatMessages. Provided every match
+    /// that *can* land in the top page is present in Core Data, the assertions
+    /// `resultCount > 0` and the duration-cap still hold.
+    ///
+    /// `coreDataLimit` is the maximum number of MessageDTOs to insert. We
+    /// preferentially seed the latest matching messages (highest `createdAt`),
+    /// which are exactly the ones FTS returns first under `ORDER BY createdAt
+    /// DESC`. Passing `Int.max` (default for small datasets) seeds everything.
+    /// `ctx` is unused but kept for source compatibility with prior call sites.
     private func seedMessages(
         count: Int,
         startId: Int64,
         channelId: ChannelId,
+        channelType: String,
         targetWord: String,
         matchRate: Double = 0.10,
         userId: String = "bench_user",
-        batchSize: Int = 500,
+        batchSize: Int = 25_000,
+        coreDataLimit: Int = .max,
         ctx: NSManagedObjectContext
     ) {
-        let user = UserDTO.fetchOrCreate(id: userId, context: ctx)
+        mockDB.setFTSSyncEnabled(false)
+        defer { mockDB.setFTSSyncEnabled(true) }
+
         let matchCount = Int(Double(count) * matchRate)
         let baseDate = Date()
+        let baseTimestamp = baseDate.timeIntervalSince1970
+        let chId = Int64(channelId)
 
         let noiseBodies: [String] = [
             "Good morning everyone",
@@ -108,7 +133,7 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
             "I will review this and respond shortly",
             "Sounds great, let us proceed with the plan",
             "Please share the document when ready",
-            "Looking forward to our next meeting",
+            "Looking forward to our next sync",
             "The report has been submitted for review",
             "Could you clarify the requirements",
             "See you at the standup tomorrow morning",
@@ -119,30 +144,108 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
             "Design review is set for Friday afternoon"
         ]
 
+        @inline(__always) func bodyFor(_ i: Int) -> String {
+            i < matchCount
+                ? "\(targetWord) in message number \(i)"
+                : noiseBodies[i % noiseBodies.count] + " (\(i))"
+        }
+
+        // Pre-compute which message indices we'll actually insert into Core
+        // Data. The viewModel's search returns the top-`limit` matches by
+        // createdAt DESC; matching messages all have lower `i` than noise
+        // (i ∈ [0, matchCount)), but they get sorted by their distinct
+        // `createdAt = baseTimestamp + i`, so the LATEST matching ones live at
+        // i = matchCount - 1 down to matchCount - limit. We pick the latest
+        // `coreDataLimit` matching indices so any top-page result the FTS
+        // returns has a backing MessageDTO to resolve into a ChatMessage.
+        var coreDataIndices: [Int] = []
+        if coreDataLimit > 0 {
+            let upper = matchCount  // exclusive
+            let lower = max(0, upper - coreDataLimit)
+            if lower < upper {
+                coreDataIndices.append(contentsOf: lower..<upper)
+            }
+            // If the caller asked for more than we have matches, top up with
+            // the latest noise messages so at least `coreDataLimit` rows are
+            // present overall (preserves the original test feel for medium
+            // datasets where `matchCount < coreDataLimit`).
+            if coreDataIndices.count < coreDataLimit {
+                let need = coreDataLimit - coreDataIndices.count
+                let noiseUpper = count
+                let noiseLower = max(matchCount, noiseUpper - need)
+                if noiseLower < noiseUpper {
+                    coreDataIndices.append(contentsOf: noiseLower..<noiseUpper)
+                }
+            }
+        }
+
+        // Phase 1: Insert the bounded set of MessageDTOs in a single Core Data
+        // save. Decoupling this from FTS batch flushing avoids the previous
+        // pattern of save+reset+refetch-user per FTS batch (which on xlarge
+        // forced a tiny FTS commit cadence to align with Core Data).
+        let phase1Start = CFAbsoluteTimeGetCurrent()
+        if !coreDataIndices.isEmpty {
+            let bgCtx = mockDB.container.newBackgroundContext()
+            bgCtx.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+            bgCtx.undoManager = nil
+            bgCtx.performAndWait {
+                let user = UserDTO.fetchOrCreate(id: userId, context: bgCtx)
+                for i in coreDataIndices {
+                    let messageId = startId + Int64(i)
+                    let msg = MessageDTO.insertNewObject(into: bgCtx)
+                    msg.id = messageId
+                    msg.tid = messageId
+                    msg.channelId = chId
+                    msg.state = 0
+                    msg.transient = false
+                    msg.user = user
+                    msg.createdAt = baseDate.addingTimeInterval(Double(i)).bridgeDate
+                    msg.body = bodyFor(i)
+                }
+                try? bgCtx.save()
+            }
+        }
+        let phase1Ms = (CFAbsoluteTimeGetCurrent() - phase1Start) * 1_000
+        print(String(format: "[SEED] Phase 1 (CoreData %d rows): %.1f ms",
+                     coreDataIndices.count, phase1Ms))
+
+        // Phase 2: Bulk-index FTS in large batches. `batchSize` now controls
+        // FTS commit size only, so callers on xlarge/xxlarge can crank it up
+        // without paying any Core Data cost.
+        let phase2Start = CFAbsoluteTimeGetCurrent()
+        var batchRows: [MessageSearchStore.Row] = []
+        batchRows.reserveCapacity(min(count, batchSize))
+        var indexedSoFar = 0
         for i in 0..<count {
-            let msg = MessageDTO.insertNewObject(into: ctx)
-            msg.id = startId + Int64(i)
-            msg.tid = startId + Int64(i)
-            msg.channelId = Int64(channelId)
-            msg.state = 0
-            msg.transient = false
-            msg.user = user
-            msg.createdAt = baseDate.addingTimeInterval(Double(i)).bridgeDate
-
-            if i < matchCount {
-                msg.body = "\(targetWord) in message number \(i)"
-            } else {
-                msg.body = noiseBodies[i % noiseBodies.count] + " (\(i))"
-            }
-
-            if (i + 1) % batchSize == 0 {
-                try? ctx.save()
+            let messageId = startId + Int64(i)
+            batchRows.append(MessageSearchStore.Row(
+                messageId: messageId,
+                channelId: chId,
+                channelType: channelType,
+                userId: userId,
+                createdAt: baseTimestamp + Double(i),
+                body: bodyFor(i)
+            ))
+            if batchRows.count >= batchSize {
+                let batchStart = CFAbsoluteTimeGetCurrent()
+                mockDB.messageSearchStore.bulkInsert(rows: batchRows)
+                indexedSoFar += batchRows.count
+                let batchMs = (CFAbsoluteTimeGetCurrent() - batchStart) * 1_000
+                print(String(format: "[SEED] FTS batch flushed %d (running: %d/%d) in %.1f ms",
+                             batchRows.count, indexedSoFar, count, batchMs))
+                batchRows.removeAll(keepingCapacity: true)
             }
         }
-        // Flush any remaining objects in the last partial batch.
-        if !ctx.insertedObjects.isEmpty {
-            try? ctx.save()
+        if !batchRows.isEmpty {
+            let batchStart = CFAbsoluteTimeGetCurrent()
+            mockDB.messageSearchStore.bulkInsert(rows: batchRows)
+            indexedSoFar += batchRows.count
+            let batchMs = (CFAbsoluteTimeGetCurrent() - batchStart) * 1_000
+            print(String(format: "[SEED] FTS batch flushed %d (running: %d/%d) in %.1f ms",
+                         batchRows.count, indexedSoFar, count, batchMs))
         }
+        let phase2Ms = (CFAbsoluteTimeGetCurrent() - phase2Start) * 1_000
+        print(String(format: "[SEED] Phase 2 (FTS %d rows): %.1f ms total", count, phase2Ms))
     }
 
     // MARK: - Benchmark runner
@@ -241,6 +344,7 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 1_001, type: directType, ctx: ctx)
         seedMessages(count: 1_000, startId: 1_000_000, channelId: 1_001,
+                     channelType: directType,
                      targetWord: "invoice", matchRate: 0.10, ctx: ctx)
 
         let r = runBenchmark(
@@ -259,6 +363,7 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 1_002, type: directType, ctx: ctx)
         seedMessages(count: 1_000, startId: 1_100_000, channelId: 1_002,
+                     channelType: directType,
                      targetWord: "meeting", matchRate: 0.15, ctx: ctx)
 
         let r = runBenchmark(
@@ -281,6 +386,7 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 2_001, type: groupType, ctx: ctx)
         seedMessages(count: 10_000, startId: 2_000_000, channelId: 2_001,
+                     channelType: groupType,
                      targetWord: "invoice", matchRate: 0.10, ctx: ctx)
 
         let r = runBenchmark(
@@ -300,6 +406,7 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 2_002, type: groupType, ctx: ctx)
         seedMessages(count: 10_000, startId: 2_200_000, channelId: 2_002,
+                     channelType: groupType,
                      targetWord: "meeting", matchRate: 0.15, ctx: ctx)
 
         let r = runBenchmark(
@@ -323,7 +430,9 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 3_001, type: directType, ctx: ctx)
         seedMessages(count: 50_000, startId: 5_000_000, channelId: 3_001,
-                     targetWord: "invoice", matchRate: 0.10, ctx: ctx)
+                     channelType: directType,
+                     targetWord: "invoice", matchRate: 0.10,
+                     coreDataLimit: 1_000, ctx: ctx)
 
         let r = runBenchmark(
             testName: "large_exactMatch",
@@ -342,7 +451,9 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 3_002, type: directType, ctx: ctx)
         seedMessages(count: 50_000, startId: 5_500_000, channelId: 3_002,
-                     targetWord: "meeting", matchRate: 0.15, ctx: ctx)
+                     channelType: directType,
+                     targetWord: "meeting", matchRate: 0.15,
+                     coreDataLimit: 1_000, ctx: ctx)
 
         let r = runBenchmark(
             testName: "large_partialMatch",
@@ -362,7 +473,9 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 3_003, type: directType, ctx: ctx)
         seedMessages(count: 50_000, startId: 6_000_000, channelId: 3_003,
-                     targetWord: "placeholder", matchRate: 0.0, ctx: ctx)
+                     channelType: directType,
+                     targetWord: "placeholder", matchRate: 0.0,
+                     coreDataLimit: 1_000, ctx: ctx)
 
         let r = runBenchmark(
             testName: "large_noMatch",
@@ -387,7 +500,9 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 4_001, type: directType, ctx: ctx)
         seedMessages(count: 500_000, startId: 10_000_000, channelId: 4_001,
-                     targetWord: "invoice", matchRate: 0.10, batchSize: 2_000, ctx: ctx)
+                     channelType: directType,
+                     targetWord: "invoice", matchRate: 0.10,
+                     batchSize: 50_000, coreDataLimit: 1_000, ctx: ctx)
 
         let r = runBenchmark(
             testName: "xlarge_exactMatch",
@@ -411,7 +526,9 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 5_001, type: directType, ctx: ctx)
         seedMessages(count: 1_000_000, startId: 20_000_000, channelId: 5_001,
-                     targetWord: "invoice", matchRate: 0.10, batchSize: 5_000, ctx: ctx)
+                     channelType: directType,
+                     targetWord: "invoice", matchRate: 0.10,
+                     batchSize: 100_000, coreDataLimit: 1_000, ctx: ctx)
 
         let r = runBenchmark(
             testName: "xxlarge_exactMatch",
@@ -430,7 +547,9 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 5_002, type: directType, ctx: ctx)
         seedMessages(count: 1_000_000, startId: 21_000_000, channelId: 5_002,
-                     targetWord: "meeting", matchRate: 0.15, batchSize: 5_000, ctx: ctx)
+                     channelType: directType,
+                     targetWord: "meeting", matchRate: 0.15,
+                     batchSize: 100_000, coreDataLimit: 1_000, ctx: ctx)
 
         let r = runBenchmark(
             testName: "xxlarge_partialMatch",
@@ -449,7 +568,9 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 5_003, type: directType, ctx: ctx)
         seedMessages(count: 1_000_000, startId: 22_000_000, channelId: 5_003,
-                     targetWord: "placeholder", matchRate: 0.0, batchSize: 5_000, ctx: ctx)
+                     channelType: directType,
+                     targetWord: "placeholder", matchRate: 0.0,
+                     batchSize: 100_000, coreDataLimit: 1_000, ctx: ctx)
 
         let r = runBenchmark(
             testName: "xxlarge_noMatch",
@@ -473,6 +594,7 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 7_001, type: directType, ctx: ctx)
         seedMessages(count: 1_000, startId: 7_000_000, channelId: 7_001,
+                     channelType: directType,
                      targetWord: "alpha", matchRate: 0.10, ctx: ctx)
 
         measure {
@@ -493,6 +615,7 @@ final class GlobalSearchMessagesViewModelDBPerformanceTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         seedChannel(id: 7_002, type: directType, ctx: ctx)
         seedMessages(count: 10_000, startId: 8_000_000, channelId: 7_002,
+                     channelType: directType,
                      targetWord: "alpha", matchRate: 0.10, ctx: ctx)
 
         measure {

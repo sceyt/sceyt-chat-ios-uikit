@@ -27,6 +27,7 @@ final class DBTestableGlobalSearchMessagesViewModel: GlobalSearchMessagesViewMod
     }
 
     override var database: Database { mockDB }
+    override var messageSearchStore: MessageSearchStore { mockDB.messageSearchStore }
     override func startDatabaseObserver() {}
 }
 
@@ -61,6 +62,11 @@ final class GlobalSearchMessagesViewModelDBTests: XCTestCase {
         let ctx = mockDB.container.viewContext
         let (ch, _) = ChannelDTO.fetchOrCreate(id: id, context: ctx)
         ch.type = type
+        // ChannelDTO has a uniqueness constraint on `sortingKey`, which
+        // willSave derives from createdAt/updatedAt/lastMessage. Give each
+        // seeded channel a distinct createdAt so multiple seeds in one test
+        // don't collide on the constraint and trump-merge each other away.
+        ch.createdAt = Date(timeIntervalSinceReferenceDate: TimeInterval(id)).bridgeDate
         try? ctx.save()
     }
 

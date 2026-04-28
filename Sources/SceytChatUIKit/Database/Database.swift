@@ -429,7 +429,17 @@ private extension PersistentContainer {
             backgroundReadOnlyObservableContext.perform {
                 self.backgroundReadOnlyObservableContext.mergeChanges(fromContextDidSave: notification)
             }
+            syncMessageSearchIndex(for: notification)
         }
+    }
+
+    /// Mirrors `MessageDTO` mutations into the FTS sidecar so search results stay
+    /// fresh as messages are sent, edited, deleted, and synced.
+    private func syncMessageSearchIndex(for notification: Notification) {
+        SceytChatUIKit.shared.messageSearchStore.sync(
+            notification: notification,
+            on: backgroundPerformContext
+        )
     }
 
     @objc

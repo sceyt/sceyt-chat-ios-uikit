@@ -13,6 +13,12 @@ final class MockDatabase: Database {
 
     let container: NSPersistentContainer
 
+    /// In-memory FTS store paired with this database. Saves through the container
+    /// are mirrored into the store via the `didSave` observer below.
+    let messageSearchStore: MessageSearchStore
+
+    private var didSaveObserver: NSObjectProtocol?
+
     init() {
         let bundle: Bundle
         #if SWIFT_PACKAGE
@@ -34,7 +40,54 @@ final class MockDatabase: Database {
         container.loadPersistentStores { _, error in
             if let error { fatalError("MockDatabase: store load failed: \(error)") }
         }
-        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+
+        messageSearchStore = MessageSearchStore.inMemory()
+        messageSearchStore.open()
+
+        installFTSObserver()
+    }
+
+    deinit {
+        if let didSaveObserver {
+            NotificationCenter.default.removeObserver(didSaveObserver)
+        }
+        messageSearchStore.close()
+    }
+
+    /// Toggles automatic FTS sync on Core Data saves. Disable during heavy
+    /// bulk seeding (e.g. perf tests) so the per-save observer doesn't add
+    /// thousands of synchronous FTS round-trips on the saving context's queue.
+    /// Caller is expected to re-enable and bulk-index manually after seeding.
+    func setFTSSyncEnabled(_ enabled: Bool) {
+        if enabled, didSaveObserver == nil {
+            installFTSObserver()
+        } else if !enabled, let observer = didSaveObserver {
+            NotificationCenter.default.removeObserver(observer)
+            didSaveObserver = nil
+        }
+    }
+
+    private func installFTSObserver() {
+        let store = messageSearchStore
+        let coordinator = container.persistentStoreCoordinator
+        didSaveObserver = NotificationCenter.default.addObserver(
+            forName: .NSManagedObjectContextDidSave,
+            object: nil,
+            queue: nil
+        ) { notification in
+            // Filter to saves that came from a context backed by this container's
+            // store coordinator. Without this, saves from other tests could leak
+            // through the shared NotificationCenter into our FTS store.
+            guard let savingContext = notification.object as? NSManagedObjectContext,
+                  savingContext.persistentStoreCoordinator === coordinator
+            else { return }
+            // The notification's userInfo references managed objects that are only
+            // valid on the saving context's queue, so we hop onto it before syncing.
+            savingContext.performAndWait {
+                store.sync(notification: notification, on: savingContext)
+            }
+        }
     }
 
     // MARK: - Database protocol

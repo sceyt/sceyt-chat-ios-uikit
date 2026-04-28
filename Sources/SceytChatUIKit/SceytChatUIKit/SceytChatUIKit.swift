@@ -27,7 +27,7 @@ public class SceytChatUIKit {
     public var database: Database {
         return _database
     }
-    
+
     private lazy var _database: Database = {
         if let directory = config.storageConfig.databaseFileDirectory {
             do {
@@ -41,12 +41,27 @@ public class SceytChatUIKit {
             return PersistentContainer(storeType: .inMemory)
         }
     }()
-    
+
+    /// Sidecar FTS5 index over message bodies, used by `GlobalSearchMessagesViewModel`.
+    /// Lives beside the Core Data file (or in-memory when the main store is in-memory).
+    public lazy var messageSearchStore: MessageSearchStore = {
+        let store: MessageSearchStore
+        if let directory = config.storageConfig.databaseFileDirectory {
+            let url = directory.appendingPathComponent("\(config.storageConfig.databaseFilename)-fts.sqlite")
+            store = MessageSearchStore(url: url)
+        } else {
+            store = MessageSearchStore.inMemory()
+        }
+        store.open()
+        return store
+    }()
+
     public static func initialize(apiUrl: String, appId: String, clientId: String = "", chatClientOnly: Bool = false) {
         ChatClient.initialize(apiUrl: apiUrl, appId: appId, clientId: clientId)
         if !chatClientOnly {
             SceytChatUIKit.shared.chatClient.add(delegate: Components.clientConnectionHandler.default, identifier: String(reflecting: ClientConnectionHandler.self))
             shared.channelEventHandler.startEventHandler()
+            shared.runMessageSearchBackfillIfNeeded()
         }
     }
     
@@ -80,12 +95,99 @@ public class SceytChatUIKit {
                 logger.debug("Device Token: Received error while removing \(error)")
                 completion(false)
             }
-            
+
             logger.debug("Device Token: Removed")
             self?.disconnect()
             UserDefaults.currentUserId = nil
+            UserDefaults.ftsBackfillVersion = 0
+            self?.messageSearchStore.clear()
             DataProvider.database.deleteAll()
             completion(true)
+        }
+    }
+
+    /// Builds (or rebuilds) the FTS index from `MessageDTO` when the on-disk
+    /// schema version is older than `MessageSearchStore.schemaVersion`. Runs on
+    /// a background queue so it never blocks app launch.
+    private func runMessageSearchBackfillIfNeeded() {
+        let target = MessageSearchStore.schemaVersion
+        guard UserDefaults.ftsBackfillVersion < target else { return }
+
+        // Touch lazy properties on the calling thread so the persistent store
+        // is loaded before we move to a background queue.
+        let database = self.database
+        let store = messageSearchStore
+
+        DispatchQueue.global(qos: .utility).async {
+            store.clear()
+
+            // Resolve channelId → channelType once. Needed so FTS rows can be
+            // filtered by channel category without joining back to Core Data.
+            var channelTypeById: [Int64: String] = [:]
+            switch database.read({ context -> [Int64: String] in
+                let request = ChannelDTO.fetchRequest()
+                let dtos = try context.fetch(request)
+                return Dictionary(uniqueKeysWithValues: dtos.map { ($0.id, $0.type) })
+            }) {
+            case .success(let map):
+                channelTypeById = map
+            case .failure(let error):
+                logger.errorIfNotNil(error, "FTS backfill: channels read failed")
+                return
+            }
+
+            let pageSize = 1000
+            var lastId: Int64 = 0
+            var didFail = false
+
+            backfill: while true {
+                let result = database.read { context -> [MessageSearchStore.Row] in
+                    let request = MessageDTO.fetchRequest()
+                    request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                        NSPredicate(format: "id > %lld", lastId),
+                        NSPredicate(format: "state != 2"),
+                        NSPredicate(format: "transient == NO"),
+                        NSPredicate(format: "body.length > 0")
+                    ])
+                    request.sortDescriptors = [NSSortDescriptor(keyPath: \MessageDTO.id, ascending: true)]
+                    request.fetchLimit = pageSize
+                    let dtos = try context.fetch(request)
+                    return dtos.compactMap { dto -> MessageSearchStore.Row? in
+                        guard dto.id > 0,
+                              let userId = dto.user?.id,
+                              !userId.isEmpty
+                        else { return nil }
+                        return MessageSearchStore.Row(
+                            messageId: dto.id,
+                            channelId: dto.channelId,
+                            channelType: channelTypeById[dto.channelId] ?? "",
+                            userId: userId,
+                            createdAt: dto.createdAt.timeIntervalSince1970,
+                            body: dto.body
+                        )
+                    }
+                }
+                switch result {
+                case .success(let rows):
+                    if rows.isEmpty { break backfill }
+                    store.index(rows: rows)
+                    if let last = rows.last?.messageId, last > lastId {
+                        lastId = last
+                    } else {
+                        break backfill
+                    }
+                    if rows.count < pageSize { break backfill }
+                case .failure(let error):
+                    logger.errorIfNotNil(error, "FTS backfill: page read failed")
+                    didFail = true
+                    break backfill
+                }
+            }
+
+            if !didFail {
+                UserDefaults.ftsBackfillVersion = target
+                logger.debug("FTS backfill: completed at version \(target)")
+            }
         }
     }
     

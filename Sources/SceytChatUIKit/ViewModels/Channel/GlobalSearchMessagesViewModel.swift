@@ -75,11 +75,14 @@ open class GlobalSearchMessagesViewModel: NSObject {
     @Atomic public private(set) var hasMoreChannelMessages = false
 
     /// Stored search parameters for `loadMoreMessages(in:)`.
-    private var currentBasePredicate: NSPredicate?
-    private var currentMemberUserId: UserId?
+    private var currentTrimmedQuery: String?
+    private var currentFilterUserId: UserId?
 
     /// Override in test subclasses to inject an in-memory database.
     open var database: Database { SceytChatUIKit.shared.database }
+
+    /// Override in test subclasses to inject an in-memory FTS store.
+    open var messageSearchStore: MessageSearchStore { SceytChatUIKit.shared.messageSearchStore }
 
     /// Observes messages transitioning to the `deleted` state so rows disappear from the
     /// on-screen results without requiring the user to re-search. We only care about the
@@ -195,134 +198,60 @@ open class GlobalSearchMessagesViewModel: NSObject {
     /// Override in testable subclasses to do in-memory filtering instead of a DB query.
     public func applyFilter() {
         let trimmed = (searchQuery ?? "").trimmingCharacters(in: .whitespaces)
-        let tokens = trimmed
-            .components(separatedBy: .whitespaces)
-            .filter { !$0.isEmpty }
-
         let config = SceytChatUIKit.shared.config.channelTypesConfig
+        let pageSize = Self.pageSize
 
-        if let filterUser = filterUser {
-            // User filter active:
-            //   - Empty query  → show all messages from that user (no body filter).
-            //   - Any query    → filter their messages by tokens (1+ char is enough).
-            let basePredicate: NSPredicate
-            if tokens.isEmpty {
-                basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-                    NSPredicate(format: "state != 2"),
-                    NSPredicate(format: "body.length > 0"),
-                    NSPredicate(format: "transient == NO"),
-                    NSPredicate(format: "user.id == %@", filterUser.id)
-                ])
-            } else {
-                basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates:
-                    tokens.map { token in
-                        let escaped = NSRegularExpression.escapedPattern(for: token)
-                        let pattern = "(?i)(?s).*\\b\(escaped).*"
-                        return NSPredicate(format: "body MATCHES %@", pattern)
-                    } + [
-                        NSPredicate(format: "state != 2"),
-                        NSPredicate(format: "body.length > 0"),
-                        NSPredicate(format: "transient == NO"),
-                        NSPredicate(format: "user.id == %@", filterUser.id)
-                    ]
-                )
-            }
+        // No user filter: require >= 2 characters before searching.
+        if filterUser == nil, trimmed.count < 2 {
+            chatMessages = []
+            channelMessages = []
+            chatMessageChannels = [:]
+            channelMessageChannels = [:]
+            hasMoreChatMessages = false
+            hasMoreChannelMessages = false
+            currentTrimmedQuery = nil
+            currentFilterUserId = nil
+            DispatchQueue.main.async { [weak self] in self?.event = .reload }
+            return
+        }
 
-            currentBasePredicate = basePredicate
-            currentMemberUserId = filterUser.id
-            chatMessagesOffset = 0
-            channelMessagesOffset = 0
+        currentTrimmedQuery = trimmed
+        currentFilterUserId = filterUser?.id
+        chatMessagesOffset = 0
+        channelMessagesOffset = 0
 
-            currentSearchTask?.cancel()
-            loadMoreTask?.cancel()
-            currentSearchTask = Task(priority: .userInitiated) { [weak self] in
+        let chatTypes = [config.direct, config.group]
+        let broadcastTypes = [config.broadcast]
+        let filterUserId = filterUser?.id
+
+        currentSearchTask?.cancel()
+        loadMoreTask?.cancel()
+        currentSearchTask = Task(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+
+            async let chatResult      = searchPage(query: trimmed,
+                                                   channelTypes: chatTypes,
+                                                   filterUserId: filterUserId,
+                                                   offset: 0,
+                                                   limit: pageSize)
+            async let broadcastResult = searchPage(query: trimmed,
+                                                   channelTypes: broadcastTypes,
+                                                   filterUserId: filterUserId,
+                                                   offset: 0,
+                                                   limit: pageSize)
+            let (chats, broadcast) = await (chatResult, broadcastResult)
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run { [weak self] in
                 guard let self else { return }
-
-                async let chatResult      = fetchMessages(basePredicate: basePredicate,
-                                                          channelTypes: [config.direct, config.group],
-                                                          memberUserId: filterUser.id,
-                                                          offset: 0,
-                                                          limit: Self.pageSize)
-                async let broadcastResult = fetchMessages(basePredicate: basePredicate,
-                                                          channelTypes: [config.broadcast],
-                                                          memberUserId: filterUser.id,
-                                                          offset: 0,
-                                                          limit: Self.pageSize)
-                let (chats, broadcast) = await (chatResult, broadcastResult)
-
-                guard !Task.isCancelled else { return }
-
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    chatMessages           = chats.0
-                    channelMessages        = broadcast.0
-                    chatMessageChannels    = chats.1
-                    channelMessageChannels = broadcast.1
-                    hasMoreChatMessages    = chats.0.count >= Self.pageSize
-                    hasMoreChannelMessages = broadcast.0.count >= Self.pageSize
-                    event = .reload
-                }
-            }
-        } else {
-            // No user filter: require >= 2 characters before searching.
-            guard trimmed.count >= 2, !tokens.isEmpty else {
-                chatMessages = []
-                channelMessages = []
-                chatMessageChannels = [:]
-                channelMessageChannels = [:]
-                hasMoreChatMessages = false
-                hasMoreChannelMessages = false
-                currentBasePredicate = nil
-                currentMemberUserId = nil
-                DispatchQueue.main.async { [weak self] in self?.event = .reload }
-                return
-            }
-
-            // Every token must match as a prefix of a word (AND semantics, case-insensitive).
-            let basePredicate = NSCompoundPredicate(andPredicateWithSubpredicates:
-                tokens.map { token in
-                    let escaped = NSRegularExpression.escapedPattern(for: token)
-                    let pattern = "(?i)(?s).*\\b\(escaped).*"
-                    return NSPredicate(format: "body MATCHES %@", pattern)
-                } + [
-                    NSPredicate(format: "state != 2"),
-                    NSPredicate(format: "body.length > 0"),
-                    NSPredicate(format: "transient == NO")
-                ]
-            )
-
-            currentBasePredicate = basePredicate
-            currentMemberUserId = nil
-            chatMessagesOffset = 0
-            channelMessagesOffset = 0
-
-            currentSearchTask?.cancel()
-            loadMoreTask?.cancel()
-            currentSearchTask = Task(priority: .userInitiated) { [weak self] in
-                guard let self else { return }
-
-                async let chatResult    = fetchMessages(basePredicate: basePredicate,
-                                                        channelTypes: [config.direct, config.group],
-                                                        offset: 0,
-                                                        limit: Self.pageSize)
-                async let channelResult = fetchMessages(basePredicate: basePredicate,
-                                                        channelTypes: [config.broadcast],
-                                                        offset: 0,
-                                                        limit: Self.pageSize)
-                let (chatsResult, channelsResult) = await (chatResult, channelResult)
-
-                guard !Task.isCancelled else { return }
-
-                await MainActor.run { [weak self] in
-                    guard let self else { return }
-                    chatMessages            = chatsResult.0
-                    channelMessages         = channelsResult.0
-                    chatMessageChannels     = chatsResult.1
-                    channelMessageChannels  = channelsResult.1
-                    hasMoreChatMessages     = chatsResult.0.count >= Self.pageSize
-                    hasMoreChannelMessages  = channelsResult.0.count >= Self.pageSize
-                    event = .reload
-                }
+                chatMessages           = chats.0
+                channelMessages        = broadcast.0
+                chatMessageChannels    = chats.1
+                channelMessageChannels = broadcast.1
+                hasMoreChatMessages    = chats.0.count >= pageSize
+                hasMoreChannelMessages = broadcast.0.count >= pageSize
+                event = .reload
             }
         }
     }
@@ -330,8 +259,9 @@ open class GlobalSearchMessagesViewModel: NSObject {
     // MARK: - Load more
 
     open func loadMoreMessages(in section: Section) {
-        guard let basePredicate = currentBasePredicate else { return }
+        guard let trimmed = currentTrimmedQuery else { return }
         let config = SceytChatUIKit.shared.config.channelTypesConfig
+        let filterUserId = currentFilterUserId
 
         switch section {
         case .chats:
@@ -341,10 +271,10 @@ open class GlobalSearchMessagesViewModel: NSObject {
             loadMoreTask?.cancel()
             loadMoreTask = Task(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
-                let result = await fetchMessages(
-                    basePredicate: basePredicate,
+                let result = await searchPage(
+                    query: trimmed,
                     channelTypes: [config.direct, config.group],
-                    memberUserId: currentMemberUserId,
+                    filterUserId: filterUserId,
                     offset: newOffset,
                     limit: Self.pageSize
                 )
@@ -366,10 +296,10 @@ open class GlobalSearchMessagesViewModel: NSObject {
             loadMoreTask?.cancel()
             loadMoreTask = Task(priority: .userInitiated) { [weak self] in
                 guard let self else { return }
-                let result = await fetchMessages(
-                    basePredicate: basePredicate,
+                let result = await searchPage(
+                    query: trimmed,
                     channelTypes: [config.broadcast],
-                    memberUserId: currentMemberUserId,
+                    filterUserId: filterUserId,
                     offset: newOffset,
                     limit: Self.pageSize
                 )
@@ -388,53 +318,94 @@ open class GlobalSearchMessagesViewModel: NSObject {
 
     // MARK: - DB fetch
 
-    private func fetchMessages(basePredicate: NSPredicate,
-                               channelTypes: [String],
-                               memberUserId: UserId? = nil,
-                               offset: Int = 0,
-                               limit: Int = pageSize) async -> ([ChatMessage], [ChannelId: ChatChannel]) {
-        await withCheckedContinuation { cont in
-            database.read { [basePredicate, channelTypes, memberUserId] context in
-                // 1. Resolve channel IDs for the requested types,
-                //    optionally restricted to channels containing a specific member.
-                let channelRequest = ChannelDTO.fetchRequest()
-                if let memberUserId {
+    /// Returns one page of search results.
+    ///
+    /// When `query` has tokens, message IDs come from the FTS5 sidecar (`MessageSearchStore`).
+    /// When `query` is empty (only valid when `filterUserId` is set), falls back to a direct
+    /// `MessageDTO` fetch — there's nothing for FTS to match against.
+    /// In both cases, full `MessageDTO`s are then loaded by id and converted to models.
+    private func searchPage(
+        query: String,
+        channelTypes: [String],
+        filterUserId: UserId?,
+        offset: Int,
+        limit: Int
+    ) async -> ([ChatMessage], [ChannelId: ChatChannel]) {
+        let store = messageSearchStore
+        return await withCheckedContinuation { cont in
+            database.read { [query, channelTypes, filterUserId, store] context -> ([ChatMessage], [ChannelId: ChatChannel]) in
+                // When scoping to a specific member, resolve their channels of the requested
+                // types up-front. FTS then sees the explicit id list instead of channelType,
+                // matching the legacy "channels the member currently belongs to" semantics.
+                var memberChannelIds: [Int64]?
+                if let memberUserId = filterUserId {
                     let memberRequest = MemberDTO.fetchRequest()
                     memberRequest.predicate = NSPredicate(format: "user.id == %@", memberUserId)
                     let memberDTOs = MemberDTO.fetch(request: memberRequest, context: context)
-                    let memberChannelIds = memberDTOs.map { $0.channelId }
+                    let allMemberChannelIds = memberDTOs.map { $0.channelId }
+
+                    let channelRequest = ChannelDTO.fetchRequest()
                     channelRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
                         NSPredicate(format: "type IN %@", channelTypes),
-                        NSPredicate(format: "id IN %@", memberChannelIds)
+                        NSPredicate(format: "id IN %@", allMemberChannelIds)
                     ])
-                } else {
-                    channelRequest.predicate = NSPredicate(format: "type IN %@", channelTypes)
+                    memberChannelIds = ChannelDTO.fetch(request: channelRequest, context: context).map { $0.id }
+                    if memberChannelIds?.isEmpty ?? true {
+                        return ([], [:])
+                    }
                 }
-                let channelDTOs = ChannelDTO.fetch(request: channelRequest, context: context)
-                let channelIds: [Int64] = channelDTOs.map { $0.id }
 
-                guard !channelIds.isEmpty else { return ([ChatMessage](), [:]) }
+                let trimmed = query.trimmingCharacters(in: .whitespaces)
+                let messageIds: [Int64]
 
-                // 2. Fetch messages matching the body tokens within those channels.
-                let msgRequest = MessageDTO.fetchRequest()
-                msgRequest.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-                    basePredicate,
-                    NSPredicate(format: "channelId IN %@", channelIds)
-                ])
-                msgRequest.sortDescriptors = [
-                    NSSortDescriptor(keyPath: \MessageDTO.createdAt, ascending: false)
-                ]
-                msgRequest.fetchOffset = offset
-                msgRequest.fetchLimit = limit
+                if !trimmed.isEmpty {
+                    let typesFilter: [String]? = (memberChannelIds == nil) ? channelTypes : nil
+                    messageIds = store.search(
+                        query: trimmed,
+                        channelTypes: typesFilter,
+                        userId: filterUserId,
+                        channelIds: memberChannelIds,
+                        offset: offset,
+                        limit: limit
+                    )
+                } else if let memberChannelIds, let filterUserId {
+                    // Empty query + filter user: list the user's messages in their channels.
+                    let request = MessageDTO.fetchRequest()
+                    request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+                        NSPredicate(format: "channelId IN %@", memberChannelIds),
+                        NSPredicate(format: "user.id == %@", filterUserId),
+                        NSPredicate(format: "state != 2"),
+                        NSPredicate(format: "transient == NO"),
+                        NSPredicate(format: "body.length > 0")
+                    ])
+                    request.sortDescriptors = [NSSortDescriptor(keyPath: \MessageDTO.createdAt, ascending: false)]
+                    request.fetchOffset = offset
+                    request.fetchLimit = limit
+                    let dtos = (try? context.fetch(request)) ?? []
+                    messageIds = dtos.map { $0.id }
+                } else {
+                    return ([], [:])
+                }
 
-                let messages = (try? context.fetch(msgRequest))?.map { $0.convert() } ?? []
+                if messageIds.isEmpty { return ([], [:]) }
 
-                // 3. Build channelId → ChatChannel map for only the channels that have results.
+                let messageRequest = MessageDTO.fetchRequest()
+                messageRequest.predicate = NSPredicate(format: "id IN %@", messageIds)
+                messageRequest.relationshipKeyPathsForPrefetching = ["user", "attachments", "reactions", "linkMetadatas"]
+                let dtos = MessageDTO.fetch(request: messageRequest, context: context)
+                let dtoById = Dictionary(uniqueKeysWithValues: dtos.map { ($0.id, $0) })
+                let orderedDTOs = messageIds.compactMap { dtoById[$0] }
+                let messages = orderedDTOs.map { $0.convert() }
+
                 let resultChannelIds = Set(messages.map { $0.channelId })
+                guard !resultChannelIds.isEmpty else { return (messages, [:]) }
+
+                let channelRequest = ChannelDTO.fetchRequest()
+                let channelIdInts: [Int64] = resultChannelIds.map { Int64($0) }
+                channelRequest.predicate = NSPredicate(format: "id IN %@", channelIdInts)
+                let channelDTOs = ChannelDTO.fetch(request: channelRequest, context: context)
                 let channelMap: [ChannelId: ChatChannel] = channelDTOs.reduce(into: [:]) { map, dto in
-                    let id = ChannelId(dto.id)
-                    guard resultChannelIds.contains(id) else { return }
-                    map[id] = dto.convert()
+                    map[ChannelId(dto.id)] = dto.convert()
                 }
 
                 return (messages, channelMap)
