@@ -6,6 +6,7 @@
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
+import SceytChat
 import UIKit
 import AVKit
 
@@ -108,7 +109,7 @@ extension ChannelInfoViewController {
                 mediaViewModel.loadAttachments()
             }
             let cell: ChannelInfoViewController.AttachmentCell
-            
+
             switch model?.attachment.type {
             case "video":
                 cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoVideoAttachmentCell.self)
@@ -116,7 +117,8 @@ extension ChannelInfoViewController {
             default:
                 cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoImageAttachmentCell.self)
             }
-            
+
+            cell.overlayLoaderAppearance = appearance.overlayLoaderAppearance
             cell.data = mediaViewModel.attachmentLayout(at: indexPath, onLoadThumbnail: { [weak cell] layout in
                 guard layout == cell?.data else { return }
                 cell?.imageView.image = layout.thumbnail
@@ -124,10 +126,63 @@ extension ChannelInfoViewController {
             cell.previewer = { [unowned self] in
                 previewer?()
             }
-            
+
             if let model {
+                cell.setProgressHandler()
+
+                switch model.attachment.status {
+                case .pending, .downloading:
+                    if let message = model.ownerMessage,
+                       let progress = fileProvider.currentProgressPercent(message: message, attachment: model.attachment) {
+                        cell.setProgress(progress)
+                    } else if fileProvider.filePath(attachment: model.attachment) == nil {
+                        let willAutoDownload = model.attachment.status == .downloading
+                            || mediaViewModel.minAutoDownloadSize <= 0
+                            || model.attachment.uploadedFileSize <= mediaViewModel.minAutoDownloadSize
+                        if willAutoDownload {
+                            cell.setProgress(0.0001)
+                        } else {
+                            cell.update(status: .pauseDownloading)
+                        }
+                    }
+                case .done:
+                    cell.setProgress(0)
+                default:
+                    break
+                }
+
+                cell.onPauseAction = { [weak cell, weak self] in
+                    guard let cell, let self, let data = cell.data else { return }
+                    let progressStatus = cell.lastAttachmentTransferProgress?.attachment.status
+                    let dataStatus = data.attachment.status
+                    let status = progressStatus ?? dataStatus
+                    switch status {
+                    case .pauseDownloading, .failedDownloading:
+                        logger.debug("[MediaGallery] onPauseAction → resumeDownload")
+                        cell.update(status: .downloading)
+                        cell.setProgressHandler()
+                        self.mediaViewModel.resumeDownload(data)
+                    case .downloading:
+                        cell.update(status: .pauseDownloading)
+                        self.mediaViewModel.pauseDownload(data)
+                    case .pending:
+                        if let message = data.ownerMessage,
+                           fileProvider.currentProgressPercent(message: message, attachment: data.attachment) != nil {
+                            cell.update(status: .pauseDownloading)
+                            self.mediaViewModel.pauseDownload(data)
+                        } else {
+                            cell.update(status: .downloading)
+                            cell.setProgressHandler()
+                            self.mediaViewModel.resumeDownload(data)
+                        }
+                    default:
+                        logger.debug("[MediaGallery] pauseButton tapped but status=\(status) — no action taken")
+                        break
+                    }
+                }
+
                 mediaViewModel.downloadAttachmentIfNeeded(model) { [weak cell] model in
-                    if let cell, cell.data.attachment.id == model.attachment.id {
+                    if let cell, cell.data?.attachment.id == model.attachment.id {
                         cell.imageView.image = model.thumbnail
                     }
                 }

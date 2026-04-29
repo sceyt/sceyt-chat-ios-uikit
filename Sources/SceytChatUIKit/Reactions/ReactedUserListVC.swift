@@ -63,13 +63,10 @@ open class ReactedUserListViewController: ViewController,
         switch event {
         case .reloadData:
             collectionView.reloadData()
-        case .insert(let indexPaths):
-            if view.superview == nil || collectionView.visibleCells.isEmpty {
-                collectionView.reloadData()
-            } else {
-                collectionView.performBatchUpdates {
-                    collectionView.insertItems(at: indexPaths)
-                }
+        case .insert:
+            collectionView.performBatchUpdates {
+                let applied = viewModel.applyPendingInserts()
+                collectionView.insertItems(at: applied)
             }
         }
     }

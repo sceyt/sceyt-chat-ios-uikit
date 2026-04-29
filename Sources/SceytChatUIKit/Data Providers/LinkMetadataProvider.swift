@@ -74,6 +74,7 @@ open class LinkMetadataProvider: DataProvider {
         url: URL,
         downloadImage: Bool = true,
         downloadIcon: Bool = true,
+        forceFetch: Bool = false,
         completion: @escaping (Result<LinkMetadata, Error>) -> Void
     ) {
         fetchCache.insert(url)
@@ -111,6 +112,19 @@ open class LinkMetadataProvider: DataProvider {
                 if let metadata = metadata {
                     logger.verbose("[LOAD LINK] \(log_hv) Load metadata from db \(metadata.url): SUCCESS")
 
+                    if forceFetch, (metadata.summary == nil || metadata.title == nil) {
+                        logger.verbose("[LOAD LINK] \(log_hv) forceFetch — no summary in DB, fetching from network")
+                        self.loadLinkMetadataFromNetwork(
+                            url: url,
+                            log_hv: log_hv,
+                            downloadImage: downloadImage,
+                            downloadIcon: downloadIcon,
+                            completion: completion
+                        )
+                        return
+                    }
+
+                    metadata.loadImages()
                     self.downloadImagesIfNeeded(
                         linkMetadata: metadata,
                         downloadImage: downloadImage,

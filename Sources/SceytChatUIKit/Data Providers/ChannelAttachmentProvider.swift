@@ -208,20 +208,22 @@ open class ChannelAttachmentProvider: DataProvider {
                 }
                 $0.createOrUpdate(attachments: attachments, channelId: self.channelId)
                 if let messages {
-                    let exists = MessageDTO
+                    let existingDTOs = MessageDTO
                         .fetch(predicate: .init(format: "id IN %@", messages.map { $0.id }),
-                               context: $0).map { $0.id }
-                    let idsSet = Set(exists)
+                               context: $0)
+                    let idsSet = Set(existingDTOs.map { $0.id })
+                    let previouslyUnlisted = Set(existingDTOs.filter { $0.unlisted }.map { $0.id })
                     $0.createOrUpdate(
                         messages: messages,
                         channelId: self.channelId
                     ).forEach {
                         if !idsSet.contains($0.id) {
                             $0.unlisted = true
+                        } else if previouslyUnlisted.contains($0.id) {
+                            $0.unlisted = true
                         }
                     }
                 }
-                
             }) { error in
                 completion?(error)
             }

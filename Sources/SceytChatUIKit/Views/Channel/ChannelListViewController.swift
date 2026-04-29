@@ -25,6 +25,7 @@ open class ChannelListViewController: ViewController,
 
     private var diffableDataSource: UITableViewDiffableDataSource<Int, ChannelId>?
     private var channelFingerprints: [ChannelId: ChannelFingerprint] = [:]
+    private var swipeOpenIndexPath: IndexPath?
 
     // MARK: -
 
@@ -235,6 +236,8 @@ open class ChannelListViewController: ViewController,
         case .reload:
             reloadTableView()
             showEmptyViewIfNeeded()
+        case .resetFingerprints:
+            channelFingerprints = [:]
         case .reloadSearch:
             searchResultsViewController.reloadData()
         case let .unreadMessagesCount(count):
@@ -244,7 +247,7 @@ open class ChannelListViewController: ViewController,
         case let .typing(isTyping, user, channel):
             for cell in tableView.visibleCells where cell is ChannelCell {
                 let channelCell = (cell as! ChannelCell)
-                if channelCell.data.channel.id == channel.id {
+                if channelCell.data?.channel.id == channel.id {
                     if isTyping {
                         channelCell.didStartTyping(user: user)
                     } else {
@@ -256,7 +259,7 @@ open class ChannelListViewController: ViewController,
         case let .recording(isRecording, user, channel):
             for cell in tableView.visibleCells where cell is ChannelCell {
                 let channelCell = (cell as! ChannelCell)
-                if channelCell.data.channel.id == channel.id {
+                if channelCell.data?.channel.id == channel.id {
                     if isRecording {
                         channelCell.didStartRecording(user: user)
                     } else {
@@ -296,7 +299,13 @@ open class ChannelListViewController: ViewController,
                 && paths.sectionInserts.isEmpty
                 && paths.sectionDeletes.isEmpty
                 
-                applyCurrentSnapshot(animation: !hasDraftMove)
+                if swipeOpenIndexPath != nil {
+                    swipeOpenIndexPath = nil
+                    tableView.setEditing(false, animated: false)
+                    applyCurrentSnapshot(animation: !hasDraftMove)
+                } else {
+                    applyCurrentSnapshot(animation: !hasDraftMove)
+                }
             } else {
                 let hasLastMessageIdChanged = paths.updates.contains { indexPath in
                     guard let channel = channelListViewModel.channel(at: indexPath) else { return false }
@@ -306,7 +315,11 @@ open class ChannelListViewController: ViewController,
                 }
 
                 if hasLastMessageIdChanged {
-                    applyCurrentSnapshot(animation: true)
+                    if let openIndexPath = swipeOpenIndexPath, paths.updates.contains(openIndexPath) {
+                        applyDiffableUpdatesOnly(at: paths.updates)
+                    } else {
+                        applyCurrentSnapshot(animation: false)
+                    }
                 } else {
                     let hasDraftChange = paths.updates.contains { indexPath in
                         guard let channel = channelListViewModel.channel(at: indexPath) else { return false }
@@ -429,6 +442,14 @@ open class ChannelListViewController: ViewController,
                 self?.onSwipeAction(actions: actions, indexPath: indexPath)
                 handler(true)
             }
+    }
+
+    open func tableView(_ tableView: UITableView, willBeginEditingRowAt indexPath: IndexPath) {
+        swipeOpenIndexPath = indexPath
+    }
+
+    open func tableView(_ tableView: UITableView, didEndEditingRowAt indexPath: IndexPath?) {
+        swipeOpenIndexPath = nil
     }
 
     open func tableView(_ tableView: UITableView,

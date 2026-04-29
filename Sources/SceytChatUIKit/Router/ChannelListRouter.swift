@@ -16,8 +16,14 @@ open class ChannelListRouter: Router<ChannelListViewController> {
         showChannelViewController(channel: chatChannel)
     }
     
-    open func showChannelViewController(channelId: ChannelId) {
-        if let chatChannel = rootViewController.channelListViewModel.channel(id: channelId) {
+    open func showChannelViewController(channelId: ChannelId, fetchFromDB: Bool = false) {
+        if fetchFromDB {
+            rootViewController.channelListViewModel.fetchChannel(id: channelId) { [weak self] chatChannel in
+                if let chatChannel {
+                    self?.showChannelViewController(channel: chatChannel)
+                }
+            }
+        } else if let chatChannel = rootViewController.channelListViewModel.channel(id: channelId) {
             showChannelViewController(channel: chatChannel)
         } else {
             rootViewController.channelListViewModel.fetchChannel(id: channelId) { [weak self] chatChannel in

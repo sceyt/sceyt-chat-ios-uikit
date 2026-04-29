@@ -374,6 +374,7 @@ public extension ChannelListViewModel {
         case change(Paths)
         case reload
         case reloadSearch
+        case resetFingerprints
         case unreadMessagesCount(Int)
         case typing(Bool, ChatUser, ChatChannel)
         case recording(Bool, ChatUser, ChatChannel)

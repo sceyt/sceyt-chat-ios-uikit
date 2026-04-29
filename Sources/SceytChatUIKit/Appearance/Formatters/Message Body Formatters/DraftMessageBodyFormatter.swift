@@ -14,8 +14,8 @@ open class DraftMessageBodyFormatter: DraftMessageBodyFormatting {
     
     open func format(_ messageBodyAttributes: DraftMessageBodyFormatterAttributes) -> NSAttributedString {
         let text = NSMutableAttributedString()
-        let title = messageBodyAttributes.draftStateText
-        let draftString = NSMutableAttributedString(string: "\(title)\n")
+        let title = messageBodyAttributes.draftStateText + ": "
+        let draftString = NSMutableAttributedString(string: title)
         draftString.addAttributes(
             [
                 .foregroundColor: messageBodyAttributes.draftPrefixLabelAppearance.foregroundColor,

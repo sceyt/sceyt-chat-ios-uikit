@@ -37,11 +37,24 @@ extension MessageInputViewController {
         
         open override func setupAppearance() {
             super.setupAppearance()
-            font = appearance.textInputAppearance.labelAppearance.font
-            textColor = appearance.textInputAppearance.labelAppearance.foregroundColor
             placeholderColor = appearance.textInputAppearance.placeholderAppearance.foregroundColor
             backgroundColor = appearance.textInputAppearance.backgroundColor
             _setCGColors()
+
+            // UITextView.font and UITextView.textColor write to NSTextStorage for the
+            // entire string range, overwriting per-character attributes such as mention
+            // foreground color and font. Guard against this when the text view already
+            // has content (e.g. a restored draft with mentions) so those attributes are
+            // preserved. When the text view is empty the setters are safe to call.
+            if attributedText == nil || attributedText.length == 0 {
+                font = appearance.textInputAppearance.labelAppearance.font
+                textColor = appearance.textInputAppearance.labelAppearance.foregroundColor
+            } else {
+                // Keep placeholderLabel in sync (normally done by the font setter).
+                placeholderLabel.font = appearance.textInputAppearance.labelAppearance.font
+                // Keep typingAttributes correct so newly typed text has the right style.
+                resetTypingAttributes()
+            }
         }
         
         open func startTypingTimer() {

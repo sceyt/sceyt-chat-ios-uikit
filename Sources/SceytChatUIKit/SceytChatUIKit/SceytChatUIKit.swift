@@ -98,10 +98,11 @@ public class SceytChatUIKit {
     }()
     
     public var currentUserId: UserId? {
-        if !SceytChatUIKit.shared.chatClient.user.id.isEmpty {
-            SceytChatUIKit.shared.chatClient.user.id
+        let userId = SceytChatUIKit.shared.chatClient.user.id
+        if !userId.isEmpty {
+            return userId
         } else {
-            UserDefaults.currentUserId
+            return UserDefaults.currentUserId
         }
     }
     

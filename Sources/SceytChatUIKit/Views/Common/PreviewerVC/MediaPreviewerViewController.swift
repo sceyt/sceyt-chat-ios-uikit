@@ -350,7 +350,19 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     
     override open func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        layout()
+        // For view-once messages, defer layout to the next run loop cycle.
+        // The screenshot-protection view (screenShotProtectedScrollView) updates its
+        // internal frame asynchronously after UIKit finishes the layout pass, so calling
+        // layout() synchronously here would size content against stale bounds.
+        // Dispatching async ensures the protected container has its final frame before
+        // we position subviews inside it.
+        if viewOnce {
+            DispatchQueue.main.async {
+                self.layout()
+            }
+        } else {
+            layout()
+        }
     }
     
     open func layout() {
