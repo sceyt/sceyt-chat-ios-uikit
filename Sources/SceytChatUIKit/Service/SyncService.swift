@@ -221,6 +221,12 @@ public final class SyncService: NSObject {
     public class func syncChannels(
         task: BGAppRefreshTask? = nil,
         completion: ((Bool) -> Void)? = nil) {
+            guard !Self.isSyncing else {
+                logger.verbose("SyncService: syncChannels skipped — already syncing")
+                task?.setTaskCompleted(success: true)
+                completion?(false)
+                return
+            }
             Components.channelMessageMarkerProvider.canMarkMessage = false
             Self.isSyncing = true
             Self.sendPendingReactions()
@@ -228,7 +234,7 @@ public final class SyncService: NSObject {
             let channelSyncQueue = OperationQueue()
             channelSyncQueue.maxConcurrentOperationCount = 1
             let messageSyncQueue = OperationQueue()
-            messageSyncQueue.maxConcurrentOperationCount = 10
+            messageSyncQueue.maxConcurrentOperationCount = 1
 
             let completionOperator = Operation()
             let channelCompletionOperator = Operation()
@@ -304,7 +310,7 @@ public struct Operations {
         let createChannel = CreateUnSyncChannelsOperation()
 
         let provider = Components.channelListProvider.init()
-        provider.config.queryLimit = 10
+        provider.config.queryLimit = 20
         let fetchChannels = FetchAllChannelsOperation(query: provider.defaultQuery)
         fetchChannels.onLoad = onLoad
 
