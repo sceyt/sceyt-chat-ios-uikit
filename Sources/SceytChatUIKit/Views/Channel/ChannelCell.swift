@@ -82,8 +82,7 @@ extension ChannelListViewController {
         
         override open func setup() {
             super.setup()
-            
-            
+            backgroundView = UIView()
             messageStackView.axis = .vertical
             messageStackView.distribution = .fill
             messageStackView.alignment = .leading
@@ -284,7 +283,6 @@ extension ChannelListViewController {
             dateLabel.text = data.formattedDate
             pinView.isHidden = data.channel.pinnedAt == nil
             backgroundColor = data.channel.pinnedAt == nil ? .clear : appearance.backgroundColor
-            backgroundView = UIView()
             backgroundView?.backgroundColor = appearance.backgroundColor
             
             ticksView.image = deliveryStatusImage(message: data.lastMessage)

@@ -878,8 +878,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
               message.incoming
         else { return }
         
-//        lastDisplayedMessageId = lastMessage.id
-        lastDisplayedMessageId = 0
+        lastDisplayedMessageId = lastMessage.id
         
         let model = Components.messageLayoutModel
             .init(
