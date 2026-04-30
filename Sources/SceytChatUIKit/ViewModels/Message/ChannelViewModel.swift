@@ -745,7 +745,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             var contentInsets: UIEdgeInsets = .zero
             if indexPath.item > 0,
                let prevModel {
-                if model.message.incoming == prevModel.message.incoming {
+                if prevModel.isSystemMessage || model.isSystemMessage {
+                    contentInsets.top = 12
+                } else if model.message.incoming == prevModel.message.incoming {
                     contentInsets.top = 2
                 } else {
                     contentInsets.top = 6
