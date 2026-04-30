@@ -85,6 +85,9 @@ open class ChannelMessageSender: DataProvider {
                     let min = min(sentMessage.id, MessageId(lastMessageId ?? Int64(sentMessage.id)))
                     let max = max(sentMessage.id, MessageId(lastMessageId ?? Int64(sentMessage.id)))
                     $0.updateRanges(startMessageId: min, endMessageId: max, channelId: ChannelId(channel.id))
+                    if channel.lastDisplayedMessageId < Int64(sentMessage.id) {
+                        channel.lastDisplayedMessageId = Int64(sentMessage.id)
+                    }
                 }
             }) { dbError in
                 completion?(error ?? dbError)

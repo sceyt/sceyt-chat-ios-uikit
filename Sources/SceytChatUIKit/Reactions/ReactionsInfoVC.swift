@@ -20,10 +20,18 @@ open class ReactionsInfoViewController: ViewController,
 
     open var userReactionsViewModel: [UserReactionViewModel] = [] {
         didSet {
-            viewControllers = userReactionsViewModel.map {
+            // Reuse existing VCs for unchanged VM instances to preserve live animations.
+            let oldVCsByVM = Dictionary(
+                zip(oldValue, viewControllers).map { (ObjectIdentifier($0), $1) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            viewControllers = userReactionsViewModel.map { vm in
+                if let existing = oldVCsByVM[ObjectIdentifier(vm)] {
+                    return existing
+                }
                 let viewController = Components.reactedUserListViewController.init()
                 viewController.appearance = appearance
-                viewController.viewModel = $0
+                viewController.viewModel = vm
                 viewController.onEvent = { [weak self] event in
                     switch event {
                     case .onSelect(let reaction):
@@ -85,6 +93,60 @@ open class ReactionsInfoViewController: ViewController,
         }
     }
     
+    open override func setupDone() {
+        super.setupDone()
+        reactionScoreViewModel.startObserver()
+        reactionScoreViewModel.$event
+            .compactMap { $0 }
+            .sink { [weak self] event in
+                guard let self else { return }
+                switch event {
+                case .reloadData(let keys):
+                    let currentKeys = self.userReactionsViewModel.compactMap { $0.reactionKey }
+                    let keysChanged = currentKeys != keys
+                    self.updateViewControllers(forKeys: keys)
+                    UIView.performWithoutAnimation {
+                        self.collectionView.reloadData()
+                        self.collectionView.layoutIfNeeded()
+                        
+                        if let currentVC = self.pageController.viewControllers?.first,
+                           let index = self.viewControllers.firstIndex(of: currentVC) {
+                            self.collectionView.selectItem(at: .init(item: index, section: .zero), animated: false, scrollPosition: .centeredHorizontally)
+                        }
+                    }
+                }
+            }.store(in: &subscriptions)
+    }
+
+    open func updateViewControllers(forKeys keys: [String]) {
+        let currentKeys = userReactionsViewModel.compactMap { $0.reactionKey }
+        guard currentKeys != keys else { return }
+
+        guard let messageId = userReactionsViewModel.first?.messageId else { return }
+
+        // Capture the current page's reaction key before rebuilding
+        let currentReactionKey = (pageController.viewControllers?.first as? ReactedUserListViewController)?.viewModel.reactionKey
+
+        // Reuse existing VMs for unchanged keys, create new ones for new keys
+        var newVMs: [UserReactionViewModel] = []
+        newVMs.append(
+            userReactionsViewModel.first(where: { $0.reactionKey == nil })
+            ?? Components.userReactionViewModel.init(messageId: messageId, reactionKey: nil)
+        )
+        for key in keys {
+            newVMs.append(
+                userReactionsViewModel.first(where: { $0.reactionKey == key })
+                ?? Components.userReactionViewModel.init(messageId: messageId, reactionKey: key)
+            )
+        }
+
+        userReactionsViewModel = newVMs // rebuilds viewControllers via didSet
+
+        // Stay on same reaction key, fall back to "All" (index 0) if it was removed
+        let targetIndex = userReactionsViewModel.firstIndex(where: { $0.reactionKey == currentReactionKey }) ?? 0
+        pageController.setViewControllers([viewControllers[targetIndex]], direction: .forward, animated: false)
+    }
+
     open override func setupAppearance() {
         super.setupAppearance()
         view.backgroundColor = appearance.backgroundColor

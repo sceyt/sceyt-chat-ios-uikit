@@ -22,6 +22,14 @@ extension SceytChatUIKit {
         public static var channelFileListViewModel: ChannelFileListViewModel.Type = ChannelFileListViewModel.self
         public static var channelForwardViewModel: ChannelForwardViewModel.Type = ChannelForwardViewModel.self
         public static var channelListViewModel: ChannelListViewModel.Type = ChannelListViewModel.self
+        public static var globalSearchViewModel: GlobalSearchViewModel.Type = GlobalSearchViewModel.self
+        public static var globalSearchMessagesViewModel: GlobalSearchMessagesViewModel.Type = GlobalSearchMessagesViewModel.self
+        public static var globalSearchAllMediaViewModel: GlobalSearchAllMediaViewModel.Type = GlobalSearchAllMediaViewModel.self
+        public static var globalSearchAllVoiceViewModel: GlobalSearchAllVoiceViewModel.Type = GlobalSearchAllVoiceViewModel.self
+        public static var globalSearchAllFilesViewModel: GlobalSearchAllFilesViewModel.Type = GlobalSearchAllFilesViewModel.self
+        public static var globalSearchAllLinksViewModel: GlobalSearchAllLinksViewModel.Type = GlobalSearchAllLinksViewModel.self
+        public static var globalSearchMediaPreviewDataSource: GlobalSearchMediaPreviewDataSource.Type = GlobalSearchMediaPreviewDataSource.self
+        public static var globalSearchUserBarViewModel: GlobalSearchUserBarViewModel.Type = GlobalSearchUserBarViewModel.self
         public static var channelMemberListViewModel: ChannelMemberListViewModel.Type = ChannelMemberListViewModel.self
         public static var channelMemberRolesViewModel: ChannelMemberRolesViewModel.Type = ChannelMemberRolesViewModel.self
         public static var channelInviteLinkViewModel: ChannelInviteLinkViewModel.Type = ChannelInviteLinkViewModel.self
@@ -55,6 +63,8 @@ extension SceytChatUIKit {
         public static var channelSearchResultsBaseViewController: ChannelSearchResultsBaseViewController.Type = ChannelSearchResultsBaseViewController.self
         public static var channelSearchResultsViewController: ChannelSearchResultsViewController.Type = ChannelSearchResultsViewController.self
         public static var channelSelectableSearchResultsViewController: ChannelSelectableSearchResultsViewController.Type = ChannelSelectableSearchResultsViewController.self
+        public static var globalSearchResultsViewController: GlobalSearchResultsViewController.Type = GlobalSearchResultsViewController.self
+        public static var globalSearchChatsPageViewController: GlobalSearchResultsViewController.ChatsPageViewController.Type = GlobalSearchResultsViewController.ChatsPageViewController.self
         public static var channelViewController: ChannelViewController.Type = ChannelViewController.self
         public static var createChannelViewController: CreateChannelViewController.Type = CreateChannelViewController.self
         public static var createGroupViewController: CreateGroupViewController.Type = CreateGroupViewController.self
@@ -149,7 +159,12 @@ extension SceytChatUIKit {
         public static var menuCell: MenuController.MenuCell.Type = MenuController.MenuCell.self
         public static var reactedUserReactionCell: ReactedUserListViewController.UserReactionCell.Type = ReactedUserListViewController.UserReactionCell.self
         public static var reactionsInfoHeaderCell: ReactionsInfoViewController.HeaderCell.Type = ReactionsInfoViewController.HeaderCell.self
+        public static var globalSearchUserBarCell: GlobalSearchUserBarCell.Type = GlobalSearchUserBarCell.self
         public static var searchResultChannelCell: SearchResultChannelCell.Type = SearchResultChannelCell.self
+        public static var globalSearchChatsChannelCell: GlobalSearchResultsViewController.ChatsPageViewController.ChannelCell.Type = GlobalSearchResultsViewController.ChatsPageViewController.ChannelCell.self
+        public static var globalSearchMessageCell: GlobalSearchMessageCell.Type = GlobalSearchMessageCell.self
+        public static var globalSearchMediaCell: GlobalSearchMediaCell.Type = GlobalSearchMediaCell.self
+        public static var globalSearchLinkCell: GlobalSearchLinkCell.Type = GlobalSearchLinkCell.self
         public static var selectableChannelCell: SelectableChannelCell.Type = SelectableChannelCell.self
         public static var selectableUserCell: SelectableUserCell.Type = SelectableUserCell.self
         public static var selectedBaseCell: SelectedBaseCell.Type = SelectedBaseCell.self
@@ -219,6 +234,7 @@ extension SceytChatUIKit {
         public static var textLabel: TextLabel.Type = TextLabel.self
         public static var timeLabel: TimeLabel.Type = TimeLabel.self
         public static var channelEventView: ChannelEventView.Type = ChannelEventView.self
+        public static var globalSearchUserBarView: GlobalSearchUserBarView.Type = GlobalSearchUserBarView.self
         public static var selectedUserListView: SelectedUserListView.Type = SelectedUserListView.self
         public static var selectedChannelListView: SelectedChannelListView.Type = SelectedChannelListView.self
         

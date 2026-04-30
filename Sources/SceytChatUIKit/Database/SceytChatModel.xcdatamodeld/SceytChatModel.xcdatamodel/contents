@@ -160,6 +160,10 @@
         <relationship name="user" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserDTO" inverseName="messages" inverseEntity="UserDTO"/>
         <relationship name="userMarkers" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="MarkerDTO" inverseName="message" inverseEntity="MarkerDTO"/>
         <relationship name="userReactions" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="ReactionDTO" inverseName="messageSelf" inverseEntity="ReactionDTO"/>
+        <fetchIndex name="byChannelIdCreatedAt">
+            <fetchIndexElement property="channelId" type="Binary" order="ascending"/>
+            <fetchIndexElement property="createdAt" type="Binary" order="descending"/>
+        </fetchIndex>
         <uniquenessConstraints>
             <uniquenessConstraint>
                 <constraint value="id"/>

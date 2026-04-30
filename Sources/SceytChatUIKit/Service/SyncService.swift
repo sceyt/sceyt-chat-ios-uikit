@@ -221,6 +221,12 @@ public final class SyncService: NSObject {
     public class func syncChannels(
         task: BGAppRefreshTask? = nil,
         completion: ((Bool) -> Void)? = nil) {
+            guard !Self.isSyncing else {
+                logger.verbose("SyncService: syncChannels skipped — already syncing")
+                task?.setTaskCompleted(success: true)
+                completion?(false)
+                return
+            }
             Components.channelMessageMarkerProvider.canMarkMessage = false
             Self.isSyncing = true
             Self.sendPendingReactions()
@@ -228,18 +234,18 @@ public final class SyncService: NSObject {
             let channelSyncQueue = OperationQueue()
             channelSyncQueue.maxConcurrentOperationCount = 1
             let messageSyncQueue = OperationQueue()
-            messageSyncQueue.maxConcurrentOperationCount = 10
-            
+            messageSyncQueue.maxConcurrentOperationCount = 1
+
             let completionOperator = Operation()
             let channelCompletionOperator = Operation()
-            
+
             let results = try? DataProvider.database.read { context in
                 let result1 = context.fetchChannelsToSyncMessages()
                 let result2 = context.fetchPendingMarkerToSyncMessages()
                 let result3 = context.fetchChannelsForPendingMessages()
                 return (result1, result2, result3)
             }.get()
-            
+
             let channelsResult = results?.0
             let operations = Operations.syncChannelOperations(undeleteChannelIds: results?.2 ?? []) { channels in
                 for channel in channels where channel.lastDisplayedMessageId != 0  {
@@ -302,12 +308,12 @@ public struct Operations {
     
     public static func syncChannelOperations(undeleteChannelIds: [ChannelId] = [], onLoad: (([Channel]) -> Void)? = nil) -> [Operation] {
         let createChannel = CreateUnSyncChannelsOperation()
-        
+
         let provider = Components.channelListProvider.init()
-        provider.config.queryLimit = 10
+        provider.config.queryLimit = 20
         let fetchChannels = FetchAllChannelsOperation(query: provider.defaultQuery)
         fetchChannels.onLoad = onLoad
-        
+
         let deleteChannels = DeleteChannelsOperation(database: DataProvider.database, channelIds: undeleteChannelIds)
         
         let fetchDone = BlockOperation { [unowned fetchChannels, unowned deleteChannels, unowned createChannel] in

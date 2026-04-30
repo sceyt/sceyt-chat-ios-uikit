@@ -346,7 +346,11 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         }
 
         if !selectedMediaView.items.isEmpty, lastDetectedLinkMetadata != nil {
-            removeActionView()
+            if case .reply = currentState {
+                findLink()
+            } else {
+                removeActionView()
+            }
         } else if selectedMediaView.items.isEmpty {
             findLink()
         }
@@ -615,7 +619,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             return
         }
 
-        LinkMetadataProvider.default.fetch(url: url) { [weak self] result in
+        LinkMetadataProvider.default.fetch(url: url, forceFetch: true) { [weak self] result in
             guard let self else { return }
 
             switch result {
@@ -651,13 +655,19 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     
     @objc
     open func actionViewCancelAction() {
-        if lastDetectedLinkMetadata != nil {
+        let isEditState: Bool
+        if case .edit = currentState { isEditState = true }
+        else if case .edit = nextState { isEditState = true }
+        else { isEditState = false }
+
+        if !isEditState, lastDetectedLinkMetadata != nil {
             cachedMessage = inputTextView.attributedText
         }
         self.didUserDismissLinkPreview = true
-        if case .edit = currentState {
+        if isEditState {
             inputTextView.attributedText = cachedMessage
             cachedMessage = nil
+            nextState = nil
         }
         isViewOnceEnabled = false
         removeActionView()

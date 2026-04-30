@@ -20,7 +20,21 @@ open class ChannelAttachmentListViewModel: NSObject {
     @Published public var event: Event?
     private let downloadQueue = DispatchQueue(label: "com.sceytchat.uikit.attachments", qos: .userInitiated)
 
-    public var thumbnailSize: CGSize = .init(width: 40, height: 40)
+    public var thumbnailSize: CGSize = .init(width: 40, height: 40) {
+        didSet {
+            guard thumbnailSize != oldValue,
+                  attachmentObserver.isObserverStarted else { return }
+            thumbnailCache.removeAll()
+            for section in 0..<attachmentObserver.numberOfSections {
+                for row in 0..<attachmentObserver.numberOfItems(in: section) {
+                    if let layout = attachmentObserver.item(at: IndexPath(row: row, section: section)) {
+                        layout.thumbnailSize = thumbnailSize
+                        layout.resetThumbnail()
+                    }
+                }
+            }
+        }
+    }
     public var minAutoDownloadSize = 3_000_000
     
     private let thumbnailCache = {
@@ -71,6 +85,8 @@ open class ChannelAttachmentListViewModel: NSObject {
                 ])
         }
 
+        let channel = self.channel
+        let appearance = self.appearance
         return LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>(
             context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
             sortDescriptors: [.init(keyPath: \AttachmentDTO.createdAt, ascending: false),
@@ -78,9 +94,9 @@ open class ChannelAttachmentListViewModel: NSObject {
             sectionNameKeyPath: sectionNameKeyPath,
             fetchPredicate: predicate,
             relationshipKeyPathsObserver: []
-        ) { [unowned self] in
+        ) { [weak self] in
             let attachment = $0.convert()
-            if let prevItem = self.attachmentObserver.item(for: $0.objectID) {
+            if let prevItem = self?.attachmentObserver.item(for: $0.objectID) {
                 prevItem.update(attachment: attachment)
                 if let message = $0.message?.convert() {
                     prevItem.updateMessageIfNeeded(ownerMessage: message)
@@ -91,13 +107,13 @@ open class ChannelAttachmentListViewModel: NSObject {
                 .AttachmentLayout(
                     attachment: attachment,
                     ownerMessage: $0.message?.convert(),
-                    ownerChannel: self.channel,
-                    thumbnailSize: self.thumbnailSize,
+                    ownerChannel: channel,
+                    thumbnailSize: self?.thumbnailSize ?? CGSize(width: 40, height: 40),
                     onLoadThumbnail: { [weak self] in
                         self?.cacheThumbnail($0, for: attachment)
                     },
                     asyncLoadThumbnail: true,
-                    appearance: self.appearance
+                    appearance: appearance
                 )
         }
 
@@ -175,6 +191,7 @@ open class ChannelAttachmentListViewModel: NSObject {
                   minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
                   attachment.status != .done,
                   attachment.status != .failedDownloading,
+                  attachment.status != .pauseDownloading,
                   attachment.status != .failedUploading
             else {
                 DispatchQueue.main.async {
@@ -208,6 +225,15 @@ open class ChannelAttachmentListViewModel: NSObject {
         let attachment = layout.attachment
         guard attachment.type != "link"
         else { return }
+        if fileProvider.filePath(attachment: attachment) != nil {
+            DataProvider.database.write {
+                let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
+                dto?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+            } completion: { error in
+                logger.errorIfNotNil(error, "")
+            }
+            return
+        }
         getMessage(layout) { message in
             if let message {
                 fileProvider.resumeTransfer(message: message, attachment: attachment) {
@@ -225,20 +251,15 @@ open class ChannelAttachmentListViewModel: NSObject {
 
     open func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
-        guard attachment.status == .downloading,
-              fileProvider.filePath(attachment: attachment) == nil
-        else { return }
-        
+
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) {
-                    if $0 {
-                        DataProvider.database.write {
-                            let attachmentDTO = AttachmentDTO.fetch(id: attachment.id, context: $0)
-                            attachmentDTO?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue
-                        } completion: { error in
-                            logger.errorIfNotNil(error, "")
-                        }
+                fileProvider.stopTransfer(message: message, attachment: attachment) { _ in
+                    DataProvider.database.write {
+                        let attachmentDTO = AttachmentDTO.fetch(id: attachment.id, context: $0)
+                        attachmentDTO?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue
+                    } completion: { error in
+                        logger.errorIfNotNil(error, "")
                     }
                 }
             }
@@ -268,5 +289,96 @@ open class ChannelAttachmentListViewModel: NSObject {
 public extension ChannelAttachmentListViewModel {
     enum Event {
         case change(ChangeItemPaths)
+    }
+}
+
+// MARK: - Protocol
+
+public protocol ChannelAttachmentListViewModelProviding: AnyObject {
+    var numberOfSections: Int { get }
+    func numberOfAttachments(in section: Int) -> Int
+    var thumbnailSize: CGSize { get set }
+    var minAutoDownloadSize: Int { get }
+    func startDatabaseObserver()
+    func stopDatabaseObserver()
+    func loadAttachments()
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?,
+        onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout?
+    func downloadAttachmentIfNeeded(
+        _ layout: MessageLayoutModel.AttachmentLayout,
+        completion: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+    )
+    func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout)
+    func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout)
+    var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> { get }
+    /// Filters the attachment list by text query and/or sender. Both filters are applied together when provided.
+    /// - Parameters:
+    ///   - query: Optional text to match against the owning message's body (case- and diacritic-insensitive).
+    ///   - filterUser: When set, only attachments sent by this user are shown.
+    func search(query: String?, filterUser: ChatUser?)
+    /// Returns true when any filter (user or query) is currently active.
+    var isFiltered: Bool { get }
+    /// Returns false when the last load returned no new items (end of data reached).
+    var hasMore: Bool { get }
+}
+
+public extension ChannelAttachmentListViewModelProviding {
+    var hasMore: Bool { true }
+    func search(query: String?, filterUser: ChatUser?) {}
+    func stopDatabaseObserver() {}
+    var isFiltered: Bool { false }
+    func attachmentLayout(at indexPath: IndexPath) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: nil, onLoadLinkMetadata: nil)
+    }
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: onLoadThumbnail, onLoadLinkMetadata: nil)
+    }
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: nil, onLoadLinkMetadata: onLoadLinkMetadata)
+    }
+    func downloadAttachmentIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
+        downloadAttachmentIfNeeded(layout, completion: nil)
+    }
+}
+
+extension ChannelAttachmentListViewModel: ChannelAttachmentListViewModelProviding {
+    public var eventPublisher: AnyPublisher<Event?, Never> { $event.eraseToAnyPublisher() }
+}
+
+// MARK: - Empty default
+
+public extension ChannelAttachmentListViewModel {
+    final class Empty: NSObject, ChannelAttachmentListViewModelProviding {
+        public var numberOfSections: Int { 0 }
+        public func numberOfAttachments(in section: Int) -> Int { 0 }
+        public var thumbnailSize: CGSize = .zero
+        public var minAutoDownloadSize: Int = 0
+        public func startDatabaseObserver() {}
+        public func loadAttachments() {}
+        public func attachmentLayout(
+            at indexPath: IndexPath,
+            onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?,
+            onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+        ) -> MessageLayoutModel.AttachmentLayout? { nil }
+        public func downloadAttachmentIfNeeded(
+            _ layout: MessageLayoutModel.AttachmentLayout,
+            completion: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+        ) {}
+        public func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {}
+        public func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout) {}
+
+        private let eventSubject = PassthroughSubject<ChannelAttachmentListViewModel.Event?, Never>()
+        public var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> {
+            eventSubject.eraseToAnyPublisher()
+        }
     }
 }

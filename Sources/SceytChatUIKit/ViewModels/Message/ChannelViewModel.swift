@@ -137,7 +137,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     //MARK: required init
     public required init(
         channel: ChatChannel,
-        threadMessage: ChatMessage? = nil
+        threadMessage: ChatMessage? = nil,
+        scrollToMessageId: MessageId = 0
     ) {
         
         provider = Components.channelMessageProvider.init(
@@ -153,13 +154,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         self.channel = channel
         self.threadMessage = threadMessage
         if let lastMessage = channel.lastMessage {
+            logger.verbose("[ChannelViewModel] init lastMessage.id: \(lastMessage.id), channel.lastDisplayedMessageId: \(channel.lastDisplayedMessageId), lastMessage.incoming: \(lastMessage.incoming)")
             if channel.lastDisplayedMessageId == lastMessage.id || !lastMessage.incoming {
                 lastDisplayedMessageId = 0
+                logger.verbose("[ChannelViewModel] init lastDisplayedMessageId set to 0 (lastDisplayedMessageId == lastMessage.id: \(channel.lastDisplayedMessageId == lastMessage.id), incoming: \(lastMessage.incoming))")
             } else {
                 lastDisplayedMessageId = channel.lastDisplayedMessageId
+                logger.verbose("[ChannelViewModel] init lastDisplayedMessageId set to \(channel.lastDisplayedMessageId)")
             }
         } else {
             lastDisplayedMessageId = 0
+            logger.verbose("[ChannelViewModel] init lastDisplayedMessageId set to 0 (no lastMessage)")
         }
         super.init()
         SceytChatUIKit.shared.chatClient.add(
@@ -196,6 +201,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         // Set up unread mentions manager delegate
         unreadMentionsManager.delegate = self
 
+        if scrollToMessageId != 0 {
+            scrollToRepliedMessageId = scrollToMessageId
+        }
         startDatabaseObserver {}
         if chatClient.connectionState == .connected {
             loadLastMessages()
@@ -252,7 +260,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             self?.onDidChangeChannelEvent(items: $0)
         }
         let initialMessageId: MessageId
-        if lastDisplayedMessageId == 0 {
+        if scrollToRepliedMessageId != 0 {
+            initialMessageId = scrollToRepliedMessageId
+        } else if lastDisplayedMessageId == 0 {
             initialMessageId = channel.lastMessage?.id ?? MessageId(Int64.max)
         } else {
             initialMessageId = lastDisplayedMessageId
@@ -591,11 +601,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 isSearchResultsLoading = false
                 isRestartingMessageObserver = .none
             } else {
-                scrollToRepliedMessageId = 0
                 isRestartingMessageObserver = .none
             }
-            
+
             scroll(to: indexPath, messageId: mid)
+            scrollToRepliedMessageId = 0
             
             // Mark mention as navigated only after successful scroll
             if isUnreadMentionNavigation {
@@ -616,21 +626,22 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
 
             if isInitial {
-                let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId : 
+                let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId :
                                scrollToUnreadMentionMessageId != 0 ? scrollToUnreadMentionMessageId : lastDisplayedMessageId
+                let batchIds = items.changeItems.compactMap { $0.item?.id }
                 if messageId != 0,
                    let indexPath = items.changeItems
                     .first(where: {$0.item?.id == messageId})?
                     .indexPath {
                     needToScroll = false
-                    let animated = scrollToRepliedMessageId != 0 || scrollToUnreadMentionMessageId != 0
+                    let animated = scrollToUnreadMentionMessageId != 0
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: animated, pos: .centeredVertically)
-                    
+
                     // Mark mention as navigated if this is an unread mention
                     if scrollToUnreadMentionMessageId == messageId {
                         handleMentionNavigated(messageId: messageId)
                     }
-                    
+
                     resetStateAfterChangeEvent()
                 } else {
                     if let (indexPath, messageId) = needsToScrollAtIndexPath(items: items) {
@@ -734,7 +745,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             var contentInsets: UIEdgeInsets = .zero
             if indexPath.item > 0,
                let prevModel {
-                if model.message.incoming == prevModel.message.incoming {
+                if prevModel.isSystemMessage || model.isSystemMessage {
+                    contentInsets.top = 12
+                } else if model.message.incoming == prevModel.message.incoming {
                     contentInsets.top = 2
                 } else {
                     contentInsets.top = 6
@@ -928,6 +941,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     open func loadLastMessages() {
         if isUnsubscribedChannel {
             loadPrevMessages(before: MessageId(Int64.max))
+        } else if scrollToRepliedMessageId != 0 {
+            provider.loadNearMessages(near: scrollToRepliedMessageId)
         } else {
             if isThread || channel.lastMessage?.incoming == false || lastDisplayedMessageId == 0 {
                 logger.info("ChannelViewModel loadLastMessages (prev) channel id: \(channel.id), lastMessage id \(channel.lastMessage?.id as Any)")
@@ -953,7 +968,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     ) {
         guard let message = message(at: indexPath)
         else { return }
-        logger.info("ChannelViewModel loadLastMessages (next) channel id: \(channel.id), \(indexPath) lastDisplayedMessageId \(message.id)")
         if message.id == 0 {
             loadPrevMessages(before: MessageId(Int64.max))
         } else {
@@ -984,6 +998,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         fetchPrev()
         
+        logger.info("ChannelViewModel loadPrevMessages channel id: \(channel.id), before messageId: \(messageId)")
         provider.loadPrevMessages(
             before: messageId
         ) { [weak self] error in
@@ -1014,6 +1029,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         fetchNext()
         
+        logger.info("ChannelViewModel loadNextMessages channel id: \(channel.id), after messageId: \(messageId)")
         provider.loadNextMessages(
             after: messageId
         ) { [weak self] error in
@@ -1055,7 +1071,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         completion: ((Error?) -> Void)? = nil
     ) {
         if chatClient.connectionState == .connected {
-            provider.loadNearMessages(near: id) { [weak self] error in
+            provider.loadNearMessages(near: id) { [weak self] _, error in
                 if error == nil {
                     self?.messageObserver.restartToNear(at: id)
                 }
@@ -1068,19 +1084,25 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open func loadNearMessagesOfRepliedMessage(
         id: MessageId,
-        completion: ((Error?) -> Void)? = nil
+        completion: (([Message]?, Error?) -> Void)? = nil
     ) {
         if chatClient.connectionState == .connected {
-            provider.loadNearMessages(near: id) { [weak self] error in
+            provider.loadNearMessages(near: id) { [weak self] messages, error in
+                guard let self else { return }
                 if error == nil {
-                    self?.messageObserver.restartToNear(at: id)
+                    
+                    if messages?.first(where: { $0.id == id }) == nil {
+                        return
+                    }
+                    
+                    self.messageObserver.restartToNear(at: id)
                 }
-                completion?(error)
+                completion?(messages, error)
             }
         } else {
-            completion?(SceytChatError.notConnect)
+            completion?(nil, SceytChatError.notConnect)
         }
-        
+
     }
     
     open func loadNearMessagesOfUnreadMention(
@@ -1088,7 +1110,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         completion: ((Error?) -> Void)? = nil
     ) {
         if chatClient.connectionState == .connected {
-            provider.loadNearMessages(near: id) { [weak self] error in
+            provider.loadNearMessages(near: id) { [weak self] _, error in
                 if error == nil {
                     self?.messageObserver.restartToNear(at: id)
                 }
@@ -2361,12 +2383,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         {[weak self] ranges in
             guard let self else { return }
             if !ranges.isEmpty {
-                let sectionsCount = self.numberOfSections
-                self.messageObserver.restartToNear(at: messageId) {[weak self] isDone in
-                    guard let self else { return }
-                    if !isDone {
-                        self.loadNearMessagesOfRepliedMessage(id: messageId)
+                self.loadNearMessagesOfRepliedMessage(id: messageId) { messages, error in
+                    if messages?.first(where: { $0.id == messageId }) == nil {
+                        return
                     }
+                    self.messageObserver.restartToNear(at: messageId)
                 }
             } else {
                 self.loadNearMessagesOfRepliedMessage(id: messageId)
@@ -2443,6 +2464,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     //MARK: Link preview
     open func updateLinkPreviewsForLayoutModelIfNeeded(model: MessageLayoutModel) {
+        guard scrollToRepliedMessageId == 0,
+              scrollToMessageIdIfSearching == 0
+        else { return }
         let matches = DataDetector.matches(text: model.message.body)
         guard !matches.isEmpty
         else { return }

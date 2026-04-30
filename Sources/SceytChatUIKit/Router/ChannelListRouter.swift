@@ -16,8 +16,14 @@ open class ChannelListRouter: Router<ChannelListViewController> {
         showChannelViewController(channel: chatChannel)
     }
     
-    open func showChannelViewController(channelId: ChannelId) {
-        if let chatChannel = rootViewController.channelListViewModel.channel(id: channelId) {
+    open func showChannelViewController(channelId: ChannelId, fetchFromDB: Bool = false) {
+        if fetchFromDB {
+            rootViewController.channelListViewModel.fetchChannel(id: channelId) { [weak self] chatChannel in
+                if let chatChannel {
+                    self?.showChannelViewController(channel: chatChannel)
+                }
+            }
+        } else if let chatChannel = rootViewController.channelListViewModel.channel(id: channelId) {
             showChannelViewController(channel: chatChannel)
         } else {
             rootViewController.channelListViewModel.fetchChannel(id: channelId) { [weak self] chatChannel in
@@ -39,6 +45,21 @@ open class ChannelListRouter: Router<ChannelListViewController> {
         viewController.hidesBottomBarWhenPushed = true
         viewController.channelViewModel = Components.channelViewModel
             .init(channel: channel)
+        push(viewController, animated: animated)
+    }
+
+    open func showChannelViewController(channel: ChatChannel, scrollToMessageId: MessageId, animated: Bool = true) {
+        if let opened = rootViewController.navigationController?.viewControllers.last(where: { $0 is ChannelViewController }) as? ChannelViewController,
+           opened.channelViewModel.channel.id == channel.id
+        {
+            popTo(opened, animated: animated)
+            opened.channelViewModel.findReplayedMessage(messageId: scrollToMessageId)
+            return
+        }
+        let viewController = Components.channelViewController.init()
+        viewController.hidesBottomBarWhenPushed = true
+        viewController.channelViewModel = Components.channelViewModel
+            .init(channel: channel, scrollToMessageId: scrollToMessageId)
         push(viewController, animated: animated)
     }
     
@@ -64,6 +85,15 @@ open class ChannelListRouter: Router<ChannelListViewController> {
         }
     }
     
+    open func showAttachment(_ attachment: ChatMessage.Attachment) {
+        let items = AttachmentModel.items(attachments: [attachment])
+        guard !items.isEmpty else { return }
+        let preview = FilePreviewController(
+            items: items.map { .init(title: $0.name, url: $0.url) }
+        )
+        preview.present(on: rootViewController)
+    }
+
     open func showNewChannel() {
         let viewController = Components.startChatViewController.init()
         viewController.viewModel = Components.createNewChannelViewModel.init()

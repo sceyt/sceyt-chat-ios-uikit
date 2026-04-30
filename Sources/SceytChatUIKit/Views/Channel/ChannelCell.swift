@@ -82,8 +82,7 @@ extension ChannelListViewController {
         
         override open func setup() {
             super.setup()
-            
-            
+            backgroundView = UIView()
             messageStackView.axis = .vertical
             messageStackView.distribution = .fill
             messageStackView.alignment = .leading
@@ -169,6 +168,7 @@ extension ChannelListViewController {
             super.setupAppearance()
             
             backgroundColor = appearance.backgroundColor
+            backgroundView?.backgroundColor = appearance.backgroundColor
             unreadCount.font = appearance.unreadCountLabelAppearance.font
             unreadCount.textColor = appearance.unreadCountLabelAppearance.foregroundColor
             atView.font = appearance.unreadMentionLabelAppearance.font
@@ -176,9 +176,9 @@ extension ChannelListViewController {
             subjectLabel.font = appearance.subjectLabelAppearance.font
             subjectLabel.textColor = appearance.subjectLabelAppearance.foregroundColor
 
-            retentionBadgeView.image = Assets.chatClock.image
+            retentionBadgeView.image = appearance.retentionBadgeImage
             retentionBadgeView.contentMode = .scaleAspectFit
-            retentionBadgeView.layer.borderColor = DefaultColors.background.cgColor
+            retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
             retentionBadgeView.layer.borderWidth = 2
             retentionBadgeView.layer.cornerRadius = 11
             retentionBadgeView.clipsToBounds = true
@@ -191,7 +191,13 @@ extension ChannelListViewController {
             pinView.isHidden = true
             muteView.isHidden = true
         }
-        
+
+        override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+            guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
+            retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
+        }
+
         // MARK: - Event Management Methods
         private func addEvent(_ event: ChannelEventView.Event, for user: ChatUser) {
             let model = ChannelEventModel(
@@ -283,6 +289,8 @@ extension ChannelListViewController {
             dateLabel.text = data.formattedDate
             pinView.isHidden = data.channel.pinnedAt == nil
             backgroundColor = data.channel.pinnedAt == nil ? .clear : appearance.backgroundColor
+            backgroundView?.backgroundColor = appearance.backgroundColor
+            
             ticksView.image = deliveryStatusImage(message: data.lastMessage)
             ticksView.isHidden = !data.shouldShowDeliveryTick
             unreadCount.value = data.formattedUnreadCount

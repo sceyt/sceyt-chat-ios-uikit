@@ -180,7 +180,7 @@ open class ChannelMessageProvider: DataProvider {
     
     open func loadNearMessages(
         near messageId: MessageId,
-        completion: ((Error?) -> Void)? = nil
+        completion: (([Message]?, Error?) -> Void)? = nil
     ) {
         loadNearMessages(
             query: defaultQuery,
@@ -192,17 +192,19 @@ open class ChannelMessageProvider: DataProvider {
     open func loadNearMessages(
         query: MessageListQuery,
         near messageId: MessageId,
-        completion: ((Error?) -> Void)? = nil) {
+        completion: (([Message]?, Error?) -> Void)? = nil) {
             loadNearMessagesWithRetry(query: query, messageId: messageId)
             { messages, error in
                 guard let messages = messages
                 else {
-                    completion?(error)
+                    completion?(nil, error)
                     return
                 }
                 self.store(
                     messages: messages,
-                    completion: completion
+                    completion: { _ in
+                        completion?(messages, nil)
+                    }
                 )
                 self.sendReceivedMarker(messages: messages)
             }

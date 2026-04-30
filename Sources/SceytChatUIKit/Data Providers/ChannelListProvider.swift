@@ -112,7 +112,8 @@ open class ChannelListProvider: DataProvider {
             channels.forEach { channel in
                 guard let message = channel.lastMessage
                 else { return }
-                if !message.incoming || channel.userRole == nil || message.markerTotals?.contains(where: {$0.name == DefaultMarker.received.rawValue}) == true {
+                let alreadyReceived = message.userMarkers?.contains { $0.name == DefaultMarker.received.rawValue } == true
+                if !message.incoming || channel.userRole == nil || alreadyReceived {
                     return
                 }
                 Components.channelMessageProvider.init(channelId: channel.id)

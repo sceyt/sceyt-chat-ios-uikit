@@ -25,6 +25,7 @@ open class ChannelListViewController: ViewController,
 
     private var diffableDataSource: UITableViewDiffableDataSource<Int, ChannelId>?
     private var channelFingerprints: [ChannelId: ChannelFingerprint] = [:]
+    private var swipeOpenIndexPath: IndexPath?
 
     // MARK: -
 
@@ -43,11 +44,20 @@ open class ChannelListViewController: ViewController,
         .init()
         .withoutAutoresizingMask
 
+    open var globalSearchEnabled: Bool = false
+    
+    open var pendingOpenChannel: ChatChannel? = nil
+
     open lazy var searchController = Components.channelSearchController
         .init(searchResultsController: searchResultsViewController)
 
-    open lazy var searchResultsViewController = Components.channelSearchResultsViewController
-        .init()
+    open lazy var searchResultsViewController: ChannelSearchResultsBaseViewController = {
+        if globalSearchEnabled {
+            return Components.globalSearchResultsViewController.init()
+        } else {
+            return Components.channelSearchResultsViewController.init()
+        }
+    }()
 
     private var isViewDidAppear = false
 
@@ -71,6 +81,23 @@ open class ChannelListViewController: ViewController,
         searchResultsViewController.resultsUpdater = channelListViewModel
         navigationItem.searchController = searchController
         searchController.searchResultsUpdater = self
+        
+        if globalSearchEnabled {
+            searchController.showsSearchResultsController = true
+            searchController.delegate = self
+        }
+
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            globalVC.searchUserBarView.onSelect = { [weak self] user in
+                self?.addUserSearchToken(user)
+            }
+            globalVC.onSelectMessage = { [weak self] message, channel in
+                self?.channelListRouter.showChannelViewController(channel: channel, scrollToMessageId: message.id)
+            }
+            globalVC.onSelectAttachment = { [weak self] attachment in
+                self?.channelListRouter.showAttachment(attachment)
+            }
+        }
 
         definesPresentationContext = true
 
@@ -163,7 +190,11 @@ open class ChannelListViewController: ViewController,
         tableView.backgroundColor = .clear
         emptyView.parentAppearance = appearance.emptyViewAppearance
         searchController.parentAppearance = appearance.searchControllerAppearance
-        searchResultsViewController.parentAppearance = appearance.searchResultControllerAppearance
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            globalVC.parentAppearance = appearance.globalSearchControllerAppearance
+        } else {
+            searchResultsViewController.parentAppearance = appearance.searchResultControllerAppearance
+        }
     }
 
     open override func setupDone() {
@@ -235,6 +266,8 @@ open class ChannelListViewController: ViewController,
         case .reload:
             reloadTableView()
             showEmptyViewIfNeeded()
+        case .resetFingerprints:
+            channelFingerprints = [:]
         case .reloadSearch:
             searchResultsViewController.reloadData()
         case let .unreadMessagesCount(count):
@@ -244,7 +277,7 @@ open class ChannelListViewController: ViewController,
         case let .typing(isTyping, user, channel):
             for cell in tableView.visibleCells where cell is ChannelCell {
                 let channelCell = (cell as! ChannelCell)
-                if channelCell.data.channel.id == channel.id {
+                if channelCell.data?.channel.id == channel.id {
                     if isTyping {
                         channelCell.didStartTyping(user: user)
                     } else {
@@ -256,7 +289,7 @@ open class ChannelListViewController: ViewController,
         case let .recording(isRecording, user, channel):
             for cell in tableView.visibleCells where cell is ChannelCell {
                 let channelCell = (cell as! ChannelCell)
-                if channelCell.data.channel.id == channel.id {
+                if channelCell.data?.channel.id == channel.id {
                     if isRecording {
                         channelCell.didStartRecording(user: user)
                     } else {
@@ -266,7 +299,14 @@ open class ChannelListViewController: ViewController,
                 }
             }
         case .showChannel(let channel):
-            channelListRouter.showChannelViewController(channel: channel)
+            if searchController.isActive {
+                pendingOpenChannel = channel
+                UIView.performWithoutAnimation {
+                    searchController.isActive = false
+                }
+            } else {
+                channelListRouter.showChannelViewController(channel: channel)
+            }
         }
     }
 
@@ -296,7 +336,13 @@ open class ChannelListViewController: ViewController,
                 && paths.sectionInserts.isEmpty
                 && paths.sectionDeletes.isEmpty
                 
-                applyCurrentSnapshot(animation: !hasDraftMove)
+                if swipeOpenIndexPath != nil {
+                    swipeOpenIndexPath = nil
+                    tableView.setEditing(false, animated: false)
+                    applyCurrentSnapshot(animation: !hasDraftMove)
+                } else {
+                    applyCurrentSnapshot(animation: !hasDraftMove)
+                }
             } else {
                 let hasLastMessageIdChanged = paths.updates.contains { indexPath in
                     guard let channel = channelListViewModel.channel(at: indexPath) else { return false }
@@ -306,7 +352,11 @@ open class ChannelListViewController: ViewController,
                 }
 
                 if hasLastMessageIdChanged {
-                    applyCurrentSnapshot(animation: true)
+                    if let openIndexPath = swipeOpenIndexPath, paths.updates.contains(openIndexPath) {
+                        applyDiffableUpdatesOnly(at: paths.updates)
+                    } else {
+                        applyCurrentSnapshot(animation: false)
+                    }
                 } else {
                     let hasDraftChange = paths.updates.contains { indexPath in
                         guard let channel = channelListViewModel.channel(at: indexPath) else { return false }
@@ -431,6 +481,14 @@ open class ChannelListViewController: ViewController,
             }
     }
 
+    open func tableView(_ tableView: UITableView, willBeginEditingRowAt indexPath: IndexPath) {
+        swipeOpenIndexPath = indexPath
+    }
+
+    open func tableView(_ tableView: UITableView, didEndEditingRowAt indexPath: IndexPath?) {
+        swipeOpenIndexPath = nil
+    }
+
     open func tableView(_ tableView: UITableView,
                         didSelectRowAt indexPath: IndexPath) {
         channelListRouter.showChannelViewController(at: indexPath)
@@ -474,10 +532,36 @@ open class ChannelListViewController: ViewController,
 
     public var lastSearchText: String?
     public func updateSearchResults(for searchController: UISearchController) {
-        NSObject.cancelPreviousPerformRequests(withTarget: channelListViewModel, selector: #selector(ChannelListViewModel.search(query:)), object: lastSearchText)
         let text = searchController.searchBar.text
-        lastSearchText = text
-        channelListViewModel.perform(#selector(ChannelListViewModel.search(query:)), with: text, afterDelay: 0.01)
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            let hasTokens = !searchController.searchBar.searchTextField.tokens.isEmpty
+            globalVC.hasSearchToken = hasTokens
+            if !hasTokens {
+                globalVC.filterUser = nil
+            }
+            globalVC.setUserBarVisible(!hasTokens, animated: true)
+            NSObject.cancelPreviousPerformRequests(withTarget: globalVC, selector: #selector(GlobalSearchResultsViewController.search(query:)), object: lastSearchText)
+            lastSearchText = text
+            globalVC.perform(#selector(GlobalSearchResultsViewController.search(query:)), with: text, afterDelay: 0.01)
+        } else {
+            NSObject.cancelPreviousPerformRequests(withTarget: channelListViewModel, selector: #selector(ChannelListViewModel.search(query:)), object: lastSearchText)
+            lastSearchText = text
+            channelListViewModel.perform(#selector(ChannelListViewModel.search(query:)), with: text, afterDelay: 0.01)
+        }
+    }
+
+    open func addUserSearchToken(_ user: ChatUser) {
+        let textField = searchController.searchBar.searchTextField
+        let fullName = SceytChatUIKit.shared.formatters.userShortNameFormatter.format(user)
+        let name = fullName.count > 12 ? String(fullName.prefix(12)) : fullName
+        let token = UISearchToken(icon: nil, text: name)
+        token.representedObject = user
+        textField.insertToken(token, at: textField.tokens.count)
+        textField.text = nil
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            globalVC.filterUser = user
+        }
+        updateSearchResults(for: searchController)
     }
 }
 
@@ -547,5 +631,26 @@ private extension ChannelListViewController {
             lastReactionId: channel.lastReaction?.id,
             lastReactionKey: channel.lastReaction?.key
         )
+    }
+}
+
+extension ChannelListViewController: UISearchControllerDelegate {
+    public func willPresentSearchController(_ searchController: UISearchController) {
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            if globalVC.pageViewController == nil {
+                globalVC.buildPages()
+                globalVC.categoryTabBar.setSelectedIndex(0, animated: false)
+            }
+        }
+    }
+
+    public func didDismissSearchController(_ searchController: UISearchController) {
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            globalVC.tearDownPages()
+        }
+        if let channel = pendingOpenChannel {
+            channelListRouter.showChannelViewController(channel: channel)
+            pendingOpenChannel = nil
+        }
     }
 }

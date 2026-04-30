@@ -350,7 +350,19 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     
     override open func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        layout()
+        // For view-once messages, defer layout to the next run loop cycle.
+        // The screenshot-protection view (screenShotProtectedScrollView) updates its
+        // internal frame asynchronously after UIKit finishes the layout pass, so calling
+        // layout() synchronously here would size content against stale bounds.
+        // Dispatching async ensures the protected container has its final frame before
+        // we position subviews inside it.
+        if viewOnce {
+            DispatchQueue.main.async {
+                self.layout()
+            }
+        } else {
+            layout()
+        }
     }
     
     open func layout() {
@@ -768,10 +780,13 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     @objc
     open func shareButtonAction(_ sender: UIBarButtonItem) {
         let previewItem = viewModel.previewItem
+        let topActions = (carouselViewController?.previewDataSource as? PreviewShareActionProviding)?
+            .previewShareTopActions(previewItem: previewItem) ?? []
         router
             .showShareActionSheet(
                 previewItem: previewItem,
-                from: sender)
+                from: sender,
+                topActions: topActions)
         { [unowned self] option in
             switch option {
             case .saveGallery:

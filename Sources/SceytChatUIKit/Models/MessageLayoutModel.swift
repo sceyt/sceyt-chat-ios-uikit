@@ -1125,6 +1125,8 @@ extension MessageLayoutModel {
         public var thumbnail: UIImage?
         public var thumbnailSize: CGSize = .zero
         public var voiceWaveform: [Float]?
+        /// Cached link metadata for link-type attachments. Set once on first load; checked before re-fetching.
+        public var linkMetadata: LinkMetadata?
         public var type: AttachmentType {
             .init(rawValue: attachment.type) ?? .file
         }
@@ -1269,6 +1271,17 @@ extension MessageLayoutModel {
             if !isThumbnailLoadedFromFile {
                 isLoadedThumbnail = false
                 loadThumbnail()
+            } else {
+                logger.debug("[Attachment] update(attachment:) SKIPPED loadThumbnail because isThumbnailLoadedFromFile=true")
+            }
+        }
+
+        open func resetThumbnail() {
+            thumbnail = nil
+            isThumbnailLoadedFromFile = false
+            isLoadedThumbnail = false
+            DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+                self?.loadThumbnail()
             }
         }
         

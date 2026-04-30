@@ -18,10 +18,13 @@ extension MessageCell {
         open lazy var sizeLabel = UILabel()
             .withoutAutoresizingMask
 
+        open lazy var playButton = UIImageView()
+            .withoutAutoresizingMask
+
         open override func setupAppearance() {
             super.setupAppearance()
             imageView.clipsToBounds = true
-            imageView.layer.cornerRadius = 4
+            imageView.cornerRadius = 8
 
             titleLabel.font = appearance.attachmentFileNameLabelAppearance.font
             titleLabel.textColor = appearance.attachmentFileNameLabelAppearance.foregroundColor
@@ -32,6 +35,9 @@ extension MessageCell {
 
             progressView.backgroundColor = appearance.mediaLoaderAppearance.backgroundColor
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
+
+            playButton.image = .videoPlayerPlay
+            playButton.isHidden = true
         }
 
         open override func setupLayout() {
@@ -42,6 +48,7 @@ extension MessageCell {
             addSubview(sizeLabel)
             addSubview(progressView)
             addSubview(pauseButton)
+            addSubview(playButton)
 
             imageView.pin(to: self, anchors: [.leading(Layouts.horizontalPadding), .centerY(-1)])
             imageView.resize(anchors: [.height(Layouts.attachmentIconSize), .width(Layouts.attachmentIconSize)])
@@ -53,19 +60,43 @@ extension MessageCell {
 
             progressView.pin(to: imageView)
             pauseButton.pin(to: progressView)
+            playButton.pin(to: imageView, anchors: [.centerX(), .centerY()])
+            playButton.resize(anchors: [.height(24.0), .width(24.0)])
+        }
+
+        private var isVideoFile: Bool {
+            URL(fileURLWithPath: data.attachment.name ?? "").isVideo
+        }
+        
+        open override func update(status: ChatMessage.Attachment.TransferStatus) {
+            super.update(status: status)
+            if data.transferStatus == .done {
+                if data.thumbnail != nil && isVideoFile {
+                    playButton.isHidden = false
+                }
+            }
         }
 
         open override var data: MessageLayoutModel.AttachmentLayout! {
             didSet {
-                imageView.image = appearance.attachmentIconProvider.provideVisual(for: data.attachment)
+                playButton.isHidden = true
+                if data.transferStatus == .done {
+                    imageView.image = data.thumbnail ?? appearance.attachmentIconProvider.provideVisual(for: data.attachment)
+                    if data.thumbnail != nil && isVideoFile {
+                        playButton.isHidden = false
+                    }
+                } else {
+                    imageView.image = appearance.attachmentIconProvider.provideVisual(for: data.attachment)
+                }
                 titleLabel.text = data.name
                 sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
             }
         }
-        
+
         open override func setProgress(_ progress: AttachmentTransfer.AttachmentProgress) {
             super.setProgress(progress)
-            
+            playButton.isHidden = true
+
             let message: String
             if progress.progress <= 0.01 || progress.progress >= 1 {
                 message = data.fileSize(using: appearance.attachmentFileSizeFormatter)
@@ -76,7 +107,7 @@ extension MessageCell {
             }
             sizeLabel.text = message
         }
-        
+
         open override func setCompletion(_ completion: AttachmentTransfer.AttachmentCompletion) {
             super.setCompletion(completion)
             guard completion.error == nil

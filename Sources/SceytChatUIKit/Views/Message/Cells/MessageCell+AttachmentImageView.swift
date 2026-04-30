@@ -90,6 +90,7 @@ extension MessageCell {
                 // Show/hide blur and fire icon based on viewOnce
                 let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
                 blurEffectView.isHidden = !isViewOnce
+                logger.verbose("[Attachment] data.didSet — attachment=\(data.attachment.id) status=\(data.transferStatus) hasThumbnail=\(data.thumbnail != nil)")
                 update(status: data.transferStatus)
 
                 data.onLoadThumbnail = { [weak self] thumbnail in

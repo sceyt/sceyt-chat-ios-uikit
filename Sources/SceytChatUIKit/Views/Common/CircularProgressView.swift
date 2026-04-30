@@ -112,8 +112,8 @@ open class CircularProgressView: View {
     
     open override func layoutSubviews() {
         super.layoutSubviews()
-        layer.cornerRadius = frame.width / 2
-        let rect = frame.inset(by: contentInsets)
+        layer.cornerRadius = bounds.width / 2
+        let rect = bounds.inset(by: contentInsets)
         let path = UIBezierPath(arcCenter: CGPoint(x: contentInsets.left + rect.width / 2, y: contentInsets.top + rect.height / 2),
                                 radius: (rect.width - 1.5) / 2,
                                 startAngle: CGFloat(-0.5 * .pi),

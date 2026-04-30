@@ -337,6 +337,7 @@
 "previewer.sharePhoto" = "Share Photo";
 "previewer.saveVideo" = "Save Video";
 "previewer.shareVideo" = "Share Video";
+"previewer.showInChat" = "Show in Chat";
 "previewer.videoSaved" = "Your video was successfully saved";
 "previewer.photoSaved" = "Your photo was successfully saved";
 
@@ -369,6 +370,14 @@
 
 "search.noResults.title" = "No Results";
 "search.noResults.message" = "There were no results found.";
+
+"search.category.chats" = "Chats";
+"search.category.channels" = "Channels";
+"search.category.media" = "Media";
+"search.category.voice" = "Voice";
+"search.category.files" = "Files";
+"search.category.links" = "Links";
+"search.category.messages" = "Messages";
 
 "channel.noMessages.title" = "No Messages yet";
 "channel.noMessages.message" = "No messages yet, start the chat";

@@ -72,10 +72,7 @@ public extension Database {
         resetStalenessInterval: Bool = true,
         completion: (() -> Void)? = nil
     ) {
-        let group = DispatchGroup()
-
-        group.enter()
-        self.backgroundPerformContext.perform {
+        backgroundPerformContext.perform {
             if resetStalenessInterval {
                 self.backgroundPerformContext.stalenessInterval = 0
             }
@@ -83,11 +80,9 @@ public extension Database {
             if resetStalenessInterval {
                 self.backgroundPerformContext.stalenessInterval = -1
             }
-            group.leave()
         }
 
-        group.enter()
-        self.backgroundReadOnlyObservableContext.perform {
+        backgroundReadOnlyObservableContext.perform {
             if resetStalenessInterval {
                 self.backgroundReadOnlyObservableContext.stalenessInterval = 0
             }
@@ -95,24 +90,26 @@ public extension Database {
             if resetStalenessInterval {
                 self.backgroundReadOnlyObservableContext.stalenessInterval = -1
             }
-            group.leave()
-        }
-
-        group.enter()
-        self.viewContext.perform {
-            if resetStalenessInterval {
-                self.viewContext.stalenessInterval = 0
-            }
-            self.viewContext.refreshAllObjects()
-            if resetStalenessInterval {
-                self.viewContext.stalenessInterval = -1
-            }
-            group.leave()
-        }
-
-        if let completion {
-            group.notify(queue: .main) {
-                completion()
+            
+            backgroundReadOnlyContext.perform {
+                if resetStalenessInterval {
+                    self.backgroundReadOnlyContext.stalenessInterval = 0
+                }
+                self.backgroundReadOnlyContext.refreshAllObjects()
+                if resetStalenessInterval {
+                    self.backgroundReadOnlyContext.stalenessInterval = -1
+                }
+                
+                DispatchQueue.main.async {
+                    if resetStalenessInterval {
+                        self.viewContext.stalenessInterval = 0
+                    }
+                    self.viewContext.refreshAllObjects()
+                    if resetStalenessInterval {
+                        self.viewContext.stalenessInterval = -1
+                    }
+                    completion?()
+                }
             }
         }
     }
@@ -265,7 +262,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func performWriteTask(resultQueue: DispatchQueue,
                                               _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                                               completion: ((Error?) -> Void)? = nil) {
-        let context = backgroundPerformContext
+        let context = createBackgroundContext()
         context.perform {[weak self] in
             guard let self = self else { return }
             do {
@@ -453,7 +450,10 @@ private extension PersistentContainer {
                       !transactions.isEmpty else { return }
 
                 let lastToken = transactions.last?.token
-                let hasExternalChanges = transactions.contains { $0.author != currentAuthor }
+                if transactions.count == 0 {
+                    return
+                }
+                let hasExternalChanges = transactions.contains { $0.author != nil && $0.author != currentAuthor }
 
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }

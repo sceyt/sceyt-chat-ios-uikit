@@ -75,7 +75,46 @@ extension ChannelInfoViewController {
         open func updateCollectionView(paths: ChannelAttachmentListViewModel.ChangeItemPaths) {
             if superview == nil || visibleCells.isEmpty {
                 reloadData()
-            } else if !paths.isEmpty {
+            } else if paths.isEmpty {
+                // restartObserver (triggered by search) delivers an empty ChangeItemPaths when
+                // the new result set has no overlap with the previous one (e.g. going from N
+                // results to 0 after narrowing a query). There are no diff operations to apply,
+                // but the collection view still holds stale cells. Reload whenever the
+                // data-source section count no longer matches what the collection view has.
+                let currentSections = numberOfSections
+                let newSections = dataSource?.numberOfSections?(in: self) ?? 0
+                if currentSections != newSections {
+                    reloadData()
+                }
+            } else {
+                // Guard against observer-restart scenarios: when restartObserver fires,
+                // it delivers all new items as insertions while UICollectionView's internal
+                // count still reflects the old data. Applying those inserts would make UIKit
+                // expect (oldCount + inserts) sections, but the data source already reports
+                // the new (smaller) count → crash. Detect the inconsistency and reload instead.
+                let expectedSectionCount = numberOfSections
+                    + paths.sectionInserts.count
+                    - paths.sectionDeletes.count
+                let actualSectionCount = dataSource?.numberOfSections?(in: self) ?? 0
+                guard expectedSectionCount == actualSectionCount else {
+                    reloadData()
+                    updateNoItems()
+                    return
+                }
+                // Guard against item-count inconsistency (e.g. event from the inactive
+                // observer when GlobalSearchAllMediaViewModel switches between
+                // allAttachmentsObserver and searchObserver). Sections matched, but
+                // per-section item counts may still be wrong → verify the net item delta.
+                let currentTotal = (0..<numberOfSections).reduce(0) { $0 + numberOfItems(inSection: $1) }
+                let expectedTotal = currentTotal + paths.inserts.count - paths.deletes.count
+                let actualTotal = (0..<actualSectionCount).reduce(0) {
+                    $0 + (dataSource?.collectionView(self, numberOfItemsInSection: $1) ?? 0)
+                }
+                guard expectedTotal == actualTotal else {
+                    reloadData()
+                    updateNoItems()
+                    return
+                }
                 UIView.performWithoutAnimation {
                     performBatchUpdates {
                         if !paths.sectionInserts.isEmpty {
@@ -90,7 +129,7 @@ extension ChannelInfoViewController {
                     }
                 }
             }
-            
+
             updateNoItems()
         }
         

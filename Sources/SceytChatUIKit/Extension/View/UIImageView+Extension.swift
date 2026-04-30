@@ -25,7 +25,7 @@ extension UIImageView {
     }
     
     func setup(
-        previewer: (() -> AttachmentPreviewDataSource?)?,
+        previewer: (() -> (any PreviewDataSource)?)?,
         item: PreviewItem?,
         from: UIViewController? = nil,
         viewOnce: Bool = false,
@@ -78,6 +78,22 @@ extension UIImageView {
                 return
             }
         } else {
+            if let item = sender.item {
+                let attachment = item.attachment
+                if fileProvider.filePath(attachment: attachment) != nil {
+                    if attachment.status != .done {
+                        attachment.status = .done
+                        DataProvider.database.write {
+                            AttachmentDTO.fetch(id: attachment.id, context: $0)?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+                        } completion: { error in
+                            logger.errorIfNotNil(error, "")
+                        }
+                    }
+                } else if attachment.status != .done {
+                    logger.verbose("[Attachment] showImageViewer blocked — attachment not downloaded yet, status=\(attachment.status) id=\(attachment.id)")
+                    return
+                }
+            }
             guard let previewer = sender.previewer?(),
                   previewer.canShowPreviewer()
             else { return }
