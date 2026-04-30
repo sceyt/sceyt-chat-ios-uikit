@@ -86,7 +86,6 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         } else {
             keyPaths = .init()
         }
-        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] init | predicate: \(fetchPredicate)")
     }
     
     open func startObserver(
@@ -96,8 +95,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         completion: (() -> Void)? = nil
     ) {
         let effectivePredicate = fetchPredicate ?? self.fetchPredicate
-        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] startObserver | predicate: \(effectivePredicate)")
-        logger.debug("[MESS] STARTED")
+        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] startObserver")
             self.fetchPredicate = fetchPredicate ?? self.fetchPredicate
             self.fetchOffset = max(0, fetchOffset)
             self.fetchLimit = max(0, fetchLimit)
@@ -111,7 +109,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 request.predicate = self.fetchPredicate
                 request.fetchLimit = self.fetchLimit
                 request.fetchOffset = self.fetchOffset
-                logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] fetchRequest | predicate: \(self.fetchPredicate) | limit: \(self.fetchLimit) | offset: \(self.fetchOffset)")
+                logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] fetchRequest | limit: \(self.fetchLimit) | offset: \(self.fetchOffset)")
                 self.clearCache()
                 var insertCache = self.mainCaches.workingCache
                 self.fetchObjects(context: self.context,
@@ -144,7 +142,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         fetchPredicate: NSPredicate,
         offset: Int? = nil,
         completion: (() -> Void)? = nil) {
-            logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver | old: \(self.fetchPredicate) | new: \(fetchPredicate)")
+            logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver")
             if isObserverRestarting {
                 logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver SKIPPED (already restarting)")
                 return
@@ -165,7 +163,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     
     open func update(predicate: NSPredicate, fetchOffset: Int = Int.max) {
-        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] update(predicate:) | old: \(self.fetchPredicate) | new: \(predicate)")
+        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] update(predicate:)")
         writeCache {
             self.fetchPredicate = predicate
             self.currentFetchOffset = max(0, fetchOffset == Int.max ? self.currentFetchOffset : fetchOffset)
@@ -1005,6 +1003,8 @@ private extension LazyDatabaseObserver {
     }
     
     func writeCache( _ block: @escaping () -> Void) {
+        // Synchronous barrier keeps mapItems/mapDeletedItems consistent with emitted observer events.
+        // Using async here can publish onDidChange before map updates are visible, causing forEach/item lookups to skip valid rows.
         cacheQueue.async(flags: .barrier) {
             block()
         }
@@ -1152,4 +1152,3 @@ internal extension LazyDatabaseObserver.ChangeItemPaths {
         "[ChangeItemPaths]: INSERTS: \(inserts), UPDATES: \(updates), DELETES: \(deletes), MOVES: \(moves), SEC_INS \(sectionInserts), SEC_DEL \(sectionDeletes)"
     }
 }
-

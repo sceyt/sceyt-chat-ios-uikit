@@ -21,7 +21,7 @@ extension ChannelInfoViewController {
                                               lineSpacing: 2,
                                               sectionHeadersPinToVisibleBounds: true)
         
-        open var mediaViewModel: ChannelAttachmentListViewModel!
+        open var mediaViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
         
         open var layout: Layout? { collectionViewLayout as? Layout }
         
@@ -63,11 +63,13 @@ extension ChannelInfoViewController {
             let itemSize = calculateItemSize()
             let thumbnailSize = itemSize.isNan ? CGSize(width: 40, height: 40) : itemSize
             mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: UIScreen.main.traitCollection.displayScale, y: UIScreen.main.traitCollection.displayScale))
-            layout?.itemSize = itemSize
+            if !itemSize.isNan {
+                layout?.itemSize = itemSize
+            }
             reloadData()
             setNeedsLayout()
             mediaViewModel.startDatabaseObserver()
-            mediaViewModel.$event
+            mediaViewModel.eventPublisher
                 .compactMap { $0 }
                 .sink { [weak self] in
                     self?.onEvent($0)
@@ -78,10 +80,10 @@ extension ChannelInfoViewController {
         open override func layoutSubviews() {
             super.layoutSubviews()
             let itemSize = calculateItemSize()
+            guard !itemSize.isNan else { return }
             if let layout, layout.itemSize != itemSize {
                 layout.itemSize = itemSize
-                let thumbnailSize = itemSize.isNan ? CGSize(width: 40, height: 40) : itemSize
-                mediaViewModel.thumbnailSize = thumbnailSize.applying(.init(scaleX: UIScreen.main.traitCollection.displayScale, y: UIScreen.main.traitCollection.displayScale))
+                mediaViewModel.thumbnailSize = itemSize.applying(.init(scaleX: UIScreen.main.traitCollection.displayScale, y: UIScreen.main.traitCollection.displayScale))
                 layout.invalidateLayout()
             }
         }
@@ -105,8 +107,12 @@ extension ChannelInfoViewController {
         
         open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
             let model = mediaViewModel.attachmentLayout(at: indexPath)
-            if indexPath.row > mediaViewModel.numberOfAttachments(in: indexPath.section) - 3 {
-                mediaViewModel.loadAttachments()
+            let lastSection = mediaViewModel.numberOfSections - 1
+            if indexPath.section == lastSection {
+                let count = mediaViewModel.numberOfAttachments(in: lastSection)
+                if count >= 3 && indexPath.row >= count - 3 {
+                    mediaViewModel.loadAttachments()
+                }
             }
             let cell: ChannelInfoViewController.AttachmentCell
 
@@ -206,7 +212,7 @@ extension ChannelInfoViewController {
             }
         }
         
-        open var previewer: (() -> AttachmentPreviewDataSource?)?
+        open var previewer: (() -> (any PreviewDataSource)?)?
     }
 }
 

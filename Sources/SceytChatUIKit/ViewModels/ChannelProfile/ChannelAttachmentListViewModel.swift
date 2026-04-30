@@ -225,6 +225,15 @@ open class ChannelAttachmentListViewModel: NSObject {
         let attachment = layout.attachment
         guard attachment.type != "link"
         else { return }
+        if fileProvider.filePath(attachment: attachment) != nil {
+            DataProvider.database.write {
+                let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
+                dto?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+            } completion: { error in
+                logger.errorIfNotNil(error, "")
+            }
+            return
+        }
         getMessage(layout) { message in
             if let message {
                 fileProvider.resumeTransfer(message: message, attachment: attachment) {
@@ -280,5 +289,96 @@ open class ChannelAttachmentListViewModel: NSObject {
 public extension ChannelAttachmentListViewModel {
     enum Event {
         case change(ChangeItemPaths)
+    }
+}
+
+// MARK: - Protocol
+
+public protocol ChannelAttachmentListViewModelProviding: AnyObject {
+    var numberOfSections: Int { get }
+    func numberOfAttachments(in section: Int) -> Int
+    var thumbnailSize: CGSize { get set }
+    var minAutoDownloadSize: Int { get }
+    func startDatabaseObserver()
+    func stopDatabaseObserver()
+    func loadAttachments()
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?,
+        onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout?
+    func downloadAttachmentIfNeeded(
+        _ layout: MessageLayoutModel.AttachmentLayout,
+        completion: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+    )
+    func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout)
+    func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout)
+    var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> { get }
+    /// Filters the attachment list by text query and/or sender. Both filters are applied together when provided.
+    /// - Parameters:
+    ///   - query: Optional text to match against the owning message's body (case- and diacritic-insensitive).
+    ///   - filterUser: When set, only attachments sent by this user are shown.
+    func search(query: String?, filterUser: ChatUser?)
+    /// Returns true when any filter (user or query) is currently active.
+    var isFiltered: Bool { get }
+    /// Returns false when the last load returned no new items (end of data reached).
+    var hasMore: Bool { get }
+}
+
+public extension ChannelAttachmentListViewModelProviding {
+    var hasMore: Bool { true }
+    func search(query: String?, filterUser: ChatUser?) {}
+    func stopDatabaseObserver() {}
+    var isFiltered: Bool { false }
+    func attachmentLayout(at indexPath: IndexPath) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: nil, onLoadLinkMetadata: nil)
+    }
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: onLoadThumbnail, onLoadLinkMetadata: nil)
+    }
+    func attachmentLayout(
+        at indexPath: IndexPath,
+        onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+    ) -> MessageLayoutModel.AttachmentLayout? {
+        attachmentLayout(at: indexPath, onLoadThumbnail: nil, onLoadLinkMetadata: onLoadLinkMetadata)
+    }
+    func downloadAttachmentIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
+        downloadAttachmentIfNeeded(layout, completion: nil)
+    }
+}
+
+extension ChannelAttachmentListViewModel: ChannelAttachmentListViewModelProviding {
+    public var eventPublisher: AnyPublisher<Event?, Never> { $event.eraseToAnyPublisher() }
+}
+
+// MARK: - Empty default
+
+public extension ChannelAttachmentListViewModel {
+    final class Empty: NSObject, ChannelAttachmentListViewModelProviding {
+        public var numberOfSections: Int { 0 }
+        public func numberOfAttachments(in section: Int) -> Int { 0 }
+        public var thumbnailSize: CGSize = .zero
+        public var minAutoDownloadSize: Int = 0
+        public func startDatabaseObserver() {}
+        public func loadAttachments() {}
+        public func attachmentLayout(
+            at indexPath: IndexPath,
+            onLoadThumbnail: ((MessageLayoutModel.AttachmentLayout) -> Void)?,
+            onLoadLinkMetadata: ((LinkMetadata?) -> Void)?
+        ) -> MessageLayoutModel.AttachmentLayout? { nil }
+        public func downloadAttachmentIfNeeded(
+            _ layout: MessageLayoutModel.AttachmentLayout,
+            completion: ((MessageLayoutModel.AttachmentLayout) -> Void)?
+        ) {}
+        public func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {}
+        public func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout) {}
+
+        private let eventSubject = PassthroughSubject<ChannelAttachmentListViewModel.Event?, Never>()
+        public var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> {
+            eventSubject.eraseToAnyPublisher()
+        }
     }
 }

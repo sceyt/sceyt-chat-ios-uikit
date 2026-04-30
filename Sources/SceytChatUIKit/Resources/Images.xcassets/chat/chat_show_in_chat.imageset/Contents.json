@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "show_in_chat.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

@@ -36,6 +36,7 @@ extension ChannelListViewController: AppearanceProviding {
             )
         ),
         searchResultControllerAppearance: ChannelSearchResultsViewController.defaultAppearance,
+        globalSearchControllerAppearance: GlobalSearchResultsViewController.defaultAppearance,
         emptyViewAppearance: EmptyStateView.Appearance(
             reference: EmptyStateView.appearance,
             icon: .emptyChannelList,
@@ -66,6 +67,9 @@ extension ChannelListViewController: AppearanceProviding {
         
         @Trackable<Appearance, ChannelSearchResultsViewController.Appearance>
         public var searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance
+
+        @Trackable<Appearance, GlobalSearchResultsViewController.Appearance>
+        public var globalSearchControllerAppearance: GlobalSearchResultsViewController.Appearance
         
         @Trackable<Appearance, EmptyStateView.Appearance>
         public var emptyViewAppearance: EmptyStateView.Appearance
@@ -81,6 +85,7 @@ extension ChannelListViewController: AppearanceProviding {
             connectionIndicatorAppearance: ConnectionStateViewAppearance,
             searchControllerAppearance: SearchController.Appearance,
             searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance,
+            globalSearchControllerAppearance: GlobalSearchResultsViewController.Appearance,
             emptyViewAppearance: EmptyStateView.Appearance,
             cellAppearance: ChannelCell.Appearance
         ) {
@@ -90,6 +95,7 @@ extension ChannelListViewController: AppearanceProviding {
             self._connectionIndicatorAppearance = Trackable(value: connectionIndicatorAppearance)
             self._searchControllerAppearance = Trackable(value: searchControllerAppearance)
             self._searchResultControllerAppearance = Trackable(value: searchResultControllerAppearance)
+            self._globalSearchControllerAppearance = Trackable(value: globalSearchControllerAppearance)
             self._emptyViewAppearance = Trackable(value: emptyViewAppearance)
             self._cellAppearance = Trackable(value: cellAppearance)
         }
@@ -102,6 +108,7 @@ extension ChannelListViewController: AppearanceProviding {
             connectionIndicatorAppearance: ConnectionStateViewAppearance? = nil,
             searchControllerAppearance: SearchController.Appearance? = nil,
             searchResultControllerAppearance: ChannelSearchResultsViewController.Appearance? = nil,
+            globalSearchControllerAppearance: GlobalSearchResultsViewController.Appearance? = nil,
             emptyViewAppearance: EmptyStateView.Appearance? = nil,
             cellAppearance: ChannelCell.Appearance? = nil
         ) {
@@ -111,15 +118,17 @@ extension ChannelListViewController: AppearanceProviding {
             self._connectionIndicatorAppearance = Trackable(reference: reference, referencePath: \.connectionIndicatorAppearance)
             self._searchControllerAppearance = Trackable(reference: reference, referencePath: \.searchControllerAppearance)
             self._searchResultControllerAppearance = Trackable(reference: reference, referencePath: \.searchResultControllerAppearance)
+            self._globalSearchControllerAppearance = Trackable(reference: reference, referencePath: \.globalSearchControllerAppearance)
             self._emptyViewAppearance = Trackable(reference: reference, referencePath: \.emptyViewAppearance)
             self._cellAppearance = Trackable(reference: reference, referencePath: \.cellAppearance)
-            
+
             if let navigationBarAppearance { self.navigationBarAppearance = navigationBarAppearance }
             if let backgroundColor { self.backgroundColor = backgroundColor }
             if let tabBarItemBadgeColor { self.tabBarItemBadgeColor = tabBarItemBadgeColor }
             if let connectionIndicatorAppearance { self.connectionIndicatorAppearance = connectionIndicatorAppearance }
             if let searchControllerAppearance { self.searchControllerAppearance = searchControllerAppearance }
             if let searchResultControllerAppearance { self.searchResultControllerAppearance = searchResultControllerAppearance }
+            if let globalSearchControllerAppearance { self.globalSearchControllerAppearance = globalSearchControllerAppearance }
             if let emptyViewAppearance { self.emptyViewAppearance = emptyViewAppearance }
             if let cellAppearance { self.cellAppearance = cellAppearance }
         }

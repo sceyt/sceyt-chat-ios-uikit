@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import SceytChat
 
 extension ChannelInfoViewController {
     open class VoiceCollectionView: ChannelInfoViewController.AttachmentCollectionView,
@@ -19,7 +20,10 @@ extension ChannelInfoViewController {
                                               lineSpacing: 0,
                                               sectionHeadersPinToVisibleBounds: true)
         
-        open var voiceViewModel: ChannelAttachmentListViewModel!
+        open var voiceViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
+
+        /// Called when the user taps a voice cell. Provides the owning message and channel.
+        open var onSelectVoice: ((ChatMessage, ChatChannel?) -> Void)?
         
         open var layout: Layout? { collectionViewLayout as? Layout }
         
@@ -57,7 +61,7 @@ extension ChannelInfoViewController {
             RunLoop.main.perform {[weak self] in
                 self?.voiceViewModel.startDatabaseObserver()
             }
-            voiceViewModel.$event
+            voiceViewModel.eventPublisher
                 .compactMap { $0 }
                 .sink { [weak self] in
                     self?.onEvent($0)
@@ -67,7 +71,7 @@ extension ChannelInfoViewController {
         
         open override func layoutSubviews() {
             super.layoutSubviews()
-            
+            guard width > 0 else { return }
             layout?.itemSize = .init(width: width,
                                      height: Layouts.iconSize + Layouts.verticalPadding * 2)
         }
@@ -117,6 +121,18 @@ extension ChannelInfoViewController {
             }
         }
         
+        public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+            collectionView.deselectItem(at: indexPath, animated: true)
+            guard let layout = voiceViewModel.attachmentLayout(at: indexPath),
+                  let message = layout.ownerMessage
+            else { return }
+            let channel: ChatChannel? = layout.ownerChannel ?? {
+                let ctx = SceytChatUIKit.shared.database.viewContext
+                return ChannelDTO.fetch(id: message.channelId, context: ctx)?.convert()
+            }()
+            onSelectVoice?(message, channel)
+        }
+
         public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
             return .init(width: collectionView.width, height: Components.channelInfoDateSeparatorView.Layouts.headerHeight)
         }

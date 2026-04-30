@@ -20,10 +20,16 @@ open class PreviewerRouter: Router<MediaPreviewerViewController> {
     open func showShareActionSheet(
         previewItem: PreviewItem,
         from barButtonItem: UIBarButtonItem,
+        topActions: [SheetAction] = [],
         callback: @escaping (ShareOption) -> Void
     ) {
         let isVideo = previewItem.attachment.type == "video"
         var actions = [SheetAction]()
+
+        if !topActions.isEmpty {
+            actions.append(contentsOf: topActions)
+        }
+
         actions.append(
             .init(
                 title: isVideo ? L10n.Previewer.saveVideo : L10n.Previewer.savePhoto,

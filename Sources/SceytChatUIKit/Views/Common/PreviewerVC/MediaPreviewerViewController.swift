@@ -780,10 +780,13 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     @objc
     open func shareButtonAction(_ sender: UIBarButtonItem) {
         let previewItem = viewModel.previewItem
+        let topActions = (carouselViewController?.previewDataSource as? PreviewShareActionProviding)?
+            .previewShareTopActions(previewItem: previewItem) ?? []
         router
             .showShareActionSheet(
                 previewItem: previewItem,
-                from: sender)
+                from: sender,
+                topActions: topActions)
         { [unowned self] option in
             switch option {
             case .saveGallery:

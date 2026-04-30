@@ -159,6 +159,7 @@ open class ChannelViewController: ViewController,
     private var shouldAnimateEditing: Bool = false
     private var lastAnimatedIndexPath: IndexPath? = nil
     private var selectMessageId: MessageId?
+    private var pinnedScrollMessageId: MessageId = 0
     private let impactFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
     
     override open func viewWillAppear(_ animated: Bool) {
@@ -1219,6 +1220,7 @@ open class ChannelViewController: ViewController,
     
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         isStartedDragging = true
+        pinnedScrollMessageId = 0
     }
     
     open func scrollViewWillEndDragging(
@@ -1363,10 +1365,23 @@ open class ChannelViewController: ViewController,
         willDisplay cell: UICollectionViewCell,
         forItemAt indexPath: IndexPath
     ) {
+        if let systemCell = cell as? SystemMessageCell, systemCell.data != nil {
+            var repliedMessageId: MessageId {
+                channelViewModel.scrollToRepliedMessageId
+            }
+            if repliedMessageId != 0,
+               systemCell.data.message.id == repliedMessageId {
+                animateHighlightCell(systemCell, mode: .reply)
+            } else if systemCell.highlightMode != .none {
+                systemCell.highlightMode = .none
+            }
+            return
+        }
+
         guard let cell = cell as? MessageCell,
               cell.data != nil
         else { return }
-        
+
         var repliedMessageId: MessageId {
             channelViewModel.scrollToRepliedMessageId
         }
@@ -1378,7 +1393,7 @@ open class ChannelViewController: ViewController,
         } else if cell.highlightMode != .none {
             cell.highlightMode = .none
         }
-       
+
         if shouldAnimateEditing, cell.isEditing, cell.checkBoxView.transform != .identity {
             cell.contentView.alpha = 1
             UIView.animate(withDuration: 0.3) { [weak self] in
@@ -2068,12 +2083,21 @@ open class ChannelViewController: ViewController,
                 guard let self else { return }
                 if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
                     self.animateHighlightCell(cell, mode: .reply)
+                } else if let systemCell = self.collectionView.cellForItem(at: indexPath) as? SystemMessageCell {
+                    self.animateHighlightCell(systemCell, mode: .reply)
                 }
             }
         }
     }
     
     open func animateHighlightCell(_ cell: MessageCell, mode: MessageCell.HighlightMode) {
+        cell.highlightMode = mode
+        UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak cell] in
+            cell?.highlightMode = .none
+        }
+    }
+
+    open func animateHighlightCell(_ cell: SystemMessageCell, mode: MessageCell.HighlightMode) {
         cell.highlightMode = mode
         UIView.animate(withDuration: highlightedDurationForReplyMessage) { [weak cell] in
             cell?.highlightMode = .none
@@ -2130,7 +2154,9 @@ open class ChannelViewController: ViewController,
             
             if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
-                collectionView.reloadDataAndScrollToBottom()
+                if channelViewModel.scrollToRepliedMessageId == 0, pinnedScrollMessageId == 0 {
+                    collectionView.reloadDataAndScrollToBottom()
+                }
                 updateUnreadViewVisibility()
                 return
             }
@@ -2166,17 +2192,59 @@ open class ChannelViewController: ViewController,
                 needsToScrollBottom = false
             }
             
-            if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil {
+            if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil || pinnedScrollMessageId != 0 {
                 needsToScrollBottom = false
             }
             
             let offsetBeforeInsertion = collectionView.contentOffset.y
             let contentHeightBeforeInsertion = collectionView.contentSize.height
-            
+
+            // TODO: Improve this part
+            // Pre-validate data source consistency before batch update.
+            // If the collection view's current count + the diff's inserts/deletes
+            // doesn't match the view model's current count, the data source has
+            // advanced past this diff — fall back to reloadData to avoid a crash.
+            let expectedSectionCount = collectionView.numberOfSections + sectionInserts.count - sectionDeletes.count
+            if expectedSectionCount != channelViewModel.numberOfSections {
+                let savedOffset = collectionView.contentOffset
+                let savedContentHeight = collectionView.contentSize.height
+                collectionView.reloadData()
+                collectionView.layoutIfNeeded()
+                if pinnedScrollMessageId != 0,
+                   let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
+                    collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                } else {
+                    let heightDiff = collectionView.contentSize.height - savedContentHeight
+                    collectionView.contentOffset.y = savedOffset.y + heightDiff
+                }
+                return
+            }
+            for section in 0..<collectionView.numberOfSections {
+                guard !sectionDeletes.contains(section) else { continue }
+                let cvCount = collectionView.numberOfItems(inSection: section)
+                let insertsInSection = inserts.filter { $0.section == section }.count
+                let deletesInSection = deletes.filter { $0.section == section }.count
+                let dsCount = channelViewModel.numberOfMessages(in: section)
+                if cvCount + insertsInSection - deletesInSection != dsCount {
+                    let savedOffset = collectionView.contentOffset
+                    let savedContentHeight = collectionView.contentSize.height
+                    collectionView.reloadData()
+                    collectionView.layoutIfNeeded()
+                    if pinnedScrollMessageId != 0,
+                       let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
+                        collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                    } else {
+                        let heightDiff = collectionView.contentSize.height - savedContentHeight
+                        collectionView.contentOffset.y = savedOffset.y + heightDiff
+                    }
+                    return
+                }
+            }
+
             isCollectionViewUpdating = true
             CATransaction.begin()
             CATransaction.setDisableActions(true)
-            
+
             collectionView.performUpdates {
                 if !sectionInserts.isEmpty {
                     collectionView.insertSections(sectionInserts)
@@ -2205,38 +2273,60 @@ open class ChannelViewController: ViewController,
                 guard let self = self else { return }
 
                 if isInsertingItemsToTop {
-                    // Get content height after new items were inserted
-                    let contentHeightAfterInsertion = self.collectionView.contentSize.height
+                    // If a specific message is pinned (e.g. navigated from global search),
+                    // keep it centered instead of using raw offset math.
+                    if self.pinnedScrollMessageId != 0,
+                       let pinnedIndexPath = self.channelViewModel.indexPathOf(messageId: self.pinnedScrollMessageId) {
+                        self.collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                    } else {
+                        // Get content height after new items were inserted
+                        let contentHeightAfterInsertion = self.collectionView.contentSize.height
 
-                    // Calculate how much the content height has grown
-                    let heightDifference = contentHeightAfterInsertion - contentHeightBeforeInsertion
+                        // Calculate how much the content height has grown
+                        let heightDifference = contentHeightAfterInsertion - contentHeightBeforeInsertion
 
-                    // Preserve scroll position by adjusting offset based on height increase
-                    var newOffsetY = offsetBeforeInsertion + heightDifference
+                        // Preserve scroll position by adjusting offset based on height increase
+                        var newOffsetY = offsetBeforeInsertion + heightDifference
 
-                    // Handle special case: initial load when collectionView was empty
-                    if contentHeightBeforeInsertion == 0 && offsetBeforeInsertion == 0 {
+                        // Handle special case: initial load when collectionView was empty
+                        if contentHeightBeforeInsertion == 0 && offsetBeforeInsertion == 0 {
 
-                        // If content doesn't fill the screen, no need to scroll - just keep offset at top
-                        if collectionView.frame.height > collectionView.contentSize.height {
-                            newOffsetY = 0.0
-                        } else {
-                            // If content is scrollable, subtract visible height (excluding bottom inset)
-                            // to align first inserted items with the top of the visible area
-                            let visibleHeight = collectionView.bounds.height - collectionView.adjustedContentInset.bottom
-                            newOffsetY -= visibleHeight
+                            // If content doesn't fill the screen, no need to scroll - just keep offset at top
+                            if collectionView.frame.height > collectionView.contentSize.height {
+                                newOffsetY = 0.0
+                            } else {
+                                // If content is scrollable, subtract visible height (excluding bottom inset)
+                                // to align first inserted items with the top of the visible area
+                                let visibleHeight = collectionView.bounds.height - collectionView.adjustedContentInset.bottom
+                                newOffsetY -= visibleHeight
+                            }
                         }
-                    }
 
-                    // Apply the adjusted offset to maintain scroll position smoothly
-                    self.collectionView.contentOffset.y = newOffsetY
+                        // Apply the adjusted offset to maintain scroll position smoothly
+                        self.collectionView.contentOffset.y = newOffsetY
+                    }
                 }
 
                 UIView.performWithoutAnimation {
                     let reloads = paths.reloads + moves.map(\.to)
                     if !reloads.isEmpty {
-                        self.collectionView.performUpdates {
-                            self.collectionView.reloadItems(at: reloads)
+                        // Validate that all reload index paths reference existing sections/items
+                        // to avoid Invalid_Number_Of_Sections crash from data source changes
+                        // between the parent batch update and this nested one.
+                        let sectionCount = self.channelViewModel.numberOfSections
+                        let validReloads = reloads.filter { indexPath in
+                            guard indexPath.section < sectionCount else { return false }
+                            return indexPath.item < self.channelViewModel.numberOfMessages(in: indexPath.section)
+                        }
+                        if !validReloads.isEmpty {
+                            if sectionCount == self.collectionView.numberOfSections {
+                                self.collectionView.performUpdates {
+                                    self.collectionView.reloadItems(at: validReloads)
+                                }
+                            } else {
+                                // Section count mismatch — safe fallback
+                                self.collectionView.reloadData()
+                            }
                         }
                     }
                 }
@@ -2258,6 +2348,17 @@ open class ChannelViewController: ViewController,
         case .reloadData:
             if let selectMessageId, let indexPath = channelViewModel.indexPathOf(messageId: selectMessageId) {
                 onEvent(.reloadDataAndSelect(indexPath: indexPath, messageId: selectMessageId))
+            } else if pinnedScrollMessageId != 0 {
+                let savedOffset = collectionView.contentOffset
+                let savedContentHeight = collectionView.contentSize.height
+                collectionView.reloadData()
+                collectionView.layoutIfNeeded()
+                if let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
+                    collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                } else {
+                    let heightDiff = collectionView.contentSize.height - savedContentHeight
+                    collectionView.contentOffset.y = savedOffset.y + heightDiff
+                }
             } else {
                 collectionView.reloadData()
             }
@@ -2271,7 +2372,12 @@ open class ChannelViewController: ViewController,
             }
             showEmptyViewIfNeeded()
         case .reloadDataAndScrollToBottom:
-            collectionView.reloadDataAndScrollToBottom()
+            if pinnedScrollMessageId != 0,
+               let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
+                collectionView.reloadDataAndScrollTo(indexPath: pinnedIndexPath, pos: .centeredVertically, animated: false)
+            } else {
+                collectionView.reloadDataAndScrollToBottom()
+            }
         case let .reloadDataAndScroll(indexPath, animated, pos):
             collectionView.reloadDataAndScrollTo(
                 indexPath: indexPath,
@@ -2357,6 +2463,7 @@ open class ChannelViewController: ViewController,
                 break
             }
         case let .scrollAndSelect(indexPath, messageId, mentionMode):
+            pinnedScrollMessageId = messageId
             if selectMessageId == messageId,
                 lastAnimatedIndexPath == indexPath,
                collectionView.visibleAttributes.contains(where: {$0.indexPath == indexPath}) {

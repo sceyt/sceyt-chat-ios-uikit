@@ -262,7 +262,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func performWriteTask(resultQueue: DispatchQueue,
                                               _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                                               completion: ((Error?) -> Void)? = nil) {
-        let context = backgroundPerformContext
+        let context = createBackgroundContext()
         context.perform {[weak self] in
             guard let self = self else { return }
             do {
@@ -450,7 +450,10 @@ private extension PersistentContainer {
                       !transactions.isEmpty else { return }
 
                 let lastToken = transactions.last?.token
-                let hasExternalChanges = transactions.contains { $0.author != currentAuthor }
+                if transactions.count == 0 {
+                    return
+                }
+                let hasExternalChanges = transactions.contains { $0.author != nil && $0.author != currentAuthor }
 
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }

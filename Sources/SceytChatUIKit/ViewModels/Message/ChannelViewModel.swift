@@ -137,7 +137,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     //MARK: required init
     public required init(
         channel: ChatChannel,
-        threadMessage: ChatMessage? = nil
+        threadMessage: ChatMessage? = nil,
+        scrollToMessageId: MessageId = 0
     ) {
         
         provider = Components.channelMessageProvider.init(
@@ -200,6 +201,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         // Set up unread mentions manager delegate
         unreadMentionsManager.delegate = self
 
+        if scrollToMessageId != 0 {
+            scrollToRepliedMessageId = scrollToMessageId
+        }
         startDatabaseObserver {}
         if chatClient.connectionState == .connected {
             loadLastMessages()
@@ -256,7 +260,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             self?.onDidChangeChannelEvent(items: $0)
         }
         let initialMessageId: MessageId
-        if lastDisplayedMessageId == 0 {
+        if scrollToRepliedMessageId != 0 {
+            initialMessageId = scrollToRepliedMessageId
+        } else if lastDisplayedMessageId == 0 {
             initialMessageId = channel.lastMessage?.id ?? MessageId(Int64.max)
         } else {
             initialMessageId = lastDisplayedMessageId
@@ -595,11 +601,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 isSearchResultsLoading = false
                 isRestartingMessageObserver = .none
             } else {
-                scrollToRepliedMessageId = 0
                 isRestartingMessageObserver = .none
             }
-            
+
             scroll(to: indexPath, messageId: mid)
+            scrollToRepliedMessageId = 0
             
             // Mark mention as navigated only after successful scroll
             if isUnreadMentionNavigation {
@@ -620,21 +626,22 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
 
             if isInitial {
-                let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId : 
+                let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId :
                                scrollToUnreadMentionMessageId != 0 ? scrollToUnreadMentionMessageId : lastDisplayedMessageId
+                let batchIds = items.changeItems.compactMap { $0.item?.id }
                 if messageId != 0,
                    let indexPath = items.changeItems
                     .first(where: {$0.item?.id == messageId})?
                     .indexPath {
                     needToScroll = false
-                    let animated = scrollToRepliedMessageId != 0 || scrollToUnreadMentionMessageId != 0
+                    let animated = scrollToUnreadMentionMessageId != 0
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: animated, pos: .centeredVertically)
-                    
+
                     // Mark mention as navigated if this is an unread mention
                     if scrollToUnreadMentionMessageId == messageId {
                         handleMentionNavigated(messageId: messageId)
                     }
-                    
+
                     resetStateAfterChangeEvent()
                 } else {
                     if let (indexPath, messageId) = needsToScrollAtIndexPath(items: items) {
@@ -932,6 +939,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     open func loadLastMessages() {
         if isUnsubscribedChannel {
             loadPrevMessages(before: MessageId(Int64.max))
+        } else if scrollToRepliedMessageId != 0 {
+            provider.loadNearMessages(near: scrollToRepliedMessageId)
         } else {
             if isThread || channel.lastMessage?.incoming == false || lastDisplayedMessageId == 0 {
                 logger.info("ChannelViewModel loadLastMessages (prev) channel id: \(channel.id), lastMessage id \(channel.lastMessage?.id as Any)")
@@ -957,7 +966,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     ) {
         guard let message = message(at: indexPath)
         else { return }
-        logger.info("ChannelViewModel loadLastMessages (next) channel id: \(channel.id), \(indexPath) lastDisplayedMessageId \(message.id)")
         if message.id == 0 {
             loadPrevMessages(before: MessageId(Int64.max))
         } else {
@@ -988,6 +996,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         fetchPrev()
         
+        logger.info("ChannelViewModel loadPrevMessages channel id: \(channel.id), before messageId: \(messageId)")
         provider.loadPrevMessages(
             before: messageId
         ) { [weak self] error in
@@ -1018,6 +1027,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         fetchNext()
         
+        logger.info("ChannelViewModel loadNextMessages channel id: \(channel.id), after messageId: \(messageId)")
         provider.loadNextMessages(
             after: messageId
         ) { [weak self] error in
@@ -2452,6 +2462,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     //MARK: Link preview
     open func updateLinkPreviewsForLayoutModelIfNeeded(model: MessageLayoutModel) {
+        guard scrollToRepliedMessageId == 0,
+              scrollToMessageIdIfSearching == 0
+        else { return }
         let matches = DataDetector.matches(text: model.message.body)
         guard !matches.isEmpty
         else { return }

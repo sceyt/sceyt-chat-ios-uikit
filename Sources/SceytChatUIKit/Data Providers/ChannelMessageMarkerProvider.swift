@@ -97,16 +97,28 @@ open class ChannelMessageMarkerProvider: DataProvider {
                     self.database.performWriteTask {
                         $0.delete(messagePendingMarkers: ids, markerName: markerName)
                     }
+                } else {
+                    let sdkError = error.sdkError
+                    if [.badRequest, .badParam, .notFound, .notAllowed,
+                        .tooLargeRequest, .internalError, .tooManyRequests,
+                        .authentication].contains(sdkError)
+                    {
+                        self.database.performWriteTask {
+                            $0.delete(messagePendingMarkers: ids, markerName: markerName)
+                        }
+                    }
                 }
                 completion?(error)
             } else if let markerList {
                 logger.debug("[MARKER CHECK] receive \(markerList.messageIds.count)")
                 logger.debug("[MARKER CHECK] received mark: \(markerList.name) for \(markerList.messageIds) in channelId:\(markerList.channelId)")
                 self.database.performWriteTask ({
+                    $0.delete(messagePendingMarkers: ids, markerName: markerName)
                     $0.update(messageSelfMarkers: markerList)
                 }, completion: completion)
+            } else {
+                completion?(nil)
             }
-            
         }
         guard !ids.isEmpty
         else {

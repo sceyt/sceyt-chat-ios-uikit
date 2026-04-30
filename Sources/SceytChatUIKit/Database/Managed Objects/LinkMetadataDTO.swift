@@ -35,6 +35,15 @@ public class LinkMetadataDTO: NSManagedObject {
         return fetch(request: request, context: context).first
     }
 
+    /// Batched lookup — one Core Data round-trip for many URLs.
+    public static func fetch(urls: [URL], context: NSManagedObjectContext) -> [LinkMetadataDTO] {
+        guard !urls.isEmpty else { return [] }
+        let request = fetchRequest()
+        request.sortDescriptor = NSSortDescriptor(keyPath: \LinkMetadataDTO.url, ascending: false)
+        request.predicate = .init(format: "url IN %@", urls)
+        return fetch(request: request, context: context)
+    }
+
     public static func fetchOrCreate(url: URL, context: NSManagedObjectContext) -> LinkMetadataDTO {
         if let mo = fetch(url: url, context: context) {
             return mo
