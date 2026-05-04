@@ -92,7 +92,7 @@ public final class SyncService: NSObject {
                             logger.verbose("SyncService: makeMessageResendOperations DO NOT RESEND (has paused attachment) message: tid \(message.tid), body \(message.body)")
                             return
                         }
-                        logger.verbose("SyncService: makeMessageResendOperations fetched message: tid \(message.tid), body \(message.body)")
+                        logger.verbose("SyncService: makeMessageResendOperations fetched message: tid \(message.tid)")
                         sender.resendMessage(message) {error in
                             if error?.sceytChatCode == .channelNotExists {
                                 provider.deletePending(message: message.tid)
