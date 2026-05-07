@@ -34,17 +34,22 @@ open class ChannelListViewModel: NSObject,
     open var queryConfig: ChannelListProvider.Config = ChannelListProvider.Config.default
     
     open var fetchPredicate: NSPredicate {
+        let directType = SceytChatUIKit.shared.config.channelTypesConfig.direct
+
         // Base predicates
         var predicates = [
             NSPredicate(format: "unsubscribed == NO"),
-            NSPredicate(format: "NOT (unsynched == YES AND lastMessage == nil)")
+            NSPredicate(format: "NOT (unsynched == YES AND lastMessage == nil)"),
+            // Hide direct channels until their member rows are linked,
+            // so we never render a row with peer == nil ("Deleted user").
+            NSPredicate(format: "type != %@ OR members.@count > 0", directType)
         ]
-        
+
         // Add type predicate if config.types is not empty
         if !queryConfig.types.isEmpty {
             predicates.append(NSPredicate(format: "type IN %@", queryConfig.types))
         }
-        
+
         // Combine all predicates with AND
         return NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
     }
