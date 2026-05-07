@@ -138,6 +138,19 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         guard let model = NSManagedObjectModel(contentsOf: modelUrl) else {
             fatalError("cant't create model for \(modelUrl)")
         }
+
+        if case let .sqLite(storeURL) = storeType {
+            do {
+                try CoreDataMigrator.migrateStoreIfNeeded(
+                    at: storeURL,
+                    modelName: modelName,
+                    bundle: modelBundle
+                )
+            } catch {
+                logger.errorIfNotNil(error, "CoreData migration failed; falling back to recreate.")
+            }
+        }
+
         super.init(name: modelName, managedObjectModel: model)
         setPersistentStoreDescription(type: storeType)
         loadPersistentStores {[weak self] _, error in
