@@ -96,6 +96,11 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     ) {
         let effectivePredicate = fetchPredicate ?? self.fetchPredicate
         logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] startObserver")
+        if DTO.self == MessageDTO.self {
+            let _observerID = String(ObjectIdentifier(self).hashValue & 0xFFFFFF, radix: 16)
+            let _ctxPtr = String(Unmanaged.passUnretained(context).toOpaque().hashValue & 0xFFFFFF, radix: 16)
+            print("[ScrollTest][SCROLL-OBSERVER] start observerID=\(_observerID) ctx=\(_ctxPtr)")
+        }
             self.fetchPredicate = fetchPredicate ?? self.fetchPredicate
             self.fetchOffset = max(0, fetchOffset)
             self.fetchLimit = max(0, fetchLimit)
@@ -133,6 +138,10 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     
     open func stopObserver() {
+        if DTO.self == MessageDTO.self {
+            let _observerID = String(ObjectIdentifier(self).hashValue & 0xFFFFFF, radix: 16)
+            print("[ScrollTest][SCROLL-OBSERVER] stop observerID=\(_observerID)")
+        }
         isObserverStarted = false
         clearCache()
         removeObservers()
@@ -530,7 +539,20 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         else { return }
         if let currentContext = notification.object as? NSManagedObjectContext,
            (currentContext === context) {
+
+            if DTO.self == MessageDTO.self {
+                let _insertCount = (userInfo[NSInsertedObjectsKey] as? Set<NSManagedObject>)?.count ?? 0
+                let _refreshCount = (userInfo[NSRefreshedObjectsKey] as? Set<NSManagedObject>)?.count ?? 0
+                let _deleteCount = (userInfo[NSDeletedObjectsKey] as? Set<NSManagedObject>)?.count ?? 0
+                let _updateCount = (userInfo[NSUpdatedObjectsKey] as? Set<NSManagedObject>)?.count ?? 0
+                let _observerID = String(ObjectIdentifier(self).hashValue & 0xFFFFFF, radix: 16)
+                let _ctxPtr = String(Unmanaged.passUnretained(currentContext).toOpaque().hashValue & 0xFFFFFF, radix: 16)
+                let _ctxKind: String = currentContext === self.viewContext ? "view" : (currentContext === self.context ? "obs" : "other")
+                let _onMain = Thread.isMainThread ? "main" : "bg"
+                print("[ScrollTest][SCROLL-DIFF] didChangeObjects ins=\(_insertCount) refresh=\(_refreshCount) del=\(_deleteCount) upd=\(_updateCount) workingBefore.s0=\(mainCaches.workingCache.first?.count ?? -1) main.s0=\(mainCaches.mainCache.first?.count ?? -1) observerID=\(_observerID) ctx=\(_ctxPtr)/\(_ctxKind) thread=\(_onMain)")
+            }
             
+
             func perform() {
                 readCache {}
                 var sendEvent = false
@@ -987,8 +1009,28 @@ private extension LazyDatabaseObserver {
         done: (() -> Void)?
     ) {
         guard isObserverStarted else { return }
+
+        let _isMessage = (DTO.self == MessageDTO.self)
+        let _diffID = UUID().uuidString.prefix(8)
+        let _insertCacheItems = insertCache.reduce(0) { $0 + $1.count }
+        if _isMessage {
+            let _workingBeforeItems = mainCaches.workingCache.reduce(0) { $0 + $1.count }
+            let _mainBeforeItems = mainCaches.mainCache.reduce(0) { $0 + $1.count }
+            let _section0InsertCache = insertCache.first?.count ?? -1
+            let _section0Working = mainCaches.workingCache.first?.count ?? -1
+            let _section0Main = mainCaches.mainCache.first?.count ?? -1
+            print("[ScrollTest][SCROLL-DIFF] didUpdate.bg.entry id=\(_diffID) paths.inserts=\(paths.inserts.count) paths.deletes=\(paths.deletes.count) paths.sectionInserts=\(paths.sectionInserts.count) paths.sectionDeletes=\(paths.sectionDeletes.count) insertCache.sections=\(insertCache.count) insertCache.items=\(_insertCacheItems) insertCache.s0=\(_section0InsertCache) workingBefore.sections=\(mainCaches.workingCache.count) workingBefore.items=\(_workingBeforeItems) workingBefore.s0=\(_section0Working) main.sections=\(mainCaches.mainCache.count) main.items=\(_mainBeforeItems) main.s0=\(_section0Main)")
+        }
+
         self.mainCaches.workingCache = insertCache
         let userInfo = self.onWillChange?(self.mainCaches.workingCache, paths)
+
+        if _isMessage {
+            print("[ScrollTest][SCROLL-DIFF] didUpdate.bg.beforeDispatch id=\(_diffID) workingNow.s0=\(mainCaches.workingCache.first?.count ?? -1) mainNow.s0=\(mainCaches.mainCache.first?.count ?? -1)")
+        }
+
+        let _section0InsertCache = insertCache.first?.count ?? -1
+
         self.queue {[weak self] in
             guard let self else { return }
             guard self.isObserverStarted || self.isObserverRestarting
@@ -996,7 +1038,18 @@ private extension LazyDatabaseObserver {
                 self.clearCache()
                 return
             }
+            if _isMessage {
+                let _workingAtMain = self.mainCaches.workingCache.reduce(0) { $0 + $1.count }
+                let _mainAtMainBefore = self.mainCaches.mainCache.reduce(0) { $0 + $1.count }
+                let _s0WorkingAtMain = self.mainCaches.workingCache.first?.count ?? -1
+                let _s0MainAtMainBefore = self.mainCaches.mainCache.first?.count ?? -1
+                let _drift = _workingAtMain - _insertCacheItems
+                print("[ScrollTest][SCROLL-DIFF] didUpdate.main.before id=\(_diffID) drift=\(_drift) workingNow.sections=\(self.mainCaches.workingCache.count) workingNow.items=\(_workingAtMain) workingNow.s0=\(_s0WorkingAtMain) mainBefore.sections=\(self.mainCaches.mainCache.count) mainBefore.items=\(_mainAtMainBefore) mainBefore.s0=\(_s0MainAtMainBefore) insertCache.s0=\(_section0InsertCache) paths.inserts=\(paths.inserts.count)")
+            }
             self.mainCaches.mainCache = insertCache
+            if _isMessage {
+                print("[ScrollTest][SCROLL-DIFF] didUpdate.main.after id=\(_diffID) mainAfter.sections=\(self.mainCaches.mainCache.count) mainAfter.s0=\(self.mainCaches.mainCache.first?.count ?? -1) -> calling onDidChange")
+            }
             self.onDidChange?(false, paths, userInfo)
             done?()
         }

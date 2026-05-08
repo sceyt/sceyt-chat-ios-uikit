@@ -77,6 +77,7 @@ public extension ChannelViewController {
         
         /// Wraps performBatchUpdates with state tracking and safe reload fallback
         open func performUpdates(_ updates: (() -> Void), completion: ((Bool) -> Void)? = nil) {
+                print("[ScrollTest][SCROLL-CV] performUpdates.enter offset=\(contentOffset.y) contentH=\(contentSize.height) sections=\(numberOfSections) isAdjustingForTopInserts=\(layout.isAdjustingForTopInserts)")
                 isPerformBatchUpdates = true
                 performBatchUpdates {
                     updates()
@@ -86,11 +87,13 @@ public extension ChannelViewController {
                         if let self {
                             isPerformBatchUpdates = false
                             if needsReloadData {
+                                print("[ScrollTest][SCROLL-CV] performUpdates.completion deferred-reloadData triggered offset=\(contentOffset.y) contentH=\(contentSize.height)")
                                 // Defer actual reload until batch updates are done
                                 reloadData()
                                 // Ensure layout is updated immediately without waiting for next runloop
                                 layoutIfNeeded()
                             }
+                            print("[ScrollTest][SCROLL-CV] performUpdates.exit offset=\(contentOffset.y) contentH=\(contentSize.height) sections=\(numberOfSections)")
                         }
                     }
                     completion?($0)
@@ -101,64 +104,80 @@ public extension ChannelViewController {
         open override func reloadData() {
             // If batch updates are in progress, defer the reload
             if isPerformBatchUpdates {
+                print("[ScrollTest][SCROLL-CV] reloadData DEFERRED (batchUpdates in progress) offset=\(contentOffset.y)")
                 needsReloadData = true
                 return
             }
+            let _stack = Thread.callStackSymbols.prefix(8).joined(separator: " | ")
+            print("[ScrollTest][SCROLL-CV] reloadData.before offset=\(contentOffset.y) stack=\(_stack)")
             // Safe to reload immediately
             super.reloadData()
             // Force layout update now to avoid visual glitches or async issues
             layoutIfNeeded()
             needsReloadData = false
+            print("[ScrollTest][SCROLL-CV] reloadData.after offset=\(contentOffset.y)")
         }
 
         open func reloadDataAndKeepOffset() {
+            print("[ScrollTest][SCROLL-CV] reloadDataAndKeepOffset.enter offset=\(contentOffset.y) contentH=\(contentSize.height)")
             // stop scrolling
             setContentOffset(contentOffset, animated: false)
-            
+
             let beforeContentSize = safeContentSize
             reloadData()
             let afterContentSize = safeContentSize
-            
+
             let newOffset = CGPoint(
                 x: max(0, contentOffset.x + (afterContentSize.width - beforeContentSize.width)),
                 y: max(0, contentOffset.y + (afterContentSize.height - beforeContentSize.height))
             )
+            print("[ScrollTest][SCROLL-CV] reloadDataAndKeepOffset.adjust beforeH=\(beforeContentSize.height) afterH=\(afterContentSize.height) deltaH=\(afterContentSize.height - beforeContentSize.height) oldOffsetY=\(contentOffset.y) newOffsetY=\(newOffset.y)")
             setContentOffset(newOffset, animated: false)
+            print("[ScrollTest][SCROLL-CV] reloadDataAndKeepOffset.exit offset=\(contentOffset.y) contentH=\(contentSize.height)")
         }
-        
+
         open func reloadDataAndScrollToBottom(animated: Bool = false) {
+            print("[ScrollTest][SCROLL-CV] reloadDataAndScrollToBottom.enter offset=\(contentOffset.y) contentH=\(contentSize.height) animated=\(animated)")
             setContentOffset(contentOffset, animated: false)
             reloadData()
             scrollToBottom(animated: animated)
+            print("[ScrollTest][SCROLL-CV] reloadDataAndScrollToBottom.exit offset=\(contentOffset.y) contentH=\(contentSize.height)")
         }
-        
+
         open func reloadDataAndScrollTo(
             indexPath: IndexPath,
             pos: UICollectionView.ScrollPosition = .top,
             animated: Bool = false
         ) {
+            print("[ScrollTest][SCROLL-CV] reloadDataAndScrollTo.enter target=\(indexPath) pos=\(pos.rawValue) animated=\(animated) offset=\(contentOffset.y) contentH=\(contentSize.height)")
             reloadDataAndKeepOffset()
             if contains(indexPath: indexPath) {
                 scrollToItem(at: indexPath, pos: pos, animated: animated)
+            } else {
+                print("[ScrollTest][SCROLL-CV] reloadDataAndScrollTo target=\(indexPath) NOT FOUND in collectionView (contains=false)")
             }
+            print("[ScrollTest][SCROLL-CV] reloadDataAndScrollTo.exit offset=\(contentOffset.y) contentH=\(contentSize.height)")
         }
-        
+
         open func scrollToItem(at indexPath: IndexPath, pos: UICollectionView.ScrollPosition = .top, animated: Bool = true) {
             if contains(indexPath: indexPath) {
+                print("[ScrollTest][SCROLL-CV] scrollToItem at=\(indexPath) pos=\(pos.rawValue) animated=\(animated) offsetBefore=\(contentOffset.y) contentH=\(contentSize.height)")
                 scrollToItem(at: indexPath, at: pos, animated: animated)
             } else {
+                print("[ScrollTest][SCROLL-CV] scrollToItem at=\(indexPath) SKIP (out of range) sections=\(numberOfSections)")
 #if DEBUG
                 //            fatalError("scrollToItem at: \(indexPath) out-of-bounds")
 #endif
             }
         }
-        
+
         open func scrollToBottom(animated: Bool, animationDuration: TimeInterval = 0.2, completion: ((Bool) -> Void)? = nil) {
             setContentOffset(contentOffset, animated: false)
             let newOffsetY = safeContentSize.height
             - bounds.height
             + contentInset.bottom
             let offsetY = max(-contentInset.top, newOffsetY)
+            print("[ScrollTest][SCROLL-CV] scrollToBottom safeContentH=\(safeContentSize.height) bounds=\(bounds.height) insetTop=\(contentInset.top) insetBottom=\(contentInset.bottom) targetOffsetY=\(offsetY) currentOffsetY=\(contentOffset.y) animated=\(animated)")
             if animated {
                 UIView.animate(
                     withDuration: animationDuration

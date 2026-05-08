@@ -245,23 +245,24 @@ open class LinkMetadataProvider: DataProvider {
                 }
 
                 // No metadata in database, load from network
-                self.loadLinkMetadataFromNetwork(
-                    url: url,
-                    log_hv: log_hv,
-                    downloadImage: downloadImage,
-                    downloadIcon: downloadIcon,
-                    completion: completion
-                )
+//                self.loadLinkMetadataFromNetwork(
+//                    url: url,
+//                    log_hv: log_hv,
+//                    downloadImage: downloadImage,
+//                    downloadIcon: downloadIcon,
+//                    completion: completion
+//                )
 
             case .failure:
+                print("failure case")
                 // Database error, try network
-                self.loadLinkMetadataFromNetwork(
-                    url: url,
-                    log_hv: log_hv,
-                    downloadImage: downloadImage,
-                    downloadIcon: downloadIcon,
-                    completion: completion
-                )
+//                self.loadLinkMetadataFromNetwork(
+//                    url: url,
+//                    log_hv: log_hv,
+//                    downloadImage: downloadImage,
+//                    downloadIcon: downloadIcon,
+//                    completion: completion
+//                )
             }
         }
     }
