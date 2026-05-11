@@ -172,6 +172,9 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         if let members = channel.members {
             for member in members {
                 let mdto = createOrUpdate(member: member, channelId: channel.id)
+                if mdto.channel !== dto {
+                    mdto.channel = dto
+                }
             }
         }
         

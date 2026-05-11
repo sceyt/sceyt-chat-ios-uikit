@@ -141,9 +141,17 @@ public class ChatChannel {
             unSynched: dto.unsynched
         )
         if self.channelType == .direct {
-            members = dto.members?
+            let viaInverse = dto.members?
                 .sorted { ($0.user?.id ?? "") > ($1.user?.id ?? "") }
-                .map { $0.convert() }
+                .map { $0.convert() } ?? []
+            if !viaInverse.isEmpty {
+                members = viaInverse
+            } else if let context = dto.managedObjectContext {
+                // Fallback for rows where the ChannelDTO<->MemberDTO inverse
+                // hasn't been wired (legacy data, partial migration).
+                members = MemberDTO.fetch(channelId: ChannelId(dto.id), context: context)
+                    .map { $0.convert() }
+            }
         }
     }
     

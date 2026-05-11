@@ -48,7 +48,7 @@ public class MemberDTO: NSManagedObject {
         let mo = insertNewObject(into: context)
         mo.channelId = Int64(channelId)
         mo.channel = ChannelDTO.fetch(id: channelId, context: context)
-        mo.user?.id = id
+        mo.user = UserDTO.fetchOrCreate(id: id, context: context)
         return mo
     }
 
