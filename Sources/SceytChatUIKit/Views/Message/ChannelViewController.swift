@@ -152,6 +152,7 @@ open class ChannelViewController: ViewController,
     }
     private var itemsAboveAtLastPrevFetch: Int = .max
     private var hasPendingPrevPagePump = false
+    private var pendingPrevDBFetchBeforeId: MessageId?
     private var isStartedDragging = false {
         didSet {
             unreadMessageIndexPath = nil
@@ -1205,8 +1206,12 @@ open class ChannelViewController: ViewController,
                     itemsAboveAtLastPrevFetch = .max
                 }
                 let madeProgress = itemsAbove < itemsAboveAtLastPrevFetch
-                if force || (itemsAbove < 5 && madeProgress) {
-                    itemsAboveAtLastPrevFetch = itemsAbove
+                if force || (itemsAbove < 10 && madeProgress) {
+                    // Pin to 0 (not itemsAbove) so subsequent frames can't keep
+                    // firing as the user reveals each consecutive prepended cell —
+                    // the gate only reopens via the reset above, which requires an
+                    // actual prepend of 10+ items.
+                    itemsAboveAtLastPrevFetch = 0
                     loadPrevMessages(beforeMessageAt: indexPath)
                 }
             }
@@ -1269,7 +1274,7 @@ open class ChannelViewController: ViewController,
            !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
             self.userSelectOnRepliedMessage = nil
         }
-        
+
         if lastScrollDirection == .down,
            let indexPath = addMoreMessage(scrollDirection: lastScrollDirection, force: false) {
             DispatchQueue.main.async { [weak self] in
@@ -1280,6 +1285,7 @@ open class ChannelViewController: ViewController,
             // while pagination is throttled. Re-evaluate once deceleration ends.
             addMoreMessage(scrollDirection: .up, force: false)
         }
+        drainPendingPrevDBFetch()
     }
 
     public func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
@@ -1288,13 +1294,24 @@ open class ChannelViewController: ViewController,
 //                self.channelViewModel.loadNearMessages(arMessageAt: lastAnimatedIndexPath)
             }
         }
+        drainPendingPrevDBFetch()
     }
-    
+
     open func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         if let userSelectOnRepliedMessage,
            !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
             self.userSelectOnRepliedMessage = nil
         }
+        if !decelerate {
+            drainPendingPrevDBFetch()
+        }
+    }
+
+    private func drainPendingPrevDBFetch() {
+        guard let beforeMessageId = pendingPrevDBFetchBeforeId
+        else { return }
+        pendingPrevDBFetchBeforeId = nil
+        channelViewModel.fetchPrevMessagesFromDB(before: beforeMessageId)
     }
     
     open func scrollViewDidScroll(_ scrollView: UIScrollView) {
@@ -2272,7 +2289,9 @@ open class ChannelViewController: ViewController,
             // actions can't suppress (UICollectionView's batch animations are driven by
             // UIView.animate, not CALayer implicit animations).
             if isTopPagination {
+                collectionView.layout.preBatchContentHeight = collectionView.contentSize.height
                 collectionView.layout.isAdjustingForTopInserts = true
+                logger.info("[topInsertOffset] VC pre-batch contentSize=\(collectionView.contentSize) contentOffset=\(collectionView.contentOffset.y) inserts=\(inserts.count) sectionInserts=\(sectionInserts.count) deletes=\(deletes.count) sectionDeletes=\(sectionDeletes.count) reloads=\(reloads.count) moves=\(moves.count)")
             }
 
             let updates: () -> Void = { [weak self] in
@@ -2306,6 +2325,11 @@ open class ChannelViewController: ViewController,
                 guard let self = self else { return }
 
                 if isInsertingItemsToTop {
+                    let postSize = self.collectionView.contentSize
+                    let postOffset = self.collectionView.contentOffset.y
+                    let actualHeightDelta = postSize.height - contentHeightBeforeInsertion
+                    let actualOffsetDelta = postOffset - offsetBeforeInsertion
+                    logger.info("[topInsertOffset] VC post-batch contentSize=\(postSize) contentOffset=\(postOffset) actualHeightDelta=\(actualHeightDelta) actualOffsetDelta=\(actualOffsetDelta) (height vs offset delta should match if anchoring is correct)")
                     if self.pinnedScrollMessageId != 0,
                        let pinnedIndexPath = self.channelViewModel.indexPathOf(messageId: self.pinnedScrollMessageId) {
                         self.collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
@@ -2373,11 +2397,16 @@ open class ChannelViewController: ViewController,
             } else {
                 addMoreMessage(scrollDirection: .up, force: false)
             }
-        case .clearPrevPaginationGate:
-            // Server wrote new prev rows to DB but the observer window wasn't expanded.
-            // Open the madeProgress gate so the user's next scroll re-triggers loadPrev,
-            // whose own DB-window expand will surface them. Passive — no addMoreMessage.
-            itemsAboveAtLastPrevFetch = .max
+        case .providerFinishedPrevPagination(let beforeMessageId):
+            // Server page just landed in CoreData under a freshly-stored range. The
+            // observer's predicate was set before the response, so new rows are
+            // filtered out until we re-expand it via fetchPrevMessagesFromDB.
+            // Defer mid-scroll so the insert doesn't jank inertia.
+            if collectionView.isDecelerating || collectionView.isDragging {
+                pendingPrevDBFetchBeforeId = beforeMessageId
+            } else {
+                channelViewModel.fetchPrevMessagesFromDB(before: beforeMessageId)
+            }
         case .reloadData:
             if let selectMessageId, let indexPath = channelViewModel.indexPathOf(messageId: selectMessageId) {
                 onEvent(.reloadDataAndSelect(indexPath: indexPath, messageId: selectMessageId))

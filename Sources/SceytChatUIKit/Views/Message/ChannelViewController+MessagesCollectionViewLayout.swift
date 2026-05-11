@@ -25,6 +25,11 @@ public extension ChannelViewController {
         // visible items rooted while content grows above them — no completion-block
         // correction, no flicker.
         public var isAdjustingForTopInserts: Bool = false
+        // VC captures contentSize.height before performBatchUpdates and assigns it here.
+        // Used in prepare(forCollectionViewUpdates:) to derive the offset adjustment as
+        // (newContentHeight - preBatchContentHeight) — exact regardless of headers,
+        // section insets, or line spacing, which a per-item frame sum misses.
+        public var preBatchContentHeight: CGFloat = 0
         private var pendingTopInsertOffsetAdjustment: CGFloat = 0
 
         public required override init() {
@@ -58,25 +63,38 @@ public extension ChannelViewController {
                 pendingTopInsertOffsetAdjustment = 0
                 return
             }
-            var total: CGFloat = 0
+            // contentSize delta is exact for pure top-inserts (no deletes above the anchor),
+            // which is what isAdjustingForTopInserts gates. Robust to header padding,
+            // section insets, and line spacing that per-item frame.height sums miss.
+            let newContentHeight = collectionViewContentSize.height
+            let delta = newContentHeight - preBatchContentHeight
+            pendingTopInsertOffsetAdjustment = max(0, delta)
+
+            var summedHeight: CGFloat = 0
             var insertCount = 0
+            var sectionInsertCount = 0
+            var nilAttrCount = 0
             for item in updateItems {
                 guard item.updateAction == .insert,
                       let newIndexPath = item.indexPathAfterUpdate
                 else { continue }
                 insertCount += 1
                 if newIndexPath.item == NSNotFound {
+                    sectionInsertCount += 1
                     if let attrs = super.layoutAttributesForSupplementaryView(
                         ofKind: UICollectionView.elementKindSectionHeader,
                         at: IndexPath(item: 0, section: newIndexPath.section)
                     ) {
-                        total += attrs.frame.height
+                        summedHeight += attrs.frame.height
+                    } else {
+                        nilAttrCount += 1
                     }
                 } else if let attrs = super.layoutAttributesForItem(at: newIndexPath) {
-                    total += attrs.frame.height
+                    summedHeight += attrs.frame.height
+                } else {
+                    nilAttrCount += 1
                 }
             }
-            pendingTopInsertOffsetAdjustment = total
         }
 
         open override func targetContentOffset(forProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {
@@ -92,6 +110,7 @@ public extension ChannelViewController {
 
         open override func finalizeCollectionViewUpdates() {
             pendingTopInsertOffsetAdjustment = 0
+            preBatchContentHeight = 0
             isAdjustingForTopInserts = false
             super.finalizeCollectionViewUpdates()
         }

@@ -992,16 +992,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             self?.resetFetchState()
         }
 
-        func fetchPrev(done: (() -> Void)? = nil) {
-            messageObserver.updatePredicateForPrevMessages(currentMessageId: messageId) {[weak self] result in
-                guard let self, result else { done?(); return }
-                messageObserver.loadPrev(before: messageId, done: done)
-            }
-        }
-
         // Local DB load drives the UI throttle. Cleared as soon as the observer settles,
         // independent of provider response — so fast scrolls can chain through cached pages.
-        fetchPrev { [weak self] in
+        fetchPrevMessagesFromDB(before: messageId) { [weak self] in
             guard let self else { return }
             resetFetchState()
             event = .pumpPrevPagination
@@ -1013,17 +1006,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         ) { [weak self] error in
             guard let self else { return }
             isFetchingData = false
-            // Fresh prev rows are in the DB but the observer window wasn't expanded
-            // (we skipped fetchPrev #2). Passively clear the VC's prev-pagination gate
-            // so the user's next scroll naturally re-triggers loadPrev — whose own
-            // fetchPrev #1 will surface these rows. We deliberately do NOT call
-            // addMoreMessage from here: the original loadPrev's network may still be
-            // racing other completions (e.g. queryInProgress), and any active re-entry
-            // from a completion handler can recurse on the main thread.
-            if error == nil {
-                event = .clearPrevPaginationGate
+            event = .providerFinishedPrevPagination(beforeMessageId: messageId)
+        }
+    }
+
+    open func fetchPrevMessagesFromDB(before messageId: MessageId, done: (() -> Void)? = nil) {
+        messageObserver.updatePredicateForPrevMessages(currentMessageId: messageId) { [weak self] result in
+            guard let self, result else {
+                done?()
+                return
             }
-            logger.errorIfNotNil(error, "on loadPrevMessages")
+            messageObserver.loadPrev(before: messageId, done: done)
         }
     }
 
@@ -2557,7 +2550,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             } else {
                 guard !linkMetadataProvider.isFetching(url: link)
                 else { return }
-                linkMetadataProvider.fetch(url: link) { [weak self] result in
+                let hasImageOriginalSize = (first.linkMetadata?.imageOriginalSize.map { $0 != .zero } ?? false)
+                linkMetadataProvider.fetch(
+                    url: link,
+                    loadFromNetworkIfMissing: hasImageOriginalSize
+                ) { [weak self] result in
                     guard let self else { return }
                     switch result {
                     case .success(let data):
@@ -2996,7 +2993,7 @@ public extension ChannelViewModel {
         case connection(state: ConnectionState)
         case close
         case pumpPrevPagination
-        case clearPrevPaginationGate
+        case providerFinishedPrevPagination(beforeMessageId: MessageId)
     }
 }
 
