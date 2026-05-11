@@ -179,8 +179,6 @@ open class ChannelViewController: ViewController,
         updateTitle()
         updateUnreadViewVisibility()
 
-//        collectionView.bounces = false
-//        print("[ScrollTest][SCROLL-LIFECYCLE] viewWillAppear offset=\(collectionView.contentOffset.y) contentH=\(collectionView.contentSize.height) bounds=\(collectionView.bounds.size) sections=\(collectionView.numberOfSections) -> invalidateLayout")
         collectionView.collectionViewLayout.invalidateLayout()
 
     }
@@ -235,26 +233,14 @@ open class ChannelViewController: ViewController,
         guard isViewLoaded
         else { return }
 
-        let _maxOffsetBefore = max(0, collectionView.contentSize.height - collectionView.bounds.height + collectionView.adjustedContentInset.bottom + collectionView.adjustedContentInset.top)
-        let _wasAtBottom = abs(collectionView.contentOffset.y - _maxOffsetBefore) < 1.5
-        print("[ScrollTest][SCROLL-ROTATION] viewWillTransition.enter newSize=\(size) currentBounds=\(collectionView.bounds.size) offset=\(collectionView.contentOffset.y) contentH=\(collectionView.contentSize.height) wasAtBottom=\(_wasAtBottom) lastVisible=\(String(describing: collectionView.lastVisibleIndexPath)) lastIndexPath=\(String(describing: collectionView.lastIndexPath))")
-
         Components.messageLayoutModel.defaults.messageWidth = floor(Components.messageLayoutModel.defaults.messageWidthRatio * size.width)
         channelViewModel.invalidateLayout()
 
         coordinator.animate(alongsideTransition: { [weak self] _ in
             guard let self else { return }
-            print("[ScrollTest][SCROLL-ROTATION] alongsideTransition bounds=\(self.collectionView.bounds.size) offset=\(self.collectionView.contentOffset.y) contentH=\(self.collectionView.contentSize.height) about to reloadData")
             self.titleView.setNeedsLayout()
             self.titleView.layoutIfNeeded()
-            print("[TESTREFRESH] cv.reloadData @ ChannelViewController.viewWillTransition")
             self.collectionView.reloadData()
-            print("[ScrollTest][SCROLL-ROTATION] alongsideTransition.afterReload offset=\(self.collectionView.contentOffset.y) contentH=\(self.collectionView.contentSize.height)")
-        }, completion: { [weak self] _ in
-            guard let self else { return }
-            let _maxOffsetAfter = max(0, self.collectionView.contentSize.height - self.collectionView.bounds.height + self.collectionView.adjustedContentInset.bottom + self.collectionView.adjustedContentInset.top)
-            let _isAtBottomAfter = abs(self.collectionView.contentOffset.y - _maxOffsetAfter) < 1.5
-            print("[ScrollTest][SCROLL-ROTATION] completion bounds=\(self.collectionView.bounds.size) offset=\(self.collectionView.contentOffset.y) contentH=\(self.collectionView.contentSize.height) maxOffsetAfter=\(_maxOffsetAfter) isAtBottomAfter=\(_isAtBottomAfter) wasAtBottomBefore=\(_wasAtBottom) lastVisible=\(String(describing: self.collectionView.lastVisibleIndexPath))")
         })
     }
     
@@ -523,7 +509,6 @@ open class ChannelViewController: ViewController,
             .sink { [weak self] _ in
                 guard let self else { return }
                 updateNavigationItems()
-                print("[TESTREFRESH] cv.reloadData @ ChannelViewController.$selectedMessages.sink")
                 collectionView.reloadData()
             }.store(in: &subscriptions)
 
@@ -535,7 +520,6 @@ open class ChannelViewController: ViewController,
                 self.updateNavigationItems()
                 if isEditing {
                     shouldAnimateEditing = true
-                    print("[TESTREFRESH] cv.reloadData @ ChannelViewController.$isEditing.sink isEditing=true")
                     collectionView.reloadData()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) { [weak self] in
                         self?.shouldAnimateEditing = false
@@ -554,7 +538,6 @@ open class ChannelViewController: ViewController,
                             }
                         }
                     } completion: { [weak self] _ in
-                        print("[TESTREFRESH] cv.reloadData @ ChannelViewController.$isEditing.sink isEditing=false completion")
                         self?.collectionView.reloadData()
                     }
                     self.showBottomViewIfNeeded()
@@ -674,7 +657,6 @@ open class ChannelViewController: ViewController,
                    cell.data.message.id != messageId,
                    !cell.unreadMessagesSeparatorView.isHidden {
                     if let indexPath = self.collectionView.indexPath(for: cell) {
-                        print("[TESTREFRESH] cv.reloadItems @ ChannelViewController.removePrevUnreadSeparatorView paths=\([indexPath])")
                         self.collectionView.reloadItems(at: [indexPath])
                     } else {
                         cell.unreadMessagesSeparatorView.isHidden = true
@@ -693,8 +675,6 @@ open class ChannelViewController: ViewController,
                 guard let self else { return }
                 if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
                     completion(cell)
-                } else {
-                    print("[STOP] cell not exist")
                 }
                 self.updateUnreadViewVisibility()
             }
@@ -1020,8 +1000,6 @@ open class ChannelViewController: ViewController,
             self.channelViewModel.invalidateLayout()
             // Invalidate the collection view layout
             self.collectionView.collectionViewLayout.invalidateLayout()
-            // Reload all data
-            print("[TESTREFRESH] cv.reloadData @ ChannelViewController.pollClosedNotification")
             self.collectionView.reloadData()
         }
     }
@@ -1628,8 +1606,6 @@ open class ChannelViewController: ViewController,
                 self.channelViewModel.invalidateLayout()
                 // Invalidate the collection view layout
                 self.collectionView.collectionViewLayout.invalidateLayout()
-                // Reload all data
-                print("[TESTREFRESH] cv.reloadData @ ChannelViewController.didTapReadMore")
                 self.collectionView.reloadData()
             }
         }
@@ -1976,7 +1952,6 @@ open class ChannelViewController: ViewController,
     }
     
     open func didSelectPhoneNumber(_ phoneNumber: String, layoutModel: MessageLayoutModel) {
-        print("did select phone number \(phoneNumber)")
         guard let phoneNumberLink = URL(string: "tel://\(phoneNumber)") else {
             return
         }
@@ -2001,7 +1976,6 @@ open class ChannelViewController: ViewController,
     }
     
     open func showProfile(user: ChatUser) {
-        print("showProfile for \(user.id)")
         channelViewModel.directChannel(user: user) { [weak self] channel, error in
             guard let self else { return }
             if let channel {
@@ -2186,13 +2160,6 @@ open class ChannelViewController: ViewController,
     
     open func onEvent(_ event: ChannelViewModel.Event) {
         switch event {
-        case .changePresence(let pres):
-            break
-        default:
-            print("[TESTREFRESH] ChannelViewController.onEvent type=\(_testRefreshLabel(event))")
-        }
-        
-        switch event {
         case .update(let paths):
             var inserts = paths.inserts.sorted()
             let reloads = paths.reloads.sorted()
@@ -2211,7 +2178,6 @@ open class ChannelViewController: ViewController,
                    collectionView.lastIndexPath == collectionView.lastVisibleIndexPath {
                     isStartedDragging = true
                 } else {
-                    print("[TESTREFRESH] cv.reloadDataAndScrollTo @ ChannelViewController.onEvent.update unreadMessageIndexPath=\(unreadMessageIndexPath)")
                     collectionView.reloadDataAndScrollTo(indexPath: unreadMessageIndexPath)
                     return
                 }
@@ -2220,7 +2186,6 @@ open class ChannelViewController: ViewController,
             if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
                 if channelViewModel.scrollToRepliedMessageId == 0, pinnedScrollMessageId == 0 {
-                    print("[TESTREFRESH] cv.reloadDataAndScrollToBottom @ ChannelViewController.onEvent.update firstTimeFromArchive")
                     collectionView.reloadDataAndScrollToBottom()
                 }
                 updateUnreadViewVisibility()
@@ -2276,10 +2241,6 @@ open class ChannelViewController: ViewController,
             let contentHeightBeforeInsertion = collectionView.contentSize.height
             let isTopPagination = isInsertingItemsToTop && pinnedScrollMessageId == 0
 
-            let _maxOffsetBefore = max(0, contentHeightBeforeInsertion - collectionView.bounds.height + collectionView.adjustedContentInset.bottom + collectionView.adjustedContentInset.top)
-            let _wasAtBottom = abs(offsetBeforeInsertion - _maxOffsetBefore) < 1.5
-            print("[ScrollTest][SCROLL-PAGINATION] pre-batch inserts=\(inserts.count) reloads=\(reloads.count) deletes=\(deletes.count) sectionInserts=\(sectionInserts.count) sectionDeletes=\(sectionDeletes.count) firstInsert=\(String(describing: inserts.first)) lastInsert=\(String(describing: inserts.last)) lastIndexPath=\(String(describing: collectionView.lastIndexPath)) lastVisible=\(String(describing: collectionView.lastVisibleIndexPath)) isInsertingItemsToTop=\(isInsertingItemsToTop) isInsertLastIndexPath=\(isInsertLastIndexPath) isUserAtBottom=\(isUserAtBottom) isTopPagination=\(isTopPagination) needsToScrollBottom=\(needsToScrollBottom) wasAtBottom=\(_wasAtBottom) offsetBefore=\(offsetBeforeInsertion) contentHeightBefore=\(contentHeightBeforeInsertion) viewBounds=\(collectionView.bounds.height) insetTop=\(collectionView.adjustedContentInset.top) insetBottom=\(collectionView.adjustedContentInset.bottom) maxOffsetBefore=\(_maxOffsetBefore) isDragging=\(collectionView.isDragging) isDecelerating=\(collectionView.isDecelerating) isScrollingBottom=\(isScrollingBottom) unreadCountHidden=\(unreadCountView.isHidden)")
-
             // TODO: Improve this part
             // Pre-validate data source consistency before batch update.
             // If the collection view's current count + the diff's inserts/deletes
@@ -2287,10 +2248,8 @@ open class ChannelViewController: ViewController,
             // advanced past this diff — fall back to reloadData to avoid a crash.
             let expectedSectionCount = collectionView.numberOfSections + sectionInserts.count - sectionDeletes.count
             if expectedSectionCount != channelViewModel.numberOfSections {
-                print("[ScrollTest][SCROLL-FALLBACK] section-count-mismatch expected=\(expectedSectionCount) actual=\(channelViewModel.numberOfSections) -> reloadData")
                 let savedOffset = collectionView.contentOffset
                 let savedContentHeight = collectionView.contentSize.height
-                print("[TESTREFRESH] cv.reloadData @ ChannelViewController.onEvent.update section-mismatch-fallback")
                 collectionView.reloadData()
                 collectionView.layoutIfNeeded()
                 if pinnedScrollMessageId != 0,
@@ -2298,9 +2257,7 @@ open class ChannelViewController: ViewController,
                     collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
                 } else {
                     let heightDiff = collectionView.contentSize.height - savedContentHeight
-                    let _newY = savedOffset.y + heightDiff
-                    print("[ScrollTest][SCROLL-FALLBACK] section-mismatch offset adjust savedY=\(savedOffset.y) savedH=\(savedContentHeight) newH=\(collectionView.contentSize.height) heightDiff=\(heightDiff) newY=\(_newY)")
-                    collectionView.contentOffset.y = _newY
+                    collectionView.contentOffset.y = savedOffset.y + heightDiff
                 }
                 return
             }
@@ -2321,21 +2278,15 @@ open class ChannelViewController: ViewController,
             let updates: () -> Void = { [weak self] in
                 guard let self = self else { return }
                 if !sectionInserts.isEmpty {
-                    print("[TESTREFRESH] cv.insertSections @ ChannelViewController.onEvent.update batch sections=\(sectionInserts.count)")
                     self.collectionView.insertSections(sectionInserts)
                 }
                 if !sectionDeletes.isEmpty {
-                    print("[TESTREFRESH] cv.deleteSections @ ChannelViewController.onEvent.update batch sections=\(sectionDeletes.count)")
                     self.collectionView.deleteSections(sectionDeletes)
                 }
-                print("[TESTREFRESH] cv.insertItems @ ChannelViewController.onEvent.update batch count=\(inserts.count)")
                 self.collectionView.insertItems(at: inserts)
-                print("[TESTREFRESH] cv.reloadItems @ ChannelViewController.onEvent.update batch count=\(reloads.count) paths=\(reloads)")
                 self.collectionView.reloadItems(at: reloads)
-                print("[TESTREFRESH] cv.deleteItems @ ChannelViewController.onEvent.update batch count=\(deletes.count)")
                 self.collectionView.deleteItems(at: deletes)
                 moves.forEach { from, to in
-                    print("[TESTREFRESH] cv.moveItem @ ChannelViewController.onEvent.update batch from=\(from) to=\(to)")
                     self.collectionView.moveItem(at: from, to: to)
                 }
             }
@@ -2387,7 +2338,6 @@ open class ChannelViewController: ViewController,
                     }
                     if !validReloads.isEmpty {
                         UIView.performWithoutAnimation {
-                            print("[TESTREFRESH] cv.reloadItems @ ChannelViewController.onEvent.update.completion moveDestinations count=\(validReloads.count)")
                             self.collectionView.reloadItems(at: validReloads)
                         }
                     }
@@ -2398,19 +2348,13 @@ open class ChannelViewController: ViewController,
                 } else {
                     self.updateUnreadViewVisibility()
                 }
-                let _contentHeightAfter = self.collectionView.contentSize.height
-                let _maxOffsetAfter = max(0, _contentHeightAfter - self.collectionView.bounds.height + self.collectionView.adjustedContentInset.bottom + self.collectionView.adjustedContentInset.top)
-                let _isAtBottomAfter = abs(self.collectionView.contentOffset.y - _maxOffsetAfter) < 1.5
-                print("[ScrollTest][SCROLL-PAGINATION] post-batch isInsertingItemsToTop=\(isInsertingItemsToTop) offsetBefore=\(offsetBeforeInsertion) contentHBefore=\(contentHeightBeforeInsertion) contentHAfter=\(_contentHeightAfter) finalOffsetY=\(self.collectionView.contentOffset.y) maxOffsetAfter=\(_maxOffsetAfter) isAtBottomAfter=\(_isAtBottomAfter) wasAtBottomBefore=\(_wasAtBottom) needsToScrollBottom=\(needsToScrollBottom) scrollBottom=\(scrollBottom) animatedScroll=\(animatedScroll) isDragging=\(self.collectionView.isDragging) isDecelerating=\(self.collectionView.isDecelerating)")
             }
 
             if isTopPagination {
                 UIView.performWithoutAnimation {
-                    print("[TESTREFRESH] cv.performUpdates @ ChannelViewController.onEvent.update isTopPagination=true")
                     collectionView.performUpdates(updates, completion: completion)
                 }
             } else {
-                print("[TESTREFRESH] cv.performUpdates @ ChannelViewController.onEvent.update isTopPagination=false")
                 collectionView.performUpdates(updates, completion: completion)
             }
 
@@ -2435,34 +2379,27 @@ open class ChannelViewController: ViewController,
             // whose own DB-window expand will surface them. Passive — no addMoreMessage.
             itemsAboveAtLastPrevFetch = .max
         case .reloadData:
-            print("[ScrollTest][SCROLL-EVENT] .reloadData received selectMessageId=\(String(describing: selectMessageId)) pinnedScrollMessageId=\(pinnedScrollMessageId) offset=\(collectionView.contentOffset.y) contentH=\(collectionView.contentSize.height)")
             if let selectMessageId, let indexPath = channelViewModel.indexPathOf(messageId: selectMessageId) {
                 onEvent(.reloadDataAndSelect(indexPath: indexPath, messageId: selectMessageId))
             } else if pinnedScrollMessageId != 0 {
                 let savedOffset = collectionView.contentOffset
                 let savedContentHeight = collectionView.contentSize.height
-                print("[TESTREFRESH] cv.reloadData @ ChannelViewController.onEvent.reloadData pinnedBranch")
                 collectionView.reloadData()
                 collectionView.layoutIfNeeded()
                 if let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
                     collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
                 } else {
                     let heightDiff = collectionView.contentSize.height - savedContentHeight
-                    let _newY = savedOffset.y + heightDiff
-                    print("[ScrollTest][SCROLL-EVENT] .reloadData pinned-no-indexPath offset adjust savedY=\(savedOffset.y) savedH=\(savedContentHeight) newH=\(collectionView.contentSize.height) heightDiff=\(heightDiff) newY=\(_newY)")
-                    collectionView.contentOffset.y = _newY
+                    collectionView.contentOffset.y = savedOffset.y + heightDiff
                 }
             } else {
-                print("[TESTREFRESH] cv.reloadData @ ChannelViewController.onEvent.reloadData defaultBranch")
                 collectionView.reloadData()
             }
             updateUnreadViewVisibility()
             showEmptyViewIfNeeded()
         case .reload(let indexPaths):
             UIView.performWithoutAnimation {
-                print("[TESTREFRESH] cv.performUpdates @ ChannelViewController.onEvent.reload count=\(indexPaths.count)")
                 collectionView.performUpdates {
-                    print("[TESTREFRESH] cv.reloadItems @ ChannelViewController.onEvent.reload count=\(indexPaths.count) paths=\(indexPaths)")
                     collectionView.reloadItems(at: indexPaths)
                 }
             }
@@ -2470,14 +2407,11 @@ open class ChannelViewController: ViewController,
         case .reloadDataAndScrollToBottom:
             if pinnedScrollMessageId != 0,
                let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
-                print("[TESTREFRESH] cv.reloadDataAndScrollTo @ ChannelViewController.onEvent.reloadDataAndScrollToBottom pinned indexPath=\(pinnedIndexPath)")
                 collectionView.reloadDataAndScrollTo(indexPath: pinnedIndexPath, pos: .centeredVertically, animated: false)
             } else {
-                print("[TESTREFRESH] cv.reloadDataAndScrollToBottom @ ChannelViewController.onEvent.reloadDataAndScrollToBottom default")
                 collectionView.reloadDataAndScrollToBottom()
             }
         case let .reloadDataAndScroll(indexPath, animated, pos):
-            print("[TESTREFRESH] cv.reloadDataAndScrollTo @ ChannelViewController.onEvent.reloadDataAndScroll indexPath=\(indexPath) animated=\(animated)")
             collectionView.reloadDataAndScrollTo(
                 indexPath: indexPath,
                 pos: pos,
@@ -2595,7 +2529,6 @@ open class ChannelViewController: ViewController,
             } else if let indexPath = channelViewModel.indexPathOf(messageId: messageId) {
                 viewIndexPath = indexPath
             } else {
-                print("[scrollAndSelect] can't find indexPath \(indexPath)")
                 return
             }
             
@@ -2618,7 +2551,6 @@ open class ChannelViewController: ViewController,
                     return .bottom
                 }
             }
-            print("[TESTREFRESH] cv.reloadDataAndScrollTo @ ChannelViewController.onEvent.reloadDataAndSelect indexPath=\(indexPath) messageId=\(messageId)")
             collectionView.reloadDataAndScrollTo(
                 indexPath: indexPath,
                 pos: pos
@@ -3055,47 +2987,6 @@ open class ChannelViewController: ViewController,
     
     open func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
         searchBar.resignFirstResponder()
-    }
-
-    private func _testRefreshLabel(_ event: ChannelViewModel.Event) -> String {
-        switch event {
-        case .update(let p):
-            return "update(inserts=\(p.inserts.count) reloads=\(p.reloads.count) deletes=\(p.deletes.count) moves=\(p.moves.count) sectionInserts=\(p.sectionInserts.count) sectionDeletes=\(p.sectionDeletes.count))"
-        case .updateDeliveryStatus(_, let indexPath):
-            return "updateDeliveryStatus(indexPath=\(indexPath))"
-        case .reload(let ips):
-            return "reload(count=\(ips.count))"
-        case .reloadData:
-            return "reloadData"
-        case .reloadDataAndScrollToBottom:
-            return "reloadDataAndScrollToBottom"
-        case .reloadDataAndScroll(let indexPath, let animated, _):
-            return "reloadDataAndScroll(indexPath=\(indexPath) animated=\(animated))"
-        case .reloadDataAndSelect(let indexPath, let messageId):
-            return "reloadDataAndSelect(indexPath=\(indexPath) messageId=\(messageId))"
-        case .scrollAndSelect(let indexPath, let messageId, _):
-            return "scrollAndSelect(indexPath=\(indexPath) messageId=\(messageId))"
-        case .didSetUnreadIndexPath(let indexPath):
-            return "didSetUnreadIndexPath(indexPath=\(indexPath))"
-        case .typing(let isTyping, _):
-            return "typing(isTyping=\(isTyping))"
-        case .recording(let isRecording, _):
-            return "recording(isRecording=\(isRecording))"
-        case .changePresence:
-            return "changePresence"
-        case .updateChannel:
-            return "updateChannel"
-        case .showNoMessage:
-            return "showNoMessage"
-        case .connection(let state):
-            return "connection(state=\(state))"
-        case .close:
-            return "close"
-        case .pumpPrevPagination:
-            return "pumpPrevPagination"
-        case .clearPrevPaginationGate:
-            return "clearPrevPaginationGate"
-        }
     }
 }
 

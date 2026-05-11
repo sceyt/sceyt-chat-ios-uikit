@@ -981,14 +981,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         guard !isFetchingData,
               ((lastLoadPrevMessageId != messageId && messageId != 0) || messageId == 0)
         else {
-            print("[ScrollTest][SCROLL-FETCH] vm.loadPrevMessages SKIPPED before=\(messageId) isFetching=\(isFetchingData) lastPrev=\(lastLoadPrevMessageId)")
             return
         }
         lastLoadPrevMessageId = messageId
         isFetchingData = true
-        let _requestStart = Date()
-        print("[ScrollTest][SCROLL-FETCH] vm.loadPrevMessages REQUEST channelId=\(channel.id) before=\(messageId)")
-        
+
         DispatchQueue.main
             .asyncAfter(deadline: .now() + 1)
         {[weak self] in
@@ -998,7 +995,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         func fetchPrev(done: (() -> Void)? = nil) {
             messageObserver.updatePredicateForPrevMessages(currentMessageId: messageId) {[weak self] result in
                 guard let self, result else { done?(); return }
-                print("[ScrollTest][SCROLL-FETCH] vm.loadPrevMessages observer.loadPrev before=\(messageId)")
                 messageObserver.loadPrev(before: messageId, done: done)
             }
         }
@@ -1016,8 +1012,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             before: messageId
         ) { [weak self] error in
             guard let self else { return }
-            let _elapsedMs = Int(Date().timeIntervalSince(_requestStart) * 1000)
-            print("[ScrollTest][SCROLL-FETCH] vm.loadPrevMessages RESPONSE before=\(messageId) elapsedMs=\(_elapsedMs) error=\(error.map { "\($0)" } ?? "nil")")
             isFetchingData = false
             // Fresh prev rows are in the DB but the observer window wasn't expanded
             // (we skipped fetchPrev #2). Passively clear the VC's prev-pagination gate
@@ -1039,13 +1033,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         guard !isFetchingData,
               lastLoadNextMessageId != messageId
         else {
-            print("[ScrollTest][SCROLL-FETCH] vm.loadNextMessages SKIPPED after=\(messageId) isFetching=\(isFetchingData) lastNext=\(lastLoadNextMessageId)")
             return
         }
         lastLoadNextMessageId = messageId
         isFetchingData = true
-        let _requestStart = Date()
-        print("[ScrollTest][SCROLL-FETCH] vm.loadNextMessages REQUEST channelId=\(channel.id) after=\(messageId)")
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
             self?.resetFetchState()
         }
@@ -1053,7 +1044,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             messageObserver.updatePredicateForNextMessages(currentMessageId: messageId) {[weak self] result in
                 guard let self else { return }
                 if result {
-                    print("[ScrollTest][SCROLL-FETCH] vm.loadNextMessages observer.loadNext after=\(messageId)")
                     messageObserver.loadNext(after: messageId)
                 }
             }
@@ -1064,8 +1054,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         provider.loadNextMessages(
             after: messageId
         ) { [weak self] error in
-            let _elapsedMs = Int(Date().timeIntervalSince(_requestStart) * 1000)
-            print("[ScrollTest][SCROLL-FETCH] vm.loadNextMessages RESPONSE after=\(messageId) elapsedMs=\(_elapsedMs) error=\(error.map { "\($0)" } ?? "nil")")
             fetchNext()
             self?.resetFetchState()
             logger.errorIfNotNil(error, "on loadNextMessages")
@@ -1201,19 +1189,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         let messages = indexPaths.compactMap {
             message(at: $0)
         }
-        print("[ScrollTest][SCROLL-MARKER] VM.markMessage(byIndexPaths) marker=\(marker.rawValue) indexPaths=\(indexPaths.count) messages=\(messages.count)")
         if marker == .displayed {
             markMessageAsDisplayed(messages)
         } else {
             markMessages(messages, as: marker)
         }
     }
-    
+
     open func markMessages( _ messages: [ChatMessage], as marker: DefaultMarker) {
         guard !markMessagesTaskStarted,
                 !messages.isEmpty
         else {
-            print("[ScrollTest][SCROLL-MARKER] VM.markMessages.SKIPPED marker=\(marker.rawValue) taskStarted=\(markMessagesTaskStarted) empty=\(messages.isEmpty)")
             return
         }
 
@@ -1252,11 +1238,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open func markMessageAsDisplayed(_ messages: [ChatMessage]) {
-        print("[ScrollTest][SCROLL-MARKER] VM.markMessageAsDisplayed.enter count=\(messages.count) taskStarted=\(markMessagesTaskStarted)")
         guard !markMessagesTaskStarted,
                 !messages.isEmpty
         else {
-            print("[ScrollTest][SCROLL-MARKER] VM.markMessageAsDisplayed.SKIPPED taskStarted=\(markMessagesTaskStarted) empty=\(messages.isEmpty)")
             return
         }
         
@@ -2549,7 +2533,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                             self?.provider.storeLinkMetadata(metadata, to: model.message)
                         }
                     } else {
-                        linkMetadataProvider.fetch(url: link) { [weak self] result in
+                        let hasImageOriginalSize = (preview.imageOriginalSize.map { $0 != .zero } ?? false)
+                        linkMetadataProvider.fetch(
+                            url: link,
+                            loadFromNetworkIfMissing: hasImageOriginalSize
+                        ) { [weak self] result in
                             guard let self else { return }
                             switch result {
                             case .success(let data):

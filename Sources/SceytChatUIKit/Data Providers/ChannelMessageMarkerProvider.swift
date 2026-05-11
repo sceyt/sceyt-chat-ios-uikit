@@ -56,7 +56,6 @@ open class ChannelMessageMarkerProvider: DataProvider {
                 }
 
                 if storeBeforeSend {
-                    print("[ScrollTest][SCROLL-MARKER] markIfNeeded.writePending count=\(ids.count) marker=\(markerName) channelId=\(self.channelId)")
                     self.database.write {
                         $0.update(messagePendingMarkers: ids, markerName: markerName)
                     }
@@ -113,7 +112,6 @@ open class ChannelMessageMarkerProvider: DataProvider {
             } else if let markerList {
                 logger.debug("[MARKER CHECK] receive \(markerList.messageIds.count)")
                 logger.debug("[MARKER CHECK] received mark: \(markerList.name) for \(markerList.messageIds) in channelId:\(markerList.channelId)")
-                print("[ScrollTest][SCROLL-MARKER] mark.writeSelfMarkers count=\(markerList.messageIds.count) marker=\(markerName) channelId=\(self.channelId)")
                 self.database.performWriteTask ({
                     $0.delete(messagePendingMarkers: ids, markerName: markerName)
                     $0.update(messageSelfMarkers: markerList)

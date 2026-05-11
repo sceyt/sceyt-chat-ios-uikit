@@ -77,7 +77,6 @@ public extension ChannelViewController {
                 }
             }
             pendingTopInsertOffsetAdjustment = total
-            logger.debug("[ScrollTest][SCROLL-PAGINATION] layout.prepareForUpdates insertCount=\(insertCount) totalUpdateItems=\(updateItems.count) pendingOffsetAdj=\(total) currentContentSize=\(collectionView?.contentSize.height ?? -1) currentOffset=\(collectionView?.contentOffset.y ?? -1)")
         }
 
         open override func targetContentOffset(forProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {
@@ -88,7 +87,6 @@ public extension ChannelViewController {
                 x: proposedContentOffset.x,
                 y: proposedContentOffset.y + pendingTopInsertOffsetAdjustment
             )
-            logger.debug("[ScrollTest][SCROLL-PAGINATION] layout.targetContentOffset proposedY=\(proposedContentOffset.y) pendingOffsetAdj=\(pendingTopInsertOffsetAdjustment) adjustedY=\(adjusted.y)")
             return adjusted
         }
 

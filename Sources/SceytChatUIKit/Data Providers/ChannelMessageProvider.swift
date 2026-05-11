@@ -62,24 +62,18 @@ open class ChannelMessageProvider: DataProvider {
             { messages, error in
                 guard let messages = messages
                 else {
-                    print("[ScrollTest][SCROLL-FETCH] provider.loadNext(initial) SERVER-ERROR error=\(error.map { "\($0)" } ?? "nil")")
                     completion?(error)
                     return
                 }
-                let _firstId = messages.map { $0.id }.min() ?? 0
-                let _lastId = messages.map { $0.id }.max() ?? 0
-                print("[ScrollTest][SCROLL-FETCH] provider.loadNext(initial) SERVER-OK count=\(messages.count) firstId=\(_firstId) lastId=\(_lastId) limit=\(query.limit)")
                 self.store(
                     messages: messages,
                     completion: { error in
-                        print("[ScrollTest][SCROLL-FETCH] provider.loadNext(initial) DB-WRITE-DONE count=\(messages.count) error=\(error.map { "\($0)" } ?? "nil")")
                         completion?(error)
                     }
                 )
                 self.sendReceivedMarker(messages: messages)
             }
         } else {
-            print("[ScrollTest][SCROLL-FETCH] provider.loadNext(initial) QUERY-IN-PROGRESS")
             completion?(SceytChatError.queryInProgress)
         }
     }
@@ -104,30 +98,23 @@ open class ChannelMessageProvider: DataProvider {
                 { messages, error in
                     guard let messages = messages
                     else {
-                        print("[ScrollTest][SCROLL-FETCH] provider.loadNext SERVER-ERROR after=\(messageId) error=\(error.map { "\($0)" } ?? "nil")")
                         completion?(error)
                         return
                     }
-                    let _ids = messages.map { $0.id }
-                    let _firstId = _ids.min() ?? 0
-                    let _lastId = _ids.max() ?? 0
-                    print("[ScrollTest][SCROLL-FETCH] provider.loadNext SERVER-OK after=\(messageId) count=\(messages.count) firstId=\(_firstId) lastId=\(_lastId) limit=\(query.limit)")
                     self.store(
                         messages: messages,
                         triggerMessage: messageId,
                         completion: { error in
-                            print("[ScrollTest][SCROLL-FETCH] provider.loadNext DB-WRITE-DONE after=\(messageId) count=\(messages.count) error=\(error.map { "\($0)" } ?? "nil")")
                             completion?(error)
                         }
                     )
                     self.sendReceivedMarker(messages: messages)
                 }
             } else {
-                print("[ScrollTest][SCROLL-FETCH] provider.loadNext QUERY-IN-PROGRESS after=\(messageId)")
                 completion?(SceytChatError.queryInProgress)
             }
         }
-    
+
     open func loadPrevMessages(
         completion: ((Error?) -> Void)? = nil
     ) {
@@ -136,7 +123,7 @@ open class ChannelMessageProvider: DataProvider {
             completion: completion
         )
     }
-    
+
     open func loadPrevMessages(
         query: MessageListQuery,
         completion: ((Error?) -> Void)? = nil
@@ -146,24 +133,16 @@ open class ChannelMessageProvider: DataProvider {
             { messages, error in
                 guard let messages = messages
                 else {
-                    print("[ScrollTest][SCROLL-FETCH] provider.loadPrev(initial) SERVER-ERROR error=\(error.map { "\($0)" } ?? "nil")")
                     completion?(error)
                     return
                 }
-                let _firstId = messages.map { $0.id }.min() ?? 0
-                let _lastId = messages.map { $0.id }.max() ?? 0
-                print("[ScrollTest][SCROLL-FETCH] provider.loadPrev(initial) SERVER-OK count=\(messages.count) firstId=\(_firstId) lastId=\(_lastId) limit=\(query.limit)")
                 self.store(
                     messages: messages,
-                    completion: { error in
-                        print("[ScrollTest][SCROLL-FETCH] provider.loadPrev(initial) DB-WRITE-DONE count=\(messages.count) error=\(error.map { "\($0)" } ?? "nil")")
-                        completion?(error)
-                    }
+                    completion: completion
                 )
                 self.sendReceivedMarker(messages: messages)
             }
         } else {
-            print("[ScrollTest][SCROLL-FETCH] provider.loadPrev(initial) QUERY-IN-PROGRESS")
             completion?(SceytChatError.queryInProgress)
         }
     }
@@ -188,26 +167,17 @@ open class ChannelMessageProvider: DataProvider {
                 { messages, error in
                     guard let messages = messages
                     else {
-                        print("[ScrollTest][SCROLL-FETCH] provider.loadPrev SERVER-ERROR before=\(messageId) error=\(error.map { "\($0)" } ?? "nil")")
                         completion?(error)
                         return
                     }
-                    let _ids = messages.map { $0.id }
-                    let _firstId = _ids.min() ?? 0
-                    let _lastId = _ids.max() ?? 0
-                    print("[ScrollTest][SCROLL-FETCH] provider.loadPrev SERVER-OK before=\(messageId) count=\(messages.count) firstId=\(_firstId) lastId=\(_lastId) limit=\(query.limit)")
                     self.store(
                         messages: messages,
                         triggerMessage: messageId,
-                        completion: { error in
-                            print("[ScrollTest][SCROLL-FETCH] provider.loadPrev DB-WRITE-DONE before=\(messageId) count=\(messages.count) error=\(error.map { "\($0)" } ?? "nil")")
-                            completion?(error)
-                        }
+                        completion: completion
                     )
                     self.sendReceivedMarker(messages: messages)
                 }
             } else {
-                print("[ScrollTest][SCROLL-FETCH] provider.loadPrev QUERY-IN-PROGRESS before=\(messageId)")
                 completion?(SceytChatError.queryInProgress)
             }
         }
@@ -227,22 +197,16 @@ open class ChannelMessageProvider: DataProvider {
         query: MessageListQuery,
         near messageId: MessageId,
         completion: (([Message]?, Error?) -> Void)? = nil) {
-            print("[ScrollTest][SCROLL-FETCH] provider.loadNear REQUEST near=\(messageId) limit=\(query.limit)")
             loadNearMessagesWithRetry(query: query, messageId: messageId)
             { messages, error in
                 guard let messages = messages
                 else {
-                    print("[ScrollTest][SCROLL-FETCH] provider.loadNear SERVER-ERROR near=\(messageId) error=\(error.map { "\($0)" } ?? "nil")")
                     completion?(nil, error)
                     return
                 }
-                let _firstId = messages.map { $0.id }.min() ?? 0
-                let _lastId = messages.map { $0.id }.max() ?? 0
-                print("[ScrollTest][SCROLL-FETCH] provider.loadNear SERVER-OK near=\(messageId) count=\(messages.count) firstId=\(_firstId) lastId=\(_lastId)")
                 self.store(
                     messages: messages,
                     completion: { _ in
-                        print("[ScrollTest][SCROLL-FETCH] provider.loadNear DB-WRITE-DONE near=\(messageId) count=\(messages.count)")
                         completion?(messages, nil)
                     }
                 )
@@ -773,7 +737,6 @@ open class ChannelMessageProvider: DataProvider {
     ) {
         guard !ids.isEmpty else { return }
         if storeForResend {
-            print("[ScrollTest][SCROLL-MARKER] markMessagesAsReceived.writePending count=\(ids.count) channelId=\(self.channelId)")
             database.write ({
                 $0.update(messagePendingMarkers: ids, markerName: DefaultMarker.received.rawValue)
             })
@@ -786,13 +749,12 @@ open class ChannelMessageProvider: DataProvider {
                 completion?(error)
                 return
             }
-            print("[ScrollTest][SCROLL-MARKER] markMessagesAsReceived.writeSelfMarkers count=\(markerList.messageIds.count) channelId=\(self.channelId)")
             self.database.write ({
                 $0.update(messageSelfMarkers: markerList)
             }, completion: completion)
         }
     }
-    
+
     open func markMessagesAsDisplayed(
         ids: [MessageId],
         storeForResend: Bool = true,
@@ -800,7 +762,6 @@ open class ChannelMessageProvider: DataProvider {
     ) {
         guard !ids.isEmpty else { return }
         if storeForResend {
-            print("[ScrollTest][SCROLL-MARKER] markMessagesAsDisplayed.writePending count=\(ids.count) channelId=\(self.channelId)")
             database.write ({
                 $0.update(messagePendingMarkers: ids, markerName: DefaultMarker.displayed.rawValue)
             })
@@ -813,13 +774,12 @@ open class ChannelMessageProvider: DataProvider {
                 completion?(error)
                 return
             }
-            print("[ScrollTest][SCROLL-MARKER] markMessagesAsDisplayed.writeSelfMarkers count=\(markerList.messageIds.count) channelId=\(self.channelId)")
             self.database.write ({
                 $0.update(messageSelfMarkers: markerList)
             }, completion: completion)
         }
     }
-    
+
     open func markMessages(
         markerName: String,
         ids: [MessageId],
@@ -828,7 +788,6 @@ open class ChannelMessageProvider: DataProvider {
     ) {
         guard !ids.isEmpty else { return }
         if storeForResend {
-            print("[ScrollTest][SCROLL-MARKER] markMessages.writePending count=\(ids.count) marker=\(markerName) channelId=\(self.channelId)")
             database.write ({
                 $0.update(messagePendingMarkers: ids, markerName: markerName)
             })
@@ -842,7 +801,6 @@ open class ChannelMessageProvider: DataProvider {
                 completion?(error)
                 return
             }
-            print("[ScrollTest][SCROLL-MARKER] markMessages.writeSelfMarkers count=\(markerList.messageIds.count) marker=\(markerName) channelId=\(self.channelId)")
             self.database.write ({
                 $0.update(messageSelfMarkers: markerList)
             }, completion: completion)
