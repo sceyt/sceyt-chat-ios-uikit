@@ -1255,6 +1255,11 @@ open class ChannelViewController: ViewController,
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         isStartedDragging = true
         pinnedScrollMessageId = 0
+        // Drag starting while pinned to the top reopens the prev-fetch gate so a
+        // failed server page can be retried once connectivity returns.
+        if scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top {
+            itemsAboveAtLastPrevFetch = .max
+        }
     }
     
     open func scrollViewWillEndDragging(
