@@ -35,7 +35,7 @@ extension GlobalSearchMessageCell: AppearanceProviding {
         titleFormatter: AnyChannelFormatting(SceytChatUIKit.shared.formatters.channelNameFormatter),
         avatarRenderer: AnyChannelAvatarRendering(SceytChatUIKit.shared.avatarRenderers.channelAvatarRenderer),
         avatarAppearance: AvatarAppearance.standard,
-        channelDateFormatter: SceytChatUIKit.shared.formatters.channelDateFormatter
+        dateFormatter: SceytChatUIKit.shared.formatters.globalSearchMessageDateFormatter
     )
 
     public class Appearance: CellAppearance<AnyChannelFormatting, AnyChannelFormatting, AnyChannelAvatarRendering> {
@@ -56,7 +56,7 @@ extension GlobalSearchMessageCell: AppearanceProviding {
         public var highlightedBodyLabelAppearance: LabelAppearance
 
         @Trackable<Appearance, any DateFormatting>
-        public var channelDateFormatter: any DateFormatting
+        public var dateFormatter: any DateFormatting
 
         public init(
             backgroundColor: UIColor,
@@ -69,14 +69,14 @@ extension GlobalSearchMessageCell: AppearanceProviding {
             titleFormatter: AnyChannelFormatting,
             avatarRenderer: AnyChannelAvatarRendering,
             avatarAppearance: AvatarAppearance,
-            channelDateFormatter: any DateFormatting
+            dateFormatter: any DateFormatting
         ) {
             self._backgroundColor = Trackable(value: backgroundColor)
             self._separatorColor = Trackable(value: separatorColor)
             self._dateLabelAppearance = Trackable(value: dateLabelAppearance)
             self._senderNameLabelAppearance = Trackable(value: senderNameLabelAppearance)
             self._highlightedBodyLabelAppearance = Trackable(value: highlightedBodyLabelAppearance)
-            self._channelDateFormatter = Trackable(value: channelDateFormatter)
+            self._dateFormatter = Trackable(value: dateFormatter)
             super.init(
                 titleLabelAppearance: titleLabelAppearance,
                 subtitleLabelAppearance: subtitleLabelAppearance,
@@ -99,14 +99,14 @@ extension GlobalSearchMessageCell: AppearanceProviding {
             titleFormatter: AnyChannelFormatting? = nil,
             avatarRenderer: AnyChannelAvatarRendering? = nil,
             avatarAppearance: AvatarAppearance? = nil,
-            channelDateFormatter: (any DateFormatting)? = nil
+            dateFormatter: (any DateFormatting)? = nil
         ) {
             self._backgroundColor = Trackable(reference: reference, referencePath: \.backgroundColor)
             self._separatorColor = Trackable(reference: reference, referencePath: \.separatorColor)
             self._dateLabelAppearance = Trackable(reference: reference, referencePath: \.dateLabelAppearance)
             self._senderNameLabelAppearance = Trackable(reference: reference, referencePath: \.senderNameLabelAppearance)
             self._highlightedBodyLabelAppearance = Trackable(reference: reference, referencePath: \.highlightedBodyLabelAppearance)
-            self._channelDateFormatter = Trackable(reference: reference, referencePath: \.channelDateFormatter)
+            self._dateFormatter = Trackable(reference: reference, referencePath: \.dateFormatter)
             super.init(
                 titleLabelAppearance: titleLabelAppearance ?? reference.titleLabelAppearance,
                 subtitleLabelAppearance: subtitleLabelAppearance ?? reference.subtitleLabelAppearance,
@@ -121,7 +121,7 @@ extension GlobalSearchMessageCell: AppearanceProviding {
             if let dateLabelAppearance { self.dateLabelAppearance = dateLabelAppearance }
             if let senderNameLabelAppearance { self.senderNameLabelAppearance = senderNameLabelAppearance }
             if let highlightedBodyLabelAppearance { self.highlightedBodyLabelAppearance = highlightedBodyLabelAppearance }
-            if let channelDateFormatter { self.channelDateFormatter = channelDateFormatter }
+            if let dateFormatter { self.dateFormatter = dateFormatter }
         }
     }
 }
