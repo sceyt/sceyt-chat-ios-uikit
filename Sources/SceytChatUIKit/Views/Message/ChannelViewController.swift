@@ -181,7 +181,7 @@ open class ChannelViewController: ViewController,
         updateUnreadViewVisibility()
 
         collectionView.collectionViewLayout.invalidateLayout()
-
+        showEmptyViewIfNeeded()
     }
     
     override open func viewDidAppear(_ animated: Bool) {
@@ -400,7 +400,7 @@ open class ChannelViewController: ViewController,
         unreadCountView.parentAppearance = appearance.scrollDownAppearance
         unreadMentionCountView.parentAppearance = appearance.unreadMentionCountAppearance
         emptyStateView.parentAppearance = appearance.emptyStateAppearance
-        emptyStateView.isHidden = true
+        showEmptyViewIfNeeded()
         searchControlsView.parentAppearance = Components.messageInputViewController.appearance.messageSearchControlsAppearance
         bottomView.parentAppearance = Components.messageInputViewController.appearance.coverAppearance
         selectingView.parentAppearance = Components.messageInputViewController.appearance.selectedMessagesActionsAppearance
@@ -2605,7 +2605,8 @@ open class ChannelViewController: ViewController,
     
     open func showEmptyViewIfNeeded() {
         emptyStateView.isHidden =
-        channelViewModel.numberOfSections > 0
+        !channelViewModel.hasLoadedInitialMessages
+        || channelViewModel.numberOfSections > 0
         || channelViewModel.scrollToMessageIdIfSearching != 0
         || channelViewModel.scrollToRepliedMessageId != 0
     }

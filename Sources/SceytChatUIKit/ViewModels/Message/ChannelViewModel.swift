@@ -107,6 +107,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     public private(set) var lastDisplayedMessageId: MessageId = 0
     public private(set) var selectedMessageForAction: (ChatMessage, MessageAction)?
+    public private(set) var hasLoadedInitialMessages: Bool = false
     public static var messagesFetchLimit: UInt = 50
 
     open var canUpdateUnreadPosition = true
@@ -626,6 +627,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
 
             if isInitial {
+                markInitialMessagesLoaded()
                 let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId :
                                scrollToUnreadMentionMessageId != 0 ? scrollToUnreadMentionMessageId : lastDisplayedMessageId
                 let batchIds = items.changeItems.compactMap { $0.item?.id }
@@ -1006,8 +1008,15 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         ) { [weak self] error in
             guard let self else { return }
             isFetchingData = false
+            markInitialMessagesLoaded()
             event = .providerFinishedPrevPagination(beforeMessageId: messageId)
         }
+    }
+
+    private func markInitialMessagesLoaded() {
+        guard !hasLoadedInitialMessages else { return }
+        hasLoadedInitialMessages = true
+        event = .showNoMessage
     }
 
     open func fetchPrevMessagesFromDB(before messageId: MessageId, done: (() -> Void)? = nil) {
