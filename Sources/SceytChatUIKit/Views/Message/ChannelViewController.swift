@@ -2263,8 +2263,46 @@ open class ChannelViewController: ViewController,
             // If the collection view's current count + the diff's inserts/deletes
             // doesn't match the view model's current count, the data source has
             // advanced past this diff — fall back to reloadData to avoid a crash.
-            let expectedSectionCount = collectionView.numberOfSections + sectionInserts.count - sectionDeletes.count
-            if expectedSectionCount != channelViewModel.numberOfSections {
+            let liveSectionCount = collectionView.numberOfSections
+            let expectedSectionCount = liveSectionCount + sectionInserts.count - sectionDeletes.count
+            var inconsistent = expectedSectionCount != channelViewModel.numberOfSections
+
+            // Per-section item-count check. Skipped when section inserts/deletes
+            // are present, since index shifts would make a precise per-section
+            // calculation fragile; in that case the total-item check below covers it.
+            if !inconsistent, sectionInserts.isEmpty, sectionDeletes.isEmpty {
+                let vmSectionCount = channelViewModel.numberOfSections
+                for s in 0..<liveSectionCount {
+                    guard s < vmSectionCount else {
+                        inconsistent = true
+                        break
+                    }
+                    let inS = inserts.lazy.filter { $0.section == s }.count
+                    let outS = deletes.lazy.filter { $0.section == s }.count
+                    let mIn = moves.lazy.filter { $0.to.section == s && $0.from.section != s }.count
+                    let mOut = moves.lazy.filter { $0.from.section == s && $0.to.section != s }.count
+                    let expected = collectionView.numberOfItems(inSection: s) + inS - outS + mIn - mOut
+                    if expected != channelViewModel.numberOfMessages(in: s) {
+                        inconsistent = true
+                        break
+                    }
+                }
+            } else if !inconsistent {
+                // Total-item fallback for the section-insert/delete case.
+                var cvTotal = 0
+                for s in 0..<liveSectionCount {
+                    cvTotal += collectionView.numberOfItems(inSection: s)
+                }
+                var vmTotal = 0
+                for s in 0..<channelViewModel.numberOfSections {
+                    vmTotal += channelViewModel.numberOfMessages(in: s)
+                }
+                if cvTotal + inserts.count - deletes.count != vmTotal {
+                    inconsistent = true
+                }
+            }
+
+            if inconsistent {
                 let savedOffset = collectionView.contentOffset
                 let savedContentHeight = collectionView.contentSize.height
                 collectionView.reloadData()
