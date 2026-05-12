@@ -172,6 +172,7 @@ open class ChannelViewController: ViewController,
     private var selectMessageId: MessageId?
     private var pinnedScrollMessageId: MessageId = 0
     private let impactFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+    private var pendingInconsistencyReload: DispatchWorkItem?
     
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -1478,11 +1479,11 @@ open class ChannelViewController: ViewController,
                 channelViewModel.createLayoutModels(at: [indexPath]).first
         else {
             logger.error("[MEESS] not found \(indexPath), lm: \(channelViewModel.layoutModel(at: indexPath)), ms: \(channelViewModel.message(at: indexPath)), lms: \(channelViewModel.createLayoutModels(at: [indexPath]))")
+            scheduleInconsistencyReload()
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: Components.channelIncomingMessageCell.reuseId,
                 for: indexPath
             )
-            cell.contentView.subviews.forEach({ $0.isHidden = true })
             return cell
         }
         
@@ -1630,7 +1631,25 @@ open class ChannelViewController: ViewController,
         channelViewModel.downloadMessageAttachmentsIfNeeded(layoutModel: model)
         return cell
     }
-    
+
+    private func scheduleInconsistencyReload() {
+        pendingInconsistencyReload?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingInconsistencyReload = nil
+            guard !self.isCollectionViewUpdating else {
+                self.scheduleInconsistencyReload()
+                return
+            }
+            let offset = self.collectionView.contentOffset
+            self.collectionView.reloadData()
+            self.collectionView.layoutIfNeeded()
+            self.collectionView.setContentOffset(offset, animated: false)
+        }
+        pendingInconsistencyReload = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: work)
+    }
+
     open func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         guard channelViewModel.canSelectMessage(at: indexPath)
         else { return }
