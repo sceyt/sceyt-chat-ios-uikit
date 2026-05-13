@@ -1289,11 +1289,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open func markChannelAsDisplayed() {
-//        channelProvider
-//            .markAs(read: true)
-//        if let id = channel.lastMessage?.id {
-//            provider.markMessagesAsDisplayed(ids: [id])
-//        }
+        channelProvider
+            .markAs(read: true)
+        if let id = channel.lastMessage?.id {
+            provider.markMessagesAsDisplayed(ids: [id])
+        }
     }
     
     //MARK: Send message
