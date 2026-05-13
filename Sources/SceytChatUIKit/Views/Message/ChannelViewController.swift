@@ -2326,6 +2326,15 @@ open class ChannelViewController: ViewController,
                 }
             }
 
+            if !inconsistent {
+                let moveSources = moves.map(\.from)
+                let moveDestinations = moves.map(\.to)
+                if Set(moveSources).count != moveSources.count ||
+                   Set(moveDestinations).count != moveDestinations.count {
+                    inconsistent = true
+                }
+            }
+
             if inconsistent {
                 let savedOffset = collectionView.contentOffset
                 let savedContentHeight = collectionView.contentSize.height
