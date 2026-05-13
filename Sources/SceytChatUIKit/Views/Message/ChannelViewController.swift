@@ -2353,7 +2353,6 @@ open class ChannelViewController: ViewController,
             if isTopPagination {
                 collectionView.layout.preBatchContentHeight = collectionView.contentSize.height
                 collectionView.layout.isAdjustingForTopInserts = true
-                logger.info("[topInsertOffset] VC pre-batch contentSize=\(collectionView.contentSize) contentOffset=\(collectionView.contentOffset.y) inserts=\(inserts.count) sectionInserts=\(sectionInserts.count) deletes=\(deletes.count) sectionDeletes=\(sectionDeletes.count) reloads=\(reloads.count) moves=\(moves.count)")
             }
 
             let updates: () -> Void = { [weak self] in
@@ -2391,7 +2390,6 @@ open class ChannelViewController: ViewController,
                     let postOffset = self.collectionView.contentOffset.y
                     let actualHeightDelta = postSize.height - contentHeightBeforeInsertion
                     let actualOffsetDelta = postOffset - offsetBeforeInsertion
-                    logger.info("[topInsertOffset] VC post-batch contentSize=\(postSize) contentOffset=\(postOffset) actualHeightDelta=\(actualHeightDelta) actualOffsetDelta=\(actualOffsetDelta) (height vs offset delta should match if anchoring is correct)")
                     if self.pinnedScrollMessageId != 0,
                        let pinnedIndexPath = self.channelViewModel.indexPathOf(messageId: self.pinnedScrollMessageId) {
                         self.collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
