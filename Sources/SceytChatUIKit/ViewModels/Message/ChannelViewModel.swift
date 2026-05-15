@@ -768,6 +768,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     open func numberOfMessages(in section: Int) -> Int {
         messageObserver.numberOfItems(in: section)
     }
+
+    /// Identifier for the section at `section`, derived from
+    /// `LazyMessagesObserver`'s `sectionNameKeyPath`
+    /// (currently `MessageDTO.daySectionIdentifier`). Used by the view layer
+    /// for diff-based snapshot reconciliation — sections that compare equal
+    /// across snapshots are treated as the same section, even if their index
+    /// changed. Falls back to the section index when the observer hasn't
+    /// populated the section yet (a transient state during inserts).
+    open func sectionName(at section: Int) -> AnyHashable {
+        messageObserver.sectionName(at: section) ?? AnyHashable(section)
+    }
     
     open func isLastMessage(at indexPath: IndexPath) -> Bool {
         messageObserver.item(at: indexPath)?.id == channel.lastMessage?.id
@@ -3013,34 +3024,48 @@ private extension ChannelViewModel {
 }
 
 public extension ChannelViewModel {
-    
+
     struct Key: Equatable, Hashable {
         private let id: MessageId
         private let tid: Int64
-        
+
         public init(message: ChatMessage) {
             id = message.id
             tid = message.tid
         }
-        
+
         public init(messageId: MessageId) {
             id = messageId
             tid = 0
         }
-        
+
         public static func == (lhs: Self, rhs: Self) -> Bool {
             if lhs.tid != 0, rhs.tid != 0 {
                 return lhs.tid == rhs.tid
             }
             return lhs.id == rhs.id
         }
-        
+
         public func hash(into hasher: inout Hasher) {
             if tid != 0 {
                 hasher.combine(tid)
             } else if id > 0 {
                 hasher.combine(id)
             }
+        }
+    }
+
+    /// Stable identifier for a section in the snapshot. Wraps whatever the
+    /// observer's `sectionNameKeyPath` yields (today: an `Int` representing
+    /// the start-of-day Unix timestamp from `MessageDTO.daySectionIdentifier`).
+    /// Two sections compare equal when their underlying day identifier is the
+    /// same, which lets the diff treat them as the same section across
+    /// snapshots even if their position shifted.
+    struct SectionId: Hashable {
+        public let name: AnyHashable
+
+        public init(name: AnyHashable) {
+            self.name = name
         }
     }
 

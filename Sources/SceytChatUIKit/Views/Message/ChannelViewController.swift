@@ -197,7 +197,11 @@ open class ChannelViewController: ViewController,
     /// directly. This guarantees that the batch-update count math
     /// `oldCount + inserts − deletes == newCount` holds by construction,
     /// instead of being checked heuristically post-hoc.
-    private var appliedSnapshot: [[ChannelViewModel.Key]] = []
+    ///
+    /// Sections carry identity (`SectionId`) so the Phase 2 diff can match
+    /// sections across snapshots even when their index shifts. Items are still
+    /// keyed by `ChannelViewModel.Key` (tid/id-based).
+    internal var appliedSnapshot: AppliedSnapshot = .empty
     
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
@@ -1487,15 +1491,18 @@ open class ChannelViewController: ViewController,
     
     // MARK: Applied snapshot helpers
 
-    /// Rebuild `appliedSnapshot` from the observer's current state. Call this
-    /// immediately before any `collectionView.reloadData()` that follows a state
-    /// change (initial load, restart, reload events) so the data source counts
-    /// reflect what's about to be rendered.
-    open func rebuildAppliedSnapshotFromObserver() {
-        let sections = channelViewModel.numberOfSections
-        var snap: [[ChannelViewModel.Key]] = []
-        snap.reserveCapacity(sections)
-        for s in 0..<sections {
+    /// Pure builder — reads the observer's current state and returns a fresh
+    /// `AppliedSnapshot` without touching any view-controller state. Used by
+    /// `rebuildAppliedSnapshotFromObserver()` and (post-Phase 2) by the
+    /// snapshot-diff pipeline to compute the target state for each batch.
+    internal func buildSnapshotFromObserver() -> AppliedSnapshot {
+        let sectionCount = channelViewModel.numberOfSections
+        var sections: [ChannelViewModel.SectionId] = []
+        var items: [[ChannelViewModel.Key]] = []
+        sections.reserveCapacity(sectionCount)
+        items.reserveCapacity(sectionCount)
+        for s in 0..<sectionCount {
+            sections.append(.init(name: channelViewModel.sectionName(at: s)))
             let n = channelViewModel.numberOfMessages(in: s)
             var section: [ChannelViewModel.Key] = []
             section.reserveCapacity(n)
@@ -1508,18 +1515,26 @@ open class ChannelViewController: ViewController,
                     section.append(.init(messageId: 0))
                 }
             }
-            snap.append(section)
+            items.append(section)
         }
-        appliedSnapshot = snap
+        return AppliedSnapshot(sections: sections, items: items)
+    }
+
+    /// Rebuild `appliedSnapshot` from the observer's current state. Call this
+    /// immediately before any `collectionView.reloadData()` that follows a state
+    /// change (initial load, restart, reload events) so the data source counts
+    /// reflect what's about to be rendered.
+    open func rebuildAppliedSnapshotFromObserver() {
+        appliedSnapshot = buildSnapshotFromObserver()
     }
 
     /// Look up the `Key` at an index path in the applied snapshot. Returns nil
     /// if the index path is out of bounds for the snapshot.
     open func snapshotKey(at indexPath: IndexPath) -> ChannelViewModel.Key? {
-        guard indexPath.section < appliedSnapshot.count,
-              indexPath.item < appliedSnapshot[indexPath.section].count
+        guard indexPath.section < appliedSnapshot.sectionCount,
+              indexPath.item < appliedSnapshot.items[indexPath.section].count
         else { return nil }
-        return appliedSnapshot[indexPath.section][indexPath.item]
+        return appliedSnapshot.items[indexPath.section][indexPath.item]
     }
 
     /// Look up a layout model via the snapshot. Falls back to the observer-based
@@ -1547,9 +1562,9 @@ open class ChannelViewController: ViewController,
         // Capture keys at move-from positions in pre-state before any removals.
         var movedKeys: [IndexPath: ChannelViewModel.Key] = [:]
         for move in paths.moves {
-            guard move.from.section < oldSnap.count,
-                  move.from.item < oldSnap[move.from.section].count else { continue }
-            movedKeys[move.to] = oldSnap[move.from.section][move.from.item]
+            guard move.from.section < oldSnap.items.count,
+                  move.from.item < oldSnap.items[move.from.section].count else { continue }
+            movedKeys[move.to] = oldSnap.items[move.from.section][move.from.item]
         }
 
         // Group per-section item removals (deletes + move-froms) for fast filtering.
@@ -1561,29 +1576,41 @@ open class ChannelViewController: ViewController,
             removedItemsBySection[move.from.section, default: []].insert(move.from.item)
         }
 
-        // Walk pre-state, keeping non-deleted sections and within them
-        // non-deleted/non-moved items.
-        var newSnap: [[ChannelViewModel.Key]] = []
-        newSnap.reserveCapacity(oldSnap.count)
-        for (preS, items) in oldSnap.enumerated() {
+        // Walk pre-state, keeping non-deleted sections (preserving their
+        // identity) and within them non-deleted/non-moved items.
+        var newSections: [ChannelViewModel.SectionId] = []
+        var newItems: [[ChannelViewModel.Key]] = []
+        newSections.reserveCapacity(oldSnap.sectionCount)
+        newItems.reserveCapacity(oldSnap.sectionCount)
+        for (preS, items) in oldSnap.items.enumerated() {
             guard !deletedSections.contains(preS) else { continue }
+            let sectionId = oldSnap.sections[preS]
             let removed = removedItemsBySection[preS] ?? []
+            newSections.append(sectionId)
             if removed.isEmpty {
-                newSnap.append(items)
+                newItems.append(items)
             } else {
                 var survivors: [ChannelViewModel.Key] = []
                 survivors.reserveCapacity(items.count - removed.count)
                 for (i, key) in items.enumerated() where !removed.contains(i) {
                     survivors.append(key)
                 }
-                newSnap.append(survivors)
+                newItems.append(survivors)
             }
         }
 
         // Insert new (post-state) sections in ascending order. Each insert shifts
-        // the subsequent ones, which is correct for ascending traversal.
+        // the subsequent ones, which is correct for ascending traversal. The
+        // section identity is read from the observer at the post-state index —
+        // the observer has already advanced past this transition, so its
+        // current `section[i]` corresponds to the post-state `section[i]`.
         for s in paths.sectionInserts.sorted() {
-            newSnap.insert([], at: min(s, newSnap.count))
+            let target = min(s, newSections.count)
+            let sectionId = ChannelViewModel.SectionId(
+                name: channelViewModel.sectionName(at: target)
+            )
+            newSections.insert(sectionId, at: target)
+            newItems.insert([], at: target)
         }
 
         // Insert new items + move destinations in post-state ascending order.
@@ -1605,15 +1632,15 @@ open class ChannelViewController: ViewController,
         }
         insertions.sort { $0.to < $1.to }
         for ins in insertions {
-            guard ins.to.section < newSnap.count else { continue }
-            let target = min(ins.to.item, newSnap[ins.to.section].count)
-            newSnap[ins.to.section].insert(ins.key, at: target)
+            guard ins.to.section < newItems.count else { continue }
+            let target = min(ins.to.item, newItems[ins.to.section].count)
+            newItems[ins.to.section].insert(ins.key, at: target)
         }
 
         // Reloads don't change structure; cells re-fetch via cellForItemAt and
         // get the new content through the same key lookup.
 
-        appliedSnapshot = newSnap
+        appliedSnapshot = AppliedSnapshot(sections: newSections, items: newItems)
     }
 
     /// Check whether `paths` can be applied on top of `appliedSnapshot` to reach
@@ -1621,14 +1648,46 @@ open class ChannelViewController: ViewController,
     /// have been lost (e.g. Combine subscription dropped events before subscribe)
     /// — in that case the caller should rebuild from the observer instead.
     open func canReconcile(_ paths: CollectionUpdateIndexPaths) -> Bool {
-        let expectedSections = appliedSnapshot.count
+        let observerSectionCounts = (0..<channelViewModel.numberOfSections).map {
+            channelViewModel.numberOfMessages(in: $0)
+        }
+        return Self.canReconcile(
+            snapshot: appliedSnapshot.items,
+            observerSectionCounts: observerSectionCounts,
+            paths: paths
+        )
+    }
+
+    /// Pure-function implementation of `canReconcile`. Takes the snapshot and
+    /// observer state explicitly so the validation logic can be unit-tested in
+    /// isolation without a live `ChannelViewController` / `ChannelViewModel`.
+    ///
+    /// Validation passes (fail-fast, top to bottom):
+    ///   1. Section count math (pre + sectionInserts − sectionDeletes == post).
+    ///   2. Move-pair uniqueness (UIKit requires distinct sources, distinct destinations).
+    ///   3. Pre-state index bounds (deletes, reloads, move-froms).
+    ///   4. Post-state index bounds (inserts, move-tos).
+    ///   5. Reload disjointness vs deletes and move-froms.
+    ///   6. Delete vs move-from, insert vs move-to disjointness.
+    ///   7. Per-section item count math (existing).
+    ///
+    /// Each pass eliminates a class of `NSInternalInconsistencyException`
+    /// crash UIKit would otherwise raise from `performBatchUpdates`. See
+    /// CAN_RECONCILE_HARDENING_PLAN.md and the test suite for the catalog.
+    internal static func canReconcile(
+        snapshot: [[ChannelViewModel.Key]],
+        observerSectionCounts: [Int],
+        paths: CollectionUpdateIndexPaths
+    ) -> Bool {
+        // 1. Section count.
+        let expectedSections = snapshot.count
             + paths.sectionInserts.count
             - paths.sectionDeletes.count
-        guard expectedSections == channelViewModel.numberOfSections else {
+        guard expectedSections == observerSectionCounts.count else {
             return false
         }
 
-        // Move uniqueness: UIKit requires distinct from/to pairs.
+        // 2. Move-pair uniqueness.
         let moveSources = paths.moves.map(\.from)
         let moveDestinations = paths.moves.map(\.to)
         guard Set(moveSources).count == moveSources.count,
@@ -1636,26 +1695,83 @@ open class ChannelViewController: ViewController,
             return false
         }
 
-        // When no section ops, sections are 1:1 pre-to-post — per-section item
-        // counts can be checked directly.
+        // 3. Pre-state index bounds. `deletes`, `reloads`, and `moves.from`
+        // use pre-batch index paths — every index must point inside `snapshot`.
+        for ip in paths.deletes {
+            guard ip.section >= 0,
+                  ip.section < snapshot.count,
+                  ip.item >= 0,
+                  ip.item < snapshot[ip.section].count
+            else { return false }
+        }
+        for ip in paths.reloads {
+            guard ip.section >= 0,
+                  ip.section < snapshot.count,
+                  ip.item >= 0,
+                  ip.item < snapshot[ip.section].count
+            else { return false }
+        }
+        for move in paths.moves {
+            guard move.from.section >= 0,
+                  move.from.section < snapshot.count,
+                  move.from.item >= 0,
+                  move.from.item < snapshot[move.from.section].count
+            else { return false }
+        }
+
+        // 4. Post-state index bounds. `inserts` and `moves.to` use post-batch
+        // index paths — every index must fit in the observer's claimed state.
+        // `<=` is intentional for `item`: inserting at the end (item == count)
+        // is valid; item > count is not.
+        for ip in paths.inserts {
+            guard ip.section >= 0,
+                  ip.section < observerSectionCounts.count,
+                  ip.item >= 0,
+                  ip.item <= observerSectionCounts[ip.section]
+            else { return false }
+        }
+        for move in paths.moves {
+            guard move.to.section >= 0,
+                  move.to.section < observerSectionCounts.count,
+                  move.to.item >= 0,
+                  move.to.item <= observerSectionCounts[move.to.section]
+            else { return false }
+        }
+
+        // 5. Reload disjointness. UIKit raises NSException when an index path
+        // appears in both `reloads` and `deletes`, or when a reload targets
+        // an index that is also a move source.
+        let deletedSet = Set(paths.deletes)
+        let moveFromSet = Set(paths.moves.map(\.from))
+        let moveToSet = Set(paths.moves.map(\.to))
+        for ip in paths.reloads {
+            if deletedSet.contains(ip) || moveFromSet.contains(ip) {
+                return false
+            }
+        }
+
+        // 6. Delete/insert vs move disjointness. An index path cannot be both
+        // a delete and a move source, or both an insert and a move destination.
+        for ip in paths.deletes where moveFromSet.contains(ip) { return false }
+        for ip in paths.inserts where moveToSet.contains(ip) { return false }
+
+        // 7. Per-section item count math. When no section ops, sections are
+        // 1:1 pre-to-post — check each section directly. With section ops,
+        // fall back to total-item comparison.
         if paths.sectionInserts.isEmpty, paths.sectionDeletes.isEmpty {
-            for s in 0..<appliedSnapshot.count {
+            for s in 0..<snapshot.count {
                 let inS = paths.inserts.lazy.filter { $0.section == s }.count
                 let outS = paths.deletes.lazy.filter { $0.section == s }.count
                 let mIn = paths.moves.lazy.filter { $0.to.section == s && $0.from.section != s }.count
                 let mOut = paths.moves.lazy.filter { $0.from.section == s && $0.to.section != s }.count
-                let expected = appliedSnapshot[s].count + inS - outS + mIn - mOut
-                if expected != channelViewModel.numberOfMessages(in: s) {
+                let expected = snapshot[s].count + inS - outS + mIn - mOut
+                if expected != observerSectionCounts[s] {
                     return false
                 }
             }
         } else {
-            // Section ops shift indices — fall back to total-item count comparison.
-            let snapshotTotal = appliedSnapshot.reduce(0) { $0 + $1.count }
-            var observerTotal = 0
-            for s in 0..<channelViewModel.numberOfSections {
-                observerTotal += channelViewModel.numberOfMessages(in: s)
-            }
+            let snapshotTotal = snapshot.reduce(0) { $0 + $1.count }
+            let observerTotal = observerSectionCounts.reduce(0, +)
             if snapshotTotal + paths.inserts.count - paths.deletes.count != observerTotal {
                 return false
             }
@@ -1667,15 +1783,15 @@ open class ChannelViewController: ViewController,
     // MARK: UICollectionViewDataSource
 
     open func numberOfSections(in collectionView: UICollectionView) -> Int {
-        appliedSnapshot.count
+        appliedSnapshot.sectionCount
     }
 
     open func collectionView(
         _ collectionView: UICollectionView,
         numberOfItemsInSection section: Int
     ) -> Int {
-        guard section < appliedSnapshot.count else { return 0 }
-        return appliedSnapshot[section].count
+        guard section < appliedSnapshot.sectionCount else { return 0 }
+        return appliedSnapshot.items[section].count
     }
     
     open func collectionView(
@@ -2407,43 +2523,59 @@ open class ChannelViewController: ViewController,
     open func onEvent(_ event: ChannelViewModel.Event) {
         switch event {
         case .update(let paths):
-            // Single-flight queue. If a batch is animating, the just-arrived diff
-            // could fire UIKit's "operations queued while a batch is in flight"
-            // misbehavior. Park it and drain after the batch finishes (see
-            // isCollectionViewUpdating.didSet).
+            // Single-flight queue. If a batch is animating, the just-arrived
+            // diff could fire UIKit's "operations queued while a batch is in
+            // flight" misbehavior. Park it and drain after the batch finishes
+            // (see isCollectionViewUpdating.didSet → applyPendingUpdate →
+            // onEvent(.update)). The cached `paths` is replayed only for its
+            // policy hints (continuesOptions, etc.); a fresh diff is computed
+            // against the latest observer state at drain time.
             if isCollectionViewUpdating {
                 pendingUpdate = .diff(paths)
                 return
             }
 
-            // Reconciliation gate. The snapshot must be in sync with the observer
-            // such that applying `paths` exactly bridges them. If they disagree
-            // (e.g. Combine `@Published` dropped intermediate diffs before the
-            // view subscribed — see ChannelViewController.setupDone:510), the
-            // batch math would fail. Fall back to a full rebuild instead of
-            // crashing. The next observer fire will start a fresh sequence.
-            if !canReconcile(paths) {
-                rebuildAppliedSnapshotFromObserver()
-                collectionView.reloadData()
-                updateUnreadViewVisibility()
-                showEmptyViewIfNeeded()
+            // ── Snapshot-diff pipeline (Phase 2/3 of SNAPSHOT_DIFF_MIGRATION_PLAN.md). ──
+            // Build the target snapshot from the observer NOW, then compute a
+            // fresh diff against the currently-applied snapshot. The diff is a
+            // pure function of the two snapshots, so the batch-update math is
+            // consistent by construction — no matter how many intermediate
+            // observer events were coalesced or how stale `paths` has become.
+            let newSnapshot = buildSnapshotFromObserver()
+            let diff = Self.computeDiff(
+                from: appliedSnapshot,
+                to: newSnapshot,
+                reloadHints: Set(paths.reloads)
+            )
+
+            // No structural or content change → cheap exit. Keeps the
+            // single-flight queue from spinning on no-op events.
+            guard !diff.isEmpty else {
                 return
             }
 
-            var inserts = paths.inserts.sorted()
-            let reloads = paths.reloads.sorted()
-            let deletes = paths.deletes.sorted()
-            let moves = paths.moves
-            let sectionInserts = paths.sectionInserts
-            let sectionDeletes = paths.sectionDeletes
+            // Note: we deliberately do NOT validate `diff` against the legacy
+            // `canReconcile` gate. canReconcile's section-ops fallback uses a
+            // total-item-count check that has false positives when sections
+            // come/go, and its reload-disjointness pass collides with stale
+            // observer reload hints that computeDiff filters separately. The
+            // diff is correct by construction (covered by the property tests
+            // in `SnapshotDiffTests`); the NSException catch in
+            // `MessagesCollectionView.performUpdates` is the runtime safety net.
+
+            // Policy hints — derive from the freshly-computed diff (structural
+            // ops the user will actually see) and the observer-supplied paths
+            // (semantic info like "this was a top pagination").
+            let diffInserts = diff.inserts
+            let diffMoves = diff.moves
             let continuesOptions = paths.continuesOptions
             var needsToScrollBottom = false
 
             showEmptyViewIfNeeded()
-            
+
             if let unreadMessageIndexPath, checkOnlyFirstTimeReceivedMessagesFromArchive {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
-                if inserts.count == 1,
+                if diffInserts.count == 1,
                    collectionView.lastIndexPath == collectionView.lastVisibleIndexPath {
                     isStartedDragging = true
                 } else {
@@ -2477,7 +2609,7 @@ open class ChannelViewController: ViewController,
                     }
                     return false
                 }
-                guard let last = inserts.last,
+                guard let last = diffInserts.last,
                       let lastIndexPath = collectionView.lastIndexPath
                 else { return false }
                 return !isOneItem && last >= lastIndexPath
@@ -2491,7 +2623,7 @@ open class ChannelViewController: ViewController,
                 else { return false }
                 return lastVisible == lastIndexPath
             }()
-            var animatedScroll = inserts.count == 1
+            var animatedScroll = diffInserts.count == 1
             if isScrollingBottom {
                 needsToScrollBottom = true
                 animatedScroll = true
@@ -2529,29 +2661,33 @@ open class ChannelViewController: ViewController,
 
             let updates: () -> Void = { [weak self] in
                 guard let self = self else { return }
-                if !sectionInserts.isEmpty {
-                    self.collectionView.insertSections(sectionInserts)
+                // UIKit ops come from the fresh diff, not the observer's paths.
+                // The diff was computed from `(appliedSnapshot, newSnapshot)`,
+                // so the batch math holds by construction.
+                if !diff.sectionInserts.isEmpty {
+                    self.collectionView.insertSections(diff.sectionInserts)
                 }
-                if !sectionDeletes.isEmpty {
-                    self.collectionView.deleteSections(sectionDeletes)
+                if !diff.sectionDeletes.isEmpty {
+                    self.collectionView.deleteSections(diff.sectionDeletes)
                 }
-                self.collectionView.insertItems(at: inserts)
-                self.collectionView.reloadItems(at: reloads)
-                self.collectionView.deleteItems(at: deletes)
-                moves.forEach { from, to in
-                    self.collectionView.moveItem(at: from, to: to)
+                if !diff.inserts.isEmpty {
+                    self.collectionView.insertItems(at: diff.inserts)
                 }
-                // Mutate the snapshot deterministically from `paths` so the
-                // batch-update math (`oldCount + inserts − deletes == newCount`)
-                // holds by construction. We do NOT read the observer here —
-                // if the observer has drifted past this diff (intermediate
-                // diffs lost), reading it would jump the snapshot count and
-                // crash UIKit's validation. Reconciliation above guarantees
-                // the observer is consistent with what `paths` describes.
-                self.applyPathsToSnapshot(paths)
+                if !diff.reloads.isEmpty {
+                    self.collectionView.reloadItems(at: diff.reloads)
+                }
+                if !diff.deletes.isEmpty {
+                    self.collectionView.deleteItems(at: diff.deletes)
+                }
+                for move in diff.moves {
+                    self.collectionView.moveItem(at: move.from, to: move.to)
+                }
+                // The new snapshot was already computed when we built `diff`,
+                // so assignment is sufficient — no observer reads at apply time.
+                self.appliedSnapshot = newSnapshot
             }
 
-            let completion: (Bool) -> Void = { [weak self] _ in
+            let completion: (Bool) -> Void = { [weak self] finished in
                 CATransaction.commit()
                 var scrollBottom = false
                 defer {
@@ -2564,6 +2700,17 @@ open class ChannelViewController: ViewController,
                 }
 
                 guard let self = self else { return }
+
+                // Phase 4: if the animation was interrupted (view dismissed,
+                // user scroll cancelled it, etc.), UIKit's internal state may
+                // not match `appliedSnapshot`. Rebuild from the observer and
+                // reload to recover deterministically.
+                if !finished {
+                    self.appliedSnapshot = self.buildSnapshotFromObserver()
+                    self.collectionView.reloadData()
+                    self.updateUnreadViewVisibility()
+                    return
+                }
 
                 if isInsertingItemsToTop {
                     let postSize = self.collectionView.contentSize
@@ -2591,8 +2738,8 @@ open class ChannelViewController: ViewController,
                 }
 
                 // Move destinations don't always trigger cellForItemAt during the batch,
-                // so reload them here (paths.reloads were already applied by the parent batch).
-                let moveDestinations = moves.map(\.to)
+                // so reload them here (diff.reloads were already applied by the parent batch).
+                let moveDestinations = diffMoves.map(\.to)
                 if !moveDestinations.isEmpty,
                    self.channelViewModel.numberOfSections == self.collectionView.numberOfSections {
                     let sectionCount = self.channelViewModel.numberOfSections
@@ -2614,9 +2761,14 @@ open class ChannelViewController: ViewController,
                 }
             }
 
+            // Phase 4 workarounds: flush pending layout (radar #28167779) and,
+            // for non-animated top pagination, wrap in UIView.animate(duration: 0)
+            // to dodge UIKit's "preparing update visible view wasn't found"
+            // crash class.
+            collectionView.layoutIfNeeded()
             if isTopPagination {
-                UIView.performWithoutAnimation {
-                    collectionView.performUpdates(updates, completion: completion)
+                UIView.animate(withDuration: 0) { [weak self] in
+                    self?.collectionView.performUpdates(updates, completion: completion)
                 }
             } else {
                 collectionView.performUpdates(updates, completion: completion)
@@ -2673,13 +2825,14 @@ open class ChannelViewController: ViewController,
             // paths that still exist in the snapshot — defensive, since these paths
             // were computed against an earlier observer state.
             let safePaths = indexPaths.filter {
-                $0.section < appliedSnapshot.count &&
-                $0.item < appliedSnapshot[$0.section].count
+                $0.section < appliedSnapshot.sectionCount &&
+                $0.item < appliedSnapshot.items[$0.section].count
             }
             if !safePaths.isEmpty {
-                UIView.performWithoutAnimation {
-                    collectionView.performUpdates {
-                        collectionView.reloadItems(at: safePaths)
+                UIView.performWithoutAnimation { [weak self] in
+                    guard let self else { return }
+                    self.collectionView.performUpdates {
+                        self.collectionView.reloadItems(at: safePaths)
                     }
                 }
             }
@@ -3275,7 +3428,25 @@ open class ChannelViewController: ViewController,
 }
 
 extension ChannelViewController {
-    
+
+    /// The data-source state UIKit thinks it has. Carries section identity
+    /// (`sections`) alongside per-section item keys (`items`) so the Phase 2
+    /// diff can match sections across snapshots by `SectionId` rather than by
+    /// raw index. Indexing is parallel: `items[i]` are the keys in
+    /// `sections[i]`.
+    ///
+    /// Marked `internal` (rather than `private`) so the Phase 2 snapshot-diff
+    /// tests can construct fixtures via `@testable import SceytChatUIKit`.
+    internal struct AppliedSnapshot: Equatable {
+        var sections: [ChannelViewModel.SectionId]
+        var items: [[ChannelViewModel.Key]]
+
+        static let empty = AppliedSnapshot(sections: [], items: [])
+
+        var isEmpty: Bool { sections.isEmpty }
+        var sectionCount: Int { sections.count }
+    }
+
     open class BarCoverView: UIView {
         override open func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
             subviews.first { view in

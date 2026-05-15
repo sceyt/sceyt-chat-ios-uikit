@@ -22,12 +22,20 @@ let package = Package(
         // Targets can depend on other targets in this package and products from dependencies.
         .target(
             name: "SceytChatUIKit",
-            dependencies: [.product(name: "SceytChat", package: "sceyt-chat-ios-sdk")],
+            dependencies: [
+                .product(name: "SceytChat", package: "sceyt-chat-ios-sdk"),
+                "SceytChatUIKitObjCSupport",
+            ],
             resources: [.copy("Database/SceytChatModel.xcdatamodeld"), .process("Resources")]
         ),
-        
+
+        .target(
+            name: "SceytChatUIKitObjCSupport",
+            path: "Sources/SceytChatUIKitObjCSupport"
+        ),
+
         .testTarget(
             name: "SceytChatUIKitTests",
-            dependencies: ["SceytChatUIKit"]),
+            dependencies: ["SceytChatUIKit", "SceytChatUIKitObjCSupport"]),
     ]
 )

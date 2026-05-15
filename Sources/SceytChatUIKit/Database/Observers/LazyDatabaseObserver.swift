@@ -177,12 +177,27 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     open var numberOfSections: Int {
         (isObserverStarted || isObserverRestarting) ? currentCaches.mainCache.count : 0
     }
-    
+
     open func numberOfItems(in section: Int) -> Int {
         guard isObserverStarted || isObserverRestarting else { return 0 }
         let cache = currentCaches.mainCache
         guard cache.indices.contains(section) else { return 0 }
         return cache[section].count
+    }
+
+    /// Returns the section identifier for the given section index, derived from
+    /// `sectionNameKeyPath`. Used by the view layer to track section identity
+    /// across snapshots when diffing. The returned value is whatever KVC yields
+    /// for the keypath on the first DTO in the section (e.g. `Int` for
+    /// `MessageDTO.daySectionIdentifier`). Returns `nil` if the observer isn't
+    /// running, the section is out of range, or no `sectionNameKeyPath` was
+    /// configured.
+    open func sectionName(at section: Int) -> AnyHashable? {
+        guard isObserverStarted || isObserverRestarting else { return nil }
+        let cache = currentCaches.mainCache
+        guard cache.indices.contains(section), let first = cache[section].first else { return nil }
+        guard let keyPath = sectionNameKeyPath else { return nil }
+        return first.value(forKey: keyPath) as? AnyHashable
     }
     
     open var count: Int {

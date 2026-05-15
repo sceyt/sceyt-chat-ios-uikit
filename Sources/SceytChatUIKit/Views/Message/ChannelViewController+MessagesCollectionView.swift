@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import SceytChatUIKitObjCSupport
 
 public extension ChannelViewController {
     open class MessagesCollectionView: CollectionView {
@@ -75,27 +76,55 @@ public extension ChannelViewController {
             lastVisibleAttributes?.indexPath
         }
         
-        /// Wraps performBatchUpdates with state tracking and safe reload fallback
-        open func performUpdates(_ updates: (() -> Void), completion: ((Bool) -> Void)? = nil) {
-                isPerformBatchUpdates = true
-                performBatchUpdates {
+        /// Wraps `performBatchUpdates` with three layers of safety:
+        ///   1. State tracking via `isPerformBatchUpdates` so a `reloadData`
+        ///      arriving mid-batch is deferred (UIKit doesn't tolerate it).
+        ///   2. An `NSException` catch (`ObjCExceptionCatcher`) — Phase 5 of
+        ///      `SNAPSHOT_DIFF_MIGRATION_PLAN.md`. Post-Phase-1–4 the diff is
+        ///      consistent by construction so UIKit should never raise, but
+        ///      undiscovered UIKit bugs would otherwise crash the app.
+        ///   3. A reload fallback if the catch fires — degrades to a single
+        ///      `reloadData()` so the user sees correct content (no animation)
+        ///      rather than a crash.
+        open func performUpdates(_ updates: @escaping (() -> Void), completion: ((Bool) -> Void)? = nil) {
+            isPerformBatchUpdates = true
+
+            let exception = ObjCExceptionCatcher.catching { [weak self] in
+                guard let self else { return }
+                self.performBatchUpdates {
                     updates()
-                } completion: { [weak self] in
+                } completion: { [weak self] finished in
                     // Ensure we're back on the main queue before resetting flags and doing reload
-                    DispatchQueue.main.async {[weak self] in
+                    DispatchQueue.main.async { [weak self] in
                         if let self {
-                            isPerformBatchUpdates = false
-                            if needsReloadData {
+                            self.isPerformBatchUpdates = false
+                            if self.needsReloadData {
                                 // Defer actual reload until batch updates are done
-                                reloadData()
+                                self.reloadData()
                                 // Ensure layout is updated immediately without waiting for next runloop
-                                layoutIfNeeded()
+                                self.layoutIfNeeded()
                             }
                         }
+                        completion?(finished)
                     }
-                    completion?($0)
                 }
             }
+
+            if let exception {
+                // Post-Phase-1–4 this should never fire — every diff is
+                // consistent by construction. If it does, the diff is a
+                // regression we want to find in production logs.
+                // Reload to recover deterministically.
+                logger.error("""
+                    performBatchUpdates raised \(exception.name.rawValue): \
+                    \(exception.reason ?? "<no reason>")
+                    """)
+                isPerformBatchUpdates = false
+                super.reloadData()
+                layoutIfNeeded()
+                completion?(false)
+            }
+        }
 
         /// Override reloadData to prevent crashes if called during performBatchUpdates
         open override func reloadData() {
