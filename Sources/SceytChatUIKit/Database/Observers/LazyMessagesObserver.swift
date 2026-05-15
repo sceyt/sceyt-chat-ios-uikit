@@ -361,7 +361,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         return false
     }
     
-    func calculateMessageFetchOffset(
+    open func calculateMessageFetchOffset(
         messageId: MessageId = 0,
         fetchLimit: UInt = ChannelViewModel.messagesFetchLimit) -> Int {
             var fetchOffset: Int
