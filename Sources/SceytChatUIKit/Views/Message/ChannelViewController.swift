@@ -987,6 +987,10 @@ open class ChannelViewController: ViewController,
             showRepliedMessage(userSelectOnRepliedMessage)
             self.userSelectOnRepliedMessage = nil
         } else {
+            // User asked to jump to the latest — release any active pin so the
+            // .reloadDataAndScrollToBottom branch (or scrollToBottom() below)
+            // can actually land at the bottom.
+            pinnedScrollMessageId = 0
             if !channelViewModel.resetToInitialStateIfNeeded() {
                 scrollToBottom()
             }
@@ -1374,12 +1378,64 @@ open class ChannelViewController: ViewController,
     
     open func scrollToBottom(animated: Bool = true, duration: CGFloat = 0.22) {
         guard isAppActive else { return }
+        // User intent is to leave the pinned message — release the anchor so
+        // follow-up pagination doesn't yank the viewport back.
+        pinnedScrollMessageId = 0
         isStartedDragging = true
         isScrollingBottom = true
         updateUnreadViewVisibility()
         collectionView.scrollToBottom(animated: animated) { [weak self] _ in
             self?.isScrollingBottom = false
         }
+    }
+
+    /// Locate the pinned message in whatever index-space is currently laid out.
+    /// Pre-batch we have to ask `appliedSnapshot` (which mirrors UICollectionView's
+    /// data source), not the observer — the observer may have already advanced
+    /// to the post-update snapshot, returning an indexPath whose section the CV
+    /// doesn't yet know about (`layoutAttributesForItem` would return nil).
+    private func pinnedMessageIndexPathInAppliedSnapshot() -> IndexPath? {
+        guard pinnedScrollMessageId != 0 else { return nil }
+        let key = ChannelViewModel.Key(messageId: pinnedScrollMessageId)
+        for (sectionIdx, items) in appliedSnapshot.items.enumerated() {
+            if let itemIdx = items.firstIndex(of: key) {
+                return IndexPath(item: itemIdx, section: sectionIdx)
+            }
+        }
+        return nil
+    }
+
+    /// Distance from the top of the viewport (in collection-view content
+    /// coordinates) to the top of the currently-pinned message. Returns nil
+    /// when there's no pin or the pinned item isn't laid out right now.
+    /// Capture before any layout-changing operation, then hand the value to
+    /// `restorePinnedMessageToVisibleOffset` after the new layout settles so
+    /// the message lands at the exact same viewport position — bottom stays
+    /// bottom, center stays center.
+    private func pinnedMessageVisibleOffset() -> CGFloat? {
+        guard let indexPath = pinnedMessageIndexPathInAppliedSnapshot(),
+              let attrs = collectionView.layoutAttributesForItem(at: indexPath)
+        else { return nil }
+        return attrs.frame.minY - collectionView.contentOffset.y
+    }
+
+    @discardableResult
+    private func restorePinnedMessageToVisibleOffset(_ visibleOffset: CGFloat) -> Bool {
+        // Post-batch: CV has been told about the new sections/items, so the
+        // observer's indexPath is now valid. Use that — `appliedSnapshot`
+        // points at the new snapshot too once `performUpdates` returns.
+        guard pinnedScrollMessageId != 0,
+              let indexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId),
+              let attrs = collectionView.layoutAttributesForItem(at: indexPath)
+        else { return false }
+        let target = attrs.frame.minY - visibleOffset
+        let minOffsetY = -collectionView.adjustedContentInset.top
+        let maxOffsetY = max(
+            minOffsetY,
+            collectionView.contentSize.height - collectionView.bounds.height + collectionView.adjustedContentInset.bottom
+        )
+        collectionView.contentOffset.y = min(max(target, minOffsetY), maxOffsetY)
+        return true
     }
     
     open func updateUnreadViewVisibility() {
@@ -2585,21 +2641,40 @@ open class ChannelViewController: ViewController,
                 }
             }
 
-            if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear {
+            if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear,
+               pinnedScrollMessageId == 0 {
+                // Pre-viewDidAppear path: skip the structural update so the
+                // navigation transition doesn't jank. We only enter this
+                // branch when nothing is pinned — when a pin IS active
+                // (e.g. scrollToMessageId), we MUST process the update so
+                // the capture-restore below can keep the pinned message at
+                // its visible offset (otherwise the prev pagination would
+                // arrive while we ignore it, then leak through later
+                // events with the viewport already drifted).
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
-                if channelViewModel.scrollToRepliedMessageId == 0, pinnedScrollMessageId == 0 {
+                if channelViewModel.scrollToRepliedMessageId == 0 {
                     rebuildAppliedSnapshotFromObserver()
                     collectionView.reloadDataAndScrollToBottom()
                 }
                 updateUnreadViewVisibility()
                 return
             }
-            var isInsertingItemsToTop = false
-            if continuesOptions.contains(.top) {
-                isInsertingItemsToTop = true
-            } else {
-                isInsertingItemsToTop = false
-            }
+            // If we reached here with the first-archive flag still set, clear
+            // it — we're about to apply the update normally.
+            checkOnlyFirstTimeReceivedMessagesFromArchive = false
+            // Source of truth for "is this a top pagination" is the
+            // snapshot diff, not the observer's continuesOptions hint —
+            // the observer routinely reports bulk inserts in a shape that
+            // leaves continuesOptions empty (rawValue:0) even when the
+            // resulting snapshot clearly has new items at (0, 0). Three
+            // top-insert signals from the diff:
+            //   • observer flagged it explicitly (kept for back-compat)
+            //   • a new section was inserted at index 0
+            //   • an item was inserted at (0, 0)
+            let isInsertingItemsToTop =
+                continuesOptions.contains(.top)
+                || diff.sectionInserts.contains(0)
+                || diff.inserts.contains(IndexPath(item: 0, section: 0))
 
             var isInsertLastIndexPath: Bool {
                 var isOneItem: Bool {
@@ -2642,7 +2717,13 @@ open class ChannelViewController: ViewController,
 
             let offsetBeforeInsertion = collectionView.contentOffset.y
             let contentHeightBeforeInsertion = collectionView.contentSize.height
-            let isTopPagination = isInsertingItemsToTop && pinnedScrollMessageId == 0
+            let isTopPagination = isInsertingItemsToTop
+            // Capture the pin's pre-batch viewport offset using the CV's
+            // current data source — the observer may already point at the
+            // post-update indexPath whose section the CV doesn't know about
+            // yet. Restored in the completion below so the pinned message
+            // stays at the same viewport position across pagination.
+            let pinnedVisibleOffsetBefore = pinnedMessageVisibleOffset()
 
             isCollectionViewUpdating = true
             CATransaction.begin()
@@ -2713,13 +2794,9 @@ open class ChannelViewController: ViewController,
                 }
 
                 if isInsertingItemsToTop {
-                    let postSize = self.collectionView.contentSize
-                    let postOffset = self.collectionView.contentOffset.y
-                    let actualHeightDelta = postSize.height - contentHeightBeforeInsertion
-                    let actualOffsetDelta = postOffset - offsetBeforeInsertion
-                    if self.pinnedScrollMessageId != 0,
-                       let pinnedIndexPath = self.channelViewModel.indexPathOf(messageId: self.pinnedScrollMessageId) {
-                        self.collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                    if let pinnedVisibleOffsetBefore,
+                       self.restorePinnedMessageToVisibleOffset(pinnedVisibleOffsetBefore) {
+                        // Pin restored at its previous viewport offset.
                     } else if contentHeightBeforeInsertion == 0 && offsetBeforeInsertion == 0 {
                         // Initial load with empty starting state: layout's
                         // targetContentOffset(forProposedContentOffset:) anchors against
@@ -2733,8 +2810,9 @@ open class ChannelViewController: ViewController,
                             self.collectionView.contentOffset.y = max(0, contentHeightAfter - visibleHeight)
                         }
                     }
-                    // Otherwise the layout's targetContentOffset(forProposedContentOffset:)
-                    // already applied the atomic offset adjustment in the same layout pass.
+                    // For non-pin / non-empty paths: the layout's
+                    // targetContentOffset(forProposedContentOffset:) already applied
+                    // the atomic offset adjustment in the same layout pass.
                 }
 
                 // Move destinations don't always trigger cellForItemAt during the batch,
@@ -2805,11 +2883,13 @@ open class ChannelViewController: ViewController,
             } else if pinnedScrollMessageId != 0 {
                 let savedOffset = collectionView.contentOffset
                 let savedContentHeight = collectionView.contentSize.height
+                let pinnedVisibleOffsetBefore = pinnedMessageVisibleOffset()
                 rebuildAppliedSnapshotFromObserver()
                 collectionView.reloadData()
                 collectionView.layoutIfNeeded()
-                if let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
-                    collectionView.scrollToItem(at: pinnedIndexPath, pos: .centeredVertically, animated: false)
+                if let pinnedVisibleOffsetBefore,
+                   restorePinnedMessageToVisibleOffset(pinnedVisibleOffsetBefore) {
+                    // Pin restored at its previous viewport offset.
                 } else {
                     let heightDiff = collectionView.contentSize.height - savedContentHeight
                     collectionView.contentOffset.y = savedOffset.y + heightDiff
@@ -2838,11 +2918,19 @@ open class ChannelViewController: ViewController,
             }
             showEmptyViewIfNeeded()
         case .reloadDataAndScrollToBottom:
-            rebuildAppliedSnapshotFromObserver()
-            if pinnedScrollMessageId != 0,
-               let pinnedIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId) {
-                collectionView.reloadDataAndScrollTo(indexPath: pinnedIndexPath, pos: .centeredVertically, animated: false)
+            if pinnedScrollMessageId != 0 {
+                let pinnedVisibleOffsetBefore = pinnedMessageVisibleOffset()
+                rebuildAppliedSnapshotFromObserver()
+                collectionView.reloadData()
+                collectionView.layoutIfNeeded()
+                if let pinnedVisibleOffsetBefore,
+                   restorePinnedMessageToVisibleOffset(pinnedVisibleOffsetBefore) {
+                    // Pin restored at its previous viewport offset.
+                } else {
+                    collectionView.scrollToBottom(animated: false)
+                }
             } else {
+                rebuildAppliedSnapshotFromObserver()
                 collectionView.reloadDataAndScrollToBottom()
             }
         case let .reloadDataAndScroll(indexPath, animated, pos):
@@ -2851,6 +2939,11 @@ open class ChannelViewController: ViewController,
                 indexPath: indexPath,
                 pos: pos,
                 animated: animated)
+            // Anchor the just-scrolled message so prev/next/near fetches that follow
+            // don't drift the viewport. Released on scrollViewWillBeginDragging.
+            if let messageId = channelViewModel.message(at: indexPath)?.id, messageId != 0 {
+                pinnedScrollMessageId = messageId
+            }
             updateUnreadViewVisibility()
             showEmptyViewIfNeeded()
         case .didSetUnreadIndexPath(let indexPath):
@@ -2931,6 +3024,14 @@ open class ChannelViewController: ViewController,
                 break
             }
         case let .scrollAndSelect(indexPath, messageId, mentionMode):
+            // The pin is already on this message — the model is re-firing
+            // scroll/select because scrollToRepliedMessageId hasn't been
+            // cleared yet (it's cleared 1 s later via resetStateAfterChangeEvent).
+            // Re-scrolling would yank the viewport to .centeredVertically and
+            // undo the position we just preserved. Skip.
+            if pinnedScrollMessageId == messageId, messageId != 0 {
+                return
+            }
             pinnedScrollMessageId = messageId
             if selectMessageId == messageId,
                 lastAnimatedIndexPath == indexPath,
@@ -2991,7 +3092,12 @@ open class ChannelViewController: ViewController,
                 indexPath: indexPath,
                 pos: pos
             )
-            
+            // Anchor the restarted-to message so subsequent prev/next/near fetches
+            // keep it on screen. Released on scrollViewWillBeginDragging.
+            if messageId != 0 {
+                pinnedScrollMessageId = messageId
+            }
+
             lastAnimatedIndexPath = indexPath
             var mode = MessageCell.HighlightMode.search
             if channelViewModel.scrollToRepliedMessageId != 0 {
