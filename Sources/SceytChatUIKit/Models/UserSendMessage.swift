@@ -212,7 +212,10 @@ public struct AttachmentModel {
                 builder.metadata(json)
             }
         } else if type == .link {
-            builder.name(linkMetaData?.title ?? name)
+            let titleMaxLength = LinkMetadataProvider.default.titleMaxLength
+            let summaryMaxLength = LinkMetadataProvider.default.summaryMaxLength
+            let truncatedTitle = linkMetaData?.title.map { String($0.prefix(titleMaxLength)) }
+            builder.name(truncatedTitle ?? name)
             var thumbnail = ""
             var width = 0
             var height = 0
@@ -224,12 +227,13 @@ public struct AttachmentModel {
                     .thumbHashBase64() ?? ""
             }
             if let meta = linkMetaData {
+                let truncatedSummary = meta.summary.map { String($0.prefix(summaryMaxLength)) }
                 if let json = ChatMessage.Attachment.Metadata<String>(
                     width: width,
                     height: height,
                     thumbnail: thumbnail,
                     duration: 0,
-                    description: meta.summary,
+                    description: truncatedSummary,
                     imageUrl: meta.imageUrl?.absoluteString,
                     thumbnailUrl: meta.iconUrl?.absoluteString,
                     hideLinkDetails: hideLinkDetails
