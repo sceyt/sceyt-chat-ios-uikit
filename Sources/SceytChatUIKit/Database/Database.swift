@@ -72,7 +72,9 @@ public extension Database {
         resetStalenessInterval: Bool = true,
         completion: (() -> Void)? = nil
     ) {
+        logger.debug("[Ctx] refreshAll called")
         backgroundPerformContext.perform {
+            logger.debug("[Ctx] refreshAll bgPerform")
             if resetStalenessInterval {
                 self.backgroundPerformContext.stalenessInterval = 0
             }
@@ -83,6 +85,7 @@ public extension Database {
         }
 
         backgroundReadOnlyObservableContext.perform {
+            logger.debug("[Ctx] refreshAll bgReadObs")
             if resetStalenessInterval {
                 self.backgroundReadOnlyObservableContext.stalenessInterval = 0
             }
@@ -90,8 +93,9 @@ public extension Database {
             if resetStalenessInterval {
                 self.backgroundReadOnlyObservableContext.stalenessInterval = -1
             }
-            
+
             backgroundReadOnlyContext.perform {
+                logger.debug("[Ctx] refreshAll bgRead")
                 if resetStalenessInterval {
                     self.backgroundReadOnlyContext.stalenessInterval = 0
                 }
@@ -99,8 +103,9 @@ public extension Database {
                 if resetStalenessInterval {
                     self.backgroundReadOnlyContext.stalenessInterval = -1
                 }
-                
+
                 DispatchQueue.main.async {
+                    logger.debug("[Ctx] refreshAll view")
                     if resetStalenessInterval {
                         self.viewContext.stalenessInterval = 0
                     }
@@ -108,6 +113,7 @@ public extension Database {
                     if resetStalenessInterval {
                         self.viewContext.stalenessInterval = -1
                     }
+                    logger.debug("[Ctx] refreshAll done")
                     completion?()
                 }
             }
@@ -249,6 +255,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func write(resultQueue: DispatchQueue,
                             _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                             completion: ((Error?) -> Void)? = nil) {
+        logger.debug("[Ctx] bgPerform write")
         backgroundPerformContext.perform {[weak self] in
             guard let self = self else { return }
             do {
@@ -276,6 +283,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                                               _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                                               completion: ((Error?) -> Void)? = nil) {
         let context = createBackgroundContext()
+        logger.debug("[Ctx] newCtx write")
         context.perform {[weak self] in
             guard let self = self else { return }
             do {
@@ -298,6 +306,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     
     public final func syncWrite(_ perform: @escaping (NSManagedObjectContext) throws -> Void) throws {
         var _error: Error?
+        logger.debug("[Ctx] bgPerform syncWrite")
         backgroundPerformContext.performAndWait {
             do {
                 try perform(self.backgroundPerformContext)
@@ -323,6 +332,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                                   _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
                                   completion: ((Result<Fetch, Error>) -> Void)?) {
         let context = backgroundReadOnlyContext
+        logger.debug("[Ctx] bgRead read")
         context.perform {[weak self] in
             guard self != nil else { return }
             do {
@@ -341,6 +351,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func read<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch) -> Result<Fetch, Error> {
         var result: Result<Fetch, Error>!
         let context = Thread.isMainThread ? viewContext : backgroundReadOnlyContext
+        logger.debug("[Ctx] \(Thread.isMainThread ? "view" : "bgRead") read")
         context.performAndWait {
             do {
                 let fetch = try perform(context)
@@ -356,6 +367,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                                            _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
                                            completion: ((Result<Fetch, Error>) -> Void)? = nil) {
         let context = createBackgroundContext()
+        logger.debug("[Ctx] newCtx bgTask")
         context.perform {
             guard self != nil else { return }
             do {

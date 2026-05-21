@@ -74,13 +74,16 @@ open class ChannelMessageSender: DataProvider {
                 completion?(error)
                 return
             }
-             logger.info("message with tid \(sentMessage.tid) id: \(sentMessage.id) sent successfully")
+            logger.info("message with tid \(sentMessage.tid) id: \(sentMessage.id) sent successfully")
+            let sendAckTid = sentMessage.tid
             self.database.write ({
+                logger.info("[SendAck] tid \(sendAckTid) write block started")
                 let predicate = NSPredicate(format: "channelId == %lld AND id > 0", self.channelId)
                 let message = MessageDTO.lastMessage(predicate: predicate, context: $0)
                 let channel = ChannelDTO.fetch(id: self.channelId, context: $0)
                 let lastMessageId = message?.id
                 $0.createOrUpdate(message: sentMessage, channelId: self.channelId)
+                logger.info("[SendAck] tid \(sendAckTid) createOrUpdate done")
                 if let channel {
                     channel.lastReceivedMessageId = Int64(sentMessage.id)
                     let min = min(sentMessage.id, MessageId(lastMessageId ?? Int64(sentMessage.id)))
@@ -90,7 +93,9 @@ open class ChannelMessageSender: DataProvider {
                         channel.lastDisplayedMessageId = Int64(sentMessage.id)
                     }
                 }
+                logger.info("[SendAck] tid \(sendAckTid) channel update done, block end")
             }) { dbError in
+                logger.info("[SendAck] tid \(sendAckTid) database.write completion, error: \(String(describing: dbError))")
                 completion?(error ?? dbError)
             }
         }
