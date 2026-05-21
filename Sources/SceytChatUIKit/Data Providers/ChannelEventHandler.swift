@@ -154,6 +154,13 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                 endMessageId: message.id,
                 channelId: channel.id
             )
+            if message.id > 0,
+               let state = ChannelSyncStateDTO.fetch(channelId: channel.id, context: $0),
+               state.lastSyncedMessageId > 0,
+               state.lastSyncedMessageId == Int64(lastMessageId),
+               Int64(message.id) > state.lastSyncedMessageId {
+                state.lastSyncedMessageId = Int64(message.id)
+            }
         } completion: { error in
             logger.debug(error?.localizedDescription ?? "")
         }
@@ -225,6 +232,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     channelId: channel.id,
                     before: channel.messagesClearedAt
                 )
+                ChannelSyncStateDTO.delete(channelId: channel.id, context: $0)
             } catch {
                 logger.errorIfNotNil(error, "")
             }
@@ -232,7 +240,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             logger.debug(error?.localizedDescription ?? "")
         }
     }
-    
+
     open func channelDidDeleteAllMessagesForEveryone(_ channel: Channel) {
         database.write {
             do {
@@ -240,6 +248,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     channelId: channel.id,
                     before: channel.messagesClearedAt
                 )
+                ChannelSyncStateDTO.delete(channelId: channel.id, context: $0)
             } catch {
                 logger.errorIfNotNil(error, "")
             }

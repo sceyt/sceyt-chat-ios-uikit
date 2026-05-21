@@ -1556,6 +1556,30 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         builder.parentMessageId(0)
         if forward {
             builder.forwardingMessageId(message.id)
+            // Source link attachments may have empty url/metadata when the source
+            // message is itself a forward — the server doesn't repopulate link details
+            // on forwards. Re-derive them from the body so the recipient gets a real,
+            // openable URL, mirroring the original-send path in `UserSendMessage`.
+            let sourceLinks = (message.attachments ?? []).filter { $0.type == "link" }
+            // Carry forward the user's "hide link preview" choice from the original.
+            // Stored inside each link attachment's metadata JSON as `hld`; keyed here
+            // by the attachment's url so we can match it to the freshly detected one.
+            let hideByURL: [String: Bool] = sourceLinks.reduce(into: [:]) { acc, a in
+                guard let urlStr = a.url, !urlStr.isEmpty,
+                      let hide = a.imageDecodedMetadata?.hideLinkDetails
+                else { return }
+                acc[urlStr] = hide
+            }
+            let nonLinks = (message.attachments ?? [])
+                .filter { $0.type != "link" }
+                .map { $0.builder.build() }
+            let freshLinks = DataDetector.getLinks(text: message.body).map { url -> Attachment in
+                let cached = LinkMetadataProvider.default.metadata(for: url.normalizedURL)
+                let hide = hideByURL[url.absoluteString] ?? false
+                return AttachmentModel(link: url, linkMetaData: cached, hideLinkDetails: hide)
+                    .attachmentBuilder.build()
+            }
+            builder.attachments(nonLinks + freshLinks)
         }
         let group = DispatchGroup()
         for channelId in channelIds {

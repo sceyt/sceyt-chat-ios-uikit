@@ -172,6 +172,9 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         if let members = channel.members {
             for member in members {
                 let mdto = createOrUpdate(member: member, channelId: channel.id)
+                if mdto.channel !== dto {
+                    mdto.channel = dto
+                }
             }
         }
         
@@ -203,6 +206,7 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     
     public func deleteChannel(id: ChannelId) {
         try? deleteAllMessages(channelId: id)
+        ChannelSyncStateDTO.delete(channelId: id, context: self)
         if let dto = ChannelDTO.fetch(id: id, context: self) {
             let deletedObjects: [AnyHashable: Any] = [
                 NSDeletedObjectsKey: [dto.objectID]

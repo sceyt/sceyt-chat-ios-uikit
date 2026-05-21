@@ -47,6 +47,7 @@ public class ChannelDTO: NSManagedObject {
     @NSManaged public var lastReaction: ReactionDTO?
     
     @NSManaged public var owner: MemberDTO?
+    @NSManaged public var members: Set<MemberDTO>?
     @NSManaged public var userRole: RoleDTO?
     
     @NSManaged public var unsubscribed: Bool

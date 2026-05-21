@@ -59,6 +59,7 @@
         <relationship name="createdBy" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="UserDTO" inverseName="creator" inverseEntity="UserDTO"/>
         <relationship name="lastMessage" optional="YES" maxCount="1" deletionRule="Cascade" destinationEntity="MessageDTO" inverseName="lastMessageChannel" inverseEntity="MessageDTO"/>
         <relationship name="lastReaction" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ReactionDTO" inverseName="channelLasts" inverseEntity="ReactionDTO"/>
+        <relationship name="members" optional="YES" toMany="YES" deletionRule="Cascade" destinationEntity="MemberDTO" inverseName="channel" inverseEntity="MemberDTO"/>
         <relationship name="owner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="MemberDTO" inverseName="channelOwner" inverseEntity="MemberDTO"/>
         <relationship name="userRole" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RoleDTO" inverseName="channelRole" inverseEntity="RoleDTO"/>
         <uniquenessConstraints>
@@ -120,6 +121,7 @@
     </entity>
     <entity name="MemberDTO" representedClassName="MemberDTO" syncable="YES">
         <attribute name="channelId" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="channel" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="members" inverseEntity="ChannelDTO"/>
         <relationship name="channelOwner" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="ChannelDTO" inverseName="owner" inverseEntity="ChannelDTO"/>
         <relationship name="role" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="RoleDTO" inverseName="members" inverseEntity="RoleDTO"/>
         <relationship name="user" optional="YES" maxCount="1" deletionRule="No Action" destinationEntity="UserDTO" inverseName="members" inverseEntity="UserDTO"/>

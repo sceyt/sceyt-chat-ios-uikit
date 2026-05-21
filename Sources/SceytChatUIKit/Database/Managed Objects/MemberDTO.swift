@@ -15,6 +15,7 @@ public class MemberDTO: NSManagedObject {
 
     @NSManaged public var role: RoleDTO?
     @NSManaged public var user: UserDTO?
+    @NSManaged public var channel: ChannelDTO?
     @NSManaged public var channelId: Int64
 
     @nonobjc
@@ -38,12 +39,16 @@ public class MemberDTO: NSManagedObject {
 
     public static func fetchOrCreate(id: UserId, channelId: ChannelId, context: NSManagedObjectContext) -> MemberDTO {
         if let mo = fetch(id: id, channelId: channelId, context: context) {
+            if mo.channel == nil {
+                mo.channel = ChannelDTO.fetch(id: channelId, context: context)
+            }
             return mo
         }
 
         let mo = insertNewObject(into: context)
         mo.channelId = Int64(channelId)
-        mo.user?.id = id
+        mo.channel = ChannelDTO.fetch(id: channelId, context: context)
+        mo.user = UserDTO.fetchOrCreate(id: id, context: context)
         return mo
     }
 

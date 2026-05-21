@@ -92,7 +92,7 @@ public final class SyncService: NSObject {
                             logger.verbose("SyncService: makeMessageResendOperations DO NOT RESEND (has paused attachment) message: tid \(message.tid), body \(message.body)")
                             return
                         }
-                        logger.verbose("SyncService: makeMessageResendOperations fetched message: tid \(message.tid), body \(message.body)")
+                        logger.verbose("SyncService: makeMessageResendOperations fetched message: tid \(message.tid)")
                         sender.resendMessage(message) {error in
                             if error?.sceytChatCode == .channelNotExists {
                                 provider.deletePending(message: message.tid)
@@ -243,10 +243,12 @@ public final class SyncService: NSObject {
                 let result1 = context.fetchChannelsToSyncMessages()
                 let result2 = context.fetchPendingMarkerToSyncMessages()
                 let result3 = context.fetchChannelsForPendingMessages()
-                return (result1, result2, result3)
+                let result4 = ChannelSyncStateDTO.fetchAll(context: context)
+                return (result1, result2, result3, result4)
             }.get()
 
             let channelsResult = results?.0
+            let syncStateResult = results?.3 ?? [:]
             let operations = Operations.syncChannelOperations(undeleteChannelIds: results?.2 ?? []) { channels in
                 for channel in channels where channel.lastDisplayedMessageId != 0  {
                     let cachedId = channelsResult?[channel.id] ?? 0
@@ -254,9 +256,21 @@ public final class SyncService: NSObject {
                     guard minDisplayId != channel.lastMessage?.id,
                           minDisplayId > 0
                     else { continue }
+                    let channelLastMessageId = channel.lastMessage?.id ?? 0
+                    if channelLastMessageId == 0 {
+                        continue
+                    }
+                    let lastSyncedMessageId = syncStateResult[channel.id] ?? 0
+                    if lastSyncedMessageId > 0,
+                       channelLastMessageId > 0,
+                       lastSyncedMessageId >= channelLastMessageId {
+                        logger.verbose("SyncService: skip syncChannelMessages for channel \(channel.id) — lastSyncedMessageId \(lastSyncedMessageId) >= lastMessageId \(channelLastMessageId)")
+                        continue
+                    }
                     let operation = Operations.syncChannelMessagesOperations(
                         startMessageId: minDisplayId - 1,
-                        channelId: channel.id
+                        channelId: channel.id,
+                        channelLastMessageId: channelLastMessageId
                     )
                     completionOperator.addDependency(operation)
                     messageSyncQueue.addOperation(operation)
@@ -337,12 +351,17 @@ public struct Operations {
                 deleteChannels]
     }
     
-    public static func syncChannelMessagesOperations(startMessageId: MessageId, channelId: ChannelId) -> Operation {
+    public static func syncChannelMessagesOperations(
+        startMessageId: MessageId,
+        channelId: ChannelId,
+        channelLastMessageId: MessageId = 0
+    ) -> Operation {
         let query = MessageListQuery
             .Builder(channelId: channelId)
             .limit(SceytChatUIKit.shared.config.queryLimits.messageListQueryLimit)
             .build()
         let messageOperation = FetchChannelMessagesOperation(query: query)
+        messageOperation.syncLastPageImmediately = false
         messageOperation.startMessageId = startMessageId
         let provider = Components.channelMessageProvider.init(channelId: channelId)
         messageOperation.onLoad = { result, end in
@@ -360,6 +379,19 @@ public struct Operations {
                     ids: messageIds,
                     storeForResend: true
                 )
+            }
+        }
+        if channelLastMessageId > 0 {
+            messageOperation.completionBlock = { [weak messageOperation] in
+                guard let op = messageOperation,
+                      case .success = op.result
+                else { return }
+                DataProvider.database.write { context in
+                    let state = ChannelSyncStateDTO.fetchOrCreate(channelId: channelId, context: context)
+                    if state.lastSyncedMessageId < Int64(channelLastMessageId) {
+                        state.lastSyncedMessageId = Int64(channelLastMessageId)
+                    }
+                }
             }
         }
         return messageOperation

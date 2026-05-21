@@ -62,7 +62,8 @@ open class ChannelMessageSender: DataProvider {
         func handleAck(sentMessage: Message?, error: Error?) {
             let sentMessage = didSend(sentMessage, error: error)
             guard let sentMessage = sentMessage,
-                  sentMessage.deliveryStatus != .failed
+                  sentMessage.deliveryStatus != .failed,
+                  sentMessage.deliveryStatus != .pending
             else {
                 logger.errorIfNotNil(error, "Sent message filed status: \(String(describing: sentMessage?.deliveryStatus)), tid \(message.tid)")
                 if error?.sceytChatCode?.isBadParam ?? false {
@@ -79,7 +80,7 @@ open class ChannelMessageSender: DataProvider {
                 let message = MessageDTO.lastMessage(predicate: predicate, context: $0)
                 let channel = ChannelDTO.fetch(id: self.channelId, context: $0)
                 let lastMessageId = message?.id
-                $0.update(message: sentMessage, channelId: self.channelId)
+                $0.createOrUpdate(message: sentMessage, channelId: self.channelId)
                 if let channel {
                     channel.lastReceivedMessageId = Int64(sentMessage.id)
                     let min = min(sentMessage.id, MessageId(lastMessageId ?? Int64(sentMessage.id)))
