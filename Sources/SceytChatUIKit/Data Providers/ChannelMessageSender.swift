@@ -180,7 +180,9 @@ open class ChannelMessageSender: DataProvider {
                         return
                     }
                      logger.info("Message with tid \(sentMessage.tid), id \(sentMessage.id) will store in db")
+                    let resendAckTid = sentMessage.tid
                     self.database.write ({
+                        logger.info("[ResendAck] tid \(resendAckTid) write block started")
                         let predicate = NSPredicate(format: "channelId == %lld AND id > 0", self.channelId)
                         let message = MessageDTO.lastMessage(predicate: predicate, context: $0)
                         let channel = ChannelDTO.fetch(id: self.channelId, context: $0)
@@ -192,11 +194,12 @@ open class ChannelMessageSender: DataProvider {
                             let existingMessageDTO = MessageDTO.fetch(tid: Int64(chatMessage.tid), context: $0)
                             pendingVotes = existingMessageDTO?.poll?.pendingVotes
                         }
-                        
+
                         $0.createOrUpdate(
                             message: sentMessage,
                             channelId: self.channelId
                         )
+                        logger.info("[ResendAck] tid \(resendAckTid) createOrUpdate done")
 
                         // Restore pending votes to the updated message
                         if let pendingVotes = pendingVotes, pendingVotes.count > 0 {
@@ -214,7 +217,11 @@ open class ChannelMessageSender: DataProvider {
                                 channel.lastDisplayedMessageId = Int64(sentMessage.id)
                             }
                         }
-                    }, completion: completion)
+                        logger.info("[ResendAck] tid \(resendAckTid) channel update done, block end")
+                    }) { dbError in
+                        logger.info("[ResendAck] tid \(resendAckTid) database.write completion, error: \(String(describing: dbError))")
+                        completion?(dbError)
+                    }
                 }
                 switch message.state {
                 case .none:
