@@ -10,7 +10,7 @@ import Foundation
 import CoreData
 
 public protocol Database {
-    
+
     func write(resultQueue: DispatchQueue,
                _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                completion: ((Error?) -> Void)?)
@@ -36,27 +36,70 @@ public protocol Database {
 }
 
 public extension Database {
-    
+
     func write(_ perform: @escaping (NSManagedObjectContext) throws -> Void,
-               completion: ((Error?) -> Void)?) {
-        write(resultQueue: .main, perform, completion: completion)
+               completion: ((Error?) -> Void)?,
+               file: StaticString = #file,
+               line: UInt = #line,
+               function: StaticString = #function) {
+        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "bgPerform", file: file, line: line, function: function)
+        write(resultQueue: .main, wrapped, completion: completion)
     }
-    
+
     func read<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
                      completion: ((Result<Fetch, Error>) -> Void)?) {
         read(resultQueue: .main, perform, completion: completion)
     }
-    
-    func write(_ perform: @escaping (NSManagedObjectContext) throws -> Void) {
-        write(perform, completion: { _ in })
+
+    func write(_ perform: @escaping (NSManagedObjectContext) throws -> Void,
+               file: StaticString = #file,
+               line: UInt = #line,
+               function: StaticString = #function) {
+        write(perform, completion: { _ in }, file: file, line: line, function: function)
     }
-    
-    func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void, completion: ((Error?) -> Void)?) {
-        performWriteTask(resultQueue: .main, perform, completion: completion)
+
+    func write(resultQueue: DispatchQueue,
+               _ perform: @escaping (NSManagedObjectContext) throws -> Void,
+               completion: ((Error?) -> Void)? = nil,
+               file: StaticString = #file,
+               line: UInt = #line,
+               function: StaticString = #function) {
+        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "bgPerform", file: file, line: line, function: function)
+        write(resultQueue: resultQueue, wrapped, completion: completion)
     }
-    
-    func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void) {
-        performWriteTask(resultQueue: .main, perform, completion: nil)
+
+    func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void,
+                          completion: ((Error?) -> Void)?,
+                          file: StaticString = #file,
+                          line: UInt = #line,
+                          function: StaticString = #function) {
+        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "newCtx", file: file, line: line, function: function)
+        performWriteTask(resultQueue: .main, wrapped, completion: completion)
+    }
+
+    func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void,
+                          file: StaticString = #file,
+                          line: UInt = #line,
+                          function: StaticString = #function) {
+        performWriteTask(perform, completion: nil, file: file, line: line, function: function)
+    }
+
+    func performWriteTask(resultQueue: DispatchQueue,
+                          _ perform: @escaping (NSManagedObjectContext) throws -> Void,
+                          completion: ((Error?) -> Void)? = nil,
+                          file: StaticString = #file,
+                          line: UInt = #line,
+                          function: StaticString = #function) {
+        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "newCtx", file: file, line: line, function: function)
+        performWriteTask(resultQueue: resultQueue, wrapped, completion: completion)
+    }
+
+    func syncWrite(_ perform: @escaping (NSManagedObjectContext) throws -> Void,
+                   file: StaticString = #file,
+                   line: UInt = #line,
+                   function: StaticString = #function) throws {
+        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "syncWrite", file: file, line: line, function: function)
+        try syncWrite(wrapped)
     }
     
     func performBgTask<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
@@ -127,15 +170,6 @@ public extension Database {
 
 public final class PersistentContainer: NSPersistentContainer, Database {
 
-    // Accessed only on the main queue — guards against reacting to same-process saves.
-    private var lastHistoryToken: NSPersistentHistoryToken?
-
-    private lazy var observersQueue: OperationQueue = {
-        let queue = OperationQueue()
-        queue.maxConcurrentOperationCount = 1
-        return queue
-    }()
-    
     public required init(modelName: String = "SceytChatModel", bundle: Bundle? = nil, storeType: StoreType) {
         let modelBundle = bundle ?? Bundle.kit(for: PersistentContainer.self)
         guard let modelUrl = modelBundle.url(forResource: modelName, withExtension: "momd") else {
@@ -167,6 +201,8 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                         logger.errorIfNotNil(error, "")
                     }
                 })
+            } else {
+                self?.purgePersistentHistory()
             }
         }
         viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
@@ -174,6 +210,18 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         addObservers()
     }
     
+    private func purgePersistentHistory() {
+        let context = newBackgroundContext()
+        context.perform {
+            let request = NSPersistentHistoryChangeRequest.deleteHistory(before: Date())
+            do {
+                try context.execute(request)
+            } catch {
+                logger.errorIfNotNil(error, "Failed to purge persistent history")
+            }
+        }
+    }
+
     private func tryRecreatePersistentStore(completion: @escaping ((Error?) -> Void)) {
         
         guard let storeDescription = persistentStoreDescriptions.first else {
@@ -204,8 +252,11 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         switch type {
         case .sqLite(let fileUrl):
             description.url = fileUrl
-            description.setOption(true as NSNumber,
-                forKey: NSPersistentStoreRemoteChangeNotificationPostOptionKey)
+            // Tracking must stay enabled once a store has used it — Core Data otherwise
+            // forces the store into read-only mode (NSCocoaErrorDomain 513). The remote-
+            // change notification is intentionally NOT requested: we don't run the
+            // per-save fetch/purge cascade, which was the source of multi-second
+            // backgroundPerformContext stalls.
             description.setOption(true as NSNumber,
                 forKey: NSPersistentHistoryTrackingKey)
         case .binary(let fileUrl):
@@ -226,7 +277,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         let context = newBackgroundContext()
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         context.automaticallyMergesChangesFromParent = true
-        context.transactionAuthor = Bundle.main.bundleIdentifier
         return context
     }()
    
@@ -318,7 +368,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                 }
                 guard self.backgroundPerformContext.hasChanges else { return }
                 try self.backgroundPerformContext.save()
-                
             } catch {
                 _error = error
             }
@@ -405,10 +454,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                 self,
                 name: .NSManagedObjectContextDidSave,
                 object: backgroundPerformContext)
-        NotificationCenter.default.removeObserver(
-            self,
-            name: .NSPersistentStoreRemoteChange,
-            object: persistentStoreCoordinator)
     }
 }
 
@@ -437,10 +482,6 @@ private extension PersistentContainer {
     func addObservers() {
         let notificationCenter = NotificationCenter.default
         notificationCenter.addObserver(self, selector: #selector(didSave(notification: )), name: .NSManagedObjectContextDidSave, object: backgroundPerformContext)
-        notificationCenter.addObserver(self,
-            selector: #selector(storeDidChangeExternally(_:)),
-            name: .NSPersistentStoreRemoteChange,
-            object: persistentStoreCoordinator)
     }
     
     func removeObservers() {
@@ -453,54 +494,6 @@ private extension PersistentContainer {
         if (notification.object as? NSManagedObjectContext) === backgroundPerformContext {
             backgroundReadOnlyObservableContext.perform {
                 self.backgroundReadOnlyObservableContext.mergeChanges(fromContextDidSave: notification)
-            }
-        }
-    }
-
-    @objc
-    func storeDidChangeExternally(_ notification: Notification) {
-        // NSPersistentStoreRemoteChange fires for ALL saves — including same-process ones.
-        // Fetch persistent history to check whether any transaction was authored by a
-        // different process (NSE / Share Extension). Only then refresh contexts and
-        // notify observers, so that normal in-app writes don't trigger a cascade.
-        let currentAuthor = Bundle.main.bundleIdentifier
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            let tokenSnapshot = self.lastHistoryToken
-            let historyContext = self.newBackgroundContext()
-            historyContext.perform {
-                let fetchRequest = NSPersistentHistoryChangeRequest.fetchHistory(after: tokenSnapshot)
-                guard let result = try? historyContext.execute(fetchRequest) as? NSPersistentHistoryResult,
-                      let transactions = result.result as? [NSPersistentHistoryTransaction],
-                      !transactions.isEmpty else { return }
-
-                let lastToken = transactions.last?.token
-                if transactions.count == 0 {
-                    return
-                }
-                let hasExternalChanges = transactions.contains { $0.author != nil && $0.author != currentAuthor }
-
-                DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    self.lastHistoryToken = lastToken
-
-                    // Purge processed history to prevent unbounded table growth.
-                    if let purgeToken = lastToken {
-                        let purgeContext = self.newBackgroundContext()
-                        purgeContext.perform {
-                            let purgeRequest = NSPersistentHistoryChangeRequest.deleteHistory(before: purgeToken)
-                            try? purgeContext.execute(purgeRequest)
-                        }
-                    }
-
-                    guard hasExternalChanges else { return }
-
-                    self.refreshAllObjects {
-                        NotificationCenter.default.post(
-                            name: .persistentStoreDidChangeExternally,
-                            object: self)
-                    }
-                }
             }
         }
     }
@@ -527,4 +520,42 @@ public extension NSManagedObjectContext {
 public extension Notification.Name {
     static let persistentStoreDidChangeExternally =
         Notification.Name("SceytChatUIKit.persistentStoreDidChangeExternally")
+}
+
+enum DatabaseWriteWatchdog {
+
+    static var stuckThreshold: TimeInterval = 5
+
+    static func wrap(
+        _ perform: @escaping (NSManagedObjectContext) throws -> Void,
+        kind: String,
+        file: StaticString,
+        line: UInt,
+        function: StaticString
+    ) -> (NSManagedObjectContext) throws -> Void {
+        let id = String(UUID().uuidString.prefix(8))
+        let callsite = "\(("\(file)" as NSString).lastPathComponent):\(line) \(function)"
+        let enqueuedAt = CFAbsoluteTimeGetCurrent()
+        logger.debug("[Ctx] \(kind) ENQUEUE id=\(id) by=\(callsite)")
+        let enqueueWatchdog = DispatchWorkItem {
+            logger.error("[Ctx] \(kind) WATCHDOG id=\(id) >\(Int(stuckThreshold))s NOT STARTED by=\(callsite)")
+        }
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + stuckThreshold, execute: enqueueWatchdog)
+        return { ctx in
+            enqueueWatchdog.cancel()
+            let waited = CFAbsoluteTimeGetCurrent() - enqueuedAt
+            let started = CFAbsoluteTimeGetCurrent()
+            logger.debug("[Ctx] \(kind) START id=\(id) waited=\(Int(waited*1000))ms by=\(callsite)")
+            let runWatchdog = DispatchWorkItem {
+                logger.error("[Ctx] \(kind) WATCHDOG id=\(id) >\(Int(stuckThreshold))s STILL RUNNING by=\(callsite)")
+            }
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + stuckThreshold, execute: runWatchdog)
+            defer {
+                runWatchdog.cancel()
+                let dur = CFAbsoluteTimeGetCurrent() - started
+                logger.debug("[Ctx] \(kind) END id=\(id) duration=\(Int(dur*1000))ms by=\(callsite)")
+            }
+            try perform(ctx)
+        }
+    }
 }
