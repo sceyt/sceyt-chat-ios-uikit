@@ -108,7 +108,6 @@ open class ChannelViewController: ViewController,
     @objc public lazy var longPressGestureRecognizer = UILongPressGestureRecognizer()
     @objc public lazy var panGestureRecognizer = UIPanGestureRecognizer()
     
-    public lazy var displayedTimer = DisplayedTimer()
     public var userSelectOnRepliedMessage: ChatMessage?
     
     public var avatarTask: Cancellable?
@@ -157,6 +156,11 @@ open class ChannelViewController: ViewController,
                     self?.applyPendingUpdate(next)
                 }
             }
+            // Re-arm displayed-marker flush after a batch finishes — willDisplay
+            // calls fired mid-update are gated out inside the work item.
+            if !isCollectionViewUpdating {
+                scheduleMarkDisplayed()
+            }
         }
     }
     private var itemsAboveAtLastPrevFetch: Int = .max
@@ -184,6 +188,8 @@ open class ChannelViewController: ViewController,
     private var contextMenu: ContextMenu!
     private var scrollTimer: Timer?
     private var isAppActive: Bool = true
+    private var markDisplayedWorkItem: DispatchWorkItem?
+    private let markDisplayedDebounceInterval: TimeInterval = 0.2
     private var shouldAnimateEditing: Bool = false
     private var lastAnimatedIndexPath: IndexPath? = nil
     private var selectMessageId: MessageId?
@@ -229,16 +235,8 @@ open class ChannelViewController: ViewController,
                 self?.keyboardWillShow(notification: $0)
             }
         
-        if !displayedTimer.isStarted {
-            displayedTimer.start { [weak self] _ in
-                guard let self,
-                      !self.isCollectionViewUpdating,
-                      self.isAppActive
-                else { return}
-                self.markMessageAsDisplayed()
-            }
-        }
-        
+        scheduleMarkDisplayed()
+
         if navigationController?.navigationBar.isUserInteractionEnabled == false { // system bug
             navigationController?.navigationBar.isUserInteractionEnabled = true
         }
@@ -256,6 +254,7 @@ open class ChannelViewController: ViewController,
         super.viewDidDisappear(animated)
         isViewDidAppear = false
         keyboardObserver = nil
+        cancelPendingMarkDisplayed()
     }
     
     override open func viewWillTransition(to size: CGSize, with coordinator: UIViewControllerTransitionCoordinator) {
@@ -653,10 +652,12 @@ open class ChannelViewController: ViewController,
                 self?.isAppActive = true
                 self?.channelViewModel.canUpdateUnreadPosition = false
                 self?.updateUnreadViewVisibility()
+                self?.scheduleMarkDisplayed()
             }
             .didEnterBackground { [weak self] _ in
                 self?.isAppActive = false
                 self?.channelViewModel.canUpdateUnreadPosition = true
+                self?.cancelPendingMarkDisplayed()
             }
     }
     
@@ -1543,8 +1544,12 @@ open class ChannelViewController: ViewController,
                 cell.contentView.alpha = self.channelViewModel.canSelectMessage(at: indexPath) ? 1 : 0.5
             }
         }
+
+        if cell.data.message.incoming {
+            scheduleMarkDisplayed()
+        }
     }
-    
+
     // MARK: Applied snapshot helpers
 
     /// Pure builder — reads the observer's current state and returns a fresh
@@ -2555,6 +2560,26 @@ open class ChannelViewController: ViewController,
         } else {
             channelViewModel.markMessage(as: .displayed, indexPaths: collectionView.indexPathsForVisibleItems)
         }
+    }
+
+    private func scheduleMarkDisplayed() {
+        guard isViewDidAppear, isAppActive else { return }
+        markDisplayedWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self,
+                  !self.isCollectionViewUpdating,
+                  self.isAppActive,
+                  self.isViewDidAppear
+            else { return }
+            self.markMessageAsDisplayed()
+        }
+        markDisplayedWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + markDisplayedDebounceInterval, execute: work)
+    }
+
+    private func cancelPendingMarkDisplayed() {
+        markDisplayedWorkItem?.cancel()
+        markDisplayedWorkItem = nil
     }
     
     // MARK: ViewModel Events

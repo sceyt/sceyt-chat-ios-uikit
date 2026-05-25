@@ -1223,26 +1223,26 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
 
         markMessagesQueue.async { [weak self] in
             guard let self else { return }
-            let filteredMessages = messages.filter {
-                return !$0.incoming ? false :
-                $0.userMarkers?.contains(where: { $0.user?.id == currentUserId && $0.name == marker.rawValue } ) == true ? false : true
+            let ids: [MessageId] = messages.compactMap { m in
+                guard m.incoming else { return nil }
+                if m.userMarkers?.contains(where: { $0.user?.id == currentUserId && $0.name == marker.rawValue }) == true {
+                    return nil
+                }
+                return m.id
             }
-            guard !filteredMessages.isEmpty,
-                    let max = filteredMessages.max(by: { $0.id < $1.id }),
-                    let min = filteredMessages.min(by: { $0.id < $1.id })
+            guard !ids.isEmpty
             else {
                 markMessagesTaskStarted = false
                 newMentionCount = UInt64(unreadMentionsManager.remainingUnreadMentionsCount)
                 return
             }
-                        //
-            self.messageMarkerProvider.markIfNeeded(
-                after: min.id,
-                before: max.id,
+
+            self.messageMarkerProvider.markMessages(
+                ids: ids,
                 markerName: marker.rawValue)
             {[weak self] error in
                 self?.markMessagesTaskStarted = false
-                
+
                 if error == nil {
                     self?.updateMentionCountAfterMarkingDisplayed(messages: messages)
                 }
@@ -1256,30 +1256,31 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         else {
             return
         }
-        
+
         // Capture currentUserId before dispatching to background queue to avoid thread safety issues
         let currentUserId = SceytChatUIKit.shared.currentUserId
-        
+
         markMessagesQueue.async { [weak self] in
             guard let self
             else { return }
-            
-            let message = messages.filter {
-                return !$0.incoming ? false :
-                $0.userMarkers?.contains(where: { $0.user?.id == currentUserId && $0.name == DefaultMarker.displayed.rawValue } ) == true ? false : true
-            }.max(by: { $0.id < $1.id })
-            
-            guard let message, self.lasMarkDisplayedMessageId != message.id
+
+            let ids: [MessageId] = messages.compactMap { m in
+                guard m.incoming else { return nil }
+                if m.userMarkers?.contains(where: { $0.user?.id == currentUserId && $0.name == DefaultMarker.displayed.rawValue }) == true {
+                    return nil
+                }
+                return m.id
+            }
+
+            guard let maxId = ids.max(), self.lasMarkDisplayedMessageId != maxId
             else {
                 markMessagesTaskStarted = false
                 return
             }
-            let prevLasMarkDisplayedMessageId = self.lasMarkDisplayedMessageId
-            self.lasMarkDisplayedMessageId = message.id
-            
-            self.messageMarkerProvider.markIfNeeded(
-                after: prevLasMarkDisplayedMessageId,
-                before: message.id,
+            self.lasMarkDisplayedMessageId = maxId
+
+            self.messageMarkerProvider.markMessages(
+                ids: ids,
                 markerName: DefaultMarker.displayed.rawValue)
             {[weak self] error in
                 self?.markMessagesTaskStarted = false

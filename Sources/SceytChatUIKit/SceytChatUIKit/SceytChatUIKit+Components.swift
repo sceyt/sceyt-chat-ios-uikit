@@ -180,7 +180,6 @@ extension SceytChatUIKit {
         public static var badgeView: BadgeView.Type = BadgeView.self
         public static var bottomSheet: BottomSheet.Type = BottomSheet.self
         public static var channelDateSeparatorView: ChannelViewController.DateSeparatorView.Type = ChannelViewController.DateSeparatorView.self
-        public static var channelDisplayedTimer: ChannelViewController.DisplayedTimer.Type = ChannelViewController.DisplayedTimer.self
         public static var channelHeaderView: ChannelViewController.HeaderView.Type = ChannelViewController.HeaderView.self
         public static var channelMessagesCollectionView: ChannelViewController.MessagesCollectionView.Type = ChannelViewController.MessagesCollectionView.self
         public static var channelMessagesCollectionViewLayout: ChannelViewController.MessagesCollectionViewLayout.Type = ChannelViewController.MessagesCollectionViewLayout.self

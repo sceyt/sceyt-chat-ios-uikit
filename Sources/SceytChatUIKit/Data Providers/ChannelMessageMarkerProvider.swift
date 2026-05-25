@@ -85,6 +85,47 @@ open class ChannelMessageMarkerProvider: DataProvider {
         }
     }
     
+    open func markMessages(
+        ids: [MessageId],
+        markerName: String,
+        storeBeforeSend: Bool = true,
+        completion: ((Error?) -> Void)? = nil
+    ) {
+        guard !ids.isEmpty else {
+            completion?(nil)
+            return
+        }
+
+        if storeBeforeSend {
+            database.write {
+                $0.update(messagePendingMarkers: ids, markerName: markerName)
+            }
+        }
+
+        guard SceytChatUIKit.shared.chatClient.connectionState == .connected,
+              Self.canMarkMessage
+        else {
+            completion?(nil)
+            return
+        }
+
+        let chunked = ids.chunked(into: 50)
+        let group = DispatchGroup()
+        var resultError: Error?
+        for chunk in chunked {
+            group.enter()
+            logger.debug("[MARKER CHECK] will mark: \(markerName) to \(chunk) in channelId \(self.channelId)")
+            self.mark(ids: Array(chunk), markerName: markerName) { error in
+                resultError = error
+                logger.debug("[MARKER CHECK] did mark: \(markerName) to \(chunk) \(error as Any)")
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) {
+            completion?(resultError)
+        }
+    }
+
     open func mark(
         ids: [MessageId],
         markerName: String,
