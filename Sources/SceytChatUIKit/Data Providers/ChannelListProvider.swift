@@ -100,11 +100,14 @@ open class ChannelListProvider: DataProvider {
         channels: [Channel],
         completion: ((Error?) -> Void)? = nil
     ) {
-        onStoreChannels?(channels)
-        database.write {
+        database.performWriteTask {
             $0.createOrUpdate(channels: channels)
         } completion: { error in
             logger.errorIfNotNil(error, "Unable Store channels")
+            if error == nil {
+                logger.debug("onStoreChannels:\(channels.count)")
+                self.onStoreChannels?(channels)
+            }
             completion?(error)
         }
 

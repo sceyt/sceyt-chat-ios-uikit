@@ -12,28 +12,50 @@ import SceytChat
 import CoreData
 
 public final class SyncService: NSObject {
-    
+
     public static var workerQueue = DispatchQueue(label: "com.sceytchat.uikit.syncService")
-    public private(set) static var isSyncing = false
-    
+    private static let syncStateLock = NSLock()
+    private static var _isSyncing = false
+
+    public static var isSyncing: Bool {
+        syncStateLock.lock()
+        defer { syncStateLock.unlock() }
+        return _isSyncing
+    }
+
+    private static func startSyncIfNeeded() -> Bool {
+        syncStateLock.lock()
+        defer { syncStateLock.unlock() }
+
+        guard !_isSyncing else { return false }
+        _isSyncing = true
+        return true
+    }
+
+    private static func finishSync() {
+        syncStateLock.lock()
+        _isSyncing = false
+        syncStateLock.unlock()
+    }
+
     public static var reactionQueue: OperationQueue = {
         let op = OperationQueue()
         op.maxConcurrentOperationCount = 1
         return op
     }()
-    
+
     public static var pollVoteQueue: OperationQueue = {
         let op = OperationQueue()
         op.maxConcurrentOperationCount = 1
         return op
     }()
-    
+
     public static var markersQueue: OperationQueue = {
         let op = OperationQueue()
         op.maxConcurrentOperationCount = 5
         return op
     }()
-    
+
     public class func resendPendingItems() {
         logger.verbose("SyncService: resendPendingItems")
         workerQueue.async {
@@ -53,7 +75,7 @@ public final class SyncService: NSObject {
             }
         }
     }
-    
+
     public class func resendPendingMessage() {
         guard Bundle.isMainApp else {
             logger.verbose("SyncService: resendPendingMessage skipped - running in app extension")
@@ -113,7 +135,7 @@ public final class SyncService: NSObject {
                 }
             }
     }
-    
+
     public class func makePendingMarkerOperations(
         completion: @escaping ([MarkerResendOperation]) -> Void
     ) {
@@ -136,7 +158,7 @@ public final class SyncService: NSObject {
                 completion(operations)
             }
     }
-    
+
     public class func makePendingReactionOperations(
         completion: @escaping ([ReactionResendOperation]) -> Void
     ) {
@@ -154,7 +176,7 @@ public final class SyncService: NSObject {
                 completion(operations)
             }
     }
-    
+
     public class func makePendingPollVoteOperations(
         completion: @escaping ([PollVoteResendOperation]) -> Void
     ) {
@@ -183,14 +205,14 @@ public final class SyncService: NSObject {
                 completion(operations)
             }
     }
-    
+
     public class func sendPendingMessages() {
         workerQueue
             .async {
                 resendPendingMessage()
             }
     }
-    
+
     public class func sendPendingMarkers() {
         workerQueue
             .async {
@@ -199,7 +221,7 @@ public final class SyncService: NSObject {
                 }
             }
     }
-    
+
     public class func sendPendingReactions() {
         workerQueue
             .async {
@@ -208,7 +230,7 @@ public final class SyncService: NSObject {
                 }
             }
     }
-    
+
     public class func sendPendingPollVotes() {
         workerQueue
             .async {
@@ -217,20 +239,20 @@ public final class SyncService: NSObject {
                 }
             }
     }
-    
+
     public class func syncChannels(
         task: BGAppRefreshTask? = nil,
         completion: ((Bool) -> Void)? = nil) {
-            guard !Self.isSyncing else {
+            guard Self.startSyncIfNeeded() else {
                 logger.verbose("SyncService: syncChannels skipped — already syncing")
                 task?.setTaskCompleted(success: true)
                 completion?(false)
                 return
             }
+            logger.verbose("SyncService: syncChannels started")
             Components.channelMessageMarkerProvider.canMarkMessage = false
-            Self.isSyncing = true
             Self.sendPendingReactions()
-            
+
             let channelSyncQueue = OperationQueue()
             channelSyncQueue.maxConcurrentOperationCount = 1
             let messageSyncQueue = OperationQueue()
@@ -284,12 +306,14 @@ public final class SyncService: NSObject {
                 Self.sendPendingMessages()
             }
             guard !operations.isEmpty else {
+                Components.channelMessageMarkerProvider.canMarkMessage = true
+                Self.finishSync()
                 completion?(true)
                 return
             }
             let markerResult = results?.1
             let markerOperations = Operations.syncMessageMarkersOperations(markersGroup: markerResult ?? [:])
-            
+
             let lastOperation: Operation = markerOperations.last ?? operations.last!
             completionOperator.addDependency(lastOperation)
             channelCompletionOperator.addDependency(operations.last!)
@@ -300,17 +324,17 @@ public final class SyncService: NSObject {
                 task.expirationHandler = {
                     channelSyncQueue.cancelAllOperations()
                     messageSyncQueue.cancelAllOperations()
-                    Self.isSyncing = false
+                    Self.finishSync()
                 }
-                
+
                 completionOperator.completionBlock = {
                     task.setTaskCompleted(success: !completionOperator.isCancelled)
                     completion?(completionOperator.isFinished)
-                    Self.isSyncing = false
+                    Self.finishSync()
                 }
             } else {
                 completionOperator.completionBlock = {
-                    Self.isSyncing = false
+                    Self.finishSync()
                     completion?(completionOperator.isFinished)
                 }
             }
@@ -319,7 +343,7 @@ public final class SyncService: NSObject {
 }
 
 public struct Operations {
-    
+
     public static func syncChannelOperations(undeleteChannelIds: [ChannelId] = [], onLoad: (([Channel]) -> Void)? = nil) -> [Operation] {
         let createChannel = CreateUnSyncChannelsOperation()
 
@@ -329,14 +353,14 @@ public struct Operations {
         fetchChannels.onLoad = onLoad
 
         let deleteChannels = DeleteChannelsOperation(database: DataProvider.database, channelIds: undeleteChannelIds)
-        
+
         let fetchDone = BlockOperation { [unowned fetchChannels, unowned deleteChannels, unowned createChannel] in
             guard case let .success(channels)? = fetchChannels.result else {
                 deleteChannels.cancel()
                 return
             }
             deleteChannels.addChannel(ids: channels.map { $0.id })
-            
+
             if  case let .success(channels)? = createChannel.result {
                 deleteChannels.addChannel(ids: channels.map { $0.id })
             }
@@ -344,13 +368,13 @@ public struct Operations {
         fetchChannels.addDependency(createChannel)
         fetchDone.addDependency(fetchChannels)
         deleteChannels.addDependency(fetchDone)
-        
+
         return [createChannel,
                 fetchChannels,
                 fetchDone,
                 deleteChannels]
     }
-    
+
     public static func syncChannelMessagesOperations(
         startMessageId: MessageId,
         channelId: ChannelId,
@@ -396,7 +420,7 @@ public struct Operations {
         }
         return messageOperation
     }
-    
+
     public static func syncMessageMarkersOperations(markersGroup: [ChannelId: [String: Set<MessageId>]]) -> [Operation] {
         var operations = [MarkerResendOperation]()
         markersGroup.forEach { (cid, markers) in
@@ -416,9 +440,9 @@ public struct Operations {
 
 
 private extension ChannelDatabaseSession where Self: NSManagedObjectContext {
-    
+
     func fetchChannelsToSyncMessages() -> [ChannelId: MessageId] {
-        
+
         let fetchRequest = NSFetchRequest<NSDictionary>(entityName: ChannelDTO.entityName)
         fetchRequest.resultType = .dictionaryResultType
         fetchRequest.propertiesToFetch = ["id", "lastDisplayedMessageId"]
@@ -431,12 +455,12 @@ private extension ChannelDatabaseSession where Self: NSManagedObjectContext {
             items[channelId] = lastDisplayedId
         }
         return items
-        
+
     }
 }
 
 private extension MessageDatabaseSession where Self: NSManagedObjectContext {
-    
+
     func fetchPendingMarkerToSyncMessages() -> [ChannelId: [String: Set<MessageId>]] {
         let request = MessageDTO.fetchRequest()
         request.sortDescriptor = NSSortDescriptor(keyPath: \MessageDTO.tid, ascending: false)
@@ -459,10 +483,10 @@ private extension MessageDatabaseSession where Self: NSManagedObjectContext {
                     result[cid]![marker]!.insert(MessageId(element.id))
                 }
                 return result
-                
+
             }
     }
-    
+
     func fetchChannelsForPendingMessages() -> [ChannelId] {
         let request = NSFetchRequest<NSDictionary>(entityName: MessageDTO.entityName)
         request.predicate = .init(
@@ -471,12 +495,12 @@ private extension MessageDatabaseSession where Self: NSManagedObjectContext {
             false,
             ChatMessage.DeliveryStatus.pending.intValue,
             ChatMessage.DeliveryStatus.failed.intValue)
-        
+
         request.resultType = .dictionaryResultType
         request.propertiesToFetch = ["channelId"]
-        
+
         let results = MessageDTO.fetch(request: request, context: self)
-            
+
         var items = [ChannelId: Bool]()
         for result in results {
             guard let channelId = result["channelId"] as? ChannelId

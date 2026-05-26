@@ -58,6 +58,11 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     @discardableResult
     public func createOrUpdate(channel: Channel, forceUpdate: Bool) -> ChannelDTO {
         let (channelDTO, created) = ChannelDTO.fetchOrCreate(id: channel.id, context: self)
+        return apply(channel: channel, to: channelDTO, created: created, forceUpdate: forceUpdate)
+    }
+
+    @discardableResult
+    private func apply(channel: Channel, to channelDTO: ChannelDTO, created: Bool, forceUpdate: Bool) -> ChannelDTO {
         let dto = channelDTO.map(channel)
 
         if channel.newMessageCount > 0 {
@@ -186,7 +191,23 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(channels: [Channel]) -> [ChannelDTO] {
-        channels.map { createOrUpdate(channel: $0, forceUpdate: true) }
+        guard !channels.isEmpty else { return [] }
+
+        let ids = channels.map { $0.id }
+        var dtosById: [Int64: ChannelDTO] = Dictionary(
+            uniqueKeysWithValues: ChannelDTO.fetch(ids: ids, context: self).map { ($0.id, $0) }
+        )
+
+        return channels.map { channel in
+            let key = Int64(channel.id)
+            if let existing = dtosById[key] {
+                return apply(channel: channel, to: existing, created: false, forceUpdate: true)
+            }
+            let new = ChannelDTO.insertNewObject(into: self)
+            new.id = key
+            dtosById[key] = new
+            return apply(channel: channel, to: new, created: true, forceUpdate: true)
+        }
     }
     
     public func markAsRead(channelId: ChannelId) {

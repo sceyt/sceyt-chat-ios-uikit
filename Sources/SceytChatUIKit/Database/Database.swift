@@ -127,38 +127,27 @@ public extension Database {
             }
         }
 
-        backgroundReadOnlyObservableContext.perform {
-            logger.debug("[Ctx] refreshAll bgReadObs")
+        backgroundReadOnlyContext.perform {
+            logger.debug("[Ctx] refreshAll bgRead")
             if resetStalenessInterval {
-                self.backgroundReadOnlyObservableContext.stalenessInterval = 0
+                self.backgroundReadOnlyContext.stalenessInterval = 0
             }
-            self.backgroundReadOnlyObservableContext.refreshAllObjects()
+            self.backgroundReadOnlyContext.refreshAllObjects()
             if resetStalenessInterval {
-                self.backgroundReadOnlyObservableContext.stalenessInterval = -1
+                self.backgroundReadOnlyContext.stalenessInterval = -1
             }
-
-            backgroundReadOnlyContext.perform {
-                logger.debug("[Ctx] refreshAll bgRead")
+            
+            DispatchQueue.main.async {
+                logger.debug("[Ctx] refreshAll view")
                 if resetStalenessInterval {
-                    self.backgroundReadOnlyContext.stalenessInterval = 0
+                    self.viewContext.stalenessInterval = 0
                 }
-                self.backgroundReadOnlyContext.refreshAllObjects()
+                self.viewContext.refreshAllObjects()
                 if resetStalenessInterval {
-                    self.backgroundReadOnlyContext.stalenessInterval = -1
+                    self.viewContext.stalenessInterval = -1
                 }
-
-                DispatchQueue.main.async {
-                    logger.debug("[Ctx] refreshAll view")
-                    if resetStalenessInterval {
-                        self.viewContext.stalenessInterval = 0
-                    }
-                    self.viewContext.refreshAllObjects()
-                    if resetStalenessInterval {
-                        self.viewContext.stalenessInterval = -1
-                    }
-                    logger.debug("[Ctx] refreshAll done")
-                    completion?()
-                }
+                logger.debug("[Ctx] refreshAll done")
+                completion?()
             }
         }
     }
