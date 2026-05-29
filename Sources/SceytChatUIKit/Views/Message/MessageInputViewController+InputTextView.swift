@@ -151,9 +151,32 @@ extension MessageInputViewController {
             }
             let mAttributedText = attributedText.mutableCopy() as! NSMutableAttributedString
             let range = selectedRange
-            mAttributedText.safeReplaceCharacters(in: range, with: mPastedAttributedString)
+
+            // Truncate the pasted text so the resulting message stays within the
+            // configured maximum length, cutting on a composed character boundary so
+            // emoji and combining marks are never split in half.
+            let maxLength = SceytChatUIKit.shared.config.maximumMessageLength
+            let availableLength = maxLength - (mAttributedText.length - range.length)
+            let insertString: NSAttributedString
+            if mPastedAttributedString.length > availableLength {
+                guard availableLength > 0 else { return }
+                let nsString = mPastedAttributedString.string as NSString
+                var cut = min(availableLength, nsString.length)
+                if cut < nsString.length {
+                    let seqRange = nsString.rangeOfComposedCharacterSequence(at: cut)
+                    if seqRange.location < cut {
+                        cut = seqRange.location
+                    }
+                }
+                guard cut > 0 else { return }
+                insertString = mPastedAttributedString.attributedSubstring(from: NSRange(location: 0, length: cut))
+            } else {
+                insertString = mPastedAttributedString
+            }
+
+            mAttributedText.safeReplaceCharacters(in: range, with: insertString)
             attributedText = mAttributedText
-            selectedRange = .init(location: range.location + mPastedAttributedString.length, length: 0)
+            selectedRange = .init(location: range.location + insertString.length, length: 0)
         }
         
         open func resetTypingAttributes() {

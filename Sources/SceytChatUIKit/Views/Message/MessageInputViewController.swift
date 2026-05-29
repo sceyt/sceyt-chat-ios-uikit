@@ -1247,7 +1247,16 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         if isRecording {
             return false
         }
-        
+
+        // Enforce the maximum message length on insertions/replacements.
+        if !text.isEmpty {
+            let currentLength = (textView.text as NSString).length
+            let newLength = currentLength - range.length + (text as NSString).length
+            if newLength > SceytChatUIKit.shared.config.maximumMessageLength {
+                return false
+            }
+        }
+
         textView.typingAttributes[.foregroundColor] = appearance.inputAppearance.textInputAppearance.labelAppearance.foregroundColor
         
         if text == " " {

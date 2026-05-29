@@ -82,6 +82,7 @@ extension SceytChatUIKit {
         public var videoAttachmentResizeConfig: VideoResizeConfig = .medium
         public var attachmentSelectionLimit: Int = 20
         public var messageMultiselectLimit: Int = 30
+        public var maximumMessageLength: Int = 5000
         public var messageReactionPerUserLimit: UInt = 6 {
             didSet {
                 if messageReactionPerUserLimit < 1 || messageReactionPerUserLimit > 6 {
