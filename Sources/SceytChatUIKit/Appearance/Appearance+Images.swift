@@ -146,11 +146,6 @@ public extension Appearance {
             AssetComposer.shared.compose(from: .init(image: Assets.replyLinkPlaceholder.image,
                                                      renderingMode: .original))!
         }()
-
-        public static var replyLinkPlaceholderDark: UIImage = {
-            AssetComposer.shared.compose(from: .init(image: Assets.replyLinkPlaceholderDark.image,
-                                                     renderingMode: .original))!
-        }()
         
         public static var pendingMessage: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.messageTickPending.image,
@@ -709,7 +704,6 @@ extension UIImage {
     public static var editAvatar: UIImage { Images.editAvatar }
     public static var brokenImagePlaceholderIcon: UIImage { Images.brokenImagePlaceholderIcon }
     public static var replyLinkPlaceholder: UIImage { Images.replyLinkPlaceholder }
-    public static var replyLinkPlaceholderDark: UIImage { Images.replyLinkPlaceholderDark }
     
     public static var pendingMessage: UIImage { Images.pendingMessage }
     public static var sentMessage: UIImage { Images.sentMessage }

@@ -145,7 +145,7 @@ extension MessageCell {
                 var willLoadLinkImage = false
                 if attachment.type == .link {
                     willLoadLinkImage = true
-                    imageView.image = traitCollection.userInterfaceStyle == .dark ? Images.replyLinkPlaceholderDark : Images.replyLinkPlaceholder
+                    imageView.image = Images.replyLinkPlaceholder
                     if let urlString = attachment.attachment.url,
                        let linkUrl = URL(string: urlString) {
                         // Use the same image LinkPreviewView shows
