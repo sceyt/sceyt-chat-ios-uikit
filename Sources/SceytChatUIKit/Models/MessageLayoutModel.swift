@@ -503,6 +503,9 @@ open class MessageLayoutModel {
             updateOptions.insert(.user)
         }
         
+        let prevHasReply = self.message.parent != nil && self.message.repliedInThread == false
+        let newHasReply = message.parent != nil && message.repliedInThread == false
+
         if let parent = message.parent {
             let title = appearance.senderNameFormatter.format(parent.user)
             if title != parentMessageUserTitle {
@@ -519,14 +522,14 @@ open class MessageLayoutModel {
                 ).textSize
                 updateOptions.insert(.parentMessageUser)
             }
-            
+
             if force || self.message.parent?.body != message.parent?.body || self.message.parent?.state != message.parent?.state {
                 let parentAttributedView = Self.attributedView(
                     message: parent,
                     userSendMessage: userSendMessage,
                     appearance: appearance
                 )
-                
+
                 let parentSize = Self.textSizeMeasure.calculateSize(of: parentAttributedView.content,
                                                                     config: .init(restrictingWidth: restrictingTextWidth))
                 self.parentAttributedView = parentAttributedView
@@ -534,7 +537,7 @@ open class MessageLayoutModel {
                 updateOptions.insert(.parentMessageBody)
             }
             replyLayout = Components.messageReplyLayoutModel.init(
-                message: parent, 
+                message: parent,
                 byMe: message.user.id == SceytChatUIKit.shared.currentUserId,
                 channel: channel,
                 thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
@@ -546,6 +549,14 @@ open class MessageLayoutModel {
             parentMessageUserTitleSize = .zero
             parentAttributedView = nil
             replyLayout = nil
+        }
+
+        // hasReply gates measureSize through reply space in measure(). When it
+        // flips and no other field is dirty, force a measureSize recompute —
+        // otherwise the cell keeps the old (reply-sized) height while bind()
+        // hides replyView, or vice versa.
+        if prevHasReply != newHasReply {
+            updateOptions.insert(.reload)
         }
         if attachments.isEmpty {
             var prevLinkPreviews = linkPreviews
