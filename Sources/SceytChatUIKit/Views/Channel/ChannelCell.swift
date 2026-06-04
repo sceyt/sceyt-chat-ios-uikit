@@ -141,6 +141,7 @@ extension ChannelListViewController {
             messageStackViewCenterYConstraint = messageStackView.centerYAnchor.pin(to: contentView.centerYAnchor, activate: false)
             updateCenterYConstraint()
             messageLabel.trailingAnchor.pin(lessThanOrEqualTo: badgeStackView.leadingAnchor)
+            messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
             
             muteView.centerYAnchor.pin(to: subjectLabel.centerYAnchor)
             muteView.leadingAnchor.pin(to: subjectLabel.trailingAnchor, constant: 4)

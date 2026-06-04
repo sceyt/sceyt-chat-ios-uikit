@@ -131,27 +131,26 @@ open class ChannelListViewController: ViewController,
 
     open func applyCurrentSnapshot(animation: Bool = false) {
         var snapshot = NSDiffableDataSourceSnapshot<Int, ChannelId>()
-        let sectionCount = channelListViewModel.numberOfSections
-        let sections = Array(0..<sectionCount)
-        snapshot.appendSections(sections)
+        snapshot.appendSections([0])
 
         var newFingerprints: [ChannelId: ChannelFingerprint] = [:]
         var changedIds: [ChannelId] = []
         var seenIds = Set<ChannelId>()
+        let count = channelListViewModel.numberOfChannel(at: 0)
+        var ids: [ChannelId] = []
+        ids.reserveCapacity(count)
 
-        for section in sections {
-            let ids = (0..<channelListViewModel.numberOfChannel(at: section)).compactMap { row -> ChannelId? in
-                guard let channel = channelListViewModel.channel(at: IndexPath(row: row, section: section)) else { return nil }
-                guard seenIds.insert(channel.id).inserted else { return nil }
-                let fp = makeFingerprint(for: channel)
-                newFingerprints[channel.id] = fp
-                if channelFingerprints[channel.id] != fp {
-                    changedIds.append(channel.id)
-                }
-                return channel.id
+        for row in 0..<count {
+            guard let channel = channelListViewModel.channel(at: IndexPath(row: row, section: 0)) else { continue }
+            guard seenIds.insert(channel.id).inserted else { continue }
+            let fp = makeFingerprint(for: channel)
+            newFingerprints[channel.id] = fp
+            if channelFingerprints[channel.id] != fp {
+                changedIds.append(channel.id)
             }
-            snapshot.appendItems(ids, toSection: section)
+            ids.append(channel.id)
         }
+        snapshot.appendItems(ids, toSection: 0)
 
         if !changedIds.isEmpty {
             snapshot.reloadItems(changedIds)
@@ -323,8 +322,6 @@ open class ChannelListViewController: ViewController,
             let hasStructuralChanges = !paths.inserts.isEmpty
                 || !paths.deletes.isEmpty
                 || !paths.moves.isEmpty
-                || !paths.sectionInserts.isEmpty
-                || !paths.sectionDeletes.isEmpty
             if hasStructuralChanges || paths.updates.isEmpty {
                 let hasDraftMove = !paths.moves.isEmpty
                 && paths.moves.allSatisfy { move in
@@ -333,9 +330,7 @@ open class ChannelListViewController: ViewController,
                 }
                 && paths.inserts.isEmpty
                 && paths.deletes.isEmpty
-                && paths.sectionInserts.isEmpty
-                && paths.sectionDeletes.isEmpty
-                
+
                 if swipeOpenIndexPath != nil {
                     swipeOpenIndexPath = nil
                     tableView.setEditing(false, animated: false)
@@ -375,12 +370,6 @@ open class ChannelListViewController: ViewController,
             } else {
                 UIView.performWithoutAnimation {
                     tableView.performBatchUpdates {
-                        if !paths.sectionInserts.isEmpty {
-                            tableView.insertSections(paths.sectionInserts, with: .none)
-                        }
-                        if !paths.sectionDeletes.isEmpty {
-                            tableView.deleteSections(paths.sectionDeletes, with: .none)
-                        }
                         tableView.insertRows(at: paths.inserts, with: .none)
                         tableView.reloadRows(at: paths.updates, with: .none)
                         tableView.deleteRows(at: paths.deletes, with: .none)

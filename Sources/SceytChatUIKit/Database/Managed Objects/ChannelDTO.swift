@@ -27,6 +27,7 @@ public class ChannelDTO: NSManagedObject {
     @NSManaged public var updatedAt: CDDate?
     @NSManaged public var messagesClearedAt: CDDate?
     @NSManaged public var pinnedAt: CDDate?
+    @NSManaged public var isPinned: Bool
     @NSManaged public var messageRetentionPeriod: TimeInterval
     
     @NSManaged public var memberCount: Int64
@@ -92,6 +93,11 @@ public class ChannelDTO: NSManagedObject {
         
         if sortingDate != sortingKey?.bridgeDate {
             sortingKey = sortingDate?.bridgeDate
+        }
+
+        let pinned = (pinnedAt != nil)
+        if isPinned != pinned {
+            isPinned = pinned
         }
     }
 

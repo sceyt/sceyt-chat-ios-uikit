@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import CoreData
 import SceytChat
 import Combine
 
@@ -16,8 +17,6 @@ open class ChannelListViewModel: NSObject,
     private var chatClient: ChatClient {
         SceytChatUIKit.shared.chatClient
     }
-    
-    public typealias Paths = LazyDatabaseObserver<ChannelDTO, ChatChannel>.ChangeItemPaths
     
     @Published public var event: Event?
 
@@ -57,28 +56,35 @@ open class ChannelListViewModel: NSObject,
     private var _selectedChannel: ChatChannel?
     
     @Atomic public var layoutModels = [ChatChannel: ChannelLayoutModel]()
-      
-    open lazy var channelObserver: LazyDatabaseObserver<ChannelDTO, ChatChannel> = {
-        return LazyDatabaseObserver<ChannelDTO, ChatChannel>(
+
+    /// The current channels snapshot, sorted by isPinned DESC, sortingKey DESC.
+    /// Rebuilt from the observer's `rawItems` on every change or reset.
+    public private(set) var channels: [ChatChannel] = []
+
+    /// O(1) lookup by channel id into `channels`.
+    private var channelIndexById: [ChannelId: Int] = [:]
+
+    open lazy var channelObserver: LazyDBObserver<ChatChannel, ChannelDTO> = makeChannelObserver()
+
+    /// Factory for the channel observer. Override in subclasses (e.g. tests) to inject
+    /// a different `NSManagedObjectContext` or an `NSFetchedResultsController` subclass.
+    open func makeChannelObserver() -> LazyDBObserver<ChatChannel, ChannelDTO> {
+        let request: NSFetchRequest<ChannelDTO> = ChannelDTO.fetchRequest()
+        request.sortDescriptors = [
+            NSSortDescriptor(keyPath: \ChannelDTO.isPinned,   ascending: false),
+            NSSortDescriptor(keyPath: \ChannelDTO.sortingKey, ascending: false)
+        ]
+        request.predicate = fetchPredicate
+        return LazyDBObserver<ChatChannel, ChannelDTO>(
             context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext,
-            sortDescriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)],
-            sectionNameKeyPath: #keyPath(ChannelDTO.pinSectionIdentifier),
-            fetchPredicate: fetchPredicate,
-            relationshipKeyPathsObserver: [
-                #keyPath(ChannelDTO.lastMessage.deliveryStatus),
-                #keyPath(ChannelDTO.lastMessage.updatedAt),
-                #keyPath(ChannelDTO.lastMessage.state),
-                #keyPath(ChannelDTO.lastMessage.metadata),
-//                #keyPath(ChannelDTO.members.user),
-                #keyPath(ChannelDTO.lastReaction.message),
-                #keyPath(ChannelDTO.lastReaction.key)
-            ]
-        ) { [weak self] in
-            let channel = $0.convert()
-            self?.createLayoutModel(channel: channel)
-            return channel
-        }
-    }()
+            fetchRequest: request,
+            itemCreator: { [weak self] dto in
+                let channel = dto.convert()
+                self?.createLayoutModel(channel: channel)
+                return channel
+            }
+        )
+    }
     
     override public required init() {
         provider = Components.channelListProvider.init(config: queryConfig)
@@ -103,17 +109,86 @@ open class ChannelListViewModel: NSObject,
     }
     
     open func startDatabaseObserver() {
-        channelObserver.onDidChange = { [weak self] _, items, _ in
-            self?.onDidChangeEvent(items: items)
+        channelObserver.onDidChange = { [weak self] changes in
+            guard let self else { return }
+            // Always rebuild the local snapshot (dedup + index) before handing off,
+            // so `onDidChangeEvent` subclasses see a coherent `channels` array.
+            self.rebuildLocalSnapshot()
+            self.onDidChangeEvent(items: DBChangeItemPaths(changeItems: changes))
         }
-        channelObserver.startObserver()
+        channelObserver.onReset = { [weak self] in
+            self?.applyReset()
+        }
+        do {
+            try channelObserver.startObserving()
+        } catch {
+            logger.errorIfNotNil(error, "ChannelListViewModel failed to start observer")
+        }
     }
+
+    /// Above this many structural changes in a single cycle, emit `.reload` instead
+    /// of `.change(items)` — the animated diff stops being informative and a single
+    /// reload pass is cheaper.
+    public static let reloadThreshold = 10
+
+    /// Default event emitter for an observer change cycle. Override to customize how
+    /// observer paths translate to `Event`. The default implementation:
+    /// - Emits `.reload` if duplicate channels were dropped from the snapshot — in
+    ///   that case `items`' indexes were computed against the un-deduped observer
+    ///   snapshot and would be off against the local `channels` array.
+    /// - Emits `.reload` if structural change count crosses `reloadThreshold`.
+    /// - Otherwise emits `.change(items)`.
+    /// - Kicks off an async refresh of the total unread count.
     open func onDidChangeEvent(items: Paths) {
-        if SyncService.isSyncing || items.numberOfChangedItems > 2 {
+        let removedDuplicates = channelObserver.rawItems.count > channels.count
+        let changedCount = items.inserts.count + items.deletes.count + items.moves.count
+
+        if removedDuplicates {
+            logger.warn("ChannelListViewModel: observer snapshot had duplicates (raw=\(channelObserver.rawItems.count), deduped=\(channels.count)) — falling back to .reload")
+            event = .reload
+        } else if changedCount > Self.reloadThreshold {
             event = .reload
         } else {
             event = .change(items)
         }
+        refreshTotalUnreadCount()
+    }
+
+    /// Called after the observer restarts under a new predicate. Treat as a full reload.
+    open func applyReset() {
+        rebuildLocalSnapshot()
+        event = .reload
+        refreshTotalUnreadCount()
+    }
+
+    /// Builds `channels` and `channelIndexById` from the observer's snapshot, keeping
+    /// the first occurrence of each `ChannelId`. Since `rawItems` is sorted by
+    /// `isPinned DESC, sortingKey DESC`, the first occurrence is the highest-priority
+    /// (pinned and/or most recently active) row — which is the one we want to surface.
+    /// This guards against transient duplicates that can appear before Core Data's
+    /// uniqueness constraint on `ChannelDTO.id` collapses them on save.
+    private func rebuildLocalSnapshot() {
+        let items = channelObserver.rawItems
+        var deduped: [ChatChannel] = []
+        deduped.reserveCapacity(items.count)
+        var index: [ChannelId: Int] = [:]
+        index.reserveCapacity(items.count)
+        var seen = Set<ChannelId>()
+        seen.reserveCapacity(items.count)
+
+        for channel in items {
+            guard seen.insert(channel.id).inserted else {
+                logger.warn("ChannelListViewModel dropped duplicate channel id=\(channel.id) from observer snapshot")
+                continue
+            }
+            index[channel.id] = deduped.count
+            deduped.append(channel)
+        }
+        channels = deduped
+        channelIndexById = index
+    }
+
+    private func refreshTotalUnreadCount() {
         Components.channelListProvider
             .totalUnreadMessagesCount(types: queryConfig.types) { [weak self] sum in
                 DispatchQueue.main.async {
@@ -136,19 +211,13 @@ open class ChannelListViewModel: NSObject,
     
     //MARK: Channel models
     open func channel(at indexPath: IndexPath) -> ChatChannel? {
-        channelObserver.item(at: indexPath)
+        guard indexPath.section == 0, channels.indices.contains(indexPath.row) else { return nil }
+        return channels[indexPath.row]
     }
-    
+
     open func channel(id: ChannelId) -> ChatChannel? {
-        var chatChannel: ChatChannel?
-        channelObserver.forEach { _, channel in
-            if channel.id == id {
-                chatChannel = channel
-                return true
-            }
-            return false
-        }
-        return chatChannel
+        guard let idx = channelIndexById[id], channels.indices.contains(idx) else { return nil }
+        return channels[idx]
     }
     
     open func fetchChannel(id: ChannelId,
@@ -164,18 +233,16 @@ open class ChannelListViewModel: NSObject,
         return nil
     }
     
-    open var numberOfSections: Int {
-        channelObserver.numberOfSections
-    }
-    
+    open var numberOfSections: Int { 1 }
+
     open func numberOfChannel(at section: Int) -> Int {
-        channelObserver.numberOfItems(in: section)
+        section == 0 ? channels.count : 0
     }
-    
+
     //MARK: Channel search
     open func search(channelListQuery: ChannelListQuery) {
         let predicate = ChannelDTO.predicate(query: channelListQuery)
-        channelObserver.restartObserver(fetchPredicate: predicate)
+        channelObserver.restart(predicate: predicate)
         provider.loadChannels(query: channelListQuery)
     }
    
@@ -374,7 +441,14 @@ open class ChannelListViewModel: NSObject,
 }
 
 public extension ChannelListViewModel {
-    
+
+    /// Alias for the change-paths shape the observer hands to the VC. Same as the
+    /// `DBChangeItemPaths` other view models use — kept under this name so callers
+    /// can refer to it as `ChannelListViewModel.Paths` (which the public API exposed
+    /// historically) and the VC's `updateTableView(paths:)` signature stays
+    /// self-describing.
+    typealias Paths = DBChangeItemPaths
+
     enum Event {
         case change(Paths)
         case reload
@@ -392,12 +466,18 @@ public extension ChannelListViewModel {
 extension ChannelListViewModel {
     
     func deleteDataBase(completion: (() -> Void)? = nil) {
-        channelObserver.stopObserver()
+        channelObserver.stopObserving()
         layoutModels.removeAll(keepingCapacity: true)
+        channels = []
+        channelIndexById = [:]
         Components.storage.deleteAll()
         DataProvider.database.deleteAll { [weak self] in
             guard let self else { return }
-            channelObserver.startObserver()
+            do {
+                try self.channelObserver.startObserving()
+            } catch {
+                logger.errorIfNotNil(error, "ChannelListViewModel failed to restart observer after deleteDataBase")
+            }
             completion?()
             SyncService.syncChannels()
         }
