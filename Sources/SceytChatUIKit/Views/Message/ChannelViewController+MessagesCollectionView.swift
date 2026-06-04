@@ -36,11 +36,21 @@ public extension ChannelViewController {
             contentInset.top = 0
             clipsToBounds = true
             contentInsetAdjustmentBehavior = .always
-            
+
             register(Components.channelSystemMessageCell)
             register(Components.channelOutgoingMessageCell)
             register(Components.channelIncomingMessageCell)
             register(Components.channelDateSeparatorView, kind: .header)
+        }
+
+        // bottomAnchorShift in the layout pins short content to the bottom of the
+        // visible area, derived from adjustedContentInset. UIKit only invalidates
+        // the layout on bounds change, so inset-only changes (keyboard open/close,
+        // input view height growth) would otherwise leave the shift stale and the
+        // single message hidden behind the keyboard.
+        open override func adjustedContentInsetDidChange() {
+            super.adjustedContentInsetDidChange()
+            collectionViewLayout.invalidateLayout()
         }
         
         open var layout: ChannelViewController.MessagesCollectionViewLayout {
@@ -271,3 +281,4 @@ public extension ChannelViewController.MessagesCollectionView {
         return nil
     }
 }
+
