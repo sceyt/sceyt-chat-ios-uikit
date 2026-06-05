@@ -2162,9 +2162,16 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
         }
     }
-    
+
+    open func didFailDownloadingAttachment(
+        message: ChatMessage,
+        attachment: ChatMessage.Attachment,
+        error: Error
+    ) {}
+
     open func downloadMessageAttachmentsIfNeeded(layoutModel: MessageLayoutModel) {
-        DispatchQueue.global().async {
+        DispatchQueue.global().async { [weak self] in
+            guard let self else { return }
             var attachmentsToDownload: [ChatMessage.Attachment]? = nil
             if !layoutModel.contentOptions.contains(.link) {
                 attachmentsToDownload = layoutModel.message.attachments?.filter { $0.type != "link" }
@@ -2174,7 +2181,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 .downloadMessageAttachmentsIfNeeded(
                     message: layoutModel.message,
                     attachments: attachmentsToDownload
-                )
+                ) { [weak self] resolvedMessage, error in
+                    guard let self, let error else { return }
+                    let source = resolvedMessage ?? layoutModel.message
+                    let failed = (source.attachments ?? [])
+                        .filter { $0.status == .failedDownloading }
+                    for attachment in failed {
+                        self.didFailDownloadingAttachment(
+                            message: source,
+                            attachment: attachment,
+                            error: error
+                        )
+                    }
+                }
         }
     }
     
