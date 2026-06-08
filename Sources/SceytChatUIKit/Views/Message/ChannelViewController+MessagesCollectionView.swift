@@ -48,10 +48,10 @@ public extension ChannelViewController {
         // the layout on bounds change, so inset-only changes (keyboard open/close,
         // input view height growth) would otherwise leave the shift stale and the
         // single message hidden behind the keyboard.
-        open override func adjustedContentInsetDidChange() {
-            super.adjustedContentInsetDidChange()
-            collectionViewLayout.invalidateLayout()
-        }
+//        open override func adjustedContentInsetDidChange() {
+//            super.adjustedContentInsetDidChange()
+//            collectionViewLayout.invalidateLayout()
+//        }
         
         open var layout: ChannelViewController.MessagesCollectionViewLayout {
             guard let layout = collectionViewLayout as? ChannelViewController.MessagesCollectionViewLayout else {
