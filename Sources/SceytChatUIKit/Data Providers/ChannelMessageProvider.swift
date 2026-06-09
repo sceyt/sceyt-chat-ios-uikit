@@ -826,20 +826,6 @@ open class ChannelMessageProvider: DataProvider {
             }   
         }
     }
-    
-    open func storeMessage(
-        notificationContent userInfo: [AnyHashable : Any],
-        completion: ((Error?) -> Void)? = nil
-    ) {
-        database.write ({
-            if let dto = try $0.createOrUpdate(notificationContent: userInfo) {
-                $0.update(messagePendingMarkers: [MessageId(dto.id)], markerName: DefaultMarker.received.rawValue)
-            }
-        }) { error in
-            completion?(error)
-        }
-    }
-    
 }
 
 extension ChannelMessageProvider {

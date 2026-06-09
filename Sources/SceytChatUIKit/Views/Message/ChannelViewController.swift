@@ -736,6 +736,7 @@ open class ChannelViewController: ViewController,
         searchControlsViewBottomConstraint.constant = shift
         updateCollectionViewInsets()
         let newBottom = collectionView.contentInset.bottom
+        let topInset = collectionView.adjustedContentInset.top
         if newBottom != bottom {
             if collectionView.contentSize.height >= collectionView.bounds.height {
                 contentOffsetY += newBottom - bottom
@@ -743,11 +744,14 @@ open class ChannelViewController: ViewController,
                 // Short content is bottom-anchored by the layout; contentSize already
                 // includes that shift. Use the natural height (without the shift) to
                 // decide whether content will still fit after the inset change.
+                // The "top scroll" position for a scroll view with inset.top is
+                // -inset.top, not 0 — clamping to 0 would shift the viewport down
+                // by inset.top and cancel out the bottom-anchor shift visually.
                 let naturalHeight = collectionView.contentSize.height - layout.bottomAnchorShift
                 let newAvailableHeight = collectionView.bounds.height
-                    - collectionView.adjustedContentInset.top
+                    - topInset
                     - newBottom
-                contentOffsetY = max(0, naturalHeight - newAvailableHeight)
+                contentOffsetY = max(-topInset, naturalHeight - newAvailableHeight)
             }
         }
         contentOffsetY = min(contentOffsetY, collectionView.contentSize.height)
@@ -771,7 +775,9 @@ open class ChannelViewController: ViewController,
         updateCollectionViewInsets()
         let newBottom = collectionView.contentInset.bottom
         contentOffsetY += newBottom - bottom
-        contentOffsetY = max(contentOffsetY, 0)
+        // The min valid offset is -adjustedContentInset.top (top scroll position),
+        // not 0. Clamping to 0 cancels out the bottom-anchor shift when inset.top > 0.
+        contentOffsetY = max(contentOffsetY, -collectionView.adjustedContentInset.top)
         
         let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
         let animation = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
@@ -3506,6 +3512,7 @@ open class ChannelViewController: ViewController,
     }
     
     deinit {
+        print("[deinit] ChannelViewController called")
         SimpleSinglePlayer.stop()
         avatarTask?.cancel()
         navigationController?.interactivePopGestureRecognizer?.isEnabled = true
