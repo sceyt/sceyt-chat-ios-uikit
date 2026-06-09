@@ -98,9 +98,6 @@ public protocol MessageDatabaseSession {
     func updateAttachment(with filePath: String, chatMessage: ChatMessage, attachment: ChatMessage.Attachment)
     
     @discardableResult
-    func createOrUpdate(notificationContent userInfo: [AnyHashable: Any]) throws -> MessageDTO?
-    
-    @discardableResult
     func createOrUpdate(checksum: ChatMessage.Attachment.Checksum) -> ChecksumDTO
     
     @discardableResult
@@ -989,85 +986,6 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         request.predicate = predicate
         try batchDelete(fetchRequest: request)
-    }
-    
-    @discardableResult
-    public func createOrUpdate(notificationContent userInfo: [AnyHashable: Any]) throws -> MessageDTO? {
-        let pushData = try NotificationPayload(from: userInfo)
-        
-        if let reaction = pushData.reaction,
-           reaction.key != ""
-        {
-            return createOrUpdateReaction(pushData: pushData)?.message
-        }
-        
-        if let message = pushData.message,
-           let channel = pushData.channel,
-           let messageId = MessageId(message.id),
-           let channelId = ChannelId(channel.id)
-        {
-            let dto = MessageDTO.fetchOrCreate(id: messageId, context: self).map(message)
-            dto.tid = Int64(messageId)
-            dto.channelId = Int64(channelId)
-            
-            if let user = pushData.user {
-                dto.user = createOrUpdate(user: user)
-            }
-            
-            if let mentionedUsers = message.mentionedUsers,
-               !mentionedUsers.isEmpty
-            {
-                createOrUpdate(mentionedUsers: mentionedUsers, dto: dto)
-            }
-            
-            if let attachments = message.attachments,
-               !attachments.isEmpty
-            {
-                createOrUpdate(attachments: attachments, dto: dto)
-            }
-            
-            if let forwardingDetails = message.forwardingDetails {
-                createOrUpdate(forwardDetail: forwardingDetails, dto: dto)
-            }
-            
-            if dto.markerTotal == nil {
-                dto.markerTotal = .init()
-            }
-            
-            if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self) {
-                channel.newMessageCount += 1
-                if let lastMessage = channel.lastMessage {
-                    if lastMessage.id != 0 && dto.id != 0 {
-                        if lastMessage.id <= dto.id {
-                            channel.lastMessage = dto
-                        }
-                    } else if lastMessage.createdAt.bridgeDate < dto.createdAt.bridgeDate {
-                        channel.lastMessage = dto
-                    }
-                } else {
-                    channel.lastMessage = dto
-                }
-                if let lm = channel.lastMessage?.createdAt.bridgeDate,
-                   let lr = channel.lastReaction?.createdAt?.bridgeDate,
-                   lm > lr
-                {
-                    channel.lastReaction = nil
-                }
-            }
-            
-            if let parentId = message.parentId,
-               let id = Int64(parentId),
-               id > 0,
-               let message = MessageDTO.fetch(id: MessageId(id), context: self)
-            {
-                dto.parent = message
-            }
-            
-            dto.replied = false
-            dto.unlisted = false
-            return dto
-        }
-        return nil
     }
     
     @discardableResult
