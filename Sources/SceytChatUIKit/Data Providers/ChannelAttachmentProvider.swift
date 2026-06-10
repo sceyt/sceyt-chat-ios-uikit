@@ -110,6 +110,11 @@ open class ChannelAttachmentProvider: DataProvider {
         query: AttachmentListQuery,
         completion: ((Error?) -> Void)? = nil
     ) {
+        guard !defaultQuery.loading else {
+            logger.debug("[MediaGallery] provider.loadPrevAttachment skipped — already loading channelId=\(channelId)")
+            completion?(nil)
+            return
+        }
         defaultQuery.loadPrevious
         { (_, attachments, users, error) in
             guard let attachments

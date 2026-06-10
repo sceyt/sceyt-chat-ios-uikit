@@ -110,7 +110,7 @@ extension ChannelInfoViewController {
             let lastSection = mediaViewModel.numberOfSections - 1
             if indexPath.section == lastSection {
                 let count = mediaViewModel.numberOfAttachments(in: lastSection)
-                if count >= 3 && indexPath.row >= count - 3 {
+                if count > 0 && indexPath.row >= max(0, count - 3) {
                     mediaViewModel.loadAttachments()
                 }
             }

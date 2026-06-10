@@ -146,11 +146,16 @@ public class ChatChannel {
                 .map { $0.convert() } ?? []
             if !viaInverse.isEmpty {
                 members = viaInverse
-            } else if let context = dto.managedObjectContext {
+            } else {
                 // Fallback for rows where the ChannelDTO<->MemberDTO inverse
                 // hasn't been wired (legacy data, partial migration).
-                members = MemberDTO.fetch(channelId: ChannelId(dto.id), context: context)
-                    .map { $0.convert() }
+                let readContext = SceytChatUIKit.shared.database.backgroundReadOnlyContext
+                var fetched: [ChatChannelMember] = []
+                readContext.performAndWait {
+                    fetched = MemberDTO.fetch(channelId: ChannelId(dto.id), context: readContext)
+                        .map { $0.convert() }
+                }
+                members = fetched
             }
         }
     }
