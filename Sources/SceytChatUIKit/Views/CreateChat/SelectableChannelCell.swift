@@ -15,12 +15,13 @@ open class SelectableChannelCell: BaseChannelUserCell {
     
     open var channelData: ChatChannel! {
         didSet {
+            imageTask?.cancel()
             imageTask = appearance.avatarRenderer.render(
                 channelData,
                 with: appearance.avatarAppearance,
                 into: avatarView
             )
-            
+
             titleLabel.text = appearance.titleFormatter.format(channelData)
             statusLabel.text = appearance.subtitleFormatter.format(channelData)
         }

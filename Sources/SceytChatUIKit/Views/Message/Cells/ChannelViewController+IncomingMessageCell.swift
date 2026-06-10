@@ -610,7 +610,6 @@ extension ChannelViewController {
                 bubbleSize.height += userNameSize.height
                 bubbleSize.width = max(bubbleSize.width, userNameSize.width)
             }
-            logger.debug("IncomingMessageCell: measure 2 messageId: \(model.message.id), measure: \(bubbleSize)")
             if model.hasReactions {
                 switch model.reactionType {
                 case .interactive:
@@ -625,7 +624,6 @@ extension ChannelViewController {
             if model.isLastDisplayedMessage {
                 bubbleSize.height += Components.messageCellUnreadMessagesSeparatorView.measure(model: model, appearance: appearance).height
             }
-            logger.debug("IncomingMessageCell: measure messageId: \(model.message.id), measure: \(bubbleSize)")
             return bubbleSize
         }
     }

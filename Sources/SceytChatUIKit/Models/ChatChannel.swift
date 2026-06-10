@@ -283,7 +283,10 @@ extension ChatChannel: Hashable {
 internal extension ChatChannel {
     
     var peer: ChatChannelMember? {
-        let _peer = (channelType == .direct ? members?.first(where: {$0.id != SceytChatUIKit.shared.currentUserId }) : nil)
-        return _peer
+        guard channelType == .direct else { return nil }
+        guard let currentUserId = SceytChatUIKit.shared.currentUserId,
+              !currentUserId.isEmpty
+        else { return nil }
+        return members?.first(where: { $0.id != currentUserId })
     }
 }
