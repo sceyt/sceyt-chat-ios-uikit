@@ -733,7 +733,7 @@ open class MessageLayoutModel {
 
         return (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
-            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type == .link ? nil : layout
         } ?? [])
         .sorted { lh, rh in
@@ -751,7 +751,7 @@ open class MessageLayoutModel {
 
         return (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
-            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type != .link || $0.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
@@ -771,7 +771,7 @@ open class MessageLayoutModel {
                 attachments[index].update(attachment: attachment)
                 return attachments[index]
             }
-            let layout = Components.messageAttachmentLayoutModel.init(attachment: attachment, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: attachment, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type == .link ? nil : layout
         } ?? [])
         .sorted { lh, rh in
@@ -787,7 +787,7 @@ open class MessageLayoutModel {
                 attachments[index].update(attachment: attachment)
                 return attachments[index]
             }
-            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type != .link || attachment.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
@@ -1212,11 +1212,14 @@ extension MessageLayoutModel {
         
         open func loadThumbnail() {
             defer {
-                isLoadedThumbnail = true
-                if let onLoadThumbnail {
-                    DispatchQueue.main.async { [weak self] in
-                        onLoadThumbnail(self?.thumbnail)
-                    }
+                // Publish on main: the flag write, the closure read, and the cell's
+                // closure assignment must serialize on one queue, otherwise a load
+                // finishing on a background thread can race a concurrent cell bind
+                // and the ready thumbnail is never delivered to the visible cell.
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.isLoadedThumbnail = true
+                    self.onLoadThumbnail?(self.thumbnail)
                 }
             }
             switch type {
@@ -1228,8 +1231,12 @@ extension MessageLayoutModel {
                     logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
-                        thumbnail = UIImage(data: data)
-                        isThumbnailLoadedFromFile = true
+                        if let image = UIImage(data: data) {
+                            thumbnail = image
+                            isThumbnailLoadedFromFile = true
+                        } else {
+                            logger.error("[Attachment] thumbnail decode failed, path \(path)")
+                        }
                     } catch {
                         logger.errorIfNotNil(error, "load image from path \(path)")
                     }
@@ -1251,8 +1258,12 @@ extension MessageLayoutModel {
                     logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
-                        thumbnail = UIImage(data: data)
-                        isThumbnailLoadedFromFile = true
+                        if let image = UIImage(data: data) {
+                            thumbnail = image
+                            isThumbnailLoadedFromFile = true
+                        } else {
+                            logger.error("[Attachment] thumbnail decode failed, path \(path)")
+                        }
                     } catch {
                         logger.errorIfNotNil(error, "load image from path \(path)")
                     }
@@ -1281,7 +1292,9 @@ extension MessageLayoutModel {
             self.attachment = attachment
             if !isThumbnailLoadedFromFile {
                 isLoadedThumbnail = false
-                loadThumbnail()
+                DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+                    self?.loadThumbnail()
+                }
             } else {
                 logger.debug("[Attachment] update(attachment:) SKIPPED loadThumbnail because isThumbnailLoadedFromFile=true")
             }
