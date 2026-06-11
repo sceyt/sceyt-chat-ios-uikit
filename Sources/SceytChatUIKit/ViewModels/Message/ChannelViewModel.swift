@@ -2157,7 +2157,23 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                     self.messageSender.resendMessage(message)
                 } else if attachment.url != nil {
                     attachment.status = .pending
-                    fileProvider.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
+                    fileProvider.downloadMessageAttachmentsIfNeeded(
+                        message: message,
+                        attachments: [attachment]
+                    ) { [weak self] resolvedMessage, error in
+                        guard let self, let error else {
+                            return
+                        }
+                        let source = resolvedMessage ?? message
+                        let failed = (source.attachments ?? []).filter { $0.status == .failedDownloading }
+                        for atch in failed {
+                            self.didFailDownloadingAttachment(
+                                message: source,
+                                attachment: atch,
+                                error: error
+                            )
+                        }
+                    }
                 }
             }
         }
