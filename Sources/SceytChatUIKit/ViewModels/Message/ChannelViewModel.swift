@@ -1157,23 +1157,81 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open func resetToInitialStateIfNeeded() -> Bool {
         guard let lastMessage = channel.lastMessage
-        else { return false}
-        if messageObserver.lastItem?.id == lastMessage.id {
+        else { return false }
+        // Already in the fresh-open state: unbounded (default) predicate and the
+        // latest message present in the loaded window — a plain scroll is enough.
+        // Checking the cache alone is not sufficient: after a jump-to-message the
+        // observer may hold a range predicate whose window happens to end at the
+        // last message, while paging offsets and inserts stay range-bound.
+        if messageObserver.fetchPredicate == messageObserver.defaultFetchPredicate,
+           messageObserver.lastItem?.id == lastMessage.id {
             return false
         }
-        let initialMessageId: MessageId
-        if lastDisplayedMessageId == 0 {
-            initialMessageId = lastMessage.id
-        } else {
-            initialMessageId = lastDisplayedMessageId
+        // Clear every pending scroll anchor before restarting, otherwise the
+        // restart's initial change event redirects the scroll to the unread
+        // separator / replied message instead of the last message.
+        resetScrollState()
+        if lastDisplayedMessageId != 0 {
+            // Layout models capture the separator at creation; drop this one so it
+            // is rebuilt without it, like on a fresh open of a fully read channel.
+            layoutModels[.init(messageId: lastDisplayedMessageId)] = nil
+            lastDisplayedMessageId = 0
         }
         isRestartingMessageObserver = .reloadToLatestState
-        let offset = calculateMessageFetchOffset(messageId: initialMessageId)
+        // Rebuild the same window a fresh open computes for a channel opened at
+        // the bottom: the last `messagesFetchLimit` messages under the default
+        // predicate. The offset must be counted against the default predicate —
+        // the currently active one may still be a range predicate.
+        let offset = messageObserver.calculateMessageFetchOffset(
+            predicate: messageObserver.defaultFetchPredicate,
+            messageId: lastMessage.id,
+            fetchLimit: Int(Self.messagesFetchLimit),
+            direction: .prev
+        )
         messageObserver
             .restartObserver(fetchPredicate: messageObserver.defaultFetchPredicate,
                              offset: offset)
         { [weak self] in
             self?.isRestartingMessageObserver = .none
+        }
+        // Re-anchor the load-ranges table at the channel tail, exactly like a
+        // fresh open does via loadLastMessages(). Scroll-up paging derives its
+        // predicates from these ranges (updatePredicateForPrevMessages): a top
+        // message that no range covers makes fetchPrevMessagesFromDB bail and
+        // kills paging. The DB tail shown by the restart above can contain such
+        // rows — messages stored by sync, which never records ranges — so once
+        // the latest server page is stored and the tail range exists, re-align
+        // the window onto those freshly covered rows.
+        if chatClient.connectionState == .connected {
+            provider.loadPrevMessages(before: MessageId(Int64.max)) { [weak self] error in
+                guard let self else { return }
+                if let error {
+                    logger.info("[BugFix][RESET] tail anchor loadPrevMessages(before: max) FAILED: \(error)")
+                    return
+                }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.isRestartingMessageObserver = .reloadToLatestState
+                    // messageId 0 → totalCount(default) - fetchLimit: the tail
+                    // window, recounted after the page was inserted.
+                    let offset = self.messageObserver.calculateMessageFetchOffset(
+                        predicate: self.messageObserver.defaultFetchPredicate,
+                        messageId: 0,
+                        fetchLimit: Int(Self.messagesFetchLimit),
+                        direction: .prev
+                    )
+                    logger.info("[BugFix][RESET] tail anchor stored, re-aligning window, offset: \(offset)")
+                    self.messageObserver
+                        .restartObserver(fetchPredicate: self.messageObserver.defaultFetchPredicate,
+                                         offset: offset)
+                    { [weak self] in
+                        self?.isRestartingMessageObserver = .none
+                    }
+                }
+            }
+        } else {
+            logger.info("[BugFix][RESET] not connected — tail anchor deferred to reconnect")
+            loadLastMessagesAfterConnect = true
         }
         refreshChannel()
         return true
@@ -2817,10 +2875,12 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     // MARK: ChatClient delegate
     
     open func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
+        logger.info("[BugFix][CONN] connection state → \(state), error: \(error.map { "\($0)" } ?? "nil"), deferredTailAnchor: \(loadLastMessagesAfterConnect)")
         if state == .connected {
             lastLoadNextMessageId = 0
             lastLoadNextMessageId = 0
             if loadLastMessagesAfterConnect {
+                logger.info("[BugFix][CONN] connected — running deferred tail anchor (loadLastMessages)")
                 loadLastMessages()
                 loadLastMessagesAfterConnect = false
             }

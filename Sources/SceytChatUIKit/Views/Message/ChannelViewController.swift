@@ -990,25 +990,21 @@ open class ChannelViewController: ViewController,
     
     @objc
     open func unreadButtonAction(_ sender: ChannelViewController.ScrollDownView) {
-        if let userSelectOnRepliedMessage {
-            showRepliedMessage(userSelectOnRepliedMessage)
-            self.userSelectOnRepliedMessage = nil
-        } else {
-            // User asked to jump to the latest — release any active pin so the
-            // .reloadDataAndScrollToBottom branch (or scrollToBottom() below)
-            // can actually land at the bottom.
-            pinnedScrollMessageId = 0
-            if !channelViewModel.resetToInitialStateIfNeeded() {
-                scrollToBottom()
-            }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-                guard let self else { return }
-                self.channelViewModel.markChannelAsDisplayed()
-                self.channelViewModel.loadPrevMessages(before: 0)
-                self.unreadCountView.isHidden = true
-                self.isScrollingBottom = false
-            }
+        // Always jump to the latest message — release any active pin and any
+        // pending replied-message navigation so the .reloadDataAndScrollToBottom
+        // branch (or scrollToBottom() below) can actually land at the bottom.
+        pinnedScrollMessageId = 0
+        userSelectOnRepliedMessage = nil
+        if !channelViewModel.resetToInitialStateIfNeeded() {
+            scrollToBottom()
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self else { return }
+            self.channelViewModel.markChannelAsDisplayed()
+            self.channelViewModel.loadPrevMessages(before: 0)
+            self.unreadCountView.isHidden = true
+            self.isScrollingBottom = false
         }
     }
 
@@ -2520,16 +2516,13 @@ open class ChannelViewController: ViewController,
         
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
+            // Deliberately no highlight on this jump: it returns the user from the
+            // original message back to the reply. The original was already
+            // highlighted when navigating from the reply — flashing the reply
+            // bubble here would read as a second, confusing highlight.
             UIView.animate(withDuration: 0.3, delay: 0, options: .allowUserInteraction) { [weak self] in
                 guard let self else { return }
                 self.collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: false)
-            } completion: { [weak self] _ in
-                guard let self else { return }
-                if let cell = self.collectionView.cellForItem(at: indexPath) as? MessageCell {
-                    self.animateHighlightCell(cell, mode: .reply)
-                } else if let systemCell = self.collectionView.cellForItem(at: indexPath) as? SystemMessageCell {
-                    self.animateHighlightCell(systemCell, mode: .reply)
-                }
             }
         }
     }
