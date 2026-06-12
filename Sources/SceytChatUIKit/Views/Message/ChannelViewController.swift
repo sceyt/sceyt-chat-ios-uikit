@@ -2502,6 +2502,7 @@ open class ChannelViewController: ViewController,
     open func showReply(layoutModel: MessageLayoutModel) {
         guard let parent = layoutModel.message.parent
         else { return }
+        pinnedScrollMessageId = 0
         userSelectOnRepliedMessage = layoutModel.message
         channelViewModel.findReplayedMessage(messageId: parent.id)
     }
