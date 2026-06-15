@@ -359,10 +359,23 @@ public struct AttachmentModel {
                             let fileUrl = Components.storage.copyFile(fullSizeImageURL) ?? fullSizeImageURL
                             var imageUrl: URL?
                             if let jpeg = Components.imageBuilder.init(imageUrl: fileUrl)?.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality) {
-                                let fileName = fileUrl
+                                let base = fileUrl
                                     .deletingPathExtension()
                                     .appendingPathExtension("jpg")
                                     .lastPathComponent
+                                // iOS exports edited photos under a shared generic name (e.g.
+                                // "FullSizeRender-3.jpg") regardless of which photo it is. Storing under
+                                // that raw name made two different picks collide on the same local path
+                                // AND on the derived thumbnail-cache key (thumbnails/{WxH}/{path}), so one
+                                // image's cached thumbnail was served for another. Prefix the stored
+                                // filename with the asset's stable unique identifier so distinct picks
+                                // never share a file path.
+                                let assetToken = asset.localIdentifier
+                                    .components(separatedBy: CharacterSet(charactersIn: "/\\:"))
+                                    .first
+                                    .flatMap { $0.isEmpty ? nil : $0 } ?? UUID().uuidString
+                                let fileName = "\(assetToken)_\(base)"
+
                                 imageUrl = Components.storage.storeData(jpeg, filename: fileName)
                             }
                             if imageUrl == nil {
