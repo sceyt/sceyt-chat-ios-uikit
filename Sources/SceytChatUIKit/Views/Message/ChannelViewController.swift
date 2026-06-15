@@ -1562,6 +1562,7 @@ open class ChannelViewController: ViewController,
         let sectionCount = channelViewModel.numberOfSections
         var sections: [ChannelViewModel.SectionId] = []
         var items: [[ChannelViewModel.Key]] = []
+        var versions: [ChannelViewModel.Key: UInt] = [:]
         sections.reserveCapacity(sectionCount)
         items.reserveCapacity(sectionCount)
         for s in 0..<sectionCount {
@@ -1571,7 +1572,9 @@ open class ChannelViewController: ViewController,
             section.reserveCapacity(n)
             for r in 0..<n {
                 if let m = channelViewModel.message(at: IndexPath(item: r, section: s)) {
-                    section.append(.init(message: m))
+                    let key = ChannelViewModel.Key(message: m)
+                    section.append(key)
+                    versions[key] = channelViewModel.layoutModels[key]?.contentVersion ?? 0
                 } else {
                     // Defensive: keep counts consistent even if a slot is briefly
                     // missing from the observer. The cell will reload once content arrives.
@@ -1580,7 +1583,7 @@ open class ChannelViewController: ViewController,
             }
             items.append(section)
         }
-        return AppliedSnapshot(sections: sections, items: items)
+        return AppliedSnapshot(sections: sections, items: items, versions: versions)
     }
 
     /// Rebuild `appliedSnapshot` from the observer's current state. Call this
@@ -2780,7 +2783,11 @@ open class ChannelViewController: ViewController,
                     self.collectionView.insertItems(at: diff.inserts)
                 }
                 if !diff.reloads.isEmpty {
-                    self.collectionView.reloadItems(at: diff.reloads)
+                    if #available(iOS 15.0, *) {
+                        self.collectionView.reconfigureItems(at: diff.reloads)
+                    } else {
+                        self.collectionView.reloadItems(at: diff.reloads)
+                    }
                 }
                 if !diff.deletes.isEmpty {
                     self.collectionView.deleteItems(at: diff.deletes)
@@ -3572,6 +3579,11 @@ extension ChannelViewController {
     internal struct AppliedSnapshot: Equatable {
         var sections: [ChannelViewModel.SectionId]
         var items: [[ChannelViewModel.Key]]
+        /// Per-item content token captured at build time. Drives content-diff
+        /// reloads in `computeDiff`; not part of structural identity (`items`
+        /// stays Key-only so `CollectionDifference` move-detection is unaffected).
+        /// Defaulted so existing `AppliedSnapshot(sections:items:)` sites compile.
+        var versions: [ChannelViewModel.Key: UInt] = [:]
 
         static let empty = AppliedSnapshot(sections: [], items: [])
 

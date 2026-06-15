@@ -129,7 +129,7 @@ extension ChannelViewController {
             }
         }
 
-        // 3. Reloads — observer-supplied hints, sanitized to be UIKit-safe.
+        // 3. Reloads — union of content-version diffs and observer hints, sanitized to be UIKit-safe.
         //
         // UIKit's `reloadItems(at:)` takes PRE-state index paths and rejects
         // any IP that also appears in `deletes` or as a move-from in the same
@@ -143,9 +143,26 @@ extension ChannelViewController {
         //   c. The `Key` at that IP must still exist in `newSnapshot` —
         //      otherwise reloading is meaningless (UIKit would crash if it
         //      tried to reload an item that's about to be deleted anyway).
+        // (a) Content-version reloads: same Key present in both snapshots with a
+        //     changed version → the cell's rendered content changed in place. This
+        //     is the durable path — it does not depend on a reload hint surviving
+        //     the observer→VM pipeline (see `contentVersion` in MessageLayoutModel).
+        //     O(n) over surviving items, same order as the structural diff above.
+        var candidates = reloadHints
+        for (oldS, sectionId) in oldSnapshot.sections.enumerated() {
+            guard newSectionIndex[sectionId] != nil else { continue }
+            for (item, key) in oldSnapshot.items[oldS].enumerated() {
+                guard let oldV = oldSnapshot.versions[key],
+                      let newV = newSnapshot.versions[key],
+                      oldV != newV
+                else { continue }
+                candidates.insert(IndexPath(item: item, section: oldS))
+            }
+        }
+
         let preStateDeletes = Set(deletes)
         let preStateMoveFroms = Set(moves.map(\.from))
-        let reloads = reloadHints
+        let reloads = candidates
             .compactMap { ip -> IndexPath? in
                 // (a) pre-state bounds
                 guard ip.section >= 0,

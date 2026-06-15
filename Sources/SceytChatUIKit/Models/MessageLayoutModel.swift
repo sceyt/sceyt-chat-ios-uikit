@@ -17,7 +17,13 @@ open class MessageLayoutModel {
     
     open var contentOptions = MessageContentOptions()
     open var updateOptions: MessageUpdateOptions = []
-    
+
+    /// Monotonic content token, bumped whenever a render-affecting field changes
+    /// in place (the same condition that recomputes `measureSize`). The snapshot
+    /// diff reads this to reconfigure a cell whose *content* changed — without
+    /// relying on observer-emitted reload hints. See ChannelViewController+SnapshotDiff.
+    public private(set) var contentVersion: UInt = 0
+
     public private(set) var channel: ChatChannel
     public private(set) var message: ChatMessage
     public private(set) var attachments: [AttachmentLayout]
@@ -618,9 +624,12 @@ open class MessageLayoutModel {
             }
             measureSize = measure()
         }
+        if isUpdated {
+            contentVersion &+= 1
+        }
         return true
     }
-    
+
     internal func replace(channel: ChatChannel) {
         self.channel = channel
     }
@@ -643,6 +652,7 @@ open class MessageLayoutModel {
                 showUserInfo = show
                 measureSize = measure()
                 updateOptions.insert(.reload)
+                contentVersion &+= 1
                 if showUserInfo {
                     createMessageUserTitle()
                 } else {
