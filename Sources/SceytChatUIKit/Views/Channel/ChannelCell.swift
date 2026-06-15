@@ -86,14 +86,14 @@ extension ChannelListViewController {
             messageStackView.axis = .vertical
             messageStackView.distribution = .fill
             messageStackView.alignment = .leading
-            messageStackView.spacing = 2
+            messageStackView.spacing = Layouts.messageStackSpacing
             
             badgeStackView.axis = .horizontal
             badgeStackView.distribution = .fill
             badgeStackView.alignment = .trailing
             badgeStackView.spacing = 8
             
-            messageLabel.numberOfLines = 2
+            messageLabel.numberOfLines = Layouts.messagePreviewNumberOfLines
             muteView.image = appearance.mutedIcon
             let pan = UIPanGestureRecognizer(
                 target: self,
@@ -116,7 +116,7 @@ extension ChannelListViewController {
             contentView.addSubview(separatorView)
             
             avatarView.pin(to: contentView, anchors: [
-                .top(8, .greaterThanOrEqual),
+                .top(Layouts.avatarVerticalPadding, .greaterThanOrEqual),
                 .centerY(),
                 .leading(Layouts.horizontalPadding)
             ])
@@ -133,8 +133,8 @@ extension ChannelListViewController {
             ])
             retentionBadgeView.resize(anchors: [.width(22), .height(22)])
 
-            let topConstraint = messageStackView.topAnchor.pin(to: contentView.topAnchor, constant: 10)
-            let bottomConstraint = messageStackView.bottomAnchor.pin(lessThanOrEqualTo: contentView.bottomAnchor, constant: -6)
+            let topConstraint = messageStackView.topAnchor.pin(to: contentView.topAnchor, constant: Layouts.messageStackTopPadding)
+            let bottomConstraint = messageStackView.bottomAnchor.pin(lessThanOrEqualTo: contentView.bottomAnchor, constant: -Layouts.messageStackBottomPadding)
             messageVerticalConstraints = [topConstraint, bottomConstraint]
             messageStackView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 12)
             messageStackView.trailingAnchor.pin(lessThanOrEqualTo: dateLabel.trailingAnchor)
@@ -465,5 +465,35 @@ public extension ChannelListViewController.ChannelCell {
         public static var avatarSize: CGFloat = 56
         public static var horizontalPadding: CGFloat = 16
         public static var verticalPadding: CGFloat = 12
+
+        /// Minimum inset between the avatar and the cell's top/bottom edges.
+        public static var avatarVerticalPadding: CGFloat = 8
+        /// Top inset of the message stack inside the cell.
+        public static var messageStackTopPadding: CGFloat = 10
+        /// Bottom inset of the message stack inside the cell.
+        public static var messageStackBottomPadding: CGFloat = 6
+        /// Vertical spacing between the subject and the message preview.
+        public static var messageStackSpacing: CGFloat = 2
+        /// Number of lines reserved for the message preview.
+        public static var messagePreviewNumberOfLines: Int = 2
+
+        /// Fixed row height for every channel cell.
+        ///
+        /// Computed so a full `messagePreviewNumberOfLines`-line preview always
+        /// fits, and never shorter than the avatar. Because it is a constant the
+        /// cell height no longer changes between 1-line and 2-line previews.
+        public static var cellHeight: CGFloat {
+            let appearance = ChannelListViewController.ChannelCell.appearance
+            let subjectHeight = appearance.subjectLabelAppearance.font.lineHeight
+            let previewHeight = appearance.lastMessageLabelAppearance.font.lineHeight
+                * CGFloat(messagePreviewNumberOfLines)
+            let textHeight = messageStackTopPadding
+                + subjectHeight
+                + messageStackSpacing
+                + previewHeight
+                + messageStackBottomPadding
+            let avatarHeight = avatarSize + avatarVerticalPadding * 2
+            return ceil(max(textHeight, avatarHeight))
+        }
     }
 }

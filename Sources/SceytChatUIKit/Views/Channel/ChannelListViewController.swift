@@ -75,6 +75,9 @@ open class ChannelListViewController: ViewController,
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
         tableView.separatorStyle = .none
+        // Fixed row height so the cell doesn't change between 1-line and 2-line previews.
+        tableView.rowHeight = ChannelCell.Layouts.cellHeight
+        tableView.estimatedRowHeight = ChannelCell.Layouts.cellHeight
         setupTableViewDelegates()
 
         navigationItem.hidesSearchBarWhenScrolling = true
