@@ -44,8 +44,6 @@ extension MessageCell {
             }
         }
 
-        private var thumbnailDownloadTask: URLSessionDataTask?
-        
         open override func setup() {
             super.setup()
             stackViewV.isUserInteractionEnabled = false
@@ -104,8 +102,6 @@ extension MessageCell {
 
         open var data: MessageLayoutModel.ReplyLayout? {
             didSet {
-                thumbnailDownloadTask?.cancel()
-                thumbnailDownloadTask = nil
                 stackViewH.removeArrangedSubview(imageView)
                 stackViewH2.removeArrangedSubview(iconView)
                 imageView.removeFromSuperview()
@@ -195,25 +191,52 @@ extension MessageCell {
                   attachment.type != .link  // link images are managed via LinkMetadataProvider, not fileProvider
             else { return }
             let message = data.message
+            let chatAttachment = attachment.attachment
+
+            // Refresh the preview whenever the thumbnail finishes loading — at bind,
+            // after `update(attachment:)`, or once the parent's file downloads. The
+            // reply layout is built from the parent message and is NOT rebuilt when the
+            // parent's attachment downloads, so without this hook the preview can stay
+            // stuck on the blurred placeholder even after the image is on disk.
+            attachment.onLoadThumbnail = { [weak self, weak data] image in
+                guard let self, let data, self.data === data, let image
+                else { return }
+                self.imageView.image = image
+            }
+
+            // Observe an in-flight transfer (e.g. the replied-to message is also on
+            // screen and downloading the same attachment under the same key).
             fileProvider
                 .progress(
                     message: message,
-                    attachment: attachment.attachment,
-                    objectIdKey: attachment.attachment.description + "reply"
+                    attachment: chatAttachment,
+                    objectIdKey: chatAttachment.description + "reply"
                 ) { _ in
                     
-                } completion: { [weak self] done in
-                    data.updateAttachment(message: done.message)
-                    guard self?.data?.attachment?.attachment.id == data.attachment?.attachment.id
-                    else { return }
+                } completion: { done in
                     if done.error == nil {
                         fileProvider.removeProgressObserver(message: done.message, attachment: done.attachment)
                     }
+                    // Reloads the thumbnail from the now-downloaded file; the
+                    // onLoadThumbnail hook above pushes it into the image view.
                     data.attachment?.update(attachment: done.attachment)
-                    DispatchQueue.main.async {[weak self] in
-                        self?.imageView.image = data.attachment?.thumbnail
-                    }
                 }
+
+            // The reply view used to only *observe* progress and never started the
+            // download, so a reply whose parent attachment wasn't already being
+            // fetched by another visible cell stayed blurred forever. Start it here
+            // (a no-op if already in flight or done). The completion also fires on the
+            // already-downloaded fast path, refreshing a stale placeholder from disk.
+            DispatchQueue.global().async {
+                fileProvider.downloadMessageAttachmentsIfNeeded(
+                    message: message,
+                    attachments: [chatAttachment]
+                ) { resolvedMessage, error in
+                    guard error == nil else { return }
+                    let resolved = resolvedMessage?.attachments?.first(where: { $0.id == chatAttachment.id }) ?? chatAttachment
+                    data.attachment?.update(attachment: resolved)
+                }
+            }
         }
         
         open class func measure(
