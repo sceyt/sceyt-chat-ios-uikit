@@ -85,7 +85,18 @@ open class ChannelListViewModel: NSObject,
                 let channel = dto.convert()
                 self?.createLayoutModel(channel: channel)
                 return channel
-            }
+            },
+            // The delivery tick, edited-text, and last-message metadata are read from the
+            // `lastMessage` relationship. A change confined to that related MessageDTO does
+            // not mark the ChannelDTO as updated, so the FRC would never report the row and
+            // the cell would stay stale until the next fetch (e.g. app relaunch). Tracking
+            // these keypaths re-faults the channel row whenever its last message changes.
+            relationshipKeyPaths: [
+                #keyPath(ChannelDTO.lastMessage.deliveryStatus),
+                #keyPath(ChannelDTO.lastMessage.updatedAt),
+                #keyPath(ChannelDTO.lastMessage.state),
+                #keyPath(ChannelDTO.lastMessage.metadata)
+            ]
         )
     }
     

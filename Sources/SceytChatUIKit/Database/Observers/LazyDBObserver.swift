@@ -87,6 +87,17 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     /// `[DBChangeItem<Item>]` batch per cycle.
     let changeRelay: ChangeRelay<DTO, Item>
 
+    /// Observes context changes for the relationship keypaths supplied at init and
+    /// refreshes affected fetched rows so the FRC reports them as `.update`s. `nil` when
+    /// no relationship keypaths were requested.
+    ///
+    /// `NSFetchedResultsController` only reports a row when the fetched entity's *own*
+    /// attributes change; a change confined to a *related* object (e.g. the last
+    /// message's `deliveryStatus`) leaves the parent `DTO` untouched, so the FRC stays
+    /// silent and the row's snapshot goes stale until the next fetch. This observer
+    /// closes that gap by re-faulting the parent rows whose tracked relationships changed.
+    private var relationshipKeyPathsObserver: RelationshipKeyPathsObserver<DTO>?
+
     // MARK: - Internal state
 
     /// Serial queue guarding the will-change snapshot fields and the start-guard flag.
@@ -161,6 +172,11 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     ///   - sorting: Optional post-fetch sort applied after DTO→`Item` conversion. Use
     ///     this when the desired order can only be expressed against the `Item` value;
     ///     prefer `fetchRequest.sortDescriptors` for sortable DTO attributes.
+    ///   - relationshipKeyPaths: Optional set of `to-one` relationship keypaths (e.g.
+    ///     `"lastMessage.deliveryStatus"`) whose changes should also surface as row
+    ///     updates. Without this, the FRC ignores changes confined to a related object
+    ///     and the row's snapshot goes stale until the next fetch. Pass `nil` (the
+    ///     default) when every display-relevant value lives on the `DTO` itself.
     ///   - fetchedResultsControllerType: Override hook for tests that need to inject a
     ///     subclass (e.g. one that stubs `performFetch()` or `fetchedObjects`).
     ///     Defaults to the standard `NSFetchedResultsController`.
@@ -170,6 +186,7 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
         itemCreator: @escaping (DTO) throws -> Item,
         itemReuseKeyPaths: (item: KeyPath<Item, String>, dto: KeyPath<DTO, String>)? = nil,
         sorting: [SortValue<Item>] = [],
+        relationshipKeyPaths: Set<String>? = nil,
         fetchedResultsControllerType: NSFetchedResultsController<DTO>.Type = NSFetchedResultsController<DTO>.self
     ) {
         self.itemCreator = itemCreator
@@ -182,6 +199,12 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
             sectionNameKeyPath: nil,
             cacheName: nil
         )
+        if let relationshipKeyPaths, !relationshipKeyPaths.isEmpty {
+            relationshipKeyPathsObserver = RelationshipKeyPathsObserver(
+                keyPaths: relationshipKeyPaths,
+                fetchedResultsController: frc
+            )
+        }
         changeRelay.onWillChange = { [weak self] in
             self?.notifyWillChange()
         }
