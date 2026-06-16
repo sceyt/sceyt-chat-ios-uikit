@@ -42,8 +42,7 @@ public extension Database {
                file: StaticString = #file,
                line: UInt = #line,
                function: StaticString = #function) {
-        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "bgPerform", file: file, line: line, function: function)
-        write(resultQueue: .main, wrapped, completion: completion)
+        write(resultQueue: .main, perform, completion: completion)
     }
 
     func read<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
@@ -64,8 +63,7 @@ public extension Database {
                file: StaticString = #file,
                line: UInt = #line,
                function: StaticString = #function) {
-        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "bgPerform", file: file, line: line, function: function)
-        write(resultQueue: resultQueue, wrapped, completion: completion)
+        write(resultQueue: resultQueue, perform, completion: completion)
     }
 
     func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void,
@@ -73,8 +71,7 @@ public extension Database {
                           file: StaticString = #file,
                           line: UInt = #line,
                           function: StaticString = #function) {
-        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "newCtx", file: file, line: line, function: function)
-        performWriteTask(resultQueue: .main, wrapped, completion: completion)
+        performWriteTask(resultQueue: .main, perform, completion: completion)
     }
 
     func performWriteTask(_ perform: @escaping (NSManagedObjectContext) throws -> Void,
@@ -90,16 +87,14 @@ public extension Database {
                           file: StaticString = #file,
                           line: UInt = #line,
                           function: StaticString = #function) {
-        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "newCtx", file: file, line: line, function: function)
-        performWriteTask(resultQueue: resultQueue, wrapped, completion: completion)
+        performWriteTask(resultQueue: resultQueue, perform, completion: completion)
     }
 
     func syncWrite(_ perform: @escaping (NSManagedObjectContext) throws -> Void,
                    file: StaticString = #file,
                    line: UInt = #line,
                    function: StaticString = #function) throws {
-        let wrapped = DatabaseWriteWatchdog.wrap(perform, kind: "syncWrite", file: file, line: line, function: function)
-        try syncWrite(wrapped)
+        try syncWrite(perform)
     }
     
     func performBgTask<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
@@ -115,9 +110,7 @@ public extension Database {
         resetStalenessInterval: Bool = true,
         completion: (() -> Void)? = nil
     ) {
-        logger.debug("[Ctx] refreshAll called")
         backgroundPerformContext.perform {
-            logger.debug("[Ctx] refreshAll bgPerform")
             if resetStalenessInterval {
                 self.backgroundPerformContext.stalenessInterval = 0
             }
@@ -128,7 +121,6 @@ public extension Database {
         }
 
         backgroundReadOnlyContext.perform {
-            logger.debug("[Ctx] refreshAll bgRead")
             if resetStalenessInterval {
                 self.backgroundReadOnlyContext.stalenessInterval = 0
             }
@@ -138,7 +130,6 @@ public extension Database {
             }
             
             DispatchQueue.main.async {
-                logger.debug("[Ctx] refreshAll view")
                 if resetStalenessInterval {
                     self.viewContext.stalenessInterval = 0
                 }
@@ -146,7 +137,6 @@ public extension Database {
                 if resetStalenessInterval {
                     self.viewContext.stalenessInterval = -1
                 }
-                logger.debug("[Ctx] refreshAll done")
                 completion?()
             }
         }
@@ -294,7 +284,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func write(resultQueue: DispatchQueue,
                             _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                             completion: ((Error?) -> Void)? = nil) {
-        logger.debug("[Ctx] bgPerform write")
         backgroundPerformContext.perform {[weak self] in
             guard let self = self else { return }
             do {
@@ -322,7 +311,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                                               _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                                               completion: ((Error?) -> Void)? = nil) {
         let context = createBackgroundContext()
-        logger.debug("[Ctx] newCtx write")
         context.perform {[weak self] in
             guard let self = self else { return }
             do {
@@ -345,7 +333,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     
     public final func syncWrite(_ perform: @escaping (NSManagedObjectContext) throws -> Void) throws {
         var _error: Error?
-        logger.debug("[Ctx] bgPerform syncWrite")
         backgroundPerformContext.performAndWait {
             do {
                 try perform(self.backgroundPerformContext)
@@ -370,7 +357,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                                   _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
                                   completion: ((Result<Fetch, Error>) -> Void)?) {
         let context = backgroundReadOnlyContext
-        logger.debug("[Ctx] bgRead read")
         context.perform {[weak self] in
             guard self != nil else { return }
             do {
@@ -389,7 +375,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
     public final func read<Fetch>(_ perform: @escaping (NSManagedObjectContext) throws -> Fetch) -> Result<Fetch, Error> {
         var result: Result<Fetch, Error>!
         let context = Thread.isMainThread ? viewContext : backgroundReadOnlyContext
-        logger.debug("[Ctx] \(Thread.isMainThread ? "view" : "bgRead") read")
         context.performAndWait {
             do {
                 let fetch = try perform(context)
@@ -405,7 +390,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                                            _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
                                            completion: ((Result<Fetch, Error>) -> Void)? = nil) {
         let context = createBackgroundContext()
-        logger.debug("[Ctx] newCtx bgTask")
         context.perform {
             guard self != nil else { return }
             do {
@@ -509,42 +493,4 @@ public extension NSManagedObjectContext {
 public extension Notification.Name {
     static let persistentStoreDidChangeExternally =
         Notification.Name("SceytChatUIKit.persistentStoreDidChangeExternally")
-}
-
-enum DatabaseWriteWatchdog {
-
-    static var stuckThreshold: TimeInterval = 5
-
-    static func wrap(
-        _ perform: @escaping (NSManagedObjectContext) throws -> Void,
-        kind: String,
-        file: StaticString,
-        line: UInt,
-        function: StaticString
-    ) -> (NSManagedObjectContext) throws -> Void {
-        let id = String(UUID().uuidString.prefix(8))
-        let callsite = "\(("\(file)" as NSString).lastPathComponent):\(line) \(function)"
-        let enqueuedAt = CFAbsoluteTimeGetCurrent()
-        logger.debug("[Ctx] \(kind) ENQUEUE id=\(id) by=\(callsite)")
-        let enqueueWatchdog = DispatchWorkItem {
-            logger.error("[Ctx] \(kind) WATCHDOG id=\(id) >\(Int(stuckThreshold))s NOT STARTED by=\(callsite)")
-        }
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + stuckThreshold, execute: enqueueWatchdog)
-        return { ctx in
-            enqueueWatchdog.cancel()
-            let waited = CFAbsoluteTimeGetCurrent() - enqueuedAt
-            let started = CFAbsoluteTimeGetCurrent()
-            logger.debug("[Ctx] \(kind) START id=\(id) waited=\(Int(waited*1000))ms by=\(callsite)")
-            let runWatchdog = DispatchWorkItem {
-                logger.error("[Ctx] \(kind) WATCHDOG id=\(id) >\(Int(stuckThreshold))s STILL RUNNING by=\(callsite)")
-            }
-            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + stuckThreshold, execute: runWatchdog)
-            defer {
-                runWatchdog.cancel()
-                let dur = CFAbsoluteTimeGetCurrent() - started
-                logger.debug("[Ctx] \(kind) END id=\(id) duration=\(Int(dur*1000))ms by=\(callsite)")
-            }
-            try perform(ctx)
-        }
-    }
 }

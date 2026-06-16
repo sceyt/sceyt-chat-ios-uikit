@@ -57,7 +57,7 @@ open class ChannelListViewModel: NSObject,
     
     @Atomic public var layoutModels = [ChatChannel: ChannelLayoutModel]()
 
-    /// The current channels snapshot, sorted by isPinned DESC, sortingKey DESC.
+    /// The current channels snapshot, sorted pinned-first (pinnedAt DESC), then sortingKey DESC.
     /// Rebuilt from the observer's `rawItems` on every change or reset.
     public private(set) var channels: [ChatChannel] = []
 
@@ -71,7 +71,10 @@ open class ChannelListViewModel: NSObject,
     open func makeChannelObserver() -> LazyDBObserver<ChatChannel, ChannelDTO> {
         let request: NSFetchRequest<ChannelDTO> = ChannelDTO.fetchRequest()
         request.sortDescriptors = [
-            NSSortDescriptor(keyPath: \ChannelDTO.isPinned,   ascending: false),
+            // Pinned channels first: `pinnedAt` is non-nil only for pinned channels and in
+            // SQLite NULL sorts last under DESC, so every pinned channel ranks above every
+            // unpinned one regardless of activity. Within each group, order by `sortingKey`.
+            NSSortDescriptor(keyPath: \ChannelDTO.pinnedAt, ascending: false),
             NSSortDescriptor(keyPath: \ChannelDTO.sortingKey, ascending: false)
         ]
         request.predicate = fetchPredicate
@@ -162,9 +165,9 @@ open class ChannelListViewModel: NSObject,
     }
 
     /// Builds `channels` and `channelIndexById` from the observer's snapshot, keeping
-    /// the first occurrence of each `ChannelId`. Since `rawItems` is sorted by
-    /// `isPinned DESC, sortingKey DESC`, the first occurrence is the highest-priority
-    /// (pinned and/or most recently active) row — which is the one we want to surface.
+    /// the first occurrence of each `ChannelId`. Since `rawItems` is sorted
+    /// pinned-first (`pinnedAt DESC`) then `sortingKey DESC`, the first occurrence is the
+    /// highest-priority (pinned and/or most recently active) row — which is the one we want to surface.
     /// This guards against transient duplicates that can appear before Core Data's
     /// uniqueness constraint on `ChannelDTO.id` collapses them on save.
     private func rebuildLocalSnapshot() {

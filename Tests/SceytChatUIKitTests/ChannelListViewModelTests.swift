@@ -37,7 +37,7 @@ private final class TestableChannelListViewModel: ChannelListViewModel {
     override func makeChannelObserver() -> LazyDBObserver<ChatChannel, ChannelDTO> {
         let request: NSFetchRequest<ChannelDTO> = ChannelDTO.fetchRequest()
         request.sortDescriptors = [
-            NSSortDescriptor(keyPath: \ChannelDTO.isPinned,   ascending: false),
+            NSSortDescriptor(keyPath: \ChannelDTO.pinnedAt, ascending: false),
             NSSortDescriptor(keyPath: \ChannelDTO.sortingKey, ascending: false)
         ]
         request.predicate = fetchPredicate
@@ -232,7 +232,6 @@ final class ChannelListViewModelTests: XCTestCase {
             dto.id = id
             dto.type = "group"
             dto.subject = subject
-            dto.isPinned = isPinned
             dto.createdAt = Date().bridgeDate
         }
         return dto
