@@ -93,7 +93,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open var isDeletedUser: Bool {
-        isDirectChat && channel.peer?.state != .active && !channel.isSelfChannel
+        isDirectChat && channel.peer?.state == .deleted && !channel.isSelfChannel
     }
     
     public var channel: ChatChannel {
