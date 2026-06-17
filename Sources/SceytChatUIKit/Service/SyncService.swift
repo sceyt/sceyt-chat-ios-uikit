@@ -328,9 +328,9 @@ public final class SyncService: NSObject {
                 }
 
                 completionOperator.completionBlock = {
-                    task.setTaskCompleted(success: !completionOperator.isCancelled)
                     completion?(completionOperator.isFinished)
                     Self.finishSync()
+                    task.setTaskCompleted(success: !completionOperator.isCancelled)
                 }
             } else {
                 completionOperator.completionBlock = {
