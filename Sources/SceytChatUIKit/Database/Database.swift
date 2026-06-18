@@ -485,7 +485,11 @@ public extension NSManagedObjectContext {
     func mergeChangesWithViewContext(fromRemoteContextSave: [AnyHashable: Any]) {
         NSManagedObjectContext.mergeChanges(
             fromRemoteContextSave: fromRemoteContextSave,
-            into: [self, SceytChatUIKit.shared.database.viewContext]
+            into: [
+                self,
+                SceytChatUIKit.shared.database.viewContext,
+                SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext
+            ]
         )
     }
 }

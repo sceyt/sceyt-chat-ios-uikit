@@ -29,7 +29,7 @@ extension NSManagedObjectContext: BatchDeleteDatabaseSession {
         ]
         mergeChangesWithViewContext(fromRemoteContextSave: deletedObjects)
     }
-    
+
     public func batchDelete(ids: [NSManagedObjectID]) throws {
 
         let deleteRequest = NSBatchDeleteRequest(objectIDs: ids)
