@@ -1139,7 +1139,28 @@ public extension MessageLayoutModel {
 extension MessageLayoutModel {
     
     open class AttachmentLayout {
-        public private(set) var attachment: ChatMessage.Attachment
+        // `attachment` is read on a background thread (loadThumbnail) and written on the
+        // main thread (update/init). The lock makes the read+retain atomic with the
+        // concurrent write+release, preventing use-after-free crashes.
+        private let _attachmentLock = NSLock()
+        private var _attachmentValue: ChatMessage.Attachment!
+        public private(set) var attachment: ChatMessage.Attachment {
+            get {
+                // Assign under the lock so the ARC retain of the returned value
+                // happens before the lock is released — prevents the main thread's
+                // concurrent release from dropping the refcount to zero mid-retain.
+                var v: ChatMessage.Attachment!
+                _attachmentLock.lock()
+                v = _attachmentValue
+                _attachmentLock.unlock()
+                return v!
+            }
+            set {
+                _attachmentLock.lock()
+                _attachmentValue = newValue
+                _attachmentLock.unlock()
+            }
+        }
         public private(set) var ownerMessage: ChatMessage?
         public private(set) var ownerChannel: ChatChannel?
         public var appearance: MessageCell.Appearance
@@ -1204,7 +1225,7 @@ extension MessageLayoutModel {
             asyncLoadThumbnail: Bool = false,
             appearance: MessageCell.Appearance
         ) {
-            self.attachment = attachment
+            _attachmentValue = attachment  // direct backing-store write — computed setter uses self, which requires all stored props initialized first
             self.ownerMessage = ownerMessage
             self.ownerChannel = ownerChannel
             self.appearance = appearance
@@ -1221,29 +1242,30 @@ extension MessageLayoutModel {
         }
         
         open func loadThumbnail() {
-            defer {
-                // Publish on main: the flag write, the closure read, and the cell's
-                // closure assignment must serialize on one queue, otherwise a load
-                // finishing on a background thread can race a concurrent cell bind
-                // and the ready thumbnail is never delivered to the visible cell.
-                DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    self.isLoadedThumbnail = true
-                    self.onLoadThumbnail?(self.thumbnail)
-                }
-            }
-            switch type {
+            // Snapshot all inputs before any concurrent work. The switch below runs
+            // only on local variables so the background thread never reads or writes
+            // through self. All writes to self are deferred to the main-thread block.
+            let attachment = self.attachment
+            let attachmentType = AttachmentType(rawValue: attachment.type) ?? .file
+            let thumbnailSize = self.thumbnailSize
+            let appearance = self.appearance
+
+            var resultThumbnail: UIImage?
+            var resultWaveform: [Float]?
+            var resultLoadedFromFile = false
+
+            switch attachmentType {
             case .voice:
-                thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
-                voiceWaveform = attachment.voiceDecodedMetadata?.thumbnail.map { Float($0) }
+                resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                resultWaveform = attachment.voiceDecodedMetadata?.thumbnail.map { Float($0) }
             case .image, .video:
                 if let path = fileProvider.thumbnailFile(for: attachment, preferred: thumbnailSize) {
                     logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
                         if let image = UIImage(data: data) {
-                            thumbnail = image
-                            isThumbnailLoadedFromFile = true
+                            resultThumbnail = image
+                            resultLoadedFromFile = true
                         } else {
                             logger.error("[Attachment] thumbnail decode failed, path \(path)")
                         }
@@ -1251,16 +1273,16 @@ extension MessageLayoutModel {
                         logger.errorIfNotNil(error, "load image from path \(path)")
                     }
                 }
-                if thumbnail == nil {
+                if resultThumbnail == nil {
                     let metadata = attachment.imageDecodedMetadata
                     logger.verbose("[Attachment] thumbnail is nil make from metadata \(attachment.description)")
                     if let data = metadata?.thumbnailImage {
-                        thumbnail = data
+                        resultThumbnail = data
                     } else if let base64 = metadata?.thumbnail,
                               let image = Components.imageBuilder.image(thumbHash: base64) {
-                        thumbnail = image
+                        resultThumbnail = image
                     } else {
-                        thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                        resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
                     }
                 }
             case .file:
@@ -1269,8 +1291,8 @@ extension MessageLayoutModel {
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
                         if let image = UIImage(data: data) {
-                            thumbnail = image
-                            isThumbnailLoadedFromFile = true
+                            resultThumbnail = image
+                            resultLoadedFromFile = true
                         } else {
                             logger.error("[Attachment] thumbnail decode failed, path \(path)")
                         }
@@ -1278,23 +1300,36 @@ extension MessageLayoutModel {
                         logger.errorIfNotNil(error, "load image from path \(path)")
                     }
                 }
-                if thumbnail == nil {
-                    thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                if resultThumbnail == nil {
+                    resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
                 }
             case .link:
-                if thumbnail == nil {
+                if resultThumbnail == nil {
                     let metadata = attachment.imageDecodedMetadata
                     if let data = metadata?.thumbnailImage {
-                        thumbnail = data
+                        resultThumbnail = data
                     } else if let base64 = metadata?.thumbnail,
                               let image = Components.imageBuilder.image(thumbHash: base64) {
-                        thumbnail = image
+                        resultThumbnail = image
                     } else {
-                        thumbnail = appearance.linkPreviewAppearance.placeholderIcon
+                        resultThumbnail = appearance.linkPreviewAppearance.placeholderIcon
                     }
                 }
             default:
                 break
+            }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                // Pointer-identity guard: if self.attachment was replaced with a different
+                // object while this load ran (even if same id), the result is stale — the
+                // replacement's own load will deliver fresh data.
+                guard self.attachment === attachment else { return }
+                self.thumbnail = resultThumbnail
+                self.voiceWaveform = resultWaveform
+                self.isThumbnailLoadedFromFile = resultLoadedFromFile
+                self.isLoadedThumbnail = true
+                self.onLoadThumbnail?(resultThumbnail)
             }
         }
         

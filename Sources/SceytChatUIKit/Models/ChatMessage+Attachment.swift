@@ -28,22 +28,8 @@ extension ChatMessage {
         public var status: TransferStatus
         public var transferProgress: Double
         
-        public private(set) lazy var imageDecodedMetadata: Metadata<String>? = {
-            if let metadata {
-                if type != "voice" {
-                    return try? Metadata<String>.decode(metadata)
-                }
-            }
-            return nil
-        }()
-        public private(set) lazy var voiceDecodedMetadata: Metadata<[Int]>? = {
-            if let metadata {
-                if type == "voice" {
-                    return try? Metadata<[Int]>.decode(metadata)
-                }
-            }
-            return nil
-        }()
+        public private(set) var imageDecodedMetadata: Metadata<String>?
+        public private(set) var voiceDecodedMetadata: Metadata<[Int]>?
         
         @Lazy public var user: ChatUser?
         
@@ -101,6 +87,14 @@ extension ChatMessage {
             self.createdAt = createdAt
             self.status = status
             self.transferProgress = transferProgress
+            // Decode metadata eagerly so the properties are immutable by the time any
+            // thread reads them — lazy var on a class is not thread-safe.
+            if let metadata, type != "voice" {
+                imageDecodedMetadata = try? Metadata<String>.decode(metadata)
+            }
+            if let metadata, type == "voice" {
+                voiceDecodedMetadata = try? Metadata<[Int]>.decode(metadata)
+            }
             $user = {
                 try? DataProvider.database.read {
                      UserDTO.fetch(id: userId, context: $0)?.convert()

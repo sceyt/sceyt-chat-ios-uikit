@@ -627,7 +627,7 @@ private extension ChannelListViewController {
 }
 
 extension ChannelListViewController: UISearchControllerDelegate {
-    public func willPresentSearchController(_ searchController: UISearchController) {
+    open func willPresentSearchController(_ searchController: UISearchController) {
         if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
             if globalVC.pageViewController == nil {
                 globalVC.buildPages()
@@ -636,7 +636,7 @@ extension ChannelListViewController: UISearchControllerDelegate {
         }
     }
 
-    public func didDismissSearchController(_ searchController: UISearchController) {
+    open func didDismissSearchController(_ searchController: UISearchController) {
         if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
             globalVC.tearDownPages()
         }

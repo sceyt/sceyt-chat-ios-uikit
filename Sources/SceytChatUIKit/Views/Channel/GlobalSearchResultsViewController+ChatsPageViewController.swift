@@ -156,9 +156,9 @@ extension GlobalSearchResultsViewController {
 
         // MARK: - UITableViewDataSource
 
-        public func numberOfSections(in tableView: UITableView) -> Int { 2 }
+        open func numberOfSections(in tableView: UITableView) -> Int { 2 }
 
-        override public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        override open func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
             switch section {
             case 0: return viewModel.shouldShowChannelSection ? channelsSnapshot.count : 0
             case 1: return showMessagesSection ? chatMessagesSnapshot.count : 0
@@ -166,7 +166,7 @@ extension GlobalSearchResultsViewController {
             }
         }
 
-        override public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        override open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
             switch indexPath.section {
             case 0:
                 guard channelsSnapshot.indices.contains(indexPath.row) else {
@@ -190,7 +190,7 @@ extension GlobalSearchResultsViewController {
             }
         }
 
-        public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
             switch section {
             case 0:
                 guard viewModel.shouldShowChannelSection, !channelsSnapshot.isEmpty else { return nil }
@@ -207,7 +207,7 @@ extension GlobalSearchResultsViewController {
             }
         }
 
-        public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
             switch section {
             case 0: return (viewModel.shouldShowChannelSection && !channelsSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
             case 1: return (showMessagesSection && !chatMessagesSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
@@ -217,7 +217,7 @@ extension GlobalSearchResultsViewController {
 
         // MARK: - UITableViewDelegate
 
-        public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        open func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
             guard indexPath.section == 1,
                   messagesViewModel.hasMoreChatMessages,
                   indexPath.row >= chatMessagesSnapshot.count - 3
@@ -225,7 +225,7 @@ extension GlobalSearchResultsViewController {
             messagesViewModel.loadMoreMessages(in: .chats)
         }
 
-        override public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        override open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
             tableView.deselectRow(at: indexPath, animated: true)
             switch indexPath.section {
             case 0:
