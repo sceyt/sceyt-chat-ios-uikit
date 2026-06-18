@@ -28,36 +28,34 @@ open class ImageBuilder {
         return UIImage(cgImage: cgImage)
     }
     
-    open class func build(size: CGSize = .init(width: 60, height: 60),
-                          backgroundColor: UIColor = .white,
-                          opaque: Bool = false,
-                          scale: CGFloat = UIScreen.main.traitCollection.displayScale,
-                          content: (UILabel) -> Void
-    ) -> UIImage? {
-        
-        func createImage() -> UIImage? {
-            let v = UIView(frame: CGRect(origin: .zero, size: size))
-            v.backgroundColor = backgroundColor
-            let l = UILabel()
-            l.textAlignment = .center
-            l.adjustsFontSizeToFitWidth = true
-            l.frame = v.bounds
-            content(l)
-            v.addSubview(l)
-            return build(
-                from: v,
-                opaque: opaque,
-                scale: scale
+    open class func build(
+        size: CGSize = CGSize(width: 60, height: 60),
+        backgroundColor: UIColor = .white,
+        text: String,
+        textColor: UIColor = .black,
+        font: UIFont = .systemFont(ofSize: 24, weight: .medium)
+    ) -> UIImage {
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { _ in
+            let rect = CGRect(origin: .zero, size: size)
+            backgroundColor.setFill()
+            UIRectFill(rect)
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: font,
+                .foregroundColor: textColor,
+                .paragraphStyle: paragraph
+            ]
+            let textSize = text.size(withAttributes: attributes)
+            let textRect = CGRect(
+                x: 0,
+                y: (size.height - textSize.height) / 2,
+                width: size.width,
+                height: textSize.height
             )
+            text.draw(in: textRect, withAttributes: attributes)
         }
-        if Thread.isMainThread {
-            return createImage()
-        }
-        var image: UIImage?
-        DispatchQueue.main.sync {
-            image = createImage()
-        }
-        return image
     }
     
     open class func build(

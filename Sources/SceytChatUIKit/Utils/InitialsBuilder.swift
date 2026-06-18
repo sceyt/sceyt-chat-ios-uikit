@@ -19,12 +19,11 @@ open class InitialsBuilder {
 
         return Components.imageBuilder.build(
             size: appearance.size,
-            backgroundColor: appearance.backgroundColor ?? backgroundColor(display: display)) {
-                $0.text = SceytChatUIKit.shared.formatters.avatarInitialsFormatter.format(display)
-                $0.textColor = appearance.color
-                $0.font = appearance.font
-                $0.adjustsFontSizeToFitWidth = appearance.adjustsFontSizeToFitWidth
-            } ?? UIImage()
+            backgroundColor: appearance.backgroundColor ?? backgroundColor(display: display),
+            text: SceytChatUIKit.shared.formatters.avatarInitialsFormatter.format(display),
+            textColor: appearance.color,
+            font: appearance.font
+        )
     }
     
     open class func backgroundColor(display: String) -> UIColor {
