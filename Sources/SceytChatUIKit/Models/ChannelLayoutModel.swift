@@ -51,8 +51,13 @@ open class ChannelLayoutModel {
     
     public var formattedUnreadCount: String!
 
+    public var hasDraftMessage: Bool {
+        guard let draft = channel.draftMessage else { return false }
+        return draft.length > 0
+    }
+
     public var shouldShowDeliveryTick: Bool {
-        guard let message = lastMessage else { return false }
+        guard !hasDraftMessage, let message = lastMessage else { return false }
         return message.state != .deleted && !message.isSystemMessage
     }
 
