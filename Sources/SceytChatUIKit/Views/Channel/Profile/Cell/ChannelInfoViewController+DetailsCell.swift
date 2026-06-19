@@ -28,6 +28,11 @@ extension ChannelInfoViewController {
         
         override open func setup() {
             super.setup()
+
+            avatarButton.clipsToBounds = true
+            avatarButton.contentHorizontalAlignment = .fill
+            avatarButton.contentVerticalAlignment = .fill
+            avatarButton.imageView?.contentMode = .scaleAspectFill
         }
         
         override open func setupAppearance() {
