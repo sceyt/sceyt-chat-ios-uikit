@@ -125,9 +125,9 @@ open class ChannelListViewController: ViewController,
     }
 
     open func setupDiffableDataSource() {
-        let ds = UITableViewDiffableDataSource<Int, ChannelId>(tableView: tableView) { [weak self] tableView, indexPath, _ in
+        let ds = UITableViewDiffableDataSource<Int, ChannelId>(tableView: tableView) { [weak self] tableView, indexPath, channelId in
             guard let self else { return UITableViewCell() }
-            return self.tableView(tableView, cellForRowAt: indexPath)
+            return self.tableView(tableView, cellForRowAt: indexPath, channelId: channelId)
         }
         diffableDataSource = ds
     }
@@ -169,7 +169,14 @@ open class ChannelListViewController: ViewController,
     open func updateVisibleCell(indexPath: IndexPath) {
         guard let cell = tableView.cellForRow(at: indexPath) as? ChannelCell else { return }
         cell.parentAppearance = appearance.cellAppearance
-        if let item = channelListViewModel.layoutModel(at: indexPath) {
+        let item: ChannelLayoutModel?
+        if dataSourceMode == .diffable,
+           let channelId = diffableDataSource?.itemIdentifier(for: indexPath) {
+            item = channelListViewModel.layoutModel(id: channelId)
+        } else {
+            item = channelListViewModel.layoutModel(at: indexPath)
+        }
+        if let item {
             cell.data = item
         }
     }
@@ -505,6 +512,25 @@ open class ChannelListViewController: ViewController,
                                                  cellType: Components.channelCell)
         cell.parentAppearance = appearance.cellAppearance
         if let item = channelListViewModel.layoutModel(at: indexPath) {
+            cell.data = item
+            if channelListViewModel.isSelected(item.channel) {
+                tableView.selectRow(at: indexPath, animated: false, scrollPosition: .none)
+            }
+        }
+
+        return cell
+    }
+
+    open func tableView(_ tableView: UITableView,
+                        cellForRowAt indexPath: IndexPath,
+                        channelId: ChannelId) -> UITableViewCell {
+        if indexPath.row > channelListViewModel.numberOfChannel(at: indexPath.section) - 3 {
+            channelListViewModel.loadChannels()
+        }
+        let cell = tableView.dequeueReusableCell(for: indexPath,
+                                                 cellType: Components.channelCell)
+        cell.parentAppearance = appearance.cellAppearance
+        if let item = channelListViewModel.layoutModel(id: channelId) {
             cell.data = item
             if channelListViewModel.isSelected(item.channel) {
                 tableView.selectRow(at: indexPath, animated: false, scrollPosition: .none)

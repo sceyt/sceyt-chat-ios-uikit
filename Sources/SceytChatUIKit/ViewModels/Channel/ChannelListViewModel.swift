@@ -246,6 +246,13 @@ open class ChannelListViewModel: NSObject,
         }
         return nil
     }
+
+    open func layoutModel(id: ChannelId) -> ChannelLayoutModel? {
+        if let channel = channel(id: id) {
+            return layoutModels[channel]
+        }
+        return nil
+    }
     
     open var numberOfSections: Int { 1 }
 
