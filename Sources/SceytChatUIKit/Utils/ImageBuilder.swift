@@ -33,11 +33,20 @@ open class ImageBuilder {
         backgroundColor: UIColor = .white,
         text: String,
         textColor: UIColor = .black,
-        font: UIFont = .systemFont(ofSize: 24, weight: .medium)
+        font: UIFont = .systemFont(ofSize: 24, weight: .medium),
+        cornerRadius: CGFloat? = 30
     ) -> UIImage {
-        let renderer = UIGraphicsImageRenderer(size: size)
+        let format = UIGraphicsImageRendererFormat.default()
+        // Corners must be transparent when clipping to a rounded shape.
+        format.opaque = cornerRadius == nil
+        let renderer = UIGraphicsImageRenderer(size: size, format: format)
         return renderer.image { _ in
             let rect = CGRect(origin: .zero, size: size)
+            if let cornerRadius {
+                // Pass min(size.width, size.height) / 2 for a full circle.
+                let radius = min(cornerRadius, min(size.width, size.height) / 2)
+                UIBezierPath(roundedRect: rect, cornerRadius: radius).addClip()
+            }
             backgroundColor.setFill()
             UIRectFill(rect)
             let paragraph = NSMutableParagraphStyle()
