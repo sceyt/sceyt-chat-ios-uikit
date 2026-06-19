@@ -155,7 +155,7 @@ open class SCTSession: NSObject, SCTDataSession {
             }
             return nil
         }
-        
+
         if let path = getFilePath(attachment: attachment) {
             let thumbnailPath = fileStorage.thumbnailPath(filePath: path, imageSize: newSize)
             if fileStorage.isFilePath(thumbnailPath) {

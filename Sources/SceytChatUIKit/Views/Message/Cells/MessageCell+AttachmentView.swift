@@ -171,6 +171,30 @@ extension MessageCell {
         
         open var previewer: (() -> AttachmentPreviewDataSource?)?
         
+        /// Loads the on-disk thumbnail for `attachment` on a background queue and applies it to the
+        /// visible cell's layout via `setFileBackedThumbnail`, keyed by attachment identity. This
+        /// updates the model state (so later rebinds stay sharp) AND notifies the cell. Robust to
+        /// the duplicate-`AttachmentLayout`-instance routing problem where the download completion /
+        /// observer fan-out updates a different layout instance than the one bound to the visible
+        /// cell, which would otherwise leave the cell on the blurry thumbHash placeholder.
+        /// No-op for non image/video attachments (their imageView is an icon, not a photo).
+        open func reloadThumbnailFromFile(for attachment: ChatMessage.Attachment) {
+            guard let data, data.type == .image || data.type == .video else { return }
+            let preferred = data.thumbnailSize == .zero
+                ? MessageLayoutModel.defaults.imageAttachmentSize
+                : data.thumbnailSize
+            DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+                guard let path = fileProvider.thumbnailFile(for: attachment, preferred: preferred),
+                      let image = UIImage(contentsOfFile: path)
+                else { return }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, let layout = self.data, layout.attachment == attachment
+                    else { return }
+                    layout.setFileBackedThumbnail(image)
+                }
+            }
+        }
+
         open func setProgressHandler() {
             guard let data = data,
                   let message = data.ownerMessage
@@ -215,6 +239,9 @@ extension MessageCell {
                         }
                         self?.update(status: done.attachment.status)
                         self?.setCompletion(done)
+                        if done.error == nil {
+                            self?.reloadThumbnailFromFile(for: done.attachment)
+                        }
                     }
                     RunLoop.main.perform { [weak self] in
                         self?.setupPreviewer()

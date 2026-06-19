@@ -1321,10 +1321,19 @@ extension MessageLayoutModel {
 
             DispatchQueue.main.async { [weak self] in
                 guard let self else { return }
-                // Pointer-identity guard: if self.attachment was replaced with a different
-                // object while this load ran (even if same id), the result is stale — the
-                // replacement's own load will deliver fresh data.
-                guard self.attachment === attachment else { return }
+                // Accept the result when it belongs to the current attachment object, OR when it
+                // was loaded from a real on-disk thumbnail file for the same logical attachment
+                // (same id/tid). The observer fan-out can swap self.attachment for a fresh
+                // ChatMessage.Attachment with the same identity while this load runs; a strict
+                // pointer-identity guard would then discard the sharp thumbnail and leave the
+                // cell stuck on the blurry thumbHash placeholder.
+                let isSameObject = self.attachment === attachment
+                let isSameFileBackedAttachment = resultLoadedFromFile && self.attachment == attachment
+                guard isSameObject || isSameFileBackedAttachment else { return }
+                // Never let a low-res fallback (metadata/thumbHash) clobber an already-loaded
+                // sharp file-backed thumbnail — guards against a stale pre-download load landing
+                // after the sharp one (ordering inversion).
+                if !resultLoadedFromFile, self.isThumbnailLoadedFromFile { return }
                 self.thumbnail = resultThumbnail
                 self.voiceWaveform = resultWaveform
                 self.isThumbnailLoadedFromFile = resultLoadedFromFile
@@ -1352,6 +1361,18 @@ extension MessageLayoutModel {
             DispatchQueue.global(qos: .userInteractive).async { [weak self] in
                 self?.loadThumbnail()
             }
+        }
+
+        /// Applies a sharp thumbnail that was already loaded from a real on-disk file and notifies
+        /// observers. Unlike `resetThumbnail()` this updates the model state in place (so later cell
+        /// rebinds to this layout stay sharp) with no nil/blur window. Safe to call after a download
+        /// completes regardless of which duplicate layout instance won the async load race — the
+        /// caller targets the instance bound to the visible cell. Must be called on the main thread.
+        open func setFileBackedThumbnail(_ image: UIImage) {
+            thumbnail = image
+            isThumbnailLoadedFromFile = true
+            isLoadedThumbnail = true
+            onLoadThumbnail?(image)
         }
         
         @discardableResult
