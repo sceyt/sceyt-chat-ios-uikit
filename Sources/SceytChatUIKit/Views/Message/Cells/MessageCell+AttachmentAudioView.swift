@@ -140,6 +140,11 @@ extension MessageCell {
                 audioWaveformView.data = data.voiceWaveform
                 displayDuration = data.mediaDuration
 
+                data.onLoadThumbnail = { [weak self, weak data] _ in
+                    guard let self, let data, self.data === data else { return }
+                    self.audioWaveformView.data = data.voiceWaveform
+                }
+
                 if data.attachment.playerId == SimpleSinglePlayer.currentId {
                     state = SimpleSinglePlayer.isPlaying ? .playing : .paused
                     SimpleSinglePlayer.set(durationBlock: setDuration, stopBlock: stop)
