@@ -25,7 +25,8 @@ open class VideoProcessor {
         url: URL,
         at time: TimeInterval = 1
     ) -> UIImage? {
-        let asset = AVAsset(url: url)
+        // Prefer precise duration/timing so `asset.duration` is reliable on a freshly written file.
+        let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
         return copyFrame(asset: asset, at: time)
     }
     
@@ -35,13 +36,23 @@ open class VideoProcessor {
     ) -> UIImage? {
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
-        var duration = asset.duration
-        duration.value = min(duration.value, CMTimeValue(Int32(time * TimeInterval(duration.timescale))))
+        // Return the nearest decodable frame instead of demanding an exact one — zero tolerance
+        // throws AVErrorNoImageAtTime on many GOP layouts (and on freshly downloaded files), which
+        // is the deterministic case a retry alone can never recover from.
+        generator.requestedTimeToleranceBefore = .positiveInfinity
+        generator.requestedTimeToleranceAfter = .positiveInfinity
+        // Clamp the requested time into the asset; never the exact end of a short clip (no frame
+        // there), and fall back to the first frame when the duration is still unresolved (cold file).
+        let durationSeconds = CMTimeGetSeconds(asset.duration)
+        let requestedSeconds = (durationSeconds.isFinite && durationSeconds > 0)
+            ? min(time, durationSeconds / 2)
+            : 0
+        let requestedTime = CMTime(seconds: requestedSeconds, preferredTimescale: 600)
         do {
-            let cgImage = try generator.copyCGImage(at: duration, actualTime: nil)
+            let cgImage = try generator.copyCGImage(at: requestedTime, actualTime: nil)
             return UIImage(cgImage: cgImage)
         } catch {
-            logger.errorIfNotNil(error, "Copy video frame at \(CMTimeGetSeconds(duration)) s., given value id \(time) s.")
+            logger.errorIfNotNil(error, "Copy video frame at \(requestedSeconds) s., given value id \(time) s.")
             return nil
         }
     }

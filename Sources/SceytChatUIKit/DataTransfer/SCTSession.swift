@@ -150,8 +150,21 @@ open class SCTSession: NSObject, SCTDataSession {
                let ib = try? Components.imageBuilder.init(image: image).resize(max: newSize.maxSide),
                let data = ib.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality)
             {
-                logger.debug("[thumbnail] 3 stored \(thumbnailPath)")
-                return Storage.storeData(data, filePath: thumbnailPath)?.path
+                // Atomic write: stage to a temp file then atomically replace the destination so a
+                // concurrent reader (loadThumbnail / reloadThumbnailFromFile) never observes a
+                // partially written JPEG. Several in-flight extractions of the same freshly
+                // downloaded video each write a complete file and the last rename wins — this
+                // removes the truncated-read `nil` that left the blurry placeholder in place.
+                let destination = URL(fileURLWithPath: thumbnailPath)
+                do {
+                    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try data.write(to: destination, options: .atomic)
+                    logger.debug("[thumbnail] 3 stored (atomic) \(thumbnailPath)")
+                    return thumbnailPath
+                } catch {
+                    logger.errorIfNotNil(error, "[thumbnail] atomic store failed, falling back \(thumbnailPath)")
+                    return Storage.storeData(data, filePath: thumbnailPath)?.path
+                }
             }
             return nil
         }
@@ -159,8 +172,15 @@ open class SCTSession: NSObject, SCTDataSession {
         if let path = getFilePath(attachment: attachment) {
             let thumbnailPath = fileStorage.thumbnailPath(filePath: path, imageSize: newSize)
             if fileStorage.isFilePath(thumbnailPath) {
-                logger.debug("[thumbnail] found file \(attachment.type)")
-                return thumbnailPath
+                // Validate the cached thumbnail actually decodes. A legacy truncated/partial JPEG
+                // would otherwise be handed back to every reader forever (and a retry just keeps
+                // getting the same undecodable path) — evict it and fall through to regenerate.
+                if UIImage(contentsOfFile: thumbnailPath) != nil {
+                    logger.debug("[thumbnail] found file \(attachment.type)")
+                    return thumbnailPath
+                }
+                logger.debug("[thumbnail] cached thumbnail unreadable, evicting \(thumbnailPath)")
+                try? FileManager.default.removeItem(atPath: thumbnailPath)
             }
             return makeThumbnail(file: path, thumbnailPath: thumbnailPath)
         } else if let path = attachment.filePath {

@@ -178,7 +178,7 @@ extension MessageCell {
         /// observer fan-out updates a different layout instance than the one bound to the visible
         /// cell, which would otherwise leave the cell on the blurry thumbHash placeholder.
         /// No-op for non image/video attachments (their imageView is an icon, not a photo).
-        open func reloadThumbnailFromFile(for attachment: ChatMessage.Attachment) {
+        open func reloadThumbnailFromFile(for attachment: ChatMessage.Attachment, retriesLeft: Int = 2) {
             guard let data, data.type == .image || data.type == .video else { return }
             let preferred = data.thumbnailSize == .zero
                 ? MessageLayoutModel.defaults.imageAttachmentSize
@@ -186,7 +186,24 @@ extension MessageCell {
             DispatchQueue.global(qos: .userInteractive).async { [weak self] in
                 guard let path = fileProvider.thumbnailFile(for: attachment, preferred: preferred),
                       let image = UIImage(contentsOfFile: path)
-                else { return }
+                else {
+                    // Video frame extraction (copyFrame) can transiently fail on a just-downloaded
+                    // file (cold I/O cache + several concurrent extractions of the same fresh file).
+                    // The file is on disk, so a sharp thumbnail IS obtainable — retry shortly instead
+                    // of leaving the blurry placeholder until the user scrolls (the only other thing
+                    // that re-runs this). setFileBackedThumbnail is idempotent, so a retry that races
+                    // a successful sibling load is harmless.
+                    guard retriesLeft > 0 else {
+                        logger.debug("[Attachment] reloadThumbnailFromFile gave up, no thumbnail yet \(attachment.description)")
+                        return
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                        guard let self, let layout = self.data, layout.attachment == attachment
+                        else { return }
+                        self.reloadThumbnailFromFile(for: attachment, retriesLeft: retriesLeft - 1)
+                    }
+                    return
+                }
                 DispatchQueue.main.async { [weak self] in
                     guard let self, let layout = self.data, layout.attachment == attachment
                     else { return }
