@@ -323,12 +323,18 @@ open class MessageCell: CollectionViewCell,
         replyView.data = message.repliedInThread ? nil : data.replyLayout
         replyCountView.count = data.replyCount
         deliveryStatus = message.deliveryStatus
+        // Cancel any in-flight avatar download from a previous binding before
+        // starting a new one. `reconfigureItems(at:)` re-binds a cell in place
+        // without calling `prepareForReuse`, so without this a stale download
+        // can complete late and stamp the wrong sender's avatar onto the cell.
+        imageTask?.cancel()
+        imageTask = nil
         if showSenderInfo {
             nameLabel.isHidden = false
             avatarView.isHidden = false
             let scale = UIScreen.main.traitCollection.displayScale
             let avatarRepresentation = appearance.userDefaultAvatarProvider.provideVisual(for: message.user)
-            
+
             imageTask = switch avatarRepresentation {
             case .image(let image):
                 Components.avatarBuilder
