@@ -168,6 +168,13 @@ extension ChannelListViewController {
             messageLabel.numberOfLines = Layouts.messagePreviewNumberOfLines
             messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
             muteView.image = appearance.mutedIcon
+
+            // Re-scale the (UIFontMetrics-based) fonts live when the user changes
+            // the Dynamic Type / Large Text setting, instead of only after an app
+            // relaunch. The row height is recomputed for the new category in
+            // ChannelListViewController.traitCollectionDidChange.
+            [subjectLabel, messageLabel, dateLabel, unreadCount, atView.label]
+                .forEach { $0.adjustsFontForContentSizeCategory = true }
         }
         
         override open func setupLayout() {
@@ -212,7 +219,7 @@ extension ChannelListViewController {
             contentStackView.bottomAnchor.pin(to: contentView.bottomAnchor, constant: -Layouts.avatarVerticalPadding)
 
             pinView.resize(anchors: [.width(20), .height(20)])
-            unreadCount.heightAnchor.pin(constant: 20)
+//            unreadCount.heightAnchor.pin(constant: 20)
             // Width comes from BadgeLabel.intrinsicContentSize (text + padding,
             // min 20), so the badge tracks the count and stays a circle for
             // single digits — no fixed/min width constraint needed here.
@@ -525,10 +532,19 @@ public extension ChannelListViewController.ChannelCell {
         /// Computed so a full `messagePreviewNumberOfLines`-line preview always
         /// fits, and never shorter than the avatar. Because it is a constant the
         /// cell height no longer changes between 1-line and 2-line previews.
-        public static var cellHeight: CGFloat {
+        ///
+        /// - Parameter traitCollection: The trait collection whose
+        ///   `preferredContentSizeCategory` the height should be sized for. Pass
+        ///   the view's current trait collection so the fixed row height grows
+        ///   with Large Text; `nil` uses the current environment. Sizes are
+        ///   derived from `baseFont` (the un-scaled font), so the result tracks
+        ///   the live category rather than the one frozen at launch.
+        public static func cellHeight(compatibleWith traitCollection: UITraitCollection? = nil) -> CGFloat {
             let appearance = ChannelListViewController.ChannelCell.appearance
-            let subjectHeight = appearance.subjectLabelAppearance.font.lineHeight
-            let previewHeight = appearance.lastMessageLabelAppearance.font.lineHeight
+            let subjectHeight = appearance.subjectLabelAppearance.baseFont
+                .asDynamic(compatibleWith: traitCollection).lineHeight
+            let previewHeight = appearance.lastMessageLabelAppearance.baseFont
+                .asDynamic(compatibleWith: traitCollection).lineHeight
                 * CGFloat(messagePreviewNumberOfLines)
             let textHeight = messageStackTopPadding
                 + subjectHeight

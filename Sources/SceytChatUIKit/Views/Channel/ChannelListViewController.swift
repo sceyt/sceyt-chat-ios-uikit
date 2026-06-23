@@ -76,8 +76,9 @@ open class ChannelListViewController: ViewController,
         tableView.tableFooterView = UIView()
         tableView.separatorStyle = .none
         // Fixed row height so the cell doesn't change between 1-line and 2-line previews.
-        tableView.rowHeight = ChannelCell.Layouts.cellHeight
-        tableView.estimatedRowHeight = ChannelCell.Layouts.cellHeight
+        // Sized for the current Dynamic Type category; recomputed in traitCollectionDidChange.
+        tableView.rowHeight = ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
+        tableView.estimatedRowHeight = ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
         setupTableViewDelegates()
 
         navigationItem.hidesSearchBarWhenScrolling = true
@@ -168,7 +169,6 @@ open class ChannelListViewController: ViewController,
 
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         guard let indexPath = tableView.indexPathForSelectedRow else { return }
-        print("scrollViewWillBeginDragging")
         tableView.deselectRow(at: indexPath, animated: true)
     }
     
@@ -552,6 +552,17 @@ open class ChannelListViewController: ViewController,
         super.traitCollectionDidChange(previousTraitCollection)
 
         searchController.setupAppearance()
+
+        // Large Text / Dynamic Type changed: the cells' fonts re-scale themselves
+        // (adjustsFontForContentSizeCategory), but the fixed row height is a
+        // constant, so recompute it for the new category and reload so rows grow
+        // to fit instead of clipping.
+        if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+            let height = ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
+            tableView.rowHeight = height
+            tableView.estimatedRowHeight = height
+            reloadTableView()
+        }
     }
 
     // MARK: - UISearchResultsUpdating
