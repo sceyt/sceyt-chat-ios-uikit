@@ -12,15 +12,65 @@ import UIKit
 extension ChannelListViewController {
     open class ChannelCell: TableViewCell {
         
-        open lazy var badgeStackView = UIStackView(arrangedSubviews: [pinView, atView, unreadCount])
+        // MARK: - Stack hierarchy
+        //
+        // contentStackView (H)
+        // ├─ avatarContainer                  (avatar + presence / retention overlays)
+        // └─ rightStackView (V)
+        //    ├─ topRowStackView (H)           [ subjectStackView ──spacer── dateStackView ]
+        //    │  ├─ subjectStackView (H)        [ subjectLabel  muteView  «spacer» ]
+        //    │  └─ dateStackView (H)           [ ticksView  dateLabel ]
+        //    └─ bottomRowStackView (H)        [ messageLabel ──spacer── badgeStackView ]
+        //       └─ badgeStackView (H)          [ atView  unreadCount pinView ]
+
+        open lazy var contentStackView = UIStackView(arrangedSubviews: [avatarContainer, rightStackView])
             .withoutAutoresizingMask
+
+        /// Non-clipping host for the avatar so the presence / retention badges
+        /// can extend beyond the (clipped) avatar image.
+        open lazy var avatarContainer = UIView()
+            .withoutAutoresizingMask
+
+        open lazy var rightStackView = UIStackView(arrangedSubviews: [topRowStackView, bottomRowStackView])
+            .withoutAutoresizingMask
+
+        /// Top row: subject (left, expands) + date (right, fixed size).
+        open lazy var topRowStackView = UIStackView(arrangedSubviews: [subjectStackView, dateStackView])
+            .withoutAutoresizingMask
+
+        /// Bottom row: message preview (left, expands) + badges (right).
+        open lazy var bottomRowStackView = UIStackView(arrangedSubviews: [messageLabel, badgeStackView])
+            .withoutAutoresizingMask
+
+        open lazy var subjectStackView = UIStackView(arrangedSubviews: [subjectLabel, muteView, subjectSpacerView])
+            .withoutAutoresizingMask
+
+        /// Date column: ticks + timestamp, kept at its intrinsic size and pinned
+        /// to the trailing edge of the top row.
+        open lazy var dateStackView = UIStackView(arrangedSubviews: [ticksView, dateLabel])
+            .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
             .contentCompressionResistancePriorityH(.required)
-        
-        open lazy var messageStackView = UIStackView(arrangedSubviews: [subjectLabel, messageLabel])
+
+        /// Badges. Sized strictly to their content (required hugging +
+        /// compression resistance), so the row gives the badges exactly the
+        /// width they need and lets `messageLabel` take the rest.
+        open lazy var badgeStackView = UIStackView(arrangedSubviews: [atView, unreadCount, pinView])
             .withoutAutoresizingMask
-        
-        open lazy var unreadCount = Components.badgeView.init()
+            .contentHuggingPriorityH(.required)
+            .contentCompressionResistancePriorityH(.required)
+
+        /// Flexible spacer that keeps `muteView` next to the subject text instead
+        /// of being pushed to the trailing edge of the filled subject row.
+        open lazy var subjectSpacerView = UIView()
             .withoutAutoresizingMask
+            .contentHuggingPriorityH(UILayoutPriority(1))
+
+        // MARK: - Components
+
+        open lazy var unreadCount = BadgeLabel()
+            .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
             .contentCompressionResistancePriorityH(.required)
         
         open lazy var atView = Components.badgeView.init()
@@ -33,13 +83,14 @@ extension ChannelListViewController {
         
         open lazy var muteView = UIImageView()
             .withoutAutoresizingMask
-            .contentMode(.center)
+            .contentMode(.scaleAspectFit)
         
         open lazy var avatarView = ImageView.init()
             .withoutAutoresizingMask
         
         open lazy var messageLabel = UILabel()
             .withoutAutoresizingMask
+            .contentHuggingPriorityH(.defaultLow)
             .contentCompressionResistancePriorityH(.defaultLow)
         
         open lazy var dateLabel = UILabel()
@@ -47,11 +98,11 @@ extension ChannelListViewController {
         
         open lazy var pinView = UIImageView(image: appearance.pinIcon)
             .withoutAutoresizingMask
-            .contentMode(.center)
+            .contentMode(.scaleAspectFit)
         
         open lazy var ticksView = UIImageView()
             .withoutAutoresizingMask
-            .contentMode(.center)
+            .contentMode(.scaleAspectFit)
         
         open lazy var presenceView = UIImageView()
             .withoutAutoresizingMask
@@ -61,11 +112,7 @@ extension ChannelListViewController {
         
         lazy var separatorView = UIView()
             .withoutAutoresizingMask
-        
-        private var unreadCountWidthAnchorConstraint: NSLayoutConstraint?
-        private var messageStackViewCenterYConstraint: NSLayoutConstraint?
-        private var messageVerticalConstraints: [NSLayoutConstraint] = []
-        
+
         public var eventModels: [ChannelEventModel] = []
         private var updateTimer: Timer?
         
@@ -75,94 +122,105 @@ extension ChannelListViewController {
             subscriptions.removeAll(keepingCapacity: true)
         }
         
-        @objc
-        private func panGestureAction(_ sender: UIPanGestureRecognizer) {
-            isSelected = false
-        }
-        
         override open func setup() {
             super.setup()
             backgroundView = UIView()
-            messageStackView.axis = .vertical
-            messageStackView.distribution = .fill
-            messageStackView.alignment = .leading
-            messageStackView.spacing = Layouts.messageStackSpacing
-            
+
+            contentStackView.axis = .horizontal
+            contentStackView.distribution = .fill
+            // Top-align so the subject row stays pinned to the top of the cell.
+            // The avatar (the tallest item) drives the stack's constant height, so
+            // it still reads as centered, while the message preview grows downward
+            // instead of shifting the subject up/down as its line count changes.
+            contentStackView.alignment = .top
+            contentStackView.spacing = 12
+
+            rightStackView.axis = .vertical
+            rightStackView.distribution = .fill
+            rightStackView.alignment = .fill
+            rightStackView.spacing = Layouts.messageStackSpacing
+
+            topRowStackView.axis = .horizontal
+            topRowStackView.distribution = .fill
+            topRowStackView.alignment = .center
+            topRowStackView.spacing = 8
+
+            bottomRowStackView.axis = .horizontal
+            bottomRowStackView.distribution = .fill
+            bottomRowStackView.alignment = .top
+            bottomRowStackView.spacing = 8
+
+            subjectStackView.axis = .horizontal
+            subjectStackView.distribution = .fill
+            subjectStackView.alignment = .center
+            subjectStackView.spacing = 4
+
+            dateStackView.axis = .horizontal
+            dateStackView.distribution = .fill
+            dateStackView.alignment = .center
+            dateStackView.spacing = 4
+
             badgeStackView.axis = .horizontal
             badgeStackView.distribution = .fill
             badgeStackView.alignment = .trailing
             badgeStackView.spacing = 8
-            
+
             messageLabel.numberOfLines = Layouts.messagePreviewNumberOfLines
+            messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
             muteView.image = appearance.mutedIcon
-            let pan = UIPanGestureRecognizer(
-                target: self,
-                action: #selector(panGestureAction(_:))
-            )
-            pan.delegate = self
-            addGestureRecognizer(pan)
         }
         
         override open func setupLayout() {
             super.setupLayout()
-            contentView.addSubview(messageStackView)
-            contentView.addSubview(badgeStackView)
-            contentView.addSubview(muteView)
-            contentView.addSubview(avatarView)
-            contentView.addSubview(retentionBadgeView)
-            contentView.addSubview(dateLabel)
-            contentView.addSubview(ticksView)
-            contentView.addSubview(presenceView)
-            contentView.addSubview(separatorView)
-            
-            avatarView.pin(to: contentView, anchors: [
-                .top(Layouts.avatarVerticalPadding, .greaterThanOrEqual),
-                .centerY(),
-                .leading(Layouts.horizontalPadding)
-            ])
+
+            // Avatar + overlapping presence / retention badges. They sit in a
+            // dedicated container (not the avatar itself, which clips its rounded
+            // image) so the badges can extend slightly past the avatar edges.
+            avatarContainer.addSubview(avatarView)
+            avatarContainer.addSubview(presenceView)
+            avatarContainer.addSubview(retentionBadgeView)
+            avatarView.pin(to: avatarContainer)
             avatarView.resize(anchors: [.width(Layouts.avatarSize), .height(Layouts.avatarSize)])
-            
+
             presenceView.pin(to: avatarView, anchors: [
                 .trailing(),
                 .bottom(-2)
             ])
-            
+
             retentionBadgeView.pin(to: avatarView, anchors: [
                 .trailing(4),
                 .top(-4)
             ])
             retentionBadgeView.resize(anchors: [.width(22), .height(22)])
 
-            let topConstraint = messageStackView.topAnchor.pin(to: contentView.topAnchor, constant: Layouts.messageStackTopPadding)
-            let bottomConstraint = messageStackView.bottomAnchor.pin(lessThanOrEqualTo: contentView.bottomAnchor, constant: -Layouts.messageStackBottomPadding)
-            messageVerticalConstraints = [topConstraint, bottomConstraint]
-            messageStackView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 12)
-            messageStackView.trailingAnchor.pin(lessThanOrEqualTo: dateLabel.trailingAnchor)
-            messageStackViewCenterYConstraint = messageStackView.centerYAnchor.pin(to: contentView.centerYAnchor, activate: false)
-            updateCenterYConstraint()
-            messageLabel.trailingAnchor.pin(lessThanOrEqualTo: badgeStackView.leadingAnchor)
-            messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
-            
-            muteView.centerYAnchor.pin(to: subjectLabel.centerYAnchor)
-            muteView.leadingAnchor.pin(to: subjectLabel.trailingAnchor, constant: 4)
-            
-            ticksView.leadingAnchor.pin(greaterThanOrEqualTo: subjectLabel.trailingAnchor, constant: 8)
-            ticksView.leadingAnchor.pin(greaterThanOrEqualTo: muteView.trailingAnchor, constant: 2)
-            ticksView.trailingAnchor.pin(to: dateLabel.leadingAnchor, constant: -4)
-            ticksView.centerYAnchor.pin(to: dateLabel.centerYAnchor)
-            
-            dateLabel.trailingAnchor.pin(to: contentView.trailingAnchor, constant: -Layouts.horizontalPadding)
-            dateLabel.centerYAnchor.pin(to: subjectLabel.centerYAnchor)
-            
-            badgeStackView.trailingAnchor.pin(to: dateLabel.trailingAnchor)
-            badgeStackView.topAnchor.pin(to: dateLabel.bottomAnchor, constant: 2)
+            contentView.addSubview(contentStackView)
+            contentView.addSubview(separatorView)
+
+            // Pin the content to the top so the subject row is fixed there. The
+            // cell height is a constant sized for a full preview, and the avatar
+            // is the tallest item, so a top inset of avatarVerticalPadding leaves
+            // the avatar exactly where centering used to put it — while the
+            // message preview now grows downward instead of shifting the subject.
+            contentStackView.pin(to: contentView, anchors: [
+                .leading(Layouts.horizontalPadding),
+                .top(Layouts.avatarVerticalPadding)
+            ])
+            contentStackView.trailingAnchor.pin(to: contentView.trailingAnchor, constant: -Layouts.horizontalPadding)
+            // Fixed bottom: the cell height is a constant, so the content fills the
+            // vertical area exactly (8…56…8). With `.top` alignment the avatar fills
+            // it and the subject stays pinned to the top.
+            contentStackView.bottomAnchor.pin(to: contentView.bottomAnchor, constant: -Layouts.avatarVerticalPadding)
+
+            pinView.resize(anchors: [.width(20), .height(20)])
             unreadCount.heightAnchor.pin(constant: 20)
-            unreadCountWidthAnchorConstraint = unreadCount.widthAnchor.pin(greaterThanOrEqualToConstant: 20)
+            // Width comes from BadgeLabel.intrinsicContentSize (text + padding,
+            // min 20), so the badge tracks the count and stays a circle for
+            // single digits — no fixed/min width constraint needed here.
             atView.resize(anchors: [.height(20), .width(20)])
+
             separatorView.pin(to: contentView, anchors: [.bottom(), .trailing(-Layouts.horizontalPadding)])
-            separatorView.leadingAnchor.pin(to: messageStackView.leadingAnchor)
+            separatorView.leadingAnchor.pin(to: rightStackView.leadingAnchor)
             separatorView.heightAnchor.pin(constant: 1)
-            updateConstraint()
         }
         
         override open func setupAppearance() {
@@ -256,23 +314,8 @@ extension ChannelListViewController {
             removeEvent(for: userId)
         }
         
-        private func updateConstraint() {
-            if !unreadCount.isHidden {
-                unreadCountWidthAnchorConstraint?.constant = 20
-            }
-        }
-        
         public func update(messageText: NSAttributedString?) {
             messageLabel.attributedText = messageText
-            updateCenterYConstraint()
-            messageLabel.setNeedsLayout()
-            messageLabel.layoutIfNeeded()
-        }
-        
-        private func updateCenterYConstraint() {
-            let shouldCenter = messageLabel.attributedText?.string.isEmpty != false
-            messageStackViewCenterYConstraint?.isActive = shouldCenter
-            messageVerticalConstraints.forEach { $0.isActive = !shouldCenter }
         }
         
         open var data: ChannelLayoutModel! {
@@ -294,10 +337,11 @@ extension ChannelListViewController {
             
             ticksView.image = deliveryStatusImage(message: data.lastMessage)
             ticksView.isHidden = !data.shouldShowDeliveryTick
+            // Show the unread badge when there are unread messages (a count to
+            // display) or the channel was manually marked as unread (empty dot).
             unreadCount.value = data.formattedUnreadCount
-            if unreadCount.isHidden, data.channel.unread {
-                unreadCount.isHidden = false
-            }
+            let hasUnreadCount = !(data.formattedUnreadCount?.isEmpty ?? true)
+            unreadCount.isHidden = !(hasUnreadCount || data.channel.unread)
             muteView.isHidden = !data.channel.muted
             unreadCount.backgroundColor = !data.channel.muted ? appearance.unreadCountLabelAppearance.backgroundColor : appearance.unreadCountMutedStateLabelAppearance.backgroundColor
             unreadCount.textColor = !data.channel.muted ? appearance.unreadCountLabelAppearance.foregroundColor : appearance.unreadCountMutedStateLabelAppearance.foregroundColor
@@ -328,7 +372,6 @@ extension ChannelListViewController {
                     avatarView.clipsToBounds = true
                     avatarView.contentMode = .scaleAspectFill
                 }.store(in: &subscriptions)
-            updateConstraints()
         }
         
         open func deliveryStatusImage(message: ChatMessage?) -> UIImage? {

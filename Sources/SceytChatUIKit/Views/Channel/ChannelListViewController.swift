@@ -166,6 +166,12 @@ open class ChannelListViewController: ViewController,
         indexPaths.forEach { updateVisibleCell(indexPath: $0) }
     }
 
+    open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        guard let indexPath = tableView.indexPathForSelectedRow else { return }
+        print("scrollViewWillBeginDragging")
+        tableView.deselectRow(at: indexPath, animated: true)
+    }
+    
     open func updateVisibleCell(indexPath: IndexPath) {
         guard let cell = tableView.cellForRow(at: indexPath) as? ChannelCell else { return }
         cell.parentAppearance = appearance.cellAppearance
@@ -482,6 +488,8 @@ open class ChannelListViewController: ViewController,
 
     open func tableView(_ tableView: UITableView, willBeginEditingRowAt indexPath: IndexPath) {
         swipeOpenIndexPath = indexPath
+        tableView.deselectRow(at: indexPath, animated: true)
+        channelListViewModel.deselectChannel()
     }
 
     open func tableView(_ tableView: UITableView, didEndEditingRowAt indexPath: IndexPath?) {
