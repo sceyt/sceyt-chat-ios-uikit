@@ -16,9 +16,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         configureSceytChatUIKit()
+        UITestSupport.bootstrapIfNeeded()
         setupAppearance()
-        registerForPushNotifications()
-        
+        // Skip the system push-permission prompt under UI tests: it would block
+        // the channel list behind a system alert.
+        if !UITestSupport.isActive {
+            registerForPushNotifications()
+        }
+
         return true
     }
     

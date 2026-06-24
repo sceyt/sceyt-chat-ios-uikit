@@ -36,7 +36,12 @@
 		5694FF382C664FBA008DA2DC /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 5694FF372C664FBA008DA2DC /* SceytChatUIKit */; };
 		56F069CF2CC62D61003D74D8 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = 56F069CE2CC62D61003D74D8 /* SceytChatUIKit */; };
 		56F88D9E2C00D3890010C3E4 /* UserDisplayNameFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */; };
+		67E0ACCCB6B43A44B1AEC5E6 /* ChannelListScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F686F784DDA615AAA51AB6D /* ChannelListScreen.swift */; };
+		BC85D90959764852B1CA68A2 /* ChannelScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFE186FD8EE3473FB30E91D6 /* ChannelScreen.swift */; };
+		7A765EED2528FB51B1348519 /* UITestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4754CD4DAA5F0D94F177D520 /* UITestSupport.swift */; };
+		8363CA9BDBDE731D1E81CF60 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 816CA5FD4CA6B55C7E6EB813 /* Foundation.framework */; };
 		A10954582F4EF457000D6FC9 /* ChannelsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10954572F4EF457000D6FC9 /* ChannelsViewController.swift */; };
+		B9E62B91E3A959D91F546F71 /* BaseUITestCase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 754317B1668832F605E923CF /* BaseUITestCase.swift */; };
 		C51C930E2B565C9C0069F9DA /* LoginViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C930D2B565C9C0069F9DA /* LoginViewController.swift */; };
 		C51C93102B5660CB0069F9DA /* ConnectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C930F2B5660CB0069F9DA /* ConnectionService.swift */; };
 		C51C93122B566FF50069F9DA /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = C51C93112B566FF50069F9DA /* UserProfile.swift */; };
@@ -49,6 +54,7 @@
 		C54DF6CF2AECF19300767983 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54DF6CE2AECF19300767983 /* Config.swift */; };
 		C5B97EA42B5692070070C913 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = C5B97EA32B5692070070C913 /* SceytChatUIKit */; };
 		C5F467D42AF020B2009AB0E5 /* README.md in Resources */ = {isa = PBXBuildFile; fileRef = C5F467D32AF020B2009AB0E5 /* README.md */; };
+		D34ED1D7576C9B4176B3C2C9 /* ChannelListUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF4381AFF3B53DBAD83F73B8 /* ChannelListUITests.swift */; };
 		ED1046B72E1933AE001294FA /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED1046B62E1933AE001294FA /* SceytChatUIKit */; };
 		ED2CBA082E018007001C5468 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED2CBA072E018007001C5468 /* SceytChatUIKit */; };
 		EDC887682E01C1A00077B1B2 /* Constraints+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDC887672E01C1980077B1B2 /* Constraints+Extensions.swift */; };
@@ -56,7 +62,18 @@
 		EDC8876C2E01C2D90077B1B2 /* UIViewController+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDC8876B2E01C2D20077B1B2 /* UIViewController+Extensions.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		9C5002912C38CD4B8D4776A4 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C54DF6AF2AECF09100767983 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C54DF6B62AECF09100767983;
+			remoteInfo = SceytDemoApp;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		4754CD4DAA5F0D94F177D520 /* UITestSupport.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UITestSupport.swift; sourceTree = "<group>"; };
 		561169DC2CBD44A300DC1979 /* SplashViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SplashViewController.swift; sourceTree = "<group>"; };
 		561169DE2CBD460100DC1979 /* LandingViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LandingViewController.swift; sourceTree = "<group>"; };
 		561169E02CBD511500DC1979 /* CustomPresentationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomPresentationController.swift; sourceTree = "<group>"; };
@@ -76,6 +93,11 @@
 		5692FDFF2CC159B300803B3F /* CustomChannelInfoViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomChannelInfoViewController.swift; sourceTree = "<group>"; };
 		56D0BBCB2CD4F7AE00FF7208 /* SceytDemoApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SceytDemoApp.entitlements; sourceTree = "<group>"; };
 		56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = UserDisplayNameFormatter.swift; sourceTree = "<group>"; };
+		702496941F3AB3653C523ECB /* SceytDemoAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SceytDemoAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		754317B1668832F605E923CF /* BaseUITestCase.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BaseUITestCase.swift; sourceTree = "<group>"; };
+		7F686F784DDA615AAA51AB6D /* ChannelListScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChannelListScreen.swift; sourceTree = "<group>"; };
+		BFE186FD8EE3473FB30E91D6 /* ChannelScreen.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChannelScreen.swift; sourceTree = "<group>"; };
+		816CA5FD4CA6B55C7E6EB813 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		A10954572F4EF457000D6FC9 /* ChannelsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelsViewController.swift; sourceTree = "<group>"; };
 		C51C930D2B565C9C0069F9DA /* LoginViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginViewController.swift; sourceTree = "<group>"; };
 		C51C930F2B5660CB0069F9DA /* ConnectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectionService.swift; sourceTree = "<group>"; };
@@ -93,6 +115,7 @@
 		EDC887672E01C1980077B1B2 /* Constraints+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Constraints+Extensions.swift"; sourceTree = "<group>"; };
 		EDC887692E01C1EF0077B1B2 /* UIColor+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIColor+Extensions.swift"; sourceTree = "<group>"; };
 		EDC8876B2E01C2D20077B1B2 /* UIViewController+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "UIViewController+Extensions.swift"; sourceTree = "<group>"; };
+		FF4381AFF3B53DBAD83F73B8 /* ChannelListUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChannelListUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,9 +140,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E897B4B24A730AF744394ED5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8363CA9BDBDE731D1E81CF60 /* Foundation.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		44C65EBEA52F21E6A70180F8 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				816CA5FD4CA6B55C7E6EB813 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
 		5649B9A12CBFA74800E3B190 /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -175,6 +214,7 @@
 				56F88D9D2C00D3890010C3E4 /* UserDisplayNameFormatter.swift */,
 				5649B9B82CBFB62800E3B190 /* UsernameValidation.swift */,
 				5649B9A92CBFA91400E3B190 /* Debouncer.swift */,
+				4754CD4DAA5F0D94F177D520 /* UITestSupport.swift */,
 			);
 			path = Common;
 			sourceTree = "<group>";
@@ -192,11 +232,33 @@
 			path = Utils;
 			sourceTree = "<group>";
 		};
+		7D3FEED3BA32FF4C3004D0E1 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				44C65EBEA52F21E6A70180F8 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C08FBF6517E8D619E5EC7997 /* SceytDemoAppUITests */ = {
+			isa = PBXGroup;
+			children = (
+				754317B1668832F605E923CF /* BaseUITestCase.swift */,
+				7F686F784DDA615AAA51AB6D /* ChannelListScreen.swift */,
+				BFE186FD8EE3473FB30E91D6 /* ChannelScreen.swift */,
+				FF4381AFF3B53DBAD83F73B8 /* ChannelListUITests.swift */,
+			);
+			name = SceytDemoAppUITests;
+			path = SceytDemoAppUITests;
+			sourceTree = SOURCE_ROOT;
+		};
 		C54DF6AE2AECF09100767983 = {
 			isa = PBXGroup;
 			children = (
 				C54DF6B92AECF09100767983 /* SceytDemoApp */,
 				C54DF6B82AECF09100767983 /* Products */,
+				7D3FEED3BA32FF4C3004D0E1 /* Frameworks */,
+				C08FBF6517E8D619E5EC7997 /* SceytDemoAppUITests */,
 			);
 			sourceTree = "<group>";
 		};
@@ -204,6 +266,7 @@
 			isa = PBXGroup;
 			children = (
 				C54DF6B72AECF09100767983 /* SceytDemoApp.app */,
+				702496941F3AB3653C523ECB /* SceytDemoAppUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -229,6 +292,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		BAF3186EC4DDFAF574926810 /* SceytDemoAppUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 149EE8D40E7DFBF9E6B0E439 /* Build configuration list for PBXNativeTarget "SceytDemoAppUITests" */;
+			buildPhases = (
+				D34C41035218A8DE609AE638 /* Sources */,
+				E897B4B24A730AF744394ED5 /* Frameworks */,
+				E70B86D6F7B7787D1D85C0BC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				07EA5711846609EC3FCE0870 /* PBXTargetDependency */,
+			);
+			name = SceytDemoAppUITests;
+			productName = SceytDemoAppUITests;
+			productReference = 702496941F3AB3653C523ECB /* SceytDemoAppUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		C54DF6B62AECF09100767983 /* SceytDemoApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = C54DF6CB2AECF09400767983 /* Build configuration list for PBXNativeTarget "SceytDemoApp" */;
@@ -288,13 +369,14 @@
 			);
 			mainGroup = C54DF6AE2AECF09100767983;
 			packageReferences = (
-				ED1046B52E1933AE001294FA /* XCLocalSwiftPackageReference "../../../sceyt-chat-ios-uikit" */,
+				ED1046B52E1933AE001294FA /* XCLocalSwiftPackageReference "sceyt-chat-ios-uikit" */,
 			);
 			productRefGroup = C54DF6B82AECF09100767983 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				C54DF6B62AECF09100767983 /* SceytDemoApp */,
+				BAF3186EC4DDFAF574926810 /* SceytDemoAppUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -308,6 +390,13 @@
 				C54DF6C42AECF09400767983 /* Assets.xcassets in Resources */,
 				C5F467D42AF020B2009AB0E5 /* README.md in Resources */,
 				C54DF6C22AECF09100767983 /* Main.storyboard in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E70B86D6F7B7787D1D85C0BC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -347,10 +436,31 @@
 				C54DF6BD2AECF09100767983 /* SceneDelegate.swift in Sources */,
 				EDC8876A2E01C1F30077B1B2 /* UIColor+Extensions.swift in Sources */,
 				561169DD2CBD44A300DC1979 /* SplashViewController.swift in Sources */,
+				7A765EED2528FB51B1348519 /* UITestSupport.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D34C41035218A8DE609AE638 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B9E62B91E3A959D91F546F71 /* BaseUITestCase.swift in Sources */,
+				67E0ACCCB6B43A44B1AEC5E6 /* ChannelListScreen.swift in Sources */,
+				BC85D90959764852B1CA68A2 /* ChannelScreen.swift in Sources */,
+				D34ED1D7576C9B4176B3C2C9 /* ChannelListUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		07EA5711846609EC3FCE0870 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = SceytDemoApp;
+			target = C54DF6B62AECF09100767983 /* SceytDemoApp */;
+			targetProxy = 9C5002912C38CD4B8D4776A4 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXVariantGroup section */
 		C54DF6C02AECF09100767983 /* Main.storyboard */ = {
@@ -372,6 +482,47 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		293C3B74C74E12B53A41A175 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 289SR6UP83;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sceyt.chat.demo.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SceytDemoApp;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		729B7F2A593E7A9810E98848 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 289SR6UP83;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sceyt.chat.demo.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = SceytDemoApp;
+			};
+			name = Debug;
+		};
 		C54DF6C92AECF09400767983 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -572,6 +723,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		149EE8D40E7DFBF9E6B0E439 /* Build configuration list for PBXNativeTarget "SceytDemoAppUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				293C3B74C74E12B53A41A175 /* Release */,
+				729B7F2A593E7A9810E98848 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		C54DF6B22AECF09100767983 /* Build configuration list for PBXProject "SceytDemoApp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -593,7 +753,7 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		ED1046B52E1933AE001294FA /* XCLocalSwiftPackageReference "../../../sceyt-chat-ios-uikit" */ = {
+		ED1046B52E1933AE001294FA /* XCLocalSwiftPackageReference "sceyt-chat-ios-uikit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = "../../../sceyt-chat-ios-uikit";
 		};

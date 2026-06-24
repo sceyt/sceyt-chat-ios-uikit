@@ -9,6 +9,8 @@
 import SceytChat
 import UIKit
 
+private typealias CellAID = SceytChatUIKit.AccessibilityIdentifiers.ChannelList.Cell
+
 extension ChannelListViewController {
     open class ChannelCell: TableViewCell {
         
@@ -128,6 +130,11 @@ extension ChannelListViewController {
         private var pinWidthConstraint: NSLayoutConstraint?
         private var pinHeightConstraint: NSLayoutConstraint?
 
+        /// Size constraints for the mute icon, recomputed for the current Dynamic
+        /// Type category so the icon scales alongside the subject label.
+        private var muteWidthConstraint: NSLayoutConstraint?
+        private var muteHeightConstraint: NSLayoutConstraint?
+
         override open func prepareForReuse() {
             super.prepareForReuse()
             clearEvents()
@@ -152,10 +159,9 @@ extension ChannelListViewController {
             rightStackView.alignment = .fill
             rightStackView.spacing = Layouts.messageStackSpacing
 
-            topRowStackView.axis = .horizontal
             topRowStackView.distribution = .fill
-            topRowStackView.alignment = .center
-            topRowStackView.spacing = 8
+            topRowStackView.spacing = Layouts.topRowSpacing
+            updateTopRowAxis()
 
             bottomRowStackView.axis = .horizontal
             bottomRowStackView.distribution = .fill
@@ -175,7 +181,7 @@ extension ChannelListViewController {
             badgeStackView.axis = .horizontal
             badgeStackView.distribution = .fill
             badgeStackView.alignment = .trailing
-            badgeStackView.spacing = 8
+            badgeStackView.spacing = 4
 
             messageLabel.numberOfLines = Layouts.messagePreviewNumberOfLines
             muteView.image = appearance.mutedIcon
@@ -190,6 +196,44 @@ extension ChannelListViewController {
             // ChannelListViewController.traitCollectionDidChange.
             [subjectLabel, messageLabel, dateLabel, unreadCount, atView]
                 .forEach { $0.adjustsFontForContentSizeCategory = true }
+
+            setupAccessibilityIdentifiers()
+        }
+
+        /// Assigns the stable `accessibilityIdentifier`s used both by assistive
+        /// technologies and by the UI tests that drive this screen.
+        ///
+        /// The labels and badges are accessibility elements by default (they are
+        /// `UILabel`s), so they are observable as soon as they carry text. The
+        /// status icons are decorative `UIImageView`s that Auto Layout hides when
+        /// inactive; promoting them to accessibility elements — with a label —
+        /// makes their presence/absence observable and also lets VoiceOver
+        /// announce the channel's muted / pinned / delivery state, which it does
+        /// not today.
+        open func setupAccessibilityIdentifiers() {
+            avatarView.accessibilityIdentifier = CellAID.avatar
+            subjectLabel.accessibilityIdentifier = CellAID.subject
+            messageLabel.accessibilityIdentifier = CellAID.message
+            dateLabel.accessibilityIdentifier = CellAID.date
+            unreadCount.accessibilityIdentifier = CellAID.unreadBadge
+            atView.accessibilityIdentifier = CellAID.mentionBadge
+
+            // Plain literals rather than L10n keys: the localization table is
+            // SwiftGen-generated, so adding entries belongs in a follow-up that
+            // also regenerates L10n. These English fallbacks are still strictly
+            // better than the (silent) status quo for VoiceOver.
+            muteView.accessibilityIdentifier = CellAID.muteIcon
+            muteView.isAccessibilityElement = true
+            muteView.accessibilityLabel = "Muted"
+
+            pinView.accessibilityIdentifier = CellAID.pinIcon
+            pinView.isAccessibilityElement = true
+            pinView.accessibilityLabel = "Pinned"
+
+            // `ticksView.isAccessibilityElement` is driven in `bind(_:)` — it is
+            // exposed only when an actual delivery-status icon is shown.
+            ticksView.accessibilityIdentifier = CellAID.ticks
+            ticksView.accessibilityLabel = "Message delivery status"
         }
         
         override open func setupLayout() {
@@ -247,8 +291,16 @@ extension ChannelListViewController {
             // Dynamic Type category (see updateTicksViewSize).
             ticksWidthConstraint = ticksView.widthAnchor.pin(constant: 0)
             ticksHeightConstraint = ticksView.heightAnchor.pin(constant: 0)
+
+            // The mute icon has no fixed size: it's driven by these constraints,
+            // recomputed from the icon's intrinsic size scaled for the current
+            // Dynamic Type category (see updateMuteViewSize), so it grows with the
+            // subject label it sits next to.
+            muteWidthConstraint = muteView.widthAnchor.pin(constant: 0)
+            muteHeightConstraint = muteView.heightAnchor.pin(constant: 0)
             updatePinViewSize()
             updateTicksViewSize()
+            updateMuteViewSize()
 
             atView.heightAnchor.pin(to: unreadCount.heightAnchor).isActive = true
 
@@ -299,10 +351,40 @@ extension ChannelListViewController {
             }
 
             // Large Text changed: grow/shrink the tick and pin alongside their
-            // neighboring labels/badges.
+            // neighboring labels/badges, and reflow the top row (date moves to
+            // its own line once the text reaches the accessibility sizes).
             if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
                 updateTicksViewSize()
                 updatePinViewSize()
+                updateMuteViewSize()
+                updateTopRowAxis()
+            }
+        }
+
+        /// Reflows the top row for the current Dynamic Type category.
+        ///
+        /// At normal sizes the subject and the date share one horizontal line,
+        /// with the date pinned to the trailing edge. At accessibility sizes the
+        /// time gets squeezed against that edge to the point of being unreadable,
+        /// so the row switches to a vertical axis and the date drops onto its own
+        /// full-width line under the subject (left-aligned).
+        ///
+        /// The flexible trailing spacer only does its job in the horizontal
+        /// layout (it pushes the date right); stacked vertically it would just
+        /// add a gap between the two lines, so it is hidden.
+        ///
+        /// The fixed cell height accounts for that extra line under the same
+        /// accessibility condition — see `Layouts.cellHeight`.
+        open func updateTopRowAxis() {
+            let category = UIApplication.shared.preferredContentSizeCategory
+            if Layouts.prefersVerticalTopRow(for: category) {
+                topRowStackView.axis = .vertical
+                topRowStackView.alignment = .leading
+                topRowSpacerView.isHidden = true
+            } else {
+                topRowStackView.axis = .horizontal
+                topRowStackView.alignment = .center
+                topRowSpacerView.isHidden = false
             }
         }
 
@@ -333,6 +415,20 @@ extension ChannelListViewController {
             let scaled = metrics.scaledValue(for: base, compatibleWith: traitCollection)
             pinWidthConstraint?.constant = scaled
             pinHeightConstraint?.constant = scaled
+        }
+
+        /// Scales the mute icon with Dynamic Type.
+        ///
+        /// The base size is the icon's own intrinsic size, scaled by the same
+        /// factor the subject label uses (its text style), so the icon keeps its
+        /// design size at the default Large Text setting and grows proportionally
+        /// from there — staying visually aligned with the subject next to it.
+        open func updateMuteViewSize() {
+            guard let size = muteView.image?.size, size != .zero else { return }
+            let style = UIFont.preferredTextStyle(for: appearance.subjectLabelAppearance.baseFont.pointSize)
+            let metrics = UIFontMetrics(forTextStyle: style)
+            muteWidthConstraint?.constant = metrics.scaledValue(for: size.width, compatibleWith: traitCollection)
+            muteHeightConstraint?.constant = metrics.scaledValue(for: size.height, compatibleWith: traitCollection)
         }
 
         // MARK: - Event Management Methods
@@ -406,6 +502,7 @@ extension ChannelListViewController {
         }
         
         open func bind(_ data: ChannelLayoutModel) {
+            accessibilityIdentifier = CellAID.identifier(for: data.channel.id)
             subjectLabel.text = data.formattedSubject
             update(messageText: data.attributedView)
             dateLabel.text = data.formattedDate
@@ -416,6 +513,13 @@ extension ChannelListViewController {
             
             ticksView.image = deliveryStatusImage(message: data.lastMessage)
             ticksView.isHidden = !data.shouldShowDeliveryTick
+            // `shouldShowDeliveryTick` is true for any last message, but the tick
+            // image is only set for *outgoing* ones. When there is no icon, keep
+            // the tick out of the accessibility tree entirely (silent for
+            // VoiceOver, and not matchable by its identifier in UI tests).
+            let hasDeliveryTick = ticksView.image != nil
+            ticksView.isAccessibilityElement = hasDeliveryTick
+            ticksView.accessibilityIdentifier = hasDeliveryTick ? CellAID.ticks : nil
             updateTicksViewSize()
             // Show the unread badge when there are unread messages (a count to
             // display) or the channel was manually marked as unread (empty dot).
@@ -597,8 +701,30 @@ public extension ChannelListViewController.ChannelCell {
         public static var messageStackBottomPadding: CGFloat = 6
         /// Vertical spacing between the subject and the message preview.
         public static var messageStackSpacing: CGFloat = 2
+        /// Spacing between the subject and the date in the top row. Horizontal
+        /// at normal text sizes; at accessibility sizes the top row becomes
+        /// vertical and this is the gap above the date's own line.
+        public static var topRowSpacing: CGFloat = 8
         /// Number of lines reserved for the message preview.
         public static var messagePreviewNumberOfLines: Int = 2
+
+        /// The Dynamic Type steps at which the top row switches from horizontal
+        /// to vertical so the date moves onto its own line. Only the two largest
+        /// accessibility sizes, where the time would otherwise be squeezed
+        /// against the trailing edge to the point of being unreadable.
+        ///
+        /// Single source of truth for both `updateTopRowAxis` (the layout) and
+        /// `cellHeight` (the reserved height) so the two can't drift apart — a
+        /// mismatch would clip the date or the message preview.
+        public static var verticalTopRowSizes: [UIContentSizeCategory] = [
+            .accessibilityExtraExtraLarge,
+            .accessibilityExtraExtraExtraLarge
+        ]
+
+        /// Whether the top row should stack vertically for the given category.
+        public static func prefersVerticalTopRow(for category: UIContentSizeCategory) -> Bool {
+            verticalTopRowSizes.contains(category)
+        }
 
         /// Fixed row height for every channel cell.
         ///
@@ -617,11 +743,24 @@ public extension ChannelListViewController.ChannelCell {
             let subjectHeight = appearance.subjectLabelAppearance.baseFont
                 .asDynamic(compatibleWith: traitCollection).lineHeight
             let previewHeight = messagePreviewHeight(compatibleWith: traitCollection)
-            let textHeight = messageStackTopPadding
+            var textHeight = messageStackTopPadding
                 + subjectHeight
                 + messageStackSpacing
                 + previewHeight
                 + messageStackBottomPadding
+            // At the two largest Dynamic Type steps the top row stacks vertically
+            // and the date moves onto its own line under the subject (see
+            // updateTopRowAxis). Reserve that extra line + the top-row spacing so
+            // the fixed height grows to fit it instead of clipping the date or
+            // the message preview. The decision uses the same app-wide category
+            // as updateTopRowAxis so the layout and the reserved height always
+            // agree; the added line is scaled from the passed trait collection.
+            let category = UIApplication.shared.preferredContentSizeCategory
+            if prefersVerticalTopRow(for: category) {
+                let dateHeight = appearance.dateLabelAppearance.baseFont
+                    .asDynamic(compatibleWith: traitCollection).lineHeight
+                textHeight += topRowSpacing + dateHeight
+            }
             let avatarHeight = avatarSize + avatarVerticalPadding * 2
             return ceil(max(textHeight, avatarHeight))
         }

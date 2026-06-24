@@ -242,8 +242,19 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         
         actionView.isHidden = true
         separatorViewCenter.isHidden = true
+
+        setupAccessibilityIdentifiers()
     }
-    
+
+    /// Assigns accessibility identifiers to the composer controls so UI tests can
+    /// locate the input field and the send button. The values are mirrored in the
+    /// central registry (`SceytChatUIKit.AccessibilityIdentifiers.MessageInput`).
+    open func setupAccessibilityIdentifiers() {
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.MessageInput
+        inputTextView.accessibilityIdentifier = AID.inputField
+        sendButton.accessibilityIdentifier = AID.sendButton
+    }
+
     override open func setupAppearance() {
         super.setupAppearance()
         

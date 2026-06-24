@@ -7,5 +7,8 @@ final class ChannelsViewController: ChannelListViewController {
         dataSourceMode = .diffable
         globalSearchEnabled = true
         super.setup()
+        #if DEBUG
+        UITestSupport.installMessageInjector(on: self)
+        #endif
     }
 }

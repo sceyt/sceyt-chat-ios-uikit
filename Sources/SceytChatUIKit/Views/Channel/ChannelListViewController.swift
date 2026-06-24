@@ -70,8 +70,12 @@ open class ChannelListViewController: ViewController,
                                                   style: .plain,
                                                   target: self,
                                                   action: #selector(newChannelAction(_:)))
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier =
+            SceytChatUIKit.AccessibilityIdentifiers.ChannelList.newChannelButton
 
         tableView.register(Components.channelCell)
+        tableView.accessibilityIdentifier =
+            SceytChatUIKit.AccessibilityIdentifiers.ChannelList.tableView
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
         tableView.separatorStyle = .none
@@ -85,6 +89,8 @@ open class ChannelListViewController: ViewController,
         searchResultsViewController.resultsUpdater = channelListViewModel
         navigationItem.searchController = searchController
         searchController.searchResultsUpdater = self
+        searchController.searchBar.accessibilityIdentifier =
+            SceytChatUIKit.AccessibilityIdentifiers.ChannelList.searchBar
         
         if globalSearchEnabled {
             searchController.showsSearchResultsController = true
@@ -106,6 +112,8 @@ open class ChannelListViewController: ViewController,
         definesPresentationContext = true
 
         emptyView.isHidden = true
+        emptyView.accessibilityIdentifier =
+            SceytChatUIKit.AccessibilityIdentifiers.ChannelList.emptyView
 
         KeyboardObserver()
             .willShow { [weak self] in

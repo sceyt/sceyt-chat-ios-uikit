@@ -24,6 +24,9 @@ class TabBarController: UITabBarController {
         tabBar.items?.last?.title = "Profile"
         
         addAppNotifications()
+        // UI tests render the channel list from seeded local data only — no
+        // spinner, no live connection.
+        guard !UITestSupport.isActive else { return }
         showSheet(activityIndicatorView, style: .center, backgroundDismiss: false) { [unowned self] in
             activityIndicatorView.startAnimating()
         }
