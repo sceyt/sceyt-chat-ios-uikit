@@ -18,7 +18,7 @@ extension ChannelListViewController {
         // ├─ avatarContainer                  (avatar + presence / retention overlays)
         // └─ rightStackView (V)
         //    ├─ topRowStackView (H)           [ subjectStackView ──spacer── dateStackView ]
-        //    │  ├─ subjectStackView (H)        [ subjectLabel  muteView  «spacer» ]
+        //    │  ├─ subjectStackView (H)        [ subjectLabel  muteView ]
         //    │  └─ dateStackView (H)           [ ticksView  dateLabel ]
         //    └─ bottomRowStackView (H)        [ messageLabel ──spacer── badgeStackView ]
         //       └─ badgeStackView (H)          [ atView  unreadCount pinView ]
@@ -35,15 +35,17 @@ extension ChannelListViewController {
             .withoutAutoresizingMask
 
         /// Top row: subject (left, expands) + date (right, fixed size).
-        open lazy var topRowStackView = UIStackView(arrangedSubviews: [subjectStackView, dateStackView])
+        open lazy var topRowStackView = UIStackView(arrangedSubviews: [subjectStackView, topRowSpacerView, dateStackView])
             .withoutAutoresizingMask
 
         /// Bottom row: message preview (left, expands) + badges (right).
         open lazy var bottomRowStackView = UIStackView(arrangedSubviews: [messageLabel, badgeStackView])
             .withoutAutoresizingMask
 
-        open lazy var subjectStackView = UIStackView(arrangedSubviews: [subjectLabel, muteView, subjectSpacerView])
+        open lazy var subjectStackView = UIStackView(arrangedSubviews: [subjectLabel, muteView])
             .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
+            .contentCompressionResistancePriorityH(.defaultLow)
 
         /// Date column: ticks + timestamp, kept at its intrinsic size and pinned
         /// to the trailing edge of the top row.
@@ -60,9 +62,8 @@ extension ChannelListViewController {
             .contentHuggingPriorityH(.required)
             .contentCompressionResistancePriorityH(.required)
 
-        /// Flexible spacer that keeps `muteView` next to the subject text instead
-        /// of being pushed to the trailing edge of the filled subject row.
-        open lazy var subjectSpacerView = UIView()
+        /// Flexible spacer between subject/mute and the fixed trailing date row.
+        open lazy var topRowSpacerView = UIView()
             .withoutAutoresizingMask
             .contentHuggingPriorityH(UILayoutPriority(1))
 
@@ -126,7 +127,7 @@ extension ChannelListViewController {
         /// Type category so the icon scales alongside the unread badge.
         private var pinWidthConstraint: NSLayoutConstraint?
         private var pinHeightConstraint: NSLayoutConstraint?
-        
+
         override open func prepareForReuse() {
             super.prepareForReuse()
             clearEvents()
@@ -177,8 +178,11 @@ extension ChannelListViewController {
             badgeStackView.spacing = 8
 
             messageLabel.numberOfLines = Layouts.messagePreviewNumberOfLines
-            messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
             muteView.image = appearance.mutedIcon
+
+            // The unread badge must never be taller than it is wide: a single
+            // digit stays a circle, longer counts (e.g. "99+") grow horizontally.
+            unreadCount.keepsWidthAtLeastHeight = true
 
             // Re-scale the (UIFontMetrics-based) fonts live when the user changes
             // the Dynamic Type / Large Text setting, instead of only after an app
@@ -604,9 +608,7 @@ public extension ChannelListViewController.ChannelCell {
             let appearance = ChannelListViewController.ChannelCell.appearance
             let subjectHeight = appearance.subjectLabelAppearance.baseFont
                 .asDynamic(compatibleWith: traitCollection).lineHeight
-            let previewHeight = appearance.lastMessageLabelAppearance.baseFont
-                .asDynamic(compatibleWith: traitCollection).lineHeight
-                * CGFloat(messagePreviewNumberOfLines)
+            let previewHeight = messagePreviewHeight(compatibleWith: traitCollection)
             let textHeight = messageStackTopPadding
                 + subjectHeight
                 + messageStackSpacing
@@ -614,6 +616,13 @@ public extension ChannelListViewController.ChannelCell {
                 + messageStackBottomPadding
             let avatarHeight = avatarSize + avatarVerticalPadding * 2
             return ceil(max(textHeight, avatarHeight))
+        }
+
+        public static func messagePreviewHeight(compatibleWith traitCollection: UITraitCollection? = nil) -> CGFloat {
+            let appearance = ChannelListViewController.ChannelCell.appearance
+            let font = appearance.lastMessageLabelAppearance.baseFont
+                .asDynamic(compatibleWith: traitCollection)
+            return ceil(font.lineHeight * CGFloat(messagePreviewNumberOfLines))
         }
     }
 }

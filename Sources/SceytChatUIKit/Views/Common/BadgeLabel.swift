@@ -39,6 +39,14 @@ open class BadgeLabel: UILabel {
         didSet { updateVisibility() }
     }
 
+    /// When `true`, the badge's width is clamped to be at least its height, so
+    /// it never renders taller than it is wide (a single short value stays a
+    /// circle and longer values grow horizontally). Defaults to `false`, in
+    /// which case width and height are sized independently.
+    open var keepsWidthAtLeastHeight = false {
+        didSet { invalidateIntrinsicContentSize() }
+    }
+
     public required init() {
         super.init(frame: .zero)
         commonInit()
@@ -69,6 +77,9 @@ open class BadgeLabel: UILabel {
         let contentWidth = (text?.isEmpty ?? true) ? 0 : size.width + horizontalPadding * 2
         size.width = max(contentWidth, minWidth)
         size.height = max(size.height, minHeight)
+        if keepsWidthAtLeastHeight {
+            size.width = max(size.width, size.height)
+        }
         return size
     }
 

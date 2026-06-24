@@ -333,6 +333,14 @@ open class ChannelListViewController: ViewController,
         }
     }
 
+    open func reloadTableViewAfterContentSizeCategoryChange() {
+        UIView.performWithoutAnimation {
+            tableView.reloadData()
+            tableView.setNeedsLayout()
+            tableView.layoutIfNeeded()
+        }
+    }
+
     open func updateTableView(paths: ChannelListViewModel.Paths) {
         if dataSourceMode == .diffable {
             let hasStructuralChanges = !paths.inserts.isEmpty
@@ -568,7 +576,7 @@ open class ChannelListViewController: ViewController,
             let height = ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
             tableView.rowHeight = height
             tableView.estimatedRowHeight = height
-            reloadTableView()
+            reloadTableViewAfterContentSizeCategoryChange()
         }
     }
 
