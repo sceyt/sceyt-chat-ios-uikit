@@ -8,86 +8,186 @@ import UIKit
 
 extension GlobalSearchResultsViewController.ChatsPageViewController {
     open class ChannelCell: TableViewCell {
-        
-        open lazy var badgeStackView = UIStackView(arrangedSubviews: [pinView, atView, unreadCount])
+
+        // MARK: - Stack hierarchy
+        //
+        // contentStackView (H)
+        // ├─ avatarContainer                  (avatar + presence / retention overlays)
+        // └─ rightStackView (V)
+        //    ├─ topRowStackView (H)           [ subjectStackView ──spacer── dateStackView ]
+        //    │  ├─ subjectStackView (H)        [ subjectLabel  muteView ]
+        //    │  └─ dateStackView (H)           [ ticksView  dateLabel ]
+        //    └─ bottomRowStackView (H)        [ messageLabel ──spacer── badgeStackView ]
+        //       └─ badgeStackView (H)          [ atView  unreadCount pinView ]
+
+        open lazy var contentStackView = UIStackView(arrangedSubviews: [avatarContainer, rightStackView])
             .withoutAutoresizingMask
+
+        /// Non-clipping host for the avatar so the presence / retention badges
+        /// can extend beyond the (clipped) avatar image.
+        open lazy var avatarContainer = UIView()
+            .withoutAutoresizingMask
+
+        open lazy var rightStackView = UIStackView(arrangedSubviews: [topRowStackView, bottomRowStackView])
+            .withoutAutoresizingMask
+
+        /// Top row: subject (left, expands) + date (right, fixed size).
+        open lazy var topRowStackView = UIStackView(arrangedSubviews: [subjectStackView, topRowSpacerView, dateStackView])
+            .withoutAutoresizingMask
+
+        /// Bottom row: message preview (left, expands) + badges (right).
+        open lazy var bottomRowStackView = UIStackView(arrangedSubviews: [messageLabel, badgeStackView])
+            .withoutAutoresizingMask
+
+        open lazy var subjectStackView = UIStackView(arrangedSubviews: [subjectLabel, muteView])
+            .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
+            .contentCompressionResistancePriorityH(.defaultLow)
+
+        /// Date column: ticks + timestamp, kept at its intrinsic size and pinned
+        /// to the trailing edge of the top row.
+        open lazy var dateStackView = UIStackView(arrangedSubviews: [ticksView, dateLabel])
+            .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
             .contentCompressionResistancePriorityH(.required)
-        
-        open lazy var messageStackView = UIStackView(arrangedSubviews: [subjectLabel, messageLabel])
+
+        /// Badges. Sized strictly to their content (required hugging +
+        /// compression resistance), so the row gives the badges exactly the
+        /// width they need and lets `messageLabel` take the rest.
+        open lazy var badgeStackView = UIStackView(arrangedSubviews: [atView, unreadCount, pinView])
             .withoutAutoresizingMask
-        
-        open lazy var unreadCount = Components.badgeView.init()
-            .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
             .contentCompressionResistancePriorityH(.required)
-        
-        open lazy var atView = Components.badgeView.init()
+
+        /// Flexible spacer between subject/mute and the fixed trailing date row.
+        open lazy var topRowSpacerView = UIView()
             .withoutAutoresizingMask
+            .contentHuggingPriorityH(UILayoutPriority(1))
+
+        // MARK: - Components
+
+        open lazy var unreadCount = Components.badgeLabel.init()
+            .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
             .contentCompressionResistancePriorityH(.required)
-        
+
+        open lazy var atView = Components.badgeLabel.init()
+            .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
+            .contentCompressionResistancePriorityH(.required)
+
         open lazy var subjectLabel = UILabel()
             .withoutAutoresizingMask
             .contentCompressionResistancePriorityH(.defaultLow)
-        
+
         open lazy var muteView = UIImageView()
             .withoutAutoresizingMask
-            .contentMode(.center)
-        
+            .contentMode(.scaleAspectFit)
+
         open lazy var avatarView = ImageView.init()
             .withoutAutoresizingMask
-        
+
         open lazy var messageLabel = UILabel()
             .withoutAutoresizingMask
+            .contentHuggingPriorityH(.defaultLow)
             .contentCompressionResistancePriorityH(.defaultLow)
-        
+
         open lazy var dateLabel = UILabel()
             .withoutAutoresizingMask
-        
+
         open lazy var pinView = UIImageView(image: appearance.pinIcon)
             .withoutAutoresizingMask
-            .contentMode(.center)
-        
+            .contentMode(.scaleAspectFit)
+
         open lazy var ticksView = UIImageView()
             .withoutAutoresizingMask
-            .contentMode(.center)
-        
+            .contentMode(.scaleAspectFit)
+
         open lazy var presenceView = UIImageView()
             .withoutAutoresizingMask
-        
+
         open lazy var retentionBadgeView = UIImageView()
             .withoutAutoresizingMask
-        
+
         lazy var separatorView = UIView()
             .withoutAutoresizingMask
-        
-        private var unreadCountWidthAnchorConstraint: NSLayoutConstraint?
-        private var messageStackViewCenterYConstraint: NSLayoutConstraint?
-        private var messageVerticalConstraints: [NSLayoutConstraint] = []
-        
+
+        /// Size constraints for the delivery-status tick, recomputed for the
+        /// current Dynamic Type category so the icon scales with the date label.
+        private var ticksWidthConstraint: NSLayoutConstraint?
+        private var ticksHeightConstraint: NSLayoutConstraint?
+
+        /// Size constraints for the pin icon, recomputed for the current Dynamic
+        /// Type category so the icon scales alongside the unread badge.
+        private var pinWidthConstraint: NSLayoutConstraint?
+        private var pinHeightConstraint: NSLayoutConstraint?
+
         override open func prepareForReuse() {
             super.prepareForReuse()
             subscriptions.removeAll(keepingCapacity: true)
         }
-        
+
         @objc
         private func panGestureAction(_ sender: UIPanGestureRecognizer) {
             isSelected = false
         }
-        
+
         override open func setup() {
             super.setup()
-            
-            messageStackView.axis = .vertical
-            messageStackView.distribution = .fill
-            messageStackView.alignment = .leading
-            messageStackView.spacing = 2
-            
+            backgroundView = UIView()
+
+            contentStackView.axis = .horizontal
+            contentStackView.distribution = .fill
+            // Top-align so the subject row stays pinned to the top of the cell.
+            // The avatar (the tallest item) drives the stack's constant height, so
+            // it still reads as centered, while the message preview grows downward
+            // instead of shifting the subject up/down as its line count changes.
+            contentStackView.alignment = .top
+            contentStackView.spacing = 12
+
+            rightStackView.axis = .vertical
+            rightStackView.distribution = .fill
+            rightStackView.alignment = .fill
+            rightStackView.spacing = Layouts.messageStackSpacing
+
+            topRowStackView.axis = .horizontal
+            topRowStackView.distribution = .fill
+            topRowStackView.alignment = .center
+            topRowStackView.spacing = 8
+
+            bottomRowStackView.axis = .horizontal
+            bottomRowStackView.distribution = .fill
+            bottomRowStackView.alignment = .top
+            bottomRowStackView.spacing = 8
+
+            subjectStackView.axis = .horizontal
+            subjectStackView.distribution = .fill
+            subjectStackView.alignment = .center
+            subjectStackView.spacing = 4
+
+            dateStackView.axis = .horizontal
+            dateStackView.distribution = .fill
+            dateStackView.alignment = .center
+            dateStackView.spacing = 4
+
             badgeStackView.axis = .horizontal
             badgeStackView.distribution = .fill
             badgeStackView.alignment = .trailing
             badgeStackView.spacing = 8
-            
-            messageLabel.numberOfLines = 2
+
+            messageLabel.numberOfLines = Layouts.messagePreviewNumberOfLines
             muteView.image = appearance.mutedIcon
+
+            // The unread badge must never be taller than it is wide: a single
+            // digit stays a circle, longer counts (e.g. "99+") grow horizontally.
+            unreadCount.keepsWidthAtLeastHeight = true
+
+            // Re-scale the (UIFontMetrics-based) fonts live when the user changes
+            // the Dynamic Type / Large Text setting, instead of only after an app
+            // relaunch.
+            [subjectLabel, messageLabel, dateLabel, unreadCount, atView]
+                .forEach { $0.adjustsFontForContentSizeCategory = true }
+
             let pan = UIPanGestureRecognizer(
                 target: self,
                 action: #selector(panGestureAction(_:))
@@ -95,71 +195,75 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
             pan.delegate = self
             addGestureRecognizer(pan)
         }
-        
+
         override open func setupLayout() {
             super.setupLayout()
-            contentView.addSubview(messageStackView)
-            contentView.addSubview(badgeStackView)
-            contentView.addSubview(muteView)
-            contentView.addSubview(avatarView)
-            contentView.addSubview(retentionBadgeView)
-            contentView.addSubview(dateLabel)
-            contentView.addSubview(ticksView)
-            contentView.addSubview(presenceView)
-            contentView.addSubview(separatorView)
-            
-            avatarView.pin(to: contentView, anchors: [
-                .top(8, .greaterThanOrEqual),
-                .centerY(),
-                .leading(Layouts.horizontalPadding)
-            ])
+
+            // Avatar + overlapping presence / retention badges. They sit in a
+            // dedicated container (not the avatar itself, which clips its rounded
+            // image) so the badges can extend slightly past the avatar edges.
+            avatarContainer.addSubview(avatarView)
+            avatarContainer.addSubview(presenceView)
+            avatarContainer.addSubview(retentionBadgeView)
+            avatarView.pin(to: avatarContainer)
             avatarView.resize(anchors: [.width(Layouts.avatarSize), .height(Layouts.avatarSize)])
-            
+
             presenceView.pin(to: avatarView, anchors: [
                 .trailing(),
                 .bottom(-2)
             ])
-            
+
             retentionBadgeView.pin(to: avatarView, anchors: [
                 .trailing(4),
                 .top(-4)
             ])
             retentionBadgeView.resize(anchors: [.width(22), .height(22)])
 
-            let topConstraint = messageStackView.topAnchor.pin(to: contentView.topAnchor, constant: 10)
-            let bottomConstraint = messageStackView.bottomAnchor.pin(lessThanOrEqualTo: contentView.bottomAnchor, constant: -6)
-            messageVerticalConstraints = [topConstraint, bottomConstraint]
-            messageStackView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 12)
-            messageStackView.trailingAnchor.pin(lessThanOrEqualTo: dateLabel.trailingAnchor)
-            messageStackViewCenterYConstraint = messageStackView.centerYAnchor.pin(to: contentView.centerYAnchor, activate: false)
-            updateCenterYConstraint()
-            messageLabel.trailingAnchor.pin(lessThanOrEqualTo: badgeStackView.leadingAnchor)
-            
-            muteView.centerYAnchor.pin(to: subjectLabel.centerYAnchor)
-            muteView.leadingAnchor.pin(to: subjectLabel.trailingAnchor, constant: 4)
-            
-            ticksView.leadingAnchor.pin(greaterThanOrEqualTo: subjectLabel.trailingAnchor, constant: 8)
-            ticksView.leadingAnchor.pin(greaterThanOrEqualTo: muteView.trailingAnchor, constant: 2)
-            ticksView.trailingAnchor.pin(to: dateLabel.leadingAnchor, constant: -4)
-            ticksView.centerYAnchor.pin(to: dateLabel.centerYAnchor)
-            
-            dateLabel.trailingAnchor.pin(to: contentView.trailingAnchor, constant: -Layouts.horizontalPadding)
-            dateLabel.centerYAnchor.pin(to: subjectLabel.centerYAnchor)
-            
-            badgeStackView.trailingAnchor.pin(to: dateLabel.trailingAnchor)
-            badgeStackView.topAnchor.pin(to: dateLabel.bottomAnchor, constant: 2)
-            unreadCount.heightAnchor.pin(constant: 20)
-            unreadCountWidthAnchorConstraint = unreadCount.widthAnchor.pin(greaterThanOrEqualToConstant: 20)
-            atView.resize(anchors: [.height(20), .width(20)])
+            contentView.addSubview(contentStackView)
+            contentView.addSubview(separatorView)
+
+            // Pin the content to the top so the subject row is fixed there. The
+            // cell height is a constant sized for a full preview, and the avatar
+            // is the tallest item, so a top inset of avatarVerticalPadding leaves
+            // the avatar exactly where centering used to put it — while the
+            // message preview now grows downward instead of shifting the subject.
+            contentStackView.pin(to: contentView, anchors: [
+                .leading(Layouts.horizontalPadding),
+                .top(Layouts.avatarVerticalPadding)
+            ])
+            contentStackView.trailingAnchor.pin(to: contentView.trailingAnchor, constant: -Layouts.horizontalPadding)
+            // Fixed bottom: the cell height is a constant, so the content fills the
+            // vertical area exactly (8…56…8). With `.top` alignment the avatar fills
+            // it and the subject stays pinned to the top.
+            contentStackView.bottomAnchor.pin(to: contentView.bottomAnchor, constant: -Layouts.avatarVerticalPadding)
+
+            // The pin icon has no fixed size: it's driven by these constraints,
+            // recomputed from a 20pt square base scaled for the current Dynamic
+            // Type category (see updatePinViewSize). It sizes itself rather than
+            // tracking the unread badge so that hiding it (unpinned channels)
+            // only collapses the pin's own width inside the stack — it can't drag
+            // the unread/mention badges down to zero height.
+            pinWidthConstraint = pinView.widthAnchor.pin(constant: 0)
+            pinHeightConstraint = pinView.heightAnchor.pin(constant: 0)
+
+            // The tick has no fixed size: it's driven by these constraints, which
+            // are recomputed from the icon's intrinsic size scaled for the current
+            // Dynamic Type category (see updateTicksViewSize).
+            ticksWidthConstraint = ticksView.widthAnchor.pin(constant: 0)
+            ticksHeightConstraint = ticksView.heightAnchor.pin(constant: 0)
+            updatePinViewSize()
+            updateTicksViewSize()
+
+            atView.heightAnchor.pin(to: unreadCount.heightAnchor).isActive = true
+
             separatorView.pin(to: contentView, anchors: [.bottom(), .trailing(-Layouts.horizontalPadding)])
-            separatorView.leadingAnchor.pin(to: messageStackView.leadingAnchor)
+            separatorView.leadingAnchor.pin(to: rightStackView.leadingAnchor)
             separatorView.heightAnchor.pin(constant: 1)
-            updateConstraint()
         }
-        
+
         override open func setupAppearance() {
             super.setupAppearance()
-            
+
             backgroundColor = appearance.backgroundColor
             backgroundView?.backgroundColor = appearance.backgroundColor
             unreadCount.font = appearance.unreadCountLabelAppearance.font
@@ -175,41 +279,70 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
             retentionBadgeView.layer.borderWidth = 2
             retentionBadgeView.layer.cornerRadius = 11
             retentionBadgeView.clipsToBounds = true
-            
+
             dateLabel.clipsToBounds = true
             dateLabel.font = appearance.dateLabelAppearance.font
             dateLabel.textColor = appearance.dateLabelAppearance.foregroundColor
             separatorView.backgroundColor = appearance.separatorColor
             retentionBadgeView.isHidden = true
-            pinView.isHidden = true
+            pinView.image = appearance.pinIcon
+            if data == nil {
+                pinView.isHidden = true
+            } else {
+                pinView.isHidden = data.channel.pinnedAt == nil
+                updatePinViewSize()
+            }
             muteView.isHidden = true
         }
 
         override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
             super.traitCollectionDidChange(previousTraitCollection)
-            guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
-            retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
-        }
 
-        private func updateConstraint() {
-            if !unreadCount.isHidden {
-                unreadCountWidthAnchorConstraint?.constant = 20
+            if previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle {
+                retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
+            }
+
+            // Large Text changed: grow/shrink the tick and pin alongside their
+            // neighboring labels/badges.
+            if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+                updateTicksViewSize()
+                updatePinViewSize()
             }
         }
-        
+
+        /// Scales the delivery-status tick with Dynamic Type.
+        ///
+        /// The base size is the icon's own intrinsic size, scaled by the same
+        /// factor the date label uses (its text style), so the tick keeps its
+        /// design size at the default Large Text setting and grows proportionally
+        /// from there — staying visually aligned with the date next to it.
+        open func updateTicksViewSize() {
+            guard let size = ticksView.image?.size, size != .zero else { return }
+            let style = UIFont.preferredTextStyle(for: appearance.dateLabelAppearance.baseFont.pointSize)
+            let metrics = UIFontMetrics(forTextStyle: style)
+            ticksWidthConstraint?.constant = metrics.scaledValue(for: size.width, compatibleWith: traitCollection)
+            ticksHeightConstraint?.constant = metrics.scaledValue(for: size.height, compatibleWith: traitCollection)
+        }
+
+        /// Scales the pin icon with Dynamic Type.
+        ///
+        /// Keeps the icon a 20pt square at the default Large Text setting (its
+        /// original design size) and grows it proportionally from there, using
+        /// the same text style as the unread badge so the two stay visually
+        /// aligned in the badge row.
+        open func updatePinViewSize() {
+            let base: CGFloat = 20
+            let style = UIFont.preferredTextStyle(for: appearance.unreadCountLabelAppearance.baseFont.pointSize)
+            let metrics = UIFontMetrics(forTextStyle: style)
+            let scaled = metrics.scaledValue(for: base, compatibleWith: traitCollection)
+            pinWidthConstraint?.constant = scaled
+            pinHeightConstraint?.constant = scaled
+        }
+
         public func update(messageText: NSAttributedString?) {
             messageLabel.attributedText = messageText
-            updateCenterYConstraint()
-            messageLabel.setNeedsLayout()
-            messageLabel.layoutIfNeeded()
         }
-        
-        private func updateCenterYConstraint() {
-            let shouldCenter = messageLabel.attributedText?.string.isEmpty != false
-            messageStackViewCenterYConstraint?.isActive = shouldCenter
-            messageVerticalConstraints.forEach { $0.isActive = !shouldCenter }
-        }
-        
+
         open var data: ChannelLayoutModel! {
             didSet {
                 guard let data = data
@@ -218,38 +351,40 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
                 subscribeForPresence()
             }
         }
-        
+
         open func bind(_ data: ChannelLayoutModel) {
             subjectLabel.text = data.formattedSubject
             update(messageText: data.attributedView)
             dateLabel.text = data.formattedDate
             pinView.isHidden = data.channel.pinnedAt == nil
+            updatePinViewSize()
             backgroundColor = data.channel.pinnedAt == nil ? .clear : appearance.backgroundColor
-            backgroundView = UIView()
             backgroundView?.backgroundColor = appearance.backgroundColor
-            
+
             ticksView.image = deliveryStatusImage(message: data.lastMessage)
             ticksView.isHidden = !data.shouldShowDeliveryTick
+            updateTicksViewSize()
+            // Show the unread badge when there are unread messages (a count to
+            // display) or the channel was manually marked as unread (empty dot).
             unreadCount.value = data.formattedUnreadCount
-            if unreadCount.isHidden, data.channel.unread {
-                unreadCount.isHidden = false
-            }
+            let hasUnreadCount = !(data.formattedUnreadCount?.isEmpty ?? true)
+            unreadCount.isHidden = !(hasUnreadCount || data.channel.unread)
             muteView.isHidden = !data.channel.muted
             unreadCount.backgroundColor = !data.channel.muted ? appearance.unreadCountLabelAppearance.backgroundColor : appearance.unreadCountMutedStateLabelAppearance.backgroundColor
             unreadCount.textColor = !data.channel.muted ? appearance.unreadCountLabelAppearance.foregroundColor : appearance.unreadCountMutedStateLabelAppearance.foregroundColor
-            atView.label.textColor = !data.channel.muted ? appearance.unreadMentionLabelAppearance.foregroundColor : appearance.unreadMentionMutedStateLabelAppearance.foregroundColor
+            atView.textColor = !data.channel.muted ? appearance.unreadMentionLabelAppearance.foregroundColor : appearance.unreadMentionMutedStateLabelAppearance.foregroundColor
             atView.backgroundColor = !data.channel.muted ? appearance.unreadMentionLabelAppearance.backgroundColor : appearance.unreadMentionMutedStateLabelAppearance.backgroundColor
-            
+
             if data.channel.isDirect, let peer = data.channel.peer {
                 presenceView.isHidden = peer.presence.state != .online
                 presenceView.image = appearance.presenceStateIconProvider.provideVisual(for: peer.presence.state)
             } else {
                 presenceView.isHidden = true
             }
-            
+
             // Show retention badge if messageRetentionPeriod > 0
             retentionBadgeView.isHidden = data.channel.messageRetentionPeriod <= 0
-            
+
             if data.channel.newMentionCount > 0,
                data.channel.newMessageCount > 0 {
                 atView.value = SceytChatUIKit.shared.config.mentionTriggerPrefix
@@ -264,9 +399,8 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
                     avatarView.clipsToBounds = true
                     avatarView.contentMode = .scaleAspectFill
                 }.store(in: &subscriptions)
-            updateConstraints()
         }
-        
+
         open func deliveryStatusImage(message: ChatMessage?) -> UIImage? {
             guard let message = message, !message.incoming else { return nil }
             switch message.deliveryStatus {
@@ -282,11 +416,11 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
                 return appearance.messageDeliveryStatusIcons.failedIcon
             }
         }
-                
+
         open func unreadCount(channel: ChatChannel) -> String? {
             appearance.unreadCountFormatter.format(channel.newMessageCount)
         }
-        
+
         open func subscribeForPresence() {
             guard let data = data,
                   data.channel.isDirect,
@@ -307,7 +441,7 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
                 }
             }
         }
-        
+
         open func unsubscribeFromPresence(data: ChannelLayoutModel) {
             guard data.channel.isDirect,
                   let userId = data.channel.peer?.id
@@ -317,7 +451,7 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
             }
             Components.presenceProvider.unsubscribe(userId: userId)
         }
-        
+
         override open func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                              shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool
         {
@@ -335,5 +469,47 @@ public extension GlobalSearchResultsViewController.ChatsPageViewController.Chann
         public static var avatarSize: CGFloat = 56
         public static var horizontalPadding: CGFloat = 16
         public static var verticalPadding: CGFloat = 12
+
+        /// Minimum inset between the avatar and the cell's top/bottom edges.
+        public static var avatarVerticalPadding: CGFloat = 8
+        /// Top inset of the message stack inside the cell.
+        public static var messageStackTopPadding: CGFloat = 10
+        /// Bottom inset of the message stack inside the cell.
+        public static var messageStackBottomPadding: CGFloat = 6
+        /// Vertical spacing between the subject and the message preview.
+        public static var messageStackSpacing: CGFloat = 2
+        /// Number of lines reserved for the message preview.
+        public static var messagePreviewNumberOfLines: Int = 2
+
+        /// Fixed row height for every channel cell.
+        ///
+        /// Computed so a full `messagePreviewNumberOfLines`-line preview always
+        /// fits, and never shorter than the avatar. Because it is a constant the
+        /// cell height no longer changes between 1-line and 2-line previews.
+        ///
+        /// - Parameter traitCollection: The trait collection whose
+        ///   `preferredContentSizeCategory` the height should be sized for. Pass
+        ///   the view's current trait collection so the fixed row height grows
+        ///   with Large Text; `nil` uses the current environment.
+        public static func cellHeight(compatibleWith traitCollection: UITraitCollection? = nil) -> CGFloat {
+            let appearance = ChannelListViewController.ChannelCell.appearance
+            let subjectHeight = appearance.subjectLabelAppearance.baseFont
+                .asDynamic(compatibleWith: traitCollection).lineHeight
+            let previewHeight = messagePreviewHeight(compatibleWith: traitCollection)
+            let textHeight = messageStackTopPadding
+                + subjectHeight
+                + messageStackSpacing
+                + previewHeight
+                + messageStackBottomPadding
+            let avatarHeight = avatarSize + avatarVerticalPadding * 2
+            return ceil(max(textHeight, avatarHeight))
+        }
+
+        public static func messagePreviewHeight(compatibleWith traitCollection: UITraitCollection? = nil) -> CGFloat {
+            let appearance = ChannelListViewController.ChannelCell.appearance
+            let font = appearance.lastMessageLabelAppearance.baseFont
+                .asDynamic(compatibleWith: traitCollection)
+            return ceil(font.lineHeight * CGFloat(messagePreviewNumberOfLines))
+        }
     }
 }

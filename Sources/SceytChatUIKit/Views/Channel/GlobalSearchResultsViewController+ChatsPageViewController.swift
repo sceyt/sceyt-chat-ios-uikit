@@ -154,6 +154,21 @@ extension GlobalSearchResultsViewController {
             emptyStateView.isHidden = pendingResponseCount > 0 || hasVisibleChannels || !chatMessagesSnapshot.isEmpty
         }
 
+        // MARK: - Dynamic Type
+
+        override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+
+            // Large Text / Dynamic Type changed. On-screen cells' fonts re-scale
+            // themselves (adjustsFontForContentSizeCategory), but the cached
+            // last-message NSAttributedString keeps the fonts it was built with —
+            // so rebuild every cached preview for the new category and reload so
+            // the fixed channel-row height (heightForRowAt) is recomputed too.
+            guard previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory else { return }
+            layoutModels.values.forEach { $0.reloadAttributedView(compatibleWith: traitCollection) }
+            reloadData()
+        }
+
         // MARK: - UITableViewDataSource
 
         open func numberOfSections(in tableView: UITableView) -> Int { 2 }
@@ -187,6 +202,17 @@ extension GlobalSearchResultsViewController {
                 cell.searchQuery = messagesViewModel.searchQuery
                 cell.messageData = channel.map { ($0, message) }
                 return cell
+            }
+        }
+
+        open func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+            switch indexPath.section {
+            // Channel rows use the same fixed height as the channel list so the
+            // row doesn't change between 1-line and 2-line previews. Sized for the
+            // current Dynamic Type category; recomputed in traitCollectionDidChange.
+            case 0: return ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
+            // Message rows self-size to fit their content.
+            default: return UITableView.automaticDimension
             }
         }
 

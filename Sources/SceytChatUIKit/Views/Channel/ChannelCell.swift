@@ -247,6 +247,8 @@ extension ChannelListViewController {
             // Dynamic Type category (see updateTicksViewSize).
             ticksWidthConstraint = ticksView.widthAnchor.pin(constant: 0)
             ticksHeightConstraint = ticksView.heightAnchor.pin(constant: 0)
+            updatePinViewSize()
+            updateTicksViewSize()
 
             atView.heightAnchor.pin(to: unreadCount.heightAnchor).isActive = true
 
@@ -279,7 +281,13 @@ extension ChannelListViewController {
             dateLabel.textColor = appearance.dateLabelAppearance.foregroundColor
             separatorView.backgroundColor = appearance.separatorColor
             retentionBadgeView.isHidden = true
-            pinView.isHidden = true
+            pinView.image = appearance.pinIcon
+            if data == nil {
+                pinView.isHidden = true
+            } else {
+                pinView.isHidden = data.channel.pinnedAt == nil
+                updatePinViewSize()
+            }
             muteView.isHidden = true
         }
 
