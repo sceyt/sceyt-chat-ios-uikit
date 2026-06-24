@@ -68,13 +68,14 @@ extension ChannelListViewController {
 
         // MARK: - Components
 
-        open lazy var unreadCount = BadgeLabel()
+        open lazy var unreadCount = Components.badgeLabel.init()
             .withoutAutoresizingMask
             .contentHuggingPriorityH(.required)
             .contentCompressionResistancePriorityH(.required)
-        
-        open lazy var atView = Components.badgeView.init()
+
+        open lazy var atView = Components.badgeLabel.init()
             .withoutAutoresizingMask
+            .contentHuggingPriorityH(.required)
             .contentCompressionResistancePriorityH(.required)
         
         open lazy var subjectLabel = UILabel()
@@ -115,6 +116,16 @@ extension ChannelListViewController {
 
         public var eventModels: [ChannelEventModel] = []
         private var updateTimer: Timer?
+
+        /// Size constraints for the delivery-status tick, recomputed for the
+        /// current Dynamic Type category so the icon scales with the date label.
+        private var ticksWidthConstraint: NSLayoutConstraint?
+        private var ticksHeightConstraint: NSLayoutConstraint?
+
+        /// Size constraints for the pin icon, recomputed for the current Dynamic
+        /// Type category so the icon scales alongside the unread badge.
+        private var pinWidthConstraint: NSLayoutConstraint?
+        private var pinHeightConstraint: NSLayoutConstraint?
         
         override open func prepareForReuse() {
             super.prepareForReuse()
@@ -173,7 +184,7 @@ extension ChannelListViewController {
             // the Dynamic Type / Large Text setting, instead of only after an app
             // relaunch. The row height is recomputed for the new category in
             // ChannelListViewController.traitCollectionDidChange.
-            [subjectLabel, messageLabel, dateLabel, unreadCount, atView.label]
+            [subjectLabel, messageLabel, dateLabel, unreadCount, atView]
                 .forEach { $0.adjustsFontForContentSizeCategory = true }
         }
         
@@ -218,12 +229,22 @@ extension ChannelListViewController {
             // it and the subject stays pinned to the top.
             contentStackView.bottomAnchor.pin(to: contentView.bottomAnchor, constant: -Layouts.avatarVerticalPadding)
 
-            pinView.resize(anchors: [.width(20), .height(20)])
-//            unreadCount.heightAnchor.pin(constant: 20)
-            // Width comes from BadgeLabel.intrinsicContentSize (text + padding,
-            // min 20), so the badge tracks the count and stays a circle for
-            // single digits — no fixed/min width constraint needed here.
-            atView.resize(anchors: [.height(20), .width(20)])
+            // The pin icon has no fixed size: it's driven by these constraints,
+            // recomputed from a 20pt square base scaled for the current Dynamic
+            // Type category (see updatePinViewSize). It sizes itself rather than
+            // tracking the unread badge so that hiding it (unpinned channels)
+            // only collapses the pin's own width inside the stack — it can't drag
+            // the unread/mention badges down to zero height.
+            pinWidthConstraint = pinView.widthAnchor.pin(constant: 0)
+            pinHeightConstraint = pinView.heightAnchor.pin(constant: 0)
+
+            // The tick has no fixed size: it's driven by these constraints, which
+            // are recomputed from the icon's intrinsic size scaled for the current
+            // Dynamic Type category (see updateTicksViewSize).
+            ticksWidthConstraint = ticksView.widthAnchor.pin(constant: 0)
+            ticksHeightConstraint = ticksView.heightAnchor.pin(constant: 0)
+
+            atView.heightAnchor.pin(to: unreadCount.heightAnchor).isActive = true
 
             separatorView.pin(to: contentView, anchors: [.bottom(), .trailing(-Layouts.horizontalPadding)])
             separatorView.leadingAnchor.pin(to: rightStackView.leadingAnchor)
@@ -260,8 +281,46 @@ extension ChannelListViewController {
 
         override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
             super.traitCollectionDidChange(previousTraitCollection)
-            guard previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle else { return }
-            retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
+
+            if previousTraitCollection?.userInterfaceStyle != traitCollection.userInterfaceStyle {
+                retentionBadgeView.layer.borderColor = DefaultColors.background.resolvedColor(with: traitCollection).cgColor
+            }
+
+            // Large Text changed: grow/shrink the tick and pin alongside their
+            // neighboring labels/badges.
+            if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+                updateTicksViewSize()
+                updatePinViewSize()
+            }
+        }
+
+        /// Scales the delivery-status tick with Dynamic Type.
+        ///
+        /// The base size is the icon's own intrinsic size, scaled by the same
+        /// factor the date label uses (its text style), so the tick keeps its
+        /// design size at the default Large Text setting and grows proportionally
+        /// from there — staying visually aligned with the date next to it.
+        open func updateTicksViewSize() {
+            guard let size = ticksView.image?.size, size != .zero else { return }
+            let style = UIFont.preferredTextStyle(for: appearance.dateLabelAppearance.baseFont.pointSize)
+            let metrics = UIFontMetrics(forTextStyle: style)
+            ticksWidthConstraint?.constant = metrics.scaledValue(for: size.width, compatibleWith: traitCollection)
+            ticksHeightConstraint?.constant = metrics.scaledValue(for: size.height, compatibleWith: traitCollection)
+        }
+
+        /// Scales the pin icon with Dynamic Type.
+        ///
+        /// Keeps the icon a 20pt square at the default Large Text setting (its
+        /// original design size) and grows it proportionally from there, using
+        /// the same text style as the unread badge so the two stay visually
+        /// aligned in the badge row.
+        open func updatePinViewSize() {
+            let base: CGFloat = 20
+            let style = UIFont.preferredTextStyle(for: appearance.unreadCountLabelAppearance.baseFont.pointSize)
+            let metrics = UIFontMetrics(forTextStyle: style)
+            let scaled = metrics.scaledValue(for: base, compatibleWith: traitCollection)
+            pinWidthConstraint?.constant = scaled
+            pinHeightConstraint?.constant = scaled
         }
 
         // MARK: - Event Management Methods
@@ -339,11 +398,13 @@ extension ChannelListViewController {
             update(messageText: data.attributedView)
             dateLabel.text = data.formattedDate
             pinView.isHidden = data.channel.pinnedAt == nil
+            updatePinViewSize()
             backgroundColor = data.channel.pinnedAt == nil ? .clear : appearance.backgroundColor
             backgroundView?.backgroundColor = appearance.backgroundColor
             
             ticksView.image = deliveryStatusImage(message: data.lastMessage)
             ticksView.isHidden = !data.shouldShowDeliveryTick
+            updateTicksViewSize()
             // Show the unread badge when there are unread messages (a count to
             // display) or the channel was manually marked as unread (empty dot).
             unreadCount.value = data.formattedUnreadCount
@@ -352,7 +413,7 @@ extension ChannelListViewController {
             muteView.isHidden = !data.channel.muted
             unreadCount.backgroundColor = !data.channel.muted ? appearance.unreadCountLabelAppearance.backgroundColor : appearance.unreadCountMutedStateLabelAppearance.backgroundColor
             unreadCount.textColor = !data.channel.muted ? appearance.unreadCountLabelAppearance.foregroundColor : appearance.unreadCountMutedStateLabelAppearance.foregroundColor
-            atView.label.textColor = !data.channel.muted ? appearance.unreadMentionLabelAppearance.foregroundColor : appearance.unreadMentionMutedStateLabelAppearance.foregroundColor
+            atView.textColor = !data.channel.muted ? appearance.unreadMentionLabelAppearance.foregroundColor : appearance.unreadMentionMutedStateLabelAppearance.foregroundColor
             atView.backgroundColor = !data.channel.muted ? appearance.unreadMentionLabelAppearance.backgroundColor : appearance.unreadMentionMutedStateLabelAppearance.backgroundColor
             
             if data.channel.isDirect, let peer = data.channel.peer {

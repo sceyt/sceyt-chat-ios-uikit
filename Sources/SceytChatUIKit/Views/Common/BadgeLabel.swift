@@ -13,12 +13,12 @@ import UIKit
 /// Layout via the inner label's constraints — `BadgeLabel` carries the width in
 /// its own `intrinsicContentSize`. The badge therefore always tracks the text:
 /// counts like `99+` grow, while short values stay a circle thanks to
-/// `minWidth`. The host only needs to fix the height; the width follows.
+/// `minWidth` and `minHeight`.
 open class BadgeLabel: UILabel {
 
     /// Horizontal padding added on each side of the text, folded into
     /// `intrinsicContentSize`.
-    open var horizontalPadding: CGFloat = 6 {
+    open var horizontalPadding: CGFloat = 3 {
         didSet { invalidateIntrinsicContentSize() }
     }
 
@@ -28,12 +28,18 @@ open class BadgeLabel: UILabel {
         didSet { invalidateIntrinsicContentSize() }
     }
 
+    /// Lower bound on the height so badges keep a stable visual size even when
+    /// their text has a smaller intrinsic line height.
+    open var minHeight: CGFloat = 20 {
+        didSet { invalidateIntrinsicContentSize() }
+    }
+
     /// When `true`, the badge hides itself whenever its text is empty.
     public var hidesWhenEmpty = true {
         didSet { updateVisibility() }
     }
 
-    public init() {
+    public required init() {
         super.init(frame: .zero)
         commonInit()
     }
@@ -62,6 +68,7 @@ open class BadgeLabel: UILabel {
         var size = super.intrinsicContentSize
         let contentWidth = (text?.isEmpty ?? true) ? 0 : size.width + horizontalPadding * 2
         size.width = max(contentWidth, minWidth)
+        size.height = max(size.height, minHeight)
         return size
     }
 

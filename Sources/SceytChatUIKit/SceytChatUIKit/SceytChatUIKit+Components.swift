@@ -178,6 +178,7 @@ extension SceytChatUIKit {
         public static var alert: Alert.Type = Alert.self
         public static var audioWaveformView: AudioWaveformView.Type = AudioWaveformView.self
         public static var badgeView: BadgeView.Type = BadgeView.self
+        public static var badgeLabel: BadgeLabel.Type = BadgeLabel.self
         public static var bottomSheet: BottomSheet.Type = BottomSheet.self
         public static var channelDateSeparatorView: ChannelViewController.DateSeparatorView.Type = ChannelViewController.DateSeparatorView.self
         public static var channelHeaderView: ChannelViewController.HeaderView.Type = ChannelViewController.HeaderView.self
