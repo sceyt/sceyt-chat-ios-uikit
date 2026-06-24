@@ -159,9 +159,17 @@ open class ChannelLastMessageBodyFormatter: LastMessageBodyFormatting {
                     finalIcon = icon
                 }
 
+                let baseIconFont = messageBodyAttributes.bodyLabelAppearance.baseFont
+                let iconScale = baseIconFont.pointSize > 0 ? bodyFont.pointSize / baseIconFont.pointSize : 1
+                let iconSide = (16 * iconScale).rounded(.up)
+                let iconSize = CGSize(width: iconSide, height: iconSide)
+                let sizedIcon = UIGraphicsImageRenderer(size: iconSize).image { _ in
+                    finalIcon.draw(in: CGRect(origin: .zero, size: iconSize))
+                }
+
                 let attachment = NSTextAttachment()
-                attachment.bounds = CGRect(x: 0, y: (bodyFont.capHeight - finalIcon.size.height).rounded() / 2, width: finalIcon.size.width, height: finalIcon.size.height)
-                attachment.image = finalIcon
+                attachment.bounds = CGRect(x: 0, y: (bodyFont.capHeight - sizedIcon.size.height).rounded() / 2, width: sizedIcon.size.width, height: sizedIcon.size.height)
+                attachment.image = sizedIcon
                 let attributedAttachmentMessage = NSMutableAttributedString(attachment: attachment)
                 attributedAttachmentMessage.append(NSAttributedString(
                     string: " ",

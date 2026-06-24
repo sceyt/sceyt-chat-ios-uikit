@@ -10,6 +10,7 @@ import Foundation
 import CoreData
 import SceytChat
 import Combine
+import UIKit
 
 open class ChannelListViewModel: NSObject,
                           ChannelDelegate, ChatClientDelegate,
@@ -252,6 +253,13 @@ open class ChannelListViewModel: NSObject,
             return layoutModels[channel]
         }
         return nil
+    }
+
+    /// Rebuilds every cached preview string for the given trait collection's
+    /// content size category after a Dynamic Type / Large Text change, so reused
+    /// cells bound after the change don't show the previous font size.
+    open func reloadAttributedViews(compatibleWith traitCollection: UITraitCollection?) {
+        layoutModels.values.forEach { $0.reloadAttributedView(compatibleWith: traitCollection) }
     }
     
     open var numberOfSections: Int { 1 }

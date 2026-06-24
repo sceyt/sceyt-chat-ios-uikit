@@ -553,11 +553,18 @@ open class ChannelListViewController: ViewController,
 
         searchController.setupAppearance()
 
-        // Large Text / Dynamic Type changed: the cells' fonts re-scale themselves
-        // (adjustsFontForContentSizeCategory), but the fixed row height is a
-        // constant, so recompute it for the new category and reload so rows grow
-        // to fit instead of clipping.
+        // Large Text / Dynamic Type changed. On-screen cells' fonts re-scale
+        // themselves (adjustsFontForContentSizeCategory), but the cached
+        // last-message NSAttributedString keeps the fonts it was built with —
+        // and a label does not re-scale an attributed string's embedded fonts
+        // when it's assigned to a reused cell. So rebuild every cached preview
+        // for the new category, drop the fingerprints so the reload re-binds
+        // every row (not just rows whose channel data changed), and recompute
+        // the fixed row height so rows grow to fit instead of clipping.
         if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+            channelListViewModel.reloadAttributedViews(compatibleWith: traitCollection)
+            channelFingerprints = [:]
+
             let height = ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
             tableView.rowHeight = height
             tableView.estimatedRowHeight = height
