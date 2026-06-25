@@ -211,6 +211,22 @@ open class ChannelInfoViewController: ViewController,
                 router.goChannelListViewController()
                 return
             }
+            // A channel update can change my role/permissions, which adds or
+            // removes rows in the .options / .items sections (e.g. "Admins",
+            // "Auto-delete messages") and can even add/remove whole sections.
+            // reloadRows performs an implicit batch update and crashes with
+            // "invalid number of rows in section" when the row/section counts
+            // changed underneath it. So recompute the layout first and do a
+            // full reload whenever the structure changed; only fall back to the
+            // surgical row reload when the structure is identical (e.g. a plain
+            // name/description edit) to preserve the attachments browser state.
+            let newSections = availableSections()
+            let didChangeLayout = layoutChanged(from: sections, to: newSections)
+            sections = newSections
+            if didChangeLayout {
+                tableView.reloadData()
+                return
+            }
             var indexPaths = [IndexPath]()
             if let cell = tableView.visibleCells.first(where: { $0 is ChannelInfoViewController.DetailsCell }) as? ChannelInfoViewController.DetailsCell,
                let indexPath = tableView.indexPath(for: cell)
@@ -613,7 +629,28 @@ open class ChannelInfoViewController: ViewController,
         sections += [.attachment]
         return sections
     }
-    
+
+    /// Returns true when the table's structure (its sections, or the number of
+    /// rows in any section) differs between two layouts. When it does, a
+    /// surgical `reloadRows` would crash and a full `reloadData` is required.
+    private func layoutChanged(from old: [Sections], to new: [Sections]) -> Bool {
+        guard old == new else { return true }
+        for (index, section) in new.enumerated() {
+            let newCount: Int
+            switch section {
+            case .options: newCount = options().count
+            case .items: newCount = items().count
+            default: newCount = 1
+            }
+            // Compare against what the table currently displays. If the table
+            // has not been populated for this section yet, treat it as changed.
+            guard index < tableView.numberOfSections,
+                  tableView.numberOfRows(inSection: index) == newCount
+            else { return true }
+        }
+        return false
+    }
+
     @objc
     open func muteAction(_ sender: Any?) {
         if let sender = sender as? UISwitch {
