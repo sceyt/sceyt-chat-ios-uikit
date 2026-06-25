@@ -194,8 +194,9 @@ private extension ContextMenu {
     }
     
     func presentContextMenu(view: UIView, gesture: UILongPressGestureRecognizer, identifier: Identifier) {
-        let generator = UIImpactFeedbackGenerator(style: .medium)
-        generator.impactOccurred()
+        if let presented = actionController, presented.presentingViewController != nil {
+            logger.warn("[ContextMenu] Replacing a still-presented menu (id \(presented.identifier.value)) — possible double-presentation race")
+        }
         movementStarted = false
         var point = gesture.location(in: view)
         if let v = parentController?.view {
@@ -203,25 +204,49 @@ private extension ContextMenu {
         }
         longPressStartLocation = point
         snapshotDelegate?.willMakeSnapshot(forViewWith: identifier)
-        actionController = ActionController(
+        let actionController = ActionController(
             for: view,
             identifier: identifier,
             alignment: alignments[identifier] ?? .center
         )
         _menuItems = nil
-        actionController?.loadViewIfNeeded()
+        actionController.loadViewIfNeeded()
+
+        // The whole context-menu layout is anchored to a snapshot of the long-pressed
+        // view. The menu is presented ~0.2s after the press begins, and in that window
+        // the view can leave the window or fail to snapshot (the list reloaded, the cell
+        // was recycled, the message was deleted, etc.). When that happens
+        // `ActionController.setupLayout` bails out and the controller is left empty, but
+        // presenting it anyway still installs the full-screen blur/dim — leaving a stuck
+        // blurred screen with nothing on top and no menu frame to tap away. Abort cleanly
+        // in that case and let the user try again.
+        guard actionController.snapshot != nil else {
+            logger.warn("[ContextMenu] Skip present (id \(identifier.value)): no snapshot. \(type(of: view)) window=\(view.window != nil) superview=\(view.superview != nil). See setupLayout abort log for reason.")
+            self.actionController = nil
+            snapshotDelegate?.didMakeSnapshot(forViewWith: identifier)
+            return
+        }
+        self.actionController = actionController
+
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+
         let emojisConfig = dataSource?.canShowEmojis(contextMenu: self, identifier: identifier)
         if emojisConfig?.canShowEmojis == false {
-            actionController?.emojiController.view.isHidden = true
+            actionController.emojiController.view.isHidden = true
         } else {
-            actionController?.emojiController.parentAppearance = emojisConfig?.emojisViewAppearance
-            actionController?.emojiController.dataSource = self
-            actionController?.emojiController.delegate = self
+            actionController.emojiController.parentAppearance = emojisConfig?.emojisViewAppearance
+            actionController.emojiController.dataSource = self
+            actionController.emojiController.delegate = self
         }
-        actionController?.menuController.dataSource = self
-        
-        actionController?.modalPresentationStyle = .custom
-        parentController?.present(actionController!, animated: true) { [weak self] in
+        actionController.menuController.dataSource = self
+
+        actionController.modalPresentationStyle = .custom
+        if parentController == nil {
+            logger.warn("[ContextMenu] Skip present (id \(identifier.value)): parentController is nil (no-op)")
+        }
+        logger.debug("[ContextMenu] Presenting menu (id \(identifier.value))")
+        parentController?.present(actionController, animated: true) { [weak self] in
             self?.snapshotDelegate?.didMakeSnapshot(forViewWith: identifier)
         }
     }
