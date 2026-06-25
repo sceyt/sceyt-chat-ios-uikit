@@ -580,6 +580,37 @@ open class ChannelProvider: DataProvider {
         }
     }
     
+    /// Resolves the real, synced direct channel for a given peer user, excluding a known stale
+    /// (local placeholder) channel id. Used to reconcile a screen that was opened on a local
+    /// hashed-id placeholder before the sync service stored the real server channel.
+    open func getSyncedDirectChannel(
+        peerId: UserId,
+        excludingChannelId: ChannelId,
+        completion: @escaping (ChatChannel?) -> Void
+    ) {
+        let directType = SceytChatUIKit.shared.config.channelTypesConfig.direct
+        database.read {
+            let memberRequest = MemberDTO.fetchRequest()
+            memberRequest.predicate = NSPredicate(format: "user.id == %@", peerId)
+            let channelIds = MemberDTO.fetch(request: memberRequest, context: $0).map { $0.channelId }
+            let channelRequest = ChannelDTO.fetchRequest()
+            channelRequest.predicate = NSPredicate(
+                format: "type == %@ AND unsynched == NO AND id != %lld AND id IN %@",
+                directType, excludingChannelId, channelIds
+            )
+            channelRequest.sortDescriptors = [NSSortDescriptor(key: "id", ascending: false)]
+            return ChannelDTO.fetch(request: channelRequest, context: $0).first?.convert()
+        } completion: { result in
+            switch result {
+            case .failure(let error):
+                logger.errorIfNotNil(error, "getSyncedDirectChannel for peer \(peerId)")
+                completion(nil)
+            case .success(let channel):
+                completion(channel)
+            }
+        }
+    }
+
     public static func getChannelByURI(_ uri: String, completion: @escaping (ChatChannel?, Error?) -> Void) {
         let query = ChannelListQuery.Builder()
             .limit(1)

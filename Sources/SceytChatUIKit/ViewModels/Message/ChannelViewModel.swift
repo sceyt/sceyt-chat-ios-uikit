@@ -219,7 +219,16 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 selector: #selector(didUpdateLocalChannelNotification(_:)),
                 name: .didUpdateLocalCreateChannelOnEventChannelCreate,
                 object: nil)
+        NotificationCenter.default
+            .addObserver(
+                self,
+                selector: #selector(didFinishChannelsSyncNotification(_:)),
+                name: .didFinishChannelsSync,
+                object: nil)
         searchResult = .init(channelId: channel.id, searchFields: [])
+        // Covers the case where the sync had already finished before this screen was opened
+        // (so no .didFinishChannelsSync notification will fire for us).
+        reconcileDirectChannelAfterSyncIfNeeded()
     }
     
     //MARK: deinit
@@ -2884,6 +2893,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 loadLastMessages()
                 loadLastMessagesAfterConnect = false
             }
+            // A sync usually follows (re)connection after a DB wipe; resolve a stale local
+            // direct placeholder to the real synced channel as soon as it lands in the DB.
+            reconcileDirectChannelAfterSyncIfNeeded()
         }
         event = .connection(state: state)
     }
@@ -2907,6 +2919,36 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
            let channel = userInfo["channel"] as? ChatChannel,
            channelId == self.channel.id {
             updateLocalChannel(channel)
+        }
+    }
+
+    @objc
+    private func didFinishChannelsSyncNotification(_ notification: Notification) {
+        reconcileDirectChannelAfterSyncIfNeeded()
+    }
+
+    /// When the screen was opened on a local direct placeholder (hashed id, `unsynched`) before
+    /// the sync service stored the real server channel, the channel observer (keyed on the stale
+    /// id) never fires. Re-resolve the real synced channel by peer user and swap to it.
+    private func reconcileDirectChannelAfterSyncIfNeeded() {
+        guard channel.isDirect else { return }   // only direct channels can be matched by peer
+        guard channel.unSynched else { return }  // only the local placeholder is stale
+        guard let peerId = channel.peer?.id else { return }
+
+        let staleId = channel.id
+        channelProvider.getSyncedDirectChannel(peerId: peerId, excludingChannelId: staleId) { [weak self] resolved in
+            guard let self, let resolved else { return }
+            guard resolved.id != self.channel.id, !resolved.unSynched else { return }
+            self.updateLocalChannel(resolved) { [weak self] in
+                guard let self else { return }
+                // Sync only stored the synced channel's last message locally; pull the
+                // preceding history from the server, mirroring a fresh channel open.
+                if self.chatClient.connectionState == .connected {
+                    self.loadLastMessages()
+                } else {
+                    self.loadLastMessagesAfterConnect = true
+                }
+            }
         }
     }
     

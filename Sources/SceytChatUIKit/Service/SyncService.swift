@@ -38,6 +38,12 @@ public final class SyncService: NSObject {
         syncStateLock.unlock()
     }
 
+    /// Signals that channel sync has finished so open screens can reconcile a stale local
+    /// direct placeholder against the channels just written to the database.
+    private static func notifyChannelsSyncFinished() {
+        NotificationCenter.default.post(name: .didFinishChannelsSync, object: nil)
+    }
+
     public static var reactionQueue: OperationQueue = {
         let op = OperationQueue()
         op.maxConcurrentOperationCount = 1
@@ -308,6 +314,7 @@ public final class SyncService: NSObject {
             guard !operations.isEmpty else {
                 Components.channelMessageMarkerProvider.canMarkMessage = true
                 Self.finishSync()
+                Self.notifyChannelsSyncFinished()
                 completion?(true)
                 return
             }
@@ -330,11 +337,13 @@ public final class SyncService: NSObject {
                 completionOperator.completionBlock = {
                     completion?(completionOperator.isFinished)
                     Self.finishSync()
+                    Self.notifyChannelsSyncFinished()
                     task.setTaskCompleted(success: !completionOperator.isCancelled)
                 }
             } else {
                 completionOperator.completionBlock = {
                     Self.finishSync()
+                    Self.notifyChannelsSyncFinished()
                     completion?(completionOperator.isFinished)
                 }
             }
