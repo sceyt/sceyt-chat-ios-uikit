@@ -490,6 +490,28 @@ extension ChannelListViewController {
         
         public func update(messageText: NSAttributedString?) {
             messageLabel.attributedText = messageText
+            updateContentAlignment()
+        }
+
+        /// Vertically centers the subject row against the avatar when nothing
+        /// sits below it — no message preview and no badges — instead of leaving
+        /// it pinned to the top with empty space underneath. As soon as there is
+        /// a preview (or a badge), the content snaps back to `.top` so a
+        /// multi-line preview grows downward without shifting the subject (see
+        /// the alignment rationale in `setup`).
+        ///
+        /// Called from `bind(_:)` after the badge visibility is resolved, and
+        /// from `update(messageText:)` so transient typing / recording
+        /// indicators re-show the (otherwise hidden) label and re-evaluate.
+        open func updateContentAlignment() {
+            let hasMessage = !(messageLabel.attributedText?.string.isEmpty ?? true)
+            messageLabel.isHidden = !hasMessage
+
+            let bottomRowEmpty = messageLabel.isHidden
+                && unreadCount.isHidden
+                && atView.isHidden
+                && pinView.isHidden
+            contentStackView.alignment = bottomRowEmpty ? .center : .top
         }
         
         open var data: ChannelLayoutModel! {
@@ -548,6 +570,13 @@ extension ChannelListViewController {
             } else {
                 atView.value = nil
             }
+
+            // Center the subject row when the channel has no preview/badges
+            // below it; otherwise keep it pinned to the top. Done here, after
+            // the badge visibility above is resolved, so the decision sees the
+            // final state.
+            updateContentAlignment()
+
             data.$avatar
                 .sink { [weak self] image in
                     guard let self else { return }
