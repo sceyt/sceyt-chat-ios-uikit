@@ -87,30 +87,12 @@ extension ChannelInfoViewController {
                     reloadData()
                 }
             } else {
-                // Guard against observer-restart scenarios: when restartObserver fires,
-                // it delivers all new items as insertions while UICollectionView's internal
-                // count still reflects the old data. Applying those inserts would make UIKit
-                // expect (oldCount + inserts) sections, but the data source already reports
-                // the new (smaller) count → crash. Detect the inconsistency and reload instead.
-                let expectedSectionCount = numberOfSections
-                    + paths.sectionInserts.count
-                    - paths.sectionDeletes.count
-                let actualSectionCount = dataSource?.numberOfSections?(in: self) ?? 0
-                guard expectedSectionCount == actualSectionCount else {
-                    reloadData()
-                    updateNoItems()
-                    return
-                }
-                // Guard against item-count inconsistency (e.g. event from the inactive
-                // observer when GlobalSearchAllMediaViewModel switches between
-                // allAttachmentsObserver and searchObserver). Sections matched, but
-                // per-section item counts may still be wrong → verify the net item delta.
-                let currentTotal = (0..<numberOfSections).reduce(0) { $0 + numberOfItems(inSection: $1) }
-                let expectedTotal = currentTotal + paths.inserts.count - paths.deletes.count
-                let actualTotal = (0..<actualSectionCount).reduce(0) {
-                    $0 + (dataSource?.collectionView(self, numberOfItemsInSection: $1) ?? 0)
-                }
-                guard expectedTotal == actualTotal else {
+                // UIKit validates batch updates PER SECTION, not in aggregate, so the
+                // earlier aggregate checks (total section count + total item count) let
+                // through diffs that are +1 in one section and −1 in another and then
+                // abort inside performBatchUpdates. Validate every section's post-update
+                // count against before ± diff; bail to reloadData() on any mismatch.
+                guard canSafelyApply(paths) else {
                     reloadData()
                     updateNoItems()
                     return
@@ -132,7 +114,35 @@ extension ChannelInfoViewController {
 
             updateNoItems()
         }
-        
+
+        /// UIKit validates batch updates PER SECTION, not in aggregate. Verify that the
+        /// data source's post-update counts equal `before ± diff` for every section; if any
+        /// section disagrees — or sections are being added/removed, which shifts section
+        /// indices and makes cheap validation unsafe — bail to `reloadData()` instead of
+        /// letting `performBatchUpdates` abort with `NSInternalInconsistencyException`.
+        private func canSafelyApply(_ paths: ChannelAttachmentListViewModel.ChangeItemPaths) -> Bool {
+            // Section add/remove shifts section indices → per-section item math is fragile
+            // to validate cheaply. Just reload when the section set changes.
+            guard paths.sectionInserts.isEmpty, paths.sectionDeletes.isEmpty else { return false }
+
+            let before = numberOfSections
+            let actualSections = dataSource?.numberOfSections?(in: self) ?? 0
+            guard before == actualSections else { return false }
+
+            // No section changes → OLD and NEW section indices coincide, so filtering both
+            // insert (new-space) and delete (old-space) paths by `.section` is valid.
+            let insertsTo = paths.inserts + paths.moves.map { $0.to }
+            let deletesFrom = paths.deletes + paths.moves.map { $0.from }
+            for s in 0..<before {
+                let expected = numberOfItems(inSection: s)
+                    + insertsTo.filter { $0.section == s }.count
+                    - deletesFrom.filter { $0.section == s }.count
+                let actual = dataSource?.collectionView(self, numberOfItemsInSection: s) ?? 0
+                if expected != actual { return false }
+            }
+            return true
+        }
+
         open func updateNoItems() {
             if totalNumberOfItems <= 0 {
                 emptyStateView.isHidden = false
