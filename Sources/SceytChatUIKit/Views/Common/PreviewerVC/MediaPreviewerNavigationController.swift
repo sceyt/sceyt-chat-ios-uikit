@@ -35,52 +35,19 @@ open class MediaPreviewerNavigationController: NavigationController, PreviewerTr
         fatalError("init(coder:) has not been implemented")
     }
 
-    private var isObservingNavBarAlpha = false
-
-    open override func viewDidLoad() {
-        super.viewDidLoad()
-        // Observe the navigation bar's alpha so we can re-assert the hidden state the
-        // instant UIKit raises it (see enforceHiddenNavBarIfNeeded()).
-        navigationBar.addObserver(self, forKeyPath: "alpha", options: [.new], context: nil)
-        isObservingNavBarAlpha = true
-    }
-
-    deinit {
-        if isObservingNavBarAlpha {
-            navigationBar.removeObserver(self, forKeyPath: "alpha")
-        }
-    }
-
-    open override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey: Any]?, context: UnsafeMutableRawPointer?) {
-        guard keyPath == "alpha" else {
-            super.observeValue(forKeyPath: keyPath, of: object, change: change, context: context)
-            return
-        }
-        enforceHiddenNavBarIfNeeded()
-    }
-
-    open override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        enforceHiddenNavBarIfNeeded()
-    }
-
-    /// UINavigationController re-asserts `navigationBar.alpha = 1` shortly after a
-    /// status-bar visibility change (the bar and the status bar share this controller).
-    /// While we're in immersive/hidden mode, snap the alpha back to 0 the instant it's
-    /// raised — synchronously, from inside the KVO callback — so the bar never renders
-    /// back into view. We only ever pin *down* to 0 while hidden, so the tap-to-show
-    /// animation and the pan-to-dismiss partial fade are left untouched.
-    private func enforceHiddenNavBarIfNeeded() {
-        guard isPreviewStatusBarHidden, navigationBar.alpha != 0 else { return }
-        navigationBar.alpha = 0
-    }
-
-    /// Controls whether the system status bar (clock, battery, etc.) is hidden.
-    /// Toggled together with the navigation bar / player controls when the user
-    /// taps the media to enter "immersive" full-screen viewing.
+    /// Controls the immersive (full-screen) state of the previewer. When `true` the
+    /// navigation bar and the system status bar (clock, battery, etc.) are both hidden;
+    /// the user toggles it by tapping the media.
+    ///
+    /// The navigation bar is driven through `setNavigationBarHidden(_:animated:)` — i.e.
+    /// UIKit's own hidden-state bookkeeping — rather than by animating `navigationBar.alpha`.
+    /// That matters because hiding the status bar makes UIKit relayout the bar, and a bar
+    /// hidden via `alpha` gets restored to full opacity by that relayout, whereas a bar
+    /// hidden via `setNavigationBarHidden` stays hidden.
     open var isPreviewStatusBarHidden = false {
         didSet {
             guard oldValue != isPreviewStatusBarHidden else { return }
+            setNavigationBarHidden(isPreviewStatusBarHidden, animated: true)
             UIView.animate(withDuration: 0.3) {
                 self.setNeedsStatusBarAppearanceUpdate()
             }
