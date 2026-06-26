@@ -565,14 +565,16 @@ open class MessageLayoutModel {
             updateOptions.insert(.reload)
         }
         if attachments.isEmpty {
-            var prevLinkPreviews = linkPreviews
             linkPreviews?.removeAll()
             for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
                 if addLinkPreview(linkMetadata: link) {
                     self.updateOptions.remove(.link)
                     updateOptions.insert(.link)
                 }
-                
+            }
+            if (linkPreviews?.isEmpty ?? true), contentOptions.contains(.link) {
+                contentOptions.remove(.link)
+                updateOptions.insert(.link)
             }
         }
         
