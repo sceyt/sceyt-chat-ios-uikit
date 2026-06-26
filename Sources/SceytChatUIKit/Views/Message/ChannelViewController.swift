@@ -1485,6 +1485,15 @@ open class ChannelViewController: ViewController,
     open func updatePinnedHeaderVisibility() {
         guard collectionView.isDragging || collectionView.isDecelerating
         else { return }
+        // When content is shorter than the visible area (few messages), the layout
+        // bottom-anchors the cells, leaving empty space at the top. Pinning would
+        // float the date header detached/over the cells, so keep it inline and let
+        // it scroll together with the messages.
+        guard layout.bottomAnchorShift == 0
+        else {
+            setSectionHeadersPinToVisibleBounds(false)
+            return
+        }
         if let scrollTimer, scrollTimer.isValid {
             scrollTimer.invalidate()
         }
