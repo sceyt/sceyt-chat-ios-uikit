@@ -296,12 +296,13 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
+
         UIView.animate(withDuration: animated ? 0.3 : 0) { [weak self] in
             guard let self else { return }
             self.carouselViewController?.navigationController?.navigationBar.alpha = 1.0
             self.playerControlContainerView.alpha = 1.0
         }
+        (carouselViewController?.navigationController as? MediaPreviewerNavigationController)?.isPreviewStatusBarHidden = false
     }
     
     override open func viewDidAppear(_ animated: Bool) {
@@ -653,10 +654,12 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     @objc
     open func onTap(_ recognizer: UITapGestureRecognizer) {
         let currentNavAlpha = carouselViewController?.navigationController?.navigationBar.alpha ?? 0.0
+        let shouldHide = currentNavAlpha > 0.5
+        (carouselViewController?.navigationController as? MediaPreviewerNavigationController)?.isPreviewStatusBarHidden = shouldHide
         UIView.animate(withDuration: 0.3) { [weak self] in
             guard let self else { return }
-            self.carouselViewController?.navigationController?.navigationBar.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
-            self.playerControlContainerView.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
+            self.carouselViewController?.navigationController?.navigationBar.alpha = shouldHide ? 0.0 : 1.0
+            self.playerControlContainerView.alpha = shouldHide ? 0.0 : 1.0
         }
     }
     
