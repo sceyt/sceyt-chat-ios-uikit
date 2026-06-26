@@ -1593,26 +1593,28 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         action: UserSendMessage.Action
     ) {
         
-        @Sendable func send(storeBeforeSend: Bool = false) {
+        @Sendable func send(storeBeforeSend: Bool = false, completion: (@Sendable (Error?) -> Void)? = nil) {
             logger.verbose("[MESSAGE SEND] sendUserMessage messageSender")
             switch action {
             case .send, .reply, .forward:
                 logger.verbose("[MESSAGE SEND] sendUserMessage messageSender send reply forward")
-                messageSender.sendMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
+                messageSender.sendMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] error in
                     logger.verbose("[MESSAGE SEND] sendUserMessage messageSender send reply forward completion")
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
                     }
+                    completion?(error)
                 }
             case .edit:
                 logger.verbose("[MESSAGE SEND] sendUserMessage messageSender edit")
-                messageSender.editMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
+                messageSender.editMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] error in
                     logger.verbose("[MESSAGE SEND] sendUserMessage messageSender edit completion")
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
                     }
+                    completion?(error)
                 }
             }
         }
@@ -1625,7 +1627,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                     if let channel = try await self.channelCreator.createChannelOnServerIfNeeded(channelId: self.channel.id) {
                         self.updateLocalChannel(channel) {
                             logger.verbose("[MESSAGE SEND] sendUserMessage local channel updated")
-                            send(storeBeforeSend: true)
+                            send(storeBeforeSend: true) { [weak self] error in
+                                guard let self, error == nil else { return }   // only on successful ack
+                                DispatchQueue.main.async {
+                                    logger.verbose("[MESSAGE SEND] sendUserMessage ack — loading previous messages")
+                                    // Mirror reconcileDirectChannelAfterSyncIfNeeded: pull the preceding
+                                    // history from the server now that the channel is real and acked.
+                                    if self.chatClient.connectionState == .connected {
+                                        self.loadLastMessages()
+                                    } else {
+                                        self.loadLastMessagesAfterConnect = true
+                                    }
+                                }
+                            }
                         }
                     } else {
                         logger.verbose("[MESSAGE SEND] sendUserMessage channel exists")
