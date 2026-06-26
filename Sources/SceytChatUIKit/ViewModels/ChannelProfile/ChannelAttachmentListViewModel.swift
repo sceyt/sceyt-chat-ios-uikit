@@ -142,8 +142,9 @@ open class ChannelAttachmentListViewModel: NSObject {
         if let attachmentLayout {
             let attachment = attachmentLayout.attachment
             if let onLoadThumbnail {
-                attachmentLayout.onLoadThumbnail = { [weak self] in
-                    self?.cacheThumbnail($0, for: attachment)
+                attachmentLayout.onLoadThumbnail = { [weak self, weak attachmentLayout] image in
+                    self?.cacheThumbnail(image, for: attachment)
+                    guard let attachmentLayout else { return }
                     onLoadThumbnail(attachmentLayout)
                 }
             }

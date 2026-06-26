@@ -158,11 +158,20 @@ extension ChannelInfoViewController {
 
         override open func prepareForReuse() {
             super.prepareForReuse()
+            if let message = data?.ownerMessage, let attachment = data?.attachment {
+                fileProvider.removeProgressObserver(message: message, attachment: attachment)
+            }
             lastAttachmentTransferProgress = nil
             progressView.isHidden = true
             pauseButton.isHidden = true
             progressView.isHiddenProgress = false
             progressView.progress = 0
+        }
+
+        deinit {
+            if let message = data?.ownerMessage, let attachment = data?.attachment {
+                fileProvider.removeProgressObserver(message: message, attachment: attachment)
+            }
         }
 
         @objc open func pauseButtonTapped() {

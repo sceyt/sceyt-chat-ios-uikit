@@ -17,7 +17,7 @@ extension ChannelInfoViewController {
                 else { return }
                 imageView.image = data.thumbnail
                 imageView.setup(
-                    previewer: { self.previewer?() },
+                    previewer: { [weak self] in self?.previewer?() },
                     item: PreviewItem.attachment(data.attachment)
                 )
                 update(status: data.attachment.status)

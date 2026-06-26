@@ -264,7 +264,17 @@ extension ChannelInfoViewController {
         
         open override func prepareForReuse() {
             super.prepareForReuse()
-            
+
+            if let message = data?.ownerMessage, let attachment = data?.attachment {
+                fileProvider.removeProgressObserver(
+                    message: message,
+                    attachment: attachment)
+            }
+        }
+
+        deinit {
+            // prepareForReuse only runs on reuse (scrolling); cells visible at screen
+            // dismiss are deallocated without it, so remove the observer here too.
             if let message = data?.ownerMessage, let attachment = data?.attachment {
                 fileProvider.removeProgressObserver(
                     message: message,
