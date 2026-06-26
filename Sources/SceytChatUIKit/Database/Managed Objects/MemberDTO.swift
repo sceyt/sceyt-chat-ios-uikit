@@ -24,10 +24,14 @@ public class MemberDTO: NSManagedObject {
     }
 
     public static func fetch(id: UserId, channelId: ChannelId, context: NSManagedObjectContext) -> MemberDTO? {
+        fetchAll(id: id, channelId: channelId, context: context).first
+    }
+
+    public static func fetchAll(id: UserId, channelId: ChannelId, context: NSManagedObjectContext) -> [MemberDTO] {
         let request = fetchRequest()
         request.sortDescriptor = NSSortDescriptor(keyPath: \MemberDTO.user?.id, ascending: false)
         request.predicate = .init(format: "user.id == %@ AND channelId == %lld", id, channelId)
-        return fetch(request: request, context: context).first
+        return fetch(request: request, context: context)
     }
     
     public static func fetch(channelId: ChannelId, context: NSManagedObjectContext) -> [MemberDTO] {
@@ -38,7 +42,11 @@ public class MemberDTO: NSManagedObject {
     }
 
     public static func fetchOrCreate(id: UserId, channelId: ChannelId, context: NSManagedObjectContext) -> MemberDTO {
-        if let mo = fetch(id: id, channelId: channelId, context: context) {
+        let existing = fetchAll(id: id, channelId: channelId, context: context)
+        if let mo = existing.first {
+            if existing.count > 1 {
+                existing.dropFirst().forEach { context.delete($0) }
+            }
             if mo.channel == nil {
                 mo.channel = ChannelDTO.fetch(id: channelId, context: context)
             }
