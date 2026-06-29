@@ -857,6 +857,22 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                     addOrUpdateLinkPreview(linkDetails: metadata)
                     return
                 }
+                // No prebuilt preview — try to recover saved metadata/image by URL.
+                if let urlString = attachment.url, let url = URL(string: urlString)?.normalizedURL {
+                    // 1. Synchronous in-memory hit → upgrade to link preview right away.
+                    if let cached = LinkMetadataProvider.default.metadata(for: url) {
+                        addOrUpdateLinkPreview(linkDetails: cached)
+                        return
+                    }
+                    // 2. Otherwise check DB + disk (no network) and upgrade when it returns.
+                    LinkMetadataProvider.default.fetchFromCacheOrDB(url: url) { [weak self] metadata in
+                        guard let self, let metadata else { return }
+                        // Guard: only apply if we're still replying to the same message.
+                        guard case .reply(let model) = self.currentState,
+                              model === layoutModel else { return }
+                        self.addOrUpdateLinkPreview(linkDetails: metadata)
+                    }
+                }
                 image = nil
             default:
                 image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
