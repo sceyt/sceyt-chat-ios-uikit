@@ -678,8 +678,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         if isEditState {
             inputTextView.attributedText = cachedMessage
             cachedMessage = nil
-            nextState = nil
         }
+        nextState = nil
         isViewOnceEnabled = false
         removeActionView()
         selectedMediaView.removeAll()
@@ -864,13 +864,14 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                         addOrUpdateLinkPreview(linkDetails: cached)
                         return
                     }
-                    // 2. Otherwise check DB + disk (no network) and upgrade when it returns.
-                    LinkMetadataProvider.default.fetchFromCacheOrDB(url: url) { [weak self] metadata in
-                        guard let self, let metadata else { return }
-                        // Guard: only apply if we're still replying to the same message.
-                        guard case .reply(let model) = self.currentState,
-                              model === layoutModel else { return }
-                        self.addOrUpdateLinkPreview(linkDetails: metadata)
+                    // 2. Cache miss → DB, then network API if still missing (also downloads the image).
+                    LinkMetadataProvider.default.fetch(url: url, loadFromNetworkIfMissing: true) { [weak self] result in
+                        guard let self, case .success(let metadata) = result else { return }
+                        DispatchQueue.main.async {
+                            guard case .reply(let model) = self.currentState,
+                                  model === layoutModel else { return }
+                            self.addOrUpdateLinkPreview(linkDetails: metadata)
+                        }
                     }
                 }
                 image = nil
