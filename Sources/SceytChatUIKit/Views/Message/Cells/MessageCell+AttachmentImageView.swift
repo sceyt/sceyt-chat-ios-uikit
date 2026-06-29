@@ -104,6 +104,19 @@ extension MessageCell {
                     }
                     self.imageView.image = thumbnail ?? data.attachment.thumbnailImage
                 }
+
+                // Self-heal for "blurry placeholder stays after download". When this cell (re)binds
+                // a downloaded image/video whose layout still shows the low-res thumbHash placeholder,
+                // pull the sharp thumbnail from disk now. It is instance-agnostic (keyed on attachment
+                // identity, applied via setFileBackedThumbnail), so it recovers even when the
+                // post-download load landed on a duplicate layout instance or no live transfer-completion
+                // callback fired. The live (no-scroll) case is reached because a download that completes
+                // while the cell is visible triggers a reconfigure (MessageLayoutModel.update(message:)
+                // inserts .reload on the completion edge), which re-runs this didSet. Gated on
+                // !isThumbnailLoadedFromFile, so it runs at most once per layout instance.
+                if data.transferStatus == .done, !data.isThumbnailLoadedFromFile {
+                    reloadThumbnailFromFile(for: data.attachment)
+                }
             }
         }
 

@@ -92,7 +92,8 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
         type: String = "image",
         name: String = "image.jpg",
         metadata: String? = nil,
-        status: ChatMessage.Attachment.TransferStatus = .pending
+        status: ChatMessage.Attachment.TransferStatus = .pending,
+        filePath: String? = nil
     ) -> ChatMessage.Attachment {
         .init(
             id: id,
@@ -100,7 +101,7 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
             messageId: 1,
             userId: "user",
             url: "https://example.com/files/\(id)/\(name)",
-            filePath: nil,
+            filePath: filePath,
             type: type,
             name: name,
             metadata: metadata,
@@ -405,5 +406,244 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
 
         XCTAssertTrue(waitUntil { layout.thumbnail?.size.width == 10 },
                       "a corrupt first load must not permanently block reloading from file")
+    }
+
+    // MARK: - Bind-time self-heal ("blurry placeholder stays after download")
+
+    /// The core fix. A downloaded image whose layout is stuck on the low-res placeholder —
+    /// because the sharp post-download load landed on a *different* (duplicate) layout
+    /// instance, or the progress-completion observer never fired for this view — must be
+    /// healed simply by (re)binding the view: it pulls the sharp thumbnail from disk on its
+    /// own, with no `update(attachment:)`, no progress completion, and no `onLoadThumbnail`
+    /// fire. This is what makes "scroll fixes it" automatic.
+    func testBindSelfHealsDownloadedImageStuckOnPlaceholder() {
+        let id: AttachmentId = 200
+        let attachment = makeAttachment(id: id, status: .done)
+
+        // Initial load runs while the file is not yet resolvable → the layout settles on the
+        // placeholder (isThumbnailLoadedFromFile == false). This is the "blurry stays" state.
+        let layout = makeLayout(attachment, async: false)
+        var initialSettled = false
+        layout.onLoadThumbnail = { _ in initialSettled = true }
+        XCTAssertTrue(waitUntil { initialSettled }, "initial (file-less) load must publish")
+        XCTAssertFalse(layout.isThumbnailLoadedFromFile,
+                       "precondition: layout is on the placeholder, not file-backed")
+
+        // The sharp thumbnail is now on disk, but nothing pushes it into the layout.
+        mock.setThumbnailPath(redPath, for: id)
+
+        let view = MessageCell.AttachmentImageView()
+        view.data = layout
+        // isThumbnailLoadedFromFile flips to true ONLY via the file-load path
+        // (setFileBackedThumbnail) — the definitive signal that the bind-time self-heal ran.
+        // (imageView width alone can't tell us: the onLoadThumbnail fallback
+        // `attachment.thumbnailImage` also reads the same mocked file.)
+        XCTAssertTrue(waitUntil { layout.isThumbnailLoadedFromFile },
+                      "binding a downloaded image not yet file-backed must self-heal from disk")
+        XCTAssertEqual(imageWidth(view), 10, "the healed view shows the sharp thumbnail")
+    }
+
+    /// Faithful reproduction of the production symptom: the layout carries a *non-nil* low-res
+    /// placeholder (the decoded thumbHash). Because `thumbnail` is non-nil, the onLoadThumbnail
+    /// `?? attachment.thumbnailImage` fallback is never reached — the cell paints the blurry
+    /// placeholder and stays there until a scroll. The bind-time self-heal must swap it for the
+    /// sharp file thumbnail. Distinguishable by size: blue 20×20 placeholder → red 10×10 sharp.
+    func testBindSwapsNonNilBlurryPlaceholderToSharp() {
+        let id: AttachmentId = 230
+        let attachment = makeAttachment(id: id, status: .done)
+        let layout = makeLayout(attachment, async: false)
+        var settled = false
+        layout.onLoadThumbnail = { _ in settled = true }
+        XCTAssertTrue(waitUntil { settled })
+
+        // Stand in for the blurry thumbHash: a non-nil placeholder that is NOT file-backed.
+        layout.thumbnail = UIImage(contentsOfFile: bluePath)
+        XCTAssertFalse(layout.isThumbnailLoadedFromFile, "precondition: placeholder, not file-backed")
+
+        // The sharp thumbnail is now on disk.
+        mock.setThumbnailPath(redPath, for: id)
+
+        let view = MessageCell.AttachmentImageView()
+        view.data = layout
+        XCTAssertTrue(waitUntil { self.imageWidth(view) == 10 },
+                      "bind must swap the non-nil blurry placeholder (20) for the sharp thumbnail (10)")
+        XCTAssertTrue(layout.isThumbnailLoadedFromFile)
+    }
+
+    /// Even if the sharp post-download load was delivered to a *sibling* layout instance
+    /// (the duplicate-instance race), the view bound to the instance that never received it
+    /// still heals on bind. The strict `===` guard is preserved — see
+    /// `testStaleInstanceOfSameAttachmentDoesNotPaint` — so cross-instance delivery happens
+    /// via disk, not by accepting a foreign instance's fire.
+    func testBindSelfHealsEvenWhenSharpLoadLandedOnDuplicateInstance() {
+        let id: AttachmentId = 210
+        let attachment = makeAttachment(id: id, status: .done)
+        let visible = makeLayout(attachment, async: false)
+        let orphan = makeLayout(attachment, async: false)
+        var visibleSettled = false, orphanSettled = false
+        visible.onLoadThumbnail = { _ in visibleSettled = true }
+        orphan.onLoadThumbnail = { _ in orphanSettled = true }
+        XCTAssertTrue(waitUntil { visibleSettled && orphanSettled })
+
+        // Download completes: the file is available and the load is delivered to the ORPHAN
+        // instance only (mirrors the observer/cache fan-out updating a duplicate layout).
+        mock.setThumbnailPath(redPath, for: id)
+        orphan.update(attachment: attachment)
+        XCTAssertTrue(waitUntil { orphan.isThumbnailLoadedFromFile },
+                      "the duplicate instance received the sharp thumbnail")
+        XCTAssertFalse(visible.isThumbnailLoadedFromFile,
+                       "the visible instance never received the sharp load (the bug)")
+
+        // Binding the view to the *visible* instance must heal that instance from disk.
+        let view = MessageCell.AttachmentImageView()
+        view.data = visible
+        XCTAssertTrue(waitUntil { visible.isThumbnailLoadedFromFile },
+                      "the view must heal its own instance from disk regardless of which got the load")
+        XCTAssertEqual(imageWidth(view), 10)
+    }
+
+    /// The self-heal is gated on `.done`: an attachment that is still downloading must not
+    /// pull from disk (the file is not final yet), so the placeholder remains.
+    func testBindDoesNotHealWhileStillDownloading() {
+        let id: AttachmentId = 202
+        let attachment = makeAttachment(id: id, status: .downloading)
+        let layout = makeLayout(attachment, async: false)
+        var settled = false
+        layout.onLoadThumbnail = { _ in settled = true }
+        XCTAssertTrue(waitUntil { settled })
+        XCTAssertFalse(layout.isThumbnailLoadedFromFile)
+
+        // File becomes resolvable, but the transfer is still in progress.
+        mock.setThumbnailPath(redPath, for: id)
+
+        let view = MessageCell.AttachmentImageView()
+        view.data = layout
+        _ = waitUntil(timeout: 0.4) { false } // give a wrongful reload time to land
+        // The self-heal would flip isThumbnailLoadedFromFile via setFileBackedThumbnail; the
+        // status gate must prevent it. (imageView may show the file via the thumbnailImage
+        // fallback, so the flag — not the pixels — is the correct signal here.)
+        XCTAssertFalse(layout.isThumbnailLoadedFromFile,
+                       "bind must not file-back from disk until the attachment is downloaded (.done)")
+    }
+
+    /// The self-heal is gated on `!isThumbnailLoadedFromFile`: once a sharp file-backed
+    /// thumbnail is loaded, binding must not re-read the disk (avoids redundant work and,
+    /// since a thumbnail path's content is fixed by contract, prevents any unexpected swap).
+    func testBindDoesNotReloadWhenAlreadyFileBacked() {
+        let id: AttachmentId = 203
+        mock.setThumbnailPath(redPath, for: id)
+        let attachment = makeAttachment(id: id, status: .done)
+        let layout = makeLayout(attachment, async: false)
+        XCTAssertTrue(waitUntil { layout.thumbnail?.size.width == 10 })
+        XCTAssertTrue(layout.isThumbnailLoadedFromFile, "precondition: already file-backed")
+
+        // Swap the underlying file. A wrongful re-pull on bind would change the view to blue.
+        mock.setThumbnailPath(bluePath, for: id)
+        let view = MessageCell.AttachmentImageView()
+        view.data = layout
+        _ = waitUntil(timeout: 0.4) { false }
+        XCTAssertEqual(imageWidth(view), 10,
+                       "bind must not re-pull from disk once the thumbnail is file-backed")
+    }
+
+    /// The video view (a separate `AttachmentView` subclass with its own `data` override) has
+    /// the same bug and must get the same self-heal.
+    func testVideoBindSelfHealsDownloadedVideoStuckOnPlaceholder() {
+        let id: AttachmentId = 220
+        let attachment = makeAttachment(id: id, type: "video", name: "v.mp4", status: .done)
+        let layout = makeLayout(attachment, async: false)
+        var initialSettled = false
+        layout.onLoadThumbnail = { _ in initialSettled = true }
+        XCTAssertTrue(waitUntil { initialSettled })
+        XCTAssertFalse(layout.isThumbnailLoadedFromFile)
+
+        mock.setThumbnailPath(redPath, for: id)
+
+        let view = MessageCell.AttachmentVideoView()
+        view.data = layout
+        XCTAssertTrue(waitUntil { layout.isThumbnailLoadedFromFile },
+                      "binding a downloaded video not yet file-backed must self-heal from disk")
+        XCTAssertEqual(view.imageView.image?.size.width, 10)
+    }
+
+    // MARK: - Live reconfigure trigger (MessageLayoutModel.update(message:))
+
+    private func makeChannel() -> ChatChannel {
+        ChatChannel(id: 100, type: "group", uri: "test-uri")
+    }
+
+    /// Messages here must carry a user: `MessageLayoutModel.init` calls
+    /// `senderNameFormatter.format(message.user)`, which force-unwraps it.
+    private func makeMediaMessage(_ attachments: [ChatMessage.Attachment]) -> ChatMessage {
+        ChatMessage(id: 1, channelId: 100, attachments: attachments, user: ChatUser(id: "u1"))
+    }
+
+    /// The bind-time self-heal only fires on a (re)bind. For the LIVE case (download completes
+    /// while the cell is visible, no scroll), the cell must be reconfigured. `update(message:)`
+    /// must therefore force a reconfigure on the media download-completion edge — otherwise the
+    /// change is swallowed (filePath/status are not render-affecting in the classic reload path,
+    /// and the event is dropped at makeEvents' `guard !paths.isEmpty`). We assert via the durable
+    /// `contentVersion` (the signal the snapshot diff reloads on) and the `.reload` updateOption
+    /// (what keeps the reload hint alive through the VM pipeline).
+    func testUpdateForcesReconfigureWhenMediaFinishesDownloading() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, status: .downloading)]),
+            appearance: MessageCell.appearance)
+        let versionBefore = model.contentVersion
+
+        // Same attachment id, now downloaded.
+        model.update(channel: channel, message: makeMediaMessage([makeAttachment(id: 1, status: .done)]))
+
+        XCTAssertGreaterThan(model.contentVersion, versionBefore,
+                             "a media download-completion must bump contentVersion so the cell reconfigures")
+        XCTAssertTrue(model.updateOptions.contains(.reload),
+                      "completion edge must insert .reload to survive makeEvents' empty-paths guard")
+    }
+
+    /// The reconfigure trigger is scoped to the completion *edge* — an attachment that is still
+    /// downloading (no .done transition) must NOT force a reconfigure, so we don't churn the cell
+    /// (and tear down its progress observer) on every transfer event.
+    func testUpdateDoesNotForceReconfigureWhileStillDownloading() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, status: .downloading)]),
+            appearance: MessageCell.appearance)
+        let versionBefore = model.contentVersion
+
+        // Still downloading — no completion edge.
+        model.update(channel: channel, message: makeMediaMessage([makeAttachment(id: 1, status: .downloading)]))
+
+        XCTAssertEqual(model.contentVersion, versionBefore,
+                       "no completion edge → no forced reconfigure")
+        XCTAssertFalse(model.updateOptions.contains(.reload))
+    }
+
+    /// Real download ordering: the downloader writes `filePath` BEFORE flipping status to `.done`
+    /// (SCTSession: updateLocalFileLocation → success), so the observer can emit an intermediate
+    /// `.downloading + filePath` state. The reconfigure edge must be aligned to `.done` (the view's
+    /// self-heal gate): it must NOT be consumed by the earlier filePath arrival, and it MUST fire on
+    /// the later `.done` transition. (A filePath-based edge would fire while still `.downloading` —
+    /// when the self-heal can't run — and then miss the real `.done` edge, leaving it blurry.)
+    func testUpdateForcesReconfigureOnDoneEvenWhenFilePathArrivesFirst() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, status: .downloading)]),
+            appearance: MessageCell.appearance)
+
+        // Intermediate: filePath written, but status is still .downloading. The self-heal is gated
+        // on .done, so this must NOT consume the completion edge.
+        model.update(channel: channel, message: makeMediaMessage([makeAttachment(id: 1, status: .downloading, filePath: "/tmp/sceyt-test-thumb.jpg")]))
+        let versionAfterFilePath = model.contentVersion
+
+        // .done arrives — the edge the self-heal acts on; it MUST reconfigure here.
+        model.update(channel: channel, message: makeMediaMessage([makeAttachment(id: 1, status: .done, filePath: "/tmp/sceyt-test-thumb.jpg")]))
+
+        XCTAssertGreaterThan(model.contentVersion, versionAfterFilePath,
+                             "reconfigure must fire on the .done edge even when filePath arrived earlier")
+        XCTAssertTrue(model.updateOptions.contains(.reload))
     }
 }

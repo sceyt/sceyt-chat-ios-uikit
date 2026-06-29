@@ -578,6 +578,31 @@ open class MessageLayoutModel {
             }
         }
         
+        // Download-completion edge: force exactly one reconfigure when a media attachment reaches
+        // .done. The attachment comparison above and the classic reload path deliberately ignore
+        // filePath/status (to avoid reload churn during transfer), so without this a download that
+        // completes while the cell is visible would never reconfigure it — leaving a blurry
+        // placeholder until the user scrolls (especially when the sharp load landed on a duplicate
+        // AttachmentLayout instance or no live transfer-completion callback fired). Inserting
+        // .reload keeps the reload hint alive through makeEvents and bumps contentVersion, so the
+        // cell re-binds once and the AttachmentView's bind-time self-heal swaps blurry→sharp.
+        //
+        // Gate on the .done transition specifically — NOT "gained a filePath". The downloader
+        // writes filePath BEFORE flipping status to .done (SCTSession: updateLocalFileLocation
+        // then success), so a filePath-based edge would fire while status is still .downloading
+        // (when the view's self-heal, gated on .done, cannot run) and then miss the real .done
+        // edge. Aligning to .done matches the self-heal gate exactly.
+        let didFinishDownloadingMedia = (message.attachments ?? []).contains { new in
+            guard new.type == "image" || new.type == "video",
+                  new.status == .done,
+                  let old = (self.message.attachments ?? []).first(where: { $0 == new })
+            else { return false }
+            return old.status != .done
+        }
+        if didFinishDownloadingMedia {
+            updateOptions.insert(.reload)
+        }
+
         var isUpdated = self.updateOptions != updateOptions
         self.updateOptions = updateOptions
         self.channel = channel
@@ -1216,7 +1241,7 @@ extension MessageLayoutModel {
             }
         }
         
-        @Atomic private var isThumbnailLoadedFromFile = false
+        @Atomic internal private(set) var isThumbnailLoadedFromFile = false
         
         public required init(
             attachment: ChatMessage.Attachment,

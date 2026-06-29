@@ -143,6 +143,16 @@ extension MessageCell {
                         }
                         self.imageView.image = thumbnail
                     }
+
+                    // Self-heal for "blurry placeholder stays after download" (see
+                    // AttachmentImageView for the full rationale). When this view (re)binds a
+                    // downloaded video whose layout still shows the low-res placeholder, pull the
+                    // sharp frame from disk now — instance-agnostic via setFileBackedThumbnail —
+                    // so it recovers even when the post-download load landed on a duplicate layout
+                    // instance or the completion observer never fired for this view.
+                    if data.transferStatus == .done, !data.isThumbnailLoadedFromFile {
+                        reloadThumbnailFromFile(for: data.attachment)
+                    }
                 }
             }
         }
