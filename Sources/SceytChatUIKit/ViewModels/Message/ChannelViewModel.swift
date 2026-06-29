@@ -2221,7 +2221,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open func updateDraftMessage(_ message: NSAttributedString?) {
-        let text = message == nil || message?.isEmpty == true ? nil : message
+        let isEmpty = message?.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        let text = isEmpty ? nil : message
         let date = text == nil ? nil : Date()
         channelProvider.saveDraftMessage(text, at: date)
     }

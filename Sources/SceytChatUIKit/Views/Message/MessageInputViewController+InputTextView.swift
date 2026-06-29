@@ -33,6 +33,13 @@ extension MessageInputViewController {
             layer.borderWidth = appearance.textInputAppearance.borderWidth
             layer.cornerRadius = appearance.textInputAppearance.cornerRadius
             allowsEditingTextAttributes = true
+            if #available(iOS 18.0, *) {
+                // Disable Genmoji / adaptive image glyphs. They insert inline
+                // content represented by a bare U+FFFC, whose artwork lives in
+                // NSAdaptiveImageGlyph.imageContent — which the send path can't
+                // serialize, so it would transmit as a blank placeholder.
+                supportsAdaptiveImageGlyph = false
+            }
         }
         
         open override func setupAppearance() {

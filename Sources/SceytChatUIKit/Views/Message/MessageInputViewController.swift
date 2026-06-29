@@ -367,8 +367,27 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         }
     }
     
+    /// Whether the input currently holds something worth sending.
+    ///
+    /// Returns `true` when there are selected media items, or when the input
+    /// contains real typed text. Bare object replacement characters (`U+FFFC`)
+    /// — left behind by inline non-text content such as `NSTextAttachment`s or
+    /// adaptive image glyphs (iOS 18+ Genmoji) — are stripped first: that content
+    /// can't be serialized by the send path (`UserSendMessage` sends only the
+    /// plain string), so on its own it must not count as sendable. Genmoji input
+    /// is additionally disabled at the text view via `supportsAdaptiveImageGlyph`,
+    /// so this mainly guards against pasted or restored placeholder content.
+    ///
+    /// Override to customize what counts as sendable (e.g. to require text).
+    open func hasSendableContent() -> Bool {
+        if !selectedMediaView.items.isEmpty { return true }
+
+        let plainText = (inputTextView.text ?? "").replacingOccurrences(of: "\u{fffc}", with: "")
+        return !plainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     open func updateTrailingInputButtons(_ animated: Bool = true) {
-        let shouldShowSendButton = !inputTextView.text.replacingOccurrences(of: "\u{fffc}", with: "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !selectedMediaView.items.isEmpty
+        let shouldShowSendButton = hasSendableContent()
         let shouldShowViewOnceButton = appearance.enableViewOnce && selectedMediaView.items.count == 1
 
         // Update button visibility
