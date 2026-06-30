@@ -872,28 +872,28 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             case "voice":
                 image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             case "link":
+                // Render like every other reply (sender + body text); use the link's
+                // preview image only as the thumbnail, never replace the reply with a link card.
                 if let metadata = layoutModel.linkPreviews?.first?.metadata {
-                    addOrUpdateLinkPreview(linkDetails: metadata)
-                    return
-                }
-                // No prebuilt preview — try to recover saved metadata/image by URL.
-                if let urlString = attachment.url, let url = URL(string: urlString)?.normalizedURL {
-                    // 1. Synchronous in-memory hit → upgrade to link preview right away.
+                    image = metadata.image
+                } else if let urlString = attachment.url, let url = URL(string: urlString)?.normalizedURL {
+                    // 1. Synchronous in-memory hit → use its image right away.
                     if let cached = LinkMetadataProvider.default.metadata(for: url) {
-                        addOrUpdateLinkPreview(linkDetails: cached)
-                        return
-                    }
-                    // 2. Cache miss → DB, then network API if still missing (also downloads the image).
-                    LinkMetadataProvider.default.fetch(url: url, loadFromNetworkIfMissing: true) { [weak self] result in
-                        guard let self, case .success(let metadata) = result else { return }
-                        DispatchQueue.main.async {
-                            guard case .reply(let model) = self.currentState,
-                                  model === layoutModel else { return }
-                            self.addOrUpdateLinkPreview(linkDetails: metadata)
+                        image = cached.image
+                    } else {
+                        // 2. Cache miss → DB, then network API if still missing (also downloads the image).
+                        // Drop the image into the existing reply thumbnail when it arrives.
+                        LinkMetadataProvider.default.fetch(url: url, loadFromNetworkIfMissing: true) { [weak self] result in
+                            guard let self, case .success(let metadata) = result, let image = metadata.image else { return }
+                            DispatchQueue.main.async {
+                                guard case .reply(let model) = self.currentState,
+                                      model === layoutModel else { return }
+                                self.actionView.imageView.image = image
+                                self.actionView.imageView.isHidden = false
+                            }
                         }
                     }
                 }
-                image = nil
             default:
                 image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
