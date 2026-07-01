@@ -389,7 +389,7 @@ open class MessageCell: CollectionViewCell,
             contentConstraints! += [replyIcon.trailingAnchor.pin(to: contentView.trailingAnchor, constant: 44)]
             contentConstraints! += [replyIcon.bottomAnchor.pin(to: bubbleView.bottomAnchor)]
             contentConstraints! += replyIcon.resize(anchors: [.height(32), .width(32)])
-            contentConstraints! += [checkBoxView.centerYAnchor.pin(to: contentView.centerYAnchor)]
+            contentConstraints! += [checkBoxView.centerYAnchor.pin(to: containerView.centerYAnchor)]
             contentConstraints! += [checkBoxView.leadingAnchor.pin(to: contentView.leadingAnchor)]
             if isEditing {
                 let checkBoxSize = Layouts.checkBoxSize + 2 * Layouts.checkBoxPadding
