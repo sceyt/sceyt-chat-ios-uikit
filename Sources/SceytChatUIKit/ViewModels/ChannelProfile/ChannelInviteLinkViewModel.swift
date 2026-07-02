@@ -110,22 +110,28 @@ open class ChannelInviteLinkViewModel: NSObject {
                 if let error = error {
                     self.error = error
                 } else if let newKey = newKey {
-                    // Update channel URI in database using best practice pattern
+                    // The regenerated primary key becomes the channel's invite URI,
+                    // so persist it to the DTO. Non-primary keys are separate invite
+                    // links and must not overwrite channel.uri.
                     SceytChatUIKit.shared.database.write { [weak self] in
                         guard let self = self else { return }
-                        if channelInviteKey?.isPrimary == false {
+                        if newKey.isPrimary {
                             let (dto, _) = ChannelDTO.fetchOrCreate(id: channel.id, context: $0)
                             dto.uri = newKey.key
                         }
                     } completion: { [weak self] error in
                         DispatchQueue.main.async {
+                            guard let self = self else { return }
                             if let error = error {
-                                self?.error = error
+                                self.error = error
                             } else {
-                                // Update the local channelInviteKey with the new key
-                                self?.channelInviteKey = newKey
-                                self?.refreshChannelFromDB()
-                                self?.event = .reloadData
+                                // Update in-memory channel on the main thread so the
+                                // UI (inviteLink derives from channel.uri) reflects it.
+                                if newKey.isPrimary {
+                                    self.channel.uri = newKey.key
+                                }
+                                self.channelInviteKey = newKey
+                                self.event = .reloadData
                             }
                         }
                     }

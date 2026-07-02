@@ -2182,6 +2182,7 @@ open class ChannelViewController: ViewController,
         channelViewModel.createAndSendUserMessage(message)
         if shouldClearText {
             inputTextView.text = nil
+            channelViewModel.updateDraftMessage(nil)
         }
         customInputViewController.selectedMediaView.removeAll()
         if channelViewModel.selectedMessageForAction == nil ||

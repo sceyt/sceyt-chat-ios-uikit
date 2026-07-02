@@ -13,7 +13,7 @@ import CoreData
 public class ChatChannel {
     public let id: ChannelId
     public let parentChannelId: ChannelId
-    public let uri: String
+    public var uri: String
     public let type: String
     public let createdAt: Date
     public let updatedAt: Date?
