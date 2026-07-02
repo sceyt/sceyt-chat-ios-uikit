@@ -22,7 +22,7 @@ extension ChannelInfoViewController {
         
         open lazy var detailLabel = UILabel()
         
-        open lazy var textVStack = UIStackView(column: [titleLabel, linkLabel, detailLabel], spacing: 4)
+        open lazy var textVStack = UIStackView(column: [titleLabel, linkLabel, detailLabel], spacing: Layouts.textSpacing)
             .withoutAutoresizingMask
         
         open lazy var contentHStack = UIStackView(row: [iconView, textVStack],
@@ -35,6 +35,7 @@ extension ChannelInfoViewController {
             
             selectedBackgroundView = UIView()
             iconView.clipsToBounds = true
+            iconView.contentMode = .scaleAspectFill
         }
         
         override open func setupAppearance() {
@@ -45,15 +46,22 @@ extension ChannelInfoViewController {
             iconView.image = appearance.linkPreviewAppearance.placeholderIcon
             iconView.layer.cornerRadius = Layouts.cornerRadius
             
+            // Line caps must stay in sync with LinkCollectionView.preferredCellHeight,
+            // which reserves exactly 1 + 1 + 2 lines for every row.
             titleLabel.font = appearance.linkPreviewAppearance.titleLabelAppearance.font
             titleLabel.textColor = appearance.linkPreviewAppearance.titleLabelAppearance.foregroundColor
-            
+            titleLabel.numberOfLines = 1
+            titleLabel.lineBreakMode = .byTruncatingTail
+
             linkLabel.font = appearance.linkLabelAppearance.font
             linkLabel.textColor = appearance.linkLabelAppearance.foregroundColor
-            
+            linkLabel.numberOfLines = 1
+            linkLabel.lineBreakMode = .byTruncatingTail
+
             detailLabel.font = appearance.linkPreviewAppearance.descriptionLabelAppearance.font
             detailLabel.textColor = appearance.linkPreviewAppearance.descriptionLabelAppearance.foregroundColor
             detailLabel.numberOfLines = 2
+            detailLabel.lineBreakMode = .byTruncatingTail
         }
         
         override open func setupLayout() {
@@ -74,9 +82,10 @@ extension ChannelInfoViewController {
                 linkLabel.text = data.url
                 titleLabel.isHidden = (titleLabel.text ?? "").isEmpty
                 detailLabel.isHidden = (detailLabel.text ?? "").isEmpty
+                updateLinkNumberOfLines()
             }
         }
-        
+
         open var metadata: LinkMetadata? {
             didSet {
                 guard let metadata else { return }
@@ -97,15 +106,26 @@ extension ChannelInfoViewController {
                         iconView.image = appearance.linkPreviewAppearance.placeholderIcon
                     }
                 }
+                updateLinkNumberOfLines()
             }
+        }
+
+        /// The row reserves 1 title + 1 URL + 2 description lines; while only the URL is
+        /// visible it may spread onto two of those lines before truncating.
+        open func updateLinkNumberOfLines() {
+            linkLabel.numberOfLines = (titleLabel.isHidden && detailLabel.isHidden) ? 2 : 1
         }
         
         override open func prepareForReuse() {
             super.prepareForReuse()
-            
+
+            data = nil
+            metadata = nil
             titleLabel.text = nil
             linkLabel.text = nil
             detailLabel.text = nil
+            titleLabel.isHidden = true
+            detailLabel.isHidden = true
             iconView.image = appearance.linkPreviewAppearance.placeholderIcon
         }
     }

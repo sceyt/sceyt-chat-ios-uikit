@@ -7,34 +7,33 @@
 //
 
 import UIKit
-import LinkPresentation
 
 extension ChannelInfoViewController {
     open class LinkCollectionView: ChannelInfoViewController.AttachmentCollectionView,
                                    UICollectionViewDelegate,
                                    UICollectionViewDataSource,
                                    UICollectionViewDelegateFlowLayout {
-        
+
         public static var settings = Layout.Settings(sectionInset: .zero,
                                                      interitemSpacing: 0,
                                                      lineSpacing: 0,
                                                      sectionHeadersPinToVisibleBounds: true)
-        
+
         open var linkViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
-        
+
         open var layout: Layout { collectionViewLayout as! Layout }
-        
+
         public required init() {
             super.init(frame: .zero, collectionViewLayout: Layout(settings: Self.settings))
         }
-        
+
         public required init?(coder: NSCoder) {
             super.init(coder: coder)
         }
-        
+
         open override func setup() {
             super.setup()
-            
+
             noItemsMessage = L10n.Channel.Info.Segment.Links.noItems
             noItemsMessageSubTitle = L10n.Channel.Info.Segment.Links.noItemsSubTitle
             noItemsIcon = UIImage.emptyLinks
@@ -43,12 +42,12 @@ extension ChannelInfoViewController {
             delegate = self
             dataSource = self
         }
-        
+
         open override func setupAppearance() {
             super.setupAppearance()
             backgroundColor = appearance.backgroundColor
         }
-        
+
         open override func setupDone() {
             super.setupDone()
             RunLoop.main.perform {[weak self] in
@@ -61,42 +60,66 @@ extension ChannelInfoViewController {
                 }.store(in: &subscriptions)
             linkViewModel.loadAttachments()
         }
-        
+
+        /// Every link row has the same height: one line of title, one line of URL and up to
+        /// two lines of description (`LinkCell` caps its labels to match; longer text
+        /// truncates). Depending only on the appearance fonts lets the flow layout use a
+        /// uniform `itemSize`, so rows never need measuring and metadata loads never
+        /// invalidate the layout.
+        open var preferredCellHeight: CGFloat {
+            let cellAppearance = appearance.cellAppearance
+            let textHeight = ceil(cellAppearance.linkPreviewAppearance.titleLabelAppearance.font.lineHeight)
+                + ceil(cellAppearance.linkLabelAppearance.font.lineHeight)
+                + ceil(cellAppearance.linkPreviewAppearance.descriptionLabelAppearance.font.lineHeight * 2)
+                + Layouts.textSpacing * 2
+            return max(Layouts.iconSize, textHeight) + Layouts.verticalPadding * 2
+        }
+
+        open override func layoutSubviews() {
+            super.layoutSubviews()
+            guard width > 0 else { return }
+            let itemSize = CGSize(width: width, height: preferredCellHeight)
+            if layout.itemSize != itemSize {
+                layout.itemSize = itemSize
+            }
+        }
+
         open func onEvent(_ event: ChannelAttachmentListViewModel.Event) {
             switch event {
             case .change(let paths):
                 updateCollectionView(paths: paths)
             }
         }
-        
+
         public func numberOfSections(in collectionView: UICollectionView) -> Int {
             linkViewModel.numberOfSections
         }
-        
+
         open func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
             linkViewModel.numberOfAttachments(in: section)
         }
-        
+
         open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
             let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoLinkCell.self)
             cell.parentAppearance = appearance.cellAppearance
-            let attachmentLayout = linkViewModel.attachmentLayout(
+            guard let attachmentLayout = linkViewModel.attachmentLayout(at: indexPath) else { return cell }
+            cell.data = attachmentLayout.attachment
+            guard attachmentLayout.attachment.imageDecodedMetadata?.hideLinkDetails != true else { return cell }
+
+            // `data` must be set before the metadata request: cached metadata is delivered
+            // synchronously, and the guard below relies on `cell.data` to drop results that
+            // arrive after the cell has been reused for another link.
+            let url = attachmentLayout.attachment.url
+            _ = linkViewModel.attachmentLayout(
                 at: indexPath,
-                onLoadLinkMetadata: { [weak cell, weak self] metadata in
-                    if let metadata {
-                        if cell?.titleLabel.text == nil || cell?.titleLabel.text == metadata.url.absoluteString {
-                            cell?.metadata = metadata
-                        }
-                        self?.layout.calculateLinkHeight(metadata, attachment: cell?.data)
-                    }
+                onLoadLinkMetadata: { [weak cell] metadata in
+                    guard let cell, let metadata, cell.data?.url == url else { return }
+                    cell.metadata = metadata
                 })
-            cell.data = attachmentLayout?.attachment
-            if let attachmentLayout, !(attachmentLayout.attachment.imageDecodedMetadata?.hideLinkDetails == true) {
-                linkViewModel.downloadAttachmentIfNeeded(attachmentLayout)
-            }
+            linkViewModel.downloadAttachmentIfNeeded(attachmentLayout)
             return cell
         }
-        
+
         public func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
             let lastSection = linkViewModel.numberOfSections - 1
             let lastRow = linkViewModel.numberOfAttachments(in: lastSection) - 1
@@ -105,7 +128,7 @@ extension ChannelInfoViewController {
                 linkViewModel.loadAttachments()
             }
         }
-        
+
         public func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
             if let urlString = linkViewModel.attachmentLayout(at: indexPath)?.attachment.url,
                let url = URL(string: urlString)?.normalizedURL {
@@ -113,20 +136,11 @@ extension ChannelInfoViewController {
             }
             collectionView.deselectItem(at: indexPath, animated: true)
         }
-        
-        public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-            if let urlString = linkViewModel.attachmentLayout(at: indexPath)?.attachment.url,
-               let url = URL(string: urlString),
-               let cellHeight = layout.cellHeights[url.normalizedURL] {
-                return .init(width: collectionView.width, height: cellHeight)
-            }
-            return .init(width: collectionView.width, height: Layouts.iconSize + Layouts.verticalPadding * 2)
-        }
-        
+
         public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
             return .init(width: collectionView.width, height: Components.channelInfoDateSeparatorView.Layouts.headerHeight)
         }
-        
+
         public func collectionView(_ collectionView: UICollectionView, viewForSupplementaryElementOfKind kind: String, at indexPath: IndexPath) -> UICollectionReusableView {
             switch kind {
             case UICollectionView.SupplementaryViewKind.header.rawValue:
@@ -142,52 +156,9 @@ extension ChannelInfoViewController {
 }
 
 extension ChannelInfoViewController.LinkCollectionView {
-    open class Layout: ChannelInfoViewController.AttachmentCollectionView.Layout {
-        open var cellHeights: [URL: CGFloat] = [:]
-        
-        open func calculateLinkHeight(_ metadata: LinkMetadata, attachment: ChatMessage.Attachment?) {
-            let appearance = Components.channelInfoLinkCollectionView.appearance
-            var hideLinkDetails: Bool {
-                attachment?.imageDecodedMetadata?.hideLinkDetails == true
-            }
-            let titleMaxSize = CGSize(width: (collectionView?.width ?? 0) - Layouts.iconSize - Layouts.horizontalPadding * 3,
-                                      height: ceil(appearance.cellAppearance.linkPreviewAppearance.titleLabelAppearance.font.lineHeight))
-            let linkMaxSize = CGSize(width: (collectionView?.width ?? 0) - Layouts.iconSize - Layouts.horizontalPadding * 3,
-                                     height: ceil(appearance.cellAppearance.linkLabelAppearance.font.lineHeight))
-            let detailMaxSize = CGSize(width: (collectionView?.width ?? 0) - Layouts.iconSize - Layouts.horizontalPadding * 3,
-                                       height: ceil(appearance.cellAppearance.linkPreviewAppearance.descriptionLabelAppearance.font.lineHeight) * 2)
-            
-            let title = hideLinkDetails ? "" : (metadata.title ?? "")
-            let summary = hideLinkDetails ? "" : (metadata.summary ?? "")
-            
-            let titleHeight: CGFloat = title.isEmpty ? 0 : (ceil(NSAttributedString(
-                string: title,
-                attributes: [
-                    .font: appearance.cellAppearance.linkPreviewAppearance.titleLabelAppearance.font
-                ])
-                .boundingRect(with: titleMaxSize, options: [.usesLineFragmentOrigin], context: nil).height) + 4)
-
-            let linkHeight: CGFloat = ceil(NSAttributedString(
-                string: metadata.url.absoluteString,
-                attributes: [
-                    .font: appearance.cellAppearance.linkLabelAppearance.font
-                ])
-                .boundingRect(with: linkMaxSize, options: [.usesLineFragmentOrigin], context: nil).height) + 4
-
-            let detailHeight: CGFloat = summary.isEmpty ? 0 : (ceil(NSAttributedString(
-                string: summary,
-                attributes: [
-                    .font: appearance.cellAppearance.linkPreviewAppearance.descriptionLabelAppearance.font
-                ])
-                .boundingRect(with: detailMaxSize, options: [.usesLineFragmentOrigin], context: nil).height) + 4)
-            
-            let cellHeight = max(Layouts.iconSize + Layouts.verticalPadding * 2, (titleHeight + linkHeight + detailHeight + Layouts.verticalPadding * 2))
-            if cellHeights[metadata.url] != cellHeight {
-            cellHeights[metadata.url.normalizedURL] = cellHeight
-                invalidateLayout()
-            }
-        }
-    }
+    /// All link rows share one `itemSize` (set in `layoutSubviews` from
+    /// `preferredCellHeight`), so the layout keeps no per-item sizing state.
+    open class Layout: ChannelInfoViewController.AttachmentCollectionView.Layout {}
 }
 
 public extension ChannelInfoViewController.LinkCollectionView {
@@ -197,5 +168,8 @@ public extension ChannelInfoViewController.LinkCollectionView {
         public static var headerHeight: CGFloat = 32
         public static var iconSize: CGFloat = 40
         public static var cornerRadius: CGFloat = 8
+        /// Vertical spacing between the title, URL and description labels; used both by
+        /// `LinkCell`'s stack and by `preferredCellHeight`.
+        public static var textSpacing: CGFloat = 4
     }
 }

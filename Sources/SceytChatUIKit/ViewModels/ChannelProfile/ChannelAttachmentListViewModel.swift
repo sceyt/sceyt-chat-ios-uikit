@@ -16,6 +16,8 @@ open class ChannelAttachmentListViewModel: NSObject {
     public let channel: ChatChannel
     public let attachmentTypes: [String]
     public let provider: ChannelAttachmentProvider
+    public lazy var messageProvider: ChannelMessageProvider = Components.channelMessageProvider
+        .init(channelId: channel.id)
     public var appearance: MessageCell.Appearance
     @Published public var event: Event?
     private let downloadQueue = DispatchQueue(label: "com.sceytchat.uikit.attachments", qos: .userInitiated)
@@ -156,21 +158,47 @@ open class ChannelAttachmentListViewModel: NSObject {
                     logger.debug("[LONK LOAD] HAS META \(url)")
                     onLoadLinkMetadata(metadata)
                 } else {
-                    LinkMetadataProvider.default.fetch(url: url) { result in
-                        DispatchQueue.main.async {
-                            switch result {
-                            case .success(let metadata):
-                                logger.debug("[LONK LOAD] HAS META fetch \(url)")
-                                onLoadLinkMetadata(metadata)
-                            case .failure:
-                                onLoadLinkMetadata(nil)
-                            }
-                        }
-                    }
+                    loadLinkMetadata(url: url, for: attachmentLayout, completion: onLoadLinkMetadata)
                 }
             }
         }
         return attachmentLayout
+    }
+
+    /// Resolves link metadata from the local stores first (memory cache, then DB — no
+    /// network); only on a full miss asks the backend and persists the result, so the
+    /// next launch is served from the DB. Without the persist step, metadata resolved
+    /// from this screen would be refetched over the network on every launch.
+    open func loadLinkMetadata(url: URL,
+                               for attachmentLayout: MessageLayoutModel.AttachmentLayout,
+                               completion: @escaping (LinkMetadata?) -> Void) {
+        LinkMetadataProvider.default.fetchFromCacheOrDB(url: url) { [weak self] metadata in
+            if let metadata {
+                completion(metadata)
+                return
+            }
+            LinkMetadataProvider.default.fetch(url: url) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let metadata):
+                        completion(metadata)
+                        self?.storeLinkMetadata(metadata, for: attachmentLayout)
+                    case .failure:
+                        completion(nil)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Persists network-resolved metadata (images to disk, fields to `LinkMetadataDTO`)
+    /// attached to the owner message — the same mechanism `ChannelViewModel` uses when a
+    /// preview resolves in a message cell.
+    open func storeLinkMetadata(_ metadata: LinkMetadata, for layout: MessageLayoutModel.AttachmentLayout) {
+        getMessage(layout) { [weak self] message in
+            guard let self, let message else { return }
+            self.messageProvider.storeLinkMetadata(metadata, to: message)
+        }
     }
 
     open var numberOfSections: Int {
