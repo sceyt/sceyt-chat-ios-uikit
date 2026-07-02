@@ -330,9 +330,17 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     }
     
     internal func deleteMembers(predicate: NSPredicate) {
-        let request = NSFetchRequest<NSFetchRequestResult>(entityName: MemberDTO.entityName)
+        // Must delete through the context, not NSBatchDeleteRequest: role rows
+        // (RoleDTO) are shared across all channels, and a batch delete leaves
+        // dangling references to the removed members in the materialized
+        // RoleDTO.members inverse. The next save that touches that role then
+        // traps in _forceRegisterLostFault (EXC_BREAKPOINT).
+        let request = MemberDTO.fetchRequest()
         request.predicate = predicate
-        try? batchDelete(fetchRequest: request)
+        MemberDTO.fetch(request: request, context: self)
+            .forEach {
+                delete($0)
+            }
     }
     
     internal func numberOfPendingMarkers(name: String, in channel: ChannelDTO) -> Int64 {
