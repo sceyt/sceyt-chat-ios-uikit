@@ -35,7 +35,7 @@ open class ChannelAttachmentListViewModel: NSObject {
             }
         }
     }
-    public var minAutoDownloadSize = 3_000_000
+    public var minAutoDownloadSize = 10_000_000
     
     private let thumbnailCache = {
         $0.countLimit = 20
