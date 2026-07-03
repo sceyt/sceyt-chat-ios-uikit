@@ -62,9 +62,11 @@ open class ChannelInviteLinkViewController: ViewController,
         
         setupBindings()
         
-        // Fetch the current invite link data
+        // Fetch the current invite link data. `loadInviteLinkData` re-reads the channel
+        // from the DB first, so it always queries with the current invite key even when
+        // the channel snapshot handed in from the member list is stale (e.g. the link
+        // was reset on a previous visit).
         inviteLinkViewModel.loadInviteLinkData()
-        inviteLinkViewModel.refreshChannelFromDB()
     }
     
     private func setupBindings() {
