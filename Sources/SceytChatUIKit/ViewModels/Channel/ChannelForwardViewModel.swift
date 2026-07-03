@@ -31,15 +31,28 @@ open class ChannelForwardViewModel: NSObject, ChannelSearchResultsUpdating {
     private var _selectedChannel: ChatChannel?
     
     open lazy var channelObserver: DatabaseObserver<ChannelDTO, ChatChannel> = {
-        DatabaseObserver<ChannelDTO, ChatChannel>(
+        // Only surface destinations the current user is allowed to post in.
+        // A broadcast channel is read-only unless the user's role is owner/admin,
+        // so subscriber-only (and unsubscribed) broadcast channels are excluded.
+        // This mirrors the read-only filtering already applied on the search path
+        // (see ChannelListSearchService.searchChannels).
+        let rolesConfig = SceytChatUIKit.shared.config.memberRolesConfig
+        let canPostPredicate = NSPredicate(
+            format: "unsubscribed == NO AND NOT (unsynched = YES AND lastMessage == nil) AND (type != %@ OR userRole.name == %@ OR userRole.name == %@)",
+            SceytChatUIKit.shared.config.channelTypesConfig.broadcast,
+            rolesConfig.owner,
+            rolesConfig.admin
+        )
+        return DatabaseObserver<ChannelDTO, ChatChannel>(
             request: ChannelDTO.fetchRequest()
                 .sort(descriptors: [.init(keyPath: \ChannelDTO.sortingKey, ascending: false)])
-                .fetch(predicate: .init(format: "unsubscribed == NO AND NOT (unsynched = YES AND lastMessage == nil)"))
+                .fetch(predicate: canPostPredicate)
                 .relationshipKeyPathsFor(refreshing: [#keyPath(ChannelDTO.lastMessage.deliveryStatus),
                                                       #keyPath(ChannelDTO.lastMessage.updatedAt),
                                                       #keyPath(ChannelDTO.lastMessage.state),
                                                       #keyPath(ChannelDTO.lastReaction.messageId),
-                                                      #keyPath(ChannelDTO.lastReaction.key)]),
+                                                      #keyPath(ChannelDTO.lastReaction.key),
+                                                      #keyPath(ChannelDTO.userRole.name)]),
             context: SceytChatUIKit.shared.database.viewContext
         ) { $0.convert() }
     }()
