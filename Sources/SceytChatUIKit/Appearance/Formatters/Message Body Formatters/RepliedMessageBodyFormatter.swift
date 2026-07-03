@@ -53,7 +53,7 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
                         }
                     }
             })
-            return attributedBody
+            return attributedBody.replacingLineBreaksWithSpacesForPreview()
         } else {
             return makeBody(messageBodyAttributes)
         }
@@ -100,10 +100,10 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
                     body = messageBodyAttributes.attachmentNameFormatter.format(attachment)
                 }
             }
-            return .init(string: body, attributes: [
+            return NSAttributedString(string: body, attributes: [
                 .font: messageBodyAttributes.bodyLabelAppearance.font,
                 .foregroundColor: messageBodyAttributes.bodyLabelAppearance.foregroundColor
-            ])
+            ]).replacingLineBreaksWithSpacesForPreview()
         }
     }
 }

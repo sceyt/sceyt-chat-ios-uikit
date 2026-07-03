@@ -79,6 +79,6 @@ open class ReplyMessageBodyFormatter: ReplyMessageBodyFormatting {
                 ]))
         }
         
-        return messageAttributedString
+        return messageAttributedString.replacingLineBreaksWithSpacesForPreview()
     }
 }
