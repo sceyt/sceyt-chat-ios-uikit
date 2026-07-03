@@ -923,10 +923,29 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     //MARK: Typing
     
+    private var lastStartTypingSentAt: Date?
+
     open var isTyping = false {
         didSet {
             guard !channel.unSynched else { return }
-            isTyping ? provider.channelOperator.sendEvent(ChannelEvent.startTyping) : provider.channelOperator.sendEvent(ChannelEvent.stopTyping)
+            if isTyping {
+                // The receiving side hides the typing indicator 3 seconds after the
+                // last startTyping event (see handleChannel(_:didStartTyping:)), so
+                // startTyping acts as a keepalive: re-send it at most every 2 seconds
+                // while typing continues, not on every text change (a single QuickType
+                // suggestion tap alone produces two changes: the word and the space).
+                if oldValue,
+                   let lastSentAt = lastStartTypingSentAt,
+                   Date().timeIntervalSince(lastSentAt) < 2 {
+                    return
+                }
+                lastStartTypingSentAt = Date()
+                provider.channelOperator.sendEvent(ChannelEvent.startTyping)
+            } else {
+                guard oldValue else { return }
+                lastStartTypingSentAt = nil
+                provider.channelOperator.sendEvent(ChannelEvent.stopTyping)
+            }
         }
     }
     
