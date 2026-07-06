@@ -729,6 +729,13 @@ open class MessageLayoutModel {
                 }
                 return .init(key: rs.key, score: UInt(rs.value), byMe: index != nil, width: 24)
             }.sorted(by: { $0.key > $1.key })
+            let maxDisplayedCount = SceytChatUIKit.shared.config.maxDisplayedReactionsCount
+            if maxDisplayedCount > 0, reactions.count > maxDisplayedCount {
+                reactions = reactions
+                    .sorted(by: { $0.score != $1.score ? $0.score > $1.score : $0.key > $1.key })
+                    .prefix(maxDisplayedCount)
+                    .sorted(by: { $0.key > $1.key })
+            }
             if reactionType == .withTotalScore, commonScore > 1 {
                 let key = "\(commonScore)"
                 let width = key.size(withAttributes: [

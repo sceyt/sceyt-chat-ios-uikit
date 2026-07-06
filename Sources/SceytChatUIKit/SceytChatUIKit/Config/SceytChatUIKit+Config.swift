@@ -90,6 +90,10 @@ extension SceytChatUIKit {
                 }
             }
         }
+        /// The maximum number of different reactions displayed on a message cell.
+        /// Reactions beyond this limit are hidden; the trailing count still reflects all reactions.
+        /// Set a value less than or equal to 0 to show all reactions.
+        public var maxDisplayedReactionsCount: Int = 3
         public var mentionTriggerPrefix: String = "@"
         public var preventDuplicateAttachmentUpload: Bool = false
         public var messageBubbleTransformScale = CGAffineTransform(scaleX: 0.95, y: 0.95)
