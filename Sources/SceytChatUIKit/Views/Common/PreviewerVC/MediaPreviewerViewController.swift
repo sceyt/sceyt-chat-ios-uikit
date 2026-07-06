@@ -380,12 +380,29 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
             router.showAlert(message: L10n.Previewer.photoSaved)
         case .videoSaved(nil):
             router.showAlert(message: L10n.Previewer.videoSaved)
+        case let .photoSaved(error?), let .videoSaved(error?):
+            router.showAlert(error: error)
+        case .saveGalleryAccessDenied:
+            showGalleryAccessDeniedAlert()
         case .didUpdateItem:
             isPreparingToPlay = false
             bindPreviewItem()
-        default:
-            return
         }
+    }
+
+    open func showGalleryAccessDeniedAlert() {
+        router.showAlert(
+            title: L10n.Previewer.GalleryAccess.title,
+            message: L10n.Previewer.GalleryAccess.message,
+            actions: [
+                .init(title: L10n.Alert.Button.cancel, style: .cancel),
+                .init(title: L10n.Alert.Button.settings, style: .default) {
+                    guard let settingsUrl = URL(string: UIApplication.openSettingsURLString)
+                    else { return }
+                    UIApplication.shared.open(settingsUrl)
+                }
+            ],
+            preferredActionIndex: 1)
     }
     
     open func play() {

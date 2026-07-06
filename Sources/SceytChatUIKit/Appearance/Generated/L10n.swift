@@ -31,6 +31,8 @@ public enum L10n {
       public static let openFiles = L10n.tr("Localizable", "alert.button.open-files", fallback: "File")
       /// Gallery
       public static let openGallery = L10n.tr("Localizable", "alert.button.open-gallery", fallback: "Gallery")
+      /// Settings
+      public static let settings = L10n.tr("Localizable", "alert.button.settings", fallback: "Settings")
     }
     public enum Error {
       /// Error
@@ -855,6 +857,12 @@ public enum L10n {
     public static let showInChat = L10n.tr("Localizable", "previewer.showInChat", fallback: "Show in Chat")
     /// Your video was successfully saved
     public static let videoSaved = L10n.tr("Localizable", "previewer.videoSaved", fallback: "Your video was successfully saved")
+    public enum GalleryAccess {
+      /// You have denied access to your photo library. To save photos and videos, allow Photos access in Settings.
+      public static let message = L10n.tr("Localizable", "previewer.galleryAccess.message", fallback: "You have denied access to your photo library. To save photos and videos, allow Photos access in Settings.")
+      /// Allow Photos Access
+      public static let title = L10n.tr("Localizable", "previewer.galleryAccess.title", fallback: "Allow Photos Access")
+    }
   }
   public enum Recorder {
     /// Cancel
