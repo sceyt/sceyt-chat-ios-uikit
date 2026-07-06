@@ -532,6 +532,19 @@ open class ChannelViewController: ViewController,
             .sink { [weak self] in
                 self?.onEvent($0)
             }.store(in: &subscriptions)
+
+        // The observer's initial event can fire before this subscription exists —
+        // e.g. group create opens the channel while the create screen's modal
+        // dismissal delays view loading. @Published replays only the latest value
+        // (typically .showNoMessage, which overwrote .reloadDataAndScrollToBottom),
+        // so the event carrying the first snapshot is lost and the collection view
+        // stays empty until something else forces a reload. Reconcile here: if the
+        // observer already has data the collection view hasn't applied, apply it.
+        if channelViewModel.numberOfSections > 0, appliedSnapshot.sections.isEmpty {
+            rebuildAppliedSnapshotFromObserver()
+            collectionView.reloadDataAndScrollToBottom()
+            showEmptyViewIfNeeded()
+        }
         
         channelViewModel.$selectedMessages
             .dropFirst()

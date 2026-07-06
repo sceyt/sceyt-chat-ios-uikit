@@ -41,7 +41,7 @@ extension ChannelListViewController {
             .withoutAutoresizingMask
 
         /// Bottom row: message preview (left, expands) + badges (right).
-        open lazy var bottomRowStackView = UIStackView(arrangedSubviews: [messageLabel, badgeStackView])
+        open lazy var bottomRowStackView = UIStackView(arrangedSubviews: [messageLabel, bottomRowSpacerView, badgeStackView])
             .withoutAutoresizingMask
 
         open lazy var subjectStackView = UIStackView(arrangedSubviews: [subjectLabel, muteView])
@@ -66,6 +66,16 @@ extension ChannelListViewController {
 
         /// Flexible spacer between subject/mute and the fixed trailing date row.
         open lazy var topRowSpacerView = UIView()
+            .withoutAutoresizingMask
+            .contentHuggingPriorityH(UILayoutPriority(1))
+
+        /// Flexible spacer between the message preview and the trailing badges.
+        /// Shown only while the preview is hidden (no last message): without it
+        /// the badge stack is the row's sole visible item, so `.fill` stretches
+        /// it full-width and the aspect-fit pin icon renders centered instead of
+        /// trailing. While the preview is visible the label itself absorbs the
+        /// slack, so the spacer is hidden to keep the original 8pt badge gap.
+        open lazy var bottomRowSpacerView = UIView()
             .withoutAutoresizingMask
             .contentHuggingPriorityH(UILayoutPriority(1))
 
@@ -506,6 +516,9 @@ extension ChannelListViewController {
         open func updateContentAlignment() {
             let hasMessage = !(messageLabel.attributedText?.string.isEmpty ?? true)
             messageLabel.isHidden = !hasMessage
+            // Keep the badges (pin/unread/@) pinned to the trailing edge when
+            // the preview is gone — see `bottomRowSpacerView`.
+            bottomRowSpacerView.isHidden = hasMessage
 
             let bottomRowEmpty = messageLabel.isHidden
                 && unreadCount.isHidden
