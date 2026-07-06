@@ -2975,6 +2975,12 @@ open class ChannelViewController: ViewController,
                 rebuildAppliedSnapshotFromObserver()
                 collectionView.reloadDataAndScrollToBottom()
             }
+            // The first message in a brand-new (unSynched) channel arrives via a
+            // full reload-and-scroll-to-bottom after the observer is restarted for
+            // the freshly-created channel id. Without re-evaluating here, the
+            // "No messages yet" empty state stays visible and overlaps the message
+            // (siblings .reloadData / .reloadDataAndScroll already do this).
+            showEmptyViewIfNeeded()
         case let .reloadDataAndScroll(indexPath, animated, pos):
             rebuildAppliedSnapshotFromObserver()
             collectionView.reloadDataAndScrollTo(
