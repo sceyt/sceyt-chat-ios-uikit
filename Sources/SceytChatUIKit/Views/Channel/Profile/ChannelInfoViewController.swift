@@ -109,7 +109,7 @@ open class ChannelInfoViewController: ViewController,
 
         groupListViewController.onSelect = { [weak self] channelModel in
             guard let self else { return }
-            router.topToChannelListShowChannel(channelModel.channel)
+            router.showChannel(channelModel.channel)
         }
 
         segmentViewController.parentScrollView = tableView
