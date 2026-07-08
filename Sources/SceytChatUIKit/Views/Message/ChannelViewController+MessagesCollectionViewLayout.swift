@@ -11,24 +11,28 @@ import UIKit
 public extension ChannelViewController {
     open class MessagesCollectionViewLayout: UICollectionViewFlowLayout {
 
-        // Distance to push every item/supplementary down so that, when the natural
-        // content height is shorter than the visible area, items pin to the bottom
-        // (above the input bar) instead of stacking from the top with empty space below.
-        // Zero whenever content already fills or exceeds the visible area.
-        public private(set) var bottomAnchorShift: CGFloat = 0
-
-        // When the controller is about to insert older messages at the top, it sets this
-        // to true before performBatchUpdates. The layout then computes the total height
-        // of inserts in prepare(forCollectionViewUpdates:) and returns a compensating
-        // contentOffset from targetContentOffset(forProposedContentOffset:), which UIKit
-        // applies atomically with the layout pass. This is the canonical way to keep
-        // visible items rooted while content grows above them — no completion-block
-        // correction, no flicker.
+        // The collection view is mirrored (scaleY: -1) and the data source is
+        // presented newest-first, so content-space "top" (y = 0, UI IndexPath(0,0))
+        // is the visual bottom. Two consequences the layout relies on:
+        //   • Short content naturally hugs the visual bottom — no anchor shift needed.
+        //   • Older-message pagination appends at the content end and never moves
+        //     the visible items — no offset compensation needed for it.
+        //
+        // The one case that still needs an atomic offset fix is inserting NEW
+        // messages (content-space top inserts) while the user is scrolled up
+        // reading history: without compensation the whole viewport would shift.
+        // The controller sets this flag before performBatchUpdates; the layout
+        // computes the content-height delta in prepare(forCollectionViewUpdates:)
+        // and returns a compensating contentOffset from
+        // targetContentOffset(forProposedContentOffset:), which UIKit applies
+        // atomically with the layout pass — no completion-block correction,
+        // no flicker.
         public var isAdjustingForTopInserts: Bool = false
-        // VC captures contentSize.height before performBatchUpdates and assigns it here.
-        // Used in prepare(forCollectionViewUpdates:) to derive the offset adjustment as
-        // (newContentHeight - preBatchContentHeight) — exact regardless of headers,
-        // section insets, or line spacing, which a per-item frame sum misses.
+        // VC captures contentSize.height before performBatchUpdates and assigns it
+        // here. Used in prepare(forCollectionViewUpdates:) to derive the offset
+        // adjustment as (newContentHeight - preBatchContentHeight) — exact
+        // regardless of headers, section insets, or line spacing, which a
+        // per-item frame sum misses.
         public var preBatchContentHeight: CGFloat = 0
         private var pendingTopInsertOffsetAdjustment: CGFloat = 0
 
@@ -44,57 +48,91 @@ public extension ChannelViewController {
             MessagesCollectionViewLayoutAttributes.self
         }
 
-        open override func prepare() {
-            super.prepare()
-            bottomAnchorShift = computeBottomAnchorShift()
+        // MARK: Mirroring
+
+        // The counter-flip for every cell and supplementary view lives in the
+        // layout attributes, NOT only at dequeue. UIKit re-applies attributes to
+        // on-screen views outside of cellForItemAt — reconfigureItems, the
+        // sticky-footer pinning invalidation, batch-update passes — and the
+        // default attributes carry an identity transform that would silently
+        // un-flip a view that was only transformed at dequeue time. Baking the
+        // mirror into the attributes makes every application re-assert it, and
+        // also covers subclasses that dequeue/configure views through their own
+        // overrides.
+        private func mirrored(_ attributes: UICollectionViewLayoutAttributes?) -> UICollectionViewLayoutAttributes? {
+            guard let attributes else { return nil }
+            let copy = attributes.copy() as! UICollectionViewLayoutAttributes
+            copy.transform = .mirrorY
+            return copy
         }
 
-        open override func shouldInvalidateLayout(forBoundsChange newBounds: CGRect) -> Bool {
-            true
+        open override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
+            super.layoutAttributesForElements(in: rect)?.compactMap { mirrored($0) }
         }
 
-        open override func invalidateLayout(with context: UICollectionViewLayoutInvalidationContext) {
-            super.invalidateLayout(with: context)
+        open override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+            mirrored(super.layoutAttributesForItem(at: indexPath))
         }
+
+        open override func layoutAttributesForSupplementaryView(ofKind elementKind: String, at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+            mirrored(super.layoutAttributesForSupplementaryView(ofKind: elementKind, at: indexPath))
+        }
+
+        open override func initialLayoutAttributesForAppearingItem(at itemIndexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+            let attributes = mirrored(super.initialLayoutAttributesForAppearingItem(at: itemIndexPath))
+            // A message inserted at the newest edge starts one own-height beyond
+            // the anchor (visually: rising from behind the input bar) instead of
+            // fading in place. Only real inserts get this — items merely shifted
+            // by the insert animate their frame change normally. The effect is
+            // visible only when the controller runs the batch animated (at-bottom
+            // newest inserts); suppressed batches jump straight to final.
+            if itemIndexPath == IndexPath(item: 0, section: 0),
+               insertedIndexPaths.contains(itemIndexPath),
+               let attributes {
+                attributes.center.y -= attributes.size.height
+                attributes.alpha = 1
+            }
+            return attributes
+        }
+
+        open override func finalLayoutAttributesForDisappearingItem(at itemIndexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+            mirrored(super.finalLayoutAttributesForDisappearingItem(at: itemIndexPath))
+        }
+
+        open override func initialLayoutAttributesForAppearingSupplementaryElement(ofKind elementKind: String, at elementIndexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+            mirrored(super.initialLayoutAttributesForAppearingSupplementaryElement(ofKind: elementKind, at: elementIndexPath))
+        }
+
+        open override func finalLayoutAttributesForDisappearingSupplementaryElement(ofKind elementKind: String, at elementIndexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
+            mirrored(super.finalLayoutAttributesForDisappearingSupplementaryElement(ofKind: elementKind, at: elementIndexPath))
+        }
+
+        // Item index paths inserted by the in-flight batch — consumed by
+        // initialLayoutAttributesForAppearingItem for the newest-edge slide-in.
+        private var insertedIndexPaths: Set<IndexPath> = []
 
         open override func prepare(forCollectionViewUpdates updateItems: [UICollectionViewUpdateItem]) {
             super.prepare(forCollectionViewUpdates: updateItems)
+            insertedIndexPaths = Set(
+                updateItems.compactMap { item in
+                    guard item.updateAction == .insert,
+                          let indexPath = item.indexPathAfterUpdate,
+                          indexPath.item != NSNotFound
+                    else { return nil }
+                    return indexPath
+                }
+            )
             guard isAdjustingForTopInserts else {
                 pendingTopInsertOffsetAdjustment = 0
                 return
             }
-            // contentSize delta is exact for pure top-inserts (no deletes above the anchor),
-            // which is what isAdjustingForTopInserts gates. Robust to header padding,
-            // section insets, and line spacing that per-item frame.height sums miss.
+            // contentSize delta is exact for pure top-inserts (no deletes above the
+            // anchor), which is what isAdjustingForTopInserts gates. Robust to
+            // header padding, section insets, and line spacing that per-item
+            // frame.height sums miss.
             let newContentHeight = collectionViewContentSize.height
             let delta = newContentHeight - preBatchContentHeight
             pendingTopInsertOffsetAdjustment = max(0, delta)
-
-            var summedHeight: CGFloat = 0
-            var insertCount = 0
-            var sectionInsertCount = 0
-            var nilAttrCount = 0
-            for item in updateItems {
-                guard item.updateAction == .insert,
-                      let newIndexPath = item.indexPathAfterUpdate
-                else { continue }
-                insertCount += 1
-                if newIndexPath.item == NSNotFound {
-                    sectionInsertCount += 1
-                    if let attrs = super.layoutAttributesForSupplementaryView(
-                        ofKind: UICollectionView.elementKindSectionHeader,
-                        at: IndexPath(item: 0, section: newIndexPath.section)
-                    ) {
-                        summedHeight += attrs.frame.height
-                    } else {
-                        nilAttrCount += 1
-                    }
-                } else if let attrs = super.layoutAttributesForItem(at: newIndexPath) {
-                    summedHeight += attrs.frame.height
-                } else {
-                    nilAttrCount += 1
-                }
-            }
         }
 
         open override func targetContentOffset(forProposedContentOffset proposedContentOffset: CGPoint) -> CGPoint {
@@ -109,55 +147,11 @@ public extension ChannelViewController {
         }
 
         open override func finalizeCollectionViewUpdates() {
+            insertedIndexPaths.removeAll()
             pendingTopInsertOffsetAdjustment = 0
             preBatchContentHeight = 0
             isAdjustingForTopInserts = false
             super.finalizeCollectionViewUpdates()
-        }
-
-        open override var collectionViewContentSize: CGSize {
-            var size = super.collectionViewContentSize
-            size.height += bottomAnchorShift
-            return size
-        }
-
-        open override func layoutAttributesForElements(in rect: CGRect) -> [UICollectionViewLayoutAttributes]? {
-            let shift = bottomAnchorShift
-            guard shift > 0 else {
-                return super.layoutAttributesForElements(in: rect)
-            }
-            let superRect = rect.offsetBy(dx: 0, dy: -shift)
-            return super.layoutAttributesForElements(in: superRect)?.map { attrs in
-                let copy = attrs.copy() as! UICollectionViewLayoutAttributes
-                copy.frame = copy.frame.offsetBy(dx: 0, dy: shift)
-                return copy
-            }
-        }
-
-        open override func layoutAttributesForItem(at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
-            guard let attrs = super.layoutAttributesForItem(at: indexPath) else { return nil }
-            let shift = bottomAnchorShift
-            guard shift > 0 else { return attrs }
-            let copy = attrs.copy() as! UICollectionViewLayoutAttributes
-            copy.frame = copy.frame.offsetBy(dx: 0, dy: shift)
-            return copy
-        }
-
-        open override func layoutAttributesForSupplementaryView(ofKind elementKind: String, at indexPath: IndexPath) -> UICollectionViewLayoutAttributes? {
-            guard let attrs = super.layoutAttributesForSupplementaryView(ofKind: elementKind, at: indexPath) else { return nil }
-            let shift = bottomAnchorShift
-            guard shift > 0 else { return attrs }
-            let copy = attrs.copy() as! UICollectionViewLayoutAttributes
-            copy.frame = copy.frame.offsetBy(dx: 0, dy: shift)
-            return copy
-        }
-
-        private func computeBottomAnchorShift() -> CGFloat {
-            guard let collectionView = collectionView else { return 0 }
-            let inset = collectionView.adjustedContentInset
-            let availableHeight = collectionView.bounds.height - inset.top - inset.bottom
-            let naturalHeight = super.collectionViewContentSize.height
-            return max(0, availableHeight - naturalHeight)
         }
     }
 }

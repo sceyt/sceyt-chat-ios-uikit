@@ -452,20 +452,24 @@ open class ChannelViewController: ViewController,
                 self.isUpdatingInputViewHeight = true
                 UIView.animate(withDuration: 0.25) { [weak self] in
                     guard let self else { return }
-                    let bottom = self.collectionView.contentInset.bottom
+                    // Mirrored list: the input bar occupies contentInset.top
+                    // (visual bottom). Shifting the offset opposite to the inset
+                    // growth keeps the visible content riding above the input bar;
+                    // at the bottom this lands exactly on the new minimum offset.
+                    let top = self.collectionView.contentInset.top
                     var contentOffsetY = self.collectionView.contentOffset.y
-                    let diff = self.messageInputViewHeightConstraint.constant - height
                     self.messageInputViewHeightConstraint.constant = height
                     self.updateCollectionViewInsets()
-                    let newBottom = self.collectionView.contentInset.bottom
-                    if newBottom != bottom {
-                        contentOffsetY += newBottom - bottom
+                    let newTop = self.collectionView.contentInset.top
+                    if newTop != top {
+                        contentOffsetY -= newTop - top
                     }
-                    contentOffsetY = min(contentOffsetY, collectionView.contentSize.height)
-                    let needsToScroll = (self.collectionView.lastVisibleAttributes?.frame.maxY ?? 0) > self.customInputViewController.view.frameRelativeTo(view: self.collectionView).minY + diff
                     self.coverView.layoutIfNeeded()
-                    guard needsToScroll else { return }
                     self.collectionView.layoutIfNeeded()
+                    contentOffsetY = min(
+                        max(contentOffsetY, self.collectionView.bottomContentOffsetY),
+                        self.collectionView.maxContentOffsetY
+                    )
                     self.collectionView.setContentOffset(
                         .init(
                             x: 0,
@@ -681,9 +685,10 @@ open class ChannelViewController: ViewController,
         let controlHeight = searchControlsView.isHidden
         ? messageInputViewHeightConstraint.constant
         : searchControlsView.frame.height
-        
-        collectionView.contentInset.bottom =
-        10 +
+
+        // Mirrored list: the input bar overlays the visual bottom, which is the
+        // content-space TOP — so the input area padding goes into contentInset.top.
+        collectionView.contentInset.top =
         abs(bottomConstraint) +
         abs(controlHeight)
         collectionView.scrollIndicatorInsets = .init(
@@ -711,6 +716,8 @@ open class ChannelViewController: ViewController,
         }
     }
     
+    /// Expects an index path in the collection view's mirrored (newest-first)
+    /// space — convert view-model paths with `uiIndexPath(fromData:)` first.
     func goTo(indexPath: IndexPath, completion: @escaping (MessageCell) -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
@@ -730,7 +737,13 @@ open class ChannelViewController: ViewController,
         setSectionHeadersPinToVisibleBounds(false)
         guard let keyboardFrameEndValue = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue
         else { return }
-        let bottom = collectionView.contentInset.bottom
+        // Mirrored list: the keyboard + input bar area lives in contentInset.top
+        // (visual bottom). Shift the offset opposite to the inset growth so the
+        // visible content rides above the keyboard; when the user is at the
+        // bottom this lands exactly on the new minimum offset (still glued to
+        // the newest message). The clamp handles short content: its max offset
+        // equals the bottom offset, so it stays pinned above the input bar.
+        let top = collectionView.contentInset.top
         var contentOffsetY = collectionView.contentOffset.y
         let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
         let keyboardScreenEndFrame = keyboardFrameEndValue.cgRectValue
@@ -748,26 +761,14 @@ open class ChannelViewController: ViewController,
         messageInputViewBottomConstraint.constant = shift
         searchControlsViewBottomConstraint.constant = shift
         updateCollectionViewInsets()
-        let newBottom = collectionView.contentInset.bottom
-        let topInset = collectionView.adjustedContentInset.top
-        if newBottom != bottom {
-            if collectionView.contentSize.height >= collectionView.bounds.height {
-                contentOffsetY += newBottom - bottom
-            } else {
-                // Short content is bottom-anchored by the layout; contentSize already
-                // includes that shift. Use the natural height (without the shift) to
-                // decide whether content will still fit after the inset change.
-                // The "top scroll" position for a scroll view with inset.top is
-                // -inset.top, not 0 — clamping to 0 would shift the viewport down
-                // by inset.top and cancel out the bottom-anchor shift visually.
-                let naturalHeight = collectionView.contentSize.height - layout.bottomAnchorShift
-                let newAvailableHeight = collectionView.bounds.height
-                    - topInset
-                    - newBottom
-                contentOffsetY = max(-topInset, naturalHeight - newAvailableHeight)
-            }
+        let newTop = collectionView.contentInset.top
+        if newTop != top {
+            contentOffsetY -= newTop - top
         }
-        contentOffsetY = min(contentOffsetY, collectionView.contentSize.height)
+        contentOffsetY = min(
+            max(contentOffsetY, collectionView.bottomContentOffsetY),
+            collectionView.maxContentOffsetY
+        )
         let animation = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
         UIView.animate(
             withDuration: duration ?? 0,
@@ -778,20 +779,23 @@ open class ChannelViewController: ViewController,
             self.collectionView.setContentOffset(.init(x: 0, y: contentOffsetY), animated: false)
         }
     }
-    
+
     open func keyboardWillHide(notification: Notification) {
         setSectionHeadersPinToVisibleBounds(false)
-        let bottom = collectionView.contentInset.bottom
+        let top = collectionView.contentInset.top
         var contentOffsetY = collectionView.contentOffset.y
         messageInputViewBottomConstraint.constant = 0
         searchControlsViewBottomConstraint.constant = 0
         updateCollectionViewInsets()
-        let newBottom = collectionView.contentInset.bottom
-        contentOffsetY += newBottom - bottom
-        // The min valid offset is -adjustedContentInset.top (top scroll position),
-        // not 0. Clamping to 0 cancels out the bottom-anchor shift when inset.top > 0.
-        contentOffsetY = max(contentOffsetY, -collectionView.adjustedContentInset.top)
-        
+        let newTop = collectionView.contentInset.top
+        // Mirror of keyboardWillShow: the inset shrinks, so the offset grows back
+        // by the same amount, clamped into the valid range.
+        contentOffsetY -= newTop - top
+        contentOffsetY = min(
+            max(contentOffsetY, collectionView.bottomContentOffsetY),
+            collectionView.maxContentOffsetY
+        )
+
         let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
         let animation = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
         UIView.animate(
@@ -1235,6 +1239,11 @@ open class ChannelViewController: ViewController,
         return customInputViewController.presentedMentionUserListViewController?.parent == nil
     }
     
+    /// The list is mirrored and presented newest-first, so the OLDEST visible
+    /// message is the MAX UI index path and older pagination is approached as the
+    /// offset grows toward the content end. Index paths handed to the view model
+    /// are converted back to its oldest-first space; the returned index path is
+    /// in the view model's (data) space too, since callers only feed it back in.
     @discardableResult
     open func addMoreMessage(scrollDirection: ScrollDirection, force: Bool = false) -> IndexPath? {
         guard !isCollectionViewUpdating,
@@ -1242,13 +1251,15 @@ open class ChannelViewController: ViewController,
         else { return nil }
         switch scrollDirection {
         case .up:
-            let indexPath = collectionView.indexPathsForVisibleItems.min()
-            if let indexPath {
-                var itemsAbove = indexPath.item
-                for section in 0..<indexPath.section {
+            let uiIndexPath = collectionView.indexPathsForVisibleItems.max()
+            if let uiIndexPath, let dataIndexPath = dataIndexPath(fromUI: uiIndexPath) {
+                // Count of loaded items older than the oldest visible one — the
+                // remaining runway before the user hits the loaded edge.
+                var itemsAbove = collectionView.numberOfItems(inSection: uiIndexPath.section) - 1 - uiIndexPath.item
+                for section in (uiIndexPath.section + 1)..<collectionView.numberOfSections {
                     itemsAbove += collectionView.numberOfItems(inSection: section)
                 }
-                // A successful prev fetch prepends items, so itemsAbove jumps up.
+                // A successful prev fetch adds older items, so itemsAbove jumps up.
                 // When that happens, reset the progress marker so the user can
                 // trigger again after consuming the new chunk.
                 if itemsAboveAtLastPrevFetch != .max,
@@ -1258,31 +1269,34 @@ open class ChannelViewController: ViewController,
                 let madeProgress = itemsAbove < itemsAboveAtLastPrevFetch
                 if force || (itemsAbove < 10 && madeProgress) {
                     // Pin to 0 (not itemsAbove) so subsequent frames can't keep
-                    // firing as the user reveals each consecutive prepended cell —
+                    // firing as the user reveals each consecutive older cell —
                     // the gate only reopens via the reset above, which requires an
-                    // actual prepend of 10+ items.
+                    // actual fetch of 10+ items.
                     itemsAboveAtLastPrevFetch = 0
-                    loadPrevMessages(beforeMessageAt: indexPath)
+                    loadPrevMessages(beforeMessageAt: dataIndexPath)
                 }
+                return dataIndexPath
             }
-            return indexPath
+            return nil
         case .down:
             let indexPathsForVisibleItems = collectionView.indexPathsForVisibleItems
             guard !indexPathsForVisibleItems.isEmpty
             else { return nil }
-            if let indexPath = indexPathsForVisibleItems.max() {
-                loadNextMessages(afterMessageAt: indexPath)
-                return indexPath
+            if let uiIndexPath = indexPathsForVisibleItems.min(),
+               let dataIndexPath = dataIndexPath(fromUI: uiIndexPath) {
+                loadNextMessages(afterMessageAt: dataIndexPath)
+                return dataIndexPath
             }
         default:
             break
         }
         return nil
     }
-    
+
     open func reloadNearMessages() {
-        if let indexPath = collectionView.indexPathsForVisibleItems.min(),
-           let model = channelViewModel.layoutModel(at: indexPath) {
+        if let uiIndexPath = collectionView.indexPathsForVisibleItems.max(),
+           let dataIndexPath = dataIndexPath(fromUI: uiIndexPath),
+           let model = channelViewModel.layoutModel(at: dataIndexPath) {
             channelViewModel.loadNearMessages(messageId: model.message.id)
         }
     }
@@ -1304,9 +1318,10 @@ open class ChannelViewController: ViewController,
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         isStartedDragging = true
         pinnedScrollMessageId = 0
-        // Drag starting while pinned to the top reopens the prev-fetch gate so a
-        // failed server page can be retried once connectivity returns.
-        if scrollView.contentOffset.y <= -scrollView.adjustedContentInset.top {
+        // Drag starting while pinned to the oldest loaded edge (content end in the
+        // mirrored order) reopens the prev-fetch gate so a failed server page can
+        // be retried once connectivity returns.
+        if scrollView.contentOffset.y >= collectionView.maxContentOffsetY - 1 {
             itemsAboveAtLastPrevFetch = .max
         }
     }
@@ -1379,14 +1394,20 @@ open class ChannelViewController: ViewController,
     }
     
     open func scrollViewDidScrollToTop(_ scrollView: UIScrollView) {
+        // In the mirrored list the system scroll-to-top (status bar tap) lands on
+        // offset ≈ 0, which is the NEWEST message — so pump the next page, not prev.
         isStartedDragging = true
-        addMoreMessage(scrollDirection: .up, force: true)
+        addMoreMessage(scrollDirection: .down, force: true)
     }
-    
+
     open func scrollDirectionForVelocity(_ velocity: CGPoint) -> ScrollDirection {
-        if velocity.y < 0 {
+        // The collection view is mirrored (scaleY: -1), so the pan velocity arrives
+        // sign-flipped relative to the screen: dragging toward older messages
+        // (revealing content at the visual top) reports a NEGATIVE y velocity.
+        // `.up` keeps meaning "toward older / prev pages", `.down` "toward newer".
+        if velocity.y > 0 {
             return .down
-        } else if velocity.y > 0 {
+        } else if velocity.y < 0 {
             return .up
         }
         return .none
@@ -1440,17 +1461,18 @@ open class ChannelViewController: ViewController,
         // Post-batch: CV has been told about the new sections/items, so the
         // observer's indexPath is now valid. Use that — `appliedSnapshot`
         // points at the new snapshot too once `performUpdates` returns.
+        // The observer's index path is in data (oldest-first) space; convert it
+        // into the mirrored UI space before asking the layout for frames.
         guard pinnedScrollMessageId != 0,
-              let indexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId),
+              let dataIndexPath = channelViewModel.indexPathOf(messageId: pinnedScrollMessageId),
+              let indexPath = uiIndexPath(fromData: dataIndexPath),
               let attrs = collectionView.layoutAttributesForItem(at: indexPath)
         else { return false }
         let target = attrs.frame.minY - visibleOffset
-        let minOffsetY = -collectionView.adjustedContentInset.top
-        let maxOffsetY = max(
-            minOffsetY,
-            collectionView.contentSize.height - collectionView.bounds.height + collectionView.adjustedContentInset.bottom
+        collectionView.contentOffset.y = min(
+            max(target, collectionView.bottomContentOffsetY),
+            collectionView.maxContentOffsetY
         )
-        collectionView.contentOffset.y = min(max(target, minOffsetY), maxOffsetY)
         return true
     }
     
@@ -1460,49 +1482,27 @@ open class ChannelViewController: ViewController,
             unreadCountView.isHidden = true
             return
         }
-        let visibleRect = collectionView.visibleContentRect
-        if collectionView.contentSize.height - visibleRect.maxY > 30 {
-            unreadCountView.isHidden = false
-        } else {
-            unreadCountView.isHidden = true
-        }
-        
-//        if isScrollingBottom {
-//            unreadCountView.isHidden = true
-//            return
-//        }
-//        if collectionView.contentSize.height < collectionView.frame.height {
-//            unreadCountView.isHidden = true
-//            return
-//        }
-//        guard let lastIndexPath = collectionView.lastVisibleAttributes?.indexPath
-//        else {
-//            unreadCountView.isHidden = true
-//            return
-//        }
-//        if channelViewModel.isLastMessage(at: lastIndexPath) {
-//            unreadCountView.isHidden = true
-//        } else {
-//            unreadCountView.isHidden = composerViewController.isRecording
-//        }
+        // Mirrored list: distance from the newest message is just the offset's
+        // distance from the bottom anchor.
+        let distanceFromNewest = collectionView.contentOffset.y - collectionView.bottomContentOffsetY
+        unreadCountView.isHidden = !(distanceFromNewest > 30)
     }
-    
+
     open func updateLastNavigatedIndexPath() {
         if channelViewModel.lastNavigatedIndexPath != nil,
             let indexPath = collectionView.lastVisibleIndexPath,
-            channelViewModel.isLastMessage(at: indexPath) {
+            let dataIndexPath = dataIndexPath(fromUI: indexPath),
+            channelViewModel.isLastMessage(at: dataIndexPath) {
             channelViewModel.updateLastNavigatedIndexPath(indexPath: nil)
         }
     }
-    
+
     open func updatePinnedHeaderVisibility() {
         guard collectionView.isDragging || collectionView.isDecelerating
         else { return }
-        // When content is shorter than the visible area (few messages), the layout
-        // bottom-anchors the cells, leaving empty space at the top. Pinning would
-        // float the date header detached/over the cells, so keep it inline and let
-        // it scroll together with the messages.
-        guard layout.bottomAnchorShift == 0
+        // Don't pin while all content fits on screen — the date would float
+        // detached at the visual top while the messages sit at the bottom anchor.
+        guard collectionView.maxContentOffsetY > collectionView.bottomContentOffsetY
         else {
             setSectionHeadersPinToVisibleBounds(false)
             return
@@ -1516,11 +1516,14 @@ open class ChannelViewController: ViewController,
             self.setSectionHeadersPinToVisibleBounds(false)
         })
     }
-    
+
+    /// The mirrored list renders date separators as section FOOTERS (the section's
+    /// content-space end is its visual top), so sticky behavior pins footers.
+    /// The method name is kept for API compatibility.
     open func setSectionHeadersPinToVisibleBounds(_ show: Bool) {
-        if layout.sectionHeadersPinToVisibleBounds != show {
+        if layout.sectionFootersPinToVisibleBounds != show {
             let context = UICollectionViewFlowLayoutInvalidationContext()
-            layout.sectionHeadersPinToVisibleBounds = show
+            layout.sectionFootersPinToVisibleBounds = show
             layout.invalidateLayout(with: context)
         }
     }
@@ -1565,7 +1568,8 @@ open class ChannelViewController: ViewController,
                 guard let self else { return }
                 cell.checkBoxView.transform = .identity
                 cell.containerView.transform = .identity
-                cell.contentView.alpha = self.channelViewModel.canSelectMessage(at: indexPath) ? 1 : 0.5
+                let canSelect = self.dataIndexPath(fromUI: indexPath).map { self.channelViewModel.canSelectMessage(at: $0) } ?? false
+                cell.contentView.alpha = canSelect ? 1 : 0.5
             }
         }
 
@@ -1580,6 +1584,13 @@ open class ChannelViewController: ViewController,
     /// `AppliedSnapshot` without touching any view-controller state. Used by
     /// `rebuildAppliedSnapshotFromObserver()` and (post-Phase 2) by the
     /// snapshot-diff pipeline to compute the target state for each batch.
+    ///
+    /// The snapshot is built in MIRRORED (UI) order: the observer keeps messages
+    /// oldest-first, but the collection view is flipped (scaleY: -1) and presents
+    /// newest-first, so sections and the items within them are reversed here.
+    /// Everything downstream of the snapshot — data source counts, cell lookups,
+    /// the diff, and the batch ops it produces — therefore lives in UI space with
+    /// no further index mapping.
     internal func buildSnapshotFromObserver() -> AppliedSnapshot {
         let sectionCount = channelViewModel.numberOfSections
         var sections: [ChannelViewModel.SectionId] = []
@@ -1587,12 +1598,12 @@ open class ChannelViewController: ViewController,
         var versions: [ChannelViewModel.Key: UInt] = [:]
         sections.reserveCapacity(sectionCount)
         items.reserveCapacity(sectionCount)
-        for s in 0..<sectionCount {
+        for s in stride(from: sectionCount - 1, through: 0, by: -1) {
             sections.append(.init(name: channelViewModel.sectionName(at: s)))
             let n = channelViewModel.numberOfMessages(in: s)
             var section: [ChannelViewModel.Key] = []
             section.reserveCapacity(n)
-            for r in 0..<n {
+            for r in stride(from: n - 1, through: 0, by: -1) {
                 if let m = channelViewModel.message(at: IndexPath(item: r, section: s)) {
                     let key = ChannelViewModel.Key(message: m)
                     section.append(key)
@@ -1631,6 +1642,51 @@ open class ChannelViewController: ViewController,
     open func snapshotLayoutModel(at indexPath: IndexPath) -> MessageLayoutModel? {
         guard let key = snapshotKey(at: indexPath) else { return nil }
         return channelViewModel.layoutModels[key]
+    }
+
+    // MARK: Mirrored-presentation index mapping
+
+    /// The view model keeps messages oldest-first; the collection view is mirrored
+    /// (scaleY: -1) and presents newest-first, with `appliedSnapshot` built in the
+    /// mirrored order. Both mappings are the same involution computed against the
+    /// applied snapshot (the collection view's source of truth):
+    ///   uiSection = sectionCount − 1 − dataSection
+    ///   uiItem    = itemCount(uiSection) − 1 − dataItem
+    /// Returns nil when the path doesn't fit the snapshot (e.g. the observer has
+    /// drifted ahead of the applied state) — callers treat that as "not present".
+    open func uiIndexPath(fromData indexPath: IndexPath) -> IndexPath? {
+        let sectionCount = appliedSnapshot.sectionCount
+        guard indexPath.section >= 0, indexPath.section < sectionCount else { return nil }
+        let uiSection = sectionCount - 1 - indexPath.section
+        let itemCount = appliedSnapshot.items[uiSection].count
+        guard indexPath.item >= 0, indexPath.item < itemCount else { return nil }
+        return IndexPath(item: itemCount - 1 - indexPath.item, section: uiSection)
+    }
+
+    /// Inverse of `uiIndexPath(fromData:)` — converts a collection-view index path
+    /// into the view model's oldest-first space.
+    open func dataIndexPath(fromUI indexPath: IndexPath) -> IndexPath? {
+        let sectionCount = appliedSnapshot.sectionCount
+        guard indexPath.section >= 0, indexPath.section < sectionCount else { return nil }
+        let itemCount = appliedSnapshot.items[indexPath.section].count
+        guard indexPath.item >= 0, indexPath.item < itemCount else { return nil }
+        return IndexPath(
+            item: itemCount - 1 - indexPath.item,
+            section: sectionCount - 1 - indexPath.section
+        )
+    }
+
+    /// Translates a scroll position expressed in visual terms (top = visually
+    /// above) into the mirrored content space, where the visual top is the
+    /// content-space bottom and vice versa.
+    open func uiScrollPosition(_ pos: UICollectionView.ScrollPosition) -> UICollectionView.ScrollPosition {
+        var mapped = pos
+        let hadTop = mapped.contains(.top)
+        let hadBottom = mapped.contains(.bottom)
+        mapped.remove([.top, .bottom])
+        if hadTop { mapped.insert(.bottom) }
+        if hadBottom { mapped.insert(.top) }
+        return mapped
     }
 
     /// Mutate `appliedSnapshot` deterministically using only `paths` — never reading
@@ -1889,25 +1945,31 @@ open class ChannelViewController: ViewController,
 
         // Snapshot-first lookup: the data source counts and the cell binding
         // both come from `appliedSnapshot`, so the model we hand to the cell
-        // always corresponds to the slot UIKit is asking about.
+        // always corresponds to the slot UIKit is asking about. The observer
+        // fallbacks expect the view model's oldest-first index space.
+        let dataIndexPath = dataIndexPath(fromUI: indexPath)
         let model = snapshotLayoutModel(at: indexPath)
-            ?? channelViewModel.layoutModel(at: indexPath)
-            ?? channelViewModel.createLayoutModels(at: [indexPath]).first
+            ?? dataIndexPath.flatMap { channelViewModel.layoutModel(at: $0) }
+            ?? dataIndexPath.flatMap { channelViewModel.createLayoutModels(at: [$0]).first }
 
         guard let model = model else {
-            logger.error("[MEESS] not found \(indexPath), lm: \(channelViewModel.layoutModel(at: indexPath)), ms: \(channelViewModel.message(at: indexPath))")
+            logger.error("[MEESS] not found \(indexPath)")
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: Components.channelIncomingMessageCell.reuseId,
                 for: indexPath
             )
+            cell.transform = .mirrorY
             return cell
         }
 
-        return cellForItemAt(
+        let cell = cellForItemAt(
             indexPath: indexPath,
             collectionView: collectionView,
             model: model
         )
+        // Flip the cell back upright inside the mirrored collection view.
+        cell.transform = .mirrorY
+        return cell
     }
     
     open func cellForItemAt(
@@ -1932,7 +1994,8 @@ open class ChannelViewController: ViewController,
         cell.parentAppearance = appearance.messageCellAppearance
         cell.isEditing = channelViewModel.isEditing
         if cell.isEditing {
-            cell.contentView.alpha = channelViewModel.canSelectMessage(at: indexPath) ? 1 : 0.5
+            let canSelect = dataIndexPath(fromUI: indexPath).map { channelViewModel.canSelectMessage(at: $0) } ?? false
+            cell.contentView.alpha = canSelect ? 1 : 0.5
         } else {
             cell.contentView.alpha = 1
         }
@@ -2048,23 +2111,35 @@ open class ChannelViewController: ViewController,
     }
 
     open func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        guard channelViewModel.canSelectMessage(at: indexPath)
+        guard let dataIndexPath = dataIndexPath(fromUI: indexPath),
+              channelViewModel.canSelectMessage(at: dataIndexPath)
         else { return }
-        channelViewModel.didChangeSelection(for: indexPath)
+        channelViewModel.didChangeSelection(for: dataIndexPath)
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         viewForSupplementaryElementOfKind kind: String,
         at indexPath: IndexPath
     ) -> UICollectionReusableView {
+        let requestedKind: UICollectionView.SupplementaryViewKind =
+            kind == UICollectionView.elementKindSectionHeader ? .header : .footer
         let cell = collectionView.dequeueReusableSupplementaryView(
             for: indexPath,
             cellType: Components.channelDateSeparatorView.self,
-            kind: .header
+            kind: requestedKind
         )
         cell.parentAppearance = appearance.dateSeparatorAppearance
-        cell.date = channelViewModel.separatorDateForMessage(at: indexPath, with: appearance.dateSeparatorAppearance)
+        if requestedKind == .footer {
+            let dataSection = appliedSnapshot.sectionCount - 1 - indexPath.section
+            cell.date = channelViewModel.separatorDateForMessage(
+                at: IndexPath(item: 0, section: max(0, dataSection)),
+                with: appearance.dateSeparatorAppearance
+            )
+        } else {
+            cell.date = nil
+        }
+        cell.transform = .mirrorY
         return cell
     }
     
@@ -2076,7 +2151,8 @@ open class ChannelViewController: ViewController,
         sizeForItemAt indexPath: IndexPath
     ) -> CGSize {
         let width = collectionView.bounds.width
-        if let lm = snapshotLayoutModel(at: indexPath) ?? channelViewModel.layoutModel(at: indexPath) {
+        if let lm = snapshotLayoutModel(at: indexPath)
+            ?? dataIndexPath(fromUI: indexPath).flatMap({ channelViewModel.layoutModel(at: $0) }) {
             return CGSize(width: width, height: lm.measureSize.height)
         }
         return CGSize(width: width, height: 38)
@@ -2115,33 +2191,35 @@ open class ChannelViewController: ViewController,
         layout collectionViewLayout: UICollectionViewLayout,
         referenceSizeForHeaderInSection section: Int
     ) -> CGSize {
-        let width = collectionView.bounds.width
-        return appearance.enableDateSeparator ? CGSize(width: width, height: 40) : .zero
+        .zero
     }
-    
+
     open func collectionView(
         _ collectionView: UICollectionView,
         layout collectionViewLayout: UICollectionViewLayout,
         referenceSizeForFooterInSection section: Int
     ) -> CGSize {
-        .zero
+        // Date separators render as footers in the mirrored list.
+        let width = collectionView.bounds.width
+        return appearance.enableDateSeparator ? CGSize(width: width, height: 40) : .zero
     }
-    
+
     open func canPerformMessageActions(
         indexPath: IndexPath,
         point: CGPoint
     ) -> Bool {
         guard !channelViewModel.isThread,
-              let item = channelViewModel.message(at: indexPath),
+              let dataIndexPath = dataIndexPath(fromUI: indexPath),
+              let item = channelViewModel.message(at: dataIndexPath),
               item.state != .deleted
         else { return false }
-        
+
         guard let cell = collectionView.cell(
             for: indexPath,
             cellType: MessageCell.self
         )
         else { return false }
-        
+
         let point = collectionView.convert(point, to: cell)
         return cell.bubbleView.frame.contains(point)
     }
@@ -2188,10 +2266,18 @@ open class ChannelViewController: ViewController,
     
     open func sendMessage(_ message: UserSendMessage, shouldClearText: Bool = true) {
         userSelectOnRepliedMessage = nil
-        isScrollingBottom = true
         logger.verbose("[MESSAGE SEND] sendMessage")
         let canShowUnread = canShowUnreadCountView
         canShowUnreadCountView = false
+        // Already at the bottom: the mirrored anchor plus the animated batch
+        // handle the insert (the bubble slides up from the input edge) — forcing
+        // isScrollingBottom here would route the update through the suppressed,
+        // animation-free path. Only a scrolled-up sender needs the explicit jump
+        // back to the newest message.
+        let wasAtBottom = collectionView.isAtBottom()
+        if !wasAtBottom {
+            isScrollingBottom = true
+        }
         channelViewModel.createAndSendUserMessage(message)
         if shouldClearText {
             inputTextView.text = nil
@@ -2203,15 +2289,12 @@ open class ChannelViewController: ViewController,
             UIView.animate(withDuration: 0.25) { [weak self] in
                 self?.view.layoutIfNeeded()
             }
-            isScrollingBottom = true
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                // Prevents scrolling when the first message is sent.
-                if self.channelViewModel.numberOfSections != 0 {
-                    self.scrollToBottom(animated: true)
-                }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
-                    self?.canShowUnreadCountView = canShowUnread
+            if !wasAtBottom {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    // Prevents scrolling when the first message is sent.
+                    if self.channelViewModel.numberOfSections != 0 {
+                        self.scrollToBottom(animated: true)
+                    }
                 }
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
@@ -2531,7 +2614,8 @@ open class ChannelViewController: ViewController,
     
     open func showRepliedMessage(_ message: ChatMessage) {
         let paths = channelViewModel.indexPaths(for: [message])
-        guard let indexPath = paths.values.first else {
+        guard let dataPath = paths.values.first,
+              let indexPath = uiIndexPath(fromData: dataPath) else {
             channelViewModel.findReplayedMessage(messageId: message.id)
             return
         }
@@ -2584,7 +2668,11 @@ open class ChannelViewController: ViewController,
         if messages.count == collectionView.indexPathsForVisibleItems.count {
             channelViewModel.markMessages(messages, as: .displayed)
         } else {
-            channelViewModel.markMessage(as: .displayed, indexPaths: collectionView.indexPathsForVisibleItems)
+            // The view model expects oldest-first index paths.
+            let dataPaths = collectionView.indexPathsForVisibleItems.compactMap {
+                dataIndexPath(fromUI: $0)
+            }
+            channelViewModel.markMessage(as: .displayed, indexPaths: dataPaths)
         }
     }
 
@@ -2671,11 +2759,9 @@ open class ChannelViewController: ViewController,
             // `MessagesCollectionView.performUpdates` is the runtime safety net.
 
             // Policy hints — derive from the freshly-computed diff (structural
-            // ops the user will actually see) and the observer-supplied paths
-            // (semantic info like "this was a top pagination").
+            // ops the user will actually see).
             let diffInserts = diff.inserts
             let diffMoves = diff.moves
-            let continuesOptions = paths.continuesOptions
             var needsToScrollBottom = false
 
             showEmptyViewIfNeeded()
@@ -2683,11 +2769,17 @@ open class ChannelViewController: ViewController,
             if let unreadMessageIndexPath, checkOnlyFirstTimeReceivedMessagesFromArchive {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
                 if diffInserts.count == 1,
-                   collectionView.lastIndexPath == collectionView.lastVisibleIndexPath {
+                   collectionView.isAtBottom() {
                     isStartedDragging = true
                 } else {
                     rebuildAppliedSnapshotFromObserver()
-                    collectionView.reloadDataAndScrollTo(indexPath: unreadMessageIndexPath)
+                    // The unread separator should appear near the visual top of the
+                    // viewport; in the mirrored content space that is `.bottom`.
+                    if let uiPath = uiIndexPath(fromData: unreadMessageIndexPath) {
+                        collectionView.reloadDataAndScrollTo(indexPath: uiPath, pos: .bottom)
+                    } else {
+                        collectionView.reloadData()
+                    }
                     return
                 }
             }
@@ -2713,80 +2805,91 @@ open class ChannelViewController: ViewController,
             // If we reached here with the first-archive flag still set, clear
             // it — we're about to apply the update normally.
             checkOnlyFirstTimeReceivedMessagesFromArchive = false
-            // Source of truth for "is this a top pagination" is the
-            // snapshot diff, not the observer's continuesOptions hint —
-            // the observer routinely reports bulk inserts in a shape that
-            // leaves continuesOptions empty (rawValue:0) even when the
-            // resulting snapshot clearly has new items at (0, 0). Three
-            // top-insert signals from the diff:
-            //   • observer flagged it explicitly (kept for back-compat)
-            //   • a new section was inserted at index 0
-            //   • an item was inserted at (0, 0)
-            let isInsertingItemsToTop =
-                continuesOptions.contains(.top)
-                || diff.sectionInserts.contains(0)
+            // Mirrored list: UI IndexPath(0,0) is the NEWEST edge (visual bottom).
+            // Inserts there are new incoming/outgoing messages. Older-message
+            // pagination lands at the content END in the mirrored order and needs
+            // no offset handling at all — the anchor is the newest edge.
+            let isInsertingNewestItems =
+                diff.sectionInserts.contains(0)
                 || diff.inserts.contains(IndexPath(item: 0, section: 0))
 
-            var isInsertLastIndexPath: Bool {
-                var isOneItem: Bool {
-                    if collectionView.numberOfSections == 1,
-                       collectionView.numberOfItems(inSection: 0) == 1 {
-                        return true
-                    }
-                    return false
-                }
-                guard let last = diffInserts.last,
-                      let lastIndexPath = collectionView.lastIndexPath
-                else { return false }
-                return !isOneItem && last >= lastIndexPath
-            }
-            // True when the actual last cell is currently on-screen — i.e. the user is
-            // reading at the bottom. Using indexPath equality avoids offset-math fuzziness
-            // (e.g. 5pt insetTop drift) and works regardless of where inserts will land.
-            let isUserAtBottom: Bool = {
-                guard let lastIndexPath = collectionView.lastIndexPath,
-                      let lastVisible = collectionView.lastVisibleIndexPath
-                else { return false }
-                return lastVisible == lastIndexPath
-            }()
-            var animatedScroll = diffInserts.count == 1
+            // Offset-based bottom check: in the mirrored space the bottom is a
+            // constant offset, so no indexPath comparison is needed.
+            let isUserAtBottom = collectionView.isAtBottom()
+
+            // With the mirrored anchor, a user at the bottom follows new messages
+            // automatically — UIKit keeps contentOffset stable while the new item
+            // materializes at the anchor. Explicit scrolling remains only for an
+            // in-flight scroll-to-bottom tap.
+            let animatedScroll = diffInserts.count == 1
             if isScrollingBottom {
                 needsToScrollBottom = true
-                animatedScroll = true
-            } else if unreadCountView.isHidden {
+            } else if isUserAtBottom, isInsertingNewestItems, !channelViewModel.isSearching {
+                // Parity with the pre-mirror behavior: receiving a message while
+                // reading at the bottom counts as interaction (clears the unread
+                // anchor state); no scroll is needed.
                 isStartedDragging = true
-                let shouldFollowBottom = (isInsertLastIndexPath || isUserAtBottom) && !channelViewModel.isSearching
-                needsToScrollBottom = shouldFollowBottom
-                animatedScroll = isInsertLastIndexPath
-            } else {
-                needsToScrollBottom = false
             }
 
             if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil || pinnedScrollMessageId != 0 {
                 needsToScrollBottom = false
             }
 
-            let offsetBeforeInsertion = collectionView.contentOffset.y
             let contentHeightBeforeInsertion = collectionView.contentSize.height
-            let isTopPagination = isInsertingItemsToTop
             // Capture the pin's pre-batch viewport offset using the CV's
             // current data source — the observer may already point at the
             // post-update indexPath whose section the CV doesn't know about
             // yet. Restored in the completion below so the pinned message
-            // stays at the same viewport position across pagination.
+            // stays at the same viewport position across structural updates.
             let pinnedVisibleOffsetBefore = pinnedMessageVisibleOffset()
 
-            isCollectionViewUpdating = true
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
+            // New messages land at the content-space top. When the user is
+            // scrolled up reading history (and no pin is active — the pin
+            // restore below handles that case exactly), ask the layout for an
+            // atomic contentOffset compensation so the reading position holds.
+            // At the bottom: no compensation, no scroll — the anchor does it.
+            let needsNewestInsertCompensation =
+                isInsertingNewestItems
+                && !isUserAtBottom
+                && !isScrollingBottom
+                && pinnedScrollMessageId == 0
+                && contentHeightBeforeInsertion > 0
 
-            // For older-message pagination, ask the layout to apply an atomic
-            // contentOffset adjustment via targetContentOffset(forProposedContentOffset:),
-            // and run the batch update without UIView animations. Together this prevents
-            // the one-frame "scrolled to top" flicker that even CATransaction's disabled
-            // actions can't suppress (UICollectionView's batch animations are driven by
-            // UIView.animate, not CALayer implicit animations).
-            if isTopPagination {
+            // A new message arriving while the user watches the bottom is the one
+            // update that SHOULD animate: the batch runs with UIKit's default
+            // animation — the new bubble slides up from the input edge (see the
+            // layout's initialLayoutAttributesForAppearingItem) while previous
+            // messages shift up. Every other update stays animation-free.
+            let animatesNewestInsert =
+                isInsertingNewestItems
+                && isUserAtBottom
+                && !isScrollingBottom
+                && pinnedScrollMessageId == 0
+                && userSelectOnRepliedMessage == nil
+                && unreadMessageIndexPath == nil
+                && contentHeightBeforeInsertion > 0
+
+            if isInsertingNewestItems {
+                logger.debug("""
+                    [MSGANIM] inserts=\(diffInserts.count) atBottom=\(isUserAtBottom) \
+                    animate=\(animatesNewestInsert) compensate=\(needsNewestInsertCompensation) \
+                    scrollingBottom=\(isScrollingBottom) pinned=\(pinnedScrollMessageId) \
+                    offset=\(collectionView.contentOffset.y) bottom=\(collectionView.bottomContentOffsetY)
+                    """)
+            }
+
+            isCollectionViewUpdating = true
+            if !animatesNewestInsert {
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+            }
+
+            // The atomic adjustment runs via targetContentOffset(forProposedContentOffset:)
+            // in the same layout pass as the batch, preventing the one-frame jump
+            // that even CATransaction's disabled actions can't suppress
+            // (UICollectionView's batch animations are driven by UIView.animate,
+            // not CALayer implicit animations).
+            if needsNewestInsertCompensation {
                 collectionView.layout.preBatchContentHeight = collectionView.contentSize.height
                 collectionView.layout.isAdjustingForTopInserts = true
             }
@@ -2824,7 +2927,9 @@ open class ChannelViewController: ViewController,
             }
 
             let completion: (Bool) -> Void = { [weak self] finished in
-                CATransaction.commit()
+                if !animatesNewestInsert {
+                    CATransaction.commit()
+                }
                 var scrollBottom = false
                 defer {
                     if let self = self {
@@ -2848,37 +2953,29 @@ open class ChannelViewController: ViewController,
                     return
                 }
 
-                if isInsertingItemsToTop {
-                    if let pinnedVisibleOffsetBefore,
-                       self.restorePinnedMessageToVisibleOffset(pinnedVisibleOffsetBefore) {
-                        // Pin restored at its previous viewport offset.
-                    } else if contentHeightBeforeInsertion == 0 && offsetBeforeInsertion == 0 {
-                        // Initial load with empty starting state: layout's
-                        // targetContentOffset(forProposedContentOffset:) anchors against
-                        // the proposed offset (0), which lands at the top of new content.
-                        // For an empty-CV first batch we want to land at the bottom instead.
-                        let contentHeightAfter = self.collectionView.contentSize.height
-                        if collectionView.frame.height > contentHeightAfter {
-                            self.collectionView.contentOffset.y = 0
-                        } else {
-                            let visibleHeight = collectionView.bounds.height - collectionView.adjustedContentInset.bottom
-                            self.collectionView.contentOffset.y = max(0, contentHeightAfter - visibleHeight)
-                        }
-                    }
-                    // For non-pin / non-empty paths: the layout's
-                    // targetContentOffset(forProposedContentOffset:) already applied
-                    // the atomic offset adjustment in the same layout pass.
+                if let pinnedVisibleOffsetBefore,
+                   self.restorePinnedMessageToVisibleOffset(pinnedVisibleOffsetBefore) {
+                    // Pin restored at its previous viewport offset.
+                } else if contentHeightBeforeInsertion == 0 {
+                    // First batch into an empty collection: land on the newest
+                    // message. In the mirrored list that is a constant offset.
+                    self.collectionView.scrollToBottom(animated: false)
                 }
+                // For all other paths nothing to fix up: older-message pagination
+                // grows content away from the anchor, and newest inserts either
+                // stay anchored (user at bottom) or were compensated atomically
+                // by the layout (user scrolled up).
 
                 // Move destinations don't always trigger cellForItemAt during the batch,
                 // so reload them here (diff.reloads were already applied by the parent batch).
+                // Validate against the applied snapshot — it IS the collection view's
+                // data source truth, in the same (mirrored) index space as the diff.
                 let moveDestinations = diffMoves.map(\.to)
-                if !moveDestinations.isEmpty,
-                   self.channelViewModel.numberOfSections == self.collectionView.numberOfSections {
-                    let sectionCount = self.channelViewModel.numberOfSections
+                if !moveDestinations.isEmpty {
+                    let sectionCount = self.appliedSnapshot.sectionCount
                     let validReloads = moveDestinations.filter { indexPath in
                         indexPath.section < sectionCount &&
-                        indexPath.item < self.channelViewModel.numberOfMessages(in: indexPath.section)
+                        indexPath.item < self.appliedSnapshot.items[indexPath.section].count
                     }
                     if !validReloads.isEmpty {
                         UIView.performWithoutAnimation {
@@ -2895,12 +2992,20 @@ open class ChannelViewController: ViewController,
             }
 
             // Phase 4 workarounds: flush pending layout (radar #28167779) and,
-            // for non-animated top pagination, wrap in UIView.animate(duration: 0)
+            // for compensated newest-edge inserts, wrap in UIView.animate(duration: 0)
             // to dodge UIKit's "preparing update visible view wasn't found"
             // crash class.
             collectionView.layoutIfNeeded()
-            if isTopPagination {
+            if needsNewestInsertCompensation {
                 UIView.animate(withDuration: 0) { [weak self] in
+                    self?.collectionView.performUpdates(updates, completion: completion)
+                }
+            } else if animatesNewestInsert {
+                UIView.animate(
+                    withDuration: 0.25,
+                    delay: 0,
+                    options: [.curveEaseOut, .allowUserInteraction]
+                ) { [weak self] in
                     self?.collectionView.performUpdates(updates, completion: completion)
                 }
             } else {
@@ -2908,7 +3013,8 @@ open class ChannelViewController: ViewController,
             }
 
         case .updateDeliveryStatus(let model, let indexPath):
-            if let cell = collectionView.cell(for: indexPath, cellType: MessageCell.self),
+            if let uiPath = uiIndexPath(fromData: indexPath),
+               let cell = collectionView.cell(for: uiPath, cellType: MessageCell.self),
                cell.data?.message.id == model.message.id {
                 cell.deliveryStatus = model.messageDeliveryStatus
             } else {
@@ -2937,7 +3043,6 @@ open class ChannelViewController: ViewController,
                 onEvent(.reloadDataAndSelect(indexPath: indexPath, messageId: selectMessageId))
             } else if pinnedScrollMessageId != 0 {
                 let savedOffset = collectionView.contentOffset
-                let savedContentHeight = collectionView.contentSize.height
                 let pinnedVisibleOffsetBefore = pinnedMessageVisibleOffset()
                 rebuildAppliedSnapshotFromObserver()
                 collectionView.reloadData()
@@ -2946,8 +3051,12 @@ open class ChannelViewController: ViewController,
                    restorePinnedMessageToVisibleOffset(pinnedVisibleOffsetBefore) {
                     // Pin restored at its previous viewport offset.
                 } else {
-                    let heightDiff = collectionView.contentSize.height - savedContentHeight
-                    collectionView.contentOffset.y = savedOffset.y + heightDiff
+                    // Mirrored list: content growth at the older end doesn't move
+                    // the visual position, so keep the offset (clamped).
+                    collectionView.contentOffset.y = min(
+                        max(savedOffset.y, collectionView.bottomContentOffsetY),
+                        collectionView.maxContentOffsetY
+                    )
                 }
             } else {
                 rebuildAppliedSnapshotFromObserver()
@@ -2956,13 +3065,12 @@ open class ChannelViewController: ViewController,
             updateUnreadViewVisibility()
             showEmptyViewIfNeeded()
         case .reload(let indexPaths):
-            // Reloads don't change snapshot identifiers, only cell content. Filter to
-            // paths that still exist in the snapshot — defensive, since these paths
-            // were computed against an earlier observer state.
-            let safePaths = indexPaths.filter {
-                $0.section < appliedSnapshot.sectionCount &&
-                $0.item < appliedSnapshot.items[$0.section].count
-            }
+            // Reloads don't change snapshot identifiers, only cell content. The
+            // paths arrive in the view model's oldest-first space; conversion into
+            // the mirrored UI space also bounds-checks against the applied
+            // snapshot — defensive, since these paths were computed against an
+            // earlier observer state.
+            let safePaths = indexPaths.compactMap { uiIndexPath(fromData: $0) }
             if !safePaths.isEmpty {
                 UIView.performWithoutAnimation { [weak self] in
                     guard let self else { return }
@@ -2996,10 +3104,16 @@ open class ChannelViewController: ViewController,
             showEmptyViewIfNeeded()
         case let .reloadDataAndScroll(indexPath, animated, pos):
             rebuildAppliedSnapshotFromObserver()
-            collectionView.reloadDataAndScrollTo(
-                indexPath: indexPath,
-                pos: pos,
-                animated: animated)
+            // The view model sends its oldest-first path and a visual position;
+            // both are translated into the mirrored space here.
+            if let uiPath = uiIndexPath(fromData: indexPath) {
+                collectionView.reloadDataAndScrollTo(
+                    indexPath: uiPath,
+                    pos: uiScrollPosition(pos),
+                    animated: animated)
+            } else {
+                collectionView.reloadData()
+            }
             // Anchor the just-scrolled message so prev/next/near fetches that follow
             // don't drift the viewport. Released on scrollViewWillBeginDragging.
             if let messageId = channelViewModel.message(at: indexPath)?.id, messageId != 0 {
@@ -3094,9 +3208,12 @@ open class ChannelViewController: ViewController,
                 return
             }
             pinnedScrollMessageId = messageId
+            // The view model's oldest-first path mapped into the mirrored UI space.
+            let uiPathCandidate = uiIndexPath(fromData: indexPath)
             if selectMessageId == messageId,
-                lastAnimatedIndexPath == indexPath,
-               collectionView.visibleAttributes.contains(where: {$0.indexPath == indexPath}) {
+               let uiPathCandidate,
+               lastAnimatedIndexPath == uiPathCandidate,
+               collectionView.visibleAttributes.contains(where: {$0.indexPath == uiPathCandidate}) {
                 return
             }
             var mode = mentionMode ?? MessageCell.HighlightMode.search
@@ -3121,16 +3238,17 @@ open class ChannelViewController: ViewController,
                 }
             }
             let viewIndexPath: IndexPath
-            if collectionView.contains(indexPath: indexPath) {
-                viewIndexPath = indexPath
-            } else if let indexPath = channelViewModel.indexPathOf(messageId: messageId) {
-                viewIndexPath = indexPath
+            if let uiPathCandidate {
+                viewIndexPath = uiPathCandidate
+            } else if let dataPath = channelViewModel.indexPathOf(messageId: messageId),
+                      let uiPath = uiIndexPath(fromData: dataPath) {
+                viewIndexPath = uiPath
             } else {
                 return
             }
-            
-            lastAnimatedIndexPath = indexPath
-            collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: mode != .mention)
+
+            lastAnimatedIndexPath = viewIndexPath
+            collectionView.scrollToItem(at: viewIndexPath, pos: .centeredVertically, animated: mode != .mention)
             searchControlsView
                 .update(
                     with: channelViewModel.searchResult,
@@ -3138,6 +3256,8 @@ open class ChannelViewController: ViewController,
                 )
             //ReSelect after animation
         case let .reloadDataAndSelect(indexPath, messageId):
+            // Visual intent: .top shows the hit near the visual top. Translated
+            // into the mirrored content space via uiScrollPosition below.
             var pos: CollectionView.ScrollPosition {
                 switch channelViewModel.searchDirection {
                 case .none:
@@ -3149,17 +3269,22 @@ open class ChannelViewController: ViewController,
                 }
             }
             rebuildAppliedSnapshotFromObserver()
-            collectionView.reloadDataAndScrollTo(
-                indexPath: indexPath,
-                pos: pos
-            )
+            let uiPath = uiIndexPath(fromData: indexPath)
+            if let uiPath {
+                collectionView.reloadDataAndScrollTo(
+                    indexPath: uiPath,
+                    pos: uiScrollPosition(pos)
+                )
+            } else {
+                collectionView.reloadData()
+            }
             // Anchor the restarted-to message so subsequent prev/next/near fetches
             // keep it on screen. Released on scrollViewWillBeginDragging.
             if messageId != 0 {
                 pinnedScrollMessageId = messageId
             }
 
-            lastAnimatedIndexPath = indexPath
+            lastAnimatedIndexPath = uiPath
             var mode = MessageCell.HighlightMode.search
             if channelViewModel.scrollToRepliedMessageId != 0 {
                 if userSelectOnRepliedMessage != nil {
@@ -3172,7 +3297,9 @@ open class ChannelViewController: ViewController,
                 selectMessageId = messageId
             }
             NotificationCenter.default.post(name: .selectMessage, object: (messageId, mode))
-            collectionView.scrollToItem(at: indexPath, pos: .centeredVertically, animated: true)
+            if let uiPath {
+                collectionView.scrollToItem(at: uiPath, pos: .centeredVertically, animated: true)
+            }
             showEmptyViewIfNeeded()
         }
     }
