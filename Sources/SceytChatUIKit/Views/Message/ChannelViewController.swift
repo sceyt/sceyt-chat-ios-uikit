@@ -123,7 +123,18 @@ open class ChannelViewController: ViewController,
     
     public var highlightedDurationForReplyMessage = TimeInterval(1)
     public var highlightedDurationForSearchMessage = TimeInterval(0.5)
-    
+
+    /// Distance from the visual top of the message area to the top edge of the
+    /// "New messages" separator bar when opening a channel with unread messages.
+    public static var unreadSeparatorScrollOffsetFromTop: CGFloat = 50
+
+    /// Measured height of the "New messages" bar inside the anchor cell —
+    /// mirrors what `UnreadMessagesSeparatorView.measure` adds to the cell height.
+    public var unreadSeparatorHeight: CGFloat {
+        MessageCell.UnreadMessagesSeparatorView.Layouts.textHeight
+            + 2 * MessageCell.UnreadMessagesSeparatorView.Layouts.verticalPadding
+    }
+
     public private(set) var keyboardObserver: KeyboardObserver?
     private lazy var keyboardBgView = UIView()
         .withoutAutoresizingMask
@@ -2773,10 +2784,16 @@ open class ChannelViewController: ViewController,
                     isStartedDragging = true
                 } else {
                     rebuildAppliedSnapshotFromObserver()
-                    // The unread separator should appear near the visual top of the
-                    // viewport; in the mirrored content space that is `.bottom`.
+                    // Same absolute position as the initial `.reloadDataAndScroll`
+                    // unread branch, recomputed from fresh layout attributes — so
+                    // when this fires on the first post-initial update (async
+                    // preload, marker change) it is an idempotent re-assert, not
+                    // a jump, and it corrects any drift from that insert.
                     if let uiPath = uiIndexPath(fromData: unreadMessageIndexPath) {
-                        collectionView.reloadDataAndScrollTo(indexPath: uiPath, pos: .bottom)
+                        collectionView.reloadDataAndScrollToUnreadSeparator(
+                            at: uiPath,
+                            separatorHeight: unreadSeparatorHeight,
+                            offsetFromVisualTop: Self.unreadSeparatorScrollOffsetFromTop)
                     } else {
                         collectionView.reloadData()
                     }
@@ -3107,10 +3124,26 @@ open class ChannelViewController: ViewController,
             // The view model sends its oldest-first path and a visual position;
             // both are translated into the mirrored space here.
             if let uiPath = uiIndexPath(fromData: indexPath) {
-                collectionView.reloadDataAndScrollTo(
-                    indexPath: uiPath,
-                    pos: uiScrollPosition(pos),
-                    animated: animated)
+                // Opening on unread: don't center the last-read message — pin the
+                // "New messages" bar at a fixed distance below the visual top so
+                // the screen fills with unread messages. Positioned from the
+                // anchor cell's layout frame (scrollToItem can only align cell
+                // edges, which leaves the bar's spot dependent on bubble height).
+                let isUnreadAnchor = channelViewModel.scrollToRepliedMessageId == 0
+                    && channelViewModel.scrollToUnreadMentionMessageId == 0
+                    && channelViewModel.lastDisplayedMessageId != 0
+                    && channelViewModel.message(at: indexPath)?.id == channelViewModel.lastDisplayedMessageId
+                if isUnreadAnchor {
+                    collectionView.reloadDataAndScrollToUnreadSeparator(
+                        at: uiPath,
+                        separatorHeight: unreadSeparatorHeight,
+                        offsetFromVisualTop: Self.unreadSeparatorScrollOffsetFromTop)
+                } else {
+                    collectionView.reloadDataAndScrollTo(
+                        indexPath: uiPath,
+                        pos: uiScrollPosition(pos),
+                        animated: animated)
+                }
             } else {
                 collectionView.reloadData()
             }

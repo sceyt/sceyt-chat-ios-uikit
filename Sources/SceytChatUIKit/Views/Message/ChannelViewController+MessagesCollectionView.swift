@@ -208,6 +208,45 @@ public extension ChannelViewController {
             }
         }
 
+        /// Positions the unread ("New messages") separator bar a fixed distance
+        /// below the visual top of the viewport. The bar renders at the visual
+        /// bottom of the anchor cell — in the mirrored content space that is
+        /// `[frame.minY, frame.minY + separatorHeight]` — so the target offset is
+        /// derived from the cell's layout frame, not from scrollToItem semantics
+        /// (which can only align cell edges, leaving the bar's final spot
+        /// dependent on the anchor bubble's height).
+        open func scrollToUnreadSeparator(
+            at indexPath: IndexPath,
+            separatorHeight: CGFloat,
+            offsetFromVisualTop: CGFloat
+        ) {
+            guard contains(indexPath: indexPath),
+                  let attrs = collectionViewLayout.layoutAttributesForItem(at: indexPath)
+            else { return }
+            // Visual-top edge in content space: contentOffset.y + bounds.height
+            // - adjustedContentInset.bottom. Place the bar's top edge
+            // (frame.minY + separatorHeight) offsetFromVisualTop below it. The
+            // clamp handles the few-unread case: the list rests at the newest
+            // edge and the bar falls wherever it naturally sits mid-screen.
+            let targetY = attrs.frame.minY + separatorHeight + offsetFromVisualTop
+                - bounds.height + adjustedContentInset.bottom
+            let clampedY = min(max(targetY, bottomContentOffsetY), maxContentOffsetY)
+            setContentOffset(CGPoint(x: 0, y: clampedY), animated: false)
+        }
+
+        open func reloadDataAndScrollToUnreadSeparator(
+            at indexPath: IndexPath,
+            separatorHeight: CGFloat,
+            offsetFromVisualTop: CGFloat
+        ) {
+            reloadDataAndKeepOffset()
+            scrollToUnreadSeparator(
+                at: indexPath,
+                separatorHeight: separatorHeight,
+                offsetFromVisualTop: offsetFromVisualTop
+            )
+        }
+
         open func scrollToItem(at indexPath: IndexPath, pos: UICollectionView.ScrollPosition = .top, animated: Bool = true) {
             if contains(indexPath: indexPath) {
                 scrollToItem(at: indexPath, at: pos, animated: animated)
