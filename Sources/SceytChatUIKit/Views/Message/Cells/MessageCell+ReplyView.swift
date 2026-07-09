@@ -50,6 +50,12 @@ extension MessageCell {
             stackViewH.isUserInteractionEnabled = false
             stackViewH2.isUserInteractionEnabled = false
             borderView.isUserInteractionEnabled = false
+
+            // Surface as a single tappable button for VoiceOver and UI tests (a
+            // bare UIControl is not an accessibility element by default).
+            isAccessibilityElement = true
+            accessibilityTraits = .button
+            accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.replyView
             
             stackViewV.distribution = .fill
             stackViewV.alignment = .leading

@@ -128,6 +128,10 @@ open class ChannelViewController: ViewController,
     /// "New messages" separator bar when opening a channel with unread messages.
     public static var unreadSeparatorScrollOffsetFromTop: CGFloat = 50
 
+    /// Vertical spacing between the newest message and the input bar (visual
+    /// bottom). Added into `contentInset.top` because the list is mirrored.
+    public static var collectionViewInputSpacing: CGFloat = 10
+
     /// Measured height of the "New messages" bar inside the anchor cell —
     /// mirrors what `UnreadMessagesSeparatorView.measure` adds to the cell height.
     public var unreadSeparatorHeight: CGFloat {
@@ -335,7 +339,9 @@ open class ChannelViewController: ViewController,
         
         collectionView.delegate = self
         collectionView.dataSource = self
-        
+        collectionView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.collectionView
+        unreadCountView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.scrollDownButton
+
         updateUnreadViewVisibility()
         updateTitle()
         unreadCountView.addTarget(self, action: #selector(unreadButtonAction(_:)), for: .touchUpInside)
@@ -699,9 +705,11 @@ open class ChannelViewController: ViewController,
 
         // Mirrored list: the input bar overlays the visual bottom, which is the
         // content-space TOP — so the input area padding goes into contentInset.top.
+        // The extra spacing keeps the newest message from touching the input bar.
         collectionView.contentInset.top =
         abs(bottomConstraint) +
-        abs(controlHeight)
+        abs(controlHeight) +
+        Self.collectionViewInputSpacing
         collectionView.scrollIndicatorInsets = .init(
             top: collectionView.contentInset.top,
             left: 0,
@@ -2002,6 +2010,7 @@ open class ChannelViewController: ViewController,
         Components.channelIncomingMessageCell :
         Components.channelOutgoingMessageCell
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: type)
+        cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.identifier(for: message.id)
         cell.parentAppearance = appearance.messageCellAppearance
         cell.isEditing = channelViewModel.isEditing
         if cell.isEditing {

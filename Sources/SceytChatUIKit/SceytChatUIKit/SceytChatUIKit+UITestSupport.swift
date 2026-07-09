@@ -64,6 +64,43 @@ extension SceytChatUIKit {
         }
     }
 
+    /// A declarative description of a single message to seed into a channel for
+    /// UI tests of the open-channel (conversation) screen.
+    public struct UITestMessageSeed {
+
+        public var id: MessageId
+        public var body: String
+        /// `true` renders an incoming (left) cell, `false` an outgoing (right) cell.
+        public var incoming: Bool
+        /// Sender of the message. Set to `SceytChatUIKit.uiTestUserId` for own
+        /// (outgoing) messages; leave nil for a message with no attached user.
+        public var senderId: String?
+        public var senderName: String?
+        public var deliveryStatus: ChatMessage.DeliveryStatus
+        /// When set to another seeded message's `id`, this message becomes an inline
+        /// reply quoting that message (renders the reply preview). The referenced
+        /// message must appear earlier in the seeded array.
+        public var parentId: MessageId?
+
+        public init(
+            id: MessageId,
+            body: String,
+            incoming: Bool = true,
+            senderId: String? = nil,
+            senderName: String? = nil,
+            deliveryStatus: ChatMessage.DeliveryStatus = .displayed,
+            parentId: MessageId? = nil
+        ) {
+            self.id = id
+            self.body = body
+            self.incoming = incoming
+            self.senderId = senderId
+            self.senderName = senderName
+            self.deliveryStatus = deliveryStatus
+            self.parentId = parentId
+        }
+    }
+
     /// The fake current-user id used by `startUITestSession`. Match a seed's
     /// `lastMessageSenderId` to this to get a "You:" preview prefix.
     public static let uiTestUserId = "uitest-user"
@@ -176,6 +213,79 @@ extension SceytChatUIKit {
             // Newer `lastMessage.createdAt` bumps the channel's `sortingKey` in
             // `ChannelDTO.willSave`, moving the row to the top of its group.
             channelDTO.lastMessage = message
+        }
+    }
+
+    /// Seeds a deterministic conversation of messages into an existing channel so
+    /// the open-channel (`ChannelViewController`) screen renders with no network.
+    ///
+    /// Messages are dated in ascending order (first element oldest, last newest),
+    /// so the mirrored message list shows the last element at the visual bottom.
+    /// The channel's `lastMessage` is set to the newest seeded message.
+    ///
+    /// - Parameters:
+    ///   - unreadCount: value for the channel's unread counter.
+    ///   - lastDisplayedMessageId: when non-zero, marks the last *read* message so
+    ///     the "New messages" separator renders on it. For the separator to show,
+    ///     the newest seeded message must be `incoming` and this id must differ
+    ///     from it (see `ChannelViewModel.init`).
+    ///
+    /// UI-test only.
+    public func seedMessagesForUITests(
+        channelId: ChannelId,
+        messages: [UITestMessageSeed],
+        unreadCount: UInt64 = 0,
+        lastDisplayedMessageId: MessageId = 0
+    ) {
+        // Clear any messages already in this channel first so repeated launches
+        // seed a deterministic conversation.
+        try? database.syncWrite { context in
+            let request = MessageDTO.fetchRequest()
+            request.predicate = NSPredicate(format: "channelId == %lld", Int64(channelId))
+            let existing = (try? context.fetch(request)) ?? []
+            existing.forEach { context.delete($0) }
+        }
+
+        guard !messages.isEmpty else { return }
+
+        // A fixed base date keeps ordering stable across runs; later messages get
+        // newer dates so they sort below (visually lower) earlier ones.
+        let baseDate = Date(timeIntervalSince1970: 1_700_100_000)
+
+        try? database.syncWrite { context in
+            guard let channelDTO = ChannelDTO.fetch(id: channelId, context: context)
+            else { return }
+
+            var newestMessage: MessageDTO?
+            var created: [MessageId: MessageDTO] = [:]
+            for (index, seed) in messages.enumerated() {
+                let date = baseDate.addingTimeInterval(TimeInterval(index))
+                let message = MessageDTO.fetchOrCreate(id: seed.id, tid: 0, context: context)
+                message.body = seed.body
+                message.type = "text"
+                message.channelId = Int64(channelId)
+                message.incoming = seed.incoming
+                message.state = 0 // ChatMessage.State.none
+                message.deliveryStatus = Int16(seed.deliveryStatus.intValue)
+                message.createdAt = date.bridgeDate
+                if let senderId = seed.senderId {
+                    message.user = context.createOrUpdate(
+                        user: ChatUser(id: senderId, firstName: seed.senderName)
+                    )
+                }
+                // Inline reply: point at an already-created earlier message so the
+                // reply preview renders.
+                if let parentId = seed.parentId {
+                    message.parent = created[parentId]
+                }
+                created[seed.id] = message
+                newestMessage = message
+            }
+            channelDTO.lastMessage = newestMessage
+            channelDTO.newMessageCount = Int64(unreadCount)
+            if lastDisplayedMessageId != 0 {
+                channelDTO.lastDisplayedMessageId = Int64(lastDisplayedMessageId)
+            }
         }
     }
 }

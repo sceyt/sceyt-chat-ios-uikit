@@ -306,6 +306,8 @@ open class MessageCell: CollectionViewCell,
 
         readMoreButton.isHidden = true
         textLabel.attributedText = data.attributedView.content
+        textLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.body
+        infoView.dateLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.date
 
         if data.shouldDisplayReadMoreButton {
             readMoreButton.isHidden = false

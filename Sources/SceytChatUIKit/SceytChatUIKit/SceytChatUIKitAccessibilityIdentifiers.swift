@@ -56,5 +56,38 @@ extension SceytChatUIKit {
             /// composer holds non-whitespace text.
             public static let sendButton = "messageInput.sendButton"
         }
+
+        /// The open-channel (conversation) screen driven by `ChannelViewController`.
+        public enum Channel {
+            /// The (mirrored) collection view that renders the message list.
+            public static let collectionView = "channel.collectionView"
+            /// The channel name shown in the navigation-bar header.
+            public static let titleLabel = "channel.title"
+            /// The subtitle (member count / status) shown under the title.
+            public static let subtitleLabel = "channel.subtitle"
+            /// The floating "scroll to bottom" button.
+            public static let scrollDownButton = "channel.scrollDownButton"
+
+            /// A single message row inside the conversation list.
+            public enum Cell {
+                /// Base identifier shared by every message cell.
+                public static let root = "messageCell"
+
+                /// Per-row identifier so a specific message can be addressed
+                /// directly, e.g. `app.cells["messageCell.42"]`.
+                public static func identifier(for id: MessageId) -> String {
+                    "\(root).\(id)"
+                }
+
+                /// The label rendering the message body text.
+                public static let body = "messageCell.body"
+                /// The timestamp label.
+                public static let date = "messageCell.date"
+                /// The "New messages" separator shown on the last displayed message.
+                public static let unreadSeparator = "messageCell.unreadSeparator"
+                /// The quoted reply preview; tapping it scrolls to the parent message.
+                public static let replyView = "messageCell.replyView"
+            }
+        }
     }
 }

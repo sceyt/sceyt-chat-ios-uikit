@@ -76,11 +76,13 @@ extension ChannelViewController {
             
             headLabel.numberOfLines = 1
             headLabel.textAlignment = .left
+            headLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.titleLabel
 
             subLabel.numberOfLines = 1
             subLabel.textAlignment = .left
             subLabel.minimumScaleFactor = 0.3
             subLabel.adjustsFontSizeToFitWidth = true
+            subLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.subtitleLabel
         }
 
         open override func setupAppearance() {

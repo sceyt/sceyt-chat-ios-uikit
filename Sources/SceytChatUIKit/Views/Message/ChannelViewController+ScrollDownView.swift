@@ -20,8 +20,12 @@ extension ChannelViewController {
         
         override open func setup() {
             super.setup()
-            
+
             unreadCount.value = nil
+            // Surface as a single button for VoiceOver and UI tests (a bare
+            // UIControl is not an accessibility element by default).
+            isAccessibilityElement = true
+            accessibilityTraits = .button
         }
         
         override open func setupLayout() {
