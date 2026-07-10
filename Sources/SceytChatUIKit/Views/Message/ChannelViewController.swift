@@ -2347,6 +2347,7 @@ open class ChannelViewController: ViewController,
         in thread: Bool
     ) {
         if !thread {
+            endMessagesSearchIfNeeded()
             UIView.animate(withDuration: 0.25) { [weak self] in
                 guard let self else { return }
                 self.inputTextView.becomeFirstResponder()
@@ -3750,13 +3751,22 @@ open class ChannelViewController: ViewController,
     }
     
     //MARK: Search
-    
+
     open func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        endMessagesSearchIfNeeded()
+    }
+
+    open func endMessagesSearchIfNeeded() {
+        guard channelViewModel.isSearching else { return }
         searchBar.text = nil
         selectMessageId = nil
         NotificationCenter.default.post(name: .selectMessage, object: nil)
         searchBarActivityIndicator.stopAnimating()
         channelViewModel.stopMessagesSearch()
+        // The $isSearching sink toggles these on the next runloop tick; flip them
+        // synchronously so a caller (e.g. reply) can focus the input view right away.
+        customInputViewController.view.isHidden = false
+        searchControlsView.isHidden = true
     }
     
     open func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
