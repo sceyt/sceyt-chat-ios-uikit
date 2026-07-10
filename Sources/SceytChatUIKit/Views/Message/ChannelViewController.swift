@@ -2298,6 +2298,18 @@ open class ChannelViewController: ViewController,
         if !wasAtBottom {
             isScrollingBottom = true
         }
+        // Sending is explicit intent to land on the newest message — release the
+        // scroll anchors armed by `.reloadDataAndScroll` (unread/search open).
+        // A surviving pin makes the insert batch's completion restore the
+        // pinned message's viewport offset, which for an at-bottom sender moves
+        // the list off the bottom by the new bubble's height (hiding it under
+        // the input bar) and suppresses the send animation. Edits and forwards
+        // keep their anchors — they don't move the newest edge.
+        if channelViewModel.selectedMessageForAction == nil ||
+            channelViewModel.selectedMessageForAction?.1 == .reply {
+            pinnedScrollMessageId = 0
+            isStartedDragging = true
+        }
         channelViewModel.createAndSendUserMessage(message)
         if shouldClearText {
             inputTextView.text = nil
@@ -2856,6 +2868,13 @@ open class ChannelViewController: ViewController,
                 // reading at the bottom counts as interaction (clears the unread
                 // anchor state); no scroll is needed.
                 isStartedDragging = true
+                // The bottom anchor wins over the position pin armed by the
+                // unread/search open: a user at the bottom follows new messages.
+                // Keeping the pin here would make the completion's pin-restore
+                // hold the pinned message still — shifting the viewport off the
+                // bottom by the new bubble's height, hiding it under the input
+                // bar — and would suppress the newest-insert animation.
+                pinnedScrollMessageId = 0
             }
 
             if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil || pinnedScrollMessageId != 0 {
@@ -2901,7 +2920,8 @@ open class ChannelViewController: ViewController,
                     [MSGANIM] inserts=\(diffInserts.count) atBottom=\(isUserAtBottom) \
                     animate=\(animatesNewestInsert) compensate=\(needsNewestInsertCompensation) \
                     scrollingBottom=\(isScrollingBottom) pinned=\(pinnedScrollMessageId) \
-                    offset=\(collectionView.contentOffset.y) bottom=\(collectionView.bottomContentOffsetY)
+                    offset=\(collectionView.contentOffset.y) bottom=\(collectionView.bottomContentOffsetY) \
+                    needScroll=\(needsToScrollBottom) unread=\(unreadMessageIndexPath != nil)
                     """)
             }
 

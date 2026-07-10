@@ -57,6 +57,12 @@ class TabBarController: UITabBarController {
     }
     
     private func connect() {
+        // UI-test mode renders exclusively from seeded local data. This guard
+        // also has to cover `didBecomeActiveNotification` (which fires right
+        // after launch): `startUITestSession` sets `currentUserId` to skip the
+        // login screen, so without it the app connects to the live server and
+        // the real account's sync overwrites the seeded fixtures mid-test.
+        guard !UITestSupport.isActive else { return }
         guard let user = Config.currentUserId
         else { return }
         ConnectionService.shared.connect(username: user) {[weak self] error in

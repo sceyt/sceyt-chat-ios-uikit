@@ -48,6 +48,9 @@ enum UITestSupport {
         SceytChatUIKit.shared.startUITestSession()
         if isConversation || isConversationUnread {
             seedConversation(withUnread: isConversationUnread)
+            if isInjectionEnabled {
+                installFloatingConversationInjector()
+            }
         } else {
             SceytChatUIKit.shared.seedChannelsForUITests(isEmpty ? [] : fixtures)
         }
@@ -164,11 +167,41 @@ enum UITestSupport {
 
     // MARK: - Message injection (test-only, gated behind --uitest-inject)
 
-    /// The channel the injector targets — id 1 "Design Team", the oldest seeded
-    /// channel, which starts at the bottom of the list.
-    static let injectTargetChannelId: UInt64 = 1
+    /// The channel the injector targets. In conversation mode it is the open
+    /// conversation itself (so tests can simulate receiving a message while the
+    /// channel screen is up); in list mode it is id 1 "Design Team", the oldest
+    /// seeded channel, which starts at the bottom of the list.
+    static var injectTargetChannelId: UInt64 {
+        (isConversation || isConversationUnread) ? conversationChannelId : 1
+    }
     static let injectedShortText = "Quick hello"
     static let injectedLongText = "This is a deliberately long preview message that should wrap across two lines in the channel list to verify the two-line layout."
+
+    /// Adds a floating, window-level button that injects an incoming message into
+    /// the conversation channel. Unlike the nav-bar injector below (used by the
+    /// channel-list tests), this stays reachable while the conversation screen is
+    /// pushed. Placed at the left edge below the nav bar, small enough not to
+    /// cover any message-cell hit point (cell centers are near the screen middle).
+    /// Present only with `--uitest-inject` in conversation mode.
+    private static func installFloatingConversationInjector() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let windows = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+            guard let window = windows.first(where: { $0.isKeyWindow }) ?? windows.first
+            else { return }
+            let button = UIButton(type: .system)
+            button.setTitle("⇩", for: .normal)
+            button.accessibilityIdentifier = "uitest.injectIncoming"
+            button.backgroundColor = .systemYellow
+            button.frame = CGRect(x: 0, y: window.safeAreaInsets.top + 56, width: 44, height: 44)
+            button.layer.zPosition = .greatestFiniteMagnitude
+            button.addTarget(UITestMessageInjector.shared,
+                             action: #selector(UITestMessageInjector.injectShort),
+                             for: .touchUpInside)
+            window.addSubview(button)
+        }
+    }
 
     /// Adds two navigation-bar buttons that inject a short / long message onto the
     /// target channel. Present only with `--uitest-inject`, so the other tests
