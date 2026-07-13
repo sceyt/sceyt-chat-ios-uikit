@@ -178,19 +178,36 @@ extension MessageCell {
                     }
                 }
 
-                guard imageView.image != nil || willLoadLinkImage else { return }
-                messageLabel.numberOfLines = 1
-                stackViewV.distribution = .fillEqually
-                stackViewH.insertArrangedSubview(imageView, at: 1)
-                stackViewH.setCustomSpacing(8, after: imageView)
-                imageView.addConstraints([
-                    imageView.heightAnchor.pin(constant: Measure.imageSize.height),
-                    imageView.widthAnchor.pin(constant: Measure.imageSize.width)
-                ])
+                guard imageView.image != nil || willLoadLinkImage else {
+                    // The thumbnail of a just-rebuilt AttachmentLayout lands via
+                    // DispatchQueue.main.async and can arrive AFTER this bind (e.g. a
+                    // reaction update recreates ReplyLayout mid-flight). Wire the
+                    // observers anyway — onLoadThumbnail inserts the image view once
+                    // the thumbnail arrives; bailing without wiring loses the image
+                    // until the next rebind.
+                    setProgressHandler()
+                    return
+                }
+                insertImageViewIfNeeded()
                 setProgressHandler()
             }
         }
         
+        /// Puts the thumbnail image view into the horizontal stack. Idempotent — also
+        /// called from `onLoadThumbnail` when the thumbnail arrives after bind (the
+        /// deferred-insert path in `data.didSet`).
+        open func insertImageViewIfNeeded() {
+            guard imageView.superview == nil else { return }
+            messageLabel.numberOfLines = 1
+            stackViewV.distribution = .fillEqually
+            stackViewH.insertArrangedSubview(imageView, at: 1)
+            stackViewH.setCustomSpacing(8, after: imageView)
+            imageView.addConstraints([
+                imageView.heightAnchor.pin(constant: Measure.imageSize.height),
+                imageView.widthAnchor.pin(constant: Measure.imageSize.width)
+            ])
+        }
+
         open func setProgressHandler() {
             guard let data = data,
                   let attachment = data.attachment,
@@ -207,6 +224,7 @@ extension MessageCell {
             attachment.onLoadThumbnail = { [weak self, weak data] image in
                 guard let self, let data, self.data === data, let image
                 else { return }
+                self.insertImageViewIfNeeded()
                 self.imageView.image = image
             }
 
