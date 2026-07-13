@@ -350,18 +350,27 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
 
     func testLayoutDeallocatesDespiteInstalledClosure() {
         mock.setThumbnailPath(redPath, for: 1)
-        var layout: MessageLayoutModel.AttachmentLayout? = makeLayout(makeAttachment(id: 1), async: false)
-        weak var weakLayout = layout
+        weak var weakLayout: MessageLayoutModel.AttachmentLayout?
 
-        var settled = false
-        layout?.onLoadThumbnail = { _ in settled = true }
-        XCTAssertTrue(waitUntil { settled })
+        // Scope the strong refs to an explicit pool: views are weak-registered in
+        // AttachmentSharpThumbnailRelay, and any weak-table read (a relay post — including
+        // one from a neighboring test's leftover async work) retains+autoreleases the live
+        // members, deferring their death to the next pool drain. That is not a leak; what
+        // this test guards against is PERMANENT retention, which would survive the drain.
+        autoreleasepool {
+            var layout: MessageLayoutModel.AttachmentLayout? = makeLayout(makeAttachment(id: 1), async: false)
+            weakLayout = layout
 
-        var view: MessageCell.AttachmentImageView? = MessageCell.AttachmentImageView()
-        view?.data = layout
+            var settled = false
+            layout?.onLoadThumbnail = { _ in settled = true }
+            XCTAssertTrue(waitUntil { settled })
 
-        layout = nil
-        view = nil
+            var view: MessageCell.AttachmentImageView? = MessageCell.AttachmentImageView()
+            view?.data = layout
+
+            layout = nil
+            view = nil
+        }
         XCTAssertNil(weakLayout,
                      "the view-installed closure must not retain the layout ([weak data])")
     }
@@ -563,6 +572,101 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
         view.data = layout
         XCTAssertTrue(waitUntil { layout.isThumbnailLoadedFromFile },
                       "binding a downloaded video not yet file-backed must self-heal from disk")
+        XCTAssertEqual(view.imageView.image?.size.width, 10)
+    }
+
+    // MARK: - Sharp-thumbnail relay (instance-agnostic delivery, no rebind required)
+
+    /// Case 5: every sharp apply can land on layout instances whose `onLoadThumbnail` slot is
+    /// owned by a dead view, leaving the model "healed" while no live view painted. The relay
+    /// must deliver a sharp load that lands on a *sibling* instance to the live bound view with
+    /// NO rebind, NO completion callback, and NO self-heal (the bound layout stays .downloading,
+    /// which gates the bind-time heal — isolating the relay as the only possible healer).
+    func testRelayHealsBoundViewWhenSharpLoadLandsOnSiblingInstance() {
+        let id: AttachmentId = 300
+        let visible = makeLayout(makeAttachment(id: id, status: .downloading), async: false)
+        var settled = false
+        visible.onLoadThumbnail = { _ in settled = true }
+        XCTAssertTrue(waitUntil { settled })
+        XCTAssertFalse(visible.isThumbnailLoadedFromFile)
+
+        let view = MessageCell.AttachmentImageView()
+        view.data = visible
+
+        // Download lands: the sharp file appears and a SIBLING layout (fresh equal-identity
+        // attachment object, as the observer fan-out produces) loads it and posts to the relay.
+        mock.setThumbnailPath(redPath, for: id)
+        let sibling = makeLayout(makeAttachment(id: id, status: .done), async: false)
+        XCTAssertTrue(waitUntil { sibling.isThumbnailLoadedFromFile },
+                      "precondition: the sibling instance received the sharp load")
+
+        XCTAssertTrue(waitUntil { visible.isThumbnailLoadedFromFile },
+                      "the relay must heal the bound instance when the sharp load lands on a sibling")
+        XCTAssertEqual(imageWidth(view), 10, "the live view must paint sharp without any rebind")
+    }
+
+    /// The exact Case 5 mechanics: the bound layout's closure slot is owned by another (dead)
+    /// view — cell reuse and back-to-back reconfigures can rebind/steal the single slot in any
+    /// order. When the layout's own sharp load then fires the stolen slot, the live view gets
+    /// nothing from the closure path; the relay's direct paint must cover it.
+    func testRelayPaintsViewWhenClosureSlotIsOwnedElsewhere() {
+        let id: AttachmentId = 310
+        let attachment = makeAttachment(id: id, status: .downloading)
+        let layout = makeLayout(attachment, async: false)
+        var settled = false
+        layout.onLoadThumbnail = { _ in settled = true }
+        XCTAssertTrue(waitUntil { settled })
+
+        let view = MessageCell.AttachmentImageView()
+        view.data = layout
+        // A dying sibling view bound to the same instance overwrites the slot after us.
+        layout.onLoadThumbnail = { _ in }
+
+        mock.setThumbnailPath(redPath, for: id)
+        layout.update(attachment: attachment)
+
+        XCTAssertTrue(waitUntil { self.imageWidth(view) == 10 },
+                      "the relay must paint the live view directly even when the closure slot is owned elsewhere")
+        XCTAssertTrue(layout.isThumbnailLoadedFromFile)
+    }
+
+    /// Identity isolation: a relay post for one attachment must never repaint a view bound to a
+    /// different attachment (the multicast analog of the `===` cross-paint guard).
+    func testRelayDoesNotTouchViewsBoundToOtherAttachments() {
+        mock.setThumbnailPath(bluePath, for: 2)
+        let other = makeLayout(makeAttachment(id: 2), async: false)
+        let view = MessageCell.AttachmentImageView()
+        view.data = other
+        XCTAssertTrue(waitUntil { self.imageWidth(view) == 20 })
+
+        // A different attachment loads sharp and posts.
+        mock.setThumbnailPath(redPath, for: 1)
+        let poster = makeLayout(makeAttachment(id: 1), async: false)
+        XCTAssertTrue(waitUntil { poster.isThumbnailLoadedFromFile })
+
+        _ = waitUntil(timeout: 0.3) { false } // give a wrongful cross-paint time to land
+        XCTAssertEqual(imageWidth(view), 20,
+                       "a relay post for another attachment must not repaint this view")
+    }
+
+    /// The video view is a separate `AttachmentView` subclass with its own `data` override and
+    /// closure wiring — it must get the same relay heal.
+    func testRelayHealsVideoViewWhenSharpLoadLandsOnSiblingInstance() {
+        let id: AttachmentId = 320
+        let visible = makeLayout(makeAttachment(id: id, type: "video", name: "v.mp4", status: .downloading), async: false)
+        var settled = false
+        visible.onLoadThumbnail = { _ in settled = true }
+        XCTAssertTrue(waitUntil { settled })
+
+        let view = MessageCell.AttachmentVideoView()
+        view.data = visible
+
+        mock.setThumbnailPath(redPath, for: id)
+        let sibling = makeLayout(makeAttachment(id: id, type: "video", name: "v.mp4", status: .done), async: false)
+        XCTAssertTrue(waitUntil { sibling.isThumbnailLoadedFromFile })
+
+        XCTAssertTrue(waitUntil { visible.isThumbnailLoadedFromFile },
+                      "the relay must heal the bound video instance from a sibling's sharp load")
         XCTAssertEqual(view.imageView.image?.size.width, 10)
     }
 

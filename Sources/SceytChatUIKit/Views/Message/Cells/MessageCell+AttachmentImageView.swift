@@ -95,7 +95,7 @@ extension MessageCell {
 
                 data.onLoadThumbnail = { [weak self, weak data] thumbnail in
                     guard let self else {
-                        logger.verbose("[Attachment] onLoadThumbnail self is nil")
+                        logger.verbose("[Attachment] onLoadThumbnail self is nil \(data.map { "\($0.attachment.description) layout=\(ObjectIdentifier($0))" } ?? "layout=deallocated")")
                         return
                     }
                     guard let data, self.data === data else {

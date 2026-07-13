@@ -150,12 +150,22 @@ extension UIImageView {
         let mediaReady = attachment.status == .done || fullFileOnDisk
         let loadedFromFile = layout?.isThumbnailLoadedFromFile
 
-        // Authoritative recurrence signal: media is fully available and a sharp thumbnail exists on
-        // disk, yet the bound layout never marked itself file-backed → the cell is still blurry.
-        // Only log when this holds — a healthy "cell already sharp" tap produces no output.
-        guard mediaReady, sharpThumbOnDisk, loadedFromFile == false else { return }
+        // Recurrence signals — a healthy "cell already sharp" tap produces no output:
+        //   • layout-never-swapped: media is fully available and a sharp thumbnail exists on disk,
+        //     yet the bound layout never marked itself file-backed → the cell is still blurry.
+        //   • layout-sharp-screen-stale (Case 5): the bound layout IS file-backed, but the pixels on
+        //     screen are placeholder-sized and not the layout's thumbnail — the sharp swap was
+        //     delivered only to dead views, so the model says "healed" while the cell stayed blurry.
+        //     The size gate keeps legitimate non-thumbnail paints (e.g. the video PHAsset preview)
+        //     from tripping it.
+        let neverSwapped = loadedFromFile == false
+        let displayedIsPlaceholderSized = max(displayed.width, displayed.height) < 100
+        let screenStaleDesync = loadedFromFile == true
+            && sourceView.image !== layout?.thumbnail
+            && displayedIsPlaceholderSized
+        guard mediaReady, sharpThumbOnDisk, neverSwapped || screenStaleDesync else { return }
 
-        logger.debug("[BLURFIX] preview-tap BLURRY-CELL RECURRENCE: sharp thumbnail was on disk but the bound layout never swapped to it — "
+        logger.debug("[BLURFIX] preview-tap BLURRY-CELL RECURRENCE: case=\(neverSwapped ? "layout-never-swapped" : "layout-sharp-screen-stale") — "
             + "id=\(attachment.id) tid=\(attachment.tid) status=\(attachment.status) "
             + "displayed=\(Int(displayed.width))x\(Int(displayed.height))"
             + "fullFileOnDisk=\(fullFileOnDisk) sharpThumbOnDisk=\(sharpThumbOnDisk) "

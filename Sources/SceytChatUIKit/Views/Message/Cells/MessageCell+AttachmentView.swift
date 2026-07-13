@@ -10,7 +10,7 @@ import SceytChat
 import UIKit
 
 extension MessageCell {
-    open class AttachmentView: View {
+    open class AttachmentView: View, AttachmentSharpThumbnailObserver {
         public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
@@ -36,13 +36,41 @@ extension MessageCell {
         
         override open func setup() {
             super.setup()
-            
+
             progressView.isHidden = true
             progressLabel.isHidden = true
             pauseButton.isHidden = true
             progressView.animationDuration = 0.2
             progressView.rotationDuration = 2
             progressLabel.iconView.isHidden = true
+            // Weak registration, lives for the view's whole lifetime — the relay prunes
+            // deallocated observers itself, so no removal on reuse/teardown is needed.
+            AttachmentSharpThumbnailRelay.default.add(self)
+        }
+
+        /// Backstop delivery of the blurry→sharp swap (see `AttachmentSharpThumbnailRelay`).
+        /// The regular path — the bound layout's `onLoadThumbnail` — is a single overwritable
+        /// slot: a sibling view that binds the same layout later and deallocates (cell reuse +
+        /// back-to-back reconfigures) leaves the slot pointing at a dead owner, and a sharp load
+        /// can also land on a duplicate layout instance this view never bound. The relay is keyed
+        /// by attachment identity and per-view, so neither failure mode can steal it.
+        open func attachmentSharpThumbnailDidLoad(_ attachment: ChatMessage.Attachment, image: UIImage) {
+            guard let layout = data,
+                  layout.type == .image || layout.type == .video,
+                  layout.attachment == attachment
+            else { return }
+            // Heal the bound layout instance first, so later rebinds/updates see the sharp,
+            // file-backed state. setFileBackedThumbnail re-posts to the relay; on that nested
+            // entry the state check below is already satisfied, so the recursion terminates.
+            if !(layout.isThumbnailLoadedFromFile && layout.thumbnail === image) {
+                layout.setFileBackedThumbnail(image)
+            }
+            // setFileBackedThumbnail normally paints via the layout's onLoadThumbnail fire, but
+            // that slot may be owned by a dead view — paint directly so the screen never
+            // depends on slot ownership.
+            if imageView.image !== image {
+                imageView.image = image
+            }
         }
         
         override open func setupAppearance() {
@@ -199,14 +227,20 @@ extension MessageCell {
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                         guard let self, let layout = self.data, layout.attachment == attachment
-                        else { return }
+                        else {
+                            logger.verbose("[Attachment] reloadThumbnailFromFile retry dropped — view died or rebound \(attachment.description)")
+                            return
+                        }
                         self.reloadThumbnailFromFile(for: attachment, retriesLeft: retriesLeft - 1)
                     }
                     return
                 }
                 DispatchQueue.main.async { [weak self] in
                     guard let self, let layout = self.data, layout.attachment == attachment
-                    else { return }
+                    else {
+                        logger.verbose("[Attachment] reloadThumbnailFromFile apply dropped — view died or rebound \(attachment.description)")
+                        return
+                    }
                     layout.setFileBackedThumbnail(image)
                 }
             }

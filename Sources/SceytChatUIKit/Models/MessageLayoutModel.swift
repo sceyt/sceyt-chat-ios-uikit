@@ -1373,6 +1373,14 @@ extension MessageLayoutModel {
                 self.isThumbnailLoadedFromFile = resultLoadedFromFile
                 self.isLoadedThumbnail = true
                 self.onLoadThumbnail?(resultThumbnail)
+                // onLoadThumbnail is a single overwritable slot: with duplicate layout
+                // instances and attachment-view churn it can be owned by an already-dead
+                // view when the sharp load lands, and the model then reads "healed" while
+                // no live view ever painted. Announce sharp file-backed applies
+                // instance-agnostically so any live view showing this attachment can heal.
+                if resultLoadedFromFile, let image = resultThumbnail {
+                    AttachmentSharpThumbnailRelay.default.post(attachment, image: image)
+                }
             }
         }
         
@@ -1407,6 +1415,10 @@ extension MessageLayoutModel {
             isThumbnailLoadedFromFile = true
             isLoadedThumbnail = true
             onLoadThumbnail?(image)
+            // Re-broadcast so sibling layout instances of the same attachment heal too.
+            // Observers gate on their layout state before re-applying, so the nested
+            // post a healing observer triggers terminates after one round trip.
+            AttachmentSharpThumbnailRelay.default.post(attachment, image: image)
         }
         
         @discardableResult
