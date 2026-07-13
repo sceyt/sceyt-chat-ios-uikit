@@ -110,7 +110,7 @@ open class MessageCell: CollectionViewCell,
 
     open override func setup() {
         super.setup()
-        
+
         unreadMessagesSeparatorView.isHidden = true
         replyCountView.addTarget(
             self,

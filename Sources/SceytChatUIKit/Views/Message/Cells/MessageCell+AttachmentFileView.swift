@@ -90,6 +90,18 @@ extension MessageCell {
                 }
                 titleLabel.text = data.name
                 sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
+
+                // The file-preview thumbnail is loaded asynchronously (and re-loaded after a
+                // download completes), so at bind time — and right after a first download —
+                // data.thumbnail may still be the default icon. Without this hook the sharp
+                // preview lands on the layout but never reaches the cell until the screen
+                // is reopened.
+                data.onLoadThumbnail = { [weak self, weak data] thumbnail in
+                    guard let self, let data, self.data === data else { return }
+                    guard data.transferStatus == .done else { return }
+                    self.imageView.image = thumbnail ?? self.appearance.attachmentIconProvider.provideVisual(for: data.attachment)
+                    self.playButton.isHidden = !(thumbnail != nil && self.isVideoFile)
+                }
             }
         }
 

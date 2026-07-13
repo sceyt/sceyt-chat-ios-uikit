@@ -236,14 +236,14 @@ extension MessageCell {
                     attachment: chatAttachment,
                     objectIdKey: chatAttachment.description + "reply"
                 ) { _ in
-                    
-                } completion: { done in
+
+                } completion: { [weak data] done in
                     if done.error == nil {
                         fileProvider.removeProgressObserver(message: done.message, attachment: done.attachment)
                     }
                     // Reloads the thumbnail from the now-downloaded file; the
                     // onLoadThumbnail hook above pushes it into the image view.
-                    data.attachment?.update(attachment: done.attachment)
+                    data?.attachment?.update(attachment: done.attachment)
                 }
 
             // The reply view used to only *observe* progress and never started the
@@ -255,10 +255,10 @@ extension MessageCell {
                 fileProvider.downloadMessageAttachmentsIfNeeded(
                     message: message,
                     attachments: [chatAttachment]
-                ) { resolvedMessage, error in
+                ) { [weak data] resolvedMessage, error in
                     guard error == nil else { return }
                     let resolved = resolvedMessage?.attachments?.first(where: { $0.id == chatAttachment.id }) ?? chatAttachment
-                    data.attachment?.update(attachment: resolved)
+                    data?.attachment?.update(attachment: resolved)
                 }
             }
         }

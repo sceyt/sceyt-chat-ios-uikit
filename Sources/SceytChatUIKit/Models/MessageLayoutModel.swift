@@ -1274,7 +1274,7 @@ extension MessageLayoutModel {
                 loadThumbnail()
             }
         }
-        
+
         open func loadThumbnail() {
             // Snapshot all inputs before any concurrent work. The switch below runs
             // only on local variables so the background thread never reads or writes

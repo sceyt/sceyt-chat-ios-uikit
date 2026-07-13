@@ -221,14 +221,14 @@ extension MessageCell {
                 .progress(
                     message: message,
                     attachment: data.attachment,
-                    objectIdKey: data.attachment.description
-                ) { [weak self] progress in
-                    guard let self, self.data == data
+                    objectIdKey: "messagecell." + data.attachment.description
+                ) { [weak self, weak data] progress in
+                    guard let self, let data, self.data == data
                     else {
-                        logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(data.attachment.description)")
+                        logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(progress.attachment.description)")
                         return
                     }
-                    
+
                     DispatchQueue.main.async { [weak self] in
                         if needsToUpdateStatus {
                             needsToUpdateStatus = false
@@ -237,10 +237,10 @@ extension MessageCell {
                         self?.setProgress(progress)
                         self?.lastAttachmentTransferProgress = progress
                     }
-                } completion: {[weak self] done in
-                    guard self?.data == data
+                } completion: {[weak self, weak data] done in
+                    guard let data, self?.data == data
                     else {
-                        logger.verbose("[Attachment] completion self is nil \(data.attachment.description)")
+                        logger.verbose("[Attachment] completion self is nil \(done.attachment.description)")
                         return
                     }
                     logger.debug("[Attachment] completion \(done.attachment.status)")

@@ -61,11 +61,22 @@ open class AttachmentTransfer: DataProvider {
         completion: CompletionBlock? = nil
     ) {
         let key = Self.key(message: message, attachment: attachment)
-        if cache[key] == nil {
-            cache[key] = [_Obj(progress: block, completion: completion)]
-        } else if cache[key]?.first(where: { !$0.idKey.isEmpty && $0.idKey == objectIdKey}) == nil {
-            cache[key]?.append(_Obj(progress: block, completion: completion))
+        let obj = _Obj(progress: block, completion: completion, idKey: objectIdKey)
+        var objs = cache[key, default: []]
+        if !objectIdKey.isEmpty,
+           let index = objs.firstIndex(where: { $0.idKey == objectIdKey }) {
+            // Replace this subscriber's previous registration (a reused cell
+            // re-binding the same attachment) instead of accumulating duplicates.
+            // Note: the old code never stored idKey on _Obj, so this branch could
+            // never match and every rebind appended another closure — each one
+            // strongly retaining its captures in this singleton forever.
+            objs[index] = obj
+        } else {
+            objs.append(obj)
         }
+        // updateValue bypasses the FileProviderCache subscript, whose setter
+        // appends instead of replacing.
+        cache.updateValue(objs, forKey: key)
     }
     
     open func currentProgressPercent(message: ChatMessage, attachment: ChatMessage.Attachment) -> Double? {
