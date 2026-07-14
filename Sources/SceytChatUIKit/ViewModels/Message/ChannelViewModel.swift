@@ -757,14 +757,14 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             if indexPath.item > 0,
                let prevModel {
                 if prevModel.isSystemMessage || model.isSystemMessage {
-                    contentInsets.top = 12
+                    contentInsets.top = Layouts.systemMessageSpacing
                 } else if model.message.incoming == prevModel.message.incoming {
-                    contentInsets.top = 2
+                    contentInsets.top = Layouts.sameSenderSpacing
                 } else {
-                    contentInsets.top = 6
+                    contentInsets.top = Layouts.differentSenderSpacing
                 }
             } else if indexPath.item == 0 {
-                contentInsets.top = 2
+                contentInsets.top = Layouts.firstMessageSpacing
             }
             model.contentInsets = contentInsets
         }
@@ -3125,6 +3125,22 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
 }
 
 public extension ChannelViewModel {
+
+    /// Vertical spacing (top content inset, in points) applied between message
+    /// cells by `updateMessageContentInsets(for:at:prevModel:prevIndexPath:)`.
+    /// Override these statics at app startup to customize message list spacing.
+    enum Layouts {
+        /// Spacing above a message when it, or the message above it, is a system message.
+        public static var systemMessageSpacing: CGFloat = 8
+        /// Spacing above a message whose direction matches the message above it
+        /// (both incoming or both outgoing).
+        public static var sameSenderSpacing: CGFloat = 4
+        /// Spacing above a message whose direction differs from the message above it.
+        public static var differentSenderSpacing: CGFloat = 8
+        /// Spacing above the first message in a day section.
+        public static var firstMessageSpacing: CGFloat = 8
+    }
+
     enum MessageAction {
         case edit
         case reply
