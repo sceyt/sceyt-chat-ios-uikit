@@ -89,7 +89,13 @@ open class MessageLayoutModel {
     public private(set) var unsupportedViewMeasure: CGSize = .zero
     public private(set) var lastCharRect: CGRect
     public private(set) var replyCount = 0
-    public              var contentInsets: UIEdgeInsets = .zero
+    public var contentInsets: UIEdgeInsets = .zero {
+        didSet {
+            if oldValue != contentInsets {
+                contentVersion &+= 1
+            }
+        }
+    }
     public private(set) var messageDeliveryStatus: ChatMessage.DeliveryStatus
     public private(set) var messageUserTitle: String = ""
     public private(set) var parentMessageUserTitle: String

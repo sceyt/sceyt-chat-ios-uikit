@@ -2770,10 +2770,16 @@ open class ChannelViewController: ViewController,
             // consistent by construction — no matter how many intermediate
             // observer events were coalesced or how stale `paths` has become.
             let newSnapshot = buildSnapshotFromObserver()
+            // Observer/VM reload hints arrive in DATA space (oldest-first), but
+            // computeDiff sanitizes hints as pre-state positions in the MIRRORED
+            // `appliedSnapshot` — convert before diffing, while `appliedSnapshot`
+            // is still the pre-state. Hints that don't fit the applied bounds are
+            // dropped; the contentVersion diff inside computeDiff covers those.
+            let reloadHints = Set(paths.reloads.compactMap { uiIndexPath(fromData: $0) })
             let diff = Self.computeDiff(
                 from: appliedSnapshot,
                 to: newSnapshot,
-                reloadHints: Set(paths.reloads)
+                reloadHints: reloadHints
             )
 
             // No structural or content change → cheap exit. Keeps the
