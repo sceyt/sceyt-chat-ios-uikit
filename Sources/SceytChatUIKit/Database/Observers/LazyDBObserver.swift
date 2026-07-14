@@ -27,8 +27,9 @@ import Foundation
 /// - All Core Data work runs on the context's queue — typically a private background queue
 ///   passed in at init.
 /// - ``onWillChange``, ``onDidChange``, and ``onReset`` are delivered on the **main queue**.
-/// - ``rawItems`` blocks the caller with `performAndWait` to read items off the context
-///   queue, and returns a value-type copy that is safe to pass across threads.
+/// - ``rawItems`` reads the snapshot published at the end of the last change cycle without
+///   touching the context queue, so the main thread never waits behind in-flight Core Data
+///   work. It returns a value-type copy that is safe to pass across threads.
 ///
 /// ## Lifecycle
 ///
@@ -107,6 +108,12 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     /// ``rawItems`` under `performAndWait`.
     private var _items: [Item]?
 
+    /// Latest published snapshot, guarded by ``queue``. Written on the context queue at
+    /// the end of each change cycle, read from any thread without touching the MOC —
+    /// so ``rawItems`` never blocks the main thread behind Core Data work. `nil` only
+    /// before the initial fetch cycle publishes and after ``stopObserving()``.
+    private var _snapshot: [Item]?
+
     /// Snapshot captured at `controllerWillChangeContent` so ``rawItems`` can serve the
     /// previous list during the ``onWillChange`` callback.
     private var _willChangeItems: [Item]?
@@ -121,15 +128,22 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     /// consumers can capture pre-change state. Outside that callback it returns the
     /// post-change snapshot.
     ///
-    /// Reading blocks briefly on the FRC's context queue via `performAndWait` so the
-    /// values are read safely off the context. The returned array is a value-type copy
-    /// that can be passed across threads.
+    /// Reads the snapshot published at the end of the last change cycle without touching
+    /// the FRC's context queue, so the caller (typically the main thread) never waits
+    /// behind in-flight Core Data work. Only before the initial fetch cycle has published
+    /// does it fall back to computing the snapshot on the context queue via
+    /// `performAndWait`. The returned array is a value-type copy that can be passed
+    /// across threads.
     public var rawItems: [Item] {
         if onWillChange != nil {
             let willChangeState: (active: Bool, cachedItems: [Item]?) = queue.sync { (_notifyingWillChange, _willChangeItems) }
             if willChangeState.active {
                 return willChangeState.cachedItems ?? []
             }
+        }
+
+        if let snapshot = queue.sync(execute: { _snapshot }) {
+            return snapshot
         }
 
         var rawItems: [Item]!
@@ -254,6 +268,7 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     public func stopObserving() {
         frc.delegate = nil
         isInitialized = false
+        queue.sync { _snapshot = nil }
         frc.managedObjectContext.perform { [weak self] in
             self?._items = nil
         }
@@ -342,6 +357,10 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
             sorting: sorting
         )
         _items = items
+        // Publish before notifyDidChange dispatches to main, so consumers reading
+        // rawItems from the onDidChange callback see a snapshot at least as new as
+        // the changes they received.
+        queue.sync { _snapshot = items }
         return items
     }
 }

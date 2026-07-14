@@ -226,6 +226,112 @@ final class LazyDBObserverTests: XCTestCase {
         XCTAssertEqual(["1"], observer.rawItems)
     }
 
+    // MARK: - Published-snapshot main-thread safety
+
+    /// Regression test for the main-thread freeze: `rawItems` must serve the published
+    /// snapshot without waiting on the context queue, even while that queue is stuck in
+    /// a long-running block (originally: TextKit measurement inside another observer's
+    /// `itemCreator` on the shared observable context).
+    func test_rawItems_doesNotBlock_whileContextQueueIsBusy() throws {
+        try syncWrite { ctx in
+            let item = NSEntityDescription.insertNewObject(forEntityName: "ChecksumDTO", into: ctx) as! ChecksumDTO
+            item.data = "1"
+        }
+
+        observer = LazyDBObserver<String, ChecksumDTO>(
+            context: context,
+            fetchRequest: fetchRequest,
+            itemCreator: { $0.data ?? "" }
+        )
+        try startObservingAndWaitForInitialResults()
+
+        // Jam the context queue. The block self-releases after 2 seconds so a
+        // regression fails the elapsed-time assertion instead of hanging the suite.
+        let release = DispatchSemaphore(value: 0)
+        let jammed = DispatchSemaphore(value: 0)
+        context.perform {
+            jammed.signal()
+            _ = release.wait(timeout: .now() + 2)
+        }
+        XCTAssertEqual(jammed.wait(timeout: .now() + defaultTimeout), .success)
+
+        let start = Date()
+        let items = observer.rawItems
+        let elapsed = Date().timeIntervalSince(start)
+        release.signal()
+
+        XCTAssertEqual(items, ["1"])
+        XCTAssertLessThan(elapsed, 0.5, "rawItems waited on the busy context queue — main-thread freeze regression")
+    }
+
+    /// Hammers `rawItems` from many threads while change cycles are produced on the
+    /// context queue — guards against data races and torn snapshot reads across cycles.
+    func test_rawItems_concurrentReads_duringWrites_areSafe() throws {
+        observer = LazyDBObserver<String, ChecksumDTO>(
+            context: context,
+            fetchRequest: fetchRequest,
+            itemCreator: { $0.data ?? "" }
+        )
+        try startObservingAndWaitForInitialResults()
+
+        let totalWrites = 50
+        let settled = expectation(description: "snapshot settles at \(totalWrites) items")
+        // Deliveries queued on main can all observe the final snapshot.
+        settled.assertForOverFulfill = false
+        observer.onDidChange = { [weak observer] _ in
+            if observer?.rawItems.count == totalWrites {
+                settled.fulfill()
+            }
+        }
+
+        let writesDone = expectation(description: "all writes saved")
+        DispatchQueue(label: "test.writer").async {
+            for i in 0..<totalWrites {
+                try? self.syncWrite { ctx in
+                    let item = NSEntityDescription.insertNewObject(forEntityName: "ChecksumDTO", into: ctx) as! ChecksumDTO
+                    item.data = String(format: "%02d", i)
+                }
+            }
+            writesDone.fulfill()
+        }
+
+        DispatchQueue.concurrentPerform(iterations: 1000) { _ in
+            let items = observer.rawItems
+            // Every published snapshot is a consistent FRC state, so it must always
+            // come out in fetch order — a torn read would break this.
+            XCTAssertEqual(items, items.sorted())
+        }
+
+        wait(for: [writesDone, settled], timeout: defaultTimeout)
+        XCTAssertEqual(observer.rawItems, (0..<totalWrites).map { String(format: "%02d", $0) })
+    }
+
+    /// The snapshot must be published before `onDidChange` reaches the main queue, so
+    /// consumers reading `rawItems` inside the callback (e.g.
+    /// `ChannelListViewModel.rebuildLocalSnapshot`) see data at least as new as the
+    /// delivered changes.
+    func test_rawItems_insideOnDidChange_reflectsDeliveredChanges() throws {
+        observer = LazyDBObserver<String, ChecksumDTO>(
+            context: context,
+            fetchRequest: fetchRequest,
+            itemCreator: { $0.data ?? "" }
+        )
+        try startObservingAndWaitForInitialResults()
+
+        let delivered = expectation(description: "insert delivered")
+        observer.onDidChange = { [weak observer] changes in
+            guard changes.contains(where: { if case .insert = $0 { return true } else { return false } }) else { return }
+            XCTAssertEqual(observer?.rawItems, ["1"], "snapshot was not published before onDidChange delivery")
+            delivered.fulfill()
+        }
+
+        try syncWrite { ctx in
+            let item = NSEntityDescription.insertNewObject(forEntityName: "ChecksumDTO", into: ctx) as! ChecksumDTO
+            item.data = "1"
+        }
+        wait(for: [delivered], timeout: defaultTimeout)
+    }
+
     // MARK: - Helpers
 
     @discardableResult
