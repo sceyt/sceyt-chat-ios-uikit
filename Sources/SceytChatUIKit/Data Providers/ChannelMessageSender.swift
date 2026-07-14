@@ -191,7 +191,7 @@ open class ChannelMessageSender: DataProvider {
                         // Preserve pending votes from the original message
                         var pendingVotes: NSSet? = nil
                         if chatMessage.poll?.pendingVotes != nil {
-                            let existingMessageDTO = MessageDTO.fetch(tid: Int64(chatMessage.tid), context: $0)
+                            let existingMessageDTO = MessageDTO.fetch(tid: Int64(chatMessage.tid), channelId: Int64(self.channelId), context: $0)
                             pendingVotes = existingMessageDTO?.poll?.pendingVotes
                         }
 

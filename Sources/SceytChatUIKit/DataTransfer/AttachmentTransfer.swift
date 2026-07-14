@@ -148,7 +148,7 @@ open class AttachmentTransfer: DataProvider {
                                 dto = MessageDTO.fetch(id: message.id, context: $0)
                             }
                             if dto == nil {
-                                dto = MessageDTO.fetch(tid: message.tid, context: $0)
+                                dto = MessageDTO.fetch(tid: message.tid, channelId: Int64(message.channelId), context: $0)
                             }
                         }
                         return dto != nil

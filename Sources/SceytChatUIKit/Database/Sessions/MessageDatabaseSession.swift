@@ -122,7 +122,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
 
     @discardableResult
     public func createOrUpdate(message: Message, channelId: ChannelId, changedBy: User?) -> MessageDTO {
-        let dto = MessageDTO.fetchOrCreate(id: message.id, tid: message.incoming ? 0 : Int64(message.tid), context: self).map(message)
+        let dto = MessageDTO.fetchOrCreate(id: message.id, tid: message.incoming ? 0 : Int64(message.tid), channelId: Int64(channelId), context: self).map(message)
         dto.channelId = Int64(channelId)
         let ownerChannel = ChannelDTO.fetch(id: channelId, context: self)
         dto.user = createOrUpdate(user: message.user)
@@ -218,7 +218,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func update(message: Message, channelId: ChannelId) -> MessageDTO? {
-        if MessageDTO.fetch(tid: Int64(message.tid), context: self) != nil {
+        if MessageDTO.fetch(tid: Int64(message.tid), channelId: Int64(channelId), context: self) != nil {
             return createOrUpdate(message: message, channelId: channelId)
         }
         if MessageDTO.fetch(id: message.id, context: self) != nil {
@@ -236,7 +236,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             predicates.append(.init(format: "id == %lld", chatMessage.id))
         }
         if chatMessage.tid != 0 {
-            predicates.append(.init(format: "tid == %lld", chatMessage.tid))
+            predicates.append(.init(format: "tid == %lld AND channelId == %lld", chatMessage.tid, Int64(chatMessage.channelId)))
         }
         guard !predicates.isEmpty
         else { return nil }
@@ -912,7 +912,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             predicates.append(.init(format: "id == %lld", chatMessage.id))
         }
         if chatMessage.tid != 0 {
-            predicates.append(.init(format: "tid == %lld", chatMessage.tid))
+            predicates.append(.init(format: "tid == %lld AND channelId == %lld", chatMessage.tid, Int64(chatMessage.channelId)))
         }
         guard !predicates.isEmpty
         else { return }

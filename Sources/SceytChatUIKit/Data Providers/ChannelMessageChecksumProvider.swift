@@ -95,7 +95,7 @@ open class ChannelMessageChecksumProvider: DataProvider {
                     guard let self else { return }
                     if let checksum, let link = checksum.data {
                         self.database.read { context -> ChatMessage.Attachment? in
-                            var dto = MessageDTO.fetch(tid: message.tid, context: context)
+                            var dto = MessageDTO.fetch(tid: message.tid, channelId: Int64(message.channelId), context: context)
                             if dto == nil, message.id > 0 {
                                 dto = MessageDTO.fetch(id: message.id, context: context)
                                 logger.debug("Found message by tid not found \(message.tid) is fetch by id \(message.id) \(dto != nil)")
