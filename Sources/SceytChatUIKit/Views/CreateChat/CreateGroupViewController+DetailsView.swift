@@ -43,6 +43,11 @@ extension CreateGroupViewController {
             super.setupLayout()
             addSubview(avatarButton)
             addSubview(mainStackView)
+
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelForm
+            avatarButton.accessibilityIdentifier = AID.avatar
+            subjectField.accessibilityIdentifier = AID.name
+            descriptionField.accessibilityIdentifier = AID.about
             avatarButton.centerXAnchor.pin(to: centerXAnchor)
             avatarButton.topAnchor.pin(to: topAnchor, constant: 16)
             avatarButton.resize(anchors: [.height(Layouts.avatarSize), .width(Layouts.avatarSize)])

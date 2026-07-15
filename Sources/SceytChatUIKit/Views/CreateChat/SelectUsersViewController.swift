@@ -54,7 +54,12 @@ open class SelectUsersViewController: ViewController,
                                                             target: self,
                                                             action: #selector(nextAction(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
-        
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.nextButton
+
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.tableView
+        searchController.searchBar.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.searchBar
+        selectedUserListView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.selectedList
+
         definesPresentationContext = true
 
         KeyboardObserver()
@@ -175,7 +180,11 @@ open class SelectUsersViewController: ViewController,
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.selectableUserCell.self)
             cell.parentAppearance = appearance.userCellAppearance
             cell.selectionStyle = .none
-            cell.userData = selectMemberViewModel.user(at: indexPath)
+            let user = selectMemberViewModel.user(at: indexPath)
+            cell.userData = user
+            cell.accessibilityIdentifier = user
+                .map { SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.Cell.identifier(for: $0.id) }
+                ?? SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.Cell.root
             return cell
         default:
             fatalError("Unchecked section")

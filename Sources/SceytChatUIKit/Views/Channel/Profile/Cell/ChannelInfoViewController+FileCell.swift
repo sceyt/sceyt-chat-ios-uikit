@@ -43,10 +43,17 @@ extension ChannelInfoViewController {
             
             downloadButton.layer.masksToBounds = true
             downloadButton.addTarget(self, action: #selector(onDownloadTapped), for: .touchUpInside)
-            
+
             progressView.isUserInteractionEnabled = false
             progressView.animationDuration = 0.2
             progressView.rotationDuration = 2
+
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.FileCell
+            accessibilityIdentifier = AID.root
+            iconView.accessibilityIdentifier = AID.icon
+            titleLabel.accessibilityIdentifier = AID.name
+            detailLabel.accessibilityIdentifier = AID.detail
+            downloadButton.accessibilityIdentifier = AID.downloadButton
         }
         
         override open func setupAppearance() {

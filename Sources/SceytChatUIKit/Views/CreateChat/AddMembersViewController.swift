@@ -28,12 +28,14 @@ open class AddMembersViewController: SelectUsersViewController {
                                                             style: .done,
                                                             target: self,
                                                             action: #selector(cancelAction(_:)))
-        
+        navigationItem.leftBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.AddMembers.cancelButton
+
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.Nav.Bar.done,
                                                            style: .done,
                                                            target: self,
                                                            action: #selector(doneAction(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.AddMembers.doneButton
         addMembersViewModel.$event1
             .compactMap { $0 }
             .sink { [weak self] in

@@ -59,7 +59,7 @@ enum UITestSupport {
 
     #if DEBUG
     /// One channel per cell state the UI tests assert on. Ids are fixed so a test
-    /// can address a row directly via `channelCell.<id>`.
+    /// can address a row directly via `sceyt_chat_channel_list_cell.<id>`.
     private static var fixtures: [SceytChatUIKit.UITestChannelSeed] {
         [
             .init(id: 1,

@@ -30,6 +30,9 @@ extension ChannelInviteLinkViewController {
             copyButton.setImage(appearance.copyImage.withRenderingMode(.alwaysTemplate), for: .normal)
             copyButton.tintColor = appearance.buttonTitleColor
             copyButton.addTarget(self, action: #selector(copyButtonTapped), for: .touchUpInside)
+
+            linkLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.linkLabel
+            copyButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.copyButton
         }
 
         open override func setupLayout() {

@@ -35,6 +35,8 @@ open class ChannelSearchResultsBaseViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SearchResults.tableView
+        emptyStateView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SearchResults.emptyView
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()

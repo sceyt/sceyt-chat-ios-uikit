@@ -35,6 +35,7 @@ open class EditChannelViewController: ViewController,
         tableView.separatorStyle = .none
         tableView.delegate = self
         tableView.dataSource = self
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.EditChannel.tableView
         tableView.sectionHeaderHeight = 24
         tableView.sectionFooterHeight = 0
         
@@ -44,6 +45,7 @@ open class EditChannelViewController: ViewController,
                                                   style: .done,
                                                   cancellables: &subscriptions,
                                                   action: { [weak self] in self?.onDone() })
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.EditChannel.doneButton
         
         profileViewModel.$isDoneEnabled.receive(on: DispatchQueue.main).sink { [weak self] in
             self?.navigationItem.rightBarButtonItem?.isEnabled = $0
@@ -145,6 +147,7 @@ open class EditChannelViewController: ViewController,
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelEditAvatarCell.self)
             cell.parentAppearance = appearance.avatarCellAppearance
             cell.selectionStyle = .none
+            cell.avatarButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.EditChannel.avatar
             profileViewModel.$avatarUrl.receive(on: DispatchQueue.main).sink {
                 cell.data = URL(string: $0 ?? "")
             }.store(in: &cell.subscriptions)
@@ -165,11 +168,13 @@ open class EditChannelViewController: ViewController,
                 cell.textView.placeholder = profileViewModel.subjectPlaceholder
                 cell.textView.text = profileViewModel.subject
                 cell.separatorView.isHidden = false
+                cell.textView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.EditChannel.name
             case 1:
                 cell.allowsNewline = true
                 cell.textView.placeholder = profileViewModel.aboutPlaceholder
                 cell.textView.text = profileViewModel.metadata
                 cell.separatorView.isHidden = true
+                cell.textView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.EditChannel.about
             default:
                 break
             }
@@ -179,6 +184,7 @@ open class EditChannelViewController: ViewController,
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelEditURICell.self)
             cell.parentAppearance = appearance.uriCellAppearance
             cell.textField.text = profileViewModel.channel.uri
+            cell.textField.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.EditChannel.uri
             cell.onTextChanged = { [weak self] in guard let self else { return }
                 let uri = $0?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 self.profileViewModel.uri = uri

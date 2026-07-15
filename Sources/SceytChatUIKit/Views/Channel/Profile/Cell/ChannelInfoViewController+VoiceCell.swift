@@ -47,13 +47,21 @@ extension ChannelInfoViewController {
             
             titleLabel.lineBreakMode = .byTruncatingMiddle
             playButton.addTarget(self, action: #selector(playButtonAction(_:)), for: .touchUpInside)
-            
+
             downloadButton.layer.masksToBounds = true
             downloadButton.addTarget(self, action: #selector(onDownloadTapped), for: .touchUpInside)
-            
+
             progressView.isUserInteractionEnabled = false
             progressView.animationDuration = 0.2
             progressView.rotationDuration = 2
+
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.VoiceCell
+            accessibilityIdentifier = AID.root
+            playButton.accessibilityIdentifier = AID.playButton
+            titleLabel.accessibilityIdentifier = AID.title
+            dateLabel.accessibilityIdentifier = AID.date
+            durationLabel.accessibilityIdentifier = AID.duration
+            downloadButton.accessibilityIdentifier = AID.downloadButton
         }
         
         override open func setupAppearance() {

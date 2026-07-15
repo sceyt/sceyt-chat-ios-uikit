@@ -341,6 +341,13 @@ open class ChannelViewController: ViewController,
         collectionView.dataSource = self
         collectionView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.collectionView
         unreadCountView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.scrollDownButton
+        unreadMentionCountView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.unreadMentionButton
+        joinGlobalChannelButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.joinButton
+        emptyStateView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.emptyView
+        searchBar.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.searchBar
+        searchControlsView.nextResultButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Search.nextButton
+        searchControlsView.prevResultButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Search.previousButton
+        searchControlsView.resultsCounterLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Search.resultLabel
 
         updateUnreadViewVisibility()
         updateTitle()

@@ -71,6 +71,7 @@ open class CreatePollViewController: ViewController,
         tableView.showsVerticalScrollIndicator = false
         tableView.keyboardDismissMode = .interactive
         tableView.isEditing = true
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.tableView
 
         let footer = UIView()
         footer.frame.size.height = .leastNormalMagnitude
@@ -95,6 +96,7 @@ open class CreatePollViewController: ViewController,
             target: self,
             action: #selector(cancelTapped)
         )
+        navigationItem.leftBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.cancelButton
 
         navigationItem.rightBarButtonItem = UIBarButtonItem(
             title: appearance.createText,
@@ -102,6 +104,7 @@ open class CreatePollViewController: ViewController,
             target: self,
             action: #selector(createTapped)
         )
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.createButton
 
         updateCreateButtonState()
     }
@@ -200,6 +203,7 @@ open class CreatePollViewController: ViewController,
         case 0:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: QuestionFieldCell.self)
             cell.parentAppearance = appearance.questionFieldCellAppearance
+            cell.textView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.questionField
             cell.textView.text = viewModel.poll.question
             cell.placeholderLabel.text = appearance.questionPlaceholderText
             cell.updatePlaceholderVisibility()
@@ -218,6 +222,8 @@ open class CreatePollViewController: ViewController,
             if indexPath.row < viewModel.poll.options.count {
                 let cell = tableView.dequeueReusableCell(for: indexPath, cellType: OptionFieldCell.self)
                 cell.parentAppearance = appearance.optionFieldCellAppearance
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.optionCell
+                cell.textView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.optionField
                 cell.textView.text = viewModel.poll.options[indexPath.row]
                 cell.placeholderLabel.text = appearance.optionPlaceholderText(indexPath.row + 1)
                 cell.updatePlaceholderVisibility()
@@ -247,6 +253,7 @@ open class CreatePollViewController: ViewController,
             } else {
                 let cell = tableView.dequeueReusableCell(for: indexPath, cellType: AddOptionCell.self)
                 cell.parentAppearance = appearance.addOptionCellAppearance
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.addOptionButton
                 cell.iconView.image = .messageActionMoreReactions
                 cell.titleLabel.text = appearance.addOptionText
                 cell.onTapped = { [weak self] in
@@ -262,12 +269,14 @@ open class CreatePollViewController: ViewController,
             case 0:
                 cell.titleLabel.text = appearance.showVoterNamesText
                 cell.switchControl.isOn = viewModel.poll.isAnonymous
+                cell.switchControl.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.anonymousSwitch
                 cell.onSwitchChanged = { [weak self] isOn in
                     self?.viewModel.updateShowVoterNames(isOn)
                 }
             case 1:
                 cell.titleLabel.text = appearance.allowMultipleAnswersText
                 cell.switchControl.isOn = viewModel.poll.allowMultipleAnswers
+                cell.switchControl.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreatePoll.multipleAnswersSwitch
                 cell.onSwitchChanged = { [weak self] isOn in
                     self?.viewModel.updateAllowMultipleAnswers(isOn)
                 }

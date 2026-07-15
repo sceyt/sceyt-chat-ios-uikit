@@ -263,6 +263,9 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         view.addSubview(searchUserBarView)
         view.addSubview(categoryTabBar) // added last so it stays on top
 
+        categoryTabBar.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.GlobalSearch.categoryTabBar
+        searchUserBarView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.GlobalSearch.userBar
+
         userBarBottom = searchUserBarView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
 
         NSLayoutConstraint.activate([

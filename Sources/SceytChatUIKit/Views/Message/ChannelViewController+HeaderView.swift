@@ -73,7 +73,8 @@ extension ChannelViewController {
             
             profileImageView.layer.masksToBounds = true
             profileImageView.contentMode = .scaleAspectFill
-            
+            profileImageView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.avatar
+
             headLabel.numberOfLines = 1
             headLabel.textAlignment = .left
             headLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.titleLabel

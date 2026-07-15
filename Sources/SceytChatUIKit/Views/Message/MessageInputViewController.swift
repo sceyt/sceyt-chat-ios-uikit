@@ -253,6 +253,11 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         typealias AID = SceytChatUIKit.AccessibilityIdentifiers.MessageInput
         inputTextView.accessibilityIdentifier = AID.inputField
         sendButton.accessibilityIdentifier = AID.sendButton
+        addMediaButton.accessibilityIdentifier = AID.attachmentButton
+        cameraButton.accessibilityIdentifier = AID.cameraButton
+        recordButton.accessibilityIdentifier = AID.voiceButton
+        viewOnceButton.accessibilityIdentifier = AID.viewOnceButton
+        actionView.cancelButton.accessibilityIdentifier = AID.actionCancelButton
     }
 
     override open func setupAppearance() {

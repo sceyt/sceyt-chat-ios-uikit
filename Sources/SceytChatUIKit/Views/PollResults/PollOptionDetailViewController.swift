@@ -51,6 +51,7 @@ open class PollOptionDetailViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.showsVerticalScrollIndicator = false
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollOptionDetail.tableView
 
         let footer = UIView()
         footer.frame.size.height = .leastNormalMagnitude
@@ -172,6 +173,7 @@ open class PollOptionDetailViewController: ViewController,
         if indexPath.row == 0 {
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: VoteCountInfoCell.self)
             cell.parentAppearance = appearance.voteCountInfoCellAppearance
+            cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollOptionDetail.voteCountCell
             let voteCount = viewModel.pollDetails.votesPerOption[viewModel.option.id] ?? 0
             let voteCountText = SceytChatUIKit.shared.formatters.voteCountFormatter.format(voteCount)
             cell.configure(text: voteCountText)
@@ -181,6 +183,7 @@ open class PollOptionDetailViewController: ViewController,
         // Rest are voter cells
         let cell = tableView.dequeueReusableCell(for: indexPath, cellType: PollResultsViewController.VoterCell.self)
         cell.parentAppearance = appearance.voterCellAppearance
+        cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollOptionDetail.voterCell
 
         if let voter = viewModel.voter(at: indexPath.row - 1) {
             cell.data = voter

@@ -45,9 +45,15 @@ open class SelectableUserCell: BaseChannelUserCell {
     
     override open func setup() {
         super.setup()
-        
+
         checkBoxView.isUserInteractionEnabled = false
         selectionStyle = .none
+
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.Cell
+        avatarView.accessibilityIdentifier = AID.avatar
+        titleLabel.accessibilityIdentifier = AID.name
+        statusLabel.accessibilityIdentifier = AID.status
+        checkBoxView.accessibilityIdentifier = AID.checkbox
     }
     
     override open func setupLayout() {

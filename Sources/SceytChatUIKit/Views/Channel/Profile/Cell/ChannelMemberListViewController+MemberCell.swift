@@ -43,6 +43,12 @@ extension ChannelMemberListViewController {
             roleLabel.clipsToBounds = true
             roleLabel.edgeInsets = .init(top: 2, left: 8, bottom: 2, right: 8)
             roleLabel.layer.cornerRadius = 9
+
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelMembers.MemberCell
+            avatarView.accessibilityIdentifier = AID.avatar
+            titleLabel.accessibilityIdentifier = AID.name
+            statusLabel.accessibilityIdentifier = AID.status
+            roleLabel.accessibilityIdentifier = AID.role
         }
         
         open override func setupAppearance() {
@@ -91,7 +97,8 @@ extension ChannelMemberListViewController {
         open var data: ChatChannelMember! {
             didSet {
                 guard let data else { return }
-                
+
+                accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelMembers.MemberCell.identifier(for: data.id)
                 selectionStyle = SceytChatUIKit.shared.currentUserId == data.id ? .none : .default
                 titleLabel.text = appearance.titleFormatter.format(data)
                 

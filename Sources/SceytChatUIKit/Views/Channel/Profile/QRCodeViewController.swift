@@ -74,6 +74,12 @@ open class QRCodeViewController: ViewController {
         // Configure close button
         closeButton.setImage(appearance.closeButtonImage, for: .normal)
         closeButton.isHidden = !appearance.showCloseButton
+
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.QRCode
+        qrCodeImageView.accessibilityIdentifier = AID.image
+        linkLabel.accessibilityIdentifier = AID.link
+        shareButton.accessibilityIdentifier = AID.shareButton
+        closeButton.accessibilityIdentifier = AID.closeButton
     }
 
     open override func setupLayout() {

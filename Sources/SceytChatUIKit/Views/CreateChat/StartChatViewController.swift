@@ -35,7 +35,8 @@ open class StartChatViewController: ViewController,
                                                            style: .done,
                                                            target: self,
                                                            action: #selector(doneAction(_:)))
-        
+        navigationItem.leftBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.cancelButton
+
         tableView.delegate = self
         tableView.dataSource = self
         tableView.separatorStyle = .none
@@ -91,6 +92,9 @@ open class StartChatViewController: ViewController,
         
         title = L10n.Channel.New.title
         searchController.parentAppearance = appearance.searchControllerAppearance
+
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.tableView
+        searchController.searchBar.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.searchBar
     }
     
     override open func setupDone() {
@@ -136,6 +140,9 @@ open class StartChatViewController: ViewController,
             cell.parentAppearance = appearance.userCellAppearance
             if let user = viewModel.user(at: indexPath) {
                 cell.userData = user
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.Cell.identifier(for: user.id)
+            } else {
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.Cell.root
             }
             return cell
         default:

@@ -18,7 +18,9 @@ open class ImagePreviewViewController: ViewController, UIScrollViewDelegate {
     
     override open func setup() {
         super.setup()
-        
+
+        scrollView.imageView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ImagePreview.image
+
         task = Components.avatarBuilder.loadAvatar(
             into: scrollView.imageView,
             for: viewModel.channel,

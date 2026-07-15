@@ -91,7 +91,8 @@ open class MediaPickerViewController: ViewController,
         collectionViewLayout?.minimumInteritemSpacing = 2
         collectionViewLayout?.minimumLineSpacing = 2
         collectionView.register(Components.mediaPickerCell.self)
-        
+        collectionView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPicker.collectionView
+
         navigationItem.leftBarButtonItem =
             UIBarButtonItem(
                 title: L10n.Alert.Button.cancel,
@@ -99,6 +100,8 @@ open class MediaPickerViewController: ViewController,
                 target: self,
                 action: #selector(cancelAction(_:))
             )
+        navigationItem.leftBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPicker.cancelButton
+        footerView.attachButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPicker.attachButton
         footerView.attachButton.addTarget(self, action: #selector(attachButtonAction(_:)), for: .touchUpInside)
         
         resetCachedAssets()

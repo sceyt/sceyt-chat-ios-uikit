@@ -158,6 +158,10 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
         playerView.isUserInteractionEnabled = true
         playPauseButton.contentEdgeInsets = .init(top: 16, left: 16, bottom: 16, right: 16)
         playPauseButton.addTarget(self, action: #selector(onTapPlay), for: .touchUpInside)
+
+        imageView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPreviewer.image
+        playPauseButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPreviewer.playButton
+        slider.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPreviewer.slider
         
         currentTimeLabel.text = "0:00"
         

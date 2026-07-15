@@ -17,9 +17,10 @@ extension ChannelInfoViewController {
         
         open override func setup() {
             super.setup()
-            
+
             timeLabel.isUserInteractionEnabled = false
             timeLabel.stackView.spacing = 0
+            timeLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.MediaCell.duration
         }
         
         open override func setupLayout() {

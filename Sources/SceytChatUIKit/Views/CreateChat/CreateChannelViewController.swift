@@ -30,6 +30,7 @@ open class CreateChannelViewController: ViewController, UITextViewDelegate {
                                                             target: self,
                                                             action: #selector(nextAction(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreateChannel.createButton
         detailsView.avatarButton.setImage(.editAvatar, for: .normal)
         
         detailsView.subjectField.publisher(for: .editingDidEndOnExit).sink { [unowned self] _ in

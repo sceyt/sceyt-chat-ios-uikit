@@ -125,6 +125,13 @@ open class MediaPreviewerCarouselViewController: UIPageViewController,
         navigationItem.titleView = titleView
         navigationController?.navigationBar.alpha = 0.0
 
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.MediaPreviewer
+        titleLabel.accessibilityIdentifier = AID.title
+        subtitleLabel.accessibilityIdentifier = AID.subtitle
+        backButton.accessibilityIdentifier = AID.backButton
+        shareButton.accessibilityIdentifier = AID.shareButton
+        oneTimeButton.accessibilityIdentifier = AID.viewOnceButton
+
         dataSource = self
         delegate = self
     }

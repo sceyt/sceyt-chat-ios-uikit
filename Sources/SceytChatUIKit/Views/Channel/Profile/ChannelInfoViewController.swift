@@ -77,7 +77,8 @@ open class ChannelInfoViewController: ViewController,
             style: .plain,
             target: self,
             action: #selector(moreAction(_:)))
-        
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.moreButton
+
         mediaListViewController.mediaViewModel = profileViewModel.mediaListViewModel
         mediaListViewController.previewer = { [weak self] in
             self?.profileViewModel.previewer
@@ -96,6 +97,12 @@ open class ChannelInfoViewController: ViewController,
         tableView.dataSource = self
         tableView.isDirectionalLockEnabled = true
         tableView.contentInsetAdjustmentBehavior = .never
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.tableView
+        mediaListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.mediaList
+        fileListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.fileList
+        voiceListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.voiceList
+        linkListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.linkList
+        groupListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.groupList
         
         let footer = UIView()
         footer.frame.size.height = .leastNormalMagnitude
@@ -346,6 +353,7 @@ open class ChannelInfoViewController: ViewController,
             cell.iconView.image = appearance.optionIcons.uriIcon
             cell.titleLabel.text = SceytChatUIKit.shared.config.channelURIConfig.prefix + (profileViewModel.channel.uri)
             cell.selectionStyle = .none
+            cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.uri
             _cell = cell
         case .options, .items:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoOptionCell.self)
@@ -353,6 +361,7 @@ open class ChannelInfoViewController: ViewController,
             let action = (sections[indexPath.section] == .options ? options() : items())[indexPath.row]
             cell.iconView.image = action.image
             cell.titleLabel.text = action.title
+            cell.accessibilityIdentifier = optionAccessibilityIdentifier(for: action.tag)
 
             // Special handling for autoDelete to show formatted time
             if action.tag == ActionTag.autoDeleteMessages {
@@ -599,6 +608,22 @@ open class ChannelInfoViewController: ViewController,
         return actions
     }
     
+    /// Maps an option/item row's `ActionTag` to its stable accessibility
+    /// identifier so UI tests (and assistive tech) can address a specific row
+    /// regardless of its position, which varies with the channel type and the
+    /// current user's role.
+    open func optionAccessibilityIdentifier(for tag: Int) -> String? {
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.Option
+        switch tag {
+        case ActionTag.notifications: return AID.notifications
+        case ActionTag.autoDeleteMessages: return AID.autoDelete
+        case ActionTag.members: return AID.members
+        case ActionTag.admins: return AID.admins
+        case ActionTag.messageSearch: return AID.search
+        default: return nil
+        }
+    }
+
     open func availableSections() -> [Sections] {
         var sections: [Sections] = [.header]
         switch profileViewModel.channelType {

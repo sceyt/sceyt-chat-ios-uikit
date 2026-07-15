@@ -45,6 +45,7 @@ open class PollResultsViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.showsVerticalScrollIndicator = false
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollResults.tableView
 
         let footer = UIView()
         footer.frame.size.height = .leastNormalMagnitude
@@ -60,6 +61,7 @@ open class PollResultsViewController: ViewController,
     }
 
     private func setupNavigationBarItems() {
+        closeButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollResults.closeButton
         navigationItem.rightBarButtonItem = UIBarButtonItem(customView: closeButton)
     }
 
@@ -171,6 +173,7 @@ open class PollResultsViewController: ViewController,
             // Question cell
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: QuestionCell.self)
             cell.parentAppearance = appearance.questionCellAppearance
+            cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollResults.questionCell
             cell.configure(questionText: viewModel.pollResults.name)
             return cell
         } else {
@@ -181,6 +184,7 @@ open class PollResultsViewController: ViewController,
                 // Answer cell (first row of each option section)
                 let cell = tableView.dequeueReusableCell(for: indexPath, cellType: AnswerCell.self)
                 cell.parentAppearance = appearance.answerCellAppearance
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollResults.answerCell
 
                 if let option = viewModel.option(at: optionIndex) {
                     let voteCount = viewModel.pollResults.votesPerOption[option.id] ?? 0
@@ -192,6 +196,7 @@ open class PollResultsViewController: ViewController,
                 // Voter cells
                 let cell = tableView.dequeueReusableCell(for: indexPath, cellType: VoterCell.self)
                 cell.parentAppearance = appearance.voterCellAppearance
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollResults.voterCell
 
                 if let option = viewModel.option(at: optionIndex) {
                     let voterIndex = indexPath.row - 1
@@ -206,6 +211,7 @@ open class PollResultsViewController: ViewController,
                 // Show More cell (last row when there are more voters)
                 let cell = tableView.dequeueReusableCell(for: indexPath, cellType: ShowMoreCell.self)
                 cell.parentAppearance = appearance.showMoreCellAppearance
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PollResults.showMoreCell
                 cell.configure(text: appearance.showMoreText)
                 cell.onShowMoreTapped = { [weak self] in
                     self?.viewModel.showMoreVoters(for: optionIndex)

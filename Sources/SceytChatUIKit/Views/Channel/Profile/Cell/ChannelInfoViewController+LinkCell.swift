@@ -36,6 +36,13 @@ extension ChannelInfoViewController {
             selectedBackgroundView = UIView()
             iconView.clipsToBounds = true
             iconView.contentMode = .scaleAspectFill
+
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.LinkCell
+            accessibilityIdentifier = AID.root
+            iconView.accessibilityIdentifier = AID.icon
+            titleLabel.accessibilityIdentifier = AID.title
+            linkLabel.accessibilityIdentifier = AID.url
+            detailLabel.accessibilityIdentifier = AID.detail
         }
         
         override open func setupAppearance() {

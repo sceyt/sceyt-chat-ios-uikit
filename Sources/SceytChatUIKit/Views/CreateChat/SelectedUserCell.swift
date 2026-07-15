@@ -11,7 +11,7 @@ import UIKit
 open class SelectedUserCell: SelectedBaseCell {
     open var userData: ChatUser! {
         didSet {
-            
+
             label.text = appearance.titleFormatter.format(userData)
             presenceView.isHidden = userData.presence.state != .online
             avatarView.image = .deletedUser
@@ -20,15 +20,21 @@ open class SelectedUserCell: SelectedBaseCell {
                 with: appearance.avatarAppearance,
                 into: avatarView
             )
+            accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.SelectedCell.identifier(for: userData.id)
         }
     }
-    
+
     open override func setupAppearance() {
         super.setupAppearance()
-        
+
         backgroundColor = appearance.backgroundColor
         label.font = appearance.labelAppearance.font
         label.textColor = appearance.labelAppearance.foregroundColor
         closeButton.setImage(appearance.removeIcon, for: .normal)
+
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.SelectUsers.SelectedCell
+        avatarView.accessibilityIdentifier = AID.avatar
+        label.accessibilityIdentifier = AID.name
+        closeButton.accessibilityIdentifier = AID.removeButton
     }
 }

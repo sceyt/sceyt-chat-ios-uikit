@@ -24,14 +24,20 @@ open class SelectableChannelCell: BaseChannelUserCell {
 
             titleLabel.text = appearance.titleFormatter.format(channelData)
             statusLabel.text = appearance.subtitleFormatter.format(channelData)
+            accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SelectableChannelCell.identifier(for: channelData.id)
         }
     }
-    
+
     override open func setup() {
         super.setup()
-        
+
         checkBoxView.isUserInteractionEnabled = false
         selectionStyle = .none
+
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.SelectableChannelCell
+        avatarView.accessibilityIdentifier = AID.avatar
+        titleLabel.accessibilityIdentifier = AID.name
+        checkBoxView.accessibilityIdentifier = AID.checkbox
     }
 
     override open func setupLayout() {

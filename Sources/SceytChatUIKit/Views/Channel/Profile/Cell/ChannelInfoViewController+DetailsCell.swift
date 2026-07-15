@@ -33,6 +33,10 @@ extension ChannelInfoViewController {
             avatarButton.contentHorizontalAlignment = .fill
             avatarButton.contentVerticalAlignment = .fill
             avatarButton.imageView?.contentMode = .scaleAspectFill
+
+            avatarButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.avatar
+            titleLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.title
+            subtitleLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.subtitle
         }
         
         override open func setupAppearance() {

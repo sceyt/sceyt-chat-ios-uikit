@@ -64,7 +64,11 @@ open class ImageCropperViewController: ViewController {
         
         cancelButton.addTarget(self, action: #selector(onCancelTapped), for: .touchUpInside)
         confirmButton.addTarget(self, action: #selector(onConfirmTapped), for: .touchUpInside)
-        
+
+        imageView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ImageCropper.image
+        confirmButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ImageCropper.confirmButton
+        cancelButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ImageCropper.cancelButton
+
         navigationItem.hidesBackButton = true
         title = L10n.ImageCropper.moveAndScale
         

@@ -51,6 +51,11 @@ extension ChannelInfoViewController {
             progressView.animationDuration = 0.2
             progressView.rotationDuration = 2
             pauseButton.addTarget(self, action: #selector(pauseButtonTapped), for: .touchUpInside)
+
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.MediaCell
+            accessibilityIdentifier = AID.root
+            imageView.accessibilityIdentifier = AID.image
+            pauseButton.accessibilityIdentifier = AID.downloadButton
         }
 
         override open func setupLayout() {

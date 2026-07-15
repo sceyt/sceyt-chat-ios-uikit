@@ -73,6 +73,9 @@ extension CreateChannelViewController {
             mainStackView.addArrangedSubview(bottomLine3)
             mainStackView.addArrangedSubview(errorLabel)
             mainStackView.addArrangedSubview(commentLabel)
+
+            uriField.textField.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelForm.uri
+            errorLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelForm.uriError
             mainStackView.setCustomSpacing(12, after: bottomLine3)
             uriField.heightAnchor.pin(greaterThanOrEqualToConstant: 48)
             uriField.widthAnchor.pin(to: mainStackView.widthAnchor)

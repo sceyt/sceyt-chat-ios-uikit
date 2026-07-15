@@ -38,6 +38,7 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
                                                  action: { [weak self] in
                                                      self?.onCancelTapped()
                                                  })
+        navigationItem.leftBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MessageInfo.cancelButton
         if #available(iOS 15.0, *) {
             tableView.sectionHeaderTopPadding = 0
         }
@@ -49,6 +50,7 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
         tableView.delegate = self
         tableView.dataSource = self
         tableView.separatorStyle = .none
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MessageInfo.tableView
     }
 
     override open func setupAppearance() {
@@ -127,6 +129,7 @@ open class MessageInfoViewController: ViewController, UITableViewDataSource, UIT
         default:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.messageInfoMarkerCell.self)
             cell.parentAppearance = appearance.markerCellAppearance
+            cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MessageInfo.markerCell
             cell.data = viewModel.marker(at: indexPath)
             cell.contentInsets.top = tableView.isFirst(indexPath) ? 8 : 0
             cell.contentInsets.bottom = tableView.isLast(indexPath) ? 8 : 0

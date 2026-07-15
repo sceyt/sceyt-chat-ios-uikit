@@ -179,9 +179,14 @@ open class SheetViewController: ViewController {
     override
     open func setup() {
         super.setup()
-        
+
         bg.addTarget(self, action: #selector(onBackgroundTapped), for: .touchUpInside)
         doneButton.addTarget(self, action: #selector(onDoneTapped), for: .touchUpInside)
+
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.Sheet
+        bg.accessibilityIdentifier = AID.background
+        titleLabel.accessibilityIdentifier = AID.title
+        doneButton.accessibilityIdentifier = AID.doneButton
     }
     
     @objc

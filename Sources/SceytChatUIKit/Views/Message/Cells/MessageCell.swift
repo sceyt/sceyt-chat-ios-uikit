@@ -308,6 +308,18 @@ open class MessageCell: CollectionViewCell,
         textLabel.attributedText = data.attributedView.content
         textLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.body
         infoView.dateLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.date
+        do {
+            typealias CellAID = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell
+            nameLabel.accessibilityIdentifier = CellAID.senderName
+            avatarView.accessibilityIdentifier = CellAID.avatar
+            attachmentView.accessibilityIdentifier = CellAID.attachments
+            linkView.accessibilityIdentifier = CellAID.linkPreview
+            pollView.accessibilityIdentifier = CellAID.poll
+            reactionTotalView.accessibilityIdentifier = CellAID.reactions
+            forwardView.accessibilityIdentifier = CellAID.forward
+            replyCountView.accessibilityIdentifier = CellAID.replyCount
+            checkBoxView.accessibilityIdentifier = CellAID.checkbox
+        }
 
         if data.shouldDisplayReadMoreButton {
             readMoreButton.isHidden = false

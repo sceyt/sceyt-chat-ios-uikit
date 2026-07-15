@@ -17,16 +17,20 @@ open class SearchResultChannelCell: BaseChannelUserCell {
                 with: appearance.avatarAppearance,
                 into: avatarView
             )
-            
+
             titleLabel.text = appearance.titleFormatter.format(channelData)
             statusLabel.text = appearance.subtitleFormatter.format(channelData)
+            accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SearchResults.Cell.identifier(for: channelData.id)
         }
     }
-    
+
     open override func setupLayout() {
         super.setupLayout()
-        
+
         avatarView.leadingAnchor.pin(to: contentView.leadingAnchor, constant: Layouts.horizontalPadding)
+
+        avatarView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SearchResults.Cell.avatar
+        titleLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SearchResults.Cell.name
     }
     
     override open func setupAppearance() {

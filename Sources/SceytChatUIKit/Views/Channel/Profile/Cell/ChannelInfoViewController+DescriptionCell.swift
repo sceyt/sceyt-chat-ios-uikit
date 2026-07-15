@@ -24,6 +24,7 @@ extension ChannelInfoViewController {
             textView.isScrollEnabled = false
             textView.textContainer.lineFragmentPadding = 0
             textView.textContainerInset = .zero
+            textView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.description
         }
         
         override open func setupAppearance() {

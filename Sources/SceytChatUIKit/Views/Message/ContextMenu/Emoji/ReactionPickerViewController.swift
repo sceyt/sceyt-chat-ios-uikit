@@ -68,6 +68,7 @@ open class ReactionPickerViewController: ViewController {
         super.setupAppearance()
         view.backgroundColor = .clear
         containerView.backgroundColor = appearance.backgroundColor
+        containerView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ReactionPicker.container
     }
 
     open override func viewDidAppear(_ animated: Bool) {
@@ -185,7 +186,8 @@ private extension ReactionPickerViewController {
             button.tag = index
             button.titleEdgeInsets = .init(top: 0, left: 0, bottom: 0, right: 0)
             button.resize(anchors: [.height(Layouts.emojiSize), .width(Layouts.emojiSize)])
-            
+            button.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ReactionPicker.emoji(emoji)
+
             containerStackView.addArrangedSubview(button)
             let backgroundView = backgroundView()
             if selectedEmojis.contains(emoji) {
@@ -206,6 +208,7 @@ private extension ReactionPickerViewController {
             moreControl.tag = dataSource.emojis.count
             moreControl.addTarget(self, action: #selector(didTapMoreControl), for: .touchUpInside)
             moreControl.backgroundColor = .clear
+            moreControl.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ReactionPicker.moreButton
             moreControl.addSubview(imageView)
             
             imageView.centerXAnchor.pin(to: moreControl.centerXAnchor)
