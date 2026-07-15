@@ -33,6 +33,11 @@ extension MessageCell {
             .withoutAutoresizingMask
         
         open var lastAttachmentTransferProgress: AttachmentTransfer.AttachmentProgress?
+
+        /// Scheduled hide for a completed transfer, delayed so the stroke-fill
+        /// animation gets to render the 100% state first. Cancelled whenever a
+        /// newer progress value arrives (e.g. the attachment starts re-downloading).
+        private var pendingHideWorkItem: DispatchWorkItem?
         
         override open func setup() {
             super.setup()
@@ -125,9 +130,29 @@ extension MessageCell {
             }
             guard progressView.progress != progress
             else { return }
+            pendingHideWorkItem?.cancel()
+            pendingHideWorkItem = nil
             progressView.progress = progress
-            if progress <= 0 || progress >= 1 {
+            if progress <= 0 {
                 hideProgressView()
+            } else if progress >= 1 {
+                if progressView.isHidden || progressView.isHiddenProgress {
+                    hideProgressView()
+                } else {
+                    // Fill-through: fast transfers deliver all their progress in a terminal
+                    // burst, so hiding on the same tick that carries the 1.0 value means the
+                    // fill animation is never rendered. Let the stroke reach 100% first,
+                    // then shrink out.
+                    let item = DispatchWorkItem { [weak self] in
+                        guard let self, self.progressView.progress >= 1 else { return }
+                        self.hideProgressView()
+                    }
+                    pendingHideWorkItem = item
+                    DispatchQueue.main.asyncAfter(
+                        deadline: .now() + progressView.animationDuration,
+                        execute: item
+                    )
+                }
             } else {
                 progressView.isHidden = false
                 progressLabel.isHidden = (progressLabel.text ?? "").isEmpty || progressView.isHidden || progressView.isHiddenProgress
@@ -146,11 +171,19 @@ extension MessageCell {
                 self.pauseButton.transform = .init(scaleX: 0.01, y: 0.01)
             } completion: { [weak self] _ in
                 guard let self else { return }
-                self.progressView.isHidden = true
-                self.pauseButton.isHidden = true
-                self.progressView.transform = .identity
-                self.pauseButton.transform = .identity
-                self.didHideProgressView()
+                // A progress tick may have re-shown the ring mid-shrink (the same
+                // attachment started transferring again); leave it visible then.
+                let progress = self.progressView.progress
+                if progress <= 0 || progress >= 1 {
+                    self.progressView.isHidden = true
+                    self.pauseButton.isHidden = true
+                    self.progressView.transform = .identity
+                    self.pauseButton.transform = .identity
+                    self.didHideProgressView()
+                } else {
+                    self.progressView.transform = .identity
+                    self.pauseButton.transform = .identity
+                }
             }
         }
         

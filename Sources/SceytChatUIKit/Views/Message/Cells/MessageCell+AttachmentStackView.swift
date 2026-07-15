@@ -107,13 +107,44 @@ extension MessageCell {
                     }
                     return
                 }
-                subviews.forEach {
-                    $0.removeFromSuperview()
+                // Rebind in place when the attachment set is unchanged (the common
+                // reconfigure: transfer status edge, delivery tick, reaction, edit).
+                // Tearing the views down would kill the in-flight progress ring and its
+                // completion animation mid-frame — reconfigures are applied inside
+                // CATransaction.setDisableActions(true), so the teardown is what makes
+                // transfers appear to finish with no animation at all.
+                if let existing = rebindableAttachmentViews(for: data.attachments) {
+                    for (av, layout) in zip(existing, data.attachments) {
+                        bind(layout: layout, to: av)
+                    }
+                } else {
+                    subviews.forEach {
+                        $0.removeFromSuperview()
+                    }
+                    addAttachmentViews(layouts: data.attachments)
                 }
-                addAttachmentViews(layouts: data.attachments)
             }
         }
-        
+
+        /// The current subviews, if and only if they can represent `layouts` by rebinding:
+        /// same count and, pairwise, the same attachment identity, type, and thumbnail size
+        /// (the height constraint was pinned to it at creation). Anything else — including
+        /// a cell reused for a different message — falls back to a full rebuild.
+        private func rebindableAttachmentViews(for layouts: [MessageLayoutModel.AttachmentLayout]) -> [AttachmentView]? {
+            let views = subviews.compactMap { $0 as? AttachmentView }
+            guard views.count == subviews.count,
+                  views.count == layouts.count
+            else { return nil }
+            for (av, layout) in zip(views, layouts) {
+                guard let bound = av.data,
+                      bound.attachment == layout.attachment,
+                      bound.type == layout.type,
+                      bound.thumbnailSize == layout.thumbnailSize
+                else { return nil }
+            }
+            return views
+        }
+
         private func addAttachmentViews(layouts: [MessageLayoutModel.AttachmentLayout]) {
             layouts.forEach { layout in
                 var av: AttachmentView?
@@ -131,22 +162,30 @@ extension MessageCell {
                     self?.previewer?()
                 }
                 guard let av else { return }
-                av.data = layout
-                av.setProgressHandler()
-                switch layout.transferStatus {
-                case .pending, .uploading, .downloading:
-                    if let progress = fileProvider.currentProgressPercent(message: data.message, attachment: layout.attachment) {
-                        av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
-                    } else if fileProvider.filePath(attachment: layout.attachment) == nil {
-                        av.setProgress(0.0001)
-                    }
-                case .pauseUploading, .failedUploading:
-                    break
-                case .pauseDownloading, .failedDownloading:
-                    break
-                case .done:
-                    av.setProgress(0)
+                bind(layout: layout, to: av)
+            }
+        }
+
+        private func bind(layout: MessageLayoutModel.AttachmentLayout, to av: AttachmentView) {
+            av.data = layout
+            av.setProgressHandler()
+            switch layout.transferStatus {
+            case .pending, .uploading, .downloading:
+                if let progress = fileProvider.currentProgressPercent(message: data.message, attachment: layout.attachment) {
+                    av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
+                } else if fileProvider.filePath(attachment: layout.attachment) == nil {
+                    av.setProgress(0.0001)
                 }
+            case .pauseUploading, .failedUploading:
+                break
+            case .pauseDownloading, .failedDownloading:
+                break
+            case .done:
+                // Completion is resolved by update(status:) inside `av.data`'s didSet:
+                // a surviving ring fills to 100% and shrinks out. Forcing 0 here would
+                // cut that animation short on in-place rebinds (on fresh views it was
+                // a no-op anyway — progress is already 0).
+                break
             }
         }
         
