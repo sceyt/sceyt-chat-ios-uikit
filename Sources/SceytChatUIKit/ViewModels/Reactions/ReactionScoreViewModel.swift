@@ -42,10 +42,32 @@ open class ReactionScoreViewModel {
     }
 
     private func updateDataSource() {
-        let totals = (0..<reactionTotalObserver.numberOfItems(in: 0))
-            .compactMap { reactionTotalObserver.item(at: IndexPath(item: $0, section: 0)) }
+        let totals = Self.uniqueTotals(
+            (0..<reactionTotalObserver.numberOfItems(in: 0))
+                .compactMap { reactionTotalObserver.item(at: IndexPath(item: $0, section: 0)) }
+        )
         dataSource = Self.buildDataSource(from: totals.map { (key: $0.key, value: Int64($0.count)) })
         event = .reloadData(reactionKeys: totals.map { $0.key })
+    }
+
+    /// Duplicate (message, key) total rows can persist when writers without shared
+    /// visibility race (a notification-service extension persisting a push while the main
+    /// app persists the socket event). Writes heal such rows lazily, but the observer sees
+    /// whatever is in the store right now — collapse by key so the screen never renders the
+    /// same reaction as two chips/pages. Duplicates describe the same reaction, so keep the
+    /// row with the highest count rather than summing.
+    public static func uniqueTotals(_ totals: [ChatMessage.ReactionTotal]) -> [ChatMessage.ReactionTotal] {
+        var unique = [ChatMessage.ReactionTotal]()
+        for total in totals {
+            if let index = unique.firstIndex(where: { $0.key == total.key }) {
+                if total.count > unique[index].count {
+                    unique[index] = total
+                }
+            } else {
+                unique.append(total)
+            }
+        }
+        return unique
     }
 
     private static func buildDataSource(from reactionScores: [(key: String, value: Int64)]) -> [String] {

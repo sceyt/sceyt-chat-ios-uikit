@@ -40,7 +40,10 @@ public protocol MessageDatabaseSession {
     
     @discardableResult
     func add(reaction: Reaction) -> ReactionDTO?
-    
+
+    @discardableResult
+    func add(reaction: Reaction, updateTotal: Bool) -> ReactionDTO?
+
     @discardableResult
     func delete(reaction: Reaction) -> ReactionDTO?
 
@@ -373,22 +376,28 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func add(reaction: Reaction) -> ReactionDTO? {
+        add(reaction: reaction, updateTotal: true)
+    }
+
+    /// Pass `updateTotal: false` when the message's reaction totals were just written from
+    /// an authoritative payload that already includes this reaction (the `didAdd` fallback
+    /// persists the event's message first) — incrementing again would double-count.
+    @discardableResult
+    public func add(reaction: Reaction, updateTotal: Bool) -> ReactionDTO? {
         // Use serial queue to prevent race conditions when multiple contexts
         // try to update the same reaction total concurrently
         Self.reactionQueue.sync {
             guard let message = MessageDTO.fetch(id: reaction.messageId, context: self)
             else { return nil }
-            let rdto = ReactionDTO.fetchOrCreate(userId: reaction.user.id, key: reaction.key, messageId: reaction.messageId, context: self).map(reaction)
+            let existing = ReactionDTO.fetch(userId: reaction.user.id, key: reaction.key, messageId: reaction.messageId, context: self)
+            let alreadyApplied = existing?.id == Int64(reaction.id)
+            let rdto = (existing ?? ReactionDTO.fetchOrCreate(userId: reaction.user.id, key: reaction.key, messageId: reaction.messageId, context: self)).map(reaction)
             rdto.user = createOrUpdate(user: reaction.user)
-            if let rTotalDto = ReactionTotalDTO.fetch(messageId: reaction.messageId, key: reaction.key, context: self) {
+            if updateTotal, !alreadyApplied {
+                let rTotalDto = ReactionTotalDTO.fetchOrCreate(messageId: reaction.messageId, key: reaction.key, context: self)
                 rTotalDto.count += 1
                 rTotalDto.score += Int64(reaction.score)
-            } else {
-                let rTotalDto = ReactionTotalDTO.insertNewObject(into: self)
-                rTotalDto.count = 1
-                rTotalDto.score = Int64(reaction.score)
-                rTotalDto.key = reaction.key
-                message.reactionTotal?.insert(rTotalDto)
+                rTotalDto.message = message
             }
 
             rdto.message = message
@@ -416,12 +425,14 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     channelDto = ChannelDTO.fetch(id: ChannelId(messageDto.channelId), context: self)
                     messageDto.userReactions?.remove(dto)
                     messageDto.pendingReactions?.remove(dto)
-                    if let total = messageDto.reactionTotal?.first(where: { $0.key == reaction.key }) {
-                        total.count = max(0, total.count - 1)
-                        total.score = max(0, total.score - Int64(reaction.score))
-                        if total.count == 0 {
-                            messageDto.reactionTotal?.remove(total)
-                        }
+                    // fetchOrCreate heals duplicate (message, key) rows; a row that reaches
+                    // count 0 is deleted rather than detached, which would leak it as an
+                    // invisible orphan.
+                    let total = ReactionTotalDTO.fetchOrCreate(messageId: reaction.messageId, key: reaction.key, context: self)
+                    total.count = max(0, total.count - 1)
+                    total.score = max(0, total.score - Int64(reaction.score))
+                    if total.count == 0 {
+                        delete(total)
                     }
                 }
                 delete(dto)

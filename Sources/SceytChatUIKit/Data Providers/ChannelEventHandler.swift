@@ -186,7 +186,9 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             if $0.add(reaction: reaction) == nil {
                 $0.createOrUpdate(message: message, channelId: channel.id)
                     .unlisted = true
-                $0.add(reaction: reaction)
+                // The persisted payload's reactionTotals already include this reaction —
+                // add() must only store the ReactionDTO, not increment the total again.
+                $0.add(reaction: reaction, updateTotal: false)
             }
         }
     }
