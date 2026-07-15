@@ -2795,6 +2795,27 @@ open class ChannelViewController: ViewController,
                 return
             }
 
+            // Fade-eligibility for the one-message + history-page case,
+            // decided up front because the pre-appear first-archive branch
+            // below must not swallow it: the server page regularly lands mid
+            // push-transition (isViewDidAppear still false) while the screen
+            // is already visible sliding in — handled there, the history pops
+            // with no animation; a few ms slower and it would fade. Same
+            // predicate as `animatesOlderPageFadeIn` further down; the
+            // newest-edge check mirrors `isInsertingNewestItems`, and section
+            // inserts count because a page from older days arrives as whole
+            // new sections with an empty `diff.inserts`.
+            let appliedItemCountBeforeUpdate = appliedSnapshot.items.reduce(0) { $0 + $1.count }
+            let olderPageFadeInEligible =
+                !(diff.sectionInserts.contains(0) || diff.inserts.contains(IndexPath(item: 0, section: 0)))
+                && (!diff.inserts.isEmpty || !diff.sectionInserts.isEmpty)
+                && appliedItemCountBeforeUpdate == 1
+                && pinnedScrollMessageId == 0
+                && userSelectOnRepliedMessage == nil
+                && unreadMessageIndexPath == nil
+                && channelViewModel.scrollToRepliedMessageId == 0
+                && collectionView.contentSize.height > 0
+
             // Note: we deliberately do NOT validate `diff` against the legacy
             // `canReconcile` gate. canReconcile's section-ops fallback uses a
             // total-item-count check that has false positives when sections
@@ -2837,7 +2858,7 @@ open class ChannelViewController: ViewController,
             }
 
             if checkOnlyFirstTimeReceivedMessagesFromArchive, !isViewDidAppear,
-               pinnedScrollMessageId == 0 {
+               pinnedScrollMessageId == 0, !olderPageFadeInEligible {
                 // Pre-viewDidAppear path: skip the structural update so the
                 // navigation transition doesn't jank. We only enter this
                 // branch when nothing is pinned — when a pin IS active
@@ -2928,6 +2949,8 @@ open class ChannelViewController: ViewController,
                 && unreadMessageIndexPath == nil
                 && contentHeightBeforeInsertion > 0
 
+            let animatesOlderPageFadeIn = olderPageFadeInEligible
+
             if isInsertingNewestItems {
                 logger.debug("""
                     [MSGANIM] inserts=\(diffInserts.count) atBottom=\(isUserAtBottom) \
@@ -2936,6 +2959,56 @@ open class ChannelViewController: ViewController,
                     offset=\(collectionView.contentOffset.y) bottom=\(collectionView.bottomContentOffsetY) \
                     needScroll=\(needsToScrollBottom) unread=\(unreadMessageIndexPath != nil)
                     """)
+            }
+
+            if animatesOlderPageFadeIn {
+                let survivorKey = appliedSnapshot.items.first?.first
+                appliedSnapshot = newSnapshot
+                collectionView.reloadData()
+                collectionView.layoutIfNeeded()
+
+                var survivorIndexPath: IndexPath?
+                if let survivorKey {
+                    for (section, items) in newSnapshot.items.enumerated() {
+                        if let item = items.firstIndex(of: survivorKey) {
+                            survivorIndexPath = IndexPath(item: item, section: section)
+                            break
+                        }
+                    }
+                }
+
+                // Fade the cells' contentViews, not the cells: a layout pass
+                // that re-applies attributes mid-fade (sticky-footer pinning,
+                // reconfigure) resets cell.alpha but leaves contentView alone.
+                var fadingViews: [UIView] = collectionView.indexPathsForVisibleItems
+                    .filter { $0 != survivorIndexPath }
+                    .compactMap { collectionView.cellForItem(at: $0)?.contentView }
+                // New sections' date separators fade with their cells; the
+                // survivor's own separator was already on screen.
+                for kind in [UICollectionView.elementKindSectionHeader,
+                             UICollectionView.elementKindSectionFooter] {
+                    for path in collectionView.indexPathsForVisibleSupplementaryElements(ofKind: kind)
+                    where path.section != survivorIndexPath?.section {
+                        if let view = collectionView.supplementaryView(forElementKind: kind, at: path) {
+                            fadingViews.append(view)
+                        }
+                    }
+                }
+
+                for view in fadingViews {
+                    view.alpha = 0
+                }
+                UIView.animate(
+                    withDuration: 0.25,
+                    delay: 0,
+                    options: [.curveEaseOut, .allowUserInteraction]
+                ) {
+                    for view in fadingViews {
+                        view.alpha = 1
+                    }
+                }
+                updateUnreadViewVisibility()
+                return
             }
 
             isCollectionViewUpdating = true
