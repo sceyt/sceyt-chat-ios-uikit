@@ -106,6 +106,9 @@ open class BottomSheet: View {
     
     open func button(for action: SheetAction, maskedCorners: CACornerMask = [], hasSeparator: Bool = true) -> SheetButton {
         let button = SheetButton()
+        button.accessibilityIdentifier = action.style == .cancel
+            ? SceytChatUIKit.AccessibilityIdentifiers.Sheet.cancelButton
+            : SceytChatUIKit.AccessibilityIdentifiers.Sheet.actionButton
         button.publisher(for: .touchUpInside).sink { [weak self] _ in
             self?.sheet?.dismiss {
                 action.handler?()

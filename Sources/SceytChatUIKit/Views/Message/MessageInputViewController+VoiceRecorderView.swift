@@ -238,6 +238,14 @@ extension MessageInputViewController {
                 addSubview(viewOnceButton.withoutAutoresizingMask)
                 viewOnceButton.addSubview(viewOnceImageView.withoutAutoresizingMask)
 
+                typealias RecorderAID = SceytChatUIKit.AccessibilityIdentifiers.MessageInput.Recorder
+                accessibilityIdentifier = RecorderAID.root
+                lockButton.accessibilityIdentifier = RecorderAID.lockButton
+                micButton.accessibilityIdentifier = RecorderAID.micButton
+                viewOnceButton.accessibilityIdentifier = RecorderAID.viewOnceButton
+                slidingView.durationLabel.accessibilityIdentifier = RecorderAID.duration
+                slidingView.slideButton.accessibilityIdentifier = RecorderAID.cancelButton
+
                 setState(.unlock, animated: false)
                 slidingView.state = .unlock
 

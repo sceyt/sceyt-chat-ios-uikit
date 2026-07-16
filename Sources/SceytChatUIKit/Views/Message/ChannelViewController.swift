@@ -1600,6 +1600,9 @@ open class ChannelViewController: ViewController,
         }
 
         if cell.data.message.incoming {
+            // Mentions the user can already see must not count toward the badge —
+            // deduct now instead of waiting for the debounced displayed-marker flush.
+            channelViewModel.deductDisplayedUnreadMentions([cell.data.message])
             scheduleMarkDisplayed()
         }
     }

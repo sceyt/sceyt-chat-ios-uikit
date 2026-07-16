@@ -47,6 +47,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
 
     public lazy var unreadMentionsManager = UnreadMentionsManager(channelId: channel.id)
 
+    /// Mention message ids already deducted from `newMentionCount` because the user
+    /// saw them on screen. Prevents double-deduction across display passes and lets
+    /// the deferred cache refresh reconcile against what was already seen.
+    private var displayedMentionMessageIds = Set<MessageId>()
+
+    /// True once `refreshUnreadMentions()` has completed, making
+    /// `unreadMentionsManager.remainingUnreadMentionsCount` authoritative. Until then
+    /// `newMentionCount` holds the server-seeded value and on-screen mentions are
+    /// deducted from it arithmetically.
+    private var isUnreadMentionsCacheLoaded = false
+
     //MARK: Message observer
     open lazy var messageObserver: LazyMessagesObserver = {
         createMessageObserver()
@@ -186,6 +197,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         if newMentionCount > 0 {
             Task {
                 await unreadMentionsManager.refreshUnreadMentions()
+                await MainActor.run { [weak self] in
+                    self?.reconcileUnreadMentionsCacheAfterLoad()
+                }
             }
         }
 
@@ -1296,6 +1310,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
 
     open func markMessages( _ messages: [ChatMessage], as marker: DefaultMarker) {
+        if marker == .displayed {
+            deductDisplayedUnreadMentions(messages)
+        }
         guard !markMessagesTaskStarted,
                 !messages.isEmpty
         else {
@@ -1319,7 +1336,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             guard !ids.isEmpty
             else {
                 markMessagesTaskStarted = false
-                newMentionCount = UInt64(unreadMentionsManager.remainingUnreadMentionsCount)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.isUnreadMentionsCacheLoaded else { return }
+                    self.newMentionCount = UInt64(self.unreadMentionsManager.remainingUnreadMentionsCount)
+                }
                 return
             }
 
@@ -1337,6 +1357,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open func markMessageAsDisplayed(_ messages: [ChatMessage]) {
+        deductDisplayedUnreadMentions(messages)
         guard !markMessagesTaskStarted,
                 !messages.isEmpty
         else {
@@ -3323,25 +3344,55 @@ public extension ChannelViewModel {
 
     /// Updates mention count after messages are successfully marked as displayed
     private func updateMentionCountAfterMarkingDisplayed(messages: [ChatMessage]) {
-        // Filter messages that mention the current user
+        // Deduction already happened optimistically when the messages appeared on
+        // screen; this just reconciles in case a path skipped it. Idempotent.
+        DispatchQueue.main.async { [weak self] in
+            self?.deductDisplayedUnreadMentions(messages)
+        }
+    }
+
+    /// Deducts mentions the user is already looking at from `newMentionCount`
+    /// without waiting for the displayed-marker server round trip, so the badge
+    /// never lingers (or shows at all) for messages visible on screen.
+    /// Main-thread only. Idempotent per message id.
+    open func deductDisplayedUnreadMentions(_ messages: [ChatMessage]) {
+        guard newMentionCount > 0 else { return }
+        let currentUserId = SceytChatUIKit.shared.currentUserId
         let mentionedMessages = messages.filter { message in
             message.incoming &&
-            message.mentionedUsers?.contains(where: { $0.id == SceytChatUIKit.shared.currentUserId }) == true
+            !displayedMentionMessageIds.contains(message.id) &&
+            message.mentionedUsers?.contains(where: { $0.id == currentUserId }) == true
         }
-
-        // If any messages had mentions, remove them from the cache and update count
         guard !mentionedMessages.isEmpty else { return }
 
-        // Remove each mention from the cache
         for message in mentionedMessages {
+            displayedMentionMessageIds.insert(message.id)
             unreadMentionsManager.removeMention(message.id)
         }
 
-        // Update the UI count on main thread
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.newMentionCount = UInt64(self.unreadMentionsManager.remainingUnreadMentionsCount)
+        if isUnreadMentionsCacheLoaded {
+            newMentionCount = UInt64(unreadMentionsManager.remainingUnreadMentionsCount)
+        } else {
+            // Cache fetch still in flight: deduct locally, counting only mentions
+            // that are actually unread so already-read mentions scrolled past
+            // don't drain the seeded server count.
+            let deducted = UInt64(mentionedMessages.filter { $0.id > channel.lastDisplayedMessageId }.count)
+            newMentionCount = newMentionCount >= deducted ? newMentionCount - deducted : 0
         }
+    }
+
+    /// Reconciles the freshly fetched unread-mentions cache with mentions the user
+    /// already saw on screen while the fetch was in flight, then republishes the count.
+    private func reconcileUnreadMentionsCacheAfterLoad() {
+        isUnreadMentionsCacheLoaded = true
+        // If the fetch yielded nothing and nothing was seen on screen (e.g. offline),
+        // keep the server-seeded count instead of zeroing the badge.
+        guard unreadMentionsManager.hasUnreadMentions || !displayedMentionMessageIds.isEmpty
+        else { return }
+        for id in displayedMentionMessageIds {
+            unreadMentionsManager.removeMention(id)
+        }
+        newMentionCount = UInt64(unreadMentionsManager.remainingUnreadMentionsCount)
     }
 
     /// Resets unread mentions cache when mention count becomes 0
@@ -3379,7 +3430,10 @@ public extension ChannelViewModel {
     /// Handles when a new message mentioning the current user is received
     public func handleNewMentionMessage(_ message: ChatMessage) {
         guard message.incoming,
-              message.mentionedUsers?.contains(where: { $0.id == SceytChatUIKit.shared.currentUserId }) == true
+              message.mentionedUsers?.contains(where: { $0.id == SceytChatUIKit.shared.currentUserId }) == true,
+              // Already on screen (cell displayed before this event arrived) —
+              // don't re-add it and flash the badge for a visible message.
+              !displayedMentionMessageIds.contains(message.id)
         else { return }
 
         // Add to unread mentions cache

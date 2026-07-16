@@ -66,6 +66,23 @@ extension SceytChatUIKit {
             /// The close button on the edit / reply / forward preview shown above
             /// the composer.
             public static let actionCancelButton = "sceyt_chat_message_input_action_cancel_button"
+
+            /// The full-screen voice-recording overlay (`VoiceRecorderView`)
+            /// shown while the record button is held.
+            public enum Recorder {
+                /// The overlay itself.
+                public static let root = "sceyt_chat_message_input_recorder"
+                /// The lock / stop control above the mic.
+                public static let lockButton = "sceyt_chat_message_input_recorder_lock_button"
+                /// The mic / send / delete control at the record button's place.
+                public static let micButton = "sceyt_chat_message_input_recorder_mic_button"
+                /// The view-once toggle shown while locked.
+                public static let viewOnceButton = "sceyt_chat_message_input_recorder_view_once_button"
+                /// The elapsed-time label.
+                public static let duration = "sceyt_chat_message_input_recorder_duration"
+                /// The "slide to cancel" / cancel control.
+                public static let cancelButton = "sceyt_chat_message_input_recorder_cancel_button"
+            }
         }
 
         /// The open-channel (conversation) screen driven by `ChannelViewController`.
@@ -696,6 +713,11 @@ extension SceytChatUIKit {
             public static let title = "sceyt_chat_sheet_title"
             /// The done button (shown when the sheet has a done action).
             public static let doneButton = "sceyt_chat_sheet_done_button"
+            /// An action row inside a `BottomSheet`. Shared by every non-cancel
+            /// action; disambiguate by label or position within the sheet.
+            public static let actionButton = "sceyt_chat_sheet_action_button"
+            /// The cancel row inside a `BottomSheet`.
+            public static let cancelButton = "sceyt_chat_sheet_cancel_button"
         }
     }
 }
