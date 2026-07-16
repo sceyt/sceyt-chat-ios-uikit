@@ -114,17 +114,22 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
 
     private func makeLayout(
         _ attachment: ChatMessage.Attachment,
-        async: Bool
+        async: Bool,
+        thumbnailSize: CGSize = CGSize(width: 100, height: 100)
     ) -> MessageLayoutModel.AttachmentLayout {
         .init(
             attachment: attachment,
             ownerMessage: nil,
             ownerChannel: nil,
-            thumbnailSize: CGSize(width: 100, height: 100),
+            thumbnailSize: thumbnailSize,
             asyncLoadThumbnail: async,
             appearance: MessageCell.appearance
         )
     }
+
+    /// A design size small enough that the 10px fixtures satisfy the relay's
+    /// size-adequacy guard on any simulator scale (3×3 → ≤8.1px required @3x).
+    private let relayCompatibleSize = CGSize(width: 3, height: 3)
 
     /// Spins the main run loop until `condition` is true or `timeout` elapses.
     /// Pumping the run loop is required because the layout publishes thumbnails
@@ -584,7 +589,7 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
     /// which gates the bind-time heal — isolating the relay as the only possible healer).
     func testRelayHealsBoundViewWhenSharpLoadLandsOnSiblingInstance() {
         let id: AttachmentId = 300
-        let visible = makeLayout(makeAttachment(id: id, status: .downloading), async: false)
+        let visible = makeLayout(makeAttachment(id: id, status: .downloading), async: false, thumbnailSize: relayCompatibleSize)
         var settled = false
         visible.onLoadThumbnail = { _ in settled = true }
         XCTAssertTrue(waitUntil { settled })
@@ -612,7 +617,7 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
     func testRelayPaintsViewWhenClosureSlotIsOwnedElsewhere() {
         let id: AttachmentId = 310
         let attachment = makeAttachment(id: id, status: .downloading)
-        let layout = makeLayout(attachment, async: false)
+        let layout = makeLayout(attachment, async: false, thumbnailSize: relayCompatibleSize)
         var settled = false
         layout.onLoadThumbnail = { _ in settled = true }
         XCTAssertTrue(waitUntil { settled })
@@ -653,7 +658,7 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
     /// closure wiring — it must get the same relay heal.
     func testRelayHealsVideoViewWhenSharpLoadLandsOnSiblingInstance() {
         let id: AttachmentId = 320
-        let visible = makeLayout(makeAttachment(id: id, type: "video", name: "v.mp4", status: .downloading), async: false)
+        let visible = makeLayout(makeAttachment(id: id, type: "video", name: "v.mp4", status: .downloading), async: false, thumbnailSize: relayCompatibleSize)
         var settled = false
         visible.onLoadThumbnail = { _ in settled = true }
         XCTAssertTrue(waitUntil { settled })
@@ -668,6 +673,51 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
         XCTAssertTrue(waitUntil { visible.isThumbnailLoadedFromFile },
                       "the relay must heal the bound video instance from a sibling's sharp load")
         XCTAssertEqual(view.imageView.image?.size.width, 10)
+    }
+
+    /// Case 6: the relay is keyed by attachment identity only, but one attachment is consumed
+    /// at several design sizes — the message bubble AND a small reply preview. The reply-sized
+    /// sibling's file-backed load is sharp for ITS size yet far too small for the bubble;
+    /// accepting it would repaint the bubble pixelated and lock the layout file-backed so no
+    /// reload path could restore the right thumbnail (the WAAFI rotation repro, 2026-07-16).
+    func testRelayIgnoresThumbnailTooSmallForThisConsumer() {
+        let id: AttachmentId = 330
+        // Bubble consumer: 100×100 design → the 10px fixture can never satisfy it.
+        let visible = makeLayout(makeAttachment(id: id, status: .downloading), async: false)
+        var settled = false
+        visible.onLoadThumbnail = { _ in settled = true }
+        XCTAssertTrue(waitUntil { settled })
+
+        let view = MessageCell.AttachmentImageView()
+        view.data = visible
+
+        // Reply-preview consumer of the SAME attachment loads its small sharp file and posts.
+        mock.setThumbnailPath(redPath, for: id)
+        let replySibling = makeLayout(makeAttachment(id: id, status: .done), async: false, thumbnailSize: relayCompatibleSize)
+        XCTAssertTrue(waitUntil { replySibling.isThumbnailLoadedFromFile },
+                      "precondition: the reply-sized sibling received its sharp load")
+
+        _ = waitUntil(timeout: 0.3) { false } // give a wrongful clobber time to land
+        XCTAssertFalse(visible.isThumbnailLoadedFromFile,
+                       "a too-small relayed thumbnail must not lock the bubble layout file-backed")
+        XCTAssertTrue(view.imageView.image !== replySibling.thumbnail,
+                      "the bubble must not paint the reply-preview-resolution image")
+    }
+
+    /// Defense-in-depth for Case 6: once a layout is file-backed, a smaller image must never
+    /// replace the bigger one in place — isThumbnailLoadedFromFile keeps gating every reload
+    /// path afterwards, so a downgrade would stick until the layout is rebuilt.
+    func testSetFileBackedThumbnailNeverDowngrades() {
+        mock.setThumbnailPath(bluePath, for: 2)
+        let layout = makeLayout(makeAttachment(id: 2), async: false)
+        XCTAssertTrue(waitUntil { layout.isThumbnailLoadedFromFile })
+        XCTAssertEqual(layout.thumbnail?.size.width, 20)
+
+        let smaller = UIImage(contentsOfFile: redPath)!
+        layout.setFileBackedThumbnail(smaller)
+        XCTAssertEqual(layout.thumbnail?.size.width, 20,
+                       "a smaller image must not replace the bigger file-backed thumbnail")
+        XCTAssertTrue(layout.isThumbnailLoadedFromFile)
     }
 
     // MARK: - Live reconfigure trigger (MessageLayoutModel.update(message:))

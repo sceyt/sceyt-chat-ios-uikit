@@ -1417,6 +1417,19 @@ extension MessageLayoutModel {
         /// completes regardless of which duplicate layout instance won the async load race — the
         /// caller targets the instance bound to the visible cell. Must be called on the main thread.
         open func setFileBackedThumbnail(_ image: UIImage) {
+            // Never downgrade: one attachment has several size-keyed thumbnail files (message
+            // bubble vs reply preview), so a smaller sibling result must not replace an
+            // already-loaded bigger one. isThumbnailLoadedFromFile stays true afterwards —
+            // gating every reload path — so a downgrade would stick until the layout is
+            // rebuilt (Case 6).
+            if isThumbnailLoadedFromFile, let current = thumbnail {
+                let currentPxMaxSide = max(current.size.width, current.size.height) * current.scale
+                let incomingPxMaxSide = max(image.size.width, image.size.height) * image.scale
+                if incomingPxMaxSide < currentPxMaxSide {
+                    logger.debug("[IMGQ] setFileBackedThumbnail skipped — would downgrade \(Int(currentPxMaxSide)) -> \(Int(incomingPxMaxSide)) px maxSide, id=\(attachment.id) layout=\(ObjectIdentifier(self))")
+                    return
+                }
+            }
             thumbnail = image
             isThumbnailLoadedFromFile = true
             isLoadedThumbnail = true

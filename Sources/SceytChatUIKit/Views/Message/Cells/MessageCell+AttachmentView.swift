@@ -64,6 +64,20 @@ extension MessageCell {
                   layout.type == .image || layout.type == .video,
                   layout.attachment == attachment
             else { return }
+            // The relay is keyed by attachment identity only, but one attachment is consumed at
+            // several design sizes (message bubble vs 40pt reply preview), each with its own
+            // size-keyed thumbnail file. A sibling consumer's file-backed load is "sharp" for ITS
+            // size yet far too small for this one — accepting it repaints the bubble at reply
+            // resolution AND locks the layout file-backed so no reload path restores the right
+            // thumbnail until the layout is rebuilt (Case 6). Compare max sides (aspect-safe;
+            // generated files match the design's max side) with the LOW-RES PAINT tolerance.
+            let displayScale = traitCollection.displayScale > 0 ? traitCollection.displayScale : UIScreen.main.scale
+            let requiredPxMaxSide = max(layout.thumbnailSize.width, layout.thumbnailSize.height) * displayScale
+            let imagePxMaxSide = max(image.size.width, image.size.height) * image.scale
+            guard imagePxMaxSide >= requiredPxMaxSide * 0.9 else {
+                logger.debug("[IMGQ] relay image ignored — too small for this consumer, id=\(attachment.id) imagePxMaxSide=\(Int(imagePxMaxSide)) requiredPxMaxSide=\(Int(requiredPxMaxSide)) layout=\(ObjectIdentifier(layout))")
+                return
+            }
             // Heal the bound layout instance first, so later rebinds/updates see the sharp,
             // file-backed state. setFileBackedThumbnail re-posts to the relay; on that nested
             // entry the state check below is already satisfied, so the recursion terminates.
