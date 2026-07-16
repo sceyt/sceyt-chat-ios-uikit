@@ -2912,6 +2912,17 @@ open class ChannelViewController: ViewController,
                 // bottom by the new bubble's height, hiding it under the input
                 // bar — and would suppress the newest-insert animation.
                 pinnedScrollMessageId = 0
+            } else if isUserAtBottom, pinnedScrollMessageId != 0, !channelViewModel.isSearching {
+                // Same bottom-anchor-wins rule for NON-insert diffs. A reload
+                // that grows a cell in place (async link preview / attachment
+                // thumbnail arriving, message edit) shifts every older frame,
+                // and the completion's pin-restore would hold the pinned
+                // message still — moving the viewport off the bottom by the
+                // growth delta and hiding the newest bubble's bottom under the
+                // input bar. Resting at the bottom, drop the pin so no restore
+                // runs: the bottom offset is constant in the mirrored list, so
+                // the viewport stays glued to the newest message by itself.
+                pinnedScrollMessageId = 0
             }
 
             if userSelectOnRepliedMessage != nil || unreadMessageIndexPath != nil || pinnedScrollMessageId != 0 {

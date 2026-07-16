@@ -81,6 +81,12 @@ extension SceytChatUIKit {
         /// reply quoting that message (renders the reply preview). The referenced
         /// message must appear earlier in the seeded array.
         public var parentId: MessageId?
+        /// Explicit creation date. When nil, messages get sequential dates from a
+        /// fixed base day, so the whole conversation shares one date. Set it to
+        /// place a message on a different day (e.g. `Date()`), which forces a
+        /// date-separator boundary in the message list. Later messages must keep
+        /// later dates or the visual order changes.
+        public var createdAt: Date?
 
         public init(
             id: MessageId,
@@ -89,7 +95,8 @@ extension SceytChatUIKit {
             senderId: String? = nil,
             senderName: String? = nil,
             deliveryStatus: ChatMessage.DeliveryStatus = .displayed,
-            parentId: MessageId? = nil
+            parentId: MessageId? = nil,
+            createdAt: Date? = nil
         ) {
             self.id = id
             self.body = body
@@ -98,6 +105,7 @@ extension SceytChatUIKit {
             self.senderName = senderName
             self.deliveryStatus = deliveryStatus
             self.parentId = parentId
+            self.createdAt = createdAt
         }
     }
 
@@ -216,6 +224,21 @@ extension SceytChatUIKit {
         }
     }
 
+    /// Rewrites the body of an existing message, simulating an in-place update
+    /// that changes the cell's height after it is already on screen — the same
+    /// list-level effect as a link preview or attachment thumbnail arriving
+    /// asynchronously, or a message edit.
+    ///
+    /// UI-test only.
+    public func updateUITestMessageBody(messageId: MessageId, body: String) {
+        try? database.syncWrite { context in
+            let request = MessageDTO.fetchRequest()
+            request.predicate = NSPredicate(format: "id == %lld", Int64(messageId))
+            request.fetchLimit = 1
+            (try? context.fetch(request))?.first?.body = body
+        }
+    }
+
     /// Seeds a deterministic conversation of messages into an existing channel so
     /// the open-channel (`ChannelViewController`) screen renders with no network.
     ///
@@ -259,7 +282,7 @@ extension SceytChatUIKit {
             var newestMessage: MessageDTO?
             var created: [MessageId: MessageDTO] = [:]
             for (index, seed) in messages.enumerated() {
-                let date = baseDate.addingTimeInterval(TimeInterval(index))
+                let date = seed.createdAt ?? baseDate.addingTimeInterval(TimeInterval(index))
                 let message = MessageDTO.fetchOrCreate(id: seed.id, tid: 0, context: context)
                 message.body = seed.body
                 message.type = "text"
