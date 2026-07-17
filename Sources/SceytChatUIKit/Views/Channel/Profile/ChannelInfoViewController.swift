@@ -593,7 +593,7 @@ open class ChannelInfoViewController: ViewController,
             default:
                 break
             }
-            if profileViewModel.isOwner || profileViewModel.isAdmin {
+            if profileViewModel.canShowAdmins {
                 actions += [.init(title: appearance.optionTitles.adminsTitleText,
                                   image: appearance.optionIcons.adminsIcon,
                                   tag: ActionTag.admins)]
