@@ -85,6 +85,69 @@ enum UITestSupport {
         launchArgumentValue("--uitest-grow-newest-on-open")
     }
 
+    /// `--uitest-inject-burst-on-open=<ms>x<count>` — `<ms>` milliseconds after
+    /// the conversation screen starts opening, inserts `count` incoming messages
+    /// in ONE database transaction — the shape a server sync delivers when
+    /// several messages arrived while the client was catching up. Unlike
+    /// `--uitest-inject-on-open`, the message observer publishes a single change
+    /// event whose diff carries every message at once (a multi-insert batch).
+    /// Bodies are long multi-line texts (`conversationBurstText`) so the batch
+    /// is tall enough to push the "New messages" separator a full screen away
+    /// from the bottom.
+    private static var injectBurstOnOpenSpec: (delayMs: Int, count: Int)? {
+        let prefix = "--uitest-inject-burst-on-open="
+        guard let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) })
+        else { return nil }
+        let parts = argument.dropFirst(prefix.count).split(separator: "x")
+        guard parts.count == 2,
+              let delayMs = Int(parts[0]), let count = Int(parts[1]),
+              delayMs >= 0, count > 0
+        else { return nil }
+        return (delayMs, count)
+    }
+
+    /// `--uitest-inject-on-keyboard=<ms>` — injects one incoming message `<ms>`
+    /// milliseconds after the keyboard starts presenting (the first
+    /// `keyboardWillShow` after launch). The keyboard's slide-up runs ~250ms and
+    /// animates the list's content insets with it, so a small delay lands the
+    /// insert inside that animation window — while the offset-vs-inset "am I at
+    /// the bottom" check is transiently unreliable.
+    private static var injectOnKeyboardDelayMs: Int? {
+        launchArgumentValue("--uitest-inject-on-keyboard")
+    }
+
+    /// `--uitest-restart-observer-on-open=<ms>` — `<ms>` after the conversation
+    /// screen starts opening, restarts its message observer exactly the way
+    /// `ChannelViewModel.createAndSendUserMessage` does when the cached tail
+    /// lags behind `channel.lastMessage` (routine during rapid receive/ACK
+    /// traffic). The restart re-delivers an `isInitial` change event
+    /// mid-session — the trigger that used to re-anchor the viewport to the
+    /// stale unread separator — without the racy timing of the real desync.
+    private static var restartObserverOnOpenDelayMs: Int? {
+        launchArgumentValue("--uitest-restart-observer-on-open")
+    }
+
+    /// `--uitest-message-storm=<pairs>x<intervalMs>[x<startMs>]` — `startMs`
+    /// (default 1500) after the conversation screen starts opening, fires
+    /// `pairs` timer ticks every `intervalMs`; each tick inserts one outgoing
+    /// and one incoming message back-to-back through the same DB→observer
+    /// pipeline live traffic uses. E.g. `20x300` = 20 sent + 20 received
+    /// messages at a 0.3s cadence, saturating the insert-batch queue while the
+    /// user rests at the bottom. A small `startMs` (e.g. 200) makes the storm
+    /// the first traffic the open screen sees — an already-busy channel.
+    private static var messageStormSpec: (pairs: Int, intervalMs: Int, startMs: Int)? {
+        let prefix = "--uitest-message-storm="
+        guard let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) })
+        else { return nil }
+        let parts = argument.dropFirst(prefix.count).split(separator: "x")
+        guard parts.count == 2 || parts.count == 3,
+              let pairs = Int(parts[0]), let intervalMs = Int(parts[1]),
+              pairs > 0, intervalMs > 0
+        else { return nil }
+        let startMs = parts.count == 3 ? Int(parts[2]) ?? 1500 : 1500
+        return (pairs, intervalMs, startMs)
+    }
+
     /// The integer value of a `<name>=<value>` launch argument, if present.
     private static func launchArgumentValue(_ name: String) -> Int? {
         let prefix = name + "="
@@ -113,6 +176,27 @@ enum UITestSupport {
                         messageId: conversationMessageId(UInt64(16 + unreadCount)),
                         body: conversationGrownBodyText
                     )
+                }
+            }
+            if let burst = injectBurstOnOpenSpec {
+                scheduleOnConversationOpen(afterMs: burst.delayMs) {
+                    SceytChatUIKit.shared.receiveUITestMessageBurst(
+                        channelId: conversationChannelId,
+                        texts: (1...burst.count).map(conversationBurstText),
+                        startingId: 3_000_000)
+                }
+            }
+            if let delayMs = injectOnKeyboardDelayMs {
+                scheduleInjectionOnKeyboardShow(afterMs: delayMs)
+            }
+            if let delayMs = restartObserverOnOpenDelayMs {
+                scheduleOnConversationOpen(afterMs: delayMs) {
+                    restartConversationMessageObserver()
+                }
+            }
+            if let storm = messageStormSpec {
+                scheduleOnConversationOpen(afterMs: storm.startMs) {
+                    startMessageStorm(pairs: storm.pairs, intervalMs: storm.intervalMs)
                 }
             }
         } else {
@@ -325,6 +409,108 @@ enum UITestSupport {
         scheduleOnConversationOpen(afterMs: delayMs) {
             UITestMessageInjector.shared.injectShort()
         }
+    }
+
+    /// Body of the `n`-th message in a `--uitest-inject-burst-on-open` batch.
+    /// Deliberately long enough to wrap across several lines, so a handful of
+    /// burst messages outgrow a phone screen. Mirrored in the UI-test bundle
+    /// (`ChannelScreen.Conversation.burstText`).
+    static func conversationBurstText(_ n: Int) -> String {
+        "Burst incoming \(n) — this body is deliberately long so the bubble wraps "
+            + "across several lines and the whole batch is tall enough to push "
+            + "the New-messages separator a full screen away from the bottom."
+    }
+
+    /// Injects one incoming message `delayMs` after the first keyboard
+    /// presentation begins. Present only with `--uitest-inject-on-keyboard=<ms>`
+    /// in conversation mode.
+    private static func scheduleInjectionOnKeyboardShow(afterMs delayMs: Int) {
+        final class TokenHolder { var token: NSObjectProtocol? }
+        let holder = TokenHolder()
+        holder.token = NotificationCenter.default.addObserver(
+            forName: UIResponder.keyboardWillShowNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            if let token = holder.token {
+                NotificationCenter.default.removeObserver(token)
+                holder.token = nil
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delayMs)) {
+                UITestMessageInjector.shared.injectShort()
+            }
+        }
+    }
+
+    /// Bodies of the storm messages (`--uitest-message-storm`). Mirrored in the
+    /// UI-test bundle (`ChannelScreen.Conversation.stormSentText/stormReceivedText`).
+    static func conversationStormSentText(_ n: Int) -> String { "Storm sent \(n)" }
+    static func conversationStormReceivedText(_ n: Int) -> String { "Storm received \(n)" }
+
+    /// Fires `pairs` ticks every `intervalMs`, each inserting one outgoing and
+    /// one incoming message back-to-back. Ids are explicit, unique, and
+    /// increasing (well clear of the seeded range at channelId * 10_000 + index),
+    /// because two timestamp-derived ids within one millisecond would dedupe.
+    private static func startMessageStorm(pairs: Int, intervalMs: Int) {
+        var tick = 0
+        let timer = Timer(timeInterval: Double(intervalMs) / 1000, repeats: true) { timer in
+            tick += 1
+            let n = tick
+            SceytChatUIKit.shared.receiveUITestMessage(
+                channelId: conversationChannelId,
+                text: conversationStormSentText(n),
+                incoming: false,
+                id: UInt64(2_000_000 + 2 * n))
+            SceytChatUIKit.shared.receiveUITestMessage(
+                channelId: conversationChannelId,
+                text: conversationStormReceivedText(n),
+                incoming: true,
+                id: UInt64(2_000_000 + 2 * n + 1))
+            if tick >= pairs {
+                timer.invalidate()
+            }
+        }
+        // `.common` so ticks keep firing during scrolling/animations.
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    /// Restarts the open conversation's message observer with the same call
+    /// `ChannelViewModel.createAndSendUserMessage` makes when the cached tail
+    /// lags behind `channel.lastMessage` — deterministically reproducing the
+    /// mid-session `isInitial` redelivery that rapid-traffic sends trigger.
+    private static func restartConversationMessageObserver() {
+        guard let vc = findChannelViewController(),
+              let vm = vc.channelViewModel
+        else { return }
+        let offset = vm.messageObserver.calculateMessageFetchOffset()
+        vm.messageObserver.restartObserver(
+            fetchPredicate: vm.messageObserver.defaultFetchPredicate,
+            offset: offset
+        )
+    }
+
+    /// The `ChannelViewController` currently in the window hierarchy, if any.
+    private static func findChannelViewController() -> ChannelViewController? {
+        func find(_ vc: UIViewController) -> ChannelViewController? {
+            if let channel = vc as? ChannelViewController { return channel }
+            if let presented = vc.presentedViewController, let found = find(presented) {
+                return found
+            }
+            if let nav = vc as? UINavigationController {
+                for child in nav.viewControllers.reversed() {
+                    if let found = find(child) { return found }
+                }
+            }
+            for child in vc.children {
+                if let found = find(child) { return found }
+            }
+            return nil
+        }
+        return UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .compactMap { $0.rootViewController.flatMap(find) }
+            .first
     }
 
     /// Runs `action` `delayMs` after the conversation screen starts opening.

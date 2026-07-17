@@ -2838,8 +2838,15 @@ open class ChannelViewController: ViewController,
 
             if let unreadMessageIndexPath, checkOnlyFirstTimeReceivedMessagesFromArchive {
                 checkOnlyFirstTimeReceivedMessagesFromArchive = false
-                if diffInserts.count == 1,
-                   collectionView.isAtBottom() {
+                if collectionView.isAtBottom() {
+                    // Resting at the bottom — the short-unread open clamps
+                    // there. The bottom anchor wins over the unread anchor:
+                    // the first update counts as reading interaction whatever
+                    // it carries — a single message, a sync burst of several,
+                    // or a marker reload. Re-asserting the separator position
+                    // from here was the "scroll position jumps back to New
+                    // messages" bug when a busy channel's first update was a
+                    // multi-insert batch.
                     isStartedDragging = true
                 } else {
                     rebuildAppliedSnapshotFromObserver()
@@ -3251,18 +3258,18 @@ open class ChannelViewController: ViewController,
             showEmptyViewIfNeeded()
         case let .reloadDataAndScroll(indexPath, animated, pos):
             rebuildAppliedSnapshotFromObserver()
+            // Opening on unread: don't center the last-read message — pin the
+            // "New messages" bar at a fixed distance below the visual top so
+            // the screen fills with unread messages. Positioned from the
+            // anchor cell's layout frame (scrollToItem can only align cell
+            // edges, which leaves the bar's spot dependent on bubble height).
+            let isUnreadAnchor = channelViewModel.scrollToRepliedMessageId == 0
+                && channelViewModel.scrollToUnreadMentionMessageId == 0
+                && channelViewModel.lastDisplayedMessageId != 0
+                && channelViewModel.message(at: indexPath)?.id == channelViewModel.lastDisplayedMessageId
             // The view model sends its oldest-first path and a visual position;
             // both are translated into the mirrored space here.
             if let uiPath = uiIndexPath(fromData: indexPath) {
-                // Opening on unread: don't center the last-read message — pin the
-                // "New messages" bar at a fixed distance below the visual top so
-                // the screen fills with unread messages. Positioned from the
-                // anchor cell's layout frame (scrollToItem can only align cell
-                // edges, which leaves the bar's spot dependent on bubble height).
-                let isUnreadAnchor = channelViewModel.scrollToRepliedMessageId == 0
-                    && channelViewModel.scrollToUnreadMentionMessageId == 0
-                    && channelViewModel.lastDisplayedMessageId != 0
-                    && channelViewModel.message(at: indexPath)?.id == channelViewModel.lastDisplayedMessageId
                 if isUnreadAnchor {
                     collectionView.reloadDataAndScrollToUnreadSeparator(
                         at: uiPath,
@@ -3281,6 +3288,15 @@ open class ChannelViewController: ViewController,
             // don't drift the viewport. Released on scrollViewWillBeginDragging.
             if let messageId = channelViewModel.message(at: indexPath)?.id, messageId != 0 {
                 pinnedScrollMessageId = messageId
+            }
+            // A short unread tail can't fill a screen, so the separator scroll
+            // above clamps to the bottom (synchronously — the offset is final
+            // here). Resting at the bottom, the constant bottom offset IS the
+            // anchor; a surviving pin would let a later batch's pin-restore
+            // drag the viewport back up to the last-read message ("New
+            // messages") while rapid traffic lands. Bottom wins — drop the pin.
+            if isUnreadAnchor, collectionView.isAtBottom() {
+                pinnedScrollMessageId = 0
             }
             updateUnreadViewVisibility()
             showEmptyViewIfNeeded()

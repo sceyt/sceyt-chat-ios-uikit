@@ -127,6 +127,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     private var schedulers = [UserId: Scheduler]()
     private var isFetchingData = false
     private var isInitialLoad = true
+    /// Whether the one-shot unread ("New messages") open-anchor scroll has been
+    /// emitted. Mid-session observer restarts re-deliver `isInitial` change
+    /// events; without this guard they would re-anchor the viewport to the
+    /// stale `lastDisplayedMessageId` on every restart (see `onDidChangeEvent`).
+    private var didEmitUnreadAnchorScroll = false
     private var loadLastMessagesAfterConnect = false
     private var lastLoadPrevMessageId: MessageId = 0
     private var lastLoadNextMessageId: MessageId = 0
@@ -651,8 +656,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
 
             if isInitial {
                 markInitialMessagesLoaded()
+                // The unread ("New messages") anchor is a ONE-SHOT open position.
+                // The observer also restarts mid-session — `createAndSendUserMessage`
+                // rebuilds the window whenever the cached tail lags behind
+                // `channel.lastMessage`, which rapid receive/ACK traffic makes
+                // routine — and that restart's first change event arrives as
+                // `isInitial` again. Re-using `lastDisplayedMessageId` then yanks
+                // a user who is already reading at the bottom back to the
+                // separator, drifting further with every message below it.
+                // Replied/mention targets stay per-navigation: they are re-armed
+                // explicitly each time.
+                let unreadAnchorMessageId = didEmitUnreadAnchorScroll ? 0 : lastDisplayedMessageId
                 let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId :
-                               scrollToUnreadMentionMessageId != 0 ? scrollToUnreadMentionMessageId : lastDisplayedMessageId
+                               scrollToUnreadMentionMessageId != 0 ? scrollToUnreadMentionMessageId : unreadAnchorMessageId
                 let batchIds = items.changeItems.compactMap { $0.item?.id }
                 if messageId != 0,
                    let indexPath = items.changeItems
@@ -660,6 +676,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                     .indexPath {
                     needToScroll = false
                     let animated = scrollToUnreadMentionMessageId != 0
+                    if scrollToRepliedMessageId == 0, scrollToUnreadMentionMessageId == 0 {
+                        didEmitUnreadAnchorScroll = true
+                    }
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: animated, pos: .centeredVertically)
 
                     // Mark mention as navigated if this is an unread mention

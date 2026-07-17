@@ -199,15 +199,20 @@ extension SceytChatUIKit {
     /// observer, with no network.
     ///
     /// UI-test only.
+    /// - Parameter id: explicit message id. Defaults to a timestamp-derived id;
+    ///   pass unique ids when injecting several messages within the same
+    ///   millisecond (e.g. a message storm), or `fetchOrCreate` dedupes them
+    ///   into one row.
     public func receiveUITestMessage(channelId: ChannelId,
                                      text: String,
-                                     incoming: Bool = true) {
+                                     incoming: Bool = true,
+                                     id: MessageId = 0) {
         try? database.syncWrite { context in
             guard let channelDTO = ChannelDTO.fetch(id: channelId, context: context)
             else { return }
             let now = Date()
             let message = MessageDTO.fetchOrCreate(
-                id: MessageId(now.timeIntervalSince1970 * 1000),
+                id: id != 0 ? id : MessageId(now.timeIntervalSince1970 * 1000),
                 tid: 0,
                 context: context
             )
@@ -221,6 +226,47 @@ extension SceytChatUIKit {
             // Newer `lastMessage.createdAt` bumps the channel's `sortingKey` in
             // `ChannelDTO.willSave`, moving the row to the top of its group.
             channelDTO.lastMessage = message
+        }
+    }
+
+    /// Simulates a *batch* of freshly-arrived messages landing in one database
+    /// transaction — the shape a server sync delivers when several messages
+    /// arrived while the client was catching up. All rows are inserted in a
+    /// single write, so the message observer publishes ONE change event whose
+    /// diff contains every message, unlike repeated `receiveUITestMessage`
+    /// calls which produce one event each.
+    ///
+    /// UI-test only.
+    /// - Parameters:
+    ///   - texts: bodies, oldest first; the last becomes the channel's `lastMessage`.
+    ///   - startingId: explicit id of the first message; subsequent ones increment.
+    public func receiveUITestMessageBurst(channelId: ChannelId,
+                                          texts: [String],
+                                          incoming: Bool = true,
+                                          startingId: MessageId) {
+        guard !texts.isEmpty else { return }
+        try? database.syncWrite { context in
+            guard let channelDTO = ChannelDTO.fetch(id: channelId, context: context)
+            else { return }
+            let now = Date()
+            var newestMessage: MessageDTO?
+            for (index, text) in texts.enumerated() {
+                let message = MessageDTO.fetchOrCreate(
+                    id: startingId + MessageId(index),
+                    tid: 0,
+                    context: context
+                )
+                message.body = text
+                message.type = "text"
+                message.channelId = Int64(channelId)
+                message.incoming = incoming
+                message.state = 0 // ChatMessage.State.none
+                message.deliveryStatus = Int16(ChatMessage.DeliveryStatus.sent.intValue)
+                // Strictly increasing dates keep the visual order deterministic.
+                message.createdAt = now.addingTimeInterval(TimeInterval(index) / 1000).bridgeDate
+                newestMessage = message
+            }
+            channelDTO.lastMessage = newestMessage
         }
     }
 
