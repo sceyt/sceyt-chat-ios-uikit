@@ -1802,8 +1802,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         layoutModel.message.attachments?.forEach {
             AttachmentTransfer.default.taskFor(message: layoutModel.message, attachment: $0)?.cancel()
         }
-        if layoutModel.message.deliveryStatus == .pending {
-            provider.deletePending(message: layoutModel.message.tid)
+        if layoutModel.message.id == 0 {
+            // Pending or failed: the message has no server id, so it is deleted by tid. The
+            // server may already hold it (ack lost, or the send lands later), so the intent is
+            // stored and retried until confirmed.
+            messageSender.deleteMessage(pendingMessage: layoutModel.message, type: type)
         } else {
             messageSender.deleteMessage(id: layoutModel.message.id, type: type)
         }

@@ -62,6 +62,12 @@ public final class SyncService: NSObject {
         return op
     }()
 
+    public static var messageDeleteQueue: OperationQueue = {
+        let op = OperationQueue()
+        op.maxConcurrentOperationCount = 1
+        return op
+    }()
+
     public class func resendPendingItems() {
         logger.verbose("SyncService: resendPendingItems")
         workerQueue.async {
@@ -78,6 +84,11 @@ public final class SyncService: NSObject {
             markersQueue.cancelAllOperations()
             makePendingMarkerOperations {
                 markersQueue.addOperations($0, waitUntilFinished: false)
+            }
+            makePendingMessageDeleteOperations {
+                if !$0.isEmpty {
+                    messageDeleteQueue.addOperations($0, waitUntilFinished: false)
+                }
             }
         }
     }
@@ -105,6 +116,7 @@ public final class SyncService: NSObject {
                     // No messages to resend, send pending poll votes immediately
                     logger.verbose("SyncService: No messages to resend, sending pending poll votes")
                     sendPendingPollVotes()
+                    sendPendingMessageDeletes()
                     return
                 }
 
@@ -135,6 +147,7 @@ public final class SyncService: NSObject {
                             if shouldSendPollVotes {
                                 logger.verbose("SyncService: All pending messages sent, sending pending poll votes")
                                 sendPendingPollVotes()
+                                sendPendingMessageDeletes()
                             }
                         }
                     }
@@ -212,6 +225,28 @@ public final class SyncService: NSObject {
             }
     }
 
+    public class func makePendingMessageDeleteOperations(
+        completion: @escaping ([PendingMessageDeleteOperation]) -> Void
+    ) {
+        Components.channelMessageProvider
+            .fetchPendingMessageDeletes { records in
+                logger.verbose("SyncService: makePendingMessageDeleteOperations fetched \(records.count) records")
+                // The flush is triggered from more than one place (a reconnect sync and
+                // `resendPendingItems`), so skip records already queued to avoid sending the
+                // same delete twice.
+                let queued = Set(messageDeleteQueue.operations.compactMap { ($0 as? AsyncOperation)?.uuid })
+                completion(records.compactMap { record in
+                    let sender = Components.channelMessageSender.init(channelId: record.channelId)
+                    let operation = PendingMessageDeleteOperation(sender: sender, record: record)
+                    guard !queued.contains(operation.uuid) else {
+                        logger.verbose("SyncService: pending delete for tid \(record.messageTid) is already queued")
+                        return nil
+                    }
+                    return operation
+                })
+            }
+    }
+
     public class func sendPendingMessages() {
         workerQueue
             .async {
@@ -242,6 +277,25 @@ public final class SyncService: NSObject {
             .async {
                 makePendingPollVoteOperations {
                     pollVoteQueue.addOperations($0, waitUntilFinished: false)
+                }
+            }
+    }
+
+    /// Replays the stored "delete this message" intents.
+    ///
+    /// Runs after pending messages have been resent, so the server never receives a delete for a
+    /// tid before the message it refers to.
+    public class func sendPendingMessageDeletes() {
+        guard Bundle.isMainApp else {
+            logger.verbose("SyncService: sendPendingMessageDeletes skipped - running in app extension")
+            return
+        }
+        workerQueue
+            .async {
+                makePendingMessageDeleteOperations {
+                    if !$0.isEmpty {
+                        messageDeleteQueue.addOperations($0, waitUntilFinished: false)
+                    }
                 }
             }
     }

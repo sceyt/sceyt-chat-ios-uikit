@@ -228,6 +228,8 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     public func deleteChannel(id: ChannelId) {
         try? deleteAllMessages(channelId: id)
         ChannelSyncStateDTO.delete(channelId: id, context: self)
+        // Their messages are gone, so retrying these would only fail with `channelNotExists`.
+        PendingMessageDeleteDTO.deleteAll(channelId: id, context: self)
         if let dto = ChannelDTO.fetch(id: id, context: self) {
             let deletedObjects: [AnyHashable: Any] = [
                 NSDeletedObjectsKey: [dto.objectID]

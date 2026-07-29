@@ -10,6 +10,14 @@ import CoreData
 import Foundation
 import SceytChat
 
+/// Result of storing a send/resend ack, see `MessageDatabaseSession.resolveSendAck(sentMessage:channelId:)`.
+public enum SendAckResolution {
+    case stored(MessageDTO)
+    /// A durable delete intent exists for this tid, so the row was **not** recreated.
+    /// The caller should re-issue the delete with `serverMessageId` now that it is known.
+    case suppressedByPendingDelete(tid: Int64, serverMessageId: MessageId)
+}
+
 public protocol MessageDatabaseSession {
     @discardableResult
     func createOrUpdate(message: Message, channelId: ChannelId, changedBy: User?) -> MessageDTO
@@ -87,9 +95,19 @@ public protocol MessageDatabaseSession {
     
     @discardableResult
     func removePendingReaction(messageId: MessageId, key: String) -> MessageDTO?
-  
+
+    @discardableResult
+    func addPendingMessageDelete(messageTid: Int64, channelId: ChannelId, messageId: MessageId, type: DeleteMessageType) -> PendingMessageDeleteDTO
+
+    func removePendingMessageDelete(messageTid: Int64, channelId: ChannelId)
+
+    func pendingMessageDelete(messageTid: Int64, channelId: ChannelId) -> PendingMessageDeleteDTO?
+
+    func resolveSendAck(sentMessage: Message, channelId: ChannelId) -> SendAckResolution
+
     func deleteMessage(id: MessageId)
     func deleteMessage(tid: Int64)
+    func deleteMessage(tid: Int64, channelId: ChannelId)
     func deleteReaction(id: ReactionId)
     func deleteNotExistReactions(_ reactions: [Reaction])
     func deleteAttachmentsFor(messageId: MessageId)
@@ -211,9 +229,23 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         ReactionDTO.unownedReactions(messageId: message.id, context: self)
             .forEach { $0.message = dto }
+
+        // The user deleted this outgoing message while the delete is still being retried on the
+        // server. Keep it out of the message list rather than letting a late ack, a multi-device
+        // echo or a message sync put it back on screen.
+        if !message.incoming,
+           message.tid != 0,
+           pendingMessageDelete(messageTid: Int64(message.tid), channelId: channelId) != nil {
+            logger.info("Message with tid \(message.tid) has a pending delete, keeping it unlisted")
+            dto.unlisted = true
+            if let channel = ownerChannel, channel.lastMessage == dto {
+                let predicate = NSPredicate(format: "channelId == %lld AND tid != %lld", channel.id, Int64(message.tid))
+                channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
+            }
+        }
         return dto
     }
-    
+
     @discardableResult
     public func createOrUpdate(messages: [Message], channelId: ChannelId) -> [MessageDTO] {
         messages.map { createOrUpdate(message: $0, channelId: channelId) }
@@ -819,6 +851,51 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         return dto
     }
 
+    // MARK: - Pending message deletes
+
+    @discardableResult
+    public func addPendingMessageDelete(
+        messageTid: Int64,
+        channelId: ChannelId,
+        messageId: MessageId,
+        type: DeleteMessageType
+    ) -> PendingMessageDeleteDTO {
+        let dto = PendingMessageDeleteDTO.fetchOrCreate(messageTid: messageTid, channelId: channelId, context: self)
+        dto.type = type
+        if messageId > 0 {
+            dto.messageId = Int64(messageId)
+        }
+        return dto
+    }
+
+    public func removePendingMessageDelete(messageTid: Int64, channelId: ChannelId) {
+        PendingMessageDeleteDTO.delete(messageTid: messageTid, channelId: channelId, context: self)
+    }
+
+    public func pendingMessageDelete(messageTid: Int64, channelId: ChannelId) -> PendingMessageDeleteDTO? {
+        PendingMessageDeleteDTO.fetch(messageTid: messageTid, channelId: channelId, context: self)
+    }
+
+    /// Stores a sent message unless the user already deleted it while the send was in flight.
+    ///
+    /// Without this check `createOrUpdate(message:channelId:)` would insert the row again —
+    /// the message would come back on screen after having been deleted.
+    @discardableResult
+    public func resolveSendAck(sentMessage: Message, channelId: ChannelId) -> SendAckResolution {
+        let tid = Int64(sentMessage.tid)
+        if tid != 0,
+           let record = pendingMessageDelete(messageTid: tid, channelId: channelId) {
+            // The message does exist on the server now, so the retry can use its real id.
+            record.messageId = Int64(sentMessage.id)
+            deleteMessage(tid: tid, channelId: channelId)
+            if sentMessage.id > 0 {
+                deleteMessage(id: sentMessage.id)
+            }
+            return .suppressedByPendingDelete(tid: tid, serverMessageId: sentMessage.id)
+        }
+        return .stored(createOrUpdate(message: sentMessage, channelId: channelId))
+    }
+
     public func deleteMessage(id: MessageId) {
         if let dto = MessageDTO.fetch(id: id, context: self) {
             if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self), channel.lastMessage == dto {
@@ -841,7 +918,13 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     }
 
     public func deleteMessage(tid: Int64) {
-        if let dto = MessageDTO.fetch(tid: tid, context: self) {
+        deleteMessage(tid: tid, channelId: 0)
+    }
+
+    /// Same as `deleteMessage(tid:)` but scoped to a channel, since tids are only unique per channel.
+    /// `channelId == 0` keeps the legacy global lookup.
+    public func deleteMessage(tid: Int64, channelId: ChannelId) {
+        if let dto = MessageDTO.fetch(tid: tid, channelId: Int64(channelId), context: self) {
             if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self), channel.lastMessage == dto {
                 let predicate = NSPredicate(format: "channelId == %lld AND tid != %lld", channel.id, tid)
                 channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)

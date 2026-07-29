@@ -841,9 +841,16 @@ extension ChannelMessageProvider {
                     false,
                     ChatMessage.DeliveryStatus.pending.intValue,
                     ChatMessage.DeliveryStatus.failed.intValue)
+                // A message the user already deleted must never be resent, even if some path
+                // recreated its row while the delete was still being retried.
+                let deletedTids = Set(PendingMessageDeleteDTO.fetchAll(context: $0).map { $0.messageTid })
                 return MessageDTO.fetch(request: request, context: $0)
-                    .compactMap {
-                        $0.convert()
+                    .compactMap { dto -> ChatMessage? in
+                        if deletedTids.contains(dto.tid) {
+                            logger.info("Skip resending message with tid \(dto.tid): a pending delete exists for it")
+                            return nil
+                        }
+                        return dto.convert()
                     }
             } completion: { result in
                 switch result {
@@ -851,6 +858,25 @@ extension ChannelMessageProvider {
                     completion(result)
                 case .failure(let error):
                     logger.errorIfNotNil(error, "")
+                    completion([])
+                }
+            }
+        }
+
+    /// Stored delete intents waiting to reach the server, oldest first.
+    ///
+    /// A record is only ever removed once the server has answered, so nothing is filtered here.
+    public class func fetchPendingMessageDeletes(
+        _ completion: @escaping ([PendingMessageDelete]) -> Void) {
+            database.performBgTask(resultQueue: .global()) { context in
+                PendingMessageDeleteDTO.fetchAll(context: context)
+                    .map { $0.convert() }
+            } completion: { result in
+                switch result {
+                case .success(let records):
+                    completion(records)
+                case .failure(let error):
+                    logger.errorIfNotNil(error, "Fetching pending message deletes failed")
                     completion([])
                 }
             }
