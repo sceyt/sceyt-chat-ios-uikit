@@ -16,4 +16,5 @@ extension Notification.Name {
     static let didClosePoll = Notification.Name("didClosePoll")
     static let didOpenViewOnceMessage = Notification.Name("didOpenViewOnceMessage")
     static let didFinishChannelsSync = Notification.Name("didFinishChannelsSync")
+    static let didSendUserMessage = Notification.Name("didSendUserMessage")
 }

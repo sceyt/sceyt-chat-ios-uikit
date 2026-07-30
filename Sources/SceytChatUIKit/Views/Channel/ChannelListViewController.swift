@@ -59,6 +59,11 @@ open class ChannelListViewController: ViewController,
 
     private var isViewDidAppear = false
 
+    /// Channel opened from a search result while the search was active. The search is
+    /// ended only if the user actually sends a message there — merely looking into the
+    /// channel and coming back keeps the search and its results.
+    private var searchOpenedChannelId: ChannelId?
+
     open override func setup() {
         super.setup()
         title = L10n.Channel.List.title
@@ -100,6 +105,7 @@ open class ChannelListViewController: ViewController,
                 self?.addUserSearchToken(user)
             }
             globalVC.onSelectMessage = { [weak self] message, channel in
+                self?.searchOpenedChannelId = channel.id
                 self?.channelListRouter.showChannelViewController(channel: channel, scrollToMessageId: message.id)
             }
             globalVC.onSelectAttachment = { [weak self] attachment in
@@ -226,6 +232,25 @@ open class ChannelListViewController: ViewController,
             .sink { [weak self] in
                 self?.onEvent($0)
             }.store(in: &subscriptions)
+
+        NotificationCenter.default
+            .publisher(for: .didSendUserMessage)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                self?.didSendUserMessage(notification)
+            }.store(in: &subscriptions)
+    }
+
+    /// A message was sent somewhere in the app. If it went to the channel this search
+    /// opened, the result has served its purpose — end the search now, while the channel
+    /// screen still covers the list, so coming back reveals the plain channel list.
+    open func didSendUserMessage(_ notification: Notification) {
+        guard let openedChannelId = searchOpenedChannelId,
+              let channelId = notification.userInfo?[ChannelViewModel.didSendUserMessageChannelIdKey] as? ChannelId,
+              channelId == openedChannelId
+        else { return }
+        searchOpenedChannelId = nil
+        endSearch()
     }
 
     open override func viewDidAppear(_ animated: Bool) {
@@ -238,6 +263,8 @@ open class ChannelListViewController: ViewController,
         tableView.visibleCells.forEach {
             ($0 as? ChannelCell)?.subscribeForPresence()
         }
+        // Back on the list: nothing was sent in the opened channel, so the search stays.
+        searchOpenedChannelId = nil
     }
 
     open override func viewWillDisappear(_ animated: Bool) {
@@ -251,6 +278,37 @@ open class ChannelListViewController: ViewController,
             tableView.deselectRow(at: indexPath, animated: false)
         }
         channelListViewModel.deselectChannel()
+    }
+
+    /// Clears the search bar text, tokens and dismisses the search controller.
+    /// Called after a search result opened a channel, so coming back shows the plain channel list.
+    open func endSearch() {
+        let searchBar = searchController.searchBar
+        let textField = searchBar.searchTextField
+
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            NSObject.cancelPreviousPerformRequests(
+                withTarget: globalVC,
+                selector: #selector(GlobalSearchResultsViewController.search(query:)),
+                object: lastSearchText
+            )
+            globalVC.hasSearchToken = false
+            globalVC.filterUser = nil
+        } else {
+            NSObject.cancelPreviousPerformRequests(
+                withTarget: channelListViewModel,
+                selector: #selector(ChannelListViewModel.search(query:)),
+                object: lastSearchText
+            )
+        }
+        lastSearchText = nil
+
+        while !textField.tokens.isEmpty {
+            textField.removeToken(at: textField.tokens.count - 1)
+        }
+        searchBar.text = nil
+        searchBar.resignFirstResponder()
+        searchController.isActive = false
     }
 
     open func adjustTableViewToKeyboard(notification: Notification) {
@@ -320,6 +378,9 @@ open class ChannelListViewController: ViewController,
                 }
             }
         case .showChannel(let channel):
+            if searchController.isActive {
+                searchOpenedChannelId = channel.id
+            }
             channelListRouter.showChannelViewController(channel: channel)
         }
     }

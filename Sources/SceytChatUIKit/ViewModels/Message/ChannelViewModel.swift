@@ -29,6 +29,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     public let channelDelegateIdentifier = NSUUID().uuidString
     
     //MARK: public properties
+    /// `userInfo` key carrying the `ChannelId` of a `.didSendUserMessage` notification.
+    public static let didSendUserMessageChannelIdKey = "channelId"
+
     public private(set) var provider: ChannelMessageProvider
     public private(set) var messageSender: ChannelMessageSender
     public private(set) var channelCreator: ChannelCreator
@@ -1651,7 +1654,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         _ message: Message,
         action: UserSendMessage.Action
     ) {
-        
+        if case .edit = action {} else {
+            // Announces the user's intent to send, not delivery. Observers use it to
+            // react to "the user wrote something in this channel" (e.g. the channel
+            // list ends an in-flight search once its result was actually used).
+            NotificationCenter.default.post(
+                name: .didSendUserMessage,
+                object: nil,
+                userInfo: [Self.didSendUserMessageChannelIdKey: channel.id]
+            )
+        }
+
         @Sendable func send(storeBeforeSend: Bool = false, completion: (@Sendable (Error?) -> Void)? = nil) {
             logger.verbose("[MESSAGE SEND] sendUserMessage messageSender")
             switch action {
