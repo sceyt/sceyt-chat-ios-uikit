@@ -619,9 +619,10 @@ open class ChannelViewController: ViewController,
             .$newMessageCount
             .receive(on: DispatchQueue.main)
             .removeDuplicates()
-            .sink { [weak self] value in
-                guard let self else { return }
-                unreadCountView.unreadCount.value = appearance.scrollDownAppearance.unreadCountFormatter.format(value)
+            .sink { [weak self] _ in
+                // The badge is derived from scroll position too, so recompute
+                // rather than rendering the raw count.
+                self?.updateUnreadCountBadge()
             }.store(in: &subscriptions)
 
         channelViewModel
@@ -1047,6 +1048,7 @@ open class ChannelViewController: ViewController,
             self.channelViewModel.markChannelAsDisplayed()
             self.channelViewModel.loadPrevMessages(before: 0)
             self.unreadCountView.isHidden = true
+            self.updateUnreadCountBadge()
             self.isScrollingBottom = false
         }
     }
@@ -1506,12 +1508,151 @@ open class ChannelViewController: ViewController,
         guard canShowUnreadCountView
         else {
             unreadCountView.isHidden = true
+            updateUnreadCountBadge()
             return
         }
         // Mirrored list: distance from the newest message is just the offset's
         // distance from the bottom anchor.
         let distanceFromNewest = collectionView.contentOffset.y - collectionView.bottomContentOffsetY
         unreadCountView.isHidden = !(distanceFromNewest > 30)
+        updateUnreadCountBadge()
+    }
+
+    /// Number of *incoming, not-yet-seen* messages currently inside the
+    /// viewport. "Visible" means intersecting `visibleContentRect` — the bounds
+    /// inset by `adjustedContentInset` — so a message hidden behind the
+    /// composer does not count as seen.
+    ///
+    /// A message only counts when BOTH hold:
+    /// - it is incoming — the user's own messages are never unread;
+    /// - it does not carry the current user's confirmed `displayed` marker
+    ///   (`hasDisplayedFromMe`). Once the server has ACKed the marker it also
+    ///   removes the message from `newMessageCount`, so subtracting it here as
+    ///   well would double-count it. Pending (sent-but-unACKed) markers live in
+    ///   `pendingMarkerNames`, not `userMarkers`, so an in-flight marker still
+    ///   counts — the server hasn't lowered the raw count for it yet.
+    ///
+    /// Returns `nil` when the answer is unknown (nothing laid out yet, or the
+    /// layout handed back a path `appliedSnapshot` doesn't cover). Callers must
+    /// treat that as "unknown", never as zero.
+    open func visibleUnseenIncomingMessageCount() -> Int? {
+        let visiblePaths = collectionView.visibleAttributes
+            .filter { $0.representedElementCategory == .cell }
+            .map(\.indexPath)
+        guard !visiblePaths.isEmpty else { return nil }
+        // One atomic read — the dictionary is COW, so indexing the local copy
+        // in the loop below costs a hash lookup rather than a lock per item.
+        let layoutModels = channelViewModel.layoutModels
+        let items = appliedSnapshot.items
+        return Self.unseenIncomingCount(
+            visiblePaths: visiblePaths,
+            sectionItemCounts: items.map(\.count),
+            isUnseenIncoming: { indexPath in
+                // A visible message whose layout model hasn't been built yet is
+                // NOT counted: subtracting an unknown would under-report, and
+                // hiding unread messages is the failure mode to avoid. (In
+                // practice a visible cell always has a layout model — it was
+                // needed to render.)
+                guard let message = layoutModels[items[indexPath.section][indexPath.item]]?.message
+                else { return false }
+                return message.incoming && !message.hasDisplayedFromMe
+            }
+        )
+    }
+
+    /// Pure walk behind `visibleUnseenIncomingMessageCount()`, split out so it
+    /// can be unit-tested without a live controller. Returns `nil` when any
+    /// visible path falls outside `sectionItemCounts` — the layout and the
+    /// snapshot are briefly out of step, so the count is unknowable.
+    internal static func unseenIncomingCount(
+        visiblePaths: [IndexPath],
+        sectionItemCounts: [Int],
+        isUnseenIncoming: (IndexPath) -> Bool) -> Int? {
+            var count = 0
+            for indexPath in visiblePaths {
+                guard indexPath.section >= 0,
+                      indexPath.section < sectionItemCounts.count,
+                      indexPath.item >= 0,
+                      indexPath.item < sectionItemCounts[indexPath.section]
+                else { return nil }
+                if isUnseenIncoming(indexPath) {
+                    count += 1
+                }
+            }
+            return count
+        }
+
+    /// Whether the channel's newest message is also the newest item the
+    /// collection view is showing.
+    ///
+    /// When it isn't — the user jumped to a search result or a replied message
+    /// and there is an unloaded gap toward the newest end — the below-viewport
+    /// count says nothing about how many unread messages are hidden, so the
+    /// badge has to fall back to the raw channel count rather than under-report.
+    ///
+    /// Compares `Key`s rather than converting index paths: `appliedSnapshot` and
+    /// the observer's index space drift by design, and a drift here would make
+    /// the badge flicker between the reduced and the raw value.
+    open var isShowingNewestMessage: Bool {
+        guard let lastMessage = channelViewModel.channel.lastMessage
+        else { return false }
+        return appliedSnapshot.items.first?.first == ChannelViewModel.Key(message: lastMessage)
+    }
+
+    /// Value to render on the scroll-down badge:
+    /// `newMessageCount - visible unseen incoming messages` — the channel's
+    /// unread count minus the incoming messages the user can see right now that
+    /// don't yet carry their confirmed `displayed` marker, floored at zero.
+    ///
+    /// Display-only — it never touches markers, `channel.newMessageCount`, or
+    /// the channel-list badge. As the displayed-marker flush is ACKed the
+    /// server lowers `newMessageCount` and the ACK moves those messages out of
+    /// the subtracted set at once, so the badge stays steady instead of
+    /// double-counting.
+    open func unreadBadgeCount() -> UInt64 {
+        let raw = channelViewModel.newMessageCount
+        // Short-circuit before the walk: with nothing unread, or with the newest
+        // message not loaded, the visible count can't change the answer.
+        guard raw > 0, isShowingNewestMessage
+        else { return raw }
+        return Self.badgeCount(
+            raw: raw,
+            visibleUnseen: visibleUnseenIncomingMessageCount(),
+            isShowingNewestMessage: true
+        )
+    }
+
+    /// Pure decision behind `unreadBadgeCount()` — the subtraction plus the two
+    /// fall-back-to-raw cases (unknown visible count, newest message not
+    /// loaded). Split out for unit testing.
+    internal static func badgeCount(
+        raw: UInt64,
+        visibleUnseen: Int?,
+        isShowingNewestMessage: Bool) -> UInt64 {
+            guard raw > 0, isShowingNewestMessage,
+                  let visibleUnseen, visibleUnseen >= 0
+            else { return raw }
+            let seen = UInt64(visibleUnseen)
+            return raw > seen ? raw - seen : 0
+        }
+
+    /// Single writer for the scroll-down badge. Called from
+    /// `updateUnreadViewVisibility()` — which covers every scroll tick and all
+    /// structural update paths — and from the `newMessageCount` subscription.
+    ///
+    /// Skips the layout query while the button is hidden (the badge isn't
+    /// visible then, and unhiding always recomputes because
+    /// `updateUnreadViewVisibility()` assigns `isHidden` first). Diffs against
+    /// the label's current text instead of caching, so it can never go stale.
+    open func updateUnreadCountBadge() {
+        guard !unreadCountView.isHidden || channelViewModel.newMessageCount == 0
+        else { return }
+        let formatted = appearance.scrollDownAppearance
+            .unreadCountFormatter
+            .format(unreadBadgeCount())
+        if unreadCountView.unreadCount.value != formatted {
+            unreadCountView.unreadCount.value = formatted
+        }
     }
 
     open func updateLastNavigatedIndexPath() {
@@ -1604,6 +1745,11 @@ open class ChannelViewController: ViewController,
             // deduct now instead of waiting for the debounced displayed-marker flush.
             channelViewModel.deductDisplayedUnreadMentions([cell.data.message])
             scheduleMarkDisplayed()
+        }
+
+        // Catches visible-set changes that arrive without a scroll event.
+        if !isCollectionViewUpdating {
+            updateUnreadCountBadge()
         }
     }
 

@@ -27,7 +27,20 @@ extension ChannelViewController {
             isAccessibilityElement = true
             accessibilityTraits = .button
         }
-        
+
+        /// Surfacing the button as a single accessibility element collapses the
+        /// child badge, so the unread count is reported as the button's value —
+        /// readable by VoiceOver and by UI tests, without splitting this into
+        /// two unlabeled elements.
+        override open var accessibilityValue: String? {
+            get {
+                guard let count = unreadCount.value, !count.isEmpty
+                else { return nil }
+                return count
+            }
+            set { super.accessibilityValue = newValue }
+        }
+
         override open func setupLayout() {
             super.setupLayout()
             
