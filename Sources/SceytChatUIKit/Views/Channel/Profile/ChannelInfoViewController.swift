@@ -180,9 +180,15 @@ open class ChannelInfoViewController: ViewController,
                     self.mediaListViewController.visibleCells
                         .compactMap { $0 as? ChannelInfoViewController.AttachmentCell }
                         .filter { !$0.progressView.isHidden }
-                        .forEach {
-                            $0.progressView.removeRotateZAnimation()
-                            $0.progressView.createRotateZAnimation()
+                        .forEach { cell in
+                            // The ring can be stale after backgrounding (the transfer
+                            // finished while suspended, or its completion observer was
+                            // wiped by cell reuse) — resync it from the layout state
+                            // first, and only revive the spinner for rings that survive.
+                            self.mediaListViewController.syncTransferOverlay(for: cell)
+                            guard !cell.progressView.isHidden, cell.progressView.progress < 1 else { return }
+                            cell.progressView.removeRotateZAnimation()
+                            cell.progressView.createRotateZAnimation()
                         }
                 }
             }.store(in: &subscriptions)

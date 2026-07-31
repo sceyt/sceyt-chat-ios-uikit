@@ -487,12 +487,11 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         let attachment = layout.attachment
         downloadQueue.async { [weak self] in
             guard let self,
-                  attachment.type != "link",
-                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
-                  attachment.status != .done,
-                  attachment.status != .failedDownloading,
-                  attachment.status != .pauseDownloading,
-                  attachment.status != .failedUploading
+                  shouldAutoDownload(attachment),
+                  // A stored `.done` is not proof the bytes are still there (cache
+                  // eviction, restored backup), and a stored `.pending` is not proof
+                  // they are missing. The file itself is the authority.
+                  fileProvider.filePath(attachment: attachment) == nil
             else {
                 DispatchQueue.main.async { completion?(layout) }
                 return
@@ -542,7 +541,11 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { _ in
+                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                    // stopTransfer persists the paused status itself whenever it had
+                    // something to stop; false means nothing was running (e.g. the
+                    // download already finished) and the stored status must stay.
+                    guard stopped else { return }
                     DataProvider.database.write {
                         let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
                         dto?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue

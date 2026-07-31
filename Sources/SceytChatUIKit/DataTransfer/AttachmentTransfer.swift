@@ -508,6 +508,11 @@ open class AttachmentTransfer: DataProvider {
         
         func didEndTask(taskInfo: SCTDataSessionTaskInfo, error: Error?) {
             let key = Self.key(message: taskInfo.message, attachment: taskInfo.attachment)
+            // The task is over — no progress/completion event will ever fire for this
+            // key again. Drop the cached percent so a later cell rebind that still
+            // reads a stale `.downloading` status can't restore a progress ring that
+            // nothing would ever hide.
+            self.progressCache[key] = nil
             var storedMessage: ChatMessage?
             self.database.write(resultQueue: .global()) {
                 storedMessage = $0.update(chatMessage: message, attachments: attachments)?.convert()

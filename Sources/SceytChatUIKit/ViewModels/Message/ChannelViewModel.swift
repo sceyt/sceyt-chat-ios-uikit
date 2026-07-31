@@ -2636,17 +2636,44 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 messageId: messageId)
         {[weak self] ranges in
             guard let self else { return }
-            if !ranges.isEmpty {
-                self.loadNearMessagesOfRepliedMessage(id: messageId) { messages, error in
-                    if messages?.first(where: { $0.id == messageId }) == nil {
-                        return
-                    }
+            // The jump is user-initiated (a tap on the quoted bubble), so every way it
+            // can fail has to reach the user — a load error left unreported is a tap
+            // that visibly does nothing.
+            self.loadNearMessagesOfRepliedMessage(id: messageId) { [weak self] messages, error in
+                guard let self else { return }
+                if let error {
+                    self.handleRepliedMessageNavigationFailure(messageId: messageId, error: error)
+                    return
+                }
+                guard messages?.first(where: { $0.id == messageId }) != nil else {
+                    // The backend answered, but the parent is not in the window it
+                    // returned — deleted, or no longer visible to this user. There is
+                    // no error object to show; just release the pending navigation so
+                    // the next tap is not blocked by stale state.
+                    logger.error("[ReplyNavigation] parent message \(messageId) not found in the loaded range")
+                    self.clearPendingRepliedMessageNavigation(messageId: messageId)
+                    return
+                }
+                if !ranges.isEmpty {
                     self.messageObserver.restartToNear(at: messageId)
                 }
-            } else {
-                self.loadNearMessagesOfRepliedMessage(id: messageId)
             }
         }
+    }
+
+    /// Releases the pending replied-message navigation and surfaces `error`.
+    /// `scrollToRepliedMessageId` is armed for the whole async load; leaving it set
+    /// after a failure both blocks link-preview updates and makes the next unrelated
+    /// change event scroll to a message the user never reached.
+    open func handleRepliedMessageNavigationFailure(messageId: MessageId, error: Error) {
+        logger.errorIfNotNil(error, "[ReplyNavigation] load near messages of replied message \(messageId)")
+        clearPendingRepliedMessageNavigation(messageId: messageId)
+        event = .showError(error)
+    }
+
+    open func clearPendingRepliedMessageNavigation(messageId: MessageId) {
+        guard scrollToRepliedMessageId == messageId else { return }
+        scrollToRepliedMessageId = 0
     }
     
     /// Finds and navigates to an unread mention message, loading it if necessary
@@ -3258,6 +3285,7 @@ public extension ChannelViewModel {
         case close
         case pumpPrevPagination
         case providerFinishedPrevPagination(beforeMessageId: MessageId)
+        case showError(Error)
     }
 }
 

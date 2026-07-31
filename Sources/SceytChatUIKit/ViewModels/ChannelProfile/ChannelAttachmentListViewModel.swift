@@ -216,19 +216,18 @@ open class ChannelAttachmentListViewModel: NSObject {
         let attachment = layout.attachment
         downloadQueue.async { [weak self] in
             guard let self,
-                  attachment.type != "link",
-                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
-                  attachment.status != .done,
-                  attachment.status != .failedDownloading,
-                  attachment.status != .pauseDownloading,
-                  attachment.status != .failedUploading
+                  shouldAutoDownload(attachment),
+                  // A stored `.done` is not proof the bytes are still there (cache
+                  // eviction, restored backup), and a stored `.pending` is not proof
+                  // they are missing. The file itself is the authority.
+                  fileProvider.filePath(attachment: attachment) == nil
             else {
                 DispatchQueue.main.async {
                     completion?(layout)
                 }
                 return
             }
-            
+
             self.getMessage(layout) { message in
                 if let message {
                     fileProvider
@@ -255,9 +254,14 @@ open class ChannelAttachmentListViewModel: NSObject {
         guard attachment.type != "link"
         else { return }
         if fileProvider.filePath(attachment: attachment) != nil {
+            let done = ChatMessage.Attachment.TransferStatus.done.rawValue
             DataProvider.database.write {
-                let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
-                dto?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+                // Skip the same-value write: Core Data would still mark the object
+                // dirty and emit an update event for a no-op reconcile.
+                guard let dto = AttachmentDTO.fetch(id: attachment.id, context: $0),
+                      dto.status != done
+                else { return }
+                dto.status = done
             } completion: { error in
                 logger.errorIfNotNil(error, "")
             }
@@ -283,7 +287,13 @@ open class ChannelAttachmentListViewModel: NSObject {
 
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { _ in
+                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                    // stopTransfer persists the paused status itself whenever it had
+                    // something to stop. False means there was no live task and the
+                    // status is not a transfer state — e.g. the download already
+                    // finished — and stamping `.pauseDownloading` over it would mark
+                    // a completed attachment as paused.
+                    guard stopped else { return }
                     DataProvider.database.write {
                         let attachmentDTO = AttachmentDTO.fetch(id: attachment.id, context: $0)
                         attachmentDTO?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue
@@ -340,6 +350,9 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
         _ layout: MessageLayoutModel.AttachmentLayout,
         completion: ((MessageLayoutModel.AttachmentLayout) -> Void)?
     )
+    /// Whether `downloadAttachmentIfNeeded` would start a transfer for this attachment,
+    /// assuming its bytes are not already on disk (callers check that separately).
+    func shouldAutoDownload(_ attachment: ChatMessage.Attachment) -> Bool
     func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout)
     func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout)
     var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> { get }
@@ -355,6 +368,24 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
 }
 
 public extension ChannelAttachmentListViewModelProviding {
+    /// The cell binding asks this the moment a cell is dequeued, to decide whether to
+    /// put the progress ring up *before* the transfer produces its first byte. Keeping
+    /// it as the one predicate both the view and `downloadAttachmentIfNeeded` consult
+    /// is what stops the two from disagreeing — a cell that auto-downloads with no
+    /// overlay, or an overlay spinning on an attachment nobody is fetching.
+    func shouldAutoDownload(_ attachment: ChatMessage.Attachment) -> Bool {
+        guard attachment.type != "link",
+              minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize
+        else { return false }
+        switch attachment.status {
+        case .pauseDownloading, .failedDownloading, .failedUploading:
+            // Paused and failed transfers wait for an explicit tap.
+            return false
+        default:
+            return true
+        }
+    }
+
     var hasMore: Bool { true }
     func search(query: String?, filterUser: ChatUser?) {}
     func stopDatabaseObserver() {}

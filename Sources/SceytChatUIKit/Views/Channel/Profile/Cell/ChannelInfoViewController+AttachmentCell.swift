@@ -25,6 +25,12 @@ extension ChannelInfoViewController {
 
         open var lastAttachmentTransferProgress: AttachmentTransfer.AttachmentProgress?
 
+        /// Increments on every show (and on reuse). `hideProgressView` captures it when
+        /// the hide animation is scheduled, and its completion applies the hide only if
+        /// no newer show/reuse happened while the animation was in flight — a stale
+        /// completion from a previous binding must not hide the next binding's ring.
+        private var overlayGeneration = 0
+
         open var overlayLoaderAppearance = CircularProgressView.Appearance(
             reference: CircularProgressView.appearance,
             progressColor: .onPrimary,
@@ -106,27 +112,52 @@ extension ChannelInfoViewController {
         }
 
         open func setProgress(_ progress: CGFloat) {
-            guard progressView.progress != progress else { return }
+            guard progressView.progress != progress else {
+                if progress > 0, progress < 1, progressView.isHidden {
+                    // A stale hide-animation completion beat the show that set this
+                    // same value (the cell was rebound during the hide's ~0.3s
+                    // animation window). The value is already right — only the
+                    // visibility was clobbered. Re-show.
+                    showProgressView()
+                }
+                return
+            }
             progressView.progress = progress
             if progress <= 0 || progress >= 1 {
                 hideProgressView()
             } else {
-                progressView.isHidden = false
-                pauseButton.isHidden = false
+                showProgressView()
             }
+        }
+
+        open func showProgressView() {
+            overlayGeneration &+= 1
+            progressView.isHidden = false
+            pauseButton.isHidden = false
         }
 
         open func hideProgressView() {
             guard !progressView.isHidden else { return }
+            overlayGeneration &+= 1
+            let generation = overlayGeneration
             UIView.animate(withDuration: progressView.animationDuration + 0.1) { [weak self] in
                 self?.progressView.transform = .init(scaleX: 0.01, y: 0.01)
                 self?.pauseButton.transform = .init(scaleX: 0.01, y: 0.01)
             } completion: { [weak self] _ in
-                self?.progressView.isHidden = true
-                self?.pauseButton.isHidden = true
-                self?.progressView.transform = .identity
-                self?.pauseButton.transform = .identity
-                self?.data.loadThumbnail()
+                guard let self else { return }
+                guard generation == self.overlayGeneration else {
+                    // The ring was shown again (or the cell rebound) while this hide
+                    // was animating — the hide no longer applies. Undo the shrink and
+                    // leave the current binding's state alone.
+                    self.progressView.transform = .identity
+                    self.pauseButton.transform = .identity
+                    return
+                }
+                self.progressView.isHidden = true
+                self.pauseButton.isHidden = true
+                self.progressView.transform = .identity
+                self.pauseButton.transform = .identity
+                self.data.loadThumbnail()
             }
         }
 
@@ -153,6 +184,9 @@ extension ChannelInfoViewController {
                     data.update(attachment: done.attachment)
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { return }
+                        // The transfer is over — its last progress tick must not keep
+                        // driving the pause button's status resolution.
+                        self.lastAttachmentTransferProgress = nil
                         if let thumbnail = self.data?.thumbnail {
                             self.imageView.image = thumbnail
                         }
@@ -163,6 +197,10 @@ extension ChannelInfoViewController {
 
         override open func prepareForReuse() {
             super.prepareForReuse()
+            // Invalidate any in-flight hide animation of the previous binding so its
+            // completion can't hide the next binding's overlay (or load the wrong
+            // thumbnail).
+            overlayGeneration &+= 1
             if let message = data?.ownerMessage, let attachment = data?.attachment {
                 fileProvider.removeProgressObserver(message: message, attachment: attachment)
             }

@@ -3462,7 +3462,13 @@ open class ChannelViewController: ViewController,
             showEmptyViewIfNeeded()
         case .showNoMessage:
             showEmptyViewIfNeeded()
-        case .close:
+        case .showError(let error):
+            // The view model publishes from whatever queue the failing request
+            // completed on; presenting has to happen on main.
+            DispatchQueue.main.async { [weak self] in
+                self?.showAlert(error: error)
+            }
+        case .close:    
             router.popToRoot()
         case .connection(let state):
             switch state {

@@ -29,6 +29,20 @@ public enum SceytChatError: Int, Error {
     }
 }
 
+extension SceytChatError: LocalizedError {
+    /// Without this, anything that surfaces one of these to the user renders Foundation's
+    /// default — "The operation couldn’t be completed. (SceytChatUIKit.SceytChatError
+    /// error 9001.)" — which is not something to put in an alert.
+    public var errorDescription: String? {
+        switch self {
+        case .notConnect, .networkConnection:
+            return L10n.Connection.Error.networkLost
+        default:
+            return L10n.Connection.Error.Try.again
+        }
+    }
+}
+
 public extension Error {
     
     var sceytChatCode: SceytChatError? {

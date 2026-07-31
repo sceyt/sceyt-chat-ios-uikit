@@ -94,6 +94,72 @@ extension ChannelInfoViewController {
                 var indexes = paths
                 indexes.updates = []
                 updateCollectionView(paths: indexes)
+                // Updates are excluded from the batch above because reloadItems would
+                // flash the thumbnails — but they carry transfer-status transitions
+                // (e.g. a download that finished while the app was backgrounded, whose
+                // in-memory completion callback never reached the cell). Re-apply the
+                // overlay state on the visible cells in place instead.
+                if !paths.updates.isEmpty {
+                    syncVisibleTransferOverlays()
+                }
+            }
+        }
+
+        /// Re-applies the transfer overlay (progress ring / pause button) of every
+        /// visible cell from its layout's current state. Layout instances are mutated
+        /// in place by the database observer, so `cell.data` already reflects the
+        /// change that was excluded from the batch update.
+        open func syncVisibleTransferOverlays() {
+            visibleCells
+                .compactMap { $0 as? ChannelInfoViewController.AttachmentCell }
+                .forEach { syncTransferOverlay(for: $0) }
+        }
+
+        /// The single source of truth for a cell's transfer overlay, used both when a
+        /// cell is bound and when a database update re-syncs the visible cells.
+        ///
+        /// It deliberately decides from the *transfer reality* — is there a live
+        /// percent, are the bytes on disk, will the view model auto-download this —
+        /// rather than from the stored status alone. Driving it off the status left
+        /// cells blank in every case the status switch had no branch for (anything
+        /// outside `.pending`/`.downloading`/`.done`, plus a `.done` whose file no
+        /// longer exists): the view model started the download anyway, so the overlay
+        /// only showed up later, when the first progress tick landed.
+        open func syncTransferOverlay(for cell: ChannelInfoViewController.AttachmentCell) {
+            guard let layout = cell.data else { return }
+            let attachment = layout.attachment
+
+            // A live transfer always wins — show its real percent.
+            if let message = layout.ownerMessage,
+               let progress = fileProvider.currentProgressPercent(message: message, attachment: attachment) {
+                cell.setProgress(progress)
+                return
+            }
+            // No live percent means no running transfer, so the last progress tick's
+            // snapshot describes a dead one. Drop it, or the pause button keeps
+            // resolving its action from a stale `.downloading` and toggles a
+            // transfer that no longer exists instead of acting on the real state.
+            cell.lastAttachmentTransferProgress = nil
+            // The bytes are on disk: nothing to overlay, whatever the status claims.
+            // A transfer can end without its completion ever reaching this cell.
+            if fileProvider.filePath(attachment: attachment) != nil {
+                cell.update(status: .done)
+                return
+            }
+            // No file and no percent yet. The transfer either is about to start —
+            // `downloadAttachmentIfNeeded` runs off the main thread and resolves the
+            // owner message before it fetches, so the ring has to be up front to cover
+            // that gap — or it waits for an explicit tap.
+            if mediaViewModel.shouldAutoDownload(attachment) {
+                cell.setProgress(0.0001)
+            } else if attachment.status == .failedUploading {
+                // An upload that failed on the sender side: there is no remote copy to
+                // pull, so offering a download button would be a dead end.
+                cell.update(status: .done)
+            } else {
+                // `.pauseDownloading` is the appearance's "tap to download" state;
+                // a failed transfer renders the same way.
+                cell.update(status: attachment.status == .failedDownloading ? .failedDownloading : .pauseDownloading)
             }
         }
         
@@ -135,30 +201,21 @@ extension ChannelInfoViewController {
 
             if let model {
                 cell.setProgressHandler()
-
-                switch model.attachment.status {
-                case .pending, .downloading:
-                    if let message = model.ownerMessage,
-                       let progress = fileProvider.currentProgressPercent(message: message, attachment: model.attachment) {
-                        cell.setProgress(progress)
-                    } else if fileProvider.filePath(attachment: model.attachment) == nil {
-                        let willAutoDownload = model.attachment.status == .downloading
-                            || mediaViewModel.minAutoDownloadSize <= 0
-                            || model.attachment.uploadedFileSize <= mediaViewModel.minAutoDownloadSize
-                        if willAutoDownload {
-                            cell.setProgress(0.0001)
-                        } else {
-                            cell.update(status: .pauseDownloading)
-                        }
-                    }
-                case .done:
-                    cell.setProgress(0)
-                default:
-                    break
-                }
+                syncTransferOverlay(for: cell)
 
                 cell.onPauseAction = { [weak cell, weak self] in
                     guard let cell, let self, let data = cell.data else { return }
+                    // The overlay can outlive its transfer — a completion that fired
+                    // while the app was backgrounded may never have reached this cell.
+                    // With the bytes already on disk there is nothing to pause, resume,
+                    // or cancel: hide the overlay and let `resumeDownload`'s
+                    // file-on-disk fast path reconcile the stored status to `.done`.
+                    if fileProvider.filePath(attachment: data.attachment) != nil {
+                        cell.lastAttachmentTransferProgress = nil
+                        cell.update(status: .done)
+                        self.mediaViewModel.resumeDownload(data)
+                        return
+                    }
                     let progressStatus = cell.lastAttachmentTransferProgress?.attachment.status
                     let dataStatus = data.attachment.status
                     let status = progressStatus ?? dataStatus
@@ -171,7 +228,10 @@ extension ChannelInfoViewController {
                     case .downloading:
                         cell.update(status: .pauseDownloading)
                         self.mediaViewModel.pauseDownload(data)
-                    case .pending:
+                    // `.done` is here because the overlay only puts a download button on
+                    // a `.done` attachment when its file is gone from disk — tapping it
+                    // has to re-fetch, not no-op.
+                    case .pending, .done:
                         if let message = data.ownerMessage,
                            fileProvider.currentProgressPercent(message: message, attachment: data.attachment) != nil {
                             cell.update(status: .pauseDownloading)
