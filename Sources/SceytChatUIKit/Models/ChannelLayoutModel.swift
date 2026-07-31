@@ -136,6 +136,23 @@ open class ChannelLayoutModel {
             return update
         }
 
+    /// Rebuilds every formatter-derived field (subject, date, unread count and
+    /// the last-message preview) from the current `channel`, keeping the
+    /// already-rendered `avatar` untouched.
+    ///
+    /// Use this when something *outside* the channel changed the formatter
+    /// output — e.g. the device contact book synced and `channelNameFormatter`
+    /// now resolves a different display name. Discarding the whole model for
+    /// that (the old `invalidateLayoutModels` behavior) also discarded the
+    /// avatar, so every visible cell flashed an empty avatar until the async
+    /// re-render completed.
+    open func reloadFormattedContent() {
+        formattedSubject = createFormattedSubject()
+        formattedDate = createFormattedDate()
+        formattedUnreadCount = createFormattedUnreadCount()
+        attributedView = createDraftMessageIfNeeded() ?? attributedBody()
+    }
+
     /// Rebuilds the cached `attributedView` with fonts scaled for the given
     /// trait collection's content size category.
     ///

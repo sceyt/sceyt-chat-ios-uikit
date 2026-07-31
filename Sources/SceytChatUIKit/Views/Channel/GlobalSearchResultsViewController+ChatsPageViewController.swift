@@ -17,11 +17,16 @@ extension GlobalSearchResultsViewController {
 
         private var layoutModels: [ChatChannel: ChannelLayoutModel] = [:]
 
-        /// Clears all cached layout models so the next `reloadData()` call recreates them from scratch.
-        /// Call this when something external to the channel (e.g. contact names) has changed so that
-        /// `attributedView` is rebuilt with up-to-date formatter output.
+        /// Rebuilds the formatter output (subject, date, preview, unread count) of every cached
+        /// layout model in place. Call this when something external to the channel (e.g. contact
+        /// names) has changed the formatter output.
+        ///
+        /// The models — and crucially their already-rendered avatars — are kept: an earlier
+        /// version did `layoutModels.removeAll()`, which forced `reloadData()` to recreate all
+        /// models with `avatar == nil`, flashing empty avatars in every visible cell until the
+        /// async avatar render completed.
         open func invalidateLayoutModels() {
-            layoutModels.removeAll()
+            layoutModels.values.forEach { $0.reloadFormattedContent() }
         }
 
         /// Stable snapshot used by both numberOfRowsInSection and cellForRowAt.
