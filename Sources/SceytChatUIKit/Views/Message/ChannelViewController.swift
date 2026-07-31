@@ -175,6 +175,10 @@ open class ChannelViewController: ViewController,
             // calls fired mid-update are gated out inside the work item.
             if !isCollectionViewUpdating {
                 scheduleMarkDisplayed()
+                // The seen-unread sweep is skipped mid-batch (offset not final
+                // until the completion's pin restore); catch up now that the
+                // viewport has settled.
+                syncSeenUnreadMessagesFromVisibleCells()
             }
         }
     }
@@ -1505,6 +1509,7 @@ open class ChannelViewController: ViewController,
     }
     
     open func updateUnreadViewVisibility() {
+        syncSeenUnreadMessagesFromVisibleCells()
         guard canShowUnreadCountView
         else {
             unreadCountView.isHidden = true
@@ -1519,24 +1524,86 @@ open class ChannelViewController: ViewController,
     }
 
     /// Ids of incoming unread messages the user has actually had on screen this
-    /// session. Fed by `willDisplay` (every cell that appears passes through
-    /// it), so it needs no layout walk: the badge is `newMessageCount` minus
+    /// session. Fed by `syncSeenUnreadMessagesFromVisibleCells()` — a sweep of
+    /// the cells intersecting the user-visible region, run on every scroll tick
+    /// and after each structural update. The badge is `newMessageCount` minus
     /// this set's size, i.e. "unread messages you haven't reached yet".
+    ///
+    /// Deliberately NOT fed from `willDisplay`: UIKit also materializes cells
+    /// at a stale offset mid-reload/mid-batch (e.g. the channel-open reload
+    /// laid out a full screen of newest cells at the bottom before the
+    /// unread-separator offset landed), and those phantom appearances counted
+    /// messages the user never saw. A settled-viewport sweep can't be fooled
+    /// that way, and it also excludes cells hidden behind the input
+    /// bar/keyboard (the mirrored list keeps them inside `bounds`).
     ///
     /// The set only grows from the UI side — scrolling back up must not
     /// re-inflate the badge while the displayed-marker flush is still in
-    /// flight. It shrinks only when the server confirms: an ACK advances
-    /// `channel.lastDisplayedMessageId` in the same channel update that lowers
-    /// `newMessageCount`, and `unreadBadgeCount()` prunes the confirmed ids so
-    /// they are not double-subtracted.
+    /// flight. It shrinks only when the server confirms progress:
+    /// `reconcileSeenSet(raw:)` removes the confirmed ids so they are not
+    /// double-subtracted once they leave `newMessageCount`.
     private var seenUnreadMessageIds: Set<MessageId> = []
     /// The `lastDisplayedMessageId` the seen set was last pruned against —
     /// lets the per-scroll-tick recompute skip the filter when nothing changed.
     private var seenSetPrunedForDisplayedId: MessageId = 0
+    /// The `newMessageCount` the seen set was last reconciled against — a net
+    /// drop means the server confirmed some displayed markers (see
+    /// `reconcileSeenSet(raw:)`).
+    private var seenSetRawBasis: UInt64 = 0
+    /// Unread ids this controller has sent in displayed-marker flushes. When
+    /// `newMessageCount` drops, these are what the ACK confirmed — removed
+    /// from the seen set by id, exactly.
+    private var flushedDisplayedUnreadIds: Set<MessageId> = []
+
+    /// Coalesced next-runloop-turn sweep, for cells that appear without a
+    /// scroll event. Deferring one turn matters: reload-then-position flows
+    /// finish repositioning within the turn that materialized the cells, so by
+    /// the time this runs the offset is what the user will actually see —
+    /// cells laid out at a transient offset get geometry-filtered out instead
+    /// of poisoning the seen set.
+    private var pendingSeenUnreadSweep = false
+    private func scheduleSeenUnreadSweep() {
+        guard !pendingSeenUnreadSweep else { return }
+        pendingSeenUnreadSweep = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.pendingSeenUnreadSweep = false
+            self.syncSeenUnreadMessagesFromVisibleCells()
+            self.updateUnreadCountBadge()
+        }
+    }
+
+    /// Sweep the cells currently intersecting the user-visible region (bounds
+    /// minus the input-bar/keyboard and top overlays) into the seen set.
+    /// Runs on every scroll tick (`updateUnreadViewVisibility`), after each
+    /// batch settles (`isCollectionViewUpdating.didSet`), and one turn after
+    /// cells appear without either (`scheduleSeenUnreadSweep`).
+    /// Skipped mid-batch: during `performBatchUpdates` the offset may not be
+    /// final (pin restore runs in the completion), so the sweep waits for the
+    /// settled viewport — `isCollectionViewUpdating.didSet` re-runs it.
+    open func syncSeenUnreadMessagesFromVisibleCells() {
+        guard !isCollectionViewUpdating else { return }
+        let visibleRect = collectionView.visibleContentRect
+        guard visibleRect.height > 0 else { return }
+        for cell in collectionView.visibleCells {
+            guard cell.frame.intersects(visibleRect) else { continue }
+            let message: ChatMessage?
+            switch cell {
+            case let messageCell as MessageCell:
+                message = messageCell.data?.message
+            case let systemCell as SystemMessageCell:
+                message = systemCell.data?.message
+            default:
+                message = nil
+            }
+            guard let message, message.incoming else { continue }
+            noteSeenUnreadMessage(message)
+        }
+    }
 
     /// Record that an unread incoming message entered the viewport. Called from
-    /// `willDisplay`; display-only bookkeeping — markers are flushed separately
-    /// by `scheduleMarkDisplayed()`.
+    /// the visible-cell sweep; display-only bookkeeping — markers are flushed
+    /// separately by `scheduleMarkDisplayed()`.
     open func noteSeenUnreadMessage(_ message: ChatMessage) {
         guard Self.countsAsSeenUnread(
             message,
@@ -1566,29 +1633,70 @@ open class ChannelViewController: ViewController,
     /// server, so anything position-based re-counts messages the user has
     /// already read whenever that round trip is slow. Instead every unread
     /// message that has ever entered the viewport stays subtracted
-    /// (`seenUnreadMessageIds`), and when the ACK lands the same channel update
-    /// lowers `newMessageCount` and advances `lastDisplayedMessageId` — the
-    /// pruning below drops the confirmed ids at that moment, so the badge stays
-    /// steady through the whole round trip.
+    /// (`seenUnreadMessageIds`), and when the ACK lowers `newMessageCount`,
+    /// `reconcileSeenSet(raw:)` removes the confirmed ids at that moment, so
+    /// the badge stays steady through the whole round trip.
     ///
     /// Display-only — it never touches markers, `channel.newMessageCount`, or
     /// the channel-list badge.
     open func unreadBadgeCount() -> UInt64 {
         let raw = channelViewModel.newMessageCount
         guard raw > 0 else {
+            seenSetRawBasis = 0
+            flushedDisplayedUnreadIds.removeAll()
             if !seenUnreadMessageIds.isEmpty {
                 seenUnreadMessageIds.removeAll()
             }
             return 0
         }
-        // ACKed messages leave `newMessageCount` and the seen set together:
-        // the server advances the watermark in the same channel update.
+        reconcileSeenSet(raw: raw)
+        return Self.badgeCount(raw: raw, seenUnreadCount: seenUnreadMessageIds.count)
+    }
+
+    /// Keeps `seenUnreadMessageIds` on the same basis as `newMessageCount`, so
+    /// a message the server has confirmed displayed (it left `raw`) is never
+    /// also still subtracted as "seen" — that double-subtraction is what drove
+    /// the badge to zero while unread messages were still below the screen.
+    /// Three layers, exact to approximate:
+    /// 1. Watermark: drop ids at or below `channel.lastDisplayedMessageId`.
+    ///    Exact, but in practice the ACK often lowers the count while this
+    ///    field lags behind (observed: `newMessageCount 20->4` with a stale
+    ///    `lastDisplayedMessageId`), so it can't be the only prune.
+    /// 2. Flushed ids: a net drop in `raw` means the server processed
+    ///    displayed markers — remove the ids this controller flushed. Exact
+    ///    even when the same channel update also adds new unread messages
+    ///    (which would make a pure size diff under-prune).
+    /// 3. Size residual: any drop still unexplained (markers confirmed from
+    ///    another device of the same user) removes that many oldest seen ids —
+    ///    reading always confirms oldest-first.
+    private func reconcileSeenSet(raw: UInt64) {
+        var accounted = 0
         let lastDisplayedId = channelViewModel.channel.lastDisplayedMessageId
         if lastDisplayedId != seenSetPrunedForDisplayedId {
             seenSetPrunedForDisplayedId = lastDisplayedId
+            let seenBefore = seenUnreadMessageIds.count
             seenUnreadMessageIds = seenUnreadMessageIds.filter { $0 > lastDisplayedId }
+            flushedDisplayedUnreadIds = flushedDisplayedUnreadIds.filter { $0 > lastDisplayedId }
+            accounted = seenBefore - seenUnreadMessageIds.count
         }
-        return Self.badgeCount(raw: raw, seenUnreadCount: seenUnreadMessageIds.count)
+        guard raw < seenSetRawBasis else {
+            seenSetRawBasis = raw
+            return
+        }
+        let drop = Int(clamping: seenSetRawBasis - raw)
+        seenSetRawBasis = raw
+        if !flushedDisplayedUnreadIds.isEmpty {
+            let confirmed = seenUnreadMessageIds.intersection(flushedDisplayedUnreadIds)
+            flushedDisplayedUnreadIds.removeAll()
+            if !confirmed.isEmpty {
+                seenUnreadMessageIds.subtract(confirmed)
+                accounted += confirmed.count
+            }
+        }
+        let residual = drop - accounted
+        if residual > 0, !seenUnreadMessageIds.isEmpty {
+            seenUnreadMessageIds.subtract(seenUnreadMessageIds.sorted().prefix(residual))
+        }
     }
 
     /// Pure subtraction behind `unreadBadgeCount()`, floored at zero. Split out
@@ -1675,9 +1783,7 @@ open class ChannelViewController: ViewController,
             } else if systemCell.highlightMode != .none {
                 systemCell.highlightMode = .none
             }
-            if systemCell.data.message.incoming {
-                noteSeenUnreadMessage(systemCell.data.message)
-            }
+            scheduleSeenUnreadSweep()
             return
         }
 
@@ -1712,11 +1818,17 @@ open class ChannelViewController: ViewController,
             // Mentions the user can already see must not count toward the badge —
             // deduct now instead of waiting for the debounced displayed-marker flush.
             channelViewModel.deductDisplayedUnreadMentions([cell.data.message])
-            noteSeenUnreadMessage(cell.data.message)
             scheduleMarkDisplayed()
         }
 
-        // Catches visible-set changes that arrive without a scroll event.
+        // Cells can enter the visible set without a scroll event (initial load,
+        // reloads). Never sweep the seen set synchronously from willDisplay:
+        // reload-then-position flows (channel open reloads at the bottom, then
+        // jumps to the "New messages" separator) materialize cells at a stale
+        // offset the user never sees, and an immediate sweep would count them
+        // as reached. The deferred sweep evaluates them after the current
+        // turn's positioning has settled.
+        scheduleSeenUnreadSweep()
         if !isCollectionViewUpdating {
             updateUnreadCountBadge()
         }
@@ -2820,18 +2932,46 @@ open class ChannelViewController: ViewController,
     open func markMessageAsDisplayed() {
         guard isViewDidAppear
         else { return }
-        let messages = collectionView.visibleCells.compactMap {
+        // Same visibility criterion as the seen-unread sweep: only cells
+        // intersecting the user-visible region. The mirrored list keeps cells
+        // behind the input bar/keyboard inside `bounds`, and flushing those as
+        // displayed knocks messages the user never saw out of
+        // `newMessageCount` — the scroll-down badge then drops (5 → 4) with no
+        // scrolling, and the channel-list unread count disagrees with what is
+        // still unread below the viewport. A hidden cell is flushed by the
+        // first scroll tick that reveals it.
+        let visibleRect = collectionView.visibleContentRect
+        let visibleCells = collectionView.visibleCells.filter {
+            $0.frame.intersects(visibleRect)
+        }
+        let messages = visibleCells.compactMap {
             ($0 as? MessageCell)?.data?.message
         }
-        if messages.count == collectionView.indexPathsForVisibleItems.count {
+        if messages.count == visibleCells.count {
+            recordFlushedUnread(messages)
             channelViewModel.markMessages(messages, as: .displayed)
         } else {
             // The view model expects oldest-first index paths.
-            let dataPaths = collectionView.indexPathsForVisibleItems.compactMap {
-                dataIndexPath(fromUI: $0)
-            }
+            let dataPaths = collectionView.indexPathsForVisibleItems
+                .filter { collectionView.cellForItem(at: $0)?.frame.intersects(visibleRect) ?? false }
+                .compactMap { dataIndexPath(fromUI: $0) }
+            recordFlushedUnread(dataPaths.compactMap { channelViewModel.message(at: $0) })
             channelViewModel.markMessage(as: .displayed, indexPaths: dataPaths)
         }
+    }
+
+    /// Remembers which still-unread messages a displayed-marker flush is about
+    /// to confirm. When the ACK later lowers `newMessageCount`,
+    /// `reconcileSeenSet(raw:)` removes exactly these ids from the seen set —
+    /// the server does not reliably advance `lastDisplayedMessageId` in that
+    /// update, so the confirmed ids must be tracked on this side.
+    private func recordFlushedUnread(_ messages: [ChatMessage]) {
+        let lastDisplayedId = channelViewModel.channel.lastDisplayedMessageId
+        let unread = messages.filter {
+            Self.countsAsSeenUnread($0, lastDisplayedMessageId: lastDisplayedId)
+        }
+        guard !unread.isEmpty else { return }
+        flushedDisplayedUnreadIds.formUnion(unread.map(\.id))
     }
 
     private func scheduleMarkDisplayed() {
