@@ -175,6 +175,13 @@ extension MessageCell {
                     av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
                 } else if fileProvider.filePath(attachment: layout.attachment) == nil {
                     av.setProgress(0.0001)
+                } else if fileProvider.taskFor(message: data.message, attachment: layout.attachment) != nil {
+                    // An upload always has a local file, so the `filePath == nil` fallback
+                    // above only ever fires for downloads. Bind a live upload to the same
+                    // floor, otherwise a cell that binds before the first progress event —
+                    // a fresh send, or reuse while the task is still preparing/queued —
+                    // shows a bare thumbnail with no ring.
+                    av.setProgress(0.0001)
                 }
             case .pauseUploading, .failedUploading:
                 break

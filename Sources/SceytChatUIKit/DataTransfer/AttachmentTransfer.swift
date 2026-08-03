@@ -32,6 +32,13 @@ open class AttachmentTransfer: DataProvider {
     @Atomic private var progressCache = ProgressCache()
     @Atomic private var taskGroups = [Int64: [SCTDataSessionTaskInfo]]()
     
+    /// Progress reported for an upload the moment its task is created, before any
+    /// byte-level callback exists. Small enough to read as "just started" (the UI shows
+    /// `Upload.preparing` under 0.01) but > 0, which is what makes the ring visible at all
+    /// — `onProgress` ignores non-positive values and the attachment views hide the ring
+    /// at 0.
+    public static var initialUploadProgress: Double = 0.001
+
     public private(set) var uploadStopedOperations = [AsyncOperationBlock]()
     public var allTasks: [SCTDataSessionTaskInfo] {
         taskGroups.values.flatMap({ $0 })
@@ -160,6 +167,15 @@ open class AttachmentTransfer: DataProvider {
                             completion?(nil, error)
                         }
                     }
+                }
+                // Seed a starting progress now that `handle` has installed the event hooks,
+                // so the ring shows for the whole pre-transfer window: the checksum
+                // round-trip, the image resize / video export, and the wait in the upload
+                // queue (serialized, so batch-sent images sit there a while). Without it an
+                // image reported nothing until the SDK streamed its first byte — only video
+                // seeded itself, from `SCTUploadOperation.startPreparing`.
+                for taskInfo in tasks where taskInfo.attachment.status == .uploading {
+                    taskInfo.updateProgress(Self.initialUploadProgress)
                 }
             } else {
                 completion?(message, AttachmentTransferError.externalTransferrerNotImplemented)
