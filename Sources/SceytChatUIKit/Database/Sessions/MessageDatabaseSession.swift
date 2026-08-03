@@ -1042,6 +1042,31 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         }
         request.predicate = predicate
         do {
+            if date != nil {
+                // Clearing history up to a date, NOT wiping the channel. Rows that still
+                // anchor reply previews (they have children) must survive the sweep:
+                // deleting them fires the `parent` relationship's Nullify rule and every
+                // reply to them silently loses its reply preview — including replies
+                // created long after the cleared period. This is re-run on EVERY channel
+                // event carrying `messagesClearedAt` (see ChannelDatabaseSession.apply),
+                // so a parent stub recreated by an incoming reply would otherwise be
+                // deleted again within seconds. Hide them as parent stubs instead
+                // (`replied = true` keeps them out of the message list) and batch-delete
+                // only the rows nothing points at.
+                let parentsRequest = MessageDTO.fetchRequest()
+                parentsRequest.predicate = NSCompoundPredicate(type: .and, subpredicates: [
+                    predicate,
+                    NSPredicate(format: "children.@count > 0")
+                ])
+                let keptParents = MessageDTO.fetch(request: parentsRequest, context: self)
+                for parent in keptParents {
+                    parent.replied = true
+                }
+                request.predicate = NSCompoundPredicate(type: .and, subpredicates: [
+                    predicate,
+                    NSPredicate(format: "children.@count == 0")
+                ])
+            }
             try batchDelete(fetchRequest: request)
             try? deleteAllAttachments(channelId: channelId, before: date)
             if let date,
@@ -1075,7 +1100,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         if let date {
             predicate = NSCompoundPredicate(type: .and, subpredicates: [
                 predicate,
-                NSPredicate(format: "createdAt <= %@", date as NSDate)
+                NSPredicate(format: "createdAt <= %@", date as NSDate),
+                // Mirror deleteAllMessages: messages kept as hidden reply-parent stubs
+                // keep their attachments too, otherwise reply previews lose thumbnails.
+                NSPredicate(format: "message == nil OR message.children.@count == 0")
             ])
         }
         request.predicate = predicate
