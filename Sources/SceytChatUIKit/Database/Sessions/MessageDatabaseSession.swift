@@ -769,6 +769,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             context: self
         )
         
+        var newlyPending = [MessageDTO]()
         messages.forEach {
             // Skip if the marker is already confirmed locally
             if $0.userMarkers?.contains(where: { $0.name == markerName }) == true { return }
@@ -776,7 +777,16 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 $0.pendingMarkerNames = .init(arrayLiteral: markerName)
             } else if !$0.pendingMarkerNames!.contains(markerName) {
                 $0.pendingMarkerNames!.insert(markerName)
+            } else {
+                return
             }
+            newlyPending.append($0)
+        }
+        if markerName == DefaultMarker.displayed.rawValue, !newlyPending.isEmpty {
+            Dictionary(grouping: newlyPending, by: \.channelId)
+                .forEach { channelId, newlyDisplayed in
+                    applyOptimisticDisplayed(channelId: channelId, newlyDisplayed: newlyDisplayed)
+                }
         }
         return messages
     }

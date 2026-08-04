@@ -66,7 +66,7 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         let dto = channelDTO.map(channel)
 
         if channel.newMessageCount > 0 {
-            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfPendingMarkers(name: DefaultMarker.displayed.rawValue, in: dto))
+            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfLocallyDisplayedMessages(channelId: Int64(channel.id), above: Int64(channel.lastDisplayedMessageId)))
         }
 
         if let createBy = channel.createdBy {
@@ -122,7 +122,7 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         dto.id = Int64(channel.id)
         
         if channel.newMessageCount > 0 {
-            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfPendingMarkers(name: DefaultMarker.displayed.rawValue, in: dto))
+            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfLocallyDisplayedMessages(channelId: Int64(channel.id), above: Int64(channel.lastDisplayedMessageId)))
         }
         if let createBy = channel.createdBy {
             dto.createdBy = createOrUpdate(user: createBy)
@@ -171,7 +171,7 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     public func createOrUpdate(channel: ChatChannel) -> ChannelDTO {
         let dto = ChannelDTO.fetchOrCreate(id: channel.id, context: self).0.map(channel)
         if channel.newMessageCount > 0 {
-            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfPendingMarkers(name: DefaultMarker.displayed.rawValue, in: dto))
+            dto.newMessageCount = max(0, Int64(channel.newMessageCount) - numberOfLocallyDisplayedMessages(channelId: Int64(channel.id), above: Int64(channel.lastDisplayedMessageId)))
         }
         
         if let members = channel.members {
@@ -345,15 +345,48 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
             }
     }
     
-    internal func numberOfPendingMarkers(name: String, in channel: ChannelDTO) -> Int64 {
-        return 0;
-        
-        let predicate = NSPredicate(format: "pendingMarkerNames != nil")
-            .and(predicate: .init(format: "(channelId == %lld", channel.id, channel.id))
-        let count = MessageDTO.fetch(predicate: predicate, context: self).filter { message in
-            message.pendingMarkerNames?.contains(name) == true
-        }.count
-        logger.debug("[MARKER CHECK] numberOfPendingMarkers (\(name)) count: \(count), from server \(channel.newMessageCount)")
-        return Int64(count)
+    /// Optimistically drops the channel's unread count when "displayed" markers are
+    /// stored locally, so the badge doesn't wait for the server's unread-count push
+    /// (which lags on slow connections and never arrives offline).
+    internal func applyOptimisticDisplayed(channelId: Int64, newlyDisplayed: [MessageDTO]) {
+        guard let dto = ChannelDTO.fetch(id: ChannelId(channelId), context: self),
+              dto.newMessageCount > 0,
+              let maxId = newlyDisplayed.map({ $0.id }).max()
+        else { return }
+        if let lastMessageId = dto.lastMessage?.id, maxId >= lastMessageId {
+            // The server clears everything <= the displayed watermark, so displaying
+            // the last message means nothing unread remains.
+            dto.newMessageCount = 0
+        } else {
+            let countable = newlyDisplayed.filter { $0.incoming && $0.id > dto.lastDisplayedMessageId }
+            dto.newMessageCount = max(0, dto.newMessageCount - Int64(countable.count))
+        }
+    }
+
+    /// Counts incoming messages above the server's displayed watermark that the local
+    /// user has already displayed (pending or ACKed marker). Server channel payloads
+    /// can carry a count that predates those markers; subtracting this keeps a stale
+    /// write from restoring an already-cleared badge. Once the server watermark passes
+    /// a marked message it drops out of the count, so server values apply verbatim.
+    internal func numberOfLocallyDisplayedMessages(channelId: Int64, above serverDisplayedId: Int64) -> Int64 {
+        var ids = Set<Int64>()
+        // pendingMarkerNames is a transformable Set — CONTAINS can't run in SQL.
+        let pendingPredicate = NSPredicate(
+            format: "channelId == %lld AND incoming == YES AND id > %lld AND pendingMarkerNames != nil",
+            channelId, serverDisplayedId
+        )
+        MessageDTO.fetch(predicate: pendingPredicate, context: self)
+            .filter { $0.pendingMarkerNames?.contains(DefaultMarker.displayed.rawValue) == true }
+            .forEach { ids.insert($0.id) }
+        if let userId = SceytChatUIKit.shared.currentUserId {
+            let request = MarkerDTO.fetchRequest()
+            request.predicate = NSPredicate(
+                format: "name == %@ AND user.id == %@ AND messageId > %lld AND message.channelId == %lld AND message.incoming == YES",
+                DefaultMarker.displayed.rawValue, userId, serverDisplayedId, channelId
+            )
+            MarkerDTO.fetch(request: request, context: self)
+                .forEach { ids.insert($0.messageId) }
+        }
+        return Int64(ids.count)
     }
 }
