@@ -110,26 +110,42 @@ open class ChannelAttachmentProvider: DataProvider {
         query: AttachmentListQuery,
         completion: ((Error?) -> Void)? = nil
     ) {
+        loadPrevAttachment(pageCompletion: { _, error in
+            completion?(error)
+        })
+    }
+
+    /// Same as `loadPrevAttachment(completion:)` but reports how many attachments the
+    /// page returned. Callers that gate UI on "has the first page come back" must tell
+    /// "the server has nothing" from "items came back and are still being merged into
+    /// the database observer" — the second case must not reveal an empty state, because
+    /// the observer's own change event is about to fill the list.
+    ///
+    /// A `nil` count means the request was not performed (a page was already in flight).
+    open func loadPrevAttachment(
+        pageCompletion: @escaping (Int?, Error?) -> Void
+    ) {
         guard !defaultQuery.loading else {
             logger.debug("[MediaGallery] provider.loadPrevAttachment skipped — already loading channelId=\(channelId)")
-            completion?(nil)
+            pageCompletion(nil, nil)
             return
         }
         defaultQuery.loadPrevious
         { (_, attachments, users, error) in
             guard let attachments
             else {
-                completion?(error)
+                pageCompletion(0, error)
                 return
             }
             self.store(
                 attachments: attachments,
-                users: users,
-                completion: completion
-            )
+                users: users
+            ) { error in
+                pageCompletion(attachments.count, error)
+            }
         }
     }
-    
+
     open func loadPrevAttachment(
         before attachmentId: AttachmentId,
         completion: ((Error?) -> Void)? = nil

@@ -22,7 +22,9 @@ extension ChannelInfoViewController {
                                               sectionHeadersPinToVisibleBounds: true)
         
         open var mediaViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
-        
+
+        open override var attachmentViewModel: (any ChannelAttachmentListViewModelProviding)? { mediaViewModel }
+
         open var layout: Layout? { collectionViewLayout as? Layout }
         
         public required init() {

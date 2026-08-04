@@ -26,6 +26,12 @@ extension ChannelInfoViewController {
         open lazy var emptyStateView = EmptyStateStackView()
             .withoutAutoresizingMask
 
+        /// The view model whose load state gates the empty state. Subclasses each hold
+        /// their own concretely named view model; this is the one thing the base class
+        /// needs from it. `nil` for subclasses that have none — `GroupCollectionView`
+        /// drives its own query — which keeps the empty state ungated for them.
+        open var attachmentViewModel: (any ChannelAttachmentListViewModelProviding)? { nil }
+
         open var shouldReceiveTouch: (() -> Bool)?
         public lazy var scrollingDecelerator = ScrollingDecelerator(scrollView: self)
         
@@ -144,11 +150,14 @@ extension ChannelInfoViewController {
         }
 
         open func updateNoItems() {
-            if totalNumberOfItems <= 0 {
-                emptyStateView.isHidden = false
-            } else {
-                emptyStateView.isHidden = true
-            }
+            // Before the first server page has come back, an empty list means "not loaded
+            // yet", not "nothing here": the database starts empty on a channel whose
+            // attachments have never been synced, so deciding from the item count alone
+            // put "No Media" up over a channel that does have media — until the fetch
+            // landed and replaced it with a full grid. Keep the placeholder hidden until
+            // the fetch has actually reported back.
+            let hasLoadedInitialAttachments = attachmentViewModel?.hasLoadedInitialAttachments ?? true
+            emptyStateView.isHidden = totalNumberOfItems > 0 || !hasLoadedInitialAttachments
         }
         
         open var onScrollViewDidScroll: ((UIScrollView) -> Void)?

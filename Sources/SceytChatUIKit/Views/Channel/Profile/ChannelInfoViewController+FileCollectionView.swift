@@ -21,7 +21,9 @@ extension ChannelInfoViewController {
                                               sectionHeadersPinToVisibleBounds: true)
         
         open var fileViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
-        
+
+        open override var attachmentViewModel: (any ChannelAttachmentListViewModelProviding)? { fileViewModel }
+
         open var layout: Layout? { collectionViewLayout as? Layout }
         
         public var onSelect: ((IndexPath) -> Void)?

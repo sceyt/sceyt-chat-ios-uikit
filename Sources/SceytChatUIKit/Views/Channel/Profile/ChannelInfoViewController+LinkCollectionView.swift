@@ -21,6 +21,8 @@ extension ChannelInfoViewController {
 
         open var linkViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
 
+        open override var attachmentViewModel: (any ChannelAttachmentListViewModelProviding)? { linkViewModel }
+
         open var layout: Layout { collectionViewLayout as! Layout }
 
         public required init() {

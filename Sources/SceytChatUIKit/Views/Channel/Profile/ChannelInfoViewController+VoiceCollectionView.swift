@@ -22,6 +22,8 @@ extension ChannelInfoViewController {
         
         open var voiceViewModel: any ChannelAttachmentListViewModelProviding = ChannelAttachmentListViewModel.Empty()
 
+        open override var attachmentViewModel: (any ChannelAttachmentListViewModelProviding)? { voiceViewModel }
+
         /// Called when the user taps a voice cell. Provides the owning message and channel.
         open var onSelectVoice: ((ChatMessage, ChatChannel?) -> Void)?
         

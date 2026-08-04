@@ -38,7 +38,13 @@ open class ChannelAttachmentListViewModel: NSObject {
         }
     }
     public var minAutoDownloadSize = 10_000_000
-    
+
+    /// False until the first server page has reported back. While false, an empty list
+    /// means "not loaded yet" rather than "nothing here", and the view keeps its empty
+    /// state hidden.
+    public private(set) var hasLoadedInitialAttachments = false
+    private var isInitialServerPageRequested = false
+
     private let thumbnailCache = {
         $0.countLimit = 20
         return $0
@@ -62,7 +68,41 @@ open class ChannelAttachmentListViewModel: NSObject {
 
     open func loadAttachments() {
         attachmentObserver.loadNext()
-        provider.loadPrevAttachment()
+        // Only the first page decides whether the list is genuinely empty; every later
+        // call is pagination and must not re-arm the flag.
+        guard !isInitialServerPageRequested else {
+            provider.loadPrevAttachment()
+            return
+        }
+        isInitialServerPageRequested = true
+        provider.loadPrevAttachment(pageCompletion: { [weak self] fetchedCount, _ in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard let fetchedCount else {
+                    // Nothing was requested (a page was already in flight) — let the
+                    // next loadAttachments() own the initial page.
+                    self.isInitialServerPageRequested = false
+                    return
+                }
+                self.markInitialAttachmentsLoaded(didFetchItems: fetchedCount > 0)
+            }
+        })
+    }
+
+    /// Counterpart of `ChannelViewModel.markInitialMessagesLoaded()`: until this has run
+    /// the view cannot tell "empty" from "still loading", so it shows no empty state.
+    ///
+    /// A failed fetch also lands here — an attempt that came back, even empty-handed, is
+    /// what the empty state is waiting for; leaving the tab blank offline would be worse.
+    open func markInitialAttachmentsLoaded(didFetchItems: Bool) {
+        guard !hasLoadedInitialAttachments else { return }
+        hasLoadedInitialAttachments = true
+        // Items came back: the database observer is about to deliver them and that event
+        // re-evaluates the empty state on its own. Nudging here would race the merge and
+        // flash the placeholder over a list that is about to fill. Nothing came back: no
+        // database change is coming, so this is the only chance to reveal it.
+        guard !didFetchItems else { return }
+        event = .change(.init(changeItems: []))
     }
 
     public typealias ChangeItemPaths = LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>.ChangeItemPaths
@@ -365,6 +405,9 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
     var isFiltered: Bool { get }
     /// Returns false when the last load returned no new items (end of data reached).
     var hasMore: Bool { get }
+    /// See `ChannelAttachmentListViewModel.hasLoadedInitialAttachments`. While false the
+    /// view treats an empty list as "still loading" and keeps its empty state hidden.
+    var hasLoadedInitialAttachments: Bool { get }
 }
 
 public extension ChannelAttachmentListViewModelProviding {
@@ -387,6 +430,9 @@ public extension ChannelAttachmentListViewModelProviding {
     }
 
     var hasMore: Bool { true }
+    /// View models that serve the database only have nothing to wait for, so their empty
+    /// state is meaningful from the start.
+    var hasLoadedInitialAttachments: Bool { true }
     func search(query: String?, filterUser: ChatUser?) {}
     func stopDatabaseObserver() {}
     var isFiltered: Bool { false }
