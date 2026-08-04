@@ -86,9 +86,9 @@ extension MessageCell {
             stackViewV.addArrangedSubview(nameLabel)
             stackViewH2.addArrangedSubview(messageLabel)
             stackViewV.addArrangedSubview(stackViewH2)
-            stackViewH.setCustomSpacing(8, after: borderView)
-            stackViewH.pin(to: self, anchors: [.leading(0), .trailing(-8), .top(6), .bottom(-6)])
-            borderView.resize(anchors: [.width(2)])
+            stackViewH.setCustomSpacing(Measure.borderSpacing, after: borderView)
+            stackViewH.pin(to: self, anchors: [.leading(0), .trailing(-Measure.trailingInset), .top(6), .bottom(-6)])
+            borderView.resize(anchors: [.width(Measure.borderWidth)])
             borderView.heightAnchor.pin(to: self.heightAnchor)
             stackViewV.heightAnchor.pin(to: stackViewH.heightAnchor)
         }
@@ -126,7 +126,7 @@ extension MessageCell {
                 layer.masksToBounds = true
                 nameLabel.text = appearance.replyMessageAppearance.senderNameFormatter.format(data.user)
                 messageLabel.attributedText = data.attributedBody
-                stackViewH2.spacing = 4.0
+                stackViewH2.spacing = Measure.iconSpacing
                 if let image = data.icon {
                     stackViewH2.insertArrangedSubview(iconView, at: 0)
                     iconView.image = image.withTintColor(.accent, renderingMode: .alwaysTemplate)
@@ -138,7 +138,7 @@ extension MessageCell {
                 } else {
                     iconView.image = nil
                 }
-                messageLabel.numberOfLines = 2
+                messageLabel.numberOfLines = Measure.maximumNumberOfLines
                 stackViewV.distribution = .fill
                 guard let attachment = data.attachment
                 else { return }
@@ -196,12 +196,16 @@ extension MessageCell {
         /// Puts the thumbnail image view into the horizontal stack. Idempotent — also
         /// called from `onLoadThumbnail` when the thumbnail arrives after bind (the
         /// deferred-insert path in `data.didSet`).
+        ///
+        /// Deliberately does NOT touch `messageLabel.numberOfLines` or the stack
+        /// distribution: the thumbnail lands asynchronously (always after `measure`,
+        /// see `AttachmentLayout.loadThumbnail`), so clamping the label here would
+        /// shrink it below the size the cell was measured for and truncate text the
+        /// bubble has room for.
         open func insertImageViewIfNeeded() {
             guard imageView.superview == nil else { return }
-            messageLabel.numberOfLines = 1
-            stackViewV.distribution = .fillEqually
             stackViewH.insertArrangedSubview(imageView, at: 1)
-            stackViewH.setCustomSpacing(8, after: imageView)
+            stackViewH.setCustomSpacing(Measure.thumbnailSpacing, after: imageView)
             imageView.addConstraints([
                 imageView.heightAnchor.pin(constant: Measure.imageSize.height),
                 imageView.widthAnchor.pin(constant: Measure.imageSize.width)
@@ -268,33 +272,40 @@ extension MessageCell {
             appearance: MessageCell.Appearance
         ) -> CGSize {
             guard let data = model.replyLayout else { return .zero }
-            
-            var space = 0.0
+
+            // Reserve the thumbnail on `attachment != nil`, NOT on `thumbnail != nil`:
+            // the thumbnail is published on the main queue by
+            // `AttachmentLayout.loadThumbnail`, i.e. always after the layout model
+            // (and therefore this measure) has run, so it is nil here every time.
+            // Keying off it left the 32pt image + 8pt spacing unaccounted for and cut
+            // ~40pt off the text the bubble was sized to show.
             var iconSize = data.icon == nil ? .zero : Measure.iconSize
             if iconSize != .zero {
-                iconSize.width += 2
+                iconSize.width += Measure.iconSpacing
             }
-            var thumbnailSize = data.attachment?.thumbnail == nil ? .zero : Measure.imageSize
+            var thumbnailSize = data.attachment == nil ? .zero : Measure.imageSize
             if thumbnailSize != .zero {
-                thumbnailSize.width += 8
+                thumbnailSize.width += Measure.thumbnailSpacing
             }
-            
-            space = iconSize.width + thumbnailSize.width
-            if space == 0 {
-                space = 10
-            }
+
+            // Width the labels really get inside the view: the reply view is capped at
+            // `Anchors.width` and spends `Measure.chromeWidth` on the trailing inset,
+            // the border and the border spacing, plus the thumbnail column.
+            let availableWidth = Anchors.width - Measure.chromeWidth - thumbnailSize.width
+
             var config = TextSizeMeasure.Config(maximumNumberOfLines: 1, lastFragmentUsedRect: false)
             config.font = appearance.replyMessageAppearance.titleLabelAppearance.font
-            config.restrictingWidth = MessageLayoutModel.defaults.messageWidth - thumbnailSize.width
+            config.restrictingWidth = availableWidth
             let user = SceytChatUIKit.shared.formatters.userNameFormatter.format(data.user)
             let nameLabelSize = TextSizeMeasure.calculateSize(of: user, config: config).textSize
-            
+
             config.font = appearance.replyMessageAppearance.subtitleLabelAppearance.font
-            config.restrictingWidth = MessageLayoutModel.defaults.messageWidth - space
-            config.maximumNumberOfLines = data.attachment == nil ? 2 : 1
+            // The icon shares the row with the message label only.
+            config.restrictingWidth = availableWidth - iconSize.width
+            config.maximumNumberOfLines = Measure.maximumNumberOfLines
             let messageLabelSize = TextSizeMeasure.calculateSize(of: data.attributedBody, config: config).textSize
-            
-            return CGSize(width: thumbnailSize.width + max(nameLabelSize.width, iconSize.width + messageLabelSize.width) + 8,
+
+            return CGSize(width: Measure.chromeWidth + thumbnailSize.width + max(nameLabelSize.width, iconSize.width + messageLabelSize.width),
                           height: max(thumbnailSize.height, nameLabelSize.height + max(iconSize.height, messageLabelSize.height)) + 16)
         }
     }
@@ -311,6 +322,19 @@ public extension MessageCell.ReplyView {
     enum Measure {
         public static var iconSize = CGSize(width: 16, height: 16)
         public static var imageSize = CGSize(width: 32, height: 32)
+        /// Lines the message preview may occupy, with or without a thumbnail.
+        public static var maximumNumberOfLines: Int = 2
+        /// Gap between the attachment-type icon and the message preview.
+        public static var iconSpacing: CGFloat = 4
+        /// Gap between the thumbnail and the text column.
+        public static var thumbnailSpacing: CGFloat = 8
+        public static var borderWidth: CGFloat = 2
+        /// Gap between the accent border and the content that follows it.
+        public static var borderSpacing: CGFloat = 8
+        public static var trailingInset: CGFloat = 8
+        /// Width the view spends on everything but the thumbnail and the labels.
+        /// Keep in sync with `setupLayout()`.
+        public static var chromeWidth: CGFloat { trailingInset + borderWidth + borderSpacing }
     }
 }
 
