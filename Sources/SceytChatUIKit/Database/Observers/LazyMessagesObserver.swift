@@ -98,13 +98,25 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
 //            } else {
 //                messagesFromRangePredicate = self.createRangePredicate(startMessageId: range?.startMessageId, endMessageId: range?.endMessageId)
 //            }
+            let direction: LoadDirection = initialMessageId == lastMessageId ? .prev : .near
+            // `initialMessageId` comes from the ChatChannel snapshot the screen was opened with,
+            // which can already be behind the database — a message forwarded into this channel a
+            // moment ago, for instance, is stored before the screen is pushed but is not in that
+            // snapshot's `lastMessage`. Anchoring a bottom-opening window on it would end the
+            // window at the stale id and leave the newer rows out of the first render, and nothing
+            // in the open path fetches the tail again (the server page writes identical values, so
+            // no change event follows, and `fetchPrevMessagesFromDB` only widens backwards). So
+            // anchor at the true bottom of the local data instead, which is what `.prev` means
+            // here. A `.near` open is deliberately positioned on the unread message, so it keeps
+            // its own anchor and reaches the rest of the tail through scroll pagination.
+            let anchorMessageId: MessageId = direction == .prev ? 0 : initialMessageId
             let fetchOffset = calculateMessageFetchOffset(
                 predicate: messagesFromRangePredicate,
-                messageId: initialMessageId,
+                messageId: anchorMessageId,
                 fetchLimit: fetchLimit,
-                direction: initialMessageId == lastMessageId ? .prev : .near
+                direction: direction
             )
-            
+
             self.startObserver(
                 fetchOffset: fetchOffset,
                 fetchLimit: fetchLimit,
