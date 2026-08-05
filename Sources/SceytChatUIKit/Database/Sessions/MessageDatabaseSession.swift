@@ -421,10 +421,29 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         Self.reactionQueue.sync {
             guard let message = MessageDTO.fetch(id: reaction.messageId, context: self)
             else { return nil }
-            let existing = ReactionDTO.fetch(userId: reaction.user.id, key: reaction.key, messageId: reaction.messageId, context: self)
+            // When the reaction is the current user's, it confirms the local `pending` row
+            // addPendingReaction stored for it. That row can carry no user — it only attaches
+            // one already in the store — so the user + key fetch below may miss it; look it up
+            // by key and reuse it rather than storing the confirmed reaction a second time.
+            let pendingDto: ReactionDTO? = {
+                guard reaction.user.id == SceytChatUIKit.shared.currentUserId
+                else { return nil }
+                let request = ReactionDTO.fetchRequest()
+                request.predicate = .init(format: "messageId == %lld AND key == %@ AND pending == true",
+                                          reaction.messageId, reaction.key)
+                return ReactionDTO.fetch(request: request, context: self).first
+            }()
+            let existing = ReactionDTO.fetch(userId: reaction.user.id, key: reaction.key, messageId: reaction.messageId, context: self) ?? pendingDto
             let alreadyApplied = existing?.id == Int64(reaction.id)
             let rdto = (existing ?? ReactionDTO.fetchOrCreate(userId: reaction.user.id, key: reaction.key, messageId: reaction.messageId, context: self)).map(reaction)
             rdto.user = createOrUpdate(user: reaction.user)
+            // The confirmed reaction counts through the total below, so the row must stop
+            // being pending — one left pending is counted a second time by every reader that
+            // sums totals and pending reactions.
+            if rdto.pending {
+                rdto.pending = false
+                message.pendingReactions?.remove(rdto)
+            }
             if updateTotal, !alreadyApplied {
                 let rTotalDto = ReactionTotalDTO.fetchOrCreate(messageId: reaction.messageId, key: reaction.key, context: self)
                 rTotalDto.count += 1
@@ -963,7 +982,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         let group = Dictionary(grouping: reactions) { $0.messageId }
         let fetchRequest: NSFetchRequest<NSFetchRequestResult> = NSFetchRequest(entityName: ReactionDTO.entityName)
         for item in group {
-            fetchRequest.predicate = .init(format: "messageId == %lld AND (NOT (id IN %@))", item.key, item.value.map { $0.id })
+            fetchRequest.predicate = ReactionDTO.notExistPredicate(messageId: item.key,
+                                                                   existingIds: item.value.map { $0.id })
             try? batchDelete(fetchRequest: fetchRequest)
         }
     }
