@@ -17,7 +17,17 @@ extension ChannelViewController {
             .init()
             .withoutAutoresizingMask
             .contentCompressionResistancePriorityH(.required)
-        
+
+        /// Flips the chevron so it points at the newest message. `false` (down) in
+        /// `.newestAtBottom`, `true` (up) in `.newestAtTop`. Only the icon is
+        /// flipped — the unread badge must stay upright and in the same corner.
+        open var pointsUp: Bool = false {
+            didSet {
+                guard oldValue != pointsUp else { return }
+                bubbleView.transform = pointsUp ? .mirrorY : .identity
+            }
+        }
+
         override open func setup() {
             super.setup()
 
@@ -58,6 +68,8 @@ extension ChannelViewController {
             backgroundColor = appearance.backgroundColor
             bubbleView.image = Components.imageBuilder.addShadow(to: appearance.icon,
                                                                  blur: 12)
+            // setupAppearance may run after `pointsUp` was set; re-assert it.
+            bubbleView.transform = pointsUp ? .mirrorY : .identity
             unreadCount.font = appearance.unreadCountLabelAppearance.font
             unreadCount.textColor = appearance.unreadCountLabelAppearance.foregroundColor
             unreadCount.backgroundColor = appearance.unreadCountLabelAppearance.backgroundColor

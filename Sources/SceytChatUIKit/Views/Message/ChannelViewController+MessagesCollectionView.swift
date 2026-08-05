@@ -16,7 +16,29 @@ public extension ChannelViewController {
         private var isPerformBatchUpdates = false
         /// A flag to delay `reloadData` if called during batch updates
         private var needsReloadData = false
-        
+
+        /// Which visual edge holds the newest message. The controller pushes
+        /// `appearance.messageListOrder` here in `setupAppearance()`; changing it
+        /// re-applies the mirror, relayouts and re-anchors to the newest message.
+        open var messageListOrder: ChannelViewController.MessageListOrder = .newestAtBottom {
+            didSet {
+                guard oldValue != messageListOrder else { return }
+                applyMessageListOrder()
+                reloadData()
+                // "bottom" means the newest edge in both orders.
+                scrollToBottom(animated: false)
+            }
+        }
+
+        /// Pushes the current order into the view's own transform and into the
+        /// layout, which bakes it into every attribute it hands back.
+        open func applyMessageListOrder() {
+            transform = messageListOrder.contentTransform
+            layout.messageListOrder = messageListOrder
+            collectionViewLayout.invalidateLayout()
+        }
+
+
         public required init() {
             super.init(
                 frame: UIScreen.main.bounds,
@@ -34,22 +56,23 @@ public extension ChannelViewController {
             showsHorizontalScrollIndicator = false
             alwaysBounceVertical = true
             clipsToBounds = true
-            // The list is mirrored: content-space top (offset ≈ 0) renders at the
-            // visual bottom and holds the newest message. Every cell/supplementary
-            // view is mirrored back at dequeue. Safe-area-driven inset adjustment
-            // would pad the wrong edges in the mirrored coordinate space, so the
-            // controller manages contentInset manually (input bar → inset.top).
-            transform = .mirrorY
+            // Content-space top (offset ≈ 0) always holds the newest message. In
+            // `.newestAtBottom` the view is mirrored so that edge renders at the
+            // visual bottom, and every cell/supplementary view is flipped back at
+            // dequeue; in `.newestAtTop` the view is upright. Either way the
+            // controller manages contentInset manually — safe-area-driven inset
+            // adjustment would pad the wrong edges in the mirrored space.
+            applyMessageListOrder()
             contentInsetAdjustmentBehavior = .never
 
             register(Components.channelSystemMessageCell)
             register(Components.channelOutgoingMessageCell)
             register(Components.channelIncomingMessageCell)
+            // The date separator renders as a footer in `.newestAtBottom` and as a
+            // header in `.newestAtTop`, so both kinds are registered. Registering
+            // both also guards subclasses that give the unused kind a non-zero
+            // reference size — an unregistered kind would crash the dequeue.
             register(Components.channelDateSeparatorView, kind: .footer)
-            // Also registered as header: consuming apps that override
-            // referenceSizeForHeaderInSection with a non-zero size (the pre-mirror
-            // convention) make the flow layout request header supplementaries, and
-            // an unregistered kind would crash the dequeue.
             register(Components.channelDateSeparatorView, kind: .header)
         }
 
@@ -77,8 +100,8 @@ public extension ChannelViewController {
             return visibleLayoutAttributes
         }
 
-        /// Attributes of the visually last (newest) visible message. The list is
-        /// mirrored and presented newest-first, so that is the MIN index path.
+        /// Attributes of the newest visible message. The list is presented
+        /// newest-first in both orders, so that is the MIN index path.
         open var lastVisibleAttributes: UICollectionViewLayoutAttributes? {
             let visibleLayoutAttributes = layout.layoutAttributesForElements(in: visibleContentRect) ?? []
             return visibleLayoutAttributes
@@ -90,12 +113,13 @@ public extension ChannelViewController {
             lastVisibleAttributes?.indexPath
         }
 
-        /// Offset of the newest edge (visual bottom) in the mirrored list.
+        /// Offset of the newest edge — the visual bottom in `.newestAtBottom`, the
+        /// visual top in `.newestAtTop`. It is the content-space origin in both.
         public var bottomContentOffsetY: CGFloat {
             -adjustedContentInset.top
         }
 
-        /// Offset of the oldest edge (visual top) in the mirrored list.
+        /// Offset of the oldest edge — the content-space end in both orders.
         public var maxContentOffsetY: CGFloat {
             max(
                 bottomContentOffsetY,
@@ -106,9 +130,10 @@ public extension ChannelViewController {
         }
 
         /// Whether the viewport rests at (or within `threshold` points of) the
-        /// newest message. In the mirrored list this is simply an offset check —
-        /// content inserted at the newest edge while this is true stays anchored
-        /// on screen without any explicit scrolling.
+        /// newest message. Because the newest edge is the content-space origin in
+        /// both orders this is simply an offset check — content inserted at that
+        /// edge while this is true stays anchored on screen without any explicit
+        /// scrolling.
         public func isAtBottom(threshold: CGFloat = 30) -> Bool {
             contentOffset.y <= bottomContentOffsetY + threshold
         }
@@ -181,8 +206,8 @@ public extension ChannelViewController {
             // stop scrolling
             setContentOffset(contentOffset, animated: false)
 
-            // Mirrored list: the offset is anchored at the newest edge, and older
-            // content grows away from it (toward larger y), so a plain reload
+            // The offset is anchored at the newest edge and older content grows
+            // away from it (toward larger y) in both orders, so a plain reload
             // already keeps the visual position. Just clamp into the new range.
             reloadData()
             let clampedY = min(max(contentOffset.y, bottomContentOffsetY), maxContentOffsetY)
@@ -209,26 +234,31 @@ public extension ChannelViewController {
         }
 
         /// Positions the unread ("New messages") separator bar a fixed distance
-        /// below the visual top of the viewport. The bar renders at the visual
-        /// bottom of the anchor cell — in the mirrored content space that is
-        /// `[frame.minY, frame.minY + separatorHeight]` — so the target offset is
+        /// inside the viewport's OLDER-facing edge, so the rest of the screen fills
+        /// with unread messages.
+        ///
+        /// The bar always renders on the anchor cell's newer-facing side, which in
+        /// content space is `[frame.minY, frame.minY + separatorHeight]` in both
+        /// orders — mirrored the cell is flipped, upright the bar is pinned to the
+        /// cell's top. The older-facing viewport edge is likewise the content-space
+        /// far end in both orders, so this one formula covers them. The target is
         /// derived from the cell's layout frame, not from scrollToItem semantics
-        /// (which can only align cell edges, leaving the bar's final spot
-        /// dependent on the anchor bubble's height).
+        /// (which can only align cell edges, leaving the bar's final spot dependent
+        /// on the anchor bubble's height).
         open func scrollToUnreadSeparator(
             at indexPath: IndexPath,
             separatorHeight: CGFloat,
-            offsetFromVisualTop: CGFloat
+            offsetFromOlderEdge: CGFloat
         ) {
             guard contains(indexPath: indexPath),
                   let attrs = collectionViewLayout.layoutAttributesForItem(at: indexPath)
             else { return }
-            // Visual-top edge in content space: contentOffset.y + bounds.height
-            // - adjustedContentInset.bottom. Place the bar's top edge
-            // (frame.minY + separatorHeight) offsetFromVisualTop below it. The
+            // Older-facing edge in content space: contentOffset.y + bounds.height
+            // - adjustedContentInset.bottom. Place the bar's older-facing edge
+            // (frame.minY + separatorHeight) offsetFromOlderEdge inside it. The
             // clamp handles the few-unread case: the list rests at the newest
             // edge and the bar falls wherever it naturally sits mid-screen.
-            let targetY = attrs.frame.minY + separatorHeight + offsetFromVisualTop
+            let targetY = attrs.frame.minY + separatorHeight + offsetFromOlderEdge
                 - bounds.height + adjustedContentInset.bottom
             let clampedY = min(max(targetY, bottomContentOffsetY), maxContentOffsetY)
             setContentOffset(CGPoint(x: 0, y: clampedY), animated: false)
@@ -237,13 +267,13 @@ public extension ChannelViewController {
         open func reloadDataAndScrollToUnreadSeparator(
             at indexPath: IndexPath,
             separatorHeight: CGFloat,
-            offsetFromVisualTop: CGFloat
+            offsetFromOlderEdge: CGFloat
         ) {
             reloadDataAndKeepOffset()
             scrollToUnreadSeparator(
                 at: indexPath,
                 separatorHeight: separatorHeight,
-                offsetFromVisualTop: offsetFromVisualTop
+                offsetFromOlderEdge: offsetFromOlderEdge
             )
         }
 
@@ -259,7 +289,7 @@ public extension ChannelViewController {
 
         open func scrollToBottom(animated: Bool, animationDuration: TimeInterval = 0.2, completion: ((Bool) -> Void)? = nil) {
             setContentOffset(contentOffset, animated: false)
-            // Mirrored list: the newest message lives at the content-space top,
+            // The newest message lives at the content-space top in both orders,
             // so "bottom" is a constant offset — no contentSize math needed.
             let offsetY = bottomContentOffsetY
             if animated {
@@ -277,7 +307,7 @@ public extension ChannelViewController {
         }
 
         open func scrollToTop(animated: Bool = true) {
-            // Oldest message = end of the mirrored content.
+            // Oldest message = end of the content in both orders.
             setContentOffset(CGPoint(x: 0, y: maxContentOffsetY), animated: animated)
         }
         
