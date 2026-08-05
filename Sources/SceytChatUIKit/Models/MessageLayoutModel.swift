@@ -411,7 +411,26 @@ open class MessageLayoutModel {
                 updateOptions.insert(.attachment)
             }
         }
-        
+
+        // The message just turned into a deleted one: it renders as the
+        // "Message was deleted." text and nothing else. Clearing `attachments`
+        // above is not enough — the content options set when the message still had
+        // its media survives (the attachment comparison only reacts to a changed
+        // *count*, and a stale relationship can report the same one). Left in, the
+        // cell picks the text+attachment layout branch and lays the old thumbnail
+        // out under the deleted text until the channel is reopened.
+        if message.state == .deleted {
+            hasMediaAttachments = false
+            hasFileAttachments = false
+            hasVoiceAttachments = false
+            let staleContent: MessageContentOptions = [.attachment, .link, .unsupported]
+            if !contentOptions.isDisjoint(with: staleContent) {
+                contentOptions.subtract(staleContent)
+                updateOptions.insert(.reload)
+            }
+            linkPreviews?.removeAll()
+        }
+
         let restrictingTextWidth = Self.restrictingWidth(attachments: attachments) - 12 * 2
         
         var isEqualMentionedUsers: Bool {
@@ -781,6 +800,16 @@ open class MessageLayoutModel {
             return []
         }
 
+        // A deleted message renders as the "Message was deleted." text only. The
+        // delete drops the attachment rows (MessageDatabaseSession.deleteAttachmentsFor),
+        // but the message can still reach us carrying them — the batch delete is not
+        // always visible on the relationship the observer converted from yet. Deriving
+        // this from the state keeps the deleted body from being rendered on top of a
+        // stale thumbnail.
+        if message.state == .deleted {
+            return []
+        }
+
         return (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
             let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
@@ -799,6 +828,11 @@ open class MessageLayoutModel {
             return []
         }
 
+        // Deleted messages show no link previews either — see `attachmentLayout`.
+        if message.state == .deleted {
+            return []
+        }
+
         return (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
             let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
@@ -809,6 +843,13 @@ open class MessageLayoutModel {
     open func updateAttachmentLayouts(message: ChatMessage) {
         // Hide attachments if message has opened marker
         if message.hasOpenedMarker {
+            attachments = []
+            linkAttachments = []
+            return
+        }
+
+        // Deleted messages keep no attachments — see `attachmentLayout`.
+        if message.state == .deleted {
             attachments = []
             linkAttachments = []
             return
