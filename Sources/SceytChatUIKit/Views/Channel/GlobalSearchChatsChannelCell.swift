@@ -19,6 +19,9 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
         //    │  └─ dateStackView (H)           [ ticksView  dateLabel ]
         //    └─ bottomRowStackView (H)        [ messageLabel ──spacer── badgeStackView ]
         //       └─ badgeStackView (H)          [ atView  unreadCount pinView ]
+        //
+        // Mirrors ChannelListViewController.ChannelCell, including the
+        // no-last-message centering handled by `updateContentAlignment()`.
 
         open lazy var contentStackView = UIStackView(arrangedSubviews: [avatarContainer, rightStackView])
             .withoutAutoresizingMask
@@ -36,7 +39,7 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
             .withoutAutoresizingMask
 
         /// Bottom row: message preview (left, expands) + badges (right).
-        open lazy var bottomRowStackView = UIStackView(arrangedSubviews: [messageLabel, badgeStackView])
+        open lazy var bottomRowStackView = UIStackView(arrangedSubviews: [messageLabel, bottomRowSpacerView, badgeStackView])
             .withoutAutoresizingMask
 
         open lazy var subjectStackView = UIStackView(arrangedSubviews: [subjectLabel, muteView])
@@ -61,6 +64,16 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
 
         /// Flexible spacer between subject/mute and the fixed trailing date row.
         open lazy var topRowSpacerView = UIView()
+            .withoutAutoresizingMask
+            .contentHuggingPriorityH(UILayoutPriority(1))
+
+        /// Flexible spacer between the message preview and the trailing badges.
+        /// Shown only while the preview is hidden (no last message): without it
+        /// the badge stack is the row's sole visible item, so `.fill` stretches
+        /// it full-width and the aspect-fit pin icon renders centered instead of
+        /// trailing. While the preview is visible the label itself absorbs the
+        /// slack, so the spacer is hidden to keep the original 8pt badge gap.
+        open lazy var bottomRowSpacerView = UIView()
             .withoutAutoresizingMask
             .contentHuggingPriorityH(UILayoutPriority(1))
 
@@ -341,6 +354,30 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
 
         public func update(messageText: NSAttributedString?) {
             messageLabel.attributedText = messageText
+            updateContentAlignment()
+        }
+
+        /// Vertically centers the subject row against the avatar when nothing
+        /// sits below it — no message preview and no badges — instead of leaving
+        /// it pinned to the top with empty space underneath. As soon as there is
+        /// a preview (or a badge), the content snaps back to `.top` so a
+        /// multi-line preview grows downward without shifting the subject (see
+        /// the alignment rationale in `setup`).
+        ///
+        /// Called from `bind(_:)` after the badge visibility is resolved, and
+        /// from `update(messageText:)`.
+        open func updateContentAlignment() {
+            let hasMessage = !(messageLabel.attributedText?.string.isEmpty ?? true)
+            messageLabel.isHidden = !hasMessage
+            // Keep the badges (pin/unread/@) pinned to the trailing edge when
+            // the preview is gone — see `bottomRowSpacerView`.
+            bottomRowSpacerView.isHidden = hasMessage
+
+            let bottomRowEmpty = messageLabel.isHidden
+                && unreadCount.isHidden
+                && atView.isHidden
+                && pinView.isHidden
+            contentStackView.alignment = bottomRowEmpty ? .center : .top
         }
 
         open var data: ChannelLayoutModel! {
@@ -391,6 +428,13 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
             } else {
                 atView.value = nil
             }
+
+            // Center the subject row when the channel has no preview/badges
+            // below it; otherwise keep it pinned to the top. Done here, after
+            // the badge visibility above is resolved, so the decision sees the
+            // final state.
+            updateContentAlignment()
+
             data.$avatar
                 .sink { [weak self] image in
                     guard let self else { return }
