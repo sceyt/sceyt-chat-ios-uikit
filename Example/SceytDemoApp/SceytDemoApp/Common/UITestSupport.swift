@@ -127,6 +127,50 @@ enum UITestSupport {
         launchArgumentValue("--uitest-restart-observer-on-open")
     }
 
+    /// `--uitest-web-sync-button=<count>[xrestart]` — installs a floating button
+    /// (`uitest.injectWebSync`) that, on tap, inserts `count` OUTGOING messages
+    /// in ONE database transaction, dated in the gap between the last-read
+    /// message and the unread incoming tail — own messages the same account
+    /// sent from the Web client, delivered late by a server sync. They sort
+    /// ABOVE the received messages already on screen, so the batch lands in the
+    /// middle of the loaded history, not at the newest edge. With the
+    /// `xrestart` suffix, the tap also restarts the conversation's message
+    /// observer right after the insert — the window recalculation the real
+    /// sync pipeline performs, which re-delivers an `isInitial` change event.
+    private static var webSyncButtonSpec: (count: Int, restart: Bool)? {
+        let prefix = "--uitest-web-sync-button="
+        guard let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) })
+        else { return nil }
+        let parts = argument.dropFirst(prefix.count).split(separator: "x")
+        guard let first = parts.first, let count = Int(first), count > 0 else { return nil }
+        return (count, parts.count == 2 && parts[1] == "restart")
+    }
+
+    /// `--uitest-web-sync-on-open=<ms>x<count>[xrestart]` — the same web-sync
+    /// insert as `--uitest-web-sync-button`, fired automatically `<ms>`
+    /// milliseconds after the conversation screen starts opening (see
+    /// `scheduleOnConversationOpen` for what 0 vs ~1500 means).
+    private static var webSyncOnOpenSpec: (delayMs: Int, count: Int, restart: Bool)? {
+        let prefix = "--uitest-web-sync-on-open="
+        guard let argument = ProcessInfo.processInfo.arguments.first(where: { $0.hasPrefix(prefix) })
+        else { return nil }
+        let parts = argument.dropFirst(prefix.count).split(separator: "x")
+        guard parts.count >= 2,
+              let delayMs = Int(parts[0]), let count = Int(parts[1]),
+              delayMs >= 0, count > 0
+        else { return nil }
+        return (delayMs, count, parts.count == 3 && parts[2] == "restart")
+    }
+
+    /// `--uitest-web-sync-seeded=<count>` — bakes the Web-sent outgoing run
+    /// into the seeded conversation itself, between the last-read message and
+    /// the unread incoming tail — a cold start whose server sync completed
+    /// BEFORE the channel was opened. Requires
+    /// `--uitest-conversation-unread-count`.
+    private static var webSyncSeededCount: Int? {
+        launchArgumentValue("--uitest-web-sync-seeded")
+    }
+
     /// `--uitest-message-storm=<pairs>x<intervalMs>[x<startMs>]` — `startMs`
     /// (default 1500) after the conversation screen starts opening, fires
     /// `pairs` timer ticks every `intervalMs`; each tick inserts one outgoing
@@ -197,6 +241,14 @@ enum UITestSupport {
             if let storm = messageStormSpec {
                 scheduleOnConversationOpen(afterMs: storm.startMs) {
                     startMessageStorm(pairs: storm.pairs, intervalMs: storm.intervalMs)
+                }
+            }
+            if webSyncButtonSpec != nil {
+                installFloatingWebSyncInjector()
+            }
+            if let webSync = webSyncOnOpenSpec {
+                scheduleOnConversationOpen(afterMs: webSync.delayMs) {
+                    performWebSync(count: webSync.count, restart: webSync.restart)
                 }
             }
         } else {
@@ -324,6 +376,11 @@ enum UITestSupport {
             // (indices 1–16), then exactly `unreadCount` incoming unread
             // messages — the "N new messages" state the open-position tests probe.
             var messages = Array(conversationMessages.prefix(16))
+            // Optionally bake in the Web-sent outgoing run (explicit dates in
+            // the gap between the last-read message and the unread tail).
+            if let seededWebCount = webSyncSeededCount, seededWebCount > 0 {
+                messages.append(contentsOf: webSyncSeeds(count: seededWebCount))
+            }
             for n in 1...unreadCount {
                 messages.append(.init(
                     id: conversationMessageId(UInt64(16 + n)),
@@ -446,6 +503,106 @@ enum UITestSupport {
     /// UI-test bundle (`ChannelScreen.Conversation.stormSentText/stormReceivedText`).
     static func conversationStormSentText(_ n: Int) -> String { "Storm sent \(n)" }
     static func conversationStormReceivedText(_ n: Int) -> String { "Storm received \(n)" }
+
+    // MARK: - Web-sync injection (same account active on Web)
+
+    /// Body of the `n`-th web-sent message a web-sync insert delivers.
+    /// Deliberately long enough to wrap across several lines, so a handful of
+    /// them stack taller than a phone screen — a viewport that jumps onto the
+    /// block cannot be mistaken for a small settle. Mirrored in the UI-test
+    /// bundle (`ChannelScreen.Conversation.webSyncText`).
+    static func conversationWebSyncText(_ n: Int) -> String {
+        "Sent from Web \(n) — this message was written on the Web client of the "
+            + "same account before the incoming messages arrived, and it reaches "
+            + "this device only later, through a server sync, so it must slot in "
+            + "ABOVE the received messages without moving the viewport."
+    }
+
+    /// The web-sent batch: OUTGOING messages (the same account, other device),
+    /// dated in the open gap between the last-read message (seed index 15 →
+    /// base+15s) and the first unread incoming one (index 16 → base+16s), so
+    /// they sort into the middle of the history — above the received block the
+    /// screen opened on. Sub-second steps keep the whole batch inside the gap
+    /// (the message list orders by `createdAt, id` ascending).
+    private static func webSyncSeeds(count: Int) -> [SceytChatUIKit.UITestMessageSeed] {
+        let base = SceytChatUIKit.uiTestMessageSeedBaseDate
+        return (1...min(count, 40)).map { n in
+            .init(id: 4_000_000 + UInt64(n),
+                  body: conversationWebSyncText(n),
+                  incoming: false,
+                  senderId: SceytChatUIKit.uiTestUserId,
+                  senderName: "Me",
+                  deliveryStatus: .sent,
+                  createdAt: base.addingTimeInterval(15.0 + Double(n) * 0.02))
+        }
+    }
+
+    /// Button-tap entry point: reads the launch-argument spec so the injector
+    /// target needs no stored state. On a committed insert, stamps the injected
+    /// count into the button's accessibility value — the test polls that value
+    /// to verify the batch really landed (and re-taps otherwise), instead of
+    /// passing vacuously when a write is dropped or a tap misses.
+    static func performWebSyncFromButton() {
+        guard let spec = webSyncButtonSpec else { return }
+        if performWebSync(count: spec.count, restart: spec.restart) {
+            findWindowButton(identifier: "uitest.injectWebSync")?
+                .accessibilityValue = "\(spec.count)"
+        }
+    }
+
+    /// Inserts the web-sent batch in one transaction; with `restart`, follows up
+    /// with the observer-window recalculation the real sync pipeline performs
+    /// after storing a page (re-delivers an `isInitial` change event). The small
+    /// delay lets the insert's own diff apply first — the real recalc also runs
+    /// only after the store completes. Returns whether the insert committed
+    /// (the restart is skipped for a dropped write — there is nothing to sync).
+    @discardableResult
+    static func performWebSync(count: Int, restart: Bool) -> Bool {
+        let landed = SceytChatUIKit.shared.insertUITestMessages(
+            channelId: conversationChannelId,
+            messages: webSyncSeeds(count: count))
+        if landed, restart {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                restartConversationMessageObserver()
+            }
+        }
+        return landed
+    }
+
+    /// A window-level floating button previously installed by this harness.
+    private static func findWindowButton(identifier: String) -> UIButton? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .flatMap { $0.subviews }
+            .compactMap { $0 as? UIButton }
+            .first { $0.accessibilityIdentifier == identifier }
+    }
+
+    /// Adds a second floating, window-level button (below the incoming-message
+    /// injector's spot) that fires the web-sync insert on tap — so a test can
+    /// sequence it exactly after a user gesture (the reported repro: the user
+    /// drags a little, THEN the web-sent messages arrive). Present only with
+    /// `--uitest-web-sync-button=<count>[xrestart]` in conversation mode.
+    private static func installFloatingWebSyncInjector() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let windows = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+            guard let window = windows.first(where: { $0.isKeyWindow }) ?? windows.first
+            else { return }
+            let button = UIButton(type: .system)
+            button.setTitle("⇵", for: .normal)
+            button.accessibilityIdentifier = "uitest.injectWebSync"
+            button.backgroundColor = .systemTeal
+            button.frame = CGRect(x: 0, y: window.safeAreaInsets.top + 108, width: 44, height: 44)
+            button.layer.zPosition = .greatestFiniteMagnitude
+            button.addTarget(UITestMessageInjector.shared,
+                             action: #selector(UITestMessageInjector.injectWebSync),
+                             for: .touchUpInside)
+            window.addSubview(button)
+        }
+    }
 
     /// Fires `pairs` ticks every `intervalMs`, each inserting one outgoing and
     /// one incoming message back-to-back. Ids are explicit, unique, and
@@ -582,6 +739,10 @@ final class UITestMessageInjector: NSObject {
             text: UITestSupport.injectedLongText,
             incoming: false
         )
+    }
+
+    @objc func injectWebSync() {
+        UITestSupport.performWebSyncFromButton()
     }
 }
 #endif

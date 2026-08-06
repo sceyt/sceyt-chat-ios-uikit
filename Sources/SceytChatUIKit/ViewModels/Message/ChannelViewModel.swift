@@ -135,6 +135,13 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     /// events; without this guard they would re-anchor the viewport to the
     /// stale `lastDisplayedMessageId` on every restart (see `onDidChangeEvent`).
     private var didEmitUnreadAnchorScroll = false
+    /// Whether any `isInitial` snapshot has been consumed (anchored open,
+    /// scroll-and-select, or the plain first render). Once true, a later
+    /// `isInitial` event can only be a mid-session observer-restart
+    /// redelivery — routed to the position-preserving reload. Kept separate
+    /// from `isInitialLoad`, whose value also steers `loadLastMessages`'
+    /// `before` paging and must keep its original lifecycle.
+    private var hasConsumedInitialSnapshot = false
     private var loadLastMessagesAfterConnect = false
     private var lastLoadPrevMessageId: MessageId = 0
     private var lastLoadNextMessageId: MessageId = 0
@@ -529,7 +536,16 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         
         guard !paths.isEmpty else { return events }
-        
+
+        // Hand the unread anchor forward over own messages that follow the
+        // marker (e.g. sent from another device and delivered by sync), so
+        // the "New messages" separator stays on the first unread INCOMING
+        // message. The affected cells re-render and re-measure via reloads.
+        for path in advanceUnreadAnchorOverOwnMessages(cache: cache)
+        where !paths.reloads.contains(path) {
+            paths.reloads.append(path)
+        }
+
         func indexPathOfLastDisplayedMessageId() -> IndexPath? {
             if lastDisplayedMessageId != 0,
                canUpdateUnreadPosition {
@@ -543,7 +559,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
             return nil
         }
-        
+
         if let indexPath = indexPathOfLastDisplayedMessageId() {
             events.append(.didSetUnreadIndexPath(indexPath: indexPath))
         }
@@ -562,6 +578,103 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         return events
     }
     
+    /// Own messages that directly follow the last-read marker — e.g. written on
+    /// the Web client of the same account and delivered later by a server
+    /// sync — are not "new messages" for this user. Walks the unread anchor
+    /// forward over that consecutive outgoing run so the "New messages"
+    /// separator (and the unread open position) sits on the boundary of the
+    /// first unread INCOMING message, leaving the own messages above it as
+    /// plain history. When the run reaches the newest message (nothing
+    /// incoming after it), the anchor disarms entirely — mirroring `init`'s
+    /// "newest message is outgoing → no unread anchor" rule.
+    ///
+    /// The separator's height is measured into the anchor cell, so the two
+    /// affected layout models are rebuilt (the same pattern as
+    /// `updateUnreadIndexIfNeeded`) and their index paths returned for the
+    /// caller to reload.
+    private func advanceUnreadAnchorOverOwnMessages(
+        cache: LazyDatabaseObserver<MessageDTO, ChatMessage>.Cache
+    ) -> [IndexPath] {
+        guard lastDisplayedMessageId != 0 else { return [] }
+
+        // The cache provides the section/item geometry; the mapped items come
+        // from the observer's working cache (the same accessor the rest of
+        // this pipeline uses).
+        func message(at path: IndexPath) -> ChatMessage? {
+            messageObserver.workingCacheItem(at: path)
+        }
+        func itemCount(in section: Int) -> Int {
+            cache[safe: section]?.count ?? 0
+        }
+        func next(after path: IndexPath) -> IndexPath? {
+            if path.item + 1 < itemCount(in: path.section) {
+                return IndexPath(item: path.item + 1, section: path.section)
+            }
+            var section = path.section + 1
+            while section < cache.count {
+                if itemCount(in: section) > 0 {
+                    return IndexPath(item: 0, section: section)
+                }
+                section += 1
+            }
+            return nil
+        }
+
+        // Locate the current anchor in the (post-update) cache.
+        var anchorPath: IndexPath?
+        outer: for section in stride(from: cache.count - 1, through: 0, by: -1) {
+            for row in stride(from: itemCount(in: section) - 1, through: 0, by: -1) {
+                let path = IndexPath(item: row, section: section)
+                if message(at: path)?.id == lastDisplayedMessageId {
+                    anchorPath = path
+                    break outer
+                }
+            }
+        }
+        guard let startPath = anchorPath else { return [] }
+
+        // Walk the consecutive outgoing run that follows the anchor.
+        var runEnd: (path: IndexPath, id: MessageId)?
+        var cursor = next(after: startPath)
+        while let path = cursor, let item = message(at: path), !item.incoming {
+            runEnd = (path, item.id)
+            cursor = next(after: path)
+        }
+        guard let runEnd else { return [] }
+
+        let oldId = lastDisplayedMessageId
+        // A run that reaches the newest message leaves nothing unread below
+        // it — disarm rather than parking the separator under the last own
+        // message.
+        lastDisplayedMessageId = cursor == nil ? 0 : runEnd.id
+
+        // Rebuild the models whose separator flag (and with it the measured
+        // cell height) changed, restoring their grouping insets.
+        var reloadPaths: [IndexPath] = []
+        for (id, path) in [(oldId, startPath), (lastDisplayedMessageId, runEnd.path)]
+        where id != 0 {
+            guard let msg = message(at: path) else { continue }
+            let model = Components.messageLayoutModel.init(
+                channel: channel,
+                message: msg,
+                lastDisplayedMessageId: lastDisplayedMessageId,
+                appearance: MessageCell.appearance)
+            layoutModels[.init(message: msg)] = model
+            let prevIndexPath = findPrevIndexPath(current: path, cache: cache)
+            var prevModel: MessageLayoutModel?
+            if let prevIndexPath, let prevMessage = message(at: prevIndexPath) {
+                prevModel = layoutModel(for: prevMessage)
+            }
+            updateMessageContentInsets(
+                for: model,
+                at: path,
+                prevModel: prevModel,
+                prevIndexPath: prevIndexPath)
+            reloadPaths.append(path)
+        }
+        return reloadPaths
+    }
+
     open func needsToScrollAtIndexPath(
         items: ChangeItem
     ) -> (IndexPath, MessageId)? {
@@ -683,6 +796,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                         didEmitUnreadAnchorScroll = true
                     }
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: animated, pos: .centeredVertically)
+                    hasConsumedInitialSnapshot = true
 
                     // Mark mention as navigated if this is an unread mention
                     if scrollToUnreadMentionMessageId == messageId {
@@ -701,14 +815,36 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                             break
                         }
                         event = .scrollAndSelect(indexPath: indexPath, messageId: messageId, mode: nil)
+                        hasConsumedInitialSnapshot = true
                         resetStateAfterChangeEvent()
                         needToScroll = false
-                    } else {
+                    } else if isRestartingMessageObserver == .reloadToLatestState {
+                        // A deliberate jump-to-latest restart (the scroll-down
+                        // far-jump rebuilds the window on the newest tail):
+                        // landing at the bottom is the point.
+                        event = .reloadDataAndScrollToBottom
+                    } else if !hasConsumedInitialSnapshot {
+                        // The genuine first render with no scroll anchor.
+                        // Publish exactly today's pair: both events reach the
+                        // synchronous sink (the VC renders on the first,
+                        // toggles the empty state on the second);
+                        // `.showNoMessage` must stay LAST because the
+                        // pre-subscription `@Published` replay keeps only the
+                        // final value (see the reconcile note where the VC
+                        // subscribes to `$event`).
+                        hasConsumedInitialSnapshot = true
                         event = .reloadDataAndScrollToBottom
                         if isInitialLoad {
                             event = .showNoMessage
                             isInitialLoad = false
                         }
+                    } else {
+                        // A mid-session observer restart with no scroll target:
+                        // the send path's tail-lag rebuild, a sync's window
+                        // recalculation, or the channel-reconciliation observer
+                        // swap. The user may be reading anywhere — reload the
+                        // data but leave the viewport where it is.
+                        event = .reloadDataAndKeepPosition
                     }
                 }
                 return
@@ -3272,6 +3408,12 @@ public extension ChannelViewModel {
         case reload([IndexPath])
         case reloadData
         case reloadDataAndScrollToBottom
+        /// Full data reload that must NOT move the viewport: emitted for
+        /// mid-session observer restarts (send tail-lag rebuilds, sync window
+        /// recalculations, channel-reconciliation observer swaps) whose fresh
+        /// snapshot re-delivers `isInitial` while the user may be reading
+        /// anywhere in the history.
+        case reloadDataAndKeepPosition
         case reloadDataAndScroll(indexPath: IndexPath, animated: Bool, pos: CollectionView.ScrollPosition)
         case reloadDataAndSelect(indexPath: IndexPath, messageId: MessageId)
         case scrollAndSelect(indexPath: IndexPath, messageId: MessageId, mode: MessageCell.HighlightMode?)

@@ -113,6 +113,13 @@ extension SceytChatUIKit {
     /// `lastMessageSenderId` to this to get a "You:" preview prefix.
     public static let uiTestUserId = "uitest-user"
 
+    /// The fixed base date `seedMessagesForUITests` assigns to seeds with no
+    /// explicit `createdAt`: the message at array index `i` is dated
+    /// `uiTestMessageSeedBaseDate + i` seconds. Public so a host app's test
+    /// harness can compute dates that land BETWEEN two seeded messages (e.g. a
+    /// synced batch that must sort into the middle of the history).
+    public static let uiTestMessageSeedBaseDate = Date(timeIntervalSince1970: 1_700_100_000)
+
     /// Marks a fake authenticated session so the app routes straight to the main
     /// flow without a live connection. `SceytChatUIKit.currentUserId` reads this
     /// value (via `UserDefaults`) when the chat client is not connected.
@@ -270,6 +277,58 @@ extension SceytChatUIKit {
         }
     }
 
+    /// Inserts a batch of messages into an existing conversation in ONE database
+    /// transaction WITHOUT wiping what is already there — the shape of a server
+    /// sync page landing after the screen is open. Unlike
+    /// `receiveUITestMessageBurst` (always dated *now*, at the newest edge), each
+    /// seed's explicit `createdAt`/`id` is honored, so the batch can land in the
+    /// MIDDLE of the loaded history — e.g. own messages sent from the Web client
+    /// on the same account, which are older than the incoming messages already
+    /// on screen and sort above them.
+    ///
+    /// `channel.lastMessage` is left untouched: a mid-history page is by
+    /// definition older than the newest message already in the store.
+    ///
+    /// Returns whether the write committed — the app-side harness surfaces
+    /// this so a test can verify the batch actually landed (and retry) instead
+    /// of passing vacuously when a write is dropped.
+    ///
+    /// UI-test only.
+    @discardableResult
+    public func insertUITestMessages(channelId: ChannelId,
+                                     messages: [UITestMessageSeed]) -> Bool {
+        guard !messages.isEmpty else { return false }
+        do {
+            try insertUITestMessagesThrowing(channelId: channelId, messages: messages)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    private func insertUITestMessagesThrowing(channelId: ChannelId,
+                                              messages: [UITestMessageSeed]) throws {
+        try database.syncWrite { context in
+            for seed in messages {
+                let message = MessageDTO.fetchOrCreate(id: seed.id, tid: 0, context: context)
+                message.body = seed.body
+                message.type = "text"
+                message.channelId = Int64(channelId)
+                message.incoming = seed.incoming
+                message.state = 0 // ChatMessage.State.none
+                message.deliveryStatus = Int16(seed.deliveryStatus.intValue)
+                if let createdAt = seed.createdAt {
+                    message.createdAt = createdAt.bridgeDate
+                }
+                if let senderId = seed.senderId {
+                    message.user = context.createOrUpdate(
+                        user: ChatUser(id: senderId, firstName: seed.senderName)
+                    )
+                }
+            }
+        }
+    }
+
     /// Rewrites the body of an existing message, simulating an in-place update
     /// that changes the cell's height after it is already on screen — the same
     /// list-level effect as a link preview or attachment thumbnail arriving
@@ -319,7 +378,7 @@ extension SceytChatUIKit {
 
         // A fixed base date keeps ordering stable across runs; later messages get
         // newer dates so they sort below (visually lower) earlier ones.
-        let baseDate = Date(timeIntervalSince1970: 1_700_100_000)
+        let baseDate = Self.uiTestMessageSeedBaseDate
 
         try? database.syncWrite { context in
             guard let channelDTO = ChannelDTO.fetch(id: channelId, context: context)

@@ -191,6 +191,10 @@ open class ChannelViewController: ViewController,
     private enum PendingUpdate {
         case diff(CollectionUpdateIndexPaths)
         case rebuild
+        /// A parked `.reloadDataAndKeepPosition` event (mid-session observer
+        /// restart that must not move the viewport) — replayed through
+        /// `onEvent` once the in-flight batch finishes.
+        case keepPosition
     }
     private var pendingUpdate: PendingUpdate?
     private var isStartedDragging = false {
@@ -201,6 +205,11 @@ open class ChannelViewController: ViewController,
     }
     
     private var isScrollingBottom = false
+    /// The message currently carrying the "New messages" separator (the unread
+    /// anchor). Tracked so that when the anchor advances mid-session (own
+    /// messages synced from another device hand the boundary forward), a pin
+    /// armed on the previous anchor can be handed over with it.
+    private var unreadAnchorMessageId: MessageId = 0
     private var isUpdatingInputViewHeight = false
     private var checkOnlyFirstTimeReceivedMessagesFromArchive = true
     private var isViewDidAppear = false
@@ -1507,7 +1516,53 @@ open class ChannelViewController: ViewController,
         )
         return true
     }
-    
+
+    /// A message the viewport is anchored on across a full data reload: its
+    /// snapshot `Key` plus its distance from the viewport's top edge. Keyed —
+    /// not id'd — so a pending outgoing message that acquires its server id
+    /// mid-reload still matches (`Key`'s equality is tid-tolerant).
+    private struct VisibleMessageAnchor {
+        let key: ChannelViewModel.Key
+        let visibleOffset: CGFloat
+    }
+
+    /// The newest currently-visible message and its viewport offset — the
+    /// anchor a position-preserving reload restores against. The newest
+    /// visible cell sits closest to the mirrored list's stable (newest) edge,
+    /// so it is the most likely to survive an observer-window rebuild.
+    /// Capture BEFORE `rebuildAppliedSnapshotFromObserver()`: both the
+    /// snapshot lookup and the layout query must see the old geometry.
+    private func newestVisibleMessageAnchor() -> VisibleMessageAnchor? {
+        guard let indexPath = collectionView.indexPathsForVisibleItems.min(),
+              let key = snapshotKey(at: indexPath),
+              let attrs = collectionView.layoutAttributesForItem(at: indexPath)
+        else { return nil }
+        return VisibleMessageAnchor(
+            key: key,
+            visibleOffset: attrs.frame.minY - collectionView.contentOffset.y
+        )
+    }
+
+    /// Re-locates the anchor in the freshly-rebuilt `appliedSnapshot` and puts
+    /// it back at its captured viewport offset (clamped into the valid offset
+    /// range). Call AFTER the rebuild + `reloadData()` + `layoutIfNeeded()`.
+    /// Returns false when the anchor is no longer in the reloaded window.
+    @discardableResult
+    private func restoreVisibleMessageAnchor(_ anchor: VisibleMessageAnchor) -> Bool {
+        for (sectionIdx, items) in appliedSnapshot.items.enumerated() {
+            guard let itemIdx = items.firstIndex(of: anchor.key) else { continue }
+            let indexPath = IndexPath(item: itemIdx, section: sectionIdx)
+            guard let attrs = collectionView.layoutAttributesForItem(at: indexPath)
+            else { return false }
+            collectionView.contentOffset.y = min(
+                max(attrs.frame.minY - anchor.visibleOffset, collectionView.bottomContentOffsetY),
+                collectionView.maxContentOffsetY
+            )
+            return true
+        }
+        return false
+    }
+
     open func updateUnreadViewVisibility() {
         syncSeenUnreadMessagesFromVisibleCells()
         guard canShowUnreadCountView
@@ -3010,6 +3065,8 @@ open class ChannelViewController: ViewController,
             collectionView.reloadData()
             updateUnreadViewVisibility()
             showEmptyViewIfNeeded()
+        case .keepPosition:
+            onEvent(.reloadDataAndKeepPosition)
         }
     }
 
@@ -3024,7 +3081,12 @@ open class ChannelViewController: ViewController,
             // policy hints (continuesOptions, etc.); a fresh diff is computed
             // against the latest observer state at drain time.
             if isCollectionViewUpdating {
-                pendingUpdate = .diff(paths)
+                // A parked keep-position rebuild subsumes any diff: the rebuild
+                // re-reads the observer at drain time, so overwriting it with
+                // a stale diff would only lose the position-preserving pass.
+                if case .keepPosition = pendingUpdate {} else {
+                    pendingUpdate = .diff(paths)
+                }
                 return
             }
 
@@ -3511,6 +3573,51 @@ open class ChannelViewController: ViewController,
             // "No messages yet" empty state stays visible and overlaps the message
             // (siblings .reloadData / .reloadDataAndScroll already do this).
             showEmptyViewIfNeeded()
+        case .reloadDataAndKeepPosition:
+            // A mid-session observer restart re-delivered its window (send
+            // tail-lag rebuild, sync window recalculation, channel
+            // reconciliation). The user may be reading anywhere — apply the
+            // fresh snapshot and put the viewport back exactly where it was.
+            //
+            // Single-flight: if a batch is animating (e.g. the sync's own
+            // insert diff, which regularly precedes the restart by
+            // milliseconds), park and drain after it finishes — capturing
+            // anchors mid-batch would read a transitional layout.
+            if isCollectionViewUpdating {
+                pendingUpdate = .keepPosition
+                return
+            }
+            // Kill any in-flight deceleration so the captured offset is not a
+            // moving target (same first step as reloadDataAndKeepOffset).
+            collectionView.setContentOffset(collectionView.contentOffset, animated: false)
+            // Capture BEFORE the snapshot rebuild — both lookups must see the
+            // geometry that is currently on screen.
+            let wasAtBottom = collectionView.isAtBottom()
+            let pinnedVisibleOffsetBefore = pinnedMessageVisibleOffset()
+            let anchorBefore = newestVisibleMessageAnchor()
+            rebuildAppliedSnapshotFromObserver()
+            collectionView.reloadData()
+            collectionView.layoutIfNeeded()
+            if let pinnedVisibleOffsetBefore,
+               restorePinnedMessageToVisibleOffset(pinnedVisibleOffsetBefore) {
+                // An armed reply/search pin keeps its viewport offset.
+            } else if wasAtBottom {
+                // Bottom wins: resting at the newest edge keeps following the
+                // tail even if the rebuilt window gained newer rows.
+                collectionView.scrollToBottom(animated: false)
+            } else if let anchorBefore, restoreVisibleMessageAnchor(anchorBefore) {
+                // The message the user was reading keeps its screen position.
+            } else {
+                // The anchor left the reloaded window. Offsets are anchored at
+                // the newest edge in the mirrored list, so the clamped current
+                // offset is the closest remaining approximation.
+                collectionView.contentOffset.y = min(
+                    max(collectionView.contentOffset.y, collectionView.bottomContentOffsetY),
+                    collectionView.maxContentOffsetY
+                )
+            }
+            updateUnreadViewVisibility()
+            showEmptyViewIfNeeded()
         case let .reloadDataAndScroll(indexPath, animated, pos):
             rebuildAppliedSnapshotFromObserver()
             // Opening on unread: don't center the last-read message — pin the
@@ -3543,6 +3650,9 @@ open class ChannelViewController: ViewController,
             // don't drift the viewport. Released on scrollViewWillBeginDragging.
             if let messageId = channelViewModel.message(at: indexPath)?.id, messageId != 0 {
                 pinnedScrollMessageId = messageId
+                if isUnreadAnchor {
+                    unreadAnchorMessageId = messageId
+                }
             }
             // A short unread tail can't fill a screen, so the separator scroll
             // above clamps to the bottom (synchronously — the offset is final
@@ -3556,6 +3666,23 @@ open class ChannelViewController: ViewController,
             updateUnreadViewVisibility()
             showEmptyViewIfNeeded()
         case .didSetUnreadIndexPath(let indexPath):
+            // The unread anchor can advance mid-session: own messages synced
+            // from another device of the same account hand the "New messages"
+            // boundary forward to the first unread incoming message. If the
+            // unread open pinned the PREVIOUS anchor message, hand the pin
+            // over too — otherwise the pin-restore would hold the old
+            // boundary fixed and shove the received messages below the fold
+            // when the synced batch inserts between the two anchors.
+            let newAnchorId = channelViewModel.message(at: indexPath)?.id ?? 0
+            if pinnedScrollMessageId != 0,
+               pinnedScrollMessageId == unreadAnchorMessageId,
+               newAnchorId != 0,
+               newAnchorId != pinnedScrollMessageId {
+                pinnedScrollMessageId = newAnchorId
+            }
+            if newAnchorId != 0 {
+                unreadAnchorMessageId = newAnchorId
+            }
             unreadMessageIndexPath = indexPath
         case .typing(let isTyping, let user):
             if !channelViewModel.channel.isDirect {
