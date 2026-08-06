@@ -45,11 +45,13 @@ open class EmojiPickerViewController: ViewController,
         
         headerToolBar.appearance = appearance
         
-        collectionViewLayout.itemSize = Components.emojiListViewModel.itemSize
         collectionViewLayout.headerReferenceSize = CGSize(width: view.width, height: 30)
         collectionViewLayout.scrollDirection = .vertical
-        collectionViewLayout.minimumInteritemSpacing = Components.emojiListViewModel.interItemSpacing
-        collectionViewLayout.sectionInset = Components.emojiListViewModel.sectionInset
+        // Spacing lives inside the cells (see `gridMetrics`) so that there is no dead area between
+        // them: every point of the grid belongs to an emoji and is tappable.
+        collectionViewLayout.minimumInteritemSpacing = 0
+        collectionViewLayout.minimumLineSpacing = 0
+        applyGridMetrics()
         collectionView.contentInset = .init(top: 8, left: 0, bottom: 0, right: 0)
         collectionView.backgroundColor = .clear
         view.layer.cornerRadius = 14
@@ -65,6 +67,39 @@ open class EmojiPickerViewController: ViewController,
         headerToolBar.heightAnchor.pin(constant: 48)
         collectionView.pin(to: view, anchors: [.leading, .trailing, .bottom()])
         collectionView.topAnchor.pin(to: headerToolBar.bottomAnchor)
+    }
+
+    private var lastLaidOutWidth: CGFloat = 0
+
+    override open func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        let width = collectionView.bounds.width
+        guard width > 0, width != lastLaidOutWidth else { return }
+        lastLaidOutWidth = width
+        collectionViewLayout.headerReferenceSize = CGSize(width: width, height: 30)
+        applyGridMetrics()
+    }
+
+    /// Grid geometry where each cell fills its whole tile, i.e. the inter-item and line spacing are
+    /// baked into the cell as padding around the centered emoji. The emojis keep their original size
+    /// and position, but the full area of the grid becomes tappable instead of only the glyph box.
+    open var gridMetrics: GridMetrics {
+        GridMetrics(
+            width: collectionView.bounds.width
+                - collectionView.adjustedContentInset.left
+                - collectionView.adjustedContentInset.right,
+            itemSize: Components.emojiListViewModel.itemSize,
+            spacing: Components.emojiListViewModel.interItemSpacing,
+            sectionInset: Components.emojiListViewModel.sectionInset
+        )
+    }
+
+    /// Every tile has the same size, so this stays on the flow layout's uniform `itemSize` fast path
+    /// instead of asking the delegate for each of the ~1500 emojis.
+    open func applyGridMetrics() {
+        let metrics = gridMetrics
+        collectionViewLayout.itemSize = metrics.cellSize
+        collectionViewLayout.sectionInset = metrics.sectionInset
     }
 
     // MARK: UICollectionViewDataSource
@@ -144,6 +179,41 @@ open class EmojiPickerViewController: ViewController,
 }
 
 public extension EmojiPickerViewController {
+    /// Turns the "glyph size + spacing" configuration into gap-free tiles.
+    ///
+    /// A tile is `itemSize` grown by `spacing`, and half of that growth is compensated on the section
+    /// insets, so the emojis land on the very same pixels they did with spaced-out cells — only now
+    /// the touch target is the whole tile (~44pt) instead of the glyph box.
+    struct GridMetrics {
+        public let cellSize: CGSize
+        public let sectionInset: UIEdgeInsets
+        public let numberOfColumns: Int
+
+        public init(width: CGFloat, itemSize: CGSize, spacing: CGFloat, sectionInset inset: UIEdgeInsets) {
+            let tileHeight = itemSize.height + spacing
+            let available = width - inset.left - inset.right + spacing
+            guard available >= itemSize.width + spacing else {
+                numberOfColumns = 1
+                cellSize = CGSize(width: itemSize.width + spacing, height: tileHeight)
+                sectionInset = inset
+                return
+            }
+            let columns = max(1, Int(available / (itemSize.width + spacing)))
+            // Floor to half points so that rounding can never push the last column onto a new line.
+            let tileWidth = (available / CGFloat(columns) * 2).rounded(.down) / 2
+            let leftover = available - tileWidth * CGFloat(columns)
+
+            numberOfColumns = columns
+            cellSize = CGSize(width: tileWidth, height: tileHeight)
+            sectionInset = .init(
+                top: max(0, inset.top - spacing / 2),
+                left: inset.left - spacing / 2 + leftover / 2,
+                bottom: max(0, inset.bottom - spacing / 2),
+                right: inset.right - spacing / 2 + leftover / 2
+            )
+        }
+    }
+
     enum Event {
         case selectEmoji(String)
 
