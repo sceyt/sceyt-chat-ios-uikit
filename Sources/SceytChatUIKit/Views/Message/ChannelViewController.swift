@@ -124,12 +124,15 @@ open class ChannelViewController: ViewController,
     public var highlightedDurationForReplyMessage = TimeInterval(1)
     public var highlightedDurationForSearchMessage = TimeInterval(0.5)
 
-    /// Distance from the visual top of the message area to the top edge of the
-    /// "New messages" separator bar when opening a channel with unread messages.
+    /// Distance from the viewport's older-facing edge to the "New messages"
+    /// separator bar when opening a channel with unread messages, so the rest of
+    /// the screen fills with unread. That edge is the visual top in
+    /// `.newestAtBottom` and the visual bottom in `.newestAtTop`.
     public static var unreadSeparatorScrollOffsetFromTop: CGFloat = 50
 
     /// Vertical spacing between the newest message and the input bar (visual
-    /// bottom). Added into `contentInset.top` because the list is mirrored.
+    /// bottom). Goes into `contentInset.top` when the list is mirrored, and into
+    /// `contentInset.bottom` when it is upright.
     public static var collectionViewInputSpacing: CGFloat = 10
 
     /// Measured height of the "New messages" bar inside the anchor cell —
@@ -449,6 +452,18 @@ open class ChannelViewController: ViewController,
         super.setupAppearance()
         
         canShowUnreadCountView = appearance.enableScrollDownButton
+        // Push the order before anything else reads geometry: the collection view
+        // re-applies its transform, relayouts and re-anchors to the newest message.
+        collectionView.messageListOrder = appearance.messageListOrder
+        // setupAppearance runs BEFORE setupLayout on the initial pass, so the input
+        // bar constraints don't exist yet — setupLayout does the first inset pass
+        // itself. Only a later appearance change needs the insets recomputed, since
+        // the order decides which edge carries the input-bar padding.
+        if messageInputViewHeightConstraint != nil {
+            updateCollectionViewInsets()
+        }
+        // "Jump to newest" scrolls up when the newest message is at the top.
+        unreadCountView.pointsUp = !appearance.messageListOrder.isMirrored
         navigationController?.navigationBar.apply(appearance: appearance.navigationBarAppearance)
         view.backgroundColor = appearance.backgroundColor
         coverView.backgroundColor = .clear
@@ -489,23 +504,21 @@ open class ChannelViewController: ViewController,
                 self.isUpdatingInputViewHeight = true
                 UIView.animate(withDuration: 0.25) { [weak self] in
                     guard let self else { return }
-                    // Mirrored list: the input bar occupies contentInset.top
-                    // (visual bottom). Shifting the offset opposite to the inset
-                    // growth keeps the visible content riding above the input bar;
-                    // at the bottom this lands exactly on the new minimum offset.
-                    let top = self.collectionView.contentInset.top
-                    var contentOffsetY = self.collectionView.contentOffset.y
+                    // Mirrored: the input bar occupies contentInset.top (the
+                    // anchored edge), so the offset shifts opposite to the inset
+                    // growth to keep the visible content riding above the input
+                    // bar; at the newest edge this lands exactly on the new minimum
+                    // offset. Upright: the inset grows the far edge and the content
+                    // does not move, so only the clamp applies.
+                    let previousAnchoringInset = self.offsetAnchoringInset
+                    let previousOffsetY = self.collectionView.contentOffset.y
                     self.messageInputViewHeightConstraint.constant = height
                     self.updateCollectionViewInsets()
-                    let newTop = self.collectionView.contentInset.top
-                    if newTop != top {
-                        contentOffsetY -= newTop - top
-                    }
                     self.coverView.layoutIfNeeded()
                     self.collectionView.layoutIfNeeded()
-                    contentOffsetY = min(
-                        max(contentOffsetY, self.collectionView.bottomContentOffsetY),
-                        self.collectionView.maxContentOffsetY
+                    let contentOffsetY = self.offsetAfterInsetChange(
+                        from: previousOffsetY,
+                        previousAnchoringInset: previousAnchoringInset
                     )
                     self.collectionView.setContentOffset(
                         .init(
@@ -724,18 +737,55 @@ open class ChannelViewController: ViewController,
         ? messageInputViewHeightConstraint.constant
         : searchControlsView.frame.height
 
-        // Mirrored list: the input bar overlays the visual bottom, which is the
-        // content-space TOP — so the input area padding goes into contentInset.top.
-        // The extra spacing keeps the newest message from touching the input bar.
-        collectionView.contentInset.top =
+        // The input bar overlays the visual bottom in both orders. In
+        // `.newestAtBottom` the mirror makes that the content-space TOP, so the
+        // padding goes into contentInset.top; upright it is the content-space
+        // BOTTOM. The extra spacing keeps the nearest message from touching the
+        // input bar.
+        let inputAreaInset =
         abs(bottomConstraint) +
         abs(controlHeight) +
         Self.collectionViewInputSpacing
+
+        if appearance.messageListOrder.isMirrored {
+            collectionView.contentInset.top = inputAreaInset
+            collectionView.contentInset.bottom = 0
+        } else {
+            collectionView.contentInset.top = 0
+            collectionView.contentInset.bottom = inputAreaInset
+        }
         collectionView.scrollIndicatorInsets = .init(
             top: collectionView.contentInset.top,
             left: 0,
             bottom: collectionView.contentInset.bottom,
             right: 0)
+    }
+
+    /// The inset edge the viewport's offset is anchored to. The offset always
+    /// counts from the newest edge (content-space origin), which the input bar
+    /// occupies only when the list is mirrored — upright the input bar grows the
+    /// far edge instead and UIKit leaves the content where it is.
+    private var offsetAnchoringInset: CGFloat {
+        appearance.messageListOrder.isMirrored ? collectionView.contentInset.top : 0
+    }
+
+    /// Re-derives the content offset after `updateCollectionViewInsets()` changed
+    /// the insets. When the growing inset sits on the anchored edge the offset has
+    /// to move by the same amount so the visible content stays put; otherwise only
+    /// the clamp applies.
+    private func offsetAfterInsetChange(
+        from previousOffsetY: CGFloat,
+        previousAnchoringInset: CGFloat
+    ) -> CGFloat {
+        var offsetY = previousOffsetY
+        let newAnchoringInset = offsetAnchoringInset
+        if newAnchoringInset != previousAnchoringInset {
+            offsetY -= newAnchoringInset - previousAnchoringInset
+        }
+        return min(
+            max(offsetY, collectionView.bottomContentOffsetY),
+            collectionView.maxContentOffsetY
+        )
     }
     
     private func removePrevUnreadSeparatorView(
@@ -756,8 +806,8 @@ open class ChannelViewController: ViewController,
         }
     }
     
-    /// Expects an index path in the collection view's mirrored (newest-first)
-    /// space — convert view-model paths with `uiIndexPath(fromData:)` first.
+    /// Expects an index path in the collection view's newest-first UI space —
+    /// convert view-model paths with `uiIndexPath(fromData:)` first.
     func goTo(indexPath: IndexPath, completion: @escaping (MessageCell) -> Void) {
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
@@ -777,14 +827,15 @@ open class ChannelViewController: ViewController,
         setSectionHeadersPinToVisibleBounds(false)
         guard let keyboardFrameEndValue = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue
         else { return }
-        // Mirrored list: the keyboard + input bar area lives in contentInset.top
-        // (visual bottom). Shift the offset opposite to the inset growth so the
-        // visible content rides above the keyboard; when the user is at the
-        // bottom this lands exactly on the new minimum offset (still glued to
-        // the newest message). The clamp handles short content: its max offset
-        // equals the bottom offset, so it stays pinned above the input bar.
-        let top = collectionView.contentInset.top
-        var contentOffsetY = collectionView.contentOffset.y
+        // Mirrored: the keyboard + input bar area lives in contentInset.top (the
+        // anchored edge), so the offset shifts opposite to the inset growth and the
+        // visible content rides above the keyboard; at the newest edge this lands
+        // exactly on the new minimum offset (still glued to the newest message).
+        // Upright: the area lives in contentInset.bottom, the content does not move
+        // and only the clamp applies. The clamp also handles short content: its max
+        // offset equals the newest-edge offset, so it stays pinned clear of the bar.
+        let previousAnchoringInset = offsetAnchoringInset
+        let previousOffsetY = collectionView.contentOffset.y
         let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
         let keyboardScreenEndFrame = keyboardFrameEndValue.cgRectValue
         let keyboardViewEndFrame = view.convert(keyboardScreenEndFrame, from: view.window)
@@ -801,13 +852,9 @@ open class ChannelViewController: ViewController,
         messageInputViewBottomConstraint.constant = shift
         searchControlsViewBottomConstraint.constant = shift
         updateCollectionViewInsets()
-        let newTop = collectionView.contentInset.top
-        if newTop != top {
-            contentOffsetY -= newTop - top
-        }
-        contentOffsetY = min(
-            max(contentOffsetY, collectionView.bottomContentOffsetY),
-            collectionView.maxContentOffsetY
+        let contentOffsetY = offsetAfterInsetChange(
+            from: previousOffsetY,
+            previousAnchoringInset: previousAnchoringInset
         )
         let animation = notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt
         UIView.animate(
@@ -822,18 +869,16 @@ open class ChannelViewController: ViewController,
 
     open func keyboardWillHide(notification: Notification) {
         setSectionHeadersPinToVisibleBounds(false)
-        let top = collectionView.contentInset.top
-        var contentOffsetY = collectionView.contentOffset.y
+        let previousAnchoringInset = offsetAnchoringInset
+        let previousOffsetY = collectionView.contentOffset.y
         messageInputViewBottomConstraint.constant = 0
         searchControlsViewBottomConstraint.constant = 0
         updateCollectionViewInsets()
-        let newTop = collectionView.contentInset.top
-        // Mirror of keyboardWillShow: the inset shrinks, so the offset grows back
-        // by the same amount, clamped into the valid range.
-        contentOffsetY -= newTop - top
-        contentOffsetY = min(
-            max(contentOffsetY, collectionView.bottomContentOffsetY),
-            collectionView.maxContentOffsetY
+        // Mirror of keyboardWillShow: when the anchoring inset shrinks the offset
+        // grows back by the same amount, clamped into the valid range.
+        let contentOffsetY = offsetAfterInsetChange(
+            from: previousOffsetY,
+            previousAnchoringInset: previousAnchoringInset
         )
 
         let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double
@@ -1280,7 +1325,7 @@ open class ChannelViewController: ViewController,
         return customInputViewController.presentedMentionUserListViewController?.parent == nil
     }
     
-    /// The list is mirrored and presented newest-first, so the OLDEST visible
+    /// The list is presented newest-first in both orders, so the OLDEST visible
     /// message is the MAX UI index path and older pagination is approached as the
     /// offset grows toward the content end. Index paths handed to the view model
     /// are converted back to its oldest-first space; the returned index path is
@@ -1435,17 +1480,18 @@ open class ChannelViewController: ViewController,
     }
     
     open func scrollViewDidScrollToTop(_ scrollView: UIScrollView) {
-        // In the mirrored list the system scroll-to-top (status bar tap) lands on
-        // offset ≈ 0, which is the NEWEST message — so pump the next page, not prev.
+        // The system scroll-to-top (status bar tap) lands on offset ≈ 0, which is
+        // the NEWEST message in both orders — so pump the next page, not prev.
         isStartedDragging = true
         addMoreMessage(scrollDirection: .down, force: true)
     }
 
     open func scrollDirectionForVelocity(_ velocity: CGPoint) -> ScrollDirection {
-        // The collection view is mirrored (scaleY: -1), so the pan velocity arrives
-        // sign-flipped relative to the screen: dragging toward older messages
-        // (revealing content at the visual top) reports a NEGATIVE y velocity.
-        // `.up` keeps meaning "toward older / prev pages", `.down` "toward newer".
+        // Velocity is taken in the collection view's own coordinate space, so the
+        // mirror (when present) cancels out and one rule covers both orders: a
+        // NEGATIVE y velocity always means the content offset is growing, i.e. the
+        // user is heading toward OLDER messages. `.up` keeps meaning "toward older
+        // / prev pages", `.down` "toward newer".
         if velocity.y > 0 {
             return .down
         } else if velocity.y < 0 {
@@ -1571,8 +1617,8 @@ open class ChannelViewController: ViewController,
             updateUnreadCountBadge()
             return
         }
-        // Mirrored list: distance from the newest message is just the offset's
-        // distance from the bottom anchor.
+        // Distance from the newest message is just the offset's distance from the
+        // newest-edge anchor — same in both orders.
         let distanceFromNewest = collectionView.contentOffset.y - collectionView.bottomContentOffsetY
         unreadCountView.isHidden = !(distanceFromNewest > 30)
         updateUnreadCountBadge()
@@ -1812,15 +1858,21 @@ open class ChannelViewController: ViewController,
         })
     }
 
-    /// The mirrored list renders date separators as section FOOTERS (the section's
-    /// content-space end is its visual top), so sticky behavior pins footers.
-    /// The method name is kept for API compatibility.
+    /// Date separators are section FOOTERS in `.newestAtBottom` (the section's
+    /// content-space end is its visual top) and section HEADERS in `.newestAtTop`,
+    /// so sticky behavior applies to whichever kind is in use. The method name is
+    /// kept for API compatibility.
     open func setSectionHeadersPinToVisibleBounds(_ show: Bool) {
-        if layout.sectionFootersPinToVisibleBounds != show {
-            let context = UICollectionViewFlowLayoutInvalidationContext()
-            layout.sectionFootersPinToVisibleBounds = show
-            layout.invalidateLayout(with: context)
-        }
+        let pinsFooters = appearance.messageListOrder.isMirrored
+        let footers = pinsFooters && show
+        let headers = !pinsFooters && show
+        guard layout.sectionFootersPinToVisibleBounds != footers
+                || layout.sectionHeadersPinToVisibleBounds != headers
+        else { return }
+        let context = UICollectionViewFlowLayoutInvalidationContext()
+        layout.sectionFootersPinToVisibleBounds = footers
+        layout.sectionHeadersPinToVisibleBounds = headers
+        layout.invalidateLayout(with: context)
     }
     
     open func collectionView(
@@ -1955,11 +2007,12 @@ open class ChannelViewController: ViewController,
         return channelViewModel.layoutModels[key]
     }
 
-    // MARK: Mirrored-presentation index mapping
+    // MARK: Newest-first presentation index mapping
 
-    /// The view model keeps messages oldest-first; the collection view is mirrored
-    /// (scaleY: -1) and presents newest-first, with `appliedSnapshot` built in the
-    /// mirrored order. Both mappings are the same involution computed against the
+    /// The view model keeps messages oldest-first; the collection view presents
+    /// newest-first in BOTH orders (only the mirror differs), with
+    /// `appliedSnapshot` built in that reversed order. Both mappings are the same
+    /// involution computed against the
     /// applied snapshot (the collection view's source of truth):
     ///   uiSection = sectionCount − 1 − dataSection
     ///   uiItem    = itemCount(uiSection) − 1 − dataItem
@@ -1988,9 +2041,11 @@ open class ChannelViewController: ViewController,
     }
 
     /// Translates a scroll position expressed in visual terms (top = visually
-    /// above) into the mirrored content space, where the visual top is the
-    /// content-space bottom and vice versa.
+    /// above) into the collection view's content space. In `.newestAtBottom` the
+    /// mirror makes the visual top the content-space bottom and vice versa; in
+    /// `.newestAtTop` the two spaces agree and the position passes through.
     open func uiScrollPosition(_ pos: UICollectionView.ScrollPosition) -> UICollectionView.ScrollPosition {
+        guard appearance.messageListOrder.isMirrored else { return pos }
         var mapped = pos
         let hadTop = mapped.contains(.top)
         let hadBottom = mapped.contains(.bottom)
@@ -2269,7 +2324,7 @@ open class ChannelViewController: ViewController,
                 withReuseIdentifier: Components.channelIncomingMessageCell.reuseId,
                 for: indexPath
             )
-            cell.transform = .mirrorY
+            cell.transform = appearance.messageListOrder.contentTransform
             return cell
         }
 
@@ -2278,8 +2333,9 @@ open class ChannelViewController: ViewController,
             collectionView: collectionView,
             model: model
         )
-        // Flip the cell back upright inside the mirrored collection view.
-        cell.transform = .mirrorY
+        // Flip the cell back upright inside the mirrored collection view (identity
+        // when the list is not mirrored).
+        cell.transform = appearance.messageListOrder.contentTransform
         return cell
     }
     
@@ -2304,6 +2360,9 @@ open class ChannelViewController: ViewController,
         let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: type)
         cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.identifier(for: message.id)
         cell.parentAppearance = appearance.messageCellAppearance
+        // Decides which edge of the cell the "New messages" bar is pinned to.
+        // Must be set before `cell.data`, which rebuilds the constraints.
+        cell.messageListOrder = appearance.messageListOrder
         cell.isEditing = channelViewModel.isEditing
         if cell.isEditing {
             let canSelect = dataIndexPath(fromUI: indexPath).map { channelViewModel.canSelectMessage(at: $0) } ?? false
@@ -2442,7 +2501,11 @@ open class ChannelViewController: ViewController,
             kind: requestedKind
         )
         cell.parentAppearance = appearance.dateSeparatorAppearance
-        if requestedKind == .footer {
+        let order = appearance.messageListOrder
+        // Only the kind that renders on the section's older-facing side carries the
+        // date — a footer when mirrored, a header when upright. The UI→data section
+        // mapping is the same involution for both.
+        if requestedKind == order.dateSeparatorKind {
             let dataSection = appliedSnapshot.sectionCount - 1 - indexPath.section
             cell.date = channelViewModel.separatorDateForMessage(
                 at: IndexPath(item: 0, section: max(0, dataSection)),
@@ -2451,7 +2514,7 @@ open class ChannelViewController: ViewController,
         } else {
             cell.date = nil
         }
-        cell.transform = .mirrorY
+        cell.transform = order.contentTransform
         return cell
     }
     
@@ -2503,7 +2566,7 @@ open class ChannelViewController: ViewController,
         layout collectionViewLayout: UICollectionViewLayout,
         referenceSizeForHeaderInSection section: Int
     ) -> CGSize {
-        .zero
+        dateSeparatorReferenceSize(for: .header, in: collectionView)
     }
 
     open func collectionView(
@@ -2511,9 +2574,20 @@ open class ChannelViewController: ViewController,
         layout collectionViewLayout: UICollectionViewLayout,
         referenceSizeForFooterInSection section: Int
     ) -> CGSize {
-        // Date separators render as footers in the mirrored list.
-        let width = collectionView.bounds.width
-        return appearance.enableDateSeparator ? CGSize(width: width, height: 40) : .zero
+        dateSeparatorReferenceSize(for: .footer, in: collectionView)
+    }
+
+    /// Date separators render as section footers in `.newestAtBottom` and as
+    /// section headers in `.newestAtTop` — whichever side faces the older
+    /// messages. The unused kind is always zero-sized.
+    private func dateSeparatorReferenceSize(
+        for kind: UICollectionView.SupplementaryViewKind,
+        in collectionView: UICollectionView
+    ) -> CGSize {
+        guard appearance.enableDateSeparator,
+              kind == appearance.messageListOrder.dateSeparatorKind
+        else { return .zero }
+        return CGSize(width: collectionView.bounds.width, height: 40)
     }
 
     open func canPerformMessageActions(
@@ -3176,7 +3250,7 @@ open class ChannelViewController: ViewController,
                         collectionView.reloadDataAndScrollToUnreadSeparator(
                             at: uiPath,
                             separatorHeight: unreadSeparatorHeight,
-                            offsetFromVisualTop: Self.unreadSeparatorScrollOffsetFromTop)
+                            offsetFromOlderEdge: Self.unreadSeparatorScrollOffsetFromTop)
                     } else {
                         collectionView.reloadData()
                     }
@@ -3205,16 +3279,16 @@ open class ChannelViewController: ViewController,
             // If we reached here with the first-archive flag still set, clear
             // it — we're about to apply the update normally.
             checkOnlyFirstTimeReceivedMessagesFromArchive = false
-            // Mirrored list: UI IndexPath(0,0) is the NEWEST edge (visual bottom).
-            // Inserts there are new incoming/outgoing messages. Older-message
-            // pagination lands at the content END in the mirrored order and needs
-            // no offset handling at all — the anchor is the newest edge.
+            // UI IndexPath(0,0) is the NEWEST edge (content-space origin) in both
+            // orders. Inserts there are new incoming/outgoing messages.
+            // Older-message pagination lands at the content END and needs no
+            // offset handling at all — the anchor is the newest edge.
             let isInsertingNewestItems =
                 diff.sectionInserts.contains(0)
                 || diff.inserts.contains(IndexPath(item: 0, section: 0))
 
-            // Offset-based bottom check: in the mirrored space the bottom is a
-            // constant offset, so no indexPath comparison is needed.
+            // Offset-based newest-edge check: that edge is a constant offset in
+            // both orders, so no indexPath comparison is needed.
             let isUserAtBottom = collectionView.isAtBottom()
 
             // With the mirrored anchor, a user at the bottom follows new messages
@@ -3636,7 +3710,7 @@ open class ChannelViewController: ViewController,
                     collectionView.reloadDataAndScrollToUnreadSeparator(
                         at: uiPath,
                         separatorHeight: unreadSeparatorHeight,
-                        offsetFromVisualTop: Self.unreadSeparatorScrollOffsetFromTop)
+                        offsetFromOlderEdge: Self.unreadSeparatorScrollOffsetFromTop)
                 } else {
                     collectionView.reloadDataAndScrollTo(
                         indexPath: uiPath,

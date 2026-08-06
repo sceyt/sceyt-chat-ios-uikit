@@ -289,6 +289,18 @@ open class MessageCell: CollectionViewCell,
         }
     }
 
+    /// Which visual edge of the list holds the newest message. Only affects which
+    /// side of the cell the "New messages" separator is pinned to: newer messages
+    /// sit below the anchor cell in `.newestAtBottom` and above it in
+    /// `.newestAtTop`, and the bar always faces them. Assign before `data` — that
+    /// setter rebuilds the constraints.
+    open var messageListOrder: ChannelViewController.MessageListOrder = .newestAtBottom {
+        didSet {
+            guard oldValue != messageListOrder, superview != nil, data != nil else { return }
+            makeConstraints()
+        }
+    }
+
     open var data: MessageLayoutModel! {
         didSet {
             if superview != nil {
@@ -391,14 +403,27 @@ open class MessageCell: CollectionViewCell,
     private func makeConstraints() {
         UIView.performWithoutAnimation {
             NSLayoutConstraint.deactivate(contentConstraints ?? [])
-            contentConstraints = containerView.pin(to: contentView,
-                                                   anchors: [
-                                                    .trailing(-data.contentInsets.right),
-                                                    .top(data.contentInsets.top)
-                                                   ])
-            contentConstraints! += [containerView.bottomAnchor.pin(to: unreadMessagesSeparatorView.topAnchor)]
+            // The "New messages" bar sits on the side of the cell that faces the
+            // newer messages: below the bubble when they are below (mirrored list),
+            // above it when they are above (upright list).
+            if messageListOrder.isMirrored {
+                contentConstraints = containerView.pin(to: contentView,
+                                                       anchors: [
+                                                        .trailing(-data.contentInsets.right),
+                                                        .top(data.contentInsets.top)
+                                                       ])
+                contentConstraints! += [containerView.bottomAnchor.pin(to: unreadMessagesSeparatorView.topAnchor)]
+                contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.bottom(-data.contentInsets.bottom)])
+            } else {
+                contentConstraints = containerView.pin(to: contentView,
+                                                       anchors: [
+                                                        .trailing(-data.contentInsets.right),
+                                                        .bottom(-data.contentInsets.bottom)
+                                                       ])
+                contentConstraints! += [containerView.topAnchor.pin(to: unreadMessagesSeparatorView.bottomAnchor)]
+                contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.top(data.contentInsets.top)])
+            }
             contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.leading(data.contentInsets.left), .trailing(-data.contentInsets.right)])
-            contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.bottom(-data.contentInsets.bottom)])
             contentConstraints! += layoutConstraints(layout: data)
             contentConstraints! += [replyIcon.trailingAnchor.pin(to: contentView.trailingAnchor, constant: 44)]
             contentConstraints! += [replyIcon.bottomAnchor.pin(to: bubbleView.bottomAnchor)]
