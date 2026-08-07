@@ -137,6 +137,31 @@ public extension MessageDatabaseSession {
     }
 }
 
+/// Tracks when a poll's vote state was last changed locally from a direct server ack
+/// (`applyChangedVotes`). Poll snapshots delivered by channel/message syncs carry no usable
+/// `updatedAt`, so a snapshot fetched before the ack can arrive *after* it and clobber the fresher
+/// state — including in the window right after the last pending vote drains, where the
+/// pending-votes guard no longer applies. Snapshot vote data is therefore also ignored for a short
+/// grace period after each locally applied ack.
+enum PollVoteSyncGuard {
+    private static let lock = NSLock()
+    private static var lastLocalApply: [String: Date] = [:]
+    static let gracePeriod: TimeInterval = 10
+
+    static func markApplied(pollId: String) {
+        lock.lock()
+        lastLocalApply[pollId] = Date()
+        lock.unlock()
+    }
+
+    static func isInGracePeriod(pollId: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let appliedAt = lastLocalApply[pollId] else { return false }
+        return Date().timeIntervalSince(appliedAt) < gracePeriod
+    }
+}
+
 extension NSManagedObjectContext: MessageDatabaseSession {
     /// Serial queue to prevent race conditions when adding/deleting reactions concurrently
     private static let reactionQueue = DispatchQueue(label: "com.sceyt.database.reactions", qos: .userInitiated)
@@ -1220,7 +1245,21 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(poll: SceytChat.PollDetails, dto: MessageDTO) -> MessageDTO {
-        let pollDTO = PollDTO.fetchOrCreate(id: poll.id, context: self).map(poll)
+        let pollDTO = PollDTO.fetchOrCreate(id: poll.id, context: self)
+
+        // While pending (locally cast but not yet replayed/acked) votes exist for this poll, a
+        // server snapshot is by definition stale with regard to vote state: it was captured before
+        // the pending votes reached the server. The payload carries no usable `updatedAt` to order
+        // writes by, so applying its votes would clobber fresher local state (resurrect a removed
+        // vote, drop an added one). Keep the local vote state and let the pending-vote replay
+        // reconcile via `applyChangedVotes`; once the pending rows drain, the next snapshot is
+        // applied in full. `PollVoteSyncGuard` extends the same protection for a short grace
+        // period after the last ack, covering snapshots that were already in flight when the
+        // pending rows drained.
+        let preserveLocalVotes = (pollDTO.pendingVotes?.count ?? 0) > 0
+            || PollVoteSyncGuard.isInGracePeriod(pollId: poll.id)
+        let preservedVotesPerOption = pollDTO.votesPerOption
+        _ = pollDTO.map(poll)
         pollDTO.messageTid = dto.tid
         pollDTO.message = dto
 
@@ -1240,45 +1279,50 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         optionsSet.removeAllObjects()
         optionsSet.addObjects(from: optionDTOs)
 
-        // Create or update votes
-        let voteDTOs = poll.votes.map { vote -> PollVoteDTO in
-            let voteDTO = PollVoteDTO.fetchOrCreate(
-                optionId: vote.optionId,
-                userId: vote.user.id,
-                pollId: poll.id,
-                context: self
-            ).map(vote)
-            voteDTO.user = createOrUpdate(user: vote.user)
-            voteDTO.pollDetails = pollDTO
-            return voteDTO
+        if preserveLocalVotes {
+            // `map(poll)` already wrote the snapshot's votesPerOption; restore the local one.
+            pollDTO.votesPerOption = preservedVotesPerOption
+        } else {
+            // Create or update votes
+            let voteDTOs = poll.votes.map { vote -> PollVoteDTO in
+                let voteDTO = PollVoteDTO.fetchOrCreate(
+                    optionId: vote.optionId,
+                    userId: vote.user.id,
+                    pollId: poll.id,
+                    context: self
+                ).map(vote)
+                voteDTO.user = createOrUpdate(user: vote.user)
+                voteDTO.pollDetails = pollDTO
+                return voteDTO
+            }
+
+            // Use mutableOrderedSetValue to safely update the relationship
+            let votesSet = pollDTO.mutableOrderedSetValue(forKey: "votes")
+            votesSet.removeAllObjects()
+            votesSet.addObjects(from: voteDTOs)
+
+            // Create or update own votes
+            let ownVoteDTOs = poll.ownVotes.map { vote -> PollVoteDTO in
+                let voteDTO = PollVoteDTO.fetchOrCreate(
+                    optionId: vote.optionId,
+                    userId: vote.user.id,
+                    pollId: poll.id,
+                    context: self
+                ).map(vote)
+                voteDTO.user = createOrUpdate(user: vote.user)
+                voteDTO.ownPollDetails = pollDTO
+                return voteDTO
+            }
+
+            // Use mutableOrderedSetValue to safely update the relationship
+            let ownVotesSet = pollDTO.mutableOrderedSetValue(forKey: "ownVotes")
+            ownVotesSet.removeAllObjects()
+            ownVotesSet.addObjects(from: ownVoteDTOs)
+
+            let votesPerOption = (poll.votesPerOption as? [String: NSNumber]) ?? [:]
+            pollDTO.votesPerOption = votesPerOption as NSDictionary
         }
 
-        // Use mutableOrderedSetValue to safely update the relationship
-        let votesSet = pollDTO.mutableOrderedSetValue(forKey: "votes")
-        votesSet.removeAllObjects()
-        votesSet.addObjects(from: voteDTOs)
-
-        // Create or update own votes
-        let ownVoteDTOs = poll.ownVotes.map { vote -> PollVoteDTO in
-            let voteDTO = PollVoteDTO.fetchOrCreate(
-                optionId: vote.optionId,
-                userId: vote.user.id,
-                pollId: poll.id,
-                context: self
-            ).map(vote)
-            voteDTO.user = createOrUpdate(user: vote.user)
-            voteDTO.ownPollDetails = pollDTO
-            return voteDTO
-        }
-
-        // Use mutableOrderedSetValue to safely update the relationship
-        let ownVotesSet = pollDTO.mutableOrderedSetValue(forKey: "ownVotes")
-        ownVotesSet.removeAllObjects()
-        ownVotesSet.addObjects(from: ownVoteDTOs)
-
-        var votesPerOption = (poll.votesPerOption as? [String: NSNumber]) ?? [:]
-        pollDTO.votesPerOption = votesPerOption as NSDictionary
-        
         dto.poll = pollDTO
         return dto
     }
@@ -1356,6 +1400,8 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         pollDTO.votesPerOption = votesPerOption as NSDictionary
 
         messageDTO.poll = pollDTO
+        // Shield the state just applied from stale snapshots already in flight.
+        PollVoteSyncGuard.markApplied(pollId: pollDTO.id)
     }
 
     public func deleteExpiredAutoDeleteMessages() {

@@ -199,7 +199,7 @@ public final class SyncService: NSObject {
     public class func makePendingPollVoteOperations(
         completion: @escaping ([PollVoteResendOperation]) -> Void
     ) {
-        var operations = [PollVoteResendOperation]()
+        var operations = [(op: PollVoteResendOperation, createdAt: Int64)]()
         Components.channelMessageProvider
             .fetchPendingPollVotes { pendingVotes in
                 let group = Dictionary(grouping: pendingVotes) { $0.2 } // Group by ChannelId
@@ -217,11 +217,14 @@ public final class SyncService: NSObject {
                                 optionId: optionId,
                                 isAdd: latestVote.0.isAdd
                             )
-                            operations.append(op)
+                            operations.append((op, latestVote.0.createdAt))
                         }
                     }
                 }
-                completion(operations)
+                // Replay in the order the user cast the votes. The queue is serial, so on a
+                // single-vote poll (where the server swaps the vote on every add) the user's most
+                // recent choice is the one that lands last and wins.
+                completion(operations.sorted { $0.createdAt < $1.createdAt }.map(\.op))
             }
     }
 

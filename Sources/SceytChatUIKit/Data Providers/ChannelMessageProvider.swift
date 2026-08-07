@@ -442,13 +442,23 @@ open class ChannelMessageProvider: DataProvider {
                 // Store pending votes for each option
                 if let messageDTO = MessageDTO.fetch(id: messageId, context: $0) {
                     if let userId = SceytChatUIKit.shared.currentUserId, !userId.isEmpty {
-                        // Cancel any existing pending vote for the same option
-                        if let existingPendingVote = PendingVoteDTO.fetch(
+                        let pollDTO = messageDTO.poll ?? PollDTO.fetch(id: pollId, context: $0)
+                        if pollDTO?.allowMultipleVotes == false {
+                            // A single-vote poll carries at most one vote, and the server swaps it
+                            // on every add. A new tap therefore supersedes EVERY stored pending
+                            // vote for this poll, not just the one for the same option — otherwise
+                            // the reconnect replay fires one add per option and whichever lands
+                            // last wins, not the user's last tap.
+                            let context = $0
+                            PendingVoteDTO.fetch(pollId: pollId, userId: userId, context: context)
+                                .forEach { context.delete($0) }
+                        } else if let existingPendingVote = PendingVoteDTO.fetch(
                             pollId: pollId,
                             optionId: optionId,
                             userId: userId,
                             context: $0
                         ) {
+                            // Cancel any existing pending vote for the same option
                             $0.delete(existingPendingVote)
                         }
 
@@ -483,7 +493,15 @@ open class ChannelMessageProvider: DataProvider {
                 }
 
                 guard let changedVotes else {
-                    completion?(error)
+                    // No error and no changed votes: the server accepted the request but the vote
+                    // was already in the target state (e.g. re-adding an option that never got
+                    // removed server-side). Clear the pending row — keeping it would replay this
+                    // no-op on every reconnect and hold the stale-snapshot guard engaged forever.
+                    self.database.write { context in
+                        self.deletePendingVote(pollId: pollId, optionId: optionId, context: context)
+                    } completion: { _ in
+                        completion?(nil)
+                    }
                     return
                 }
                 
@@ -572,7 +590,13 @@ open class ChannelMessageProvider: DataProvider {
                 }
 
                 guard let changedVotes else {
-                    completion?(error)
+                    // No error and no changed votes: the vote was already absent server-side.
+                    // Clear the pending row so it is not replayed on every reconnect.
+                    self.database.write { context in
+                        self.deletePendingVote(pollId: pollId, optionId: optionId, context: context)
+                    } completion: { _ in
+                        completion?(nil)
+                    }
                     return
                 }
 
