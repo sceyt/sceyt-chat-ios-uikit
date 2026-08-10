@@ -879,7 +879,13 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             case "link":
                 // Render like every other reply (sender + body text); use the link's
                 // preview image only as the thumbnail, never replace the reply with a link card.
-                if let metadata = layoutModel.linkPreviews?.first?.metadata {
+                if attachment.imageDecodedMetadata?.hideLinkDetails == true {
+                    // The sender dismissed the preview for this link — the site image must not
+                    // leak back in through the reply thumbnail (and `linkPreviews` is empty for
+                    // such attachments, so without this the metadata fetch below would do
+                    // exactly that). Show the generic link icon instead.
+                    image = appearance.linkPreviewAppearance.placeholderIcon
+                } else if let metadata = layoutModel.linkPreviews?.first?.metadata {
                     image = metadata.image
                 } else if let urlString = attachment.url, let url = URL(string: urlString)?.normalizedURL {
                     // 1. Synchronous in-memory hit → use its image right away.

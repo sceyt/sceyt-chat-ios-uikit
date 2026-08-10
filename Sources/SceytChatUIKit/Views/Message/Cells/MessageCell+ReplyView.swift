@@ -148,7 +148,12 @@ extension MessageCell {
                 if attachment.type == .link {
                     willLoadLinkImage = true
                     imageView.image = Images.replyLinkPlaceholder
-                    if let urlString = attachment.attachment.url,
+                    if attachment.attachment.imageDecodedMetadata?.hideLinkDetails == true {
+                        // The sender disabled the preview for this link, so its site image
+                        // must not resurface here — keep the generic link icon and skip the
+                        // metadata lookup/fetch below entirely.
+                        imageView.image = appearance.linkPreviewAppearance.placeholderIcon ?? Images.replyLinkPlaceholder
+                    } else if let urlString = attachment.attachment.url,
                        let linkUrl = URL(string: urlString) {
                         // Use the same image LinkPreviewView shows
                         if let metadata = LinkMetadataProvider.default.metadata(for: linkUrl) {
