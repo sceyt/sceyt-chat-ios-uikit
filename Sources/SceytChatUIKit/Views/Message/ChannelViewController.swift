@@ -2713,7 +2713,12 @@ open class ChannelViewController: ViewController,
     
     open func edit(layoutModel: MessageLayoutModel) {
         customInputViewController.addEdit(layoutModel: layoutModel)
-        inputTextView.attributedText = layoutModel.attributedView.content
+        // Detected links and phone numbers are styled at render time, not stored
+        // formatting. Handing that styling to the input would make `UserSendMessage`
+        // read the link/phone underline back as a real `.underline` body attribute
+        // and persist it — the number then stays underlined forever, even after the
+        // edit makes it stop being a detectable number ("612345" -> "612345abc").
+        inputTextView.attributedText = attributedTextWithoutDetectionStyling(from: layoutModel)
         UIView.animate(withDuration: 0.25) { [weak self] in
             self?.inputTextView.becomeFirstResponder()
             self?.view.layoutIfNeeded()
@@ -2908,14 +2913,16 @@ open class ChannelViewController: ViewController,
             return
         }
         
-        let attributedText = prepareAttributedTextForCopy(from: layoutModel)
+        let attributedText = attributedTextWithoutDetectionStyling(from: layoutModel)
         copyToPasteboard(attributedText, fallbackText: layoutModel.message.body)
     }
-    
-    /// Prepares attributed text for copying by normalizing colors and removing underlines from URLs
+
+    /// Strips the styling that link/phone detection adds at render time — the link
+    /// color and underline — leaving only the message's real formatting.
+    /// Used wherever the rendered body leaves the message list (copy, edit).
     /// - Parameter layoutModel: The message layout model containing the content
-    /// - Returns: A mutable attributed string ready for copying
-    private func prepareAttributedTextForCopy(from layoutModel: MessageLayoutModel) -> NSMutableAttributedString {
+    /// - Returns: A mutable attributed string carrying no detection styling
+    private func attributedTextWithoutDetectionStyling(from layoutModel: MessageLayoutModel) -> NSMutableAttributedString {
         let attr = layoutModel.attributedView.content.mutableCopy() as! NSMutableAttributedString
 
         // Process links and phone numbers
