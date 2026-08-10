@@ -162,6 +162,33 @@ enum UITestSupport {
         return (delayMs, count, parts.count == 3 && parts[2] == "restart")
     }
 
+    /// `--uitest-poll[=multiple]` — seeds a short conversation whose newest
+    /// message is a poll, so the in-bubble poll view is on screen the moment the
+    /// channel opens. Without the `=multiple` suffix the poll is single-choice
+    /// (`allowMultipleVotes == false`), i.e. at most one option may ever render as
+    /// voted. Implies conversation mode and, since UI-test mode never connects,
+    /// switches poll-vote requests to completing locally
+    /// (`SceytChatUIKit.uiTestPollVotesCompleteLocally`).
+    private static var isPoll: Bool {
+        let arguments = ProcessInfo.processInfo.arguments
+        return arguments.contains("--uitest-poll")
+            || arguments.contains { $0.hasPrefix("--uitest-poll=") }
+    }
+
+    private static var pollAllowsMultipleVotes: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-poll=multiple")
+    }
+
+    /// `--uitest-poll-double-vote=<gapMs>` — installs a floating button
+    /// (`uitest.pollDoubleVote`) that, on tap, votes for the FIRST poll option and
+    /// then, `gapMs` milliseconds later, for the SECOND one: the "tap option 1,
+    /// immediately change to option 2" gesture, at a gap XCUITest cannot deliver
+    /// itself. On commit the button stamps the number of dispatched votes into its
+    /// `accessibilityValue`, so the test can tell a real run from a swallowed tap.
+    private static var pollDoubleVoteGapMs: Int? {
+        launchArgumentValue("--uitest-poll-double-vote")
+    }
+
     /// `--uitest-web-sync-seeded=<count>` — bakes the Web-sent outgoing run
     /// into the seeded conversation itself, between the last-read message and
     /// the unread incoming tail — a cold start whose server sync completed
@@ -205,7 +232,16 @@ enum UITestSupport {
         guard isActive else { return }
         #if DEBUG
         SceytChatUIKit.shared.startUITestSession()
-        if isConversation || isConversationUnread || conversationUnreadCountOverride != nil {
+        if isPoll {
+            // No live connection here, so a vote request never comes back; without
+            // this the in-flight guard would swallow every tap after the first and
+            // a *changed* vote could not be driven at all.
+            SceytChatUIKit.uiTestPollVotesCompleteLocally = true
+            seedPollConversation()
+            if let gapMs = pollDoubleVoteGapMs {
+                installFloatingPollDoubleVoteInjector(gapMs: gapMs)
+            }
+        } else if isConversation || isConversationUnread || conversationUnreadCountOverride != nil {
             seedConversation()
             if isInjectionEnabled {
                 installFloatingConversationInjector()
@@ -408,6 +444,89 @@ enum UITestSupport {
                 unreadCount: isConversationUnread ? 3 : 0,
                 lastDisplayedMessageId: isConversationUnread ? conversationMessageId(16) : 0
             )
+        }
+    }
+
+    // MARK: - Poll conversation (test-only, gated behind --uitest-poll)
+
+    static let pollId = "uitest-poll-1"
+    static let pollQuestion = "Which option do you pick?"
+    /// Option bodies in row order. Mirrored in the UI-test bundle
+    /// (`ChannelScreen.Conversation.pollOptionTexts`).
+    static let pollOptionTexts = ["First option", "Second option", "Third option"]
+    /// The poll message: newest in the seeded conversation, so it is on screen the
+    /// moment the channel opens.
+    static var pollMessageId: UInt64 { conversationMessageId(20) }
+
+    static func pollOptionId(_ index: Int) -> String { "uitest-poll-option-\(index)" }
+
+    /// A short history plus a poll as the newest message. The poll starts with no
+    /// votes at all, so a test can watch the very first vote land — and, for a
+    /// single-choice poll, watch it *move* when the user changes their mind.
+    private static func seedPollConversation() {
+        SceytChatUIKit.shared.seedChannelsForUITests([
+            .init(id: conversationChannelId, subject: conversationSubject)
+        ])
+        var messages = Array(conversationMessages.prefix(5))
+        messages.append(
+            .init(id: pollMessageId,
+                  body: pollQuestion,
+                  incoming: true,
+                  senderId: "bob",
+                  senderName: "Bob",
+                  poll: .init(
+                      id: pollId,
+                      question: pollQuestion,
+                      options: pollOptionTexts.enumerated().map { index, text in
+                          .init(id: pollOptionId(index), text: text)
+                      },
+                      allowMultipleVotes: pollAllowsMultipleVotes,
+                      // Anonymous, so no voter avatars render and the whole option
+                      // row votes on tap — the poll's vote state is the only thing
+                      // the test has to reason about.
+                      anonymous: true))
+        )
+        SceytChatUIKit.shared.seedMessagesForUITests(
+            channelId: conversationChannelId,
+            messages: messages
+        )
+    }
+
+    /// Button-tap entry point for `--uitest-poll-double-vote=<gapMs>`: votes for the
+    /// first option, then for the second one `gapMs` later, and stamps how many of
+    /// the two votes were actually dispatched into the button's accessibility value
+    /// so the test can reject a vacuous run.
+    static func performPollDoubleVoteFromButton() {
+        guard let gapMs = pollDoubleVoteGapMs else { return }
+        SceytChatUIKit.shared.performUITestPollVotes(
+            optionIndexes: [0, 1],
+            gapMs: gapMs
+        ) { dispatched in
+            findWindowButton(identifier: "uitest.pollDoubleVote")?
+                .accessibilityValue = "\(dispatched)"
+        }
+    }
+
+    /// A third floating, window-level button (below the web-sync injector's spot)
+    /// that fires the rapid vote change. Present only with
+    /// `--uitest-poll-double-vote=<gapMs>`.
+    private static func installFloatingPollDoubleVoteInjector(gapMs: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let windows = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+            guard let window = windows.first(where: { $0.isKeyWindow }) ?? windows.first
+            else { return }
+            let button = UIButton(type: .system)
+            button.setTitle("⇄", for: .normal)
+            button.accessibilityIdentifier = "uitest.pollDoubleVote"
+            button.backgroundColor = .systemPink
+            button.frame = CGRect(x: 0, y: window.safeAreaInsets.top + 56, width: 44, height: 44)
+            button.layer.zPosition = .greatestFiniteMagnitude
+            button.addTarget(UITestMessageInjector.shared,
+                             action: #selector(UITestMessageInjector.pollDoubleVote),
+                             for: .touchUpInside)
+            window.addSubview(button)
         }
     }
 
@@ -743,6 +862,10 @@ final class UITestMessageInjector: NSObject {
 
     @objc func injectWebSync() {
         UITestSupport.performWebSyncFromButton()
+    }
+
+    @objc func pollDoubleVote() {
+        UITestSupport.performPollDoubleVoteFromButton()
     }
 }
 #endif

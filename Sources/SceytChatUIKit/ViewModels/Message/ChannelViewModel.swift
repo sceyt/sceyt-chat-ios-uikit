@@ -2051,6 +2051,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             // Clear pending state when request completes
             self?.pendingPollVotes[layoutModel.message.id] = false
         }
+
+        releasePendingPollVoteGuardIfUITesting(messageId: layoutModel.message.id)
+    }
+
+    /// UI-test hook: the deterministic test session never connects, so the vote
+    /// request above never completes and the guard would swallow every later tap.
+    /// See `SceytChatUIKit.uiTestPollVotesCompleteLocally`.
+    private func releasePendingPollVoteGuardIfUITesting(messageId: MessageId) {
+        #if DEBUG
+        guard SceytChatUIKit.uiTestPollVotesCompleteLocally else { return }
+        pendingPollVotes[messageId] = false
+        #endif
     }
 
     open func deletePollVote(
@@ -2085,6 +2097,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             // Clear pending state when request completes
             self?.pendingPollVotes[layoutModel.message.id] = false
         }
+
+        releasePendingPollVoteGuardIfUITesting(messageId: layoutModel.message.id)
     }
 
     open func retractPollVote(

@@ -58,6 +58,7 @@
 		AA11BB22CC33DD44EE55FF01 /* ChannelUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF02 /* ChannelUITests.swift */; };
 		AA11BB22CC33DD44EE55FF03 /* ChannelOpenPositionUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF04 /* ChannelOpenPositionUITests.swift */; };
 		AA11BB22CC33DD44EE55FF05 /* ChannelMultiDeviceSyncUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF06 /* ChannelMultiDeviceSyncUITests.swift */; };
+		AA11BB22CC33DD44EE55FF07 /* ChannelPollVoteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB22CC33DD44EE55FF08 /* ChannelPollVoteUITests.swift */; };
 		ED1046B72E1933AE001294FA /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED1046B62E1933AE001294FA /* SceytChatUIKit */; };
 		ED2CBA082E018007001C5468 /* SceytChatUIKit in Frameworks */ = {isa = PBXBuildFile; productRef = ED2CBA072E018007001C5468 /* SceytChatUIKit */; };
 		EDC887682E01C1A00077B1B2 /* Constraints+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDC887672E01C1980077B1B2 /* Constraints+Extensions.swift */; };
@@ -122,6 +123,7 @@
 		AA11BB22CC33DD44EE55FF02 /* ChannelUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChannelUITests.swift; sourceTree = "<group>"; };
 		AA11BB22CC33DD44EE55FF04 /* ChannelOpenPositionUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChannelOpenPositionUITests.swift; sourceTree = "<group>"; };
 		AA11BB22CC33DD44EE55FF06 /* ChannelMultiDeviceSyncUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChannelMultiDeviceSyncUITests.swift; sourceTree = "<group>"; };
+		AA11BB22CC33DD44EE55FF08 /* ChannelPollVoteUITests.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChannelPollVoteUITests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -256,6 +258,7 @@
 				AA11BB22CC33DD44EE55FF02 /* ChannelUITests.swift */,
 				AA11BB22CC33DD44EE55FF04 /* ChannelOpenPositionUITests.swift */,
 				AA11BB22CC33DD44EE55FF06 /* ChannelMultiDeviceSyncUITests.swift */,
+				AA11BB22CC33DD44EE55FF08 /* ChannelPollVoteUITests.swift */,
 			);
 			name = SceytDemoAppUITests;
 			path = SceytDemoAppUITests;
@@ -460,6 +463,7 @@
 				AA11BB22CC33DD44EE55FF01 /* ChannelUITests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF03 /* ChannelOpenPositionUITests.swift in Sources */,
 				AA11BB22CC33DD44EE55FF05 /* ChannelMultiDeviceSyncUITests.swift in Sources */,
+				AA11BB22CC33DD44EE55FF07 /* ChannelPollVoteUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

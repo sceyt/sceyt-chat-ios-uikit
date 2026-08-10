@@ -11,6 +11,7 @@
 #if DEBUG
 import CoreData
 import Foundation
+import UIKit
 import SceytChat
 
 extension SceytChatUIKit {
@@ -64,6 +65,59 @@ extension SceytChatUIKit {
         }
     }
 
+    /// One option of a seeded poll (see `UITestPollSeed`).
+    public struct UITestPollOptionSeed {
+
+        public var id: String
+        public var text: String
+        /// Server-side vote count for this option (`votesPerOption`).
+        public var voteCount: Int
+        /// Seeds a *server-confirmed* own vote on this option (`PollDTO.ownVotes`),
+        /// i.e. the state after the current user already voted and the server
+        /// acknowledged it — not a pending/optimistic vote.
+        public var votedByMe: Bool
+
+        public init(id: String, text: String, voteCount: Int = 0, votedByMe: Bool = false) {
+            self.id = id
+            self.text = text
+            self.voteCount = voteCount
+            self.votedByMe = votedByMe
+        }
+    }
+
+    /// A declarative description of a poll to attach to a seeded message, so the
+    /// in-bubble poll view renders with no network. Set `allowMultipleVotes` to
+    /// `false` for a single-choice poll — the shape where at most one option may
+    /// ever show as voted.
+    public struct UITestPollSeed {
+
+        public var id: String
+        public var question: String
+        /// Options in display order; the array index is the option's row index in
+        /// the rendered poll (`sceyt_chat_channel_message_cell_poll_option.<index>`).
+        public var options: [UITestPollOptionSeed]
+        public var allowMultipleVotes: Bool
+        public var anonymous: Bool
+        public var allowVoteRetract: Bool
+        public var closed: Bool
+
+        public init(id: String,
+                    question: String,
+                    options: [UITestPollOptionSeed],
+                    allowMultipleVotes: Bool = false,
+                    anonymous: Bool = true,
+                    allowVoteRetract: Bool = true,
+                    closed: Bool = false) {
+            self.id = id
+            self.question = question
+            self.options = options
+            self.allowMultipleVotes = allowMultipleVotes
+            self.anonymous = anonymous
+            self.allowVoteRetract = allowVoteRetract
+            self.closed = closed
+        }
+    }
+
     /// A declarative description of a single message to seed into a channel for
     /// UI tests of the open-channel (conversation) screen.
     public struct UITestMessageSeed {
@@ -87,6 +141,10 @@ extension SceytChatUIKit {
         /// date-separator boundary in the message list. Later messages must keep
         /// later dates or the visual order changes.
         public var createdAt: Date?
+        /// When set, the message becomes a poll message (`type == "poll"`) and
+        /// renders the in-bubble poll view instead of a text bubble. `body` is
+        /// still stored (the real send path puts the question there too).
+        public var poll: UITestPollSeed?
 
         public init(
             id: MessageId,
@@ -96,7 +154,8 @@ extension SceytChatUIKit {
             senderName: String? = nil,
             deliveryStatus: ChatMessage.DeliveryStatus = .displayed,
             parentId: MessageId? = nil,
-            createdAt: Date? = nil
+            createdAt: Date? = nil,
+            poll: UITestPollSeed? = nil
         ) {
             self.id = id
             self.body = body
@@ -106,6 +165,7 @@ extension SceytChatUIKit {
             self.deliveryStatus = deliveryStatus
             self.parentId = parentId
             self.createdAt = createdAt
+            self.poll = poll
         }
     }
 
@@ -390,7 +450,7 @@ extension SceytChatUIKit {
                 let date = seed.createdAt ?? baseDate.addingTimeInterval(TimeInterval(index))
                 let message = MessageDTO.fetchOrCreate(id: seed.id, tid: 0, context: context)
                 message.body = seed.body
-                message.type = "text"
+                message.type = seed.poll != nil ? "poll" : "text"
                 message.channelId = Int64(channelId)
                 message.incoming = seed.incoming
                 message.state = 0 // ChatMessage.State.none
@@ -406,6 +466,9 @@ extension SceytChatUIKit {
                 if let parentId = seed.parentId {
                     message.parent = created[parentId]
                 }
+                if let pollSeed = seed.poll {
+                    self.createUITestPoll(pollSeed, on: message, context: context)
+                }
                 created[seed.id] = message
                 newestMessage = message
             }
@@ -415,6 +478,182 @@ extension SceytChatUIKit {
                 channelDTO.lastDisplayedMessageId = Int64(lastDisplayedMessageId)
             }
         }
+    }
+
+    // MARK: - Poll seeding (test-only)
+
+    /// Builds the `PollDTO` graph a poll message needs and attaches it to `message`,
+    /// mirroring what `MessageDatabaseSession.createOrUpdate(poll:dto:)` writes when
+    /// a real poll arrives — options in an ordered set (their order is the rendered
+    /// row order), per-option counts in `votesPerOption`, and server-confirmed own
+    /// votes in `ownVotes`.
+    ///
+    /// Any pending (unsent) votes left over from an earlier launch are dropped, so
+    /// a seeded poll always starts from the state the seed describes.
+    private func createUITestPoll(_ seed: UITestPollSeed,
+                                  on message: MessageDTO,
+                                  context: NSManagedObjectContext) {
+        let timestamp = Int64(Self.uiTestMessageSeedBaseDate.timeIntervalSince1970)
+
+        let pollDTO = PollDTO.fetchOrCreate(id: seed.id, context: context)
+        pollDTO.name = seed.question
+        pollDTO.pollDescription = ""
+        pollDTO.anonymous = seed.anonymous
+        pollDTO.allowMultipleVotes = seed.allowMultipleVotes
+        pollDTO.allowVoteRetract = seed.allowVoteRetract
+        pollDTO.closed = seed.closed
+        pollDTO.closedAt = 0
+        pollDTO.createdAt = timestamp
+        pollDTO.updatedAt = timestamp
+        pollDTO.messageTid = message.tid
+        pollDTO.message = message
+
+        // A previous launch may have left pending votes on this poll id; they would
+        // render as an already-cast optimistic vote.
+        (pollDTO.pendingVotes?.allObjects as? [PendingVoteDTO])?.forEach { context.delete($0) }
+
+        let options = pollDTO.mutableOrderedSetValue(forKey: "options")
+        options.removeAllObjects()
+        var counts: [String: NSNumber] = [:]
+        for optionSeed in seed.options {
+            let optionDTO = PollOptionDTO.fetchOrCreate(
+                id: optionSeed.id,
+                pollId: seed.id,
+                context: context
+            )
+            optionDTO.name = optionSeed.text
+            optionDTO.poll = pollDTO
+            options.add(optionDTO)
+            counts[optionSeed.id] = NSNumber(value: optionSeed.voteCount)
+        }
+        pollDTO.votesPerOption = counts as NSDictionary
+
+        let ownVotes = pollDTO.mutableOrderedSetValue(forKey: "ownVotes")
+        ownVotes.removeAllObjects()
+        if let currentUserId = SceytChatUIKit.shared.currentUserId, !currentUserId.isEmpty {
+            for optionSeed in seed.options where optionSeed.votedByMe {
+                let voteDTO = PollVoteDTO.fetchOrCreate(
+                    optionId: optionSeed.id,
+                    userId: currentUserId,
+                    pollId: seed.id,
+                    context: context
+                )
+                voteDTO.createdAt = timestamp
+                voteDTO.user = context.createOrUpdate(
+                    user: ChatUser(id: currentUserId, firstName: "Me")
+                )
+                voteDTO.ownPollDetails = pollDTO
+                ownVotes.add(voteDTO)
+            }
+        }
+
+        message.poll = pollDTO
+    }
+
+    // MARK: - Poll voting (test-only)
+
+    /// When `true`, `ChannelViewModel.addPollVote` / `deletePollVote` release their
+    /// in-flight guard as soon as the pending-vote row is stored, instead of when
+    /// the server round trip returns.
+    ///
+    /// UI-test mode never connects, so that round trip never completes and the
+    /// guard would swallow every tap after the first — which makes a *changed*
+    /// vote impossible to drive. With this on, the app behaves as it does when the
+    /// first request has already come back (offline error or no-op ack): the
+    /// pending row stays in the database and the next tap is accepted.
+    ///
+    /// UI-test only.
+    public static var uiTestPollVotesCompleteLocally = false
+
+    /// Fires poll-option taps on the poll message currently on screen in the open
+    /// conversation, `gapMs` milliseconds apart, through the same
+    /// `ChannelViewController.didTapPollOption` entry point a real tap reaches — so
+    /// the in-flight guard, the optimistic update notification and the cell's
+    /// animated refresh all run exactly as they do for a user.
+    ///
+    /// XCUITest cannot reliably deliver two taps inside the sub-second window a
+    /// "quickly change my vote" gesture spans (it waits for app quiescence between
+    /// events, and the poll cell animates on every vote), so tests drive the
+    /// sequence from here instead.
+    ///
+    /// `completion` reports how many taps were actually dispatched: a test asserts
+    /// on that first, so a swallowed tap surfaces as a harness failure instead of
+    /// letting the real assertion pass vacuously.
+    ///
+    /// UI-test only.
+    public func performUITestPollVotes(optionIndexes: [Int],
+                                       gapMs: Int,
+                                       completion: @escaping (Int) -> Void) {
+        var dispatched = 0
+
+        func fire(_ remaining: ArraySlice<Int>) {
+            guard let index = remaining.first else {
+                completion(dispatched)
+                return
+            }
+            if tapUITestPollOption(at: index) {
+                dispatched += 1
+            }
+            let rest = remaining.dropFirst()
+            guard !rest.isEmpty else {
+                completion(dispatched)
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(gapMs)) {
+                fire(rest)
+            }
+        }
+
+        fire(optionIndexes[...])
+    }
+
+    /// Taps one option of the visible poll message. Returns `false` when there is
+    /// nothing to tap (no open conversation, no poll on screen, bad index) — the
+    /// caller reports that count so a test never mistakes "nothing happened" for
+    /// "the app behaved correctly".
+    private func tapUITestPollOption(at index: Int) -> Bool {
+        guard let viewController = uiTestChannelViewController(),
+              let cell = viewController.collectionView.visibleCells
+                  .compactMap({ $0 as? MessageCell })
+                  .first(where: { $0.data?.message.poll != nil }),
+              let layoutModel = cell.data,
+              // The poll view model the cell currently renders — the same value a
+              // real tap hands to the view controller, pending votes included.
+              let pollViewModel = cell.pollView.pollViewModel,
+              index >= 0, index < pollViewModel.options.count
+        else { return false }
+
+        viewController.didTapPollOption(
+            layoutModel: layoutModel,
+            optionIndex: index,
+            pollViewModel: pollViewModel
+        )
+        return true
+    }
+
+    /// The `ChannelViewController` currently in the window hierarchy, if any.
+    private func uiTestChannelViewController() -> ChannelViewController? {
+        func find(_ viewController: UIViewController) -> ChannelViewController? {
+            if let channel = viewController as? ChannelViewController { return channel }
+            if let presented = viewController.presentedViewController,
+               let found = find(presented) {
+                return found
+            }
+            if let navigation = viewController as? UINavigationController {
+                for child in navigation.viewControllers.reversed() {
+                    if let found = find(child) { return found }
+                }
+            }
+            for child in viewController.children {
+                if let found = find(child) { return found }
+            }
+            return nil
+        }
+        return UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .compactMap { $0.rootViewController.flatMap(find) }
+            .first
     }
 }
 #endif

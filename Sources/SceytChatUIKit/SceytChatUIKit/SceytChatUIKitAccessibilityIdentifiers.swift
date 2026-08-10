@@ -145,6 +145,12 @@ extension SceytChatUIKit {
                 public static let linkPreview = "sceyt_chat_channel_message_cell_link_preview"
                 /// The in-bubble poll view.
                 public static let poll = "sceyt_chat_channel_message_cell_poll"
+                /// A single option row inside the in-bubble poll view, suffixed
+                /// with the option's zero-based index — e.g.
+                /// `sceyt_chat_channel_message_cell_poll_option.0`. The row's
+                /// `accessibilityValue` mirrors its checkbox: `voted` when the
+                /// current user's vote sits on this option, `not_voted` otherwise.
+                public static let pollOption = "sceyt_chat_channel_message_cell_poll_option"
                 /// The reactions summary strip.
                 public static let reactions = "sceyt_chat_channel_message_cell_reactions"
                 /// The "forwarded from" header.

@@ -142,6 +142,8 @@ extension MessageCell {
         ) -> PollOptionView {
             let tapGesture = UITapGestureRecognizer(target: self, action: #selector(optionTapped(_:)))
             let optionView = PollOptionView()
+            optionView.accessibilityIdentifier =
+                "\(SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.pollOption).\(index)"
             optionView.viewModel = option
             optionView.addGestureRecognizer(tapGesture)
             optionView.tag = index

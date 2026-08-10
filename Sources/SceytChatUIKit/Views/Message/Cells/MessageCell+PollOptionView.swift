@@ -9,7 +9,12 @@ import UIKit
 
 extension MessageCell {
     open class PollOptionView: View, MessageCellMeasurable {
-        
+
+        /// `accessibilityValue` of an option the current user's vote sits on.
+        public static let votedAccessibilityValue = "voted"
+        /// `accessibilityValue` of an option the current user has not voted for.
+        public static let notVotedAccessibilityValue = "not_voted"
+
         // MARK: - UI Components
         open lazy var checkboxView = {
             $0.contentInsets = .zero
@@ -54,6 +59,12 @@ extension MessageCell {
         
         private var optionLabelLeadingConstraint: NSLayoutConstraint?
         private var avatarViews: [UIView] = []
+        /// Set by `updateViewModel` for the single `configure()` pass it triggers,
+        /// so a freshly-added voter's avatar pops in instead of appearing abruptly.
+        private var animatesVoterAvatarsOnNextConfigure = false
+        /// Identifies the in-flight vote-count animation, so the completion of a
+        /// superseded one leaves the label to whichever update owns it now.
+        private var voteCountAnimation = 0
 
         open var onAvatarsTapped: (() -> Void)?
         open var onOptionTapped: (() -> Void)?
@@ -79,6 +90,15 @@ extension MessageCell {
         
         open override func setup() {
             super.setup()
+            // `CheckBoxView` toggles its own `isSelected` on touch, and nothing here
+            // listens for that — a tap landing on the radio would fill it in without
+            // a vote being cast, which then sticks for as long as the app has no
+            // reason to re-render the row (a rejected or in-flight vote). The row's
+            // tap gesture is the only thing allowed to move this state, exactly as
+            // in the other model-driven check boxes (`SelectableUserCell`,
+            // `SelectableChannelCell`, the media picker cell). Taps still reach the
+            // row, so the radio remains a valid place to press.
+            checkboxView.isUserInteractionEnabled = false
             addSubview(checkboxView)
             addSubview(optionLabel)
             addSubview(votersContainerView)
@@ -169,6 +189,13 @@ extension MessageCell {
             progressBar.setProgress(viewModel.progress, animated: false)
             checkboxView.isSelected = viewModel.isSelected
             checkboxView.isHidden = viewModel.isClosed
+            // Exposes the rendered vote state to assistive tech and to UI tests.
+            // Deliberately assigned right next to `checkboxView.isSelected`, so it
+            // travels the same code path the user-visible checkbox does — a test
+            // reading it sees exactly what is on screen, stale updates included.
+            accessibilityValue = viewModel.isSelected
+                ? PollOptionView.votedAccessibilityValue
+                : PollOptionView.notVotedAccessibilityValue
             votersStackView.isHidden = viewModel.isAnonymous
 
             // Update option label leading constraint when checkbox is hidden
@@ -182,8 +209,11 @@ extension MessageCell {
             votersStackView.removeArrangedSubviews()
             avatarViews.removeAll()
             if !viewModel.isAnonymous {
-                createVoterAvatars(voters: viewModel.voters, appearance: appearance)
+                createVoterAvatars(voters: viewModel.voters,
+                                   appearance: appearance,
+                                   animated: animatesVoterAvatarsOnNextConfigure)
             }
+            animatesVoterAvatarsOnNextConfigure = false
         }
 
         /// Animate progress bar with a nice scale effect
@@ -199,57 +229,87 @@ extension MessageCell {
             }
         }
 
-        /// Update view model with animations
+        /// Update view model with animations.
+        ///
+        /// The new model is adopted *before* anything animates, so `configure()`
+        /// renders it in full right away. Nothing that runs later may write state
+        /// derived from `newViewModel`: an animation started here can still be in
+        /// flight when the next update lands (voting, then changing that vote a
+        /// moment later, is a couple of hundred milliseconds of work), and a
+        /// completion block holding the older model would put the row back to a
+        /// state the user has already moved on from — e.g. re-checking the option
+        /// they just switched away from, so a single-choice poll ends up showing
+        /// two votes. Completions below therefore only ever read the *current*
+        /// `viewModel`, and each animation is superseded by the next one.
         func updateViewModel(_ newViewModel: PollOptionViewModel) {
             guard let oldViewModel = viewModel else {
                 viewModel = newViewModel
-                configure()
                 return
             }
 
             let oldVoteCount = oldViewModel.voteCount
-            let oldIsSelected = oldViewModel.isSelected
+            let oldProgress = oldViewModel.progress
+            // Animate the avatar in only when this option gains exactly one vote
+            // (0->1, 1->2, …); `configure()` consumes the flag as it rebuilds them.
+            animatesVoterAvatarsOnNextConfigure =
+                (newViewModel.voteCount == oldVoteCount + 1) && !newViewModel.isAnonymous
 
-            // Animate vote count change with smooth transition
+            viewModel = newViewModel
+
             if oldVoteCount != newViewModel.voteCount {
-                let isIncreasing = newViewModel.voteCount > oldVoteCount
-                let translationDistance: CGFloat = 12.0
+                animateVoteCountChange(increasing: newViewModel.voteCount > oldVoteCount,
+                                       from: oldVoteCount)
+            }
+            if oldProgress != newViewModel.progress {
+                animateProgressChange(from: oldProgress, to: newViewModel.progress)
+            }
+        }
 
-                let exitTransform = CGAffineTransform(translationX: 0, y: isIncreasing ? -translationDistance : translationDistance)
-                let enterTransform = CGAffineTransform(translationX: 0, y: isIncreasing ? translationDistance : -translationDistance)
+        /// Slides the old vote count out and the new one in. `configure()` has
+        /// already put the new count on screen, so the label is rewound to
+        /// `oldCount` for the exit leg; the entering text is read back from the
+        /// current view model, which may by then be newer than the count that
+        /// started this animation.
+        private func animateVoteCountChange(increasing: Bool, from oldCount: Int) {
+            let translationDistance: CGFloat = 12.0
+            let exitTransform = CGAffineTransform(translationX: 0, y: increasing ? -translationDistance : translationDistance)
+            let enterTransform = CGAffineTransform(translationX: 0, y: increasing ? translationDistance : -translationDistance)
 
-                UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseInOut], animations: {
-                    self.voteCountLabel.transform = exitTransform
-                    self.voteCountLabel.alpha = 0.0
-                }) { _ in
-                    self.voteCountLabel.text = String(newViewModel.voteCount)
-                    self.voteCountLabel.transform = enterTransform
-                    self.voteCountLabel.alpha = 0.0
+            voteCountAnimation += 1
+            let animation = voteCountAnimation
 
-                    UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.3, options: [.curveEaseOut]) {
-                        self.voteCountLabel.transform = .identity
-                        self.voteCountLabel.alpha = 1.0
-                    }
-                    
-                    self.viewModel = newViewModel
+            voteCountLabel.text = String(oldCount)
+            voteCountLabel.transform = .identity
+            voteCountLabel.alpha = 1.0
+
+            UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseInOut], animations: {
+                self.voteCountLabel.transform = exitTransform
+                self.voteCountLabel.alpha = 0.0
+            }) { _ in
+                // A newer update already owns the label; it will finish the job.
+                guard animation == self.voteCountAnimation else { return }
+
+                self.voteCountLabel.text = String(self.viewModel?.voteCount ?? oldCount)
+                self.voteCountLabel.transform = enterTransform
+                self.voteCountLabel.alpha = 0.0
+
+                UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.3, options: [.curveEaseOut]) {
+                    self.voteCountLabel.transform = .identity
+                    self.voteCountLabel.alpha = 1.0
                 }
-            } else {
-                voteCountLabel.text = String(newViewModel.voteCount)
-                viewModel = newViewModel
             }
+        }
 
-            // Animate progress bar with custom faster duration
+        /// Fills the bar from the previous share of the votes to the new one.
+        /// `configure()` has already set the new progress, so the bar is rewound
+        /// (outside the animation) and then animated forward again.
+        private func animateProgressChange(from oldProgress: Float, to newProgress: Float) {
+            progressBar.setProgress(oldProgress, animated: false)
+            progressBar.layoutIfNeeded()
+
             UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut]) {
-                self.progressBar.setProgress(newViewModel.progress, animated: false)
+                self.progressBar.setProgress(newProgress, animated: false)
                 self.progressBar.layoutIfNeeded()
-            }
-
-            // Animate voter avatars only when vote count increases by 1 (0->1, 1->2, etc.)
-            let shouldAnimateAvatars = (newViewModel.voteCount == oldVoteCount + 1) && !newViewModel.isAnonymous
-            votersStackView.removeArrangedSubviews()
-            avatarViews.removeAll()
-            if !newViewModel.isAnonymous {
-                createVoterAvatars(voters: newViewModel.voters, appearance: appearance, animated: shouldAnimateAvatars)
             }
         }
 
