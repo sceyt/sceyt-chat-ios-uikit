@@ -141,8 +141,9 @@ public extension MessageDatabaseSession {
 /// (`applyChangedVotes`). Poll snapshots delivered by channel/message syncs carry no usable
 /// `updatedAt`, so a snapshot fetched before the ack can arrive *after* it and clobber the fresher
 /// state — including in the window right after the last pending vote drains, where the
-/// pending-votes guard no longer applies. Snapshot vote data is therefore also ignored for a short
-/// grace period after each locally applied ack.
+/// pending-votes guard no longer applies. The snapshot's OWN-vote data is therefore merged
+/// (other users' votes applied, own votes kept local) for a short grace period after each
+/// locally applied ack.
 enum PollVoteSyncGuard {
     private static let lock = NSLock()
     private static var lastLocalApply: [String: Date] = [:]
@@ -1248,17 +1249,20 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         let pollDTO = PollDTO.fetchOrCreate(id: poll.id, context: self)
 
         // While pending (locally cast but not yet replayed/acked) votes exist for this poll, a
-        // server snapshot is by definition stale with regard to vote state: it was captured before
-        // the pending votes reached the server. The payload carries no usable `updatedAt` to order
-        // writes by, so applying its votes would clobber fresher local state (resurrect a removed
-        // vote, drop an added one). Keep the local vote state and let the pending-vote replay
-        // reconcile via `applyChangedVotes`; once the pending rows drain, the next snapshot is
-        // applied in full. `PollVoteSyncGuard` extends the same protection for a short grace
-        // period after the last ack, covering snapshots that were already in flight when the
-        // pending rows drained.
-        let preserveLocalVotes = (pollDTO.pendingVotes?.count ?? 0) > 0
+        // server snapshot is stale with regard to the CURRENT user's vote state: it was captured
+        // before the pending votes reached the server. The payload carries no usable `updatedAt`
+        // to order writes by, so applying its own-vote data would clobber fresher local state
+        // (resurrect a removed vote, drop an added one). Other users' votes in the snapshot are
+        // NOT affected by the pending rows — they are strictly newer information than what is
+        // stored locally, and no later snapshot is guaranteed to arrive once the guard
+        // disengages — so they must be applied, not dropped. Hence: merge. Own-vote state stays
+        // local (the pending-vote replay reconciles it via `applyChangedVotes`), other users'
+        // votes come from the snapshot, and the counts are rebuilt from the snapshot with the
+        // server's own-vote contribution replaced by the local one. `PollVoteSyncGuard` extends
+        // the same protection for a short grace period after the last ack, covering snapshots
+        // that were already in flight when the pending rows drained.
+        let preserveLocalOwnVotes = (pollDTO.pendingVotes?.count ?? 0) > 0
             || PollVoteSyncGuard.isInGracePeriod(pollId: poll.id)
-        let preservedVotesPerOption = pollDTO.votesPerOption
         _ = pollDTO.map(poll)
         pollDTO.messageTid = dto.tid
         pollDTO.message = dto
@@ -1279,9 +1283,45 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         optionsSet.removeAllObjects()
         optionsSet.addObjects(from: optionDTOs)
 
-        if preserveLocalVotes {
-            // `map(poll)` already wrote the snapshot's votesPerOption; restore the local one.
-            pollDTO.votesPerOption = preservedVotesPerOption
+        let currentUserId = SceytChatUIKit.shared.currentUserId
+
+        if preserveLocalOwnVotes {
+            // Merge: other users' votes from the snapshot, own votes from local state.
+            let otherUsersVotes = poll.votes.filter { $0.user.id != currentUserId }
+            let voteDTOs = otherUsersVotes.map { vote -> PollVoteDTO in
+                let voteDTO = PollVoteDTO.fetchOrCreate(
+                    optionId: vote.optionId,
+                    userId: vote.user.id,
+                    pollId: poll.id,
+                    context: self
+                ).map(vote)
+                voteDTO.user = createOrUpdate(user: vote.user)
+                voteDTO.pollDetails = pollDTO
+                return voteDTO
+            }
+            let votesSet = pollDTO.mutableOrderedSetValue(forKey: "votes")
+            votesSet.removeAllObjects()
+            votesSet.addObjects(from: voteDTOs)
+
+            // `ownVotes` is intentionally left untouched: local state is fresher than the
+            // snapshot while pending votes exist / the grace period is active.
+
+            // Counts: snapshot counts minus the server's view of own votes, plus the local one.
+            // `map(poll)` already wrote the raw snapshot counts; overwrite with the merged ones.
+            var mergedCounts = ((poll.votesPerOption as? [String: NSNumber]) ?? [:])
+                .mapValues(\.intValue)
+            let serverOwnOptionIds = poll.ownVotes.map(\.optionId)
+            let localOwnOptionIds = (pollDTO.ownVotes?.array as? [PollVoteDTO])?.map(\.optionId) ?? []
+            for optionId in serverOwnOptionIds {
+                mergedCounts[optionId] = max(0, (mergedCounts[optionId] ?? 0) - 1)
+            }
+            for optionId in localOwnOptionIds {
+                mergedCounts[optionId] = (mergedCounts[optionId] ?? 0) + 1
+            }
+            let merged = mergedCounts
+                .filter { $0.value > 0 }
+                .mapValues { NSNumber(value: $0) }
+            pollDTO.votesPerOption = merged as NSDictionary
         } else {
             // Create or update votes
             let voteDTOs = poll.votes.map { vote -> PollVoteDTO in
