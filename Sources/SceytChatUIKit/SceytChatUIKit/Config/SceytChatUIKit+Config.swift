@@ -97,7 +97,7 @@ extension SceytChatUIKit {
         public var mentionTriggerPrefix: String = "@"
         public var preventDuplicateAttachmentUpload: Bool = false
         public var messageBubbleTransformScale = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        public var defaultReactions = ["👍", "😍", "❤️", "🤝", "😂", "😏"]
+        public var defaultReactions = ["👍", "😍", "❤", "🤝", "😂", "😏"]
         public var voiceRecorderConfig: VoiceRecorderConfig = .init()
     }
 }
