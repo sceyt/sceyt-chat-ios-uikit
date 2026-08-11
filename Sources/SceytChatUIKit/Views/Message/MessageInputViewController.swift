@@ -479,7 +479,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     open func update(height: CGFloat) {
         guard view.bounds.height > 0, inputTextView.bounds.height > 0
         else { return }
-        var updateHeight = CGFloat(Int(height + view.bounds.height - inputTextView.bounds.height))
+        // Round up, never down: truncating leaves the container up to a point
+        // shorter than the text view's content, which makes the text view
+        // scrollable by a fraction of a point even though the text visually fits.
+        var updateHeight = ceil(height + view.bounds.height - inputTextView.bounds.height)
         if updateHeight < style.preferredMinHeight {
             updateHeight = style.preferredMinHeight
         } else if updateHeight > style.preferredMaxHeight {
