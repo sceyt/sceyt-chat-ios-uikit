@@ -103,6 +103,42 @@ extension MessageCell {
             progressView.parentAppearance = appearance.overlayMediaLoaderAppearance
         }
         
+        /// Paints a thumbnail that arrived outside the bind path (a transfer completing, an
+        /// async load landing). Subclasses override to apply their own rules about what the
+        /// slot may show. The default keeps the historical behaviour of ignoring a nil value
+        /// rather than clearing whatever is on screen.
+        open func applyThumbnail(_ thumbnail: UIImage?) {
+            guard let thumbnail else { return }
+            imageView.image = thumbnail
+        }
+
+        /// Whether this view's `imageView` is a slot that holds (or will hold) a real preview,
+        /// and so should carry the placeholder background while that preview is missing.
+        /// True for image/video; `AttachmentFileView` widens it to previewable documents.
+        open var showsMediaPlaceholderBackground: Bool {
+            guard let data else { return false }
+            return data.type == .image || data.type == .video
+        }
+
+        /// Fills the media slot with the reply-preview bubble color so the translucent loader
+        /// always has something to sit on. Without it, an attachment whose sender shipped no
+        /// thumbHash in metadata (older clients) has no preview to show — the icon provider
+        /// returns nil for image/video — so the slot is transparent and the only thing on
+        /// screen is the loader's own dark disc floating over the bubble. Harmless once a
+        /// thumbnail exists: `imageView` is `.scaleAspectFill` + `clipsToBounds`, so the
+        /// image covers the color completely. Always assigns (clearing when not applicable)
+        /// so a reused cell cannot keep a previous binding's color.
+        open func updateThumbnailPlaceholderBackground() {
+            guard showsMediaPlaceholderBackground, let data else {
+                imageView.backgroundColor = nil
+                return
+            }
+            let incoming = data.ownerMessage?.incoming ?? true
+            imageView.backgroundColor = incoming
+                ? appearance.incomingReplyBackgroundColor
+                : appearance.outgoingReplyBackgroundColor
+        }
+
         open func setupPreviewer() {
             guard (data.type == .image || data.type == .video)
             else { return }
@@ -252,9 +288,11 @@ extension MessageCell {
         /// the duplicate-`AttachmentLayout`-instance routing problem where the download completion /
         /// observer fan-out updates a different layout instance than the one bound to the visible
         /// cell, which would otherwise leave the cell on the blurry thumbHash placeholder.
-        /// No-op for non image/video attachments (their imageView is an icon, not a photo).
+        /// No-op for voice/link attachments (their imageView is an icon, not a photo). File
+        /// attachments are included: previewable documents (image/video files) get an on-disk
+        /// thumbnail after download and need the same blurred→sharp recovery.
         open func reloadThumbnailFromFile(for attachment: ChatMessage.Attachment, retriesLeft: Int = 2) {
-            guard let data, data.type == .image || data.type == .video else { return }
+            guard let data, data.type == .image || data.type == .video || data.type == .file else { return }
             let preferred = data.thumbnailSize == .zero
                 ? MessageLayoutModel.defaults.imageAttachmentSize
                 : data.thumbnailSize
@@ -332,9 +370,12 @@ extension MessageCell {
                     }
                     self?.data.update(attachment: done.attachment)
                     DispatchQueue.main.async {
-                        if let thumbnail = self?.data?.thumbnail {
-                            self?.imageView.image = thumbnail
-                        }
+                        // Via applyThumbnail, not a direct assignment: subclasses have their own
+                        // rules for what may be painted. A previewable file with no thumbHash
+                        // resolves `data.thumbnail` to the generic file icon here, and painting
+                        // it would flash that icon between the loader disappearing and the sharp
+                        // preview arriving from reloadThumbnailFromFile just below.
+                        self?.applyThumbnail(self?.data?.thumbnail)
                         self?.update(status: done.attachment.status)
                         self?.setCompletion(done)
                         if done.error == nil {

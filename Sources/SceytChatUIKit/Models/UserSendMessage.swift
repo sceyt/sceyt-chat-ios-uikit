@@ -201,6 +201,23 @@ public struct AttachmentModel {
             ).build() {
                 builder.metadata(json)
             }
+        } else if type == .file, imageWidth > 0, imageHeight > 0 {
+            // Previewable document (image/video sent as a file): ship a thumbHash so the
+            // receiver renders a blurred placeholder until the download finishes — same
+            // mechanism as image/video attachments. imageWidth/Height > 0 marks that a
+            // real preview was extracted in init(fileUrl:).
+            let tm = Components
+                .imageBuilder.init(image: thumbnail)
+                .thumbHashBase64()
+
+            if let json = ChatMessage.Attachment.Metadata<String>(
+                width: imageWidth,
+                height: imageHeight,
+                thumbnail: tm ?? "",
+                duration: duration
+            ).build() {
+                builder.metadata(json)
+            }
         } else if type == .voice {
             let targetCount = 50
             if let json = ChatMessage.Attachment.Metadata<[Int]>(
@@ -316,7 +333,20 @@ public struct AttachmentModel {
         name = url.lastPathComponent
         isLocalFile = true
         type = .file
-        thumbnail = .messageFile
+        // Extract a real preview for previewable documents (image/video files) so the
+        // sender's cell shows it from the very start and a thumbHash of it travels in
+        // the attachment metadata for the receiver's blurred placeholder.
+        if fileUrl.isImage, let image = UIImage(contentsOfFile: fileUrl.path) {
+            thumbnail = image
+            imageWidth = Int(image.size.width)
+            imageHeight = Int(image.size.height)
+        } else if fileUrl.isVideo, let image = Components.videoProcessor.copyFrame(url: fileUrl) {
+            thumbnail = image
+            imageWidth = Int(image.size.width)
+            imageHeight = Int(image.size.height)
+        } else {
+            thumbnail = .messageFile
+        }
         fileSize = Components.storage.sizeOfItem(at: url)
     }
     

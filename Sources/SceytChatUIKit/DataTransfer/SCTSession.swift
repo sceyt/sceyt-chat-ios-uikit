@@ -143,8 +143,13 @@ open class SCTSession: NSObject, SCTDataSession {
                 image = UIImage(contentsOfFile: path)
             } else if attachment.type == "video" {
                 image = Components.videoProcessor.copyFrame(url: URL(fileURLWithPath: path))
-            } else if attachment.type == "file", URL(fileURLWithPath: path).isImage {
-                image = UIImage(contentsOfFile: path)
+            } else if attachment.type == "file" {
+                let fileURL = URL(fileURLWithPath: path)
+                if fileURL.isImage {
+                    image = UIImage(contentsOfFile: path)
+                } else if fileURL.isVideo {
+                    image = Components.videoProcessor.copyFrame(url: fileURL)
+                }
             }
             if let image,
                let ib = try? Components.imageBuilder.init(image: image).resize(max: newSize.maxSide),

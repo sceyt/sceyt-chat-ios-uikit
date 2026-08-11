@@ -47,7 +47,7 @@ extension MessageCell {
             blurEffectView.clipsToBounds = true
 
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
-            progressView.backgroundColor = .black.withAlphaComponent(0.3)
+            progressView.backgroundColor = appearance.overlayMediaLoaderAppearance.backgroundColor
         }
 
         override open func setupLayout() {
@@ -85,6 +85,7 @@ extension MessageCell {
             didSet {
                 setupPreviewer()
                 filePath = data.attachment.filePath
+                updateThumbnailPlaceholderBackground()
                 imageView.image = data.thumbnail
 
                 // Show/hide blur and fire icon based on viewOnce

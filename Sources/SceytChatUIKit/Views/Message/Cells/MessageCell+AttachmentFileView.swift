@@ -33,7 +33,7 @@ extension MessageCell {
             sizeLabel.font = appearance.attachmentFileSizeLabelAppearance.font
             sizeLabel.textColor = appearance.attachmentFileSizeLabelAppearance.foregroundColor
 
-            progressView.backgroundColor = appearance.mediaLoaderAppearance.backgroundColor
+            updateProgressViewBackground()
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
 
             playButton.image = .videoPlayerPlay
@@ -64,14 +64,73 @@ extension MessageCell {
             playButton.resize(anchors: [.height(24.0), .width(24.0)])
         }
 
+        /// Nil-safe: these are reached from `setupAppearance()`, which runs before `data` is
+        /// ever bound (`data` is implicitly unwrapped, so a plain access would trap there).
         private var isVideoFile: Bool {
-            URL(fileURLWithPath: data.attachment.name ?? "").isVideo
+            URL(fileURLWithPath: data?.attachment.name ?? "").isVideo
         }
-        
+
+        private var isImageFile: Bool {
+            URL(fileURLWithPath: data?.attachment.name ?? "").isImage
+        }
+
+        /// A document that carries a real preview (image/video sent as a file), as opposed to
+        /// a pdf/zip/etc. whose icon slot only ever holds the generic file-type icon.
+        private var isPreviewableFile: Bool {
+            isImageFile || isVideoFile
+        }
+
+        /// True when the icon slot currently has a real preview to draw — either the sharp
+        /// on-disk thumbnail or the blurred thumbHash placeholder decoded from metadata.
+        /// False for a previewable document whose sender shipped no thumbHash (older clients)
+        /// until its download lands, which is exactly when the placeholder background shows.
+        private var showsPreviewImage: Bool {
+            guard let data, isPreviewableFile else { return false }
+            if data.isThumbnailLoadedFromFile { return true }
+            guard let metadata = data.attachment.imageDecodedMetadata else { return false }
+            return metadata.thumbnailImage != nil || !metadata.thumbnail.isEmpty
+        }
+
+        /// Previewable documents get the media placeholder background, so their slot reads like
+        /// an image attachment's rather than flashing the generic file puck before the preview
+        /// arrives. Plain files (pdf/zip/…) keep the icon and need no background behind it.
+        open override var showsMediaPlaceholderBackground: Bool {
+            isPreviewableFile
+        }
+
+        /// The loader fills the whole 40×40 icon slot, so an opaque background would hide what
+        /// is underneath it for the entire transfer — and, since an undownloaded attachment
+        /// sits in `.pauseDownloading` with the circle still visible, before the download even
+        /// starts. Use the translucent overlay the image/video views use for any previewable
+        /// document — including one with no thumbHash, where it sits over the placeholder
+        /// background. Keep the solid accent puck for plain files, where it covers nothing but
+        /// the generic icon.
+        private func updateProgressViewBackground() {
+            progressView.backgroundColor = isPreviewableFile
+                ? appearance.overlayMediaLoaderAppearance.backgroundColor
+                : appearance.mediaLoaderAppearance.backgroundColor
+        }
+
+        /// Paints the icon slot. A previewable document shows only a real preview — never the
+        /// generic file puck, which is an opaque accent circle that would hide the placeholder
+        /// background and then jump to a photo once the download lands. Note the layout model
+        /// resolves `data.thumbnail` to that same icon when no preview is available, so this
+        /// deliberately drops it rather than passing it through.
+        open override func applyThumbnail(_ thumbnail: UIImage?) {
+            if isPreviewableFile {
+                imageView.image = showsPreviewImage ? (thumbnail ?? data.thumbnail) : nil
+            } else {
+                imageView.image = thumbnail ?? data.thumbnail
+                    ?? appearance.attachmentIconProvider.provideVisual(for: data.attachment)
+            }
+            updateThumbnailPlaceholderBackground()
+            updateProgressViewBackground()
+        }
+
         open override func update(status: ChatMessage.Attachment.TransferStatus) {
             super.update(status: status)
             if data.transferStatus == .done {
-                if data.thumbnail != nil && isVideoFile {
+                if imageView.image != nil && isVideoFile {
                     playButton.isHidden = false
                 }
             }
@@ -80,27 +139,34 @@ extension MessageCell {
         open override var data: MessageLayoutModel.AttachmentLayout! {
             didSet {
                 playButton.isHidden = true
-                if data.transferStatus == .done {
-                    imageView.image = data.thumbnail ?? appearance.attachmentIconProvider.provideVisual(for: data.attachment)
-                    if data.thumbnail != nil && isVideoFile {
-                        playButton.isHidden = false
-                    }
-                } else {
-                    imageView.image = appearance.attachmentIconProvider.provideVisual(for: data.attachment)
+                // Show whatever preview the layout resolved: the sharp on-disk one when the
+                // file is local/downloaded, or the blurred thumbHash placeholder decoded from
+                // metadata while the upload/download is still in flight. The play button stays
+                // gated on .done — the blurred placeholder is not playable.
+                applyThumbnail(nil)
+                if data.transferStatus == .done, imageView.image != nil, isVideoFile {
+                    playButton.isHidden = false
                 }
                 titleLabel.text = data.name
                 sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
 
                 // The file-preview thumbnail is loaded asynchronously (and re-loaded after a
-                // download completes), so at bind time — and right after a first download —
-                // data.thumbnail may still be the default icon. Without this hook the sharp
-                // preview lands on the layout but never reaches the cell until the screen
-                // is reopened.
+                // download completes), so at bind time data.thumbnail may still be nil or the
+                // blurred metadata placeholder. Without this hook the blurred/sharp preview
+                // lands on the layout but never reaches the cell until the screen is reopened.
                 data.onLoadThumbnail = { [weak self, weak data] thumbnail in
                     guard let self, let data, self.data === data else { return }
-                    guard data.transferStatus == .done else { return }
-                    self.imageView.image = thumbnail ?? self.appearance.attachmentIconProvider.provideVisual(for: data.attachment)
-                    self.playButton.isHidden = !(thumbnail != nil && self.isVideoFile)
+                    // A file-backed load flips showsPreviewImage for a document with no
+                    // metadata thumbHash (older messages), so re-run the whole paint.
+                    self.applyThumbnail(thumbnail)
+                    self.playButton.isHidden = !(self.imageView.image != nil && self.isVideoFile && data.transferStatus == .done)
+                }
+
+                // Self-heal for "blurred placeholder stays after download" — same recovery the
+                // image/video views use. Only for previewable documents; other files have no
+                // on-disk thumbnail to load, so the retry loop would be wasted work.
+                if data.transferStatus == .done, !data.isThumbnailLoadedFromFile, isPreviewableFile {
+                    reloadThumbnailFromFile(for: data.attachment)
                 }
             }
         }

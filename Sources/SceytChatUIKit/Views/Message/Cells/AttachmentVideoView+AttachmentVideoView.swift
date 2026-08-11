@@ -58,7 +58,7 @@ extension MessageCell {
             blurEffectView.clipsToBounds = true
 
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
-            progressView.backgroundColor = .black.withAlphaComponent(0.3)
+            progressView.backgroundColor = appearance.overlayMediaLoaderAppearance.backgroundColor
 
             playButton.image = appearance.videoPlayIcon
             timeLabel.backgroundColor = appearance.overlayColor
@@ -102,6 +102,7 @@ extension MessageCell {
         override open var data: MessageLayoutModel.AttachmentLayout! {
             didSet {
                 setupPreviewer()
+                updateThumbnailPlaceholderBackground()
                 let duration = data.mediaDuration
                 if duration >= 0 {
                     timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)

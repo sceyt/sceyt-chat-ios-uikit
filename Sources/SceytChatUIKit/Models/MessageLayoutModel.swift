@@ -1382,7 +1382,18 @@ extension MessageLayoutModel {
                     }
                 }
                 if resultThumbnail == nil {
-                    resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                    // Same blurred-placeholder path as image/video: previewable documents carry
+                    // a thumbHash in metadata; decode it until the sharp on-disk thumbnail
+                    // exists (pre-download on the receiver, mid-upload on the sender).
+                    let metadata = attachment.imageDecodedMetadata
+                    if let data = metadata?.thumbnailImage {
+                        resultThumbnail = data
+                    } else if let base64 = metadata?.thumbnail,
+                              let image = Components.imageBuilder.image(thumbHash: base64) {
+                        resultThumbnail = image
+                    } else {
+                        resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                    }
                 }
             case .link:
                 if resultThumbnail == nil {
