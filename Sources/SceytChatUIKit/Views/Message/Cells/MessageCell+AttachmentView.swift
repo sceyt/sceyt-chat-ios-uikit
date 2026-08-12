@@ -9,6 +9,89 @@
 import SceytChat
 import UIKit
 
+/// De-duplicates on-disk thumbnail reloads across every attachment view in the app.
+///
+/// A reload is keyed by attachment identity + the size it is being generated for, so
+/// the same attachment consumed at two design sizes (message bubble vs reply preview)
+/// still gets one load each. Two things are suppressed:
+///
+/// - **Concurrent duplicates.** A reload only clears `isThumbnailLoadedFromFile` once it
+///   lands, so every bind in between would otherwise start its own — and each one can be a
+///   full-size decode + resize + JPEG encode. Scrolling a screenful of file messages fanned
+///   this out across a dozen threads.
+/// - **Hot retries of a hopeless attachment.** A file with no derivable preview fails every
+///   time; the cooldown stops each subsequent bind from paying for that discovery again.
+enum ThumbnailReloadGate {
+    /// How long a failed reload is suppressed before another bind may retry it.
+    static var failureCooldown: TimeInterval = 30
+
+    private static let lock = NSLock()
+    private static var inFlight = Set<String>()
+    private static var cooldownUntil = [String: CFAbsoluteTime]()
+
+    static func key(attachment: ChatMessage.Attachment, size: CGSize) -> String {
+        "\(identity(of: attachment))@\(Int(size.width))x\(Int(size.height))"
+    }
+
+    /// Includes the location alongside id/tid: a locally-built attachment can carry
+    /// id 0 and tid 0, and two of those must not share one ticket.
+    private static func identity(of attachment: ChatMessage.Attachment) -> String {
+        "\(attachment.id).\(attachment.tid).\(attachment.url ?? attachment.filePath ?? "")"
+    }
+
+    /// Claims the right to run a reload for `key`. False means one is already running, or
+    /// the last one failed recently enough that retrying now would just burn CPU again.
+    static func begin(_ key: String) -> Bool {
+        let now = CFAbsoluteTimeGetCurrent()
+        lock.lock()
+        defer { lock.unlock() }
+        if inFlight.contains(key) { return false }
+        if let until = cooldownUntil[key] {
+            if until > now { return false }
+            cooldownUntil[key] = nil
+        }
+        inFlight.insert(key)
+        return true
+    }
+
+    /// Releases the ticket without recording a failure — the work never got to run
+    /// (the view died or was rebound), so the next bind deserves a fresh attempt.
+    static func cancel(_ key: String) {
+        lock.lock()
+        inFlight.remove(key)
+        lock.unlock()
+    }
+
+    static func end(_ key: String, succeeded: Bool) {
+        lock.lock()
+        inFlight.remove(key)
+        if succeeded {
+            cooldownUntil[key] = nil
+        } else {
+            cooldownUntil[key] = CFAbsoluteTimeGetCurrent() + failureCooldown
+        }
+        lock.unlock()
+    }
+
+    /// Drops all suppression. Call when something has changed on disk that could make a
+    /// previously-failing attachment succeed (a download completing, a cache purge).
+    static func reset() {
+        lock.lock()
+        inFlight.removeAll()
+        cooldownUntil.removeAll()
+        lock.unlock()
+    }
+
+    /// Clears suppression for one attachment, at every size it may have been generated for.
+    static func invalidate(attachment: ChatMessage.Attachment) {
+        let prefix = "\(identity(of: attachment))@"
+        lock.lock()
+        inFlight = inFlight.filter { !$0.hasPrefix(prefix) }
+        cooldownUntil = cooldownUntil.filter { !$0.key.hasPrefix(prefix) }
+        lock.unlock()
+    }
+}
+
 extension MessageCell {
     open class AttachmentView: View, AttachmentSharpThumbnailObserver {
         public lazy var appearance = Components.messageCell.appearance {
@@ -291,12 +374,24 @@ extension MessageCell {
         /// No-op for voice/link attachments (their imageView is an icon, not a photo). File
         /// attachments are included: previewable documents (image/video files) get an on-disk
         /// thumbnail after download and need the same blurred→sharp recovery.
-        open func reloadThumbnailFromFile(for attachment: ChatMessage.Attachment, retriesLeft: Int = 2) {
+        public static let thumbnailReloadRetryCount = 2
+
+        open func reloadThumbnailFromFile(for attachment: ChatMessage.Attachment, retriesLeft: Int = thumbnailReloadRetryCount) {
             guard let data, data.type == .image || data.type == .video || data.type == .file else { return }
             let preferred = data.thumbnailSize == .zero
                 ? MessageLayoutModel.defaults.imageAttachmentSize
                 : data.thumbnailSize
-            DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+            // Only the outermost call takes the gate; the delayed retries below run under the
+            // ticket it already holds. Without it every bind of the same attachment — i.e.
+            // every scroll pass over it — starts another full thumbnail generation, because
+            // the layout only flips to `isThumbnailLoadedFromFile` once one of them lands.
+            let gateKey = ThumbnailReloadGate.key(attachment: attachment, size: preferred)
+            let isRetry = retriesLeft < Self.thumbnailReloadRetryCount
+            if !isRetry, !ThumbnailReloadGate.begin(gateKey) { return }
+            // `.utility`, not `.userInteractive`: this can be a full-size decode + resize +
+            // JPEG encode. At userInteractive it competes with the render loop for CPU on
+            // exactly the frames the user is scrolling, which is what it was doing.
+            DispatchQueue.global(qos: .utility).async { [weak self] in
                 guard let path = fileProvider.thumbnailFile(for: attachment, preferred: preferred),
                       let image = UIImage(contentsOfFile: path)
                 else {
@@ -308,12 +403,14 @@ extension MessageCell {
                     // a successful sibling load is harmless.
                     guard retriesLeft > 0 else {
                         logger.debug("[Attachment] reloadThumbnailFromFile gave up, no thumbnail yet \(attachment.description)")
+                        ThumbnailReloadGate.end(gateKey, succeeded: false)
                         return
                     }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
                         guard let self, let layout = self.data, layout.attachment == attachment
                         else {
                             logger.verbose("[Attachment] reloadThumbnailFromFile retry dropped — view died or rebound \(attachment.description)")
+                            ThumbnailReloadGate.cancel(gateKey)
                             return
                         }
                         self.reloadThumbnailFromFile(for: attachment, retriesLeft: retriesLeft - 1)
@@ -321,6 +418,7 @@ extension MessageCell {
                     return
                 }
                 DispatchQueue.main.async { [weak self] in
+                    ThumbnailReloadGate.end(gateKey, succeeded: true)
                     guard let self, let layout = self.data, layout.attachment == attachment
                     else {
                         logger.verbose("[Attachment] reloadThumbnailFromFile apply dropped — view died or rebound \(attachment.description)")
@@ -329,6 +427,35 @@ extension MessageCell {
                     layout.setFileBackedThumbnail(image)
                 }
             }
+        }
+
+        /// Clears the transfer visuals left behind by the attachment this view was previously
+        /// bound to. Only needed when a recycled view is handed a *different* attachment —
+        /// otherwise an in-flight ring (or its pending shrink-out) from the old one bleeds
+        /// onto the new one for a frame.
+        open func prepareForRebind() {
+            pendingHideWorkItem?.cancel()
+            pendingHideWorkItem = nil
+            lastAttachmentTransferProgress = nil
+            progressView.transform = .identity
+            pauseButton.transform = .identity
+            // Assigning `progress` installs a strokeEnd animation from the old value, so the
+            // reset has to happen with actions off and the animation cleared afterwards —
+            // otherwise recycling a view mid-transfer plays its ring rewinding to empty.
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            progressView.progress = 0
+            progressView.progressLayer.removeAnimation(forKey: "animateprogress")
+            progressView.layer.removeAllAnimations()
+            pauseButton.layer.removeAllAnimations()
+            CATransaction.commit()
+            progressView.isHidden = true
+            progressView.isHiddenProgress = false
+            progressLabel.isHidden = true
+            progressLabel.text = nil
+            pauseButton.isHidden = true
+            imageView.image = nil
+            imageView.backgroundColor = nil
         }
 
         open func setProgressHandler() {
@@ -379,6 +506,10 @@ extension MessageCell {
                         self?.update(status: done.attachment.status)
                         self?.setCompletion(done)
                         if done.error == nil {
+                            // The bytes just landed on disk, so a reload that failed before the
+                            // download (nothing to derive a preview from) can now succeed — lift
+                            // its cooldown rather than making the user wait it out.
+                            ThumbnailReloadGate.invalidate(attachment: done.attachment)
                             self?.reloadThumbnailFromFile(for: done.attachment)
                         }
                     }

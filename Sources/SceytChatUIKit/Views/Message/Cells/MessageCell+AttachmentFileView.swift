@@ -8,6 +8,39 @@
 
 import UIKit
 
+/// Extension → "is this previewable" lookup, memoized.
+///
+/// Resolving it goes through two `UTType` round-trips (extension → MIME → UTI → conformance),
+/// and `AttachmentFileView` asks the question about half a dozen times per bind — from
+/// `applyThumbnail`, `showsPreviewImage`, `showsMediaPlaceholderBackground` and
+/// `updateProgressViewBackground`. The answer depends only on the file extension, so the
+/// whole app needs to resolve any given one once.
+enum AttachmentFileKind {
+    struct Kind {
+        let isImage: Bool
+        let isVideo: Bool
+        var isPreviewable: Bool { isImage || isVideo }
+    }
+
+    private static let lock = NSLock()
+    private static var cache = [String: Kind]()
+
+    static func kind(ofFileNamed name: String?) -> Kind {
+        let ext = ((name ?? "") as NSString).pathExtension.lowercased()
+        lock.lock()
+        let cached = cache[ext]
+        lock.unlock()
+        if let cached { return cached }
+
+        let url = URL(fileURLWithPath: "file.\(ext)")
+        let kind = Kind(isImage: url.isImage, isVideo: url.isVideo)
+        lock.lock()
+        cache[ext] = kind
+        lock.unlock()
+        return kind
+    }
+}
+
 extension MessageCell {
 
     open class AttachmentFileView: AttachmentView {
@@ -66,18 +99,22 @@ extension MessageCell {
 
         /// Nil-safe: these are reached from `setupAppearance()`, which runs before `data` is
         /// ever bound (`data` is implicitly unwrapped, so a plain access would trap there).
+        private var fileKind: AttachmentFileKind.Kind {
+            AttachmentFileKind.kind(ofFileNamed: data?.attachment.name)
+        }
+
         private var isVideoFile: Bool {
-            URL(fileURLWithPath: data?.attachment.name ?? "").isVideo
+            fileKind.isVideo
         }
 
         private var isImageFile: Bool {
-            URL(fileURLWithPath: data?.attachment.name ?? "").isImage
+            fileKind.isImage
         }
 
         /// A document that carries a real preview (image/video sent as a file), as opposed to
         /// a pdf/zip/etc. whose icon slot only ever holds the generic file-type icon.
         private var isPreviewableFile: Bool {
-            isImageFile || isVideoFile
+            fileKind.isPreviewable
         }
 
         /// True when the icon slot currently has a real preview to draw — either the sharp

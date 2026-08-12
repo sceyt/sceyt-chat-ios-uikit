@@ -127,20 +127,33 @@ extension MessageCell {
         }
 
         /// The current subviews, if and only if they can represent `layouts` by rebinding:
-        /// same count and, pairwise, the same attachment identity, type, and thumbnail size
-        /// (the height constraint was pinned to it at creation). Anything else — including
-        /// a cell reused for a different message — falls back to a full rebuild.
+        /// same count and, pairwise, the same type and thumbnail size (the height constraint
+        /// was pinned to it at creation).
+        ///
+        /// A *file* view may be rebound to a different attachment — a file row paints every
+        /// pixel it owns from the new layout, so recycling it is safe, and it saves rebuilding
+        /// six subviews and twelve constraints for every file cell the user scrolls past.
+        /// Media and voice views still require attachment identity: they carry playback and
+        /// preview state that a rebind does not fully reset.
         private func rebindableAttachmentViews(for layouts: [MessageLayoutModel.AttachmentLayout]) -> [AttachmentView]? {
             let views = subviews.compactMap { $0 as? AttachmentView }
             guard views.count == subviews.count,
                   views.count == layouts.count
             else { return nil }
             for (av, layout) in zip(views, layouts) {
-                guard let bound = av.data,
-                      bound.attachment == layout.attachment,
-                      bound.type == layout.type,
-                      bound.thumbnailSize == layout.thumbnailSize
+                guard let bound = av.data, bound.type == layout.type
                 else { return nil }
+                if layout.type == .file, av is AttachmentFileView {
+                    // Only the height was baked into a constraint; a file row's width comes
+                    // from the stack view (and so from the bubble, which the cell re-lays out
+                    // for every binding), so it does not have to match to recycle the view.
+                    guard bound.thumbnailSize.height == layout.thumbnailSize.height
+                    else { return nil }
+                } else {
+                    guard bound.attachment == layout.attachment,
+                          bound.thumbnailSize == layout.thumbnailSize
+                    else { return nil }
+                }
             }
             return views
         }
@@ -167,6 +180,11 @@ extension MessageCell {
         }
 
         private func bind(layout: MessageLayoutModel.AttachmentLayout, to av: AttachmentView) {
+            // Recycled onto a different attachment: drop the previous one's transfer visuals
+            // so its progress ring (or a pending shrink-out) cannot bleed into this binding.
+            if let bound = av.data, bound.attachment != layout.attachment {
+                av.prepareForRebind()
+            }
             av.data = layout
             av.setProgressHandler()
             switch layout.transferStatus {

@@ -6,6 +6,7 @@
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
+import ImageIO
 import SceytChat
 import UIKit
 
@@ -133,6 +134,17 @@ open class SCTSession: NSObject, SCTDataSession {
         return nil
     }
     
+    /// True when `path` holds an image whose data is complete and decodable, checked from the
+    /// container's header rather than by decoding the pixels. Catches the truncated/partial
+    /// JPEG that a cached thumbnail write could leave behind, at a fraction of the cost.
+    static func isCompleteImageFile(at path: String) -> Bool {
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, options),
+              CGImageSourceGetCount(source) > 0
+        else { return false }
+        return CGImageSourceGetStatus(source) == .statusComplete
+    }
+
     open func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
         let scale = UIScreen.main.traitCollection.displayScale
         let newSize = CGSize(width: size.width * scale, height: size.height * scale)
@@ -180,7 +192,10 @@ open class SCTSession: NSObject, SCTDataSession {
                 // Validate the cached thumbnail actually decodes. A legacy truncated/partial JPEG
                 // would otherwise be handed back to every reader forever (and a retry just keeps
                 // getting the same undecodable path) — evict it and fall through to regenerate.
-                if UIImage(contentsOfFile: thumbnailPath) != nil {
+                // Header-only via ImageIO: the caller decodes this file itself immediately after,
+                // so fully decoding it here just to throw the pixels away doubled the cost of
+                // every cached-thumbnail lookup — on the hot path of every file-cell bind.
+                if Self.isCompleteImageFile(at: thumbnailPath) {
                     logger.debug("[thumbnail] found file \(attachment.type)")
                     return thumbnailPath
                 }

@@ -1273,17 +1273,27 @@ extension MessageLayoutModel {
             attachment.name ?? ((attachment.url ?? attachment.filePath) as NSString?)?.lastPathComponent ?? ""
         }
         
-        open func fileSize(using formatter: any UIntFormatting) -> String {
-            let fileSize: UInt
+        /// Memoized because the fallback branch is a `stat` on the main thread, and the file
+        /// cell asks for it on every bind — i.e. once per file row per scroll pass. Cleared
+        /// by `update(attachment:)`, which is the only thing that can change the answer.
+        @Atomic private var cachedFileSizeBytes: UInt?
+
+        open var fileSizeBytes: UInt {
+            if let cachedFileSizeBytes { return cachedFileSizeBytes }
+            let resolved: UInt
             if attachment.uploadedFileSize > 0 {
-                fileSize = attachment.uploadedFileSize
+                resolved = attachment.uploadedFileSize
             } else if let filePath = attachment.filePath {
-                fileSize = Components.storage.sizeOfItem(at: filePath)
+                resolved = Components.storage.sizeOfItem(at: filePath)
             } else {
-                fileSize = 0
+                resolved = 0
             }
-            
-            return formatter.format(UInt64(fileSize))
+            cachedFileSizeBytes = resolved
+            return resolved
+        }
+
+        open func fileSize(using formatter: any UIntFormatting) -> String {
+            formatter.format(UInt64(fileSizeBytes))
         }
         
         @Atomic private var isLoadedThumbnail: Bool = false
@@ -1444,6 +1454,7 @@ extension MessageLayoutModel {
         
         open func update(attachment: ChatMessage.Attachment) {
             self.attachment = attachment
+            cachedFileSizeBytes = nil
             if !isThumbnailLoadedFromFile {
                 isLoadedThumbnail = false
                 DispatchQueue.global(qos: .userInteractive).async { [weak self] in
@@ -1532,8 +1543,13 @@ extension MessageLayoutModel {
                     of: name,
                     config: config).textSize.width
                 config.font = appearance.attachmentFileSizeLabelAppearance.font
+                // Widest thing the size label ever shows: the mid-transfer
+                // "<downloaded> • <total>" form that `setProgress` writes.
+                // (This used to interpolate the `fileSize(using:)` *method*, so every file
+                // bubble was measured against the literal string "(Function) • (Function)".)
+                let formattedSize = fileSize(using: appearance.attachmentFileSizeFormatter)
                 var sizeWidth = TextSizeMeasure.calculateSize(
-                    of: "\(fileSize) • \(fileSize)",
+                    of: "\(formattedSize) • \(formattedSize)",
                     config: config).textSize.width
                 if let ownerChannel, let ownerMessage {
                     sizeWidth += MessageCell.InfoView.measure(channel: ownerChannel, message: ownerMessage, appearance: MessageCell.appearance).width
