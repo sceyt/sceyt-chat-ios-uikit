@@ -908,6 +908,21 @@ public extension MessageCell {
         public static var checkBoxPadding: CGFloat = 10
         public static var horizontalPadding: CGFloat = 12
         public static var attachmentIconSize: CGFloat = 40
+        /// The file row's icon/preview slot. Separate from `attachmentIconSize` (still the
+        /// voice row's play button) because a previewable document shows a real thumbnail there.
+        public static var attachmentFileIconSize: CGFloat = 48
+        /// Inset around that slot, measured from the *bubble's* edge — leading, and (via the row
+        /// height) top and bottom. The gap to the name/size labels and their trailing inset stay
+        /// `horizontalPadding`.
+        public static var attachmentFilePadding: CGFloat = 8
+        /// Diameter of the transfer loader drawn over that slot. Smaller than the slot, so a
+        /// previewable document stays partly visible while it downloads.
+        public static var attachmentFileProgressSize: CGFloat = 40
+        /// How far the attachment stack sits inside the bubble on its top and sides; at its
+        /// bottom the stack is flush with the bubble. Mirrors the literals in the `.file` branch
+        /// of Incoming/OutgoingMessageCell, and is what `attachmentFilePadding` is measured
+        /// against: a file row's own insets are this much smaller on the sides it applies to.
+        static var attachmentStackBubbleInset: CGFloat = 2
         public static var cornerRadius: CGFloat = 8
     }
 }

@@ -1151,7 +1151,10 @@ public extension MessageLayoutModel {
         public var messageSenderNameWidth = CGFloat(170)
         public var imageAttachmentSize  = CGSize(width: 260, height: 200)
         public var imageRepliedAttachmentSize  = CGSize(width: 40, height: 40)
-        public var fileAttachmentSize   = CGSize(width: CGFloat.infinity, height: 54)
+        /// Height = the icon slot plus the row's own top and bottom inset: 48 + (8 - 2) + 8. The
+        /// top is 2 short because the stack is already inset from the bubble there and flush at
+        /// its bottom, so both edges read as `attachmentFilePadding` — see `MessageCell.Layouts`.
+        public var fileAttachmentSize   = CGSize(width: CGFloat.infinity, height: 62)
         public var audioAttachmentSize  = CGSize(width: CGFloat.infinity, height: 54)
     }
     
@@ -1554,7 +1557,11 @@ extension MessageLayoutModel {
                 if let ownerChannel, let ownerMessage {
                     sizeWidth += MessageCell.InfoView.measure(channel: ownerChannel, message: ownerMessage, appearance: MessageCell.appearance).width
                 }
-                size.width = min(size.width, max(nameWidth, sizeWidth) + MessageCell.Layouts.attachmentIconSize + MessageCell.Layouts.horizontalPadding * 3)
+                // Chrome around the labels: the slot's leading inset (row-relative, so minus the
+                // stack's own) + the slot itself, then the gap to the labels and their trailing
+                // inset (both `horizontalPadding`).
+                let slotLeading = MessageCell.Layouts.attachmentFilePadding - MessageCell.Layouts.attachmentStackBubbleInset
+                size.width = min(size.width, max(nameWidth, sizeWidth) + slotLeading + MessageCell.Layouts.attachmentFileIconSize + MessageCell.Layouts.horizontalPadding * 2)
             case .voice:
                 size.height = defaults.audioAttachmentSize.height
             case .link:

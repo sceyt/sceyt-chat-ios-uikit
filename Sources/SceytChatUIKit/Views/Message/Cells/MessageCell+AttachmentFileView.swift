@@ -54,6 +54,9 @@ extension MessageCell {
         open lazy var playButton = UIImageView()
             .withoutAutoresizingMask
 
+        /// Spans the name + size labels so they can be centered on the thumbnail as one block.
+        open lazy var textLayoutGuide = UILayoutGuide()
+
         open override func setupAppearance() {
             super.setupAppearance()
             imageView.clipsToBounds = true
@@ -83,15 +86,31 @@ extension MessageCell {
             addSubview(pauseButton)
             addSubview(playButton)
 
-            imageView.pin(to: self, anchors: [.leading(Layouts.horizontalPadding), .centerY(-1)])
-            imageView.resize(anchors: [.height(Layouts.attachmentIconSize), .width(Layouts.attachmentIconSize)])
+            // The stack this view fills is itself inset from the bubble on the top and sides but
+            // flush with its bottom, so equal insets here would not read as equal on screen —
+            // subtract the stack's own inset on the two sides that have one. The bottom's full
+            // padding comes from the row height (`defaults.fileAttachmentSize`).
+            let inset = Layouts.attachmentFilePadding - Layouts.attachmentStackBubbleInset
+            imageView.pin(to: self, anchors: [.leading(inset), .top(inset)])
+            imageView.resize(anchors: [.height(Layouts.attachmentFileIconSize), .width(Layouts.attachmentFileIconSize)])
             titleLabel.leadingAnchor.pin(to: imageView.trailingAnchor, constant: Layouts.horizontalPadding)
-            titleLabel.topAnchor.pin(to: imageView.topAnchor, constant: 2)
             titleLabel.trailingAnchor.pin(lessThanOrEqualTo: trailingAnchor, constant: -Layouts.horizontalPadding)
             sizeLabel.leadingAnchor.pin(to: titleLabel.leadingAnchor)
             sizeLabel.topAnchor.pin(to: titleLabel.bottomAnchor, constant: 4)
 
-            progressView.pin(to: imageView)
+            // Center the name/size pair on the thumbnail as one block. A guide rather than an
+            // offset from the icon's top so it stays centered whatever the two label fonts are
+            // (they differ) and whatever the slot grows to.
+            addLayoutGuide(textLayoutGuide)
+            textLayoutGuide.topAnchor.pin(to: titleLabel.topAnchor)
+            textLayoutGuide.bottomAnchor.pin(to: sizeLabel.bottomAnchor)
+            textLayoutGuide.centerYAnchor.pin(to: imageView.centerYAnchor)
+
+            // Centered in the slot at a fixed size rather than filling it, like the image view's
+            // loader does over a photo. The background is a circle of the view's own bounds
+            // (`CircularProgressView.layoutSubviews`), so the size is the disc the user sees.
+            progressView.resize(anchors: [.height(Layouts.attachmentFileProgressSize), .width(Layouts.attachmentFileProgressSize)])
+            progressView.pin(to: imageView, anchors: [.centerX(), .centerY()])
             pauseButton.pin(to: progressView)
             playButton.pin(to: imageView, anchors: [.centerX(), .centerY()])
             playButton.resize(anchors: [.height(24.0), .width(24.0)])
