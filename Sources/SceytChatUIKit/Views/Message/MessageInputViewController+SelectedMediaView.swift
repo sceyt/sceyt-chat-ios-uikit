@@ -74,8 +74,13 @@ extension MessageInputViewController {
                 let fv = Components.messageInputThumbnailViewFileView.init()
                     .withoutAutoresizingMask
                 fv.appearance = appearance
-//                fv.imageView.image = view.thumbnail
-                fv.imageView.image = appearance.fileAttachmentIconProvider.provideVisual(for: .init(attachment: view.attachment))
+                // An image/video picked as a document previews itself here, the same way its
+                // bubble and the reply bar do. Everything else (pdf/zip/…) keeps the icon.
+                if view.hasFilePreview {
+                    fv.showPreview(view.thumbnail)
+                } else {
+                    fv.showIcon(appearance.fileAttachmentIconProvider.provideVisual(for: .init(attachment: view.attachment)))
+                }
                 v = fv
             default:
                 let mv = Components.messageInputThumbnailViewMediaView.init()

@@ -173,6 +173,14 @@ public struct AttachmentModel {
     private var needsToUploadInternally: Bool {
         Components.dataSession == nil && isLocalFile
     }
+
+    /// True when `thumbnail` holds a real preview extracted from a picked document (an image
+    /// or a video sent as a file) rather than the `.messageFile` stand-in a plain pdf/zip/…
+    /// gets. Same marker `attachmentBuilder` keys the outgoing thumbHash off — `init(fileUrl:)`
+    /// only sets the dimensions when it managed to decode a preview.
+    public var hasFilePreview: Bool {
+        type == .file && imageWidth > 0 && imageHeight > 0
+    }
     
     public var attachmentBuilder: Attachment.Builder {
         let builder: Attachment.Builder

@@ -908,6 +908,16 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                         }
                     }
                 }
+            case "file":
+                // An image/video sent as a document previews itself here, exactly like its
+                // bubble does. The generic file icon stays the fallback — for a plain
+                // document (pdf/zip/…) and for a previewable one with no preview available yet.
+                if let thumbnail = attachment.filePreviewImage {
+                    image = thumbnail
+                    showPlayIcon = attachment.isVideoFileAttachment
+                } else {
+                    image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
+                }
             default:
                 image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
@@ -1027,6 +1037,14 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                     return
                 }
                 image = nil
+            case "file":
+                // Same preview-or-icon rule as the reply bar above.
+                if let thumbnail = attachment.filePreviewImage {
+                    image = thumbnail
+                    showPlayIcon = attachment.isVideoFileAttachment
+                } else {
+                    image = appearance.editMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
+                }
             default:
                 image = appearance.editMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
