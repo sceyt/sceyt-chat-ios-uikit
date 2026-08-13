@@ -3033,8 +3033,12 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
 
     open func canSwipeToReply(model: MessageLayoutModel) -> Bool {
-        // Media and file messages don't support the swipe-to-reply gesture.
-        canReply(model: model) && model.contentOptions.isDisjoint(with: [.image, .file])
+        guard canReply(model: model) else { return false }
+        // Media and file messages don't support the swipe-to-reply gesture while they are still being sent.
+        if !model.contentOptions.isDisjoint(with: [.image, .file]) {
+            return model.message.deliveryStatus != .pending && model.messageDeliveryStatus != .pending
+        }
+        return true
     }
 
     // MARK: view titles
