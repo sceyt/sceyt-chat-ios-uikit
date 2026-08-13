@@ -3031,7 +3031,12 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     open func canReply(model: MessageLayoutModel) -> Bool {
         model.message.state != .deleted && !model.contentOptions.contains(.unsupported)
     }
-    
+
+    open func canSwipeToReply(model: MessageLayoutModel) -> Bool {
+        // Media and file messages don't support the swipe-to-reply gesture.
+        canReply(model: model) && model.contentOptions.isDisjoint(with: [.image, .file])
+    }
+
     // MARK: view titles
     open func getTitleForHeader(with appearance: ChannelViewController.HeaderView.Appearance) -> String {
         (isThread ?

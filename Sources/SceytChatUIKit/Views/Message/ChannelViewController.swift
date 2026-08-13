@@ -1211,7 +1211,7 @@ open class ChannelViewController: ViewController,
             return
         }
         if let panningCell {
-            if channelViewModel.canReply(model: panningCell.data) {
+            if channelViewModel.canSwipeToReply(model: panningCell.data) {
                 panningCell.handlePan(sender)
             }
             if [.cancelled, .recognized].contains(sender.state) {
@@ -1219,7 +1219,7 @@ open class ChannelViewController: ViewController,
             }
         } else if let cell = collectionView.findCell(forGesture: sender) as? MessageCell {
             panningCell = cell
-            if channelViewModel.canReply(model: cell.data) {
+            if channelViewModel.canSwipeToReply(model: cell.data) {
                 cell.handlePan(sender)
             }
         }
