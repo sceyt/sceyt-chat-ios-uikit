@@ -71,6 +71,9 @@ extension MessageCell {
             stackViewH2.spacing = 2
             
             messageLabel.lineBreakMode = .byTruncatingTail
+
+            nameLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+            messageLabel.setContentCompressionResistancePriority(.required, for: .vertical)
             imageView.clipsToBounds = true
             imageView.layer.cornerRadius = 4
 
@@ -80,17 +83,16 @@ extension MessageCell {
        
         open override func setupLayout() {
             super.setupLayout()
+
+            addSubview(borderView)
             addSubview(stackViewH)
-            stackViewH.addArrangedSubview(borderView)
             stackViewH.addArrangedSubview(stackViewV)
             stackViewV.addArrangedSubview(nameLabel)
             stackViewH2.addArrangedSubview(messageLabel)
             stackViewV.addArrangedSubview(stackViewH2)
-            stackViewH.setCustomSpacing(Measure.borderSpacing, after: borderView)
-            stackViewH.pin(to: self, anchors: [.leading(0), .trailing(-Measure.trailingInset), .top(6), .bottom(-6)])
+            borderView.pin(to: self, anchors: [.leading(0), .top(0), .bottom(0)])
             borderView.resize(anchors: [.width(Measure.borderWidth)])
-            borderView.heightAnchor.pin(to: self.heightAnchor)
-            stackViewV.heightAnchor.pin(to: stackViewH.heightAnchor)
+            stackViewH.pin(to: self, anchors: [.leading(Measure.borderWidth + Measure.borderSpacing), .trailing(-Measure.trailingInset), .top(6), .bottom(-6)])
         }
 
         open override func setupAppearance() {
@@ -209,7 +211,7 @@ extension MessageCell {
         /// bubble has room for.
         open func insertImageViewIfNeeded() {
             guard imageView.superview == nil else { return }
-            stackViewH.insertArrangedSubview(imageView, at: 1)
+            stackViewH.insertArrangedSubview(imageView, at: 0)
             stackViewH.setCustomSpacing(Measure.thumbnailSpacing, after: imageView)
             imageView.addConstraints([
                 imageView.heightAnchor.pin(constant: Measure.imageSize.height),
@@ -301,14 +303,26 @@ extension MessageCell {
             var config = TextSizeMeasure.Config(maximumNumberOfLines: 1, lastFragmentUsedRect: false)
             config.font = appearance.replyMessageAppearance.titleLabelAppearance.font
             config.restrictingWidth = availableWidth
-            let user = SceytChatUIKit.shared.formatters.userNameFormatter.format(data.user)
+
+            let user = appearance.replyMessageAppearance.senderNameFormatter.format(data.user)
             let nameLabelSize = TextSizeMeasure.calculateSize(of: user, config: config).textSize
 
-            config.font = appearance.replyMessageAppearance.subtitleLabelAppearance.font
+            config.font = nil
+            let body = NSMutableAttributedString(attributedString: data.attributedBody)
+            body.enumerateAttribute(.font, in: NSRange(location: 0, length: body.length)) { value, range, _ in
+                if value == nil {
+                    body.addAttribute(.font, value: appearance.replyMessageAppearance.subtitleLabelAppearance.font, range: range)
+                }
+            }
             // The icon shares the row with the message label only.
             config.restrictingWidth = availableWidth - iconSize.width
+            config.maximumNumberOfLines = 1
+            let singleLineHeight = TextSizeMeasure.calculateSize(of: body, config: config).textSize.height
             config.maximumNumberOfLines = Measure.maximumNumberOfLines
-            let messageLabelSize = TextSizeMeasure.calculateSize(of: data.attributedBody, config: config).textSize
+            var messageLabelSize = TextSizeMeasure.calculateSize(of: body, config: config).textSize
+            if messageLabelSize.height > singleLineHeight {
+                messageLabelSize.width = config.restrictingWidth
+            }
 
             return CGSize(width: Measure.chromeWidth + thumbnailSize.width + max(nameLabelSize.width, iconSize.width + messageLabelSize.width),
                           height: max(thumbnailSize.height, nameLabelSize.height + max(iconSize.height, messageLabelSize.height)) + 16)
