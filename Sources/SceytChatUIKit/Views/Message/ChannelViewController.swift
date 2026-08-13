@@ -135,6 +135,19 @@ open class ChannelViewController: ViewController,
     /// `contentInset.bottom` when it is upright.
     public static var collectionViewInputSpacing: CGFloat = 10
 
+    /// Vertical spacing between the message list's visual top (below the
+    /// navigation bar, or below any overlay pinned there) and the nearest
+    /// content — the pinned date separator included. Goes into
+    /// `contentInset.bottom` when the list is mirrored, and into
+    /// `contentInset.top` when it is upright. Raise it per instance to make
+    /// room for a top overlay bar.
+    public var collectionViewTopSpacing: CGFloat = 5 {
+        didSet {
+            guard oldValue != collectionViewTopSpacing, isViewLoaded else { return }
+            updateCollectionViewInsets()
+        }
+    }
+
     /// Measured height of the "New messages" bar inside the anchor cell —
     /// mirrors what `UnreadMessagesSeparatorView.measure` adds to the cell height.
     public var unreadSeparatorHeight: CGFloat {
@@ -747,11 +760,14 @@ open class ChannelViewController: ViewController,
         abs(controlHeight) +
         Self.collectionViewInputSpacing
 
+        // The visual-top padding lives on the opposite edge: content-space
+        // BOTTOM when mirrored, TOP when upright. It keeps the oldest visible
+        // message and the pinned date separator clear of the navigation bar.
         if appearance.messageListOrder.isMirrored {
             collectionView.contentInset.top = inputAreaInset
-            collectionView.contentInset.bottom = 0
+            collectionView.contentInset.bottom = collectionViewTopSpacing
         } else {
-            collectionView.contentInset.top = 0
+            collectionView.contentInset.top = collectionViewTopSpacing
             collectionView.contentInset.bottom = inputAreaInset
         }
         collectionView.scrollIndicatorInsets = .init(
