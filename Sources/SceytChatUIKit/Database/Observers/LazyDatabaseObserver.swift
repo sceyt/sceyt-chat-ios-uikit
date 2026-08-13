@@ -33,14 +33,18 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         @Atomic var prevCache: Cache?
         @Atomic var mapItems = [NSManagedObjectID: Item]()
         @Atomic var mapDeletedItems = [NSManagedObjectID: Item]()
-        
+        /// Section identifier per object, precomputed on the context's queue so the
+        /// main thread never has to do KVC on a (possibly deleted) managed object.
+        @Atomic var mapSectionIdentifiers = [NSManagedObjectID: AnyHashable]()
+
         func copy() -> Caches {
             .init(
                 mainCache: mainCache,
                 workingCache: workingCache,
                 prevCache: prevCache,
                 mapItems: mapItems,
-                mapDeletedItems: mapDeletedItems
+                mapDeletedItems: mapDeletedItems,
+                mapSectionIdentifiers: mapSectionIdentifiers
             )
         }
     }
@@ -191,17 +195,23 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
 
     /// Returns the section identifier for the given section index, derived from
     /// `sectionNameKeyPath`. Used by the view layer to track section identity
-    /// across snapshots when diffing. The returned value is whatever KVC yields
-    /// for the keypath on the first DTO in the section (e.g. `Int` for
-    /// `MessageDTO.daySectionIdentifier`). Returns `nil` if the observer isn't
-    /// running, the section is out of range, or no `sectionNameKeyPath` was
-    /// configured.
+    /// across snapshots when diffing (e.g. `Int` for
+    /// `MessageDTO.daySectionIdentifier`). The value is precomputed on the
+    /// context's queue when the DTO enters the cache and served from
+    /// `mapSectionIdentifiers` here — this runs on the main thread while the DTOs
+    /// belong to a private-queue context, so doing KVC on the managed object here
+    /// would race the context's queue and crash on rows whose snapshot was already
+    /// invalidated by a delete (only `objectID` is thread-safe to read). Returns
+    /// `nil` if the observer isn't running, the section is out of range, or no
+    /// `sectionNameKeyPath` was configured.
     open func sectionName(at section: Int) -> AnyHashable? {
         guard isObserverStarted || isObserverRestarting else { return nil }
-        let cache = currentCaches.mainCache
+        guard sectionNameKeyPath != nil else { return nil }
+        let caches = currentCaches
+        let cache = caches.mainCache
         guard cache.indices.contains(section), let first = cache[section].first else { return nil }
-        guard let keyPath = sectionNameKeyPath else { return nil }
-        return first.value(forKey: keyPath) as? AnyHashable
+        let objectID = first.objectID
+        return readCache { caches.mapSectionIdentifiers[objectID] }
     }
     
     open var count: Int {
@@ -243,11 +253,12 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
             guard let self, let obj = try? self.context.existingObject(with: objectID) as? DTO
             else { return }
             let item = self.itemCreator(obj)
+            self.cacheSectionIdentifier(for: obj)
             self.writeCache {
                 caches.mapItems[dto.objectID] = item
                 caches.mapDeletedItems[dto.objectID] = nil
             }
-            
+
             logger.error("object did not find with id \(objectID.uriRepresentation()), found from context \(obj) ")
         }
         return nil
@@ -700,13 +711,26 @@ private extension LazyDatabaseObserver {
     }
         let item = itemCreator(dto)
         cache[section].insert(dto, at: foundIndex)
+        cacheSectionIdentifier(for: dto)
         writeCache {
             self.mainCaches.mapItems[dto.objectID] = item
             self.mainCaches.mapDeletedItems[dto.objectID] = nil
         }
         changeItems.append(.insert(.init(row: foundIndex, section: section), item))
     }
-    
+
+    /// Precomputes and caches the `sectionNameKeyPath` value for the given DTO so
+    /// `sectionName(at:)` can serve it without touching the managed object.
+    /// Must be called on the context's queue — it does KVC on the DTO.
+    private func cacheSectionIdentifier(for dto: DTO, value: Any? = nil) {
+        guard let keyPath = sectionNameKeyPath,
+              let value = (value ?? dto.value(forKey: keyPath)) as? AnyHashable
+        else { return }
+        writeCache {
+            self.mainCaches.mapSectionIdentifiers[dto.objectID] = value
+        }
+    }
+
     @discardableResult
     private func fetchObjects(
         context: NSManagedObjectContext,
@@ -736,6 +760,7 @@ private extension LazyDatabaseObserver {
             if cache.isEmpty {
                 cache.append([dto])
                 let item = itemCreator(dto)
+                cacheSectionIdentifier(for: dto)
                 writeCache {
                     self.mainCaches.mapItems[dto.objectID] = item
                     self.mainCaches.mapDeletedItems[dto.objectID] = nil
@@ -745,6 +770,7 @@ private extension LazyDatabaseObserver {
             } else if let sectionNameKeyPath {
                 var found = false
                 let _nv = dto.value(forKey: sectionNameKeyPath)
+                cacheSectionIdentifier(for: dto, value: _nv)
             exitLoop: for (index, elements) in cache.enumerated() {
                 if let first = elements.first {
                     if let fv = valueCache[first.objectID] ?? first.value(forKey: sectionNameKeyPath),
@@ -962,9 +988,10 @@ private extension LazyDatabaseObserver {
     }
     
     func clearCache() {
-        readCache {
+        writeCache {
             self.mainCaches.mapItems.removeAll(keepingCapacity: true)
             self.mainCaches.mapDeletedItems.removeAll()
+            self.mainCaches.mapSectionIdentifiers.removeAll(keepingCapacity: true)
         }
         mainCaches.mainCache.removeAll(keepingCapacity: true)
         mainCaches.workingCache.removeAll(keepingCapacity: true)
