@@ -3572,7 +3572,7 @@ open class ChannelViewController: ViewController,
                 UIView.animate(
                     withDuration: 0.25,
                     delay: 0,
-                    options: [.curveEaseOut, .allowUserInteraction]
+                    options: [.curveLinear, .allowUserInteraction]
                 ) { [weak self] in
                     self?.collectionView.performUpdates(updates, completion: completion)
                 }
