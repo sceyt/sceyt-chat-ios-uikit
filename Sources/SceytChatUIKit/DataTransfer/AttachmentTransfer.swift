@@ -9,6 +9,7 @@
 import Foundation
 import SceytChat
 import Combine
+import UIKit.UIImage
 
 let fileProvider = Components.attachmentTransfer.default
 
@@ -31,6 +32,7 @@ open class AttachmentTransfer: DataProvider {
     @Atomic private var downloadCallbackCache = CallbackCache()
     @Atomic private var progressCache = ProgressCache()
     @Atomic private var taskGroups = [Int64: [SCTDataSessionTaskInfo]]()
+    @Atomic private var inFlightVideoThumbOrigins = Set<String>()
     
     /// Progress reported for an upload the moment its task is created, before any
     /// byte-level callback exists. Small enough to read as "just started" (the UI shows
@@ -192,7 +194,12 @@ open class AttachmentTransfer: DataProvider {
         guard let attachments = attachments ?? message.attachments,
               !attachments.isEmpty
         else { return [] }
-        
+
+        // Before any status filtering: fetch the small "video_thumb" posters for
+        // videos that aren't local yet, so even paused/failed video downloads show
+        // a sharp preview instead of the blurred thumbHash.
+        downloadVideoThumbnailsIfNeeded(message: message, attachments: attachments)
+
         for att in attachments {
             let resolvedLocalFilePath = dataSession(for: message)?.getFilePath(attachment: att)
             if att.status == .pending,
@@ -384,6 +391,136 @@ open class AttachmentTransfer: DataProvider {
         return task.attachment.status
     }
     
+    /// Extracts a poster frame from the video attachment's local file and writes it
+    /// as a resized JPEG into the temporary directory. Returns nil when the file is
+    /// missing or frame extraction fails — the caller treats that as "no thumbnail".
+    open func makeVideoThumbnailFile(for attachment: ChatMessage.Attachment) -> URL? {
+        let path = dataSession(forAttachment: attachment)?.getFilePath(attachment: attachment)
+            ?? attachment.filePath
+        guard let path,
+              FileManager.default.fileExists(atPath: path),
+              let frame = Components.videoProcessor.copyFrame(url: URL(fileURLWithPath: path)),
+              let builder = try? Components.imageBuilder.init(image: frame)
+                .resize(max: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.dimensionThreshold),
+              let data = builder.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality)
+        else { return nil }
+        return Components.storage.storeInTemporaryDirectory(
+            data: data,
+            filename: "video_thumb_\(attachment.tid)",
+            ext: "jpg"
+        )
+    }
+
+    /// After a video upload succeeds, uploads its poster frame through the data
+    /// session and merges the returned origin into the attachment metadata under
+    /// "video_thumb". Always calls `completion` exactly once; the thumbnail is a
+    /// progressive enhancement, so any failure (or a 30s timeout) just sends the
+    /// message without it.
+    open func attachVideoThumbnailIfNeeded(
+        taskInfo: SCTDataSessionTaskInfo,
+        message: ChatMessage,
+        attachment atch: ChatMessage.Attachment,
+        completion: @escaping () -> Void
+    ) {
+        // Decode the metadata string fresh: the checksum-dedupe path replaces only
+        // the string, leaving the eagerly-decoded copy stale — and a dedupe hit on a
+        // previously thumbnailed upload already carries "video_thumb" here.
+        let decoded = atch.metadata.flatMap { try? ChatMessage.Attachment.Metadata<String>.decode($0) }
+        guard taskInfo.transferType == .upload,
+              atch.type == "video",
+              !message.isViewOnceMessage,
+              decoded?.videoThumbnail == nil,
+              let dataSession = dataSession(for: message, forAttachment: atch)
+        else {
+            completion()
+            return
+        }
+        let finish = OneShotBlock(completion)
+        handleTaskQueue.asyncAfter(deadline: .now() + 30) {
+            finish.fire()
+        }
+        handleTaskQueue.async { [weak self] in
+            guard let self,
+                  let fileUrl = self.makeVideoThumbnailFile(for: atch)
+            else {
+                finish.fire()
+                return
+            }
+            dataSession.uploadAttachmentThumbnail(for: atch, fileUrl: fileUrl) { result in
+                defer { try? FileManager.default.removeItem(at: fileUrl) }
+                switch result {
+                case .success(let origin):
+                    var meta = decoded ?? ChatMessage.Attachment.Metadata<String>(thumbnail: "")
+                    meta.videoThumbnail = origin
+                    atch.updateMetadata(meta.build())
+                    logger.verbose("[Attachment] video_thumb uploaded, origin \(origin)")
+                case .failure(let error):
+                    logger.errorIfNotNil(error, "[Attachment] video_thumb upload failed — sending without it")
+                }
+                finish.fire()
+            }
+        }
+    }
+
+    /// Local cache path of a downloaded "video_thumb" poster, or nil if not cached.
+    open func cachedVideoThumbnailPath(attachment: ChatMessage.Attachment) -> String? {
+        guard attachment.type == "video",
+              let origin = attachment.imageDecodedMetadata?.videoThumbnail,
+              !origin.isEmpty
+        else { return nil }
+        let path = FileStorage.default.videoThumbnailCachePath(origin: origin)
+        return FileManager.default.fileExists(atPath: path) ? path : nil
+    }
+
+    /// Downloads the "video_thumb" poster for video attachments whose video file is
+    /// not local yet, so the receiver can show a sharp preview while the (much
+    /// larger) video is still downloading. Failures are dropped silently and
+    /// retried on the next cell bind.
+    open func downloadVideoThumbnailsIfNeeded(
+        message: ChatMessage,
+        attachments: [ChatMessage.Attachment]? = nil
+    ) {
+        guard !message.isViewOnceMessage,
+              let attachments = attachments ?? message.attachments,
+              let dataSession = dataSession(for: message)
+        else { return }
+        for atch in attachments where atch.type == "video" {
+            guard let origin = atch.imageDecodedMetadata?.videoThumbnail,
+                  !origin.isEmpty,
+                  dataSession.getFilePath(attachment: atch) == nil,
+                  cachedVideoThumbnailPath(attachment: atch) == nil,
+                  !inFlightVideoThumbOrigins.contains(origin)
+            else { continue }
+            inFlightVideoThumbOrigins.insert(origin)
+            dataSession.downloadAttachmentThumbnail(for: atch, origin: origin) { [weak self] result in
+                guard let self else { return }
+                self.inFlightVideoThumbOrigins.remove(origin)
+                guard case .success(let localUrl) = result else {
+                    if case .failure(let error) = result {
+                        logger.errorIfNotNil(error, "[Attachment] video_thumb download failed, origin \(origin)")
+                    }
+                    return
+                }
+                let destination = URL(fileURLWithPath: FileStorage.default.videoThumbnailCachePath(origin: origin))
+                do {
+                    let data = try Data(contentsOf: localUrl)
+                    // Atomic write so a concurrent loadThumbnail never observes a
+                    // partially written JPEG (same pattern as SCTSession.thumbnailFile).
+                    try data.write(to: destination, options: .atomic)
+                    try? FileManager.default.removeItem(at: localUrl)
+                } catch {
+                    logger.errorIfNotNil(error, "[Attachment] video_thumb store failed, origin \(origin)")
+                    return
+                }
+                DispatchQueue.main.async {
+                    if let image = UIImage(contentsOfFile: destination.path) {
+                        AttachmentSharpThumbnailRelay.default.post(atch, image: image)
+                    }
+                }
+            }
+        }
+    }
+
     private func handle(
         tasks: [SCTDataSessionTaskInfo],
         message: ChatMessage,
@@ -445,7 +582,12 @@ open class AttachmentTransfer: DataProvider {
                                         width: Int(builder.imageSize.width),
                                         height: Int(builder.imageSize.height),
                                         thumbnail: decodedMetadata.thumbnail,
-                                        duration: decodedMetadata.duration
+                                        duration: decodedMetadata.duration,
+                                        description: decodedMetadata.description,
+                                        imageUrl: decodedMetadata.imageUrl,
+                                        thumbnailUrl: decodedMetadata.thumbnailUrl,
+                                        hideLinkDetails: decodedMetadata.hideLinkDetails,
+                                        videoThumbnail: decodedMetadata.videoThumbnail
                                     ).build()
                                 } else if let decodedMetadata = atch.voiceDecodedMetadata {
                                     atch.metadata =
@@ -453,7 +595,12 @@ open class AttachmentTransfer: DataProvider {
                                         width: Int(builder.imageSize.width),
                                         height: Int(builder.imageSize.height),
                                         thumbnail: decodedMetadata.thumbnail,
-                                        duration: decodedMetadata.duration
+                                        duration: decodedMetadata.duration,
+                                        description: decodedMetadata.description,
+                                        imageUrl: decodedMetadata.imageUrl,
+                                        thumbnailUrl: decodedMetadata.thumbnailUrl,
+                                        hideLinkDetails: decodedMetadata.hideLinkDetails,
+                                        videoThumbnail: decodedMetadata.videoThumbnail
                                     ).build()
                                 }
                             }
@@ -476,29 +623,10 @@ open class AttachmentTransfer: DataProvider {
                         }
                     case .successURL(let url):
                         logger.verbose("[Attachment] Handle successURL  \(url)")
-                        let uri = url.absoluteString
-                        if attachments.indices.contains(index) {
-                            let atch = attachments[index]
-                            logger.verbose("[Attachment] Handle successURL  found \(String(describing: atch.url))")
-                            atch.url = uri
-                            atch.transferProgress = 1
-                            atch.status = .done
-                            onCompletion(taskInfo: taskInfo, attachment: atch)
-                        }
-                        logger.verbose("[Attachment] receive successURL \(uri)")
-                        didEndTask(taskInfo: taskInfo, error: nil)
+                        finishSuccess(uri: url.absoluteString, taskInfo: taskInfo, index: index)
                     case .successURI(let uri):
                         logger.verbose("[Attachment] Handle successURI  \(uri)")
-                        if attachments.indices.contains(index) {
-                            let atch = attachments[index]
-                            logger.verbose("[Attachment] Handle successURI  found \(String(describing: atch.url))")
-                            atch.url = uri
-                            atch.transferProgress = 1
-                            atch.status = .done
-                            onCompletion(taskInfo: taskInfo, attachment: atch)
-                        }
-                        logger.verbose("[Attachment] receive successURI \(uri)")
-                        didEndTask(taskInfo: taskInfo, error: nil)
+                        finishSuccess(uri: uri, taskInfo: taskInfo, index: index)
                     case .failure(let error):
                         logger.errorIfNotNil(error, "[Attachment] transfer")
                         if attachments.indices.contains(index) {
@@ -522,6 +650,27 @@ open class AttachmentTransfer: DataProvider {
                 }
         }
         
+        func finishSuccess(uri: String, taskInfo: SCTDataSessionTaskInfo, index: Int) {
+            guard attachments.indices.contains(index) else {
+                logger.verbose("[Attachment] receive success \(uri)")
+                didEndTask(taskInfo: taskInfo, error: nil)
+                return
+            }
+            let atch = attachments[index]
+            logger.verbose("[Attachment] Handle success found \(String(describing: atch.url))")
+            // For a just-uploaded video, upload its poster frame too before completing,
+            // so the merged "video_thumb" metadata is persisted by didEndTask and rides
+            // the wire message the sender builds from this attachment.
+            attachVideoThumbnailIfNeeded(taskInfo: taskInfo, message: message, attachment: atch) {
+                atch.url = uri
+                atch.transferProgress = 1
+                atch.status = .done
+                onCompletion(taskInfo: taskInfo, attachment: atch)
+                logger.verbose("[Attachment] receive success \(uri)")
+                didEndTask(taskInfo: taskInfo, error: nil)
+            }
+        }
+
         func didEndTask(taskInfo: SCTDataSessionTaskInfo, error: Error?) {
             let key = Self.key(message: taskInfo.message, attachment: taskInfo.attachment)
             // The task is over — no progress/completion event will ever fire for this
@@ -645,6 +794,25 @@ extension AttachmentTransfer {
 enum AttachmentTransferError: Error {
     case alreadyTransferring
     case externalTransferrerNotImplemented
+}
+
+/// Runs the wrapped block at most once, from whichever caller fires first
+/// (e.g. a completion callback racing its timeout fallback).
+private final class OneShotBlock {
+    private let lock = NSLock()
+    private var block: (() -> Void)?
+
+    init(_ block: @escaping () -> Void) {
+        self.block = block
+    }
+
+    func fire() {
+        lock.lock()
+        let block = self.block
+        self.block = nil
+        lock.unlock()
+        block?()
+    }
 }
 
 

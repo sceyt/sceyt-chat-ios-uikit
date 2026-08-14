@@ -1367,6 +1367,23 @@ extension MessageLayoutModel {
                         logger.errorIfNotNil(error, "load image from path \(path)")
                     }
                 }
+                if resultThumbnail == nil, attachmentType == .video,
+                   let path = fileProvider.cachedVideoThumbnailPath(attachment: attachment) {
+                    // Downloaded "video_thumb" poster: sharp preview available before
+                    // the video itself is local. File-backed semantics so the
+                    // no-downgrade guards keep it over the thumbHash blur.
+                    do {
+                        let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
+                        if let image = UIImage(data: data) {
+                            resultThumbnail = image
+                            resultLoadedFromFile = true
+                        } else {
+                            logger.error("[Attachment] video_thumb decode failed, path \(path)")
+                        }
+                    } catch {
+                        logger.errorIfNotNil(error, "load video_thumb from path \(path)")
+                    }
+                }
                 if resultThumbnail == nil {
                     let metadata = attachment.imageDecodedMetadata
                     logger.verbose("[Attachment] thumbnail is nil make from metadata \(attachment.description)")

@@ -58,6 +58,19 @@ extension ChatMessage {
         }
         
         public var assetFilePath: String?
+
+        /// Replaces the metadata JSON and re-runs the eager decode so
+        /// `imageDecodedMetadata`/`voiceDecodedMetadata` stay in sync — they are
+        /// otherwise only decoded in `init`.
+        public func updateMetadata(_ metadata: String?) {
+            self.metadata = metadata
+            guard let metadata else { return }
+            if type != "voice" {
+                imageDecodedMetadata = try? Metadata<String>.decode(metadata)
+            } else {
+                voiceDecodedMetadata = try? Metadata<[Int]>.decode(metadata)
+            }
+        }
         
         init(
             id: AttachmentId,
@@ -158,7 +171,8 @@ extension ChatMessage {
             public var imageUrl: String?
             public var thumbnailUrl: String?
             public var hideLinkDetails: Bool?
-            
+            public var videoThumbnail: String?
+
             enum CodingKeys: String, CodingKey {
                 case width = "szw"
                 case height = "szh"
@@ -168,9 +182,9 @@ extension ChatMessage {
                 case imageUrl = "iur"
                 case thumbnailUrl = "tur"
                 case hideLinkDetails = "hld"
-                
+                case videoThumbnail = "video_thumb"
             }
-            
+
             public init(
                 width: Int = 0,
                 height: Int = 0,
@@ -179,7 +193,8 @@ extension ChatMessage {
                 description: String? = nil,
                 imageUrl: String? = nil,
                 thumbnailUrl: String? = nil,
-                hideLinkDetails: Bool? = nil
+                hideLinkDetails: Bool? = nil,
+                videoThumbnail: String? = nil
             ) {
                 self.width = width
                 self.height = height
@@ -189,6 +204,7 @@ extension ChatMessage {
                 self.imageUrl = imageUrl
                 self.thumbnailUrl = thumbnailUrl
                 self.hideLinkDetails = hideLinkDetails
+                self.videoThumbnail = videoThumbnail
             }
             
             func build() -> String? {
@@ -213,6 +229,7 @@ extension ChatMessage {
                 imageUrl = (try? container.decode(String.self, forKey: CodingKeys.imageUrl))
                 thumbnailUrl = (try? container.decode(String.self, forKey: CodingKeys.thumbnailUrl))
                 hideLinkDetails = (try? container.decode(Bool.self, forKey: CodingKeys.hideLinkDetails))
+                videoThumbnail = (try? container.decode(String.self, forKey: CodingKeys.videoThumbnail))
                 if let base64 = thumbnail as? String, !base64.isEmpty {
                     thumbnailImage = Components.imageBuilder.image(thumbHash: base64)
                     if thumbnailImage == nil,
