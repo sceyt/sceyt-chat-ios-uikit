@@ -10,7 +10,7 @@ import SceytChat
 import UIKit
 
 extension ChannelInfoViewController {
-    open class AttachmentCell: CollectionViewCell {
+    open class AttachmentCell: CollectionViewCell, AttachmentSharpThumbnailObserver {
 
         open lazy var imageView = UIImageView()
             .withoutAutoresizingMask
@@ -57,6 +57,9 @@ extension ChannelInfoViewController {
             progressView.animationDuration = 0.2
             progressView.rotationDuration = 2
             pauseButton.addTarget(self, action: #selector(pauseButtonTapped), for: .touchUpInside)
+            // Weak registration, lives for the cell's whole lifetime — the relay prunes
+            // deallocated observers itself, so no removal on reuse/teardown is needed.
+            AttachmentSharpThumbnailRelay.default.add(self)
 
             typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.MediaCell
             accessibilityIdentifier = AID.root
@@ -86,6 +89,49 @@ extension ChannelInfoViewController {
             progressView.backgroundColor = overlayLoaderAppearance.backgroundColor
             progressView.parentAppearance = overlayLoaderAppearance
             pauseButton.setImage(overlayLoaderAppearance.cancelIcon, for: .normal)
+        }
+
+        /// Repaints when a sharp, file-backed thumbnail lands for the bound attachment —
+        /// most visibly the downloaded "video_thumb" poster, which arrives long after the
+        /// cell was bound and while the video itself is still transferring (or not
+        /// transferring at all).
+        ///
+        /// The bound layout's `onLoadThumbnail` cannot carry this on its own: the grid
+        /// builds its own `AttachmentLayout` instances, so a load that lands on the chat
+        /// list's instance for the same attachment never reaches here, and the slot is a
+        /// single overwritable one that cell reuse can leave pointing at a dead owner.
+        /// The relay is keyed by attachment identity and per-cell, so neither applies.
+        open func attachmentSharpThumbnailDidLoad(_ attachment: ChatMessage.Attachment, image: UIImage) {
+            guard let layout = data,
+                  layout.type == .image || layout.type == .video,
+                  layout.attachment == attachment
+            else { return }
+            // One attachment is consumed at several design sizes, each with its own
+            // size-keyed thumbnail file, and the relay carries no size. A sibling
+            // consumer's load is "sharp" for ITS size yet can be far too small for this
+            // grid — accepting it would repaint at that resolution AND lock the layout
+            // file-backed, so no reload path restores the right thumbnail. Compare max
+            // sides (aspect-safe) with the same tolerance the message cell uses.
+            //
+            // The requirement comes from this cell's own bounds rather than
+            // `layout.thumbnailSize`, whose units are not consistent across consumers:
+            // the chat list fills it in points, `MediaCollectionView` in device pixels.
+            let displayScale = traitCollection.displayScale > 0 ? traitCollection.displayScale : UIScreen.main.scale
+            let requiredPxMaxSide = max(bounds.width, bounds.height) * displayScale
+            let imagePxMaxSide = max(image.size.width, image.size.height) * image.scale
+            guard imagePxMaxSide >= requiredPxMaxSide * 0.9 else { return }
+            // Heal the layout first so later rebinds see the sharp, file-backed state.
+            // setFileBackedThumbnail re-posts to the relay; on that nested entry the
+            // state check below is already satisfied, so the recursion terminates.
+            if !(layout.isThumbnailLoadedFromFile && layout.thumbnail === image) {
+                layout.setFileBackedThumbnail(image)
+            }
+            // setFileBackedThumbnail normally paints via the layout's onLoadThumbnail
+            // fire, but that slot may be owned by a dead cell — paint directly so the
+            // screen never depends on slot ownership.
+            if imageView.image !== image {
+                imageView.image = image
+            }
         }
 
         open func update(status: ChatMessage.Attachment.TransferStatus) {

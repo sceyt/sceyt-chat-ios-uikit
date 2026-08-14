@@ -472,6 +472,22 @@ open class AttachmentTransfer: DataProvider {
         return FileManager.default.fileExists(atPath: path) ? path : nil
     }
 
+    /// Whether `downloadVideoThumbnailsIfNeeded` would actually fetch anything for this
+    /// attachment. Answerable from the attachment alone, unlike the fetch itself, which
+    /// needs the owner message — attachment list view models call this first so the
+    /// overwhelmingly common no-op case costs no message lookup (a database round trip
+    /// per bound cell in `ChannelAttachmentListViewModel`).
+    open func needsVideoThumbnailDownload(attachment: ChatMessage.Attachment) -> Bool {
+        guard attachment.type == "video",
+              let origin = attachment.imageDecodedMetadata?.videoThumbnail,
+              !origin.isEmpty,
+              cachedVideoThumbnailPath(attachment: attachment) == nil,
+              filePath(attachment: attachment) == nil,
+              !inFlightVideoThumbOrigins.contains(origin)
+        else { return false }
+        return true
+    }
+
     /// Downloads the "video_thumb" poster for video attachments whose video file is
     /// not local yet, so the receiver can show a sharp preview while the (much
     /// larger) video is still downloading. Failures are dropped silently and

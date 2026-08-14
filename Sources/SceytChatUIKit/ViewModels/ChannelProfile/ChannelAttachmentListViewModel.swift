@@ -255,8 +255,22 @@ open class ChannelAttachmentListViewModel: NSObject {
     ) {
         let attachment = layout.attachment
         downloadQueue.async { [weak self] in
-            guard let self,
-                  shouldAutoDownload(attachment),
+            guard let self
+            else {
+                DispatchQueue.main.async {
+                    completion?(layout)
+                }
+                return
+            }
+
+            // The video poster is a separate, tiny fetch, so it runs ahead of the
+            // auto-download gate below — a video that won't auto-download (over the
+            // size limit, or a paused/failed transfer waiting for a tap) is exactly
+            // the case where the grid would otherwise sit on the blurred thumbHash
+            // indefinitely.
+            self.downloadVideoThumbnailIfNeeded(layout)
+
+            guard shouldAutoDownload(attachment),
                   // A stored `.done` is not proof the bytes are still there (cache
                   // eviction, restored backup), and a stored `.pending` is not proof
                   // they are missing. The file itself is the authority.
@@ -286,6 +300,27 @@ open class ChannelAttachmentListViewModel: NSObject {
                         }
                 }
             }
+        }
+    }
+
+    /// Fetches the small "video_thumb" poster so a video that is not downloaded yet
+    /// still previews sharply in the grid. Independent of the video transfer itself:
+    /// it must happen even when the video won't be (or hasn't been) downloaded.
+    ///
+    /// The cheap `needsVideoThumbnailDownload` pre-check comes first because
+    /// `getMessage` falls back to a database fetch when the layout carries no owner
+    /// message — this runs for every bound cell, and for images and already-posted
+    /// videos there is nothing to fetch.
+    open func downloadVideoThumbnailIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
+        let attachment = layout.attachment
+        guard fileProvider.needsVideoThumbnailDownload(attachment: attachment)
+        else { return }
+        getMessage(layout) { message in
+            guard let message else { return }
+            fileProvider.downloadVideoThumbnailsIfNeeded(
+                message: message,
+                attachments: [attachment]
+            )
         }
     }
 
