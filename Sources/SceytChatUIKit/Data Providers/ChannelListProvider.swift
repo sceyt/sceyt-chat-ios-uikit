@@ -50,6 +50,40 @@ open class ChannelListProvider: DataProvider {
         self.config = config
         super.init()
         createDefaultQuery()
+        Self.repairMemberChannelLinksIfNeeded()
+    }
+
+    private static let memberLinkRepairKey = "SceytChatUIKit.didRepairMemberChannelLinks"
+    private static var didStartMemberLinkRepair = false
+
+    /// One-off cleanup for stores written before `MemberDTO.fetchOrCreate` started
+    /// asserting the channel link on every write: relinks member rows whose `channel`
+    /// disagrees with their `channelId`. Rows in that state make the channel they belong
+    /// to report `members.@count == 0`, which hides direct channels from this list.
+    ///
+    /// New drift can't accumulate any more, so this runs once per install, not per launch.
+    private static func repairMemberChannelLinksIfNeeded() {
+        // Serialised on main so two providers built concurrently can't both start a scan.
+        guard Thread.isMainThread else {
+            return DispatchQueue.main.async { repairMemberChannelLinksIfNeeded() }
+        }
+        guard !didStartMemberLinkRepair,
+              !UserDefaults.standard.bool(forKey: memberLinkRepairKey)
+        else { return }
+        didStartMemberLinkRepair = true
+
+        var repaired = 0
+        database.write {
+            repaired = $0.repairMemberChannelLinks()
+        } completion: { error in
+            if let error {
+                DispatchQueue.main.async { didStartMemberLinkRepair = false }
+                logger.errorIfNotNil(error, "Failed to relink member rows")
+                return
+            }
+            UserDefaults.standard.set(true, forKey: memberLinkRepairKey)
+            logger.info("Relinked \(repaired) member rows whose channel link disagreed with channelId")
+        }
     }
     
     open func createDefaultQuery() {

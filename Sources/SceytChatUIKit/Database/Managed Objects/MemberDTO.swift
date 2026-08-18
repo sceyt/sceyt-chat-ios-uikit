@@ -47,7 +47,11 @@ public class MemberDTO: NSManagedObject {
             if existing.count > 1 {
                 existing.dropFirst().forEach { context.delete($0) }
             }
-            if mo.channel == nil {
+            // The relationship must always point at the channel `channelId` names.
+            // When it doesn't, the channel it should point at reports members.@count == 0
+            // (and is filtered out of the channel list) while another channel gets members
+            // it doesn't own.
+            if mo.channel?.id != Int64(channelId) {
                 mo.channel = ChannelDTO.fetch(id: channelId, context: context)
             }
             return mo

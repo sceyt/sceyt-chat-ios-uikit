@@ -259,6 +259,46 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         return dto
     }
     
+    /// Realigns `MemberDTO.channel` with the ChannelDTO that `MemberDTO.channelId` names.
+    ///
+    /// A member row states its channel twice — in the `channelId` attribute and in the
+    /// `channel` relationship — and nothing in Core Data keeps the two in sync. When they
+    /// drift apart the channel the member really belongs to reports `members.@count == 0`,
+    /// which hides direct channels from the channel list, while an unrelated channel
+    /// reports members it doesn't own. `channelId` is the authoritative side: message rows,
+    /// member lookups and channel search are all keyed by it.
+    /// - Returns: the number of member rows that were relinked.
+    @discardableResult
+    public func repairMemberChannelLinks() -> Int {
+        let request = MemberDTO.fetchRequest()
+        request.fetchBatchSize = 500
+        request.relationshipKeyPathsForPrefetching = [#keyPath(MemberDTO.channel)]
+        let diverged = MemberDTO.fetch(request: request, context: self)
+            .filter { $0.channel?.id != $0.channelId }
+        guard !diverged.isEmpty else { return 0 }
+
+        // Chunked so a badly drifted store doesn't build one enormous `id IN (…)`.
+        var channelsById = [Int64: ChannelDTO]()
+        let ids = Array(Set(diverged.compactMap { $0.channelId > 0 ? ChannelId($0.channelId) : nil }))
+        for chunk in ids.chunked(into: 500) {
+            for dto in ChannelDTO.fetch(ids: Array(chunk), context: self) {
+                channelsById[dto.id] = dto
+            }
+        }
+
+        var relinked = 0
+        for member in diverged {
+            // A row whose channel isn't in the store belongs to no local channel: nil is
+            // the honest link, and leaving it pointing elsewhere corrupts that channel's
+            // member count.
+            let channel = channelsById[member.channelId]
+            guard member.channel !== channel else { continue }
+            member.channel = channel
+            relinked += 1
+        }
+        return relinked
+    }
+
     @discardableResult
     public func createOrUpdate(member: Member, channelId: ChannelId) -> MemberDTO {
         let dto = MemberDTO.fetchOrCreate(id: member.id, channelId: channelId, context: self).map(member)
