@@ -81,6 +81,9 @@ open class AttachmentTransfer: DataProvider {
         if attachment.id != 0 {
             return "id\(attachment.id)"
         }
+        // No tid, url, filePath or id: every such attachment collapses onto one key,
+        // so their progress would be delivered to each other's observers.
+        logger.error("[Attachment] transferIdentity has nothing to key on — progress delivery will be wrong for \(attachment.description)")
         return "unknown"
     }
     
@@ -139,6 +142,9 @@ open class AttachmentTransfer: DataProvider {
         // Remove only the caller's registration. Dropping the whole bucket silenced
         // every other subscriber for the same attachment — a channel-info cell being
         // deallocated took the open message cell's live progress ring with it.
+        if objectIdKey.isEmpty, existing.count > 1 {
+            logger.warn("[Attachment] removeProgressObserver called with no objectIdKey — dropping all \(existing.count) observers for \(key), including ones this caller does not own")
+        }
         let remaining = objectIdKey.isEmpty ? [] : existing.filter { $0.idKey != objectIdKey }
         // The cached percent belongs to the transfer, not to any one observer: it is
         // what a later rebind reads to restore the ring. Keep it while a task is
@@ -314,6 +320,7 @@ open class AttachmentTransfer: DataProvider {
         tasksQueue.async {
             guard let attachments = attachments ?? message.attachments
             else {
+                logger.verbose("[Attachment] downloadMessageAttachments: nothing to download, message \(message.id) has no attachments")
                 completion?(message, nil)
                 return
             }
@@ -324,7 +331,12 @@ open class AttachmentTransfer: DataProvider {
                 for (_, attachment) in attachments.enumerated() {
                     guard let url = attachment.url,
                           !url.isEmpty
-                    else { continue }
+                    else {
+                        // Skipped without a task, so nothing will ever complete or fail
+                        // it — it keeps whatever status it has, forever.
+                        logger.error("[Attachment] downloadMessageAttachments: skipping attachment with no url, it will never download \(attachment.description)")
+                        continue
+                    }
                     if existTasks?.contains(where: { $0.attachment.url == attachment.url }) == true || fileProvider.filePath(attachment: attachment) != nil {
                         let key = Self.key(message: message, attachment: attachment)
                         self.downloadCallbackCache[key] = [.init(callback: completion)]
@@ -346,6 +358,7 @@ open class AttachmentTransfer: DataProvider {
                     )
                 }
                 guard !tasks.isEmpty else {
+                    logger.verbose("[Attachment] downloadMessageAttachments: no new tasks for message \(message.id), every requested attachment is already transferring or on disk")
                     completion?(message, AttachmentTransferError.alreadyTransferring)
                     return
                 }
@@ -362,6 +375,7 @@ open class AttachmentTransfer: DataProvider {
                 self.taskGroups[groupKey] = (self.taskGroups[groupKey] ?? []) + tasks
                 self.handle(tasks: tasks, message: message, attachments: attachments, completion: completion)
             } else {
+                logger.error("[Attachment] downloadMessageAttachments: Components.dataSession is nil — no transport, nothing will download for message \(message.id)")
                 completion?(message, AttachmentTransferError.externalTransferrerNotImplemented)
             }
         }
@@ -390,8 +404,14 @@ open class AttachmentTransfer: DataProvider {
                 return
             }
             
+            // Matched by transfer identity, not `id`: every attachment of an incoming
+            // message has `id == 0` until the server assigns one, so `$0.id == attachment.id`
+            // returned whichever attachment came first — pausing the third video paused
+            // the first — and when the ids disagreed it matched nothing and silently
+            // reported success having changed no status at all.
+            let identity = Self.transferIdentity(of: attachment)
             if let attachments = message.attachments,
-                let attachment = attachments.first(where: { $0.id == attachment.id }) {
+                let attachment = attachments.first(where: { Self.transferIdentity(of: $0) == identity }) {
                 switch task.transferType {
                 case .download:
                     attachment.status = .pauseDownloading
@@ -406,6 +426,7 @@ open class AttachmentTransfer: DataProvider {
                 completion?(true)
                 return
             }
+            logger.error("[Attachment] stopTransfer: no attachment on the message matches \(identity) — status unchanged, the transfer keeps running")
             completion?(true)
         }
     }
@@ -420,8 +441,10 @@ open class AttachmentTransfer: DataProvider {
                     completion?(false)
                     return
                 }
+                // See `stopTransfer`: `id` is not a usable match for an in-flight transfer.
+                let identity = Self.transferIdentity(of: attachment)
                 if let attachments = message.attachments,
-                   let attachment = attachments.first(where: { $0.id == attachment.id }) {
+                   let attachment = attachments.first(where: { Self.transferIdentity(of: $0) == identity }) {
                     switch task.transferType {
                     case .download:
                         attachment.status = .downloading
@@ -436,6 +459,7 @@ open class AttachmentTransfer: DataProvider {
                     completion?(true)
                     return
                 }
+                logger.error("[Attachment] resumeTransfer: no attachment on the message matches \(identity) — status unchanged, the UI will keep showing it paused")
                 completion?(true)
                 return
             }
@@ -613,10 +637,16 @@ open class AttachmentTransfer: DataProvider {
                 progress: progress
             )
             logger.verbose("[Attachment] onProgress KEY \(key)")
-            if let blocks = self.cache[key] {
+            if let blocks = self.cache[key], !blocks.isEmpty {
                 blocks.forEach {
                     $0.progress?(attachmentProgress)
                 }
+            } else {
+                // The transfer is running but nothing is listening on this key. Either
+                // no view is on screen for it, or the emitter and the subscriber
+                // disagree on the attachment's identity — the latter shows up as a ring
+                // frozen at its bind-time floor until the download completes.
+                logger.warn("[Attachment] onProgress has no observers for KEY \(key) — progress \(progress) will not be rendered \(taskInfo.attachment.description)")
             }
             self.progressCache[key] = progress
         }

@@ -91,7 +91,12 @@ open class SCTSession: NSObject, SCTDataSession {
     open func download(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo) {
         guard let urlString = attachment.url,
               let url = URL(string: urlString)
-        else { return }
+        else {
+            // No task is created, so nothing will ever report progress, complete or
+            // fail — the attachment is left in whatever status it already has.
+            logger.error("[Attachment] SCTSession.download: unusable url, download not started \(attachment.description)")
+            return
+        }
         Session.download(url: url) { progress in
             taskInfo.updateProgress(progress.fractionCompleted)
         } completion: { result in

@@ -461,7 +461,12 @@ extension MessageCell {
         open func setProgressHandler() {
             guard let data = data,
                   let message = data.ownerMessage
-            else { return }
+            else {
+                // Without a subscription this view can never show progress: the ring
+                // stays on whatever `bind` seeded until the transfer completes.
+                logger.error("[Attachment] setProgressHandler skipped, no progress will be shown — data=\(data == nil ? "nil" : "set") ownerMessage=\(data?.ownerMessage == nil ? "nil" : "set")")
+                return
+            }
             var needsToUpdateStatus = false
             fileProvider
                 .progress(
@@ -484,7 +489,10 @@ extension MessageCell {
                     // and would reject every tick of the very transfer we are showing.
                     guard AttachmentTransfer.transferIdentity(of: data.attachment)
                             == AttachmentTransfer.transferIdentity(of: progress.attachment)
-                    else { return }
+                    else {
+                        logger.warn("[Attachment] dropping a tick for another attachment — bound \(AttachmentTransfer.transferIdentity(of: data.attachment)) received \(AttachmentTransfer.transferIdentity(of: progress.attachment))")
+                        return
+                    }
 
                     DispatchQueue.main.async { [weak self] in
                         if needsToUpdateStatus {
