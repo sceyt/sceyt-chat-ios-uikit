@@ -192,7 +192,11 @@ extension MessageCell {
                 if let progress = fileProvider.currentProgressPercent(message: data.message, attachment: layout.attachment) {
                     av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
                 } else if fileProvider.filePath(attachment: layout.attachment) == nil {
-                    av.setProgress(0.0001)
+                    // Through the AttachmentProgress overload so the "0 B / 12.4 MB"
+                    // label is seeded too. The CGFloat overload only moves the ring,
+                    // which left the byte count blank until the next tick — and blank
+                    // forever when the transfer had already delivered its last one.
+                    av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: 0.0001))
                 } else if fileProvider.taskFor(message: data.message, attachment: layout.attachment) != nil {
                     // An upload always has a local file, so the `filePath == nil` fallback
                     // above only ever fires for downloads. Bind a live upload to the same

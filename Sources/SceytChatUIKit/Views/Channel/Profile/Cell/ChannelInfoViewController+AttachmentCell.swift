@@ -215,7 +215,7 @@ extension ChannelInfoViewController {
                 .progress(
                     message: message,
                     attachment: data.attachment,
-                    objectIdKey: data.attachment.description
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infoattachment")
                 ) { [weak self] progress in
                     guard let self, self.data?.attachment.id == data.attachment.id else { return }
                     DispatchQueue.main.async { [weak self] in
@@ -225,7 +225,11 @@ extension ChannelInfoViewController {
                 } completion: { [weak self] done in
                     guard self?.data?.attachment.id == data.attachment.id else { return }
                     if done.error == nil {
-                        fileProvider.removeProgressObserver(message: done.message, attachment: done.attachment)
+                        fileProvider.removeProgressObserver(
+                            message: done.message,
+                            attachment: done.attachment,
+                            objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "infoattachment") } ?? ""
+                        )
                     }
                     data.update(attachment: done.attachment)
                     DispatchQueue.main.async { [weak self] in
@@ -248,7 +252,11 @@ extension ChannelInfoViewController {
             // thumbnail).
             overlayGeneration &+= 1
             if let message = data?.ownerMessage, let attachment = data?.attachment {
-                fileProvider.removeProgressObserver(message: message, attachment: attachment)
+                fileProvider.removeProgressObserver(
+                    message: message,
+                    attachment: attachment,
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infoattachment")
+                )
             }
             lastAttachmentTransferProgress = nil
             progressView.isHidden = true
@@ -259,7 +267,11 @@ extension ChannelInfoViewController {
 
         deinit {
             if let message = data?.ownerMessage, let attachment = data?.attachment {
-                fileProvider.removeProgressObserver(message: message, attachment: attachment)
+                fileProvider.removeProgressObserver(
+                    message: message,
+                    attachment: attachment,
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infoattachment")
+                )
             }
         }
 

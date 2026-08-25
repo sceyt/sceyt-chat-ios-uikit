@@ -167,7 +167,8 @@ extension ChannelInfoViewController {
             fileProvider
                 .progress(
                     message: message,
-                    attachment: attachment
+                    attachment: attachment,
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infofile")
                 ) { [weak self] progress in
                     guard let self, self.data == data
                     else {
@@ -178,9 +179,13 @@ extension ChannelInfoViewController {
                     DispatchQueue.main.async { [weak self] in
                         self?.progressView.progress = progress.progress
                     }
-                } completion: { result in
+                } completion: { [weak self] result in
                     logger.debug("[Attachment] completion \(result.attachment.status)")
-                    fileProvider.removeProgressObserver(message: result.message, attachment: result.attachment)
+                    fileProvider.removeProgressObserver(
+                        message: result.message,
+                        attachment: result.attachment,
+                        objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "infofile") } ?? ""
+                    )
                 }
         }
         
@@ -204,7 +209,8 @@ extension ChannelInfoViewController {
             if let message = data?.ownerMessage, let attachment = data?.attachment {
                 fileProvider.removeProgressObserver(
                     message: message,
-                    attachment: attachment)
+                    attachment: attachment,
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infofile"))
             }
         }
 
@@ -214,7 +220,8 @@ extension ChannelInfoViewController {
             if let message = data?.ownerMessage, let attachment = data?.attachment {
                 fileProvider.removeProgressObserver(
                     message: message,
-                    attachment: attachment)
+                    attachment: attachment,
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infofile"))
             }
         }
     }

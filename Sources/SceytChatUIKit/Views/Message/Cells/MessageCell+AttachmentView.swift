@@ -467,13 +467,24 @@ extension MessageCell {
                 .progress(
                     message: message,
                     attachment: data.attachment,
-                    objectIdKey: "messagecell." + data.attachment.description
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "messagecell")
                 ) { [weak self, weak data] progress in
                     guard let self, let data, self.data == data
                     else {
                         logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(progress.attachment.description)")
                         return
                     }
+                    // A tick for a different attachment is not ours to render: its
+                    // percent against this attachment's total would produce a byte
+                    // count belonging to neither.
+                    //
+                    // Compared by transfer identity rather than `==`: the tick carries
+                    // the task's copy of the attachment, which can be missing the `id`
+                    // this cell's database-backed copy already has. `==` is `id`-first
+                    // and would reject every tick of the very transfer we are showing.
+                    guard AttachmentTransfer.transferIdentity(of: data.attachment)
+                            == AttachmentTransfer.transferIdentity(of: progress.attachment)
+                    else { return }
 
                     DispatchQueue.main.async { [weak self] in
                         if needsToUpdateStatus {
@@ -491,7 +502,11 @@ extension MessageCell {
                     }
                     logger.debug("[Attachment] completion \(done.attachment.status)")
                     if done.error == nil {
-                        fileProvider.removeProgressObserver(message: done.message, attachment: done.attachment)
+                        fileProvider.removeProgressObserver(
+                            message: done.message,
+                            attachment: done.attachment,
+                            objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "messagecell") } ?? ""
+                        )
                     } else {
                         needsToUpdateStatus = true
                     }

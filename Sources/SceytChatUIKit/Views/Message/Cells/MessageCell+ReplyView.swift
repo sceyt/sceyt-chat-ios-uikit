@@ -245,12 +245,16 @@ extension MessageCell {
                 .progress(
                     message: message,
                     attachment: chatAttachment,
-                    objectIdKey: chatAttachment.description + "reply"
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "reply")
                 ) { _ in
 
-                } completion: { [weak data] done in
+                } completion: { [weak self, weak data] done in
                     if done.error == nil {
-                        fileProvider.removeProgressObserver(message: done.message, attachment: done.attachment)
+                        fileProvider.removeProgressObserver(
+                            message: done.message,
+                            attachment: done.attachment,
+                            objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "reply") } ?? ""
+                        )
                     }
                     // Reloads the thumbnail from the now-downloaded file; the
                     // onLoadThumbnail hook above pushes it into the image view.

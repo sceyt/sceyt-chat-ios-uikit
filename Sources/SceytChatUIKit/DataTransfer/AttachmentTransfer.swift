@@ -50,14 +50,51 @@ open class AttachmentTransfer: DataProvider {
         Components.dataSession
     }
     
+    /// Identifies an attachment *for the duration of one transfer*.
+    ///
+    /// The emitter and the subscriber hold different `ChatMessage.Attachment`
+    /// instances of the same attachment — the task captures one when the transfer
+    /// starts, the cell rebinds from a fresher copy out of the database. Matching
+    /// them requires a discriminator that is populated on both and does not change
+    /// while the bytes are moving, which rules out the obvious candidates:
+    ///
+    /// - `id`   is 0 on the task's copy of an outgoing attachment and non-zero on the
+    ///          database's, so leading with it splits one transfer across two keys —
+    ///          the emitter publishes to `url…` while the cell listens on `id…`.
+    /// - `tid`  is 0 for every incoming attachment (nothing assigns one), so leading
+    ///          with it alone collapses all attachments of a message into one bucket.
+    ///
+    /// Hence: `tid` (stable across an upload) → `url` (present from the start of a
+    /// download) → `filePath` (a tid-less upload's local file) → `id` only as a last
+    /// resort. This is deliberately *not* `ChatMessage.Attachment.==`, which is
+    /// `id`-first and is used for layout diffing elsewhere.
+    static func transferIdentity(of attachment: ChatMessage.Attachment) -> String {
+        if attachment.tid != 0 {
+            return "tid\(attachment.tid)"
+        }
+        if let url = attachment.url, !url.isEmpty {
+            return "url\(url)"
+        }
+        if let filePath = attachment.filePath, !filePath.isEmpty {
+            return "path\((filePath as NSString).lastPathComponent.lowercased())"
+        }
+        if attachment.id != 0 {
+            return "id\(attachment.id)"
+        }
+        return "unknown"
+    }
+    
     private static func key(message: ChatMessage, attachment: ChatMessage.Attachment) -> String {
-        let key = "\(message.id).\(message.tid).\(attachment.tid)"
-        return key
+        "\(message.id).\(message.tid).\(transferIdentity(of: attachment))"
     }
     
     open func taskFor(message: ChatMessage, attachment: ChatMessage.Attachment) -> SCTDataSessionTaskInfo? {
         if let tasks = taskGroups[message.id != 0 ? Int64(message.id) : message.tid] {
-            return tasks.first(where: { $0.attachment == attachment })
+            // Not `==`: that is `id`-first, so a live task holding an id-less copy of
+            // this attachment would not be found and the caller would conclude the
+            // transfer is dead.
+            let identity = Self.transferIdentity(of: attachment)
+            return tasks.first(where: { Self.transferIdentity(of: $0.attachment) == identity })
         }
         return nil
     }
@@ -92,10 +129,30 @@ open class AttachmentTransfer: DataProvider {
         progressCache[Self.key(message: message, attachment: attachment)]
     }
     
-    open func removeProgressObserver(message: ChatMessage, attachment: ChatMessage.Attachment) {
+    open func removeProgressObserver(
+        message: ChatMessage,
+        attachment: ChatMessage.Attachment,
+        objectIdKey: String = ""
+    ) {
         let key = Self.key(message: message, attachment: attachment)
-        cache[key] = nil
-        progressCache[key] = nil
+        let existing = cache[key] ?? []
+        // Remove only the caller's registration. Dropping the whole bucket silenced
+        // every other subscriber for the same attachment — a channel-info cell being
+        // deallocated took the open message cell's live progress ring with it.
+        let remaining = objectIdKey.isEmpty ? [] : existing.filter { $0.idKey != objectIdKey }
+        // The cached percent belongs to the transfer, not to any one observer: it is
+        // what a later rebind reads to restore the ring. Keep it while a task is
+        // still running; `didEndTask` clears it when the transfer really is over.
+        let liveTask = taskFor(message: message, attachment: attachment) != nil
+        if remaining.isEmpty {
+            cache[key] = nil
+        } else {
+            // updateValue, not the subscript: the FileProviderCache setter appends.
+            cache.updateValue(remaining, forKey: key)
+        }
+        if !liveTask {
+            progressCache[key] = nil
+        }
     }
     
     open func uploadMessageAttachments(
@@ -299,7 +356,10 @@ open class AttachmentTransfer: DataProvider {
                     logger.verbose("[Attachment] Download error \(infos.map { $0.attachment.url}) \(message.id)")
                     logger.verbose("[Attachment] Download error new \(tasks.map { $0.attachment.url}) \(tasks.map { $0.message.id})")
                 }
-                self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] = tasks
+                // Merge: overwriting dropped any sibling task still running under this
+                // message from the `existTasks` guard consulted on the next rebind.
+                let groupKey = message.id != 0 ? Int64(message.id) : message.tid
+                self.taskGroups[groupKey] = (self.taskGroups[groupKey] ?? []) + tasks
                 self.handle(tasks: tasks, message: message, attachments: attachments, completion: completion)
             } else {
                 completion?(message, AttachmentTransferError.externalTransferrerNotImplemented)
@@ -689,6 +749,7 @@ open class AttachmentTransfer: DataProvider {
 
         func didEndTask(taskInfo: SCTDataSessionTaskInfo, error: Error?) {
             let key = Self.key(message: taskInfo.message, attachment: taskInfo.attachment)
+            let groupKey = message.id != 0 ? Int64(message.id) : message.tid
             // The task is over — no progress/completion event will ever fire for this
             // key again. Drop the cached percent so a later cell rebind that still
             // reads a stale `.downloading` status can't restore a progress ring that
@@ -722,9 +783,13 @@ open class AttachmentTransfer: DataProvider {
                     }
                 }
             }
-            if let taskInfos = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] {
+            if let taskInfos = self.taskGroups[groupKey] {
                 logger.verbose("[Attachment] Handle didEndTask  taskInfos \(taskInfos.map { $0.attachment.url})")
-                self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] = nil
+                // Only this task is over. Clearing the whole group left the message's
+                // other attachments with no entry to guard against, so the next cell
+                // rebind started a second download for bytes already in flight.
+                let survivors = taskInfos.filter { $0 !== taskInfo }
+                self.taskGroups[groupKey] = survivors.isEmpty ? nil : survivors
             }
             
         }
@@ -875,5 +940,18 @@ private extension CallbackCache {
             self[key] = self[key]?.filter { $0.callback != nil }
             self[key]?.append(contentsOf: newValue)
         }
+    }
+}
+
+public extension AttachmentTransfer {
+
+    /// A stable identity for one progress subscriber, for `objectIdKey`.
+    ///
+    /// Derived from the observing object, not from the attachment: an attachment's
+    /// `description` embeds `filePath`, which is `nil` while downloading and set
+    /// once the bytes land, so a key built from it changes underneath the observer
+    /// and neither the replace-on-rebind nor the scoped removal can match it.
+    static func observerKey(for object: AnyObject, prefix: String) -> String {
+        prefix + "." + String(UInt(bitPattern: ObjectIdentifier(object).hashValue), radix: 16)
     }
 }
