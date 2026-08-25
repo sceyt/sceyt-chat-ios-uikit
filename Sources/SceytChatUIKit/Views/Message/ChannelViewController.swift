@@ -3573,13 +3573,7 @@ open class ChannelViewController: ViewController,
                     self?.collectionView.performUpdates(updates, completion: completion)
                 }
             } else if animatesNewestInsert {
-                UIView.animate(
-                    withDuration: 0.25,
-                    delay: 0,
-                    options: [.curveLinear, .allowUserInteraction]
-                ) { [weak self] in
-                    self?.collectionView.performUpdates(updates, completion: completion)
-                }
+                self.collectionView.performUpdates(updates, completion: completion)
             } else {
                 collectionView.performUpdates(updates, completion: completion)
             }
