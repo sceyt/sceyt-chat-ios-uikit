@@ -15,13 +15,32 @@ open class MediaPickerViewController: ViewController,
     UICollectionViewDelegate
 {
     private let imageManager = PHCachingImageManager()
+
+    @available(*, deprecated, message: "Pagination was removed — PHFetchResult is already lazy and faults assets in on demand. This value is unused.")
     public static let pageSize = 100
-    
+
     public var onSelected: (([PHAsset], MediaPickerViewController) -> Bool)?
+    /// Every asset the picker considers selected: `preSelectedIdentifiers` ∪ the ones tapped
+    /// in this session. Drives the selected count, the selection limit and the checkmarks.
     private var selectedIdentifiers = Set<String>()
     private var preSelectedIdentifiers = Set<String>()
-    private var selectedIndexPaths = [IndexPath]()
+    /// Identifiers tapped *in this session*, in tap order — the assets handed to `onSelected`.
+    /// Pre-selected ones are deliberately absent: they are already in the composer, and
+    /// returning them again would attach duplicates.
+    ///
+    /// Keyed by `localIdentifier` rather than `IndexPath` because index paths go stale across
+    /// any reload — a photo-library change used to shift them and hand back the *wrong* assets.
+    private var selectedIdentifierOrder = [String]()
     private var attachmentSelectionLimit = SceytChatUIKit.shared.config.attachmentSelectionLimit
+
+    /// How many items the collection view is actually showing, as of the last applied update.
+    ///
+    /// `collectionView.numberOfItems(inSection:)` cannot be trusted for this: `reloadData()` is
+    /// lazy, so between a `reloadData()` and the next layout pass UIKit still reports the
+    /// *pre-reload* count. Incremental updates computed against that stale number are what
+    /// aborted `performBatchUpdates` in production. Tracked explicitly instead, and every
+    /// incremental update validates against it before it is applied.
+    private var appliedItemCount = 0
     
     open lazy var collectionView = Components.mediaPickerCollectionView
         .init()
@@ -59,6 +78,9 @@ open class MediaPickerViewController: ViewController,
     
     public private(set) var assets: PHFetchResult<PHAsset> = PHFetchResult()
     
+    /// Passthrough to `fetchOptions.fetchLimit`. The picker no longer paginates — it fetches the
+    /// whole library and lets `PHFetchResult` fault assets in on demand — so this is `0`
+    /// (unlimited) unless a host deliberately caps it.
     public var fetchLimit: Int {
         get {
             return fetchOptions.fetchLimit
@@ -148,7 +170,7 @@ open class MediaPickerViewController: ViewController,
     }
     
     override open func viewDidLayoutSubviews() {
-        super.viewWillLayoutSubviews()
+        super.viewDidLayoutSubviews()
         collectionViewLayout?.itemSize = itemSize()
         collectionView.collectionViewLayout.invalidateLayout()
     }
@@ -178,11 +200,10 @@ open class MediaPickerViewController: ViewController,
     @objc
     open func attachButtonAction(_ sender: AttachButton) {
         loader.isLoading = true
-        var selectedAssets: [PHAsset] = []
-        for indexPath in selectedIndexPaths {
-            guard indexPath.item < assets.count else { continue }
-            selectedAssets += [assets.object(at: indexPath.item)]
-        }
+        // Resolved by identifier, so assets scrolled out of — or filtered out of — the current
+        // fetch result still come back, and a library change can never substitute a different
+        // photo for one the user actually tapped.
+        let selectedAssets = resolveAssets(for: selectedIdentifierOrder)
         let shouldDismiss = onSelected?(selectedAssets, self)
         if shouldDismiss != false {
             dismiss(animated: true)
@@ -264,7 +285,6 @@ open class MediaPickerViewController: ViewController,
         _ collectionView: UICollectionView,
         cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-        fetchNextPageIfNeeded(indexPath: indexPath)
         let cell = collectionView.dequeueReusableCell(
             for: indexPath,
             cellType: Components.mediaPickerCell.self
@@ -329,8 +349,14 @@ open class MediaPickerViewController: ViewController,
         didSelectItemAt indexPath: IndexPath
     ) {
         if indexPath.item < assets.count {
-            selectedIdentifiers.insert(assets[indexPath.item].localIdentifier)
-            selectedIndexPaths.append(indexPath)
+            let identifier = assets[indexPath.item].localIdentifier
+            selectedIdentifiers.insert(identifier)
+            // A `reloadData()` clears the collection view's own selection while `willDisplay`
+            // keeps drawing the checkmark from `selectedIdentifiers`, so the same cell can be
+            // "selected" twice. Appending unconditionally would attach it twice as well.
+            if !selectedIdentifierOrder.contains(identifier) {
+                selectedIdentifierOrder.append(identifier)
+            }
         }
         footerView.selectedCount = selectedIdentifiers.count
     }
@@ -340,8 +366,9 @@ open class MediaPickerViewController: ViewController,
         didDeselectItemAt indexPath: IndexPath
     ) {
         if indexPath.item < assets.count {
-            selectedIdentifiers.remove(assets[indexPath.item].localIdentifier)
-            selectedIndexPaths.removeAll(where: { $0 == indexPath })
+            let identifier = assets[indexPath.item].localIdentifier
+            selectedIdentifiers.remove(identifier)
+            selectedIdentifierOrder.removeAll(where: { $0 == identifier })
         }
         footerView.selectedCount = selectedIdentifiers.count
     }
@@ -392,8 +419,7 @@ private extension MediaPickerViewController {
         PHPhotoLibrary.requestAuthorization { [weak self] _ in
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                self.assets = PHAsset.fetchAssets(with: self.fetchOptions)
-                self.collectionView.reloadData()
+                self.fetchAssets()
                 self.updateManageAccessView()
             }
         }
@@ -416,20 +442,64 @@ private extension MediaPickerViewController {
         }
     }
     
+    /// Re-fetches the whole library from scratch and reloads. `PHFetchOptions.fetchLimit` is
+    /// left alone: the picker does not paginate, so the fetch result covers every matching
+    /// asset and `PHFetchResult` faults them in as the grid scrolls.
     func fetchAssets() {
-        let selectedAssets = collectionView.indexPathsForSelectedItems?.map {
-            assets.object(at: $0.item)
-        } ?? []
-        
-        fetchOptions.fetchLimit = Self.pageSize
         assets = PHAsset.fetchAssets(with: fetchOptions)
+        reloadCollectionView()
+    }
+
+    /// The single reload entry point — keeps `appliedItemCount` and the selection in step with
+    /// whatever `assets` now holds.
+    func reloadCollectionView() {
         collectionView.reloadData()
-        
-        selectedAssets.forEach {
-            collectionView.selectItem(at: .init(item: assets.index(of: $0), section: 0), animated: false, scrollPosition: [])
-        }
-        
+        appliedItemCount = assets.count
+        reapplySelection()
         resetCachedAssets()
+    }
+
+    /// Maps identifiers back to assets, preserving the order they were given in.
+    ///
+    /// `fetchAssets(withLocalIdentifiers:options:)` deliberately passes no options: this is an
+    /// identity lookup, so the picker's predicate and sort must not filter or reorder it.
+    func resolveAssets(for identifiers: [String]) -> [PHAsset] {
+        guard !identifiers.isEmpty else { return [] }
+        let fetched = PHAsset.fetchAssets(withLocalIdentifiers: identifiers, options: nil)
+        var byIdentifier = [String: PHAsset](minimumCapacity: fetched.count)
+        fetched.enumerateObjects { asset, _, _ in
+            byIdentifier[asset.localIdentifier] = asset
+        }
+        return identifiers.compactMap { byIdentifier[$0] }
+    }
+
+    /// Restores the collection view's selection after a `reloadData()`, which clears it.
+    ///
+    /// Resolves by identifier rather than walking `assets` — that is now the entire library, so
+    /// an enumeration would be O(library). Assets that no longer resolve have been deleted from
+    /// the library and are dropped from the selection; previously they produced an
+    /// `IndexPath(item: NSNotFound)`.
+    func reapplySelection() {
+        guard !selectedIdentifiers.isEmpty else { return }
+
+        let resolved = resolveAssets(for: Array(selectedIdentifiers))
+        let existing = Set(resolved.map { $0.localIdentifier })
+        if existing.count != selectedIdentifiers.count {
+            selectedIdentifiers.formIntersection(existing)
+            preSelectedIdentifiers.formIntersection(existing)
+            selectedIdentifierOrder.removeAll { !existing.contains($0) }
+            footerView.selectedCount = selectedIdentifiers.count
+        }
+
+        for asset in resolved {
+            let index = assets.index(of: asset)
+            guard index != NSNotFound else { continue }
+            collectionView.selectItem(
+                at: IndexPath(item: index, section: 0),
+                animated: false,
+                scrollPosition: []
+            )
+        }
     }
     
     func updateFetchOptionPredicate() {
@@ -455,26 +525,83 @@ private extension MediaPickerViewController {
         fetchAssets()
     }
     
-    func fetchNextPageIfNeeded(indexPath: IndexPath) {
-        guard indexPath.item == fetchLimit - 1
-        else { return }
-        DispatchQueue.main.async {
-            let oldFetchLimit = self.fetchLimit
-            self.fetchLimit += Self.pageSize
-            self.assets = PHAsset.fetchAssets(with: self.fetchOptions)
-            
-            let indexPaths = (oldFetchLimit ..< self.assets.count).map {
-                IndexPath(item: $0, section: 0)
-            }
-            self.collectionView.insertItems(at: indexPaths)
+    /// Applies a photo-library change to the grid.
+    func apply(_ changes: PHFetchResultChangeDetails<PHAsset>) {
+        // `updateUI(for:)` detaches the data source when photo access is revoked. Anything
+        // applied now would be a batch update against a view with no data source; restoring
+        // access goes back through `fetchAssets()`, which re-syncs everything from scratch.
+        guard collectionView.dataSource != nil else { return }
+
+        assets = changes.fetchResultAfterChanges
+
+        // The incremental indexes are only meaningful if the collection view is really showing
+        // `fetchResultBeforeChanges`. A `reloadData()` from `fetchAssets()` earlier in this same
+        // run-loop turn has not been laid out yet, so UIKit's cached count is still the
+        // pre-reload one — applying a diff on top of that is exactly what aborted
+        // `performBatchUpdates` in production. `appliedItemCount` catches that; moves are sat
+        // out because the sort is stable enough that they are rare, and a reload is correct.
+        guard changes.hasIncrementalChanges,
+              !changes.hasMoves,
+              changes.fetchResultBeforeChanges.count == appliedItemCount
+        else {
+            reloadCollectionView()
+            return
         }
+
+        let removed = (changes.removedIndexes ?? []).map { IndexPath(item: $0, section: 0) }
+        let inserted = (changes.insertedIndexes ?? []).map { IndexPath(item: $0, section: 0) }
+        // Captured as assets, not indexes: `changedIndexes` is in pre-change coordinates, and
+        // reloading in the same batch as inserts/deletes (UIKit implements a reload as a
+        // delete + insert) is a well-known way to trip the same assertion. Resolved back to
+        // post-change index paths and reloaded once the batch has landed.
+        let changedAssets = (changes.changedIndexes ?? []).map {
+            changes.fetchResultBeforeChanges.object(at: $0)
+        }
+
+        guard !removed.isEmpty || !inserted.isEmpty || !changedAssets.isEmpty else {
+            appliedItemCount = assets.count
+            return
+        }
+
+        collectionView.performBatchUpdates {
+            if !removed.isEmpty {
+                collectionView.deleteItems(at: removed)
+            }
+            if !inserted.isEmpty {
+                collectionView.insertItems(at: inserted)
+            }
+        } completion: { [weak self] _ in
+            guard let self, !changedAssets.isEmpty else { return }
+            let changedPaths = changedAssets.compactMap { asset -> IndexPath? in
+                let index = self.assets.index(of: asset)
+                return index == NSNotFound ? nil : IndexPath(item: index, section: 0)
+            }
+            guard !changedPaths.isEmpty else { return }
+            self.collectionView.reloadItems(at: changedPaths)
+        }
+        appliedItemCount = assets.count
+
+        reapplySelection()
+        resetCachedAssets()
     }
 }
 
 extension MediaPickerViewController: PHPhotoLibraryChangeObserver {
     public func photoLibraryDidChange(_ changeInstance: PHChange) {
+        // Delivered on an arbitrary serial queue, so the diff is deferred to main rather than
+        // computed here: `assets` is main-thread state, and reading it on Photos' queue races
+        // `apply(_:)` and `fetchAssets()` writing it. `PHChange` is an immutable snapshot and the
+        // block retains it, so deferring costs nothing.
+        //
+        // Diffing on main also means `fetchResultBeforeChanges` is, by construction, the fetch
+        // result the picker is actually displaying — so `apply(_:)`'s `appliedItemCount` check
+        // passes in the normal case and the change lands as an incremental update rather than
+        // degrading to a full reload.
         DispatchQueue.main.async { [weak self] in
-            self?.fetchAssets()
+            guard let self,
+                  let changes = changeInstance.changeDetails(for: self.assets)
+            else { return }
+            self.apply(changes)
         }
     }
 }
