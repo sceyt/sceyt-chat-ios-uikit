@@ -2783,6 +2783,10 @@ open class ChannelViewController: ViewController,
                         self?.deleteReaction(layoutModel: layoutModel, reaction: reaction.key)
                     }
                 }
+            case .showUserProfile(let user):
+                self.presentedViewController?.dismiss(animated: true) { [weak self] in
+                    self?.showProfile(user: user)
+                }
             }
         }
     }
