@@ -10,7 +10,7 @@ import UIKit
 import Combine
 
 extension ChannelInfoViewController {
-    open class VoiceCell: CollectionViewCell {
+    open class VoiceCell: CollectionViewCell, AttachmentTransferStatusObserver {
         typealias Layouts = ChannelInfoViewController.VoiceCollectionView.Layouts
         
         let event = PassthroughSubject<Event, Never>()
@@ -44,6 +44,9 @@ extension ChannelInfoViewController {
         
         override open func setup() {
             super.setup()
+            // Weak registration, lives for the cell's whole lifetime — the relay prunes
+            // deallocated observers itself, so no removal on reuse/teardown is needed.
+            AttachmentTransferStatusRelay.default.add(self)
             
             titleLabel.lineBreakMode = .byTruncatingMiddle
             playButton.addTarget(self, action: #selector(playButtonAction(_:)), for: .touchUpInside)
@@ -181,6 +184,22 @@ extension ChannelInfoViewController {
             }
         }
         
+        /// Backstop delivery of a pause/resume/failure raised on another screen (see
+        /// `AttachmentTransferStatusRelay`). `updateStatus()` otherwise runs only from `data`'s
+        /// `didSet` and from this cell's own download button, so a pause issued in the chat
+        /// thread leaves this row rendering the state it was bound with.
+        open func attachmentTransferStatusDidChange(
+            _ attachment: ChatMessage.Attachment,
+            status: ChatMessage.Attachment.TransferStatus
+        ) {
+            guard let data,
+                  AttachmentTransfer.transferIdentity(of: data.attachment)
+                    == AttachmentTransfer.transferIdentity(of: attachment)
+            else { return }
+            data.attachment.status = status
+            updateStatus()
+        }
+
         open func updateStatus() {
             guard let attachment = data?.attachment,
                   let message = data?.ownerMessage

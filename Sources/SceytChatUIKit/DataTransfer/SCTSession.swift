@@ -97,7 +97,7 @@ open class SCTSession: NSObject, SCTDataSession {
             logger.error("[Attachment] SCTSession.download: unusable url, download not started \(attachment.description)")
             return
         }
-        Session.download(url: url) { progress in
+        let downloadTask = Session.download(url: url) { progress in
             taskInfo.updateProgress(progress.fractionCompleted)
         } completion: { result in
             switch result {
@@ -111,14 +111,27 @@ open class SCTSession: NSObject, SCTDataSession {
             }
         }
         
-        taskInfo.onAction = {
-            switch $0 {
+        // Drive the real URLSession task. This handler used to be an empty switch — the
+        // returned Cancellable was discarded — so pausing a download changed only the
+        // persisted status while the bytes kept arriving and `updateProgress` kept ticking
+        // into whatever view was showing the (supposedly paused) transfer.
+        //
+        // `suspend()` rather than `cancel(byProducingResumeData:)`: it keeps the bytes already
+        // received and leaves the task alive, which is what `AttachmentTransfer.resumeTransfer`
+        // assumes — it refuses to resume unless `taskFor(...)` still finds a live task. A task
+        // left suspended long enough can still be timed out by the system; that surfaces as
+        // `.failedDownloading` through the existing failure path, which is the correct outcome.
+        // Weakly: URLSession keeps the task alive until it finishes, and a strong capture
+        // here would close the cycle task -> completion closure -> taskInfo -> onAction -> task.
+        taskInfo.onAction = { [weak task = downloadTask as? URLSessionTask] action in
+            guard let task else { return }
+            switch action {
             case .stop:
-                break
+                task.suspend()
             case .cancel:
-                break
+                task.cancel()
             case .resume:
-                break
+                task.resume()
             }
         }
     }

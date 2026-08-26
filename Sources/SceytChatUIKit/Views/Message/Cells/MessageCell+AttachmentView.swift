@@ -93,7 +93,7 @@ enum ThumbnailReloadGate {
 }
 
 extension MessageCell {
-    open class AttachmentView: View, AttachmentSharpThumbnailObserver {
+    open class AttachmentView: View, AttachmentSharpThumbnailObserver, AttachmentTransferStatusObserver {
         public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
@@ -134,6 +134,34 @@ extension MessageCell {
             // Weak registration, lives for the view's whole lifetime — the relay prunes
             // deallocated observers itself, so no removal on reuse/teardown is needed.
             AttachmentSharpThumbnailRelay.default.add(self)
+            AttachmentTransferStatusRelay.default.add(self)
+        }
+
+        /// Backstop delivery of a pause/resume/failure raised somewhere other than this cell
+        /// (see `AttachmentTransferStatusRelay`). `update(status:)` otherwise runs only from
+        /// `data`'s `didSet` — i.e. on bind — and a status-only change bumps no
+        /// `contentVersion`, so nothing reconfigures this cell and it keeps rendering the
+        /// state the transfer was in when it was last bound.
+        open func attachmentTransferStatusDidChange(
+            _ attachment: ChatMessage.Attachment,
+            status: ChatMessage.Attachment.TransferStatus
+        ) {
+            guard let data,
+                  AttachmentTransfer.transferIdentity(of: data.attachment)
+                    == AttachmentTransfer.transferIdentity(of: attachment)
+            else { return }
+            data.attachment.status = status
+            lastAttachmentTransferProgress = nil
+            update(status: status)
+            switch status {
+            case .pending, .downloading, .uploading:
+                if let message = data.ownerMessage,
+                   let live = fileProvider.currentProgressPercent(message: message, attachment: data.attachment) {
+                    setProgress(live)
+                }
+            default:
+                break
+            }
         }
 
         /// Backstop delivery of the blurry→sharp swap (see `AttachmentSharpThumbnailRelay`).
@@ -491,6 +519,17 @@ extension MessageCell {
                             == AttachmentTransfer.transferIdentity(of: progress.attachment)
                     else {
                         logger.warn("[Attachment] dropping a tick for another attachment — bound \(AttachmentTransfer.transferIdentity(of: data.attachment)) received \(AttachmentTransfer.transferIdentity(of: progress.attachment))")
+                        return
+                    }
+
+                    // A paused transfer must not keep moving the ring. The default download
+                    // session cannot truly suspend on every transport, and a pause raised on
+                    // another screen races the bytes already in flight, so ticks can arrive
+                    // after this view has correctly rendered the paused state.
+                    guard ![.pauseDownloading, .pauseUploading,
+                            .failedDownloading, .failedUploading].contains(data.attachment.status)
+                    else {
+                        logger.verbose("[Attachment] dropping a tick for a paused transfer \(AttachmentTransfer.transferIdentity(of: data.attachment))")
                         return
                     }
 

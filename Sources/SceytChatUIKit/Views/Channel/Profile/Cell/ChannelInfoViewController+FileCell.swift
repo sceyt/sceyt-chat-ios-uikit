@@ -10,7 +10,7 @@ import UIKit
 import Combine
 
 extension ChannelInfoViewController {
-    open class FileCell: CollectionViewCell {
+    open class FileCell: CollectionViewCell, AttachmentTransferStatusObserver {
         let event = PassthroughSubject<Event, Never>()
         
         open lazy var iconView = UIImageView()
@@ -36,6 +36,7 @@ extension ChannelInfoViewController {
         
         override open func setup() {
             super.setup()
+            AttachmentTransferStatusRelay.default.add(self)
             
             selectedBackgroundView = UIView()
             titleLabel.lineBreakMode = .byTruncatingMiddle
@@ -112,6 +113,22 @@ extension ChannelInfoViewController {
             }
         }
         
+        /// Backstop delivery of a pause/resume/failure raised on another screen (see
+        /// `AttachmentTransferStatusRelay`). `updateStatus()` otherwise runs only from `data`'s
+        /// `didSet` and from this cell's own download button, so a pause issued in the chat
+        /// thread leaves this row rendering the state it was bound with.
+        open func attachmentTransferStatusDidChange(
+            _ attachment: ChatMessage.Attachment,
+            status: ChatMessage.Attachment.TransferStatus
+        ) {
+            guard let data,
+                  AttachmentTransfer.transferIdentity(of: data.attachment)
+                    == AttachmentTransfer.transferIdentity(of: attachment)
+            else { return }
+            data.attachment.status = status
+            updateStatus()
+        }
+
         open func updateStatus() {
             guard let attachment = data?.attachment,
                   let message = data?.ownerMessage

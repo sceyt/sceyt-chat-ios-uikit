@@ -400,6 +400,7 @@ open class AttachmentTransfer: DataProvider {
                 self.database.write {
                     $0.update(chatMessage: message, attachments: [attachment])
                 }
+                AttachmentTransferStatusRelay.default.post(attachment, status: attachment.status)
                 completion?(true)
                 return
             }
@@ -423,6 +424,7 @@ open class AttachmentTransfer: DataProvider {
                 } completion: { _ in
                     task.stop()
                 }
+                AttachmentTransferStatusRelay.default.post(attachment, status: attachment.status)
                 completion?(true)
                 return
             }
@@ -456,6 +458,7 @@ open class AttachmentTransfer: DataProvider {
                     } completion: { _ in
                         task.resume()
                     }
+                    AttachmentTransferStatusRelay.default.post(attachment, status: attachment.status)
                     completion?(true)
                     return
                 }
@@ -749,6 +752,7 @@ open class AttachmentTransfer: DataProvider {
                                 }
                             }
                             onCompletion(taskInfo: taskInfo, attachment: atch, error: error)
+                            AttachmentTransferStatusRelay.default.post(atch, status: atch.status)
                         }
                         logger.errorIfNotNil(error, "[Attachment] receive failure")
                         didEndTask(taskInfo: taskInfo, error: error)

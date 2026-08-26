@@ -10,7 +10,7 @@ import SceytChat
 import UIKit
 
 extension ChannelInfoViewController {
-    open class AttachmentCell: CollectionViewCell, AttachmentSharpThumbnailObserver {
+    open class AttachmentCell: CollectionViewCell, AttachmentSharpThumbnailObserver, AttachmentTransferStatusObserver {
 
         open lazy var imageView = UIImageView()
             .withoutAutoresizingMask
@@ -60,6 +60,7 @@ extension ChannelInfoViewController {
             // Weak registration, lives for the cell's whole lifetime — the relay prunes
             // deallocated observers itself, so no removal on reuse/teardown is needed.
             AttachmentSharpThumbnailRelay.default.add(self)
+            AttachmentTransferStatusRelay.default.add(self)
 
             typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.MediaCell
             accessibilityIdentifier = AID.root
@@ -89,6 +90,31 @@ extension ChannelInfoViewController {
             progressView.backgroundColor = overlayLoaderAppearance.backgroundColor
             progressView.parentAppearance = overlayLoaderAppearance
             pauseButton.setImage(overlayLoaderAppearance.cancelIcon, for: .normal)
+        }
+
+        /// Backstop delivery of a pause/resume/failure raised on another screen — most often
+        /// the chat thread's own pause button (see `AttachmentTransferStatusRelay`). This grid
+        /// otherwise learns a status only through its own `AttachmentDTO` observer or a rebind.
+        open func attachmentTransferStatusDidChange(
+            _ attachment: ChatMessage.Attachment,
+            status: ChatMessage.Attachment.TransferStatus
+        ) {
+            guard let data,
+                  AttachmentTransfer.transferIdentity(of: data.attachment)
+                    == AttachmentTransfer.transferIdentity(of: attachment)
+            else { return }
+            data.attachment.status = status
+            lastAttachmentTransferProgress = nil
+            update(status: status)
+            switch status {
+            case .pending, .downloading, .uploading:
+                let live = data.ownerMessage.flatMap {
+                    fileProvider.currentProgressPercent(message: $0, attachment: data.attachment)
+                }
+                setProgress(live ?? 0.0001)
+            default:
+                break
+            }
         }
 
         /// Repaints when a sharp, file-backed thumbnail lands for the bound attachment —

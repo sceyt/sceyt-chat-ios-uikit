@@ -533,4 +533,121 @@ final class AttachmentTransferProgressTests: XCTestCase {
         XCTAssertTrue(waitUntil { captured.status == .pauseDownloading },
                       "the message's attachment must be paused even when the copies disagree on id")
     }
+
+    // MARK: - Status relay
+
+    /// Records every status the relay announces. Held weakly by the relay, so tests must keep
+    /// their own strong reference for as long as they expect deliveries.
+    private final class RelayObserver: AttachmentTransferStatusObserver {
+        private(set) var received = [(ChatMessage.Attachment, ChatMessage.Attachment.TransferStatus)]()
+        func attachmentTransferStatusDidChange(
+            _ attachment: ChatMessage.Attachment,
+            status: ChatMessage.Attachment.TransferStatus
+        ) {
+            received.append((attachment, status))
+        }
+    }
+
+    /// The reported bug, at its source: `stopTransfer` writes the status and drives the task but
+    /// publishes nothing into the progress observer cache, so a view holding a live subscription
+    /// hears nothing at all. The relay is what carries a pause raised on one screen to a view on
+    /// another.
+    func testStopTransferAnnouncesThePauseOnTheRelay() throws {
+        let attachment = makeAttachment(status: .downloading)
+        let message = makeMessage([attachment])
+        _ = try startDownload(message: message, attachments: [attachment])
+
+        let observer = RelayObserver()
+        AttachmentTransferStatusRelay.default.add(observer)
+
+        transfer.stopTransfer(message: message, attachment: attachment)
+
+        XCTAssertTrue(waitUntil { observer.received.contains { $0.1 == .pauseDownloading } },
+                      "a pause must be announced so views on other screens repaint")
+    }
+
+    /// Symmetric: a resume is just as invisible to the progress observers, and the first real
+    /// tick can be a long way off.
+    func testResumeTransferAnnouncesTheResumeOnTheRelay() throws {
+        let attachment = makeAttachment(status: .downloading)
+        let message = makeMessage([attachment])
+        _ = try startDownload(message: message, attachments: [attachment])
+        transfer.stopTransfer(message: message, attachment: attachment)
+        XCTAssertTrue(waitUntil { attachment.status == .pauseDownloading })
+
+        let observer = RelayObserver()
+        AttachmentTransferStatusRelay.default.add(observer)
+
+        transfer.resumeTransfer(message: message, attachment: attachment)
+
+        XCTAssertTrue(waitUntil { observer.received.contains { $0.1 == .downloading } },
+                      "a resume must be announced too")
+    }
+
+    /// The no-live-task branch of `stopTransfer` — the attachment is downloading but its task
+    /// has already gone — persists the pause and must announce it just the same.
+    func testStopTransferAnnouncesThePauseWhenThereIsNoLiveTask() throws {
+        let attachment = makeAttachment(status: .downloading)
+        let message = makeMessage([attachment])
+
+        let observer = RelayObserver()
+        AttachmentTransferStatusRelay.default.add(observer)
+
+        transfer.stopTransfer(message: message, attachment: attachment)
+
+        XCTAssertTrue(waitUntil { observer.received.contains { $0.1 == .pauseDownloading } },
+                      "the taskless pause branch must announce too, or the UI never learns of it")
+    }
+
+    /// A failure reaches `onCompletion` only for subscribers registered under that key; the
+    /// relay also reaches views on other screens showing the same attachment.
+    func testFailureIsAnnouncedOnTheRelay() throws {
+        let attachment = makeAttachment(id: 0, status: .downloading)
+        let message = makeMessage([attachment])
+        let task = try startDownload(message: message, attachments: [attachment])
+
+        let observer = RelayObserver()
+        AttachmentTransferStatusRelay.default.add(observer)
+
+        task.failure(error: NSError(domain: "test", code: 7))
+
+        XCTAssertTrue(waitUntil { observer.received.contains { $0.1 == .failedDownloading } },
+                      "a failed download must be announced so every screen can offer a retry")
+    }
+
+    /// The relay carries the attachment, and consumers filter on transfer identity — the same
+    /// discriminator the progress ticks use, because `==` is `id`-first and an incoming
+    /// attachment's `id` is 0 until the server assigns one.
+    func testRelayCarriesAnAttachmentMatchableByTransferIdentity() throws {
+        let captured = makeAttachment(id: 0, status: .downloading)
+        let message = makeMessage([captured])
+        _ = try startDownload(message: message, attachments: [captured])
+
+        let observer = RelayObserver()
+        AttachmentTransferStatusRelay.default.add(observer)
+
+        // The database's id-carrying copy of the same attachment — the shape a cell binds.
+        let fromDatabase = makeAttachment(id: 851_649_417_420_390_401, status: .downloading)
+        transfer.stopTransfer(message: message, attachment: fromDatabase)
+
+        XCTAssertTrue(waitUntil { !observer.received.isEmpty })
+        let announced = try XCTUnwrap(observer.received.first?.0)
+        XCTAssertEqual(
+            AttachmentTransfer.transferIdentity(of: announced),
+            AttachmentTransfer.transferIdentity(of: fromDatabase),
+            "a consumer bound to the database copy must recognise the announced attachment")
+    }
+
+    /// The relay holds observers weakly, so a deallocated cell cannot keep receiving — and
+    /// cannot keep its captures alive in a process-wide singleton.
+    func testRelayDoesNotRetainItsObservers() {
+        weak var weakObserver: RelayObserver?
+        autoreleasepool {
+            let observer = RelayObserver()
+            weakObserver = observer
+            AttachmentTransferStatusRelay.default.add(observer)
+            XCTAssertNotNil(weakObserver)
+        }
+        XCTAssertNil(weakObserver, "the relay must not retain observers")
+    }
 }

@@ -340,6 +340,8 @@ open class ChannelAttachmentListViewModel: NSObject {
             } completion: { error in
                 logger.errorIfNotNil(error, "")
             }
+            attachment.status = .done
+            AttachmentTransferStatusRelay.default.post(attachment, status: .done)
             return
         }
         getMessage(layout) { message in

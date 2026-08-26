@@ -628,6 +628,18 @@ open class MessageLayoutModel {
             updateOptions.insert(.reload)
         }
 
+        func isActiveTransfer(_ status: ChatMessage.Attachment.TransferStatus) -> Bool {
+            status == .pending || status == .downloading || status == .uploading
+        }
+        let didChangeTransferState = (message.attachments ?? []).contains { new in
+            guard let old = (self.message.attachments ?? []).first(where: { $0 == new })
+            else { return false }
+            return isActiveTransfer(old.status) != isActiveTransfer(new.status)
+        }
+        if didChangeTransferState {
+            updateOptions.insert(.reload)
+        }
+
         var isUpdated = self.updateOptions != updateOptions
         self.updateOptions = updateOptions
         self.channel = channel

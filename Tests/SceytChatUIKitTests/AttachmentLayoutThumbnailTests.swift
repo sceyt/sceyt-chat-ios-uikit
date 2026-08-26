@@ -800,4 +800,116 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
                              "reconfigure must fire on the .done edge even when filePath arrived earlier")
         XCTAssertTrue(model.updateOptions.contains(.reload))
     }
+
+    // MARK: - Live reconfigure trigger (pause / resume)
+
+    /// The reported bug: pausing a download from the Media tab left the chat thread's *visible*
+    /// cell spinning, while scrolling it out of view and back showed it correctly paused.
+    /// `updateAttachmentLayouts` heals the layout in place (hence the correct state on rebind),
+    /// but a status-only change inserts no updateOption, so `contentVersion` never bumped,
+    /// `makeEvents` stripped the reload hint and the snapshot diff reconfigured nothing.
+    func testUpdateForcesReconfigureWhenADownloadIsPaused() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .downloading)]),
+            appearance: MessageCell.appearance)
+        let versionBefore = model.contentVersion
+
+        model.update(channel: channel,
+                     message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .pauseDownloading)]))
+
+        XCTAssertGreaterThan(model.contentVersion, versionBefore,
+                             "a pause raised on another screen must bump contentVersion so the visible cell reconfigures")
+        XCTAssertTrue(model.updateOptions.contains(.reload),
+                      "the pause edge must insert .reload to survive makeEvents' hint strip")
+    }
+
+    /// And back again — resuming from the Media tab has the identical gap.
+    func testUpdateForcesReconfigureWhenADownloadIsResumed() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .pauseDownloading)]),
+            appearance: MessageCell.appearance)
+        let versionBefore = model.contentVersion
+
+        model.update(channel: channel,
+                     message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .downloading)]))
+
+        XCTAssertGreaterThan(model.contentVersion, versionBefore,
+                             "a resume must reconfigure the visible cell too")
+        XCTAssertTrue(model.updateOptions.contains(.reload))
+    }
+
+    /// A download that fails is the same class of change — the cell has to swap to its retry
+    /// affordance rather than keep a ring that silently stopped.
+    func testUpdateForcesReconfigureWhenADownloadFails() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .downloading)]),
+            appearance: MessageCell.appearance)
+        let versionBefore = model.contentVersion
+
+        model.update(channel: channel,
+                     message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .failedDownloading)]))
+
+        XCTAssertGreaterThan(model.contentVersion, versionBefore)
+    }
+
+    /// `didFinishDownloadingMedia` is scoped to image/video, so a file or voice attachment
+    /// reaching `.done` bumped nothing and depended entirely on its progress subscription
+    /// still being alive. The transfer-state edge is deliberately type-agnostic.
+    func testUpdateForcesReconfigureWhenAFileFinishesDownloading() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, type: "file", name: "doc.pdf", status: .downloading)]),
+            appearance: MessageCell.appearance)
+        let versionBefore = model.contentVersion
+
+        model.update(channel: channel,
+                     message: makeMediaMessage([makeAttachment(id: 1, type: "file", name: "doc.pdf", status: .done)]))
+
+        XCTAssertGreaterThan(model.contentVersion, versionBefore,
+                             "a file download completing must reconfigure the cell, not only image/video")
+    }
+
+    /// The guard that keeps this cheap: the edge is gated on the *class* of the status, so the
+    /// per-tick progress stream — which never changes `status` — cannot reach it. Without this
+    /// the cell would be torn down and rebuilt on every byte, taking its progress observer with it.
+    func testUpdateDoesNotReconfigureForProgressOnlyChanges() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .downloading)]),
+            appearance: MessageCell.appearance)
+        let versionBefore = model.contentVersion
+
+        let ticked = makeAttachment(id: 1, type: "video", status: .downloading)
+        ticked.transferProgress = 0.42
+        model.update(channel: channel, message: makeMediaMessage([ticked]))
+
+        XCTAssertEqual(model.contentVersion, versionBefore,
+                       "progress ticks must never reconfigure the cell")
+        XCTAssertFalse(model.updateOptions.contains(.reload))
+    }
+
+    /// Pausing and resuming are both *within* the paused class in one direction only — going
+    /// from one paused state to another (pause -> failed) is not a rendered class change and
+    /// must stay cheap.
+    func testUpdateDoesNotReconfigureBetweenTwoInactiveStates() {
+        let channel = makeChannel()
+        let model = MessageLayoutModel(
+            channel: channel,
+            message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .pauseDownloading)]),
+            appearance: MessageCell.appearance)
+        let versionBefore = model.contentVersion
+
+        model.update(channel: channel,
+                     message: makeMediaMessage([makeAttachment(id: 1, type: "video", status: .failedDownloading)]))
+
+        XCTAssertEqual(model.contentVersion, versionBefore)
+    }
 }
