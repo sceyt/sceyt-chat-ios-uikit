@@ -187,7 +187,7 @@ extension MessageCell {
             }
             av.data = layout
             av.setProgressHandler()
-            switch layout.transferStatus {
+            switch av.renderedTransferStatus(for: layout.transferStatus) {
             case .pending, .uploading, .downloading:
                 if let progress = fileProvider.currentProgressPercent(message: data.message, attachment: layout.attachment) {
                     av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
@@ -305,7 +305,9 @@ extension MessageCell {
         open func pauseAction(_ sender: Button) {
             guard let av = sender.superview as? AttachmentView
             else { return }
-            let status = av.lastAttachmentTransferProgress?.attachment.status ?? av.data.transferStatus
+            let status = av.renderedTransferStatus(
+                for: av.lastAttachmentTransferProgress?.attachment.status ?? av.data.transferStatus
+            )
             var message: ChatMessage {
                 data.message
             }

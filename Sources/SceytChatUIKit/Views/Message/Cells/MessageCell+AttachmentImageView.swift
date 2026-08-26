@@ -92,7 +92,7 @@ extension MessageCell {
                 let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
                 blurEffectView.isHidden = !isViewOnce
                 logger.verbose("[Attachment] data.didSet — attachment=\(data.attachment.id) status=\(data.transferStatus) hasThumbnail=\(data.thumbnail != nil)")
-                update(status: data.transferStatus)
+                applyTransferStatus(data.transferStatus)
 
                 data.onLoadThumbnail = { [weak self, weak data] thumbnail in
                     guard let self else {

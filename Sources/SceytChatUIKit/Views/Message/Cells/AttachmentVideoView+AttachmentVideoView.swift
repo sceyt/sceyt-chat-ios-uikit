@@ -122,7 +122,7 @@ extension MessageCell {
                     }
                 }
 
-                update(status: data.transferStatus)
+                applyTransferStatus(data.transferStatus)
 
                 if let filePath = data.attachment.filePath,
                    filePath.hasPrefix("/local/"),

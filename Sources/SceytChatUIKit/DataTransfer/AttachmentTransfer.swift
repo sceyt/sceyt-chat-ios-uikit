@@ -87,6 +87,17 @@ open class AttachmentTransfer: DataProvider {
         return "unknown"
     }
     
+    /// Statuses that describe a download either in flight or waiting for one, and are
+    /// therefore safe to reconcile to `.done` when the bytes turn out to be on disk.
+    ///
+    /// Deliberately excludes every upload status: an upload has a local file from the
+    /// start — that file is what is being sent — so "the file exists" says nothing about
+    /// whether it was delivered. `.pending` is shared by both directions, and is included
+    /// because that is the one combination the reconcile has always covered.
+    static let healableDownloadStatuses: Set<ChatMessage.Attachment.TransferStatus> = [
+        .pending, .downloading, .pauseDownloading, .failedDownloading
+    ]
+
     private static func key(message: ChatMessage, attachment: ChatMessage.Attachment) -> String {
         "\(message.id).\(message.tid).\(transferIdentity(of: attachment))"
     }
@@ -263,14 +274,21 @@ open class AttachmentTransfer: DataProvider {
         // a sharp preview instead of the blurred thumbHash.
         downloadVideoThumbnailsIfNeeded(message: message, attachments: attachments)
 
-        for att in attachments {
+        var reconciled = [ChatMessage.Attachment]()
+        for att in attachments where att.type != "link" {
             let resolvedLocalFilePath = dataSession(for: message)?.getFilePath(attachment: att)
-            if att.status == .pending,
-               let filePath = resolvedLocalFilePath, !filePath.isEmpty
-            {
+            if let filePath = resolvedLocalFilePath, !filePath.isEmpty {
+                guard Self.healableDownloadStatuses.contains(att.status),
+                      taskFor(message: message, attachment: att) == nil
+                else { continue }
+                logger.verbose("[Attachment] reconciling stale \(att.status) to .done, file is on disk \(att.description)")
                 att.status = .done
                 att.transferProgress = 1
-                
+                if att.filePath != filePath {
+                    att.filePath = filePath
+                }
+                reconciled.append(att)
+
                 let key = Self.key(message: message, attachment: att)
                 logger.verbose("[Attachment] onCompletion KEY \(key)")
                 if let blocks = self.cache[key] {
@@ -283,12 +301,16 @@ open class AttachmentTransfer: DataProvider {
                         $0.completion?(attachmentCompletion)
                     }
                 }
-            } else if att.type != "link",
-                      att.status == .done,
-                      resolvedLocalFilePath == nil
-            {
+                AttachmentTransferStatusRelay.default.post(att, status: .done)
+            } else if att.status == .done {
                 att.status = .pending
                 att.transferProgress = 0
+                reconciled.append(att)
+            }
+        }
+        if !reconciled.isEmpty {
+            database.write {
+                $0.update(chatMessage: message, attachments: reconciled)
             }
         }
 
@@ -719,6 +741,10 @@ open class AttachmentTransfer: DataProvider {
                             if fileSize > 0 {
                                 atch.uploadedFileSize = fileSize
                             }
+                            if taskInfo.transferType == .download, fileSize > 0 {
+                                atch.transferProgress = 1
+                                atch.status = .done
+                            }
                             taskInfo.attachment = atch
                             self.database.write {
                                 if let filePath {
@@ -776,6 +802,7 @@ open class AttachmentTransfer: DataProvider {
                 atch.transferProgress = 1
                 atch.status = .done
                 onCompletion(taskInfo: taskInfo, attachment: atch)
+                AttachmentTransferStatusRelay.default.post(atch, status: .done)
                 logger.verbose("[Attachment] receive success \(uri)")
                 didEndTask(taskInfo: taskInfo, error: nil)
             }

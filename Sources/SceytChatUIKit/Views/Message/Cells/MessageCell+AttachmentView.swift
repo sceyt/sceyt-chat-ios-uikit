@@ -152,8 +152,8 @@ extension MessageCell {
             else { return }
             data.attachment.status = status
             lastAttachmentTransferProgress = nil
-            update(status: status)
-            switch status {
+            let rendered = applyTransferStatus(status)
+            switch rendered {
             case .pending, .downloading, .uploading:
                 if let message = data.ownerMessage,
                    let live = fileProvider.currentProgressPercent(message: message, attachment: data.attachment) {
@@ -387,7 +387,7 @@ extension MessageCell {
         open var data: MessageLayoutModel.AttachmentLayout! {
             didSet {
                 guard let data else { return }
-                update(status: data.attachment.status)
+                applyTransferStatus(data.attachment.status)
             }
         }
         
@@ -462,6 +462,20 @@ extension MessageCell {
         /// otherwise an in-flight ring (or its pending shrink-out) from the old one bleeds
         /// onto the new one for a frame.
         open func prepareForRebind() {
+            clearTransferOverlay()
+            imageView.image = nil
+            imageView.backgroundColor = nil
+        }
+
+        /// Takes the transfer overlay off screen at once — no fill-through, no shrink-out.
+        ///
+        /// `update(status: .done)` deliberately animates a surviving ring to 100% before hiding
+        /// it, because a fast transfer delivers its last progress in a terminal burst and the
+        /// fill would otherwise never render. That is right for a transfer that finished *here*.
+        /// It is wrong for a status resolved to `.done` because the bytes turned out to already
+        /// be on disk: there was no transfer, so animating one to completion flashes a ring the
+        /// user never started.
+        open func clearTransferOverlay() {
             pendingHideWorkItem?.cancel()
             pendingHideWorkItem = nil
             lastAttachmentTransferProgress = nil
@@ -482,8 +496,49 @@ extension MessageCell {
             progressLabel.isHidden = true
             progressLabel.text = nil
             pauseButton.isHidden = true
-            imageView.image = nil
-            imageView.backgroundColor = nil
+        }
+
+        /// The status this view should *render* for `stored`, resolved from the transfer rather
+        /// than from the stored value — the rule `syncTransferOverlay` already applies on the
+        /// media gallery: live percent → bytes on disk → stored status.
+        ///
+        /// A stored status can outlive its transfer (the process was killed mid-download, a
+        /// completion never reached this view), and rendering it puts a progress ring or a
+        /// download button over a file the user can already open. No live percent and no task
+        /// means whatever the status describes is over; with the bytes on disk it succeeded.
+        ///
+        /// Only download-shaped statuses are resolved. An upload's local file is its *source*,
+        /// not proof of delivery, so a `.failedUploading` over a local file has to keep its
+        /// retry affordance — hiding it would show a sent-looking attachment that never left
+        /// the device.
+        open func renderedTransferStatus(
+            for stored: ChatMessage.Attachment.TransferStatus
+        ) -> ChatMessage.Attachment.TransferStatus {
+            guard let data,
+                  let message = data.ownerMessage,
+                  AttachmentTransfer.healableDownloadStatuses.contains(stored),
+                  fileProvider.currentProgressPercent(message: message, attachment: data.attachment) == nil,
+                  fileProvider.taskFor(message: message, attachment: data.attachment) == nil,
+                  fileProvider.filePath(attachment: data.attachment) != nil
+            else { return stored }
+            return .done
+        }
+
+        /// Renders `stored` through `renderedTransferStatus`, and returns what was actually
+        /// rendered so the caller can branch on the same value. A status resolved to `.done`
+        /// out of staleness clears the overlay outright rather than animating a completion that
+        /// never happened.
+        @discardableResult
+        open func applyTransferStatus(
+            _ stored: ChatMessage.Attachment.TransferStatus
+        ) -> ChatMessage.Attachment.TransferStatus {
+            let rendered = renderedTransferStatus(for: stored)
+            if rendered == .done, stored != .done {
+                clearTransferOverlay()
+            } else {
+                update(status: rendered)
+            }
+            return rendered
         }
 
         open func setProgressHandler() {

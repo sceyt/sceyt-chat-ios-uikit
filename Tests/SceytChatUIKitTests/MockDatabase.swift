@@ -41,7 +41,17 @@ final class MockDatabase: Database {
 
     var viewContext: NSManagedObjectContext { container.viewContext }
 
-    var backgroundPerformContext: NSManagedObjectContext { container.newBackgroundContext() }
+    /// One serial context for every write, mirroring `PersistentContainer`. A fresh context
+    /// per write let concurrent writes land out of order and conflict on save (the default
+    /// `NSErrorMergePolicy`), so a sequence like "persist the downloaded file, then persist the
+    /// completion" could commit in either order or not at all — a race the production code does
+    /// not have.
+    lazy var backgroundPerformContext: NSManagedObjectContext = {
+        let context = container.newBackgroundContext()
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        context.automaticallyMergesChangesFromParent = true
+        return context
+    }()
 
     var backgroundReadOnlyContext: NSManagedObjectContext { container.newBackgroundContext() }
 
@@ -72,7 +82,7 @@ final class MockDatabase: Database {
     func write(resultQueue: DispatchQueue,
                _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                completion: ((Error?) -> Void)?) {
-        let ctx = container.newBackgroundContext()
+        let ctx = backgroundPerformContext
         ctx.perform {
             do {
                 try perform(ctx)
