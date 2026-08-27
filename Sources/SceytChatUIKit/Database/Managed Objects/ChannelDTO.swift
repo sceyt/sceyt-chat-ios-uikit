@@ -55,6 +55,12 @@ public class ChannelDTO: NSManagedObject {
     @NSManaged public var createdBy: UserDTO?
 
     @NSManaged public var draft: NSAttributedString?
+    /// Type of the draft's first attachment, denormalized off `DraftMessageDTO` so the channel
+    /// list can preview "Draft: Image" without faulting the draft row for every row it renders.
+    @NSManaged public var draftAttachmentType: String?
+    /// `"reply"` / `"edit"` when the draft carries a reply or edit target, so a draft that is
+    /// nothing but a reply still previews as "Draft: Reply". Denormalized for the same reason.
+    @NSManaged public var draftActionType: String?
     @NSManaged public var draftDate: CDDate?
     @NSManaged public var sortingKey: CDDate?
     

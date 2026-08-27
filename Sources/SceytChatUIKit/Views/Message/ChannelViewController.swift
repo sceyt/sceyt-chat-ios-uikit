@@ -229,6 +229,9 @@ open class ChannelViewController: ViewController,
     private var isUpdatingInputViewHeight = false
     private var checkOnlyFirstTimeReceivedMessagesFromArchive = true
     private var isViewDidAppear = false
+    /// Restoring is a one-shot per screen; `viewDidAppear` fires again on every return from a
+    /// pushed screen, and by then the bar already holds whatever the user left in it.
+    private var hasRestoredDraft = false
     private var contextMenu: ContextMenu!
     private var scrollTimer: Timer?
     private var isAppActive: Bool = true
@@ -269,6 +272,7 @@ open class ChannelViewController: ViewController,
         
         updateUnreadViewVisibility()
         isViewDidAppear = true
+        restoreDraftIfNeeded()
         keyboardObserver = KeyboardObserver()
             .willShow { [weak self] in
                 self?.keyboardWillShow(notification: $0)
@@ -2695,7 +2699,10 @@ open class ChannelViewController: ViewController,
         channelViewModel.createAndSendUserMessage(message)
         if shouldClearText {
             inputTextView.text = nil
-            channelViewModel.updateDraftMessage(nil)
+            // Cleared explicitly rather than by reading the current state: the action is not
+            // released until the end of this function, so an implicit read would persist a stale
+            // reply/edit target against an empty body.
+            channelViewModel.clearDraft()
         }
         customInputViewController.selectedMediaView.removeAll()
         if channelViewModel.selectedMessageForAction == nil ||
@@ -4016,13 +4023,110 @@ open class ChannelViewController: ViewController,
         animated: Bool
     ) {
         if self !== viewController {
-            channelViewModel.updateDraftMessage(inputTextView.attributedText)
+            saveDraft()
             if inputTextView.isFirstResponder {
                 inputTextView.resignFirstResponder()
             }
         }
     }
     
+    // MARK: Draft
+
+    /// Captures the whole input bar. In edit mode the input holds the message body being edited
+    /// and the user's real draft is parked in `cachedMessage`, so the two are stored separately —
+    /// otherwise leaving mid-edit would overwrite the channel draft with the edited message and
+    /// surface it as "Draft: …" in the channel list.
+    open func saveDraft() {
+        let isEditing: Bool
+        if case .edit = customInputViewController.currentState {
+            isEditing = true
+        } else {
+            isEditing = false
+        }
+
+        // A recorded-but-unsent voice message is not in the media strip — it sits in the
+        // recorder's own preview until the user sends it — so it has to be picked up separately.
+        let recording = customInputViewController.pendingVoiceRecording.map {
+            AttachmentModel(voiceUrl: $0.url, metadata: $0.metadata)
+        }
+
+        channelViewModel.updateDraft(
+            body: isEditing ? customInputViewController.cachedMessage : inputTextView.attributedText,
+            editBody: isEditing ? inputTextView.attributedText : nil,
+            attachments: customInputViewController.selectedMediaView.items,
+            voiceRecording: recording,
+            viewOnce: customInputViewController.isViewOnceEnabled,
+            target: channelViewModel.draftTarget
+        )
+    }
+
+    /// Restores the input bar from the last saved draft, once per screen.
+    ///
+    /// Runs from `viewDidAppear` rather than `setupDone`: `addReply`/`addEdit` drive
+    /// `onContentHeightUpdate`, which animates the input height and re-anchors the collection
+    /// view's content offset — at `setupDone` the collection view has no final bounds yet.
+    open func restoreDraftIfNeeded() {
+        guard !hasRestoredDraft else { return }
+        hasRestoredDraft = true
+
+        channelViewModel.loadDraft { [weak self] draft in
+            guard let self, let draft else { return }
+            DispatchQueue.main.async {
+                self.apply(draft: draft)
+            }
+        }
+    }
+
+    open func apply(draft: DraftMessage) {
+        // The read is async, so a user who tapped Reply or started an edit in the meantime wins.
+        guard customInputViewController.currentState == nil,
+              channelViewModel.selectedMessageForAction == nil
+        else { return }
+
+        // Attachments before view-once: `updateViewOnceButtonVisibility()` clears the flag unless
+        // exactly one attachment is present, and it runs on every insert.
+        draft.attachments.forEach {
+            customInputViewController.selectedMediaView.insert(view: $0)
+        }
+        if let recording = draft.voiceRecording {
+            customInputViewController.showRecordedVoicePreview(
+                url: recording.url,
+                metadata: .init(thumbnail: recording.thumb, duration: recording.duration),
+                viewOnce: draft.viewOnce
+            )
+        }
+        if draft.viewOnce {
+            customInputViewController.isViewOnceEnabled = true
+        }
+
+        guard let target = draft.target else {
+            if let body = draft.body {
+                inputTextView.attributedText = body
+            }
+            customInputViewController.updateState()
+            return
+        }
+
+        let layoutModel = channelViewModel.createLayoutModel(for: target.message)
+        if target.isReply {
+            if let body = draft.body {
+                inputTextView.attributedText = body
+            }
+            customInputViewController.addReply(layoutModel: layoutModel)
+        } else {
+            // `addEdit` parks whatever is in the input into `cachedMessage`, so seeding the
+            // pre-edit draft first is what makes cancelling a restored edit fall back to it.
+            inputTextView.attributedText = draft.body ?? .init()
+            customInputViewController.addEdit(layoutModel: layoutModel)
+            inputTextView.attributedText = draft.editBody ?? .init()
+        }
+        // The text was set programmatically, so nothing has told the bar to re-evaluate its
+        // trailing buttons.
+        customInputViewController.updateState()
+        // Deliberately no `becomeFirstResponder()` — reopening a channel should not raise the
+        // keyboard the way tapping Reply does.
+    }
+
     open func showEndPollAlert(for layoutModel: MessageLayoutModel) {
         guard let pollDetails = layoutModel.message.poll else { return }
         let pollViewModel = PollViewModel(from: pollDetails, isIncmoing: layoutModel.message.incoming)

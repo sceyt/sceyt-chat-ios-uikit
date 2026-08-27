@@ -2451,6 +2451,50 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         let date = text == nil ? nil : Date()
         channelProvider.saveDraftMessage(text, at: date)
     }
+
+    /// Persists the whole input-bar state. `body` is always the next *new* message, so in edit
+    /// mode the caller passes the parked pre-edit draft here and the text being edited as
+    /// `editBody` — that keeps a pending edit out of the channel list's "Draft:" preview.
+    open func updateDraft(
+        body: NSAttributedString?,
+        editBody: NSAttributedString? = nil,
+        attachments: [AttachmentModel] = [],
+        voiceRecording: AttachmentModel? = nil,
+        viewOnce: Bool = false,
+        target: DraftMessage.Target? = nil
+    ) {
+        let draft = DraftMessage(
+            channelId: channel.id,
+            body: body,
+            editBody: editBody,
+            createdAt: Date(),
+            target: target,
+            attachments: attachments,
+            voiceRecording: voiceRecording,
+            viewOnce: viewOnce
+        )
+        channelProvider.saveDraft(draft, at: draft.hasContent ? Date() : nil)
+    }
+
+    /// Clears every trace of the draft — used after a successful send, where the action must be
+    /// dropped explicitly because `selectedMessageForAction` is still set at that point.
+    open func clearDraft() {
+        channelProvider.saveDraft(DraftMessage(channelId: channel.id), at: nil)
+    }
+
+    open func loadDraft(completion: @escaping (DraftMessage?) -> Void) {
+        channelProvider.fetchDraft(completion: completion)
+    }
+
+    /// The reply/edit target as the input bar's own state, ready to persist.
+    open var draftTarget: DraftMessage.Target? {
+        guard let (message, action) = selectedMessageForAction else { return nil }
+        switch action {
+        case .reply: return .init(message: message, isReply: true)
+        case .edit: return .init(message: message, isReply: false)
+        case .forward: return nil
+        }
+    }
     
     open func stopFileTransfer(message: ChatMessage, attachment: ChatMessage.Attachment) {
         fileProvider.stopTransfer(message: message, attachment: attachment)

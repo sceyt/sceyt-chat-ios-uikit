@@ -70,6 +70,13 @@ open class ChannelCreator: DataProvider {
                     dto.id = Int64(sceytChannel.id)
                     try $0.batchUpdate(object: MessageDTO.self, predicate: .init(format: "channelId == %lld", oldId), propertiesToUpdate: [#keyPath(MessageDTO.channelId): oldId])
                     try $0.batchUpdate(object: MemberDTO.self, predicate: .init(format: "channelId == %lld", oldId), propertiesToUpdate: [#keyPath(MemberDTO.channelId): oldId])
+                    // The draft is keyed by channel id, so it has to follow the channel to its
+                    // server id or the user's composed message is stranded on a row nothing reads.
+                    DraftMessageDTO.move(
+                        fromChannelId: ChannelId(oldId),
+                        toChannelId: sceytChannel.id,
+                        context: $0
+                    )
                 }
                 chatChannel = $0.createOrUpdate(channel: sceytChannel)
                     .convert()

@@ -228,6 +228,7 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     public func deleteChannel(id: ChannelId) {
         try? deleteAllMessages(channelId: id)
         ChannelSyncStateDTO.delete(channelId: id, context: self)
+        DraftMessageDTO.delete(channelId: id, context: self)
         // Their messages are gone, so retrying these would only fail with `channelNotExists`.
         PendingMessageDeleteDTO.deleteAll(channelId: id, context: self)
         if let dto = ChannelDTO.fetch(id: id, context: self) {
@@ -368,7 +369,85 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         let dto = ChannelDTO.fetch(id: channelId, context: self)
         dto?.draft = message
         dto?.draftDate = date?.bridgeDate
+        // A plain-text draft has no attachments and no reply/edit target; leaving stale values
+        // would preview "Draft: Image" or "Draft: Reply" for a draft that has neither.
+        dto?.draftAttachmentType = nil
+        dto?.draftActionType = nil
         return dto
+    }
+
+    public func draft(channelId: ChannelId) -> DraftMessage? {
+        DraftMessageDTO.fetch(channelId: channelId, context: self)?.convert(context: self)
+    }
+
+    /// Persists the whole input-bar state, and mirrors the composed text into
+    /// `ChannelDTO.draft`/`draftDate` so the channel list preview and `sortingKey` keep working
+    /// without reaching across into the draft row.
+    @discardableResult
+    public func update(draft: DraftMessage, date: Date? = nil) -> ChannelDTO? {
+        applyDraft(draft, date: date)
+    }
+
+    @discardableResult
+    func applyDraft(_ draft: DraftMessage, date: Date?) -> ChannelDTO? {
+        // No channel row means no draft. Without this guard a channelId-keyed side table would
+        // collect rows for channels that do not exist — the same reason the Android DAO checks
+        // `existsChannel` before inserting.
+        guard let channel = ChannelDTO.fetch(id: draft.channelId, context: self) else { return nil }
+
+        let body = draft.channelListBody
+        channel.draft = body
+        // The first attachment's type is all the list needs to render "Draft: Image"; it mirrors
+        // how `ChannelLastMessageBodyFormatter` previews an attachment-only message.
+        channel.draftAttachmentType = (draft.attachments.first ?? draft.voiceRecording)?.type.rawValue
+        channel.draftActionType = draft.target.map { $0.isReply ? "reply" : "edit" }
+        // Everything the cell can preview also sorts as a draft — including a bare reply target,
+        // which shows as "Draft: Reply", so leaving it pending should surface the channel the same
+        // way a typed draft does.
+        let showsInList = body != nil
+            || !draft.attachments.isEmpty
+            || draft.voiceRecording != nil
+            || draft.target != nil
+        channel.draftDate = showsInList ? date?.bridgeDate : nil
+
+        guard draft.hasContent else {
+            channel.draftAttachmentType = nil
+            channel.draftActionType = nil
+            DraftMessageDTO.delete(channelId: draft.channelId, context: self)
+            return channel
+        }
+
+        let dto = DraftMessageDTO.fetchOrCreate(channelId: draft.channelId, context: self)
+        // Stored separately from `channel.draft`: while editing, the list previews the edit but the
+        // draft row keeps the parked pre-edit text, which cancelling restores.
+        dto.body = draft.normalizedBody
+        dto.editBody = draft.editBody
+        dto.createdAt = (draft.createdAt ?? date ?? Date()).bridgeDate
+        dto.viewOnce = draft.viewOnce
+        dto.isReply = draft.target?.isReply ?? false
+        dto.targetMessageId = Int64(draft.target?.message.id ?? 0)
+        dto.targetMessageTid = draft.target.map { Int64($0.message.tid) } ?? 0
+
+        // Replaced wholesale rather than diffed: the strip is an ordered list, and a rewrite also
+        // prunes rows whose files disappeared and were skipped on the last restore.
+        DraftAttachmentDTO.deleteAll(channelId: draft.channelId, context: self)
+        var rows = draft.attachments.enumerated().map { index, model -> DraftAttachmentDTO in
+            let attachment = DraftAttachmentDTO.insertNewObject(into: self)
+            attachment.map(model, channelId: draft.channelId, order: index)
+            return attachment
+        }
+        if let recording = draft.voiceRecording {
+            let attachment = DraftAttachmentDTO.insertNewObject(into: self)
+            attachment.map(
+                recording,
+                channelId: draft.channelId,
+                order: rows.count,
+                isVoiceRecording: true
+            )
+            rows.append(attachment)
+        }
+        dto.attachments = Set(rows)
+        return channel
     }
     
     internal func deleteMembers(predicate: NSPredicate) {

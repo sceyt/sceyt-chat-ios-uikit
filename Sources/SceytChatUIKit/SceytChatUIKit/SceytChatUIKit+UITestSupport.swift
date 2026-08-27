@@ -203,6 +203,10 @@ extension SceytChatUIKit {
         try? database.syncWrite { context in
             let request = ChannelDTO.fetchRequest()
             let existing = (try? context.fetch(request)) ?? []
+            // Drafts are keyed by channel id rather than a relationship, so deleting the channel
+            // rows does not cascade to them. Without this a draft outlives the wipe and reattaches
+            // to the re-seeded channel of the same id, leaking state between test launches.
+            existing.forEach { DraftMessageDTO.delete(channelId: ChannelId($0.id), context: context) }
             existing.forEach { context.delete($0) }
         }
 

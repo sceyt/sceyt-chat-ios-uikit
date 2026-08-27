@@ -68,10 +68,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             case .recordingUnavailable:
                 self.showRecordingUnavailable()
             case let .recorded(url, metadata, viewOnce):
-                self.recordedView.isHidden = false
-                self.recordedView.setup(url: url, metadata: metadata, viewOnce: viewOnce)
+                self.showRecordedVoicePreview(url: url, metadata: metadata, viewOnce: viewOnce)
             case let .send(url, metadata, viewOnce):
                 if let url = Components.storage.copyFile(url) {
+                    self.pendingVoiceRecording = nil
                     self.selectedMediaView.insert(view: AttachmentModel(voiceUrl: url, metadata: metadata))
                     self.isViewOnceEnabled = viewOnce
                     self.action = .send(false)
@@ -87,6 +87,28 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     
     open lazy var recordedView = Components.messageInputVoiceRecordPlaybackView.init()
         .withoutAutoresizingMask
+
+    /// A recording that has been made but not sent yet.
+    ///
+    /// It lives in `recordedView`, which keeps its url and metadata private, and it never reaches
+    /// `selectedMediaView` — that only happens on send, which fires immediately. Mirroring it here
+    /// is what lets the draft persist a paused recording.
+    internal private(set) var pendingVoiceRecording: (
+        url: URL,
+        metadata: ChatMessage.Attachment.Metadata<[Int]>,
+        viewOnce: Bool
+    )?
+
+    /// Shows the play/send/cancel preview for a recording, from the recorder or from a draft.
+    open func showRecordedVoicePreview(
+        url: URL,
+        metadata: ChatMessage.Attachment.Metadata<[Int]>,
+        viewOnce: Bool
+    ) {
+        pendingVoiceRecording = (url, metadata, viewOnce)
+        recordedView.isHidden = false
+        recordedView.setup(url: url, metadata: metadata, viewOnce: viewOnce)
+    }
     
     open var shouldHideRecordButton = false {
         didSet {
@@ -219,8 +241,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             switch $0 {
             case .cancel:
                 self.recordedView.isHidden = true
+                self.pendingVoiceRecording = nil
             case let .send(url, metadata, viewOnce):
                 self.recordedView.isHidden = true
+                self.pendingVoiceRecording = nil
                 if let url = Components.storage.copyFile(url) {
                     self.selectedMediaView.insert(view: AttachmentModel(voiceUrl: url, metadata: metadata))
                     self.isViewOnceEnabled = viewOnce
@@ -258,6 +282,7 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         recordButton.accessibilityIdentifier = AID.voiceButton
         viewOnceButton.accessibilityIdentifier = AID.viewOnceButton
         actionView.cancelButton.accessibilityIdentifier = AID.actionCancelButton
+        actionView.titleLabel.accessibilityIdentifier = AID.actionTitleLabel
     }
 
     override open func setupAppearance() {

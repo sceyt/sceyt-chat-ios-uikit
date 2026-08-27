@@ -63,6 +63,9 @@ open class ChannelLayoutModel {
     public var formattedUnreadCount: String!
 
     public var hasDraftMessage: Bool {
+        // A draft need not have any text: an image picked with nothing typed previews as
+        // "Draft: Image", and a bare reply target as "Draft: Reply". Both still count.
+        if channel.draftAttachmentType != nil || channel.draftActionType != nil { return true }
         guard let draft = channel.draftMessage else { return false }
         return draft.length > 0
     }
@@ -108,6 +111,8 @@ open class ChannelLayoutModel {
             
             var update =
             channel.draftMessage != selfChannel.draftMessage ||
+            channel.draftAttachmentType != selfChannel.draftAttachmentType ||
+            channel.draftActionType != selfChannel.draftActionType ||
             channel.lastMessage?.id != selfChannel.lastMessage?.id ||
             channel.lastMessage?.tid != selfChannel.lastMessage?.tid ||
             channel.lastMessage?.state != selfChannel.lastMessage?.state ||
@@ -290,18 +295,45 @@ open class ChannelLayoutModel {
     }
     
     open func createDraftMessageIfNeeded() -> NSAttributedString? {
-        guard let draft = channel.draftMessage,
-              draft.length > 0
-        else { return nil }
+        let draft = channel.draftMessage ?? NSAttributedString()
+        let attachment = draftAttachmentForPreview()
         let appearance = effectiveAppearance()
-        
+        let actionText: String? = switch channel.draftActionType {
+        case "reply": appearance.draftReplyStateText
+        case "edit": appearance.draftEditStateText
+        default: nil
+        }
+        guard draft.length > 0 || attachment != nil || actionText != nil else { return nil }
+
         return appearance.draftMessageBodyFormatter.format(
             .init(
                 draftMessage: draft,
                 draftPrefixLabelAppearance: appearance.draftPrefixLabelAppearance,
                 draftStateText: appearance.draftStateText,
-                lastMessageLabelAppearance: appearance.lastMessageLabelAppearance
+                lastMessageLabelAppearance: appearance.lastMessageLabelAppearance,
+                draftAttachment: attachment,
+                attachmentNameFormatter: appearance.attachmentNameFormatter,
+                attachmentIconProvider: appearance.attachmentIconProvider,
+                draftActionText: actionText
             )
+        )
+    }
+
+    /// A stand-in attachment carrying only the persisted type, which is all the name formatter and
+    /// icon provider read. The channel row stores just the type so the list never has to fault the
+    /// draft's own attachment rows.
+    private func draftAttachmentForPreview() -> ChatMessage.Attachment? {
+        guard let type = channel.draftAttachmentType else { return nil }
+        return .init(
+            id: 0,
+            tid: 0,
+            messageId: 0,
+            userId: "",
+            url: nil,
+            filePath: nil,
+            type: type,
+            uploadedFileSize: 0,
+            createdAt: Date()
         )
     }
 

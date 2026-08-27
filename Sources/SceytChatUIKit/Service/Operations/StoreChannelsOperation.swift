@@ -113,7 +113,23 @@ open class DeleteChannelsOperation: AsyncOperation {
             }
             
             do {
+                // Collect the ids before the delete: `NSBatchDeleteRequest` bypasses deletion
+                // rules, so the channel-scoped side tables have to be swept explicitly or their
+                // rows outlive the channel forever. Read as a dictionary so a full channel-list
+                // sync does not materialize every doomed row just to learn its id.
+                let idRequest = NSFetchRequest<NSDictionary>(entityName: ChannelDTO.entityName)
+                idRequest.predicate = request.predicate
+                idRequest.propertiesToFetch = ["id"]
+                idRequest.resultType = .dictionaryResultType
+                let doomed = (ChannelDTO.fetch(request: idRequest, context: $0) as? [[String: Int64]] ?? [])
+                    .compactMap { $0["id"].map { ChannelId($0) } }
+
                 try $0.batchDelete(fetchRequest: request)
+
+                for id in doomed {
+                    DraftMessageDTO.delete(channelId: id, context: $0)
+                    DraftAttachmentDTO.deleteAll(channelId: id, context: $0)
+                }
             } catch {
                 logger.errorIfNotNil(error, "")
             }

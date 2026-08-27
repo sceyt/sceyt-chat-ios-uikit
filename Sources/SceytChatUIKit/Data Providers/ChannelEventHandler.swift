@@ -65,6 +65,13 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                 dto.id = Int64(channel.id)
                 dto.unsynched = false
                 try? $0.batchUpdate(object: MessageDTO.self, predicate: .init(format: "channelId == %lld", dto.id), propertiesToUpdate: [#keyPath(MessageDTO.channelId): oldId])
+                // Same reason as in `ChannelCreator.create(channel:)`: a channelId-keyed draft
+                // does not follow the row when its id is rewritten.
+                DraftMessageDTO.move(
+                    fromChannelId: ChannelId(oldId),
+                    toChannelId: ChannelId(channel.id),
+                    context: $0
+                )
                 let chatChannel = $0.createOrUpdate(channel: channel).convert()
                 NotificationCenter.default
                     .post(name: .didUpdateLocalCreateChannelOnEventChannelCreate,
@@ -235,6 +242,9 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     before: channel.messagesClearedAt
                 )
                 ChannelSyncStateDTO.delete(channelId: channel.id, context: $0)
+                // The messages are gone, so a reply/edit target pointing into them cannot resolve.
+                // The composed text is kept.
+                DraftMessageDTO.clearTarget(channelId: channel.id, context: $0)
             } catch {
                 logger.errorIfNotNil(error, "")
             }
@@ -251,6 +261,9 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     before: channel.messagesClearedAt
                 )
                 ChannelSyncStateDTO.delete(channelId: channel.id, context: $0)
+                // The messages are gone, so a reply/edit target pointing into them cannot resolve.
+                // The composed text is kept.
+                DraftMessageDTO.clearTarget(channelId: channel.id, context: $0)
             } catch {
                 logger.errorIfNotNil(error, "")
             }

@@ -27,6 +27,7 @@ struct ChannelScreen {
         static let voiceButton = "sceyt_chat_message_input_voice_button"
         static let viewOnceButton = "sceyt_chat_message_input_view_once_button"
         static let actionCancelButton = "sceyt_chat_message_input_action_cancel_button"
+        static let actionTitleLabel = "sceyt_chat_message_input_action_title_label"
 
         // Conversation screen.
         static let collectionView = "sceyt_chat_channel_collection_view"
@@ -252,4 +253,75 @@ struct ChannelScreen {
     func goBack() {
         backButton.tap()
     }
+
+    // MARK: - Composer action bar (reply / edit preview)
+
+    /// The cancel button of the reply/edit preview above the composer. The preview is hidden
+    /// until an action is active, so its mere existence means "the bar is showing".
+    var actionCancelButton: XCUIElement { app.buttons[AID.actionCancelButton] }
+
+    /// The preview's title — "Reply: <name>" or "Edit: ", i.e. what tells the modes apart.
+    var actionTitle: XCUIElement { app.staticTexts[AID.actionTitleLabel] }
+
+    var hasActionBar: Bool { actionCancelButton.exists }
+
+    @discardableResult
+    func waitForActionBar(timeout: TimeInterval = 5) -> Bool {
+        actionCancelButton.waitForExistence(timeout: timeout)
+    }
+
+    /// Long-presses a message and taps a context-menu item by its visible title.
+    ///
+    /// The menu rows are `MenuController.MenuCell`s carrying a plain `UILabel`, so they surface as
+    /// static texts rather than buttons; buttons are tried too in case the row is wrapped.
+    func performContextMenuAction(_ title: String, on messageId: UInt64) {
+        let target = cell(messageId)
+        _ = target.waitForExistence(timeout: 10)
+        target.press(forDuration: 0.7)
+
+        tapContextMenuItem(title)
+    }
+
+    /// Long-presses the first realized cell whose body contains `text`, then taps a menu item.
+    /// Needed for a message the test just sent, whose id the test does not know.
+    func performContextMenuAction(_ title: String, onCellContaining text: String) {
+        guard let target = visibleMessageCells.first(where: {
+            $0.staticTexts[AID.body].exists && $0.staticTexts[AID.body].label.contains(text)
+        }) else {
+            return XCTFail("no message cell containing \"\(text)\"")
+        }
+        target.press(forDuration: 0.7)
+        tapContextMenuItem(title)
+    }
+
+    /// The menu rows carry a plain `UILabel`, so they surface as static texts rather than
+    /// buttons; the other queries cover a wrapped row.
+    private func tapContextMenuItem(_ title: String) {
+        for query in [app.staticTexts[title], app.buttons[title], app.cells[title]] {
+            if query.waitForExistence(timeout: 3) {
+                query.tap()
+                return
+            }
+        }
+        XCTFail("context-menu item \"\(title)\" never appeared")
+    }
+
+    /// Types `text` into the composer without sending it.
+    func type(_ text: String) {
+        inputField.tap()
+        inputField.typeText(text)
+    }
+
+    /// Replaces whatever the composer holds with `text`.
+    func clearAndType(_ text: String) {
+        inputField.tap()
+        guard let existing = inputField.value as? String, !existing.isEmpty else {
+            inputField.typeText(text)
+            return
+        }
+        inputField.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
+        inputField.typeText(text)
+    }
+
+    var composerText: String { (inputField.value as? String) ?? "" }
 }

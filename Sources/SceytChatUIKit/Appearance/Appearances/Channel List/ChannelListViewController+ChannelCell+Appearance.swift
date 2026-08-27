@@ -50,6 +50,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             font: Fonts.regular.withSize(15)
         ),
         draftStateText: L10n.Channel.Message.draft,
+        draftReplyStateText: L10n.Message.Action.Title.reply,
+        draftEditStateText: L10n.Message.Action.Title.edit,
         typingLabelAppearance: LabelAppearance(
             foregroundColor: .secondaryText,
             font: Fonts.regular.with(traits: .traitItalic).withSize(15)
@@ -142,6 +144,14 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
         
         @Trackable<Appearance, String>
         public var draftStateText: String
+
+        /// Shown instead of the body when a draft is nothing but a reply — "Draft: Reply".
+        @Trackable<Appearance, String>
+        public var draftReplyStateText: String
+
+        /// The edit counterpart of `draftReplyStateText`.
+        @Trackable<Appearance, String>
+        public var draftEditStateText: String
         
         @Trackable<Appearance, LabelAppearance>
         public var typingLabelAppearance: LabelAppearance
@@ -237,6 +247,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             deletedStateText: String,
             draftPrefixLabelAppearance: LabelAppearance,
             draftStateText: String,
+            draftReplyStateText: String,
+            draftEditStateText: String,
             typingLabelAppearance: LabelAppearance,
             mentionLabelAppearance: LabelAppearance,
             unreadMentionLabelAppearance: LabelAppearance,
@@ -281,6 +293,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._deletedStateText = Trackable(value: deletedStateText)
             self._draftPrefixLabelAppearance = Trackable(value: draftPrefixLabelAppearance)
             self._draftStateText = Trackable(value: draftStateText)
+            self._draftReplyStateText = Trackable(value: draftReplyStateText)
+            self._draftEditStateText = Trackable(value: draftEditStateText)
             self._typingLabelAppearance = Trackable(value: typingLabelAppearance)
             self._mentionLabelAppearance = Trackable(value: mentionLabelAppearance)
             self._unreadMentionLabelAppearance = Trackable(value: unreadMentionLabelAppearance)
@@ -328,6 +342,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             deletedStateText: String? = nil,
             draftPrefixLabelAppearance: LabelAppearance? = nil,
             draftStateText: String? = nil,
+            draftReplyStateText: String? = nil,
+            draftEditStateText: String? = nil,
             typingLabelAppearance: LabelAppearance? = nil,
             mentionLabelAppearance: LabelAppearance? = nil,
             unreadMentionLabelAppearance: LabelAppearance? = nil,
@@ -370,6 +386,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             self._deletedStateText = Trackable(reference: reference, referencePath: \.deletedStateText)
             self._draftPrefixLabelAppearance = Trackable(reference: reference, referencePath: \.draftPrefixLabelAppearance)
             self._draftStateText = Trackable(reference: reference, referencePath: \.draftStateText)
+            self._draftReplyStateText = Trackable(reference: reference, referencePath: \.draftReplyStateText)
+            self._draftEditStateText = Trackable(reference: reference, referencePath: \.draftEditStateText)
             self._typingLabelAppearance = Trackable(reference: reference, referencePath: \.typingLabelAppearance)
             self._mentionLabelAppearance = Trackable(reference: reference, referencePath: \.mentionLabelAppearance)
             self._unreadMentionLabelAppearance = Trackable(reference: reference, referencePath: \.unreadMentionLabelAppearance)
@@ -409,6 +427,8 @@ extension ChannelListViewController.ChannelCell: AppearanceProviding {
             if let deletedStateText { self.deletedStateText = deletedStateText }
             if let draftPrefixLabelAppearance { self.draftPrefixLabelAppearance = draftPrefixLabelAppearance }
             if let draftStateText { self.draftStateText = draftStateText }
+            if let draftReplyStateText { self.draftReplyStateText = draftReplyStateText }
+            if let draftEditStateText { self.draftEditStateText = draftEditStateText }
             if let typingLabelAppearance { self.typingLabelAppearance = typingLabelAppearance }
             if let mentionLabelAppearance { self.mentionLabelAppearance = mentionLabelAppearance }
             if let unreadMentionLabelAppearance { self.unreadMentionLabelAppearance = unreadMentionLabelAppearance }

@@ -66,6 +66,9 @@ extension SceytChatUIKit {
             /// The close button on the edit / reply / forward preview shown above
             /// the composer.
             public static let actionCancelButton = "sceyt_chat_message_input_action_cancel_button"
+            /// The title of that preview — reads "Reply: <name>" or "Edit: ", so it is what
+            /// distinguishes the two modes.
+            public static let actionTitleLabel = "sceyt_chat_message_input_action_title_label"
 
             /// The full-screen voice-recording overlay (`VoiceRecorderView`)
             /// shown while the record button is held.

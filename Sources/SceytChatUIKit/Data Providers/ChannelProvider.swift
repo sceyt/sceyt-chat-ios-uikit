@@ -560,6 +560,25 @@ open class ChannelProvider: DataProvider {
             logger.errorIfNotNil(error, "save draft message channel \(self.channelId) in db")
         }
     }
+
+    /// Persists the full input-bar state — composed text, reply/edit target, media strip,
+    /// view-once — so reopening the channel restores the bar the user left behind.
+    open func saveDraft(_ draft: DraftMessage, at date: Date? = Date()) {
+        self.database.write {
+            $0.update(draft: draft, date: date)
+        }  completion: { error in
+            logger.errorIfNotNil(error, "save draft channel \(self.channelId) in db")
+        }
+    }
+
+    open func fetchDraft(completion: @escaping (DraftMessage?) -> Void) {
+        let channelId = self.channelId
+        database.read {
+            $0.draft(channelId: channelId)
+        } completion: { result in
+            completion(try? result.get())
+        }
+    }
     
     open func getLocalChannel(type: String, userId: UserId, completion: @escaping (ChatChannel?) -> Void) {
         database.read {

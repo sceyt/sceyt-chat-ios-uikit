@@ -39,6 +39,12 @@ public class ChatChannel {
     public var unSynched: Bool = false
     
     public var draftMessage: NSAttributedString?
+    /// Type of the draft's first attachment (`AttachmentType` raw value), for the channel-list
+    /// preview of a draft that is attachments-only.
+    public var draftAttachmentType: String?
+    /// `"reply"` / `"edit"` when the draft carries a target, for the channel-list preview of a
+    /// draft that is nothing but a reply.
+    public var draftActionType: String?
     
     public var decodedMetadata: Metadata?
 
@@ -73,6 +79,8 @@ public class ChatChannel {
         userRole: String? = nil,
         messageRetentionPeriod: TimeInterval = 0,
         draftMessage: NSAttributedString? = nil,
+        draftAttachmentType: String? = nil,
+        draftActionType: String? = nil,
         unSynched: Bool = false
     ) {
         self.id = id
@@ -101,6 +109,8 @@ public class ChatChannel {
         self.userRole = userRole
         self.messageRetentionPeriod = messageRetentionPeriod
         self.draftMessage = draftMessage
+        self.draftAttachmentType = draftAttachmentType
+        self.draftActionType = draftActionType
         self.unSynched = unSynched
         if let metadata {
             decodedMetadata = try? Metadata.decode(metadata)
@@ -138,6 +148,8 @@ public class ChatChannel {
             userRole: dto.userRole?.name,
             messageRetentionPeriod: dto.messageRetentionPeriod,
             draftMessage: dto.draft,
+            draftAttachmentType: dto.draftAttachmentType,
+            draftActionType: dto.draftActionType,
             unSynched: dto.unsynched
         )
         if self.channelType == .direct {

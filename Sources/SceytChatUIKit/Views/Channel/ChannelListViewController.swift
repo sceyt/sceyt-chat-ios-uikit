@@ -410,7 +410,7 @@ open class ChannelListViewController: ViewController,
                 let hasDraftMove = !paths.moves.isEmpty
                 && paths.moves.allSatisfy { move in
                     guard let channel = channelListViewModel.channel(at: move.to) else { return false }
-                    return channel.draftMessage?.string != channelFingerprints[channel.id]?.draftMessageText
+                    return hasDraftChanged(channel)
                 }
                 && paths.inserts.isEmpty
                 && paths.deletes.isEmpty
@@ -439,7 +439,7 @@ open class ChannelListViewController: ViewController,
                 } else {
                     let hasDraftChange = paths.updates.contains { indexPath in
                         guard let channel = channelListViewModel.channel(at: indexPath) else { return false }
-                        return channel.draftMessage?.string != channelFingerprints[channel.id]?.draftMessageText
+                        return hasDraftChanged(channel)
                     }
                     if hasDraftChange {
                         applyCurrentSnapshot(animation: false)
@@ -701,6 +701,10 @@ private extension ChannelListViewController {
 
         // Draft text (NSAttributedString is not Equatable, use plain string)
         let draftMessageText: String?
+        // An attachments-only draft has no text, so the type is what changes its preview.
+        let draftAttachmentType: String?
+        // Same for a draft that is only a reply/edit target.
+        let draftActionType: String?
 
         // Peer presence (online dot for direct channels)
         let peerPresenceState: ChatUser.Presence.State?
@@ -719,6 +723,15 @@ private extension ChannelListViewController {
         let lastReactionKey: String?
     }
 
+    /// Whether a channel's draft differs from the one its last-rendered fingerprint captured.
+    /// Covers the attachments-only case, where the text is empty on both sides.
+    func hasDraftChanged(_ channel: ChatChannel) -> Bool {
+        let fingerprint = channelFingerprints[channel.id]
+        return channel.draftMessage?.string != fingerprint?.draftMessageText
+            || channel.draftAttachmentType != fingerprint?.draftAttachmentType
+            || channel.draftActionType != fingerprint?.draftActionType
+    }
+
     func makeFingerprint(for channel: ChatChannel) -> ChannelFingerprint {
         let lastMsg = channel.lastMessage
         return ChannelFingerprint(
@@ -732,6 +745,8 @@ private extension ChannelListViewController {
             pinnedAt: channel.pinnedAt,
             messageRetentionPeriod: channel.messageRetentionPeriod,
             draftMessageText: channel.draftMessage?.string,
+            draftAttachmentType: channel.draftAttachmentType,
+            draftActionType: channel.draftActionType,
             peerPresenceState: channel.peer?.presence.state,
             lastMessageId: lastMsg?.id,
             lastMessageTid: lastMsg?.tid,
