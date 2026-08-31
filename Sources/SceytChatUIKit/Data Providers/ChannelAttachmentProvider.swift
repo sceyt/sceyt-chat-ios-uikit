@@ -134,6 +134,11 @@ open class ChannelAttachmentProvider: DataProvider {
         { (_, attachments, users, error) in
             guard let attachments
             else {
+                if let error {
+                    logger.error("[MediaGallery] query loadPrevious failed channelId=\(self.channelId): \(error)")
+                } else {
+                    logger.warn("[MediaGallery] query loadPrevious returned no attachments and no error channelId=\(self.channelId)")
+                }
                 pageCompletion(0, error)
                 return
             }
@@ -155,6 +160,41 @@ open class ChannelAttachmentProvider: DataProvider {
             before: attachmentId,
             completion: completion
         )
+    }
+
+    /// Loads the page of attachments older than `attachmentId` on a query of its own,
+    /// reporting how many items the page returned like `loadPrevAttachment(pageCompletion:)`.
+    ///
+    /// `defaultQuery` is a cursor: a second `loadPrevious` on it is dropped while the
+    /// first is still in flight, so a user who reaches the bottom of the list during the
+    /// initial request gets no request at all and ends up waiting for two round-trips in
+    /// sequence. A page anchored on an attachment id carries no cursor state, so every
+    /// anchored page gets a fresh query and runs concurrently with whatever else is
+    /// loading. Callers dedupe by anchor — see `ChannelAttachmentListViewModel`.
+    open func loadPrevAttachment(
+        before attachmentId: AttachmentId,
+        pageCompletion: @escaping (Int, Error?) -> Void
+    ) {
+        let query = makeQuery()
+        query.loadPrevious(attachmentId: attachmentId)
+        { (_, attachments, users, error) in
+            guard let attachments
+            else {
+                if let error {
+                    logger.error("[MediaGallery] query loadPrevious(before: \(attachmentId)) failed channelId=\(self.channelId): \(error)")
+                } else {
+                    logger.warn("[MediaGallery] query loadPrevious(before: \(attachmentId)) returned no attachments and no error channelId=\(self.channelId)")
+                }
+                pageCompletion(0, error)
+                return
+            }
+            self.store(
+                attachments: attachments,
+                users: users
+            ) { error in
+                pageCompletion(attachments.count, error)
+            }
+        }
     }
     
     open func loadPrevAttachment(
@@ -223,6 +263,13 @@ open class ChannelAttachmentProvider: DataProvider {
         channelOperator.getMessages(
             ids: messageIds)
         { messages, error in
+            if let error {
+                // Attachments are still written, but without their owner messages they
+                // may not pass the list's predicate and stay invisible.
+                logger.error("[MediaGallery] store: getMessages for \(messageIds.count) messages failed channelId=\(self.channelId), storing \(attachments.count) attachments without owner messages: \(error)")
+            } else if let messages, messages.count != Set(messageIds).count {
+                logger.warn("[MediaGallery] store: getMessages returned \(messages.count) of \(Set(messageIds).count) requested messages channelId=\(self.channelId)")
+            }
             self.database.performWriteTask ({
                 if let users {
                     $0.createOrUpdate(users: users)
@@ -246,6 +293,11 @@ open class ChannelAttachmentProvider: DataProvider {
                     }
                 }
             }) { error in
+                if let error {
+                    logger.error("[MediaGallery] store: writing \(attachments.count) attachments to the database failed channelId=\(self.channelId): \(error)")
+                } else {
+                    logger.debug("[MediaGallery] store: wrote \(attachments.count) attachments (\(messages?.count ?? 0) messages) channelId=\(self.channelId)")
+                }
                 completion?(error)
             }
         }

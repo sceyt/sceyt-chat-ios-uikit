@@ -179,6 +179,7 @@ extension ChannelInfoViewController {
             if indexPath.section == lastSection {
                 let count = mediaViewModel.numberOfAttachments(in: lastSection)
                 if count > 0 && indexPath.row >= max(0, count - 3) {
+                    logger.info("[MediaGallery] reached bottom at \(indexPath.section)/\(indexPath.row) of \(mediaViewModel.numberOfSections) sections, last section count=\(count) — loading more")
                     mediaViewModel.loadAttachments()
                 }
             }

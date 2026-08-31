@@ -44,6 +44,13 @@ open class ChannelAttachmentListViewModel: NSObject {
     /// state hidden.
     public private(set) var hasLoadedInitialAttachments = false
     private var isInitialServerPageRequested = false
+    /// Anchors of the previous-page requests already sent to the server. The anchor is
+    /// the oldest attachment the list holds, so it only moves once a page has landed in
+    /// the database; asking again for the same one — a second reach of the bottom while
+    /// the page is in flight, or a page that came back empty because the channel has
+    /// nothing older — would be a duplicate request. A failed page is dropped from here
+    /// so the next reach of the bottom retries it.
+    private var requestedPreviousPageAnchors = Set<AttachmentId>()
 
     private let thumbnailCache = {
         $0.countLimit = 20
@@ -71,18 +78,75 @@ open class ChannelAttachmentListViewModel: NSObject {
         // Only the first page decides whether the list is genuinely empty; every later
         // call is pagination and must not re-arm the flag.
         guard !isInitialServerPageRequested else {
-            provider.loadPrevAttachment()
+            loadPreviousServerPage()
             return
         }
+        loadInitialServerPage()
+    }
+
+    open var oldestLoadedAttachmentId: AttachmentId? {
+        for section in stride(from: attachmentObserver.numberOfSections - 1, through: 0, by: -1) {
+            for row in stride(from: attachmentObserver.numberOfItems(in: section) - 1, through: 0, by: -1) {
+                if let id = attachmentObserver.item(at: IndexPath(row: row, section: section))?.attachment.id,
+                   id != 0 {
+                    return id
+                }
+            }
+        }
+        return nil
+    }
+
+    open func loadPreviousServerPage() {
+        let loadedCount = attachmentObserver.count
+        guard let anchor = oldestLoadedAttachmentId else {
+            // Nothing loaded to anchor on (the channel is empty, or the initial page
+            // has not landed yet): fall back to the cursor, which the query itself
+            // dedupes while a page is in flight.
+            logger.info("[MediaGallery] previous page: no anchor (loaded=\(loadedCount)), falling back to cursor channelId=\(channel.id)")
+            let channelId = channel.id
+            provider.loadPrevAttachment { error in
+                if let error {
+                    logger.error("[MediaGallery] previous page (cursor) failed channelId=\(channelId): \(error)")
+                }
+            }
+            return
+        }
+        guard !requestedPreviousPageAnchors.contains(anchor) else {
+            logger.info("[MediaGallery] previous page before=\(anchor) skipped — already requested (in flight or end of history) loaded=\(loadedCount) channelId=\(channel.id)")
+            return
+        }
+        requestedPreviousPageAnchors.insert(anchor)
+        logger.info("[MediaGallery] previous page before=\(anchor) requested loaded=\(loadedCount) channelId=\(channel.id)")
+        provider.loadPrevAttachment(before: anchor) { [weak self] fetchedCount, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let error {
+                    logger.error("[MediaGallery] previous page before=\(anchor) failed channelId=\(self.channel.id): \(error)")
+                    self.requestedPreviousPageAnchors.remove(anchor)
+                    return
+                }
+                logger.info("[MediaGallery] previous page before=\(anchor) fetched=\(fetchedCount)\(fetchedCount == 0 ? " (end of history)" : "") channelId=\(self.channel.id)")
+            }
+        }
+    }
+
+    open func loadInitialServerPage() {
         isInitialServerPageRequested = true
-        provider.loadPrevAttachment(pageCompletion: { [weak self] fetchedCount, _ in
+        logger.info("[MediaGallery] initial page requested loaded=\(attachmentObserver.count) channelId=\(channel.id)")
+        provider.loadPrevAttachment(pageCompletion: { [weak self] fetchedCount, error in
             DispatchQueue.main.async {
                 guard let self else { return }
                 guard let fetchedCount else {
                     // Nothing was requested (a page was already in flight) — let the
                     // next loadAttachments() own the initial page.
+                    logger.info("[MediaGallery] initial page not sent (cursor already loading), will retry on next load channelId=\(self.channel.id)")
                     self.isInitialServerPageRequested = false
                     return
+                }
+                if let error {
+                    logger.error("[MediaGallery] initial page failed channelId=\(self.channel.id): \(error) — empty state will show as if there were no attachments")
+                } else {
+                    logger.info("[MediaGallery] initial page fetched=\(fetchedCount) channelId=\(self.channel.id)")
                 }
                 self.markInitialAttachmentsLoaded(didFetchItems: fetchedCount > 0)
             }
