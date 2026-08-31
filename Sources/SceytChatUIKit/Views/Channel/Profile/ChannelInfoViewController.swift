@@ -740,8 +740,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Chat.pin,
                         icon: .chatPin,
-                        handler: { [unowned self] in
-                            pinChat()
+                        handler: { [weak self] in
+                            self?.pinChat()
                         })
                 ]
             } else {
@@ -749,8 +749,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Chat.unpin,
                         icon: .chatUnpin,
-                        handler: { [unowned self] in
-                            unpinChat()
+                        handler: { [weak self] in
+                            self?.unpinChat()
                         })
                 ]
             }
@@ -759,8 +759,8 @@ open class ChannelInfoViewController: ViewController,
                 .init(
                     title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
-                    handler: { [unowned self] in
-                        deleteAllMessages()
+                    handler: { [weak self] in
+                        self?.deleteAllMessages()
                     })
             ]
             
@@ -769,8 +769,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.unblock,
                         icon: .chatUnBlock,
-                        handler: { [unowned self] in
-                            unblock()
+                        handler: { [weak self] in
+                            self?.unblock()
                         })
                 ]
             } else {
@@ -778,8 +778,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.block,
                         icon: .chatBlock,
-                        handler: { [unowned self] in
-                            block()
+                        handler: { [weak self] in
+                            self?.block()
                         })
                 ]
             }
@@ -789,8 +789,8 @@ open class ChannelInfoViewController: ViewController,
                     title: L10n.Channel.Info.Action.Chat.delete,
                     icon: .chatDelete,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        delete()
+                    handler: { [weak self] in
+                        self?.delete()
                     })
             ]
            
@@ -800,8 +800,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Group.edit,
                         icon: .chatEdit,
-                        handler: { [unowned self] in
-                            editAction(nil)
+                        handler: { [weak self] in
+                            self?.editAction(nil)
                         })
                 ]
             }
@@ -811,8 +811,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Group.pin,
                         icon: .chatPin,
-                        handler: { [unowned self] in
-                            pinChat()
+                        handler: { [weak self] in
+                            self?.pinChat()
                         })
                 ]
             } else {
@@ -820,8 +820,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Group.unpin,
                         icon: .chatUnpin,
-                        handler: { [unowned self] in
-                            unpinChat()
+                        handler: { [weak self] in
+                            self?.unpinChat()
                         })
                 ]
             }
@@ -830,22 +830,22 @@ open class ChannelInfoViewController: ViewController,
                 .init(
                     title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
-                    handler: { [unowned self] in
-                        deleteAllMessages()
+                    handler: { [weak self] in
+                        self?.deleteAllMessages()
                     }),
                 .init(
                     title: L10n.Channel.Info.Action.Group.blockAndLeave,
                     icon: .chatBlock,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        blockAndLeave()
+                    handler: { [weak self] in
+                        self?.blockAndLeave()
                     }),
                 .init(
                     title: L10n.Channel.Info.Action.Group.leave,
                     icon: .chatLeave,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        leave()
+                    handler: { [weak self] in
+                        self?.leave()
                     })
             ]
             
@@ -855,8 +855,8 @@ open class ChannelInfoViewController: ViewController,
                         title: L10n.Channel.Info.Action.Group.delete,
                         icon: .chatDelete,
                         style: .destructive,
-                        handler: { [unowned self] in
-                            delete()
+                        handler: { [weak self] in
+                            self?.delete()
                         })
                 ]
             }
@@ -867,8 +867,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Channel.edit,
                         icon: .chatEdit,
-                        handler: { [unowned self] in
-                            editAction(nil)
+                        handler: { [weak self] in
+                            self?.editAction(nil)
                         })
                 ]
             }
@@ -878,8 +878,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Channel.pin,
                         icon: .chatPin,
-                        handler: { [unowned self] in
-                            pinChat()
+                        handler: { [weak self] in
+                            self?.pinChat()
                         })
                 ]
             } else {
@@ -887,8 +887,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Channel.unpin,
                         icon: .chatUnpin,
-                        handler: { [unowned self] in
-                            unpinChat()
+                        handler: { [weak self] in
+                            self?.unpinChat()
                         })
                 ]
             }
@@ -897,22 +897,22 @@ open class ChannelInfoViewController: ViewController,
                 .init(
                     title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
-                    handler: { [unowned self] in
-                        deleteAllMessages(forEveryone: true)
+                    handler: { [weak self] in
+                        self?.deleteAllMessages(forEveryone: true)
                     }),
                 .init(
                     title: L10n.Channel.Info.Action.Channel.blockAndLeave,
                     icon: .chatBlock,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        blockAndLeave()
+                    handler: { [weak self] in
+                        self?.blockAndLeave()
                     }),
                 .init(
                     title: L10n.Channel.Info.Action.Channel.leave,
                     icon: .chatLeave,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        leave()
+                    handler: { [weak self] in
+                        self?.leave()
                     })
             ]
             
@@ -922,8 +922,8 @@ open class ChannelInfoViewController: ViewController,
                         title: L10n.Channel.Info.Action.Channel.delete,
                         icon: .chatDelete,
                         style: .destructive,
-                        handler: { [unowned self] in
-                            delete()
+                        handler: { [weak self] in
+                            self?.delete()
                         })
                 ]
             }
