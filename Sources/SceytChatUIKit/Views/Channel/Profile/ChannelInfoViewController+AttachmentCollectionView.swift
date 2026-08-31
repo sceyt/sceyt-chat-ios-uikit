@@ -85,35 +85,35 @@ extension ChannelInfoViewController {
                 // restartObserver (triggered by search) delivers an empty ChangeItemPaths when
                 // the new result set has no overlap with the previous one (e.g. going from N
                 // results to 0 after narrowing a query). There are no diff operations to apply,
-                // but the collection view still holds stale cells. Reload whenever the
-                // data-source section count no longer matches what the collection view has.
-                let currentSections = numberOfSections
-                let newSections = dataSource?.numberOfSections?(in: self) ?? 0
-                if currentSections != newSections {
-                    reloadData()
-                }
-            } else {
-                // UIKit validates batch updates PER SECTION, not in aggregate, so the
-                // earlier aggregate checks (total section count + total item count) let
-                // through diffs that are +1 in one section and −1 in another and then
-                // abort inside performBatchUpdates. Validate every section's post-update
-                // count against before ± diff; bail to reloadData() on any mismatch.
-                guard canSafelyApply(paths) else {
+                // but the collection view still holds stale cells, so reload whenever what it
+                // renders no longer matches what the data source now reports — item counts as
+                // well as section counts, since a search can narrow a section without changing
+                // how many sections there are.
+                guard let counts = renderedAndSourceCounts(), counts.rendered == counts.source
+                else {
                     reloadData()
                     updateNoItems()
                     return
                 }
+            } else {
+                // A `.move` is applied as delete-from + insert-to, so the two index spaces are
+                // flattened here once and validated together below.
+                let deletes = paths.deletes + paths.moves.map { $0.from }
+                let inserts = paths.inserts + paths.moves.map { $0.to }
+                let updates = Array(Set(paths.updates))
+
+                guard canSafelyApply(deletes: deletes, inserts: inserts, updates: updates, paths: paths)
+                else {
+                    reloadData()
+                    updateNoItems()
+                    return
+                }
+
                 UIView.performWithoutAnimation {
                     performBatchUpdates {
-                        if !paths.sectionInserts.isEmpty {
-                            insertSections(paths.sectionInserts)
-                        }
-                        if !paths.sectionDeletes.isEmpty {
-                            deleteSections(paths.sectionDeletes)
-                        }
-                        self.insertItems(at: paths.inserts + paths.moves.map { $0.to })
-                        self.reloadItems(at: paths.updates)
-                        self.deleteItems(at: paths.deletes + paths.moves.map { $0.from })
+                        self.insertItems(at: inserts)
+                        self.reloadItems(at: updates)
+                        self.deleteItems(at: deletes)
                     }
                 }
             }
@@ -121,31 +121,78 @@ extension ChannelInfoViewController {
             updateNoItems()
         }
 
-        /// UIKit validates batch updates PER SECTION, not in aggregate. Verify that the
-        /// data source's post-update counts equal `before ± diff` for every section; if any
-        /// section disagrees — or sections are being added/removed, which shifts section
-        /// indices and makes cheap validation unsafe — bail to `reloadData()` instead of
-        /// letting `performBatchUpdates` abort with `NSInternalInconsistencyException`.
-        private func canSafelyApply(_ paths: ChannelAttachmentListViewModel.ChangeItemPaths) -> Bool {
+        private func renderedAndSourceCounts() -> (rendered: [Int], source: [Int])? {
+            let sectionCount = numberOfSections
+            guard sectionCount == (dataSource?.numberOfSections?(in: self) ?? 0) else { return nil }
+            var rendered = [Int](repeating: 0, count: sectionCount)
+            var source = [Int](repeating: 0, count: sectionCount)
+            for s in 0 ..< sectionCount {
+                rendered[s] = numberOfItems(inSection: s)
+                source[s] = dataSource?.collectionView(self, numberOfItemsInSection: s) ?? 0
+            }
+            return (rendered, source)
+        }
+
+        private func canSafelyApply(
+            deletes: [IndexPath],
+            inserts: [IndexPath],
+            updates: [IndexPath],
+            paths: ChannelAttachmentListViewModel.ChangeItemPaths
+        ) -> Bool {
             // Section add/remove shifts section indices → per-section item math is fragile
             // to validate cheaply. Just reload when the section set changes.
             guard paths.sectionInserts.isEmpty, paths.sectionDeletes.isEmpty else { return false }
 
-            let before = numberOfSections
-            let actualSections = dataSource?.numberOfSections?(in: self) ?? 0
-            guard before == actualSections else { return false }
+            guard let counts = renderedAndSourceCounts() else { return false }
+            let before = counts.rendered
+            let after = counts.source
+            let sectionCount = before.count
 
-            // No section changes → OLD and NEW section indices coincide, so filtering both
-            // insert (new-space) and delete (old-space) paths by `.section` is valid.
-            let insertsTo = paths.inserts + paths.moves.map { $0.to }
-            let deletesFrom = paths.deletes + paths.moves.map { $0.from }
-            for s in 0..<before {
-                let expected = numberOfItems(inSection: s)
-                    + insertsTo.filter { $0.section == s }.count
-                    - deletesFrom.filter { $0.section == s }.count
-                let actual = dataSource?.collectionView(self, numberOfItemsInSection: s) ?? 0
-                if expected != actual { return false }
+            // The same index path listed twice in one batch is an abort on its own.
+            guard Set(deletes).count == deletes.count, Set(inserts).count == inserts.count
+            else { return false }
+
+            // A row cannot be reloaded and structurally changed in the same batch.
+            let deleteSet = Set(deletes), insertSet = Set(inserts)
+            guard updates.allSatisfy({ !deleteSet.contains($0) && !insertSet.contains($0) })
+            else { return false }
+
+            func addressable(_ indexPath: IndexPath) -> Bool {
+                indexPath.section >= 0 && indexPath.section < sectionCount && indexPath.item >= 0
             }
+
+            // Deletes address the OLD index space.
+            var deletesPerSection = [Int](repeating: 0, count: sectionCount)
+            for indexPath in deletes {
+                guard addressable(indexPath), indexPath.item < before[indexPath.section]
+                else { return false }
+                deletesPerSection[indexPath.section] += 1
+            }
+
+            // Inserts address the NEW index space.
+            var insertsPerSection = [Int](repeating: 0, count: sectionCount)
+            for indexPath in inserts {
+                guard addressable(indexPath), indexPath.item < after[indexPath.section]
+                else { return false }
+                insertsPerSection[indexPath.section] += 1
+            }
+
+            // A reload is applied as delete-then-insert at the same index path, so it has to be
+            // addressable in both spaces.
+            for indexPath in updates {
+                guard addressable(indexPath),
+                      indexPath.item < before[indexPath.section],
+                      indexPath.item < after[indexPath.section]
+                else { return false }
+            }
+
+            // UIKit validates PER SECTION, not in aggregate: an aggregate check passes when one
+            // section is +1 and another is −1, and then aborts.
+            for s in 0 ..< sectionCount
+            where before[s] + insertsPerSection[s] - deletesPerSection[s] != after[s] {
+                return false
+            }
+
             return true
         }
 
