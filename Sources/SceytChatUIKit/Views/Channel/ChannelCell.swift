@@ -997,6 +997,11 @@ extension ChannelListViewController {
                 trailingActionsView.transform = translation
                 trailingActionsView.setOverDrag(-offset - trailingActionsView.fullRevealWidth)
                 leadingActionsView.setOverDrag(offset - leadingActionsView.fullRevealWidth)
+                // On top of that shared slide, each button lags by what is still
+                // to come on its side, so the actions widen from zero together
+                // rather than arriving one at a time.
+                leadingActionsView.setRevealedWidth(max(0, offset), mirrored: isRightToLeft)
+                trailingActionsView.setRevealedWidth(max(0, -offset), mirrored: isRightToLeft)
                 // Over-drag mutates a width constraint, so it has to be laid out
                 // inside the animation block to be animated with the transform.
                 layoutIfNeeded()

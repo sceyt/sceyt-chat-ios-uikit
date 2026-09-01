@@ -534,6 +534,134 @@ final class ChannelSwipeActionsTests: XCTestCase {
         XCTAssertLessThan(-cell.swipeOffset, openedWidth)
     }
 
+    // MARK: - Progressive reveal
+
+    /// Sliding the container alone would reveal it edge-first — the innermost
+    /// button arrives whole before the outer ones start showing at all. Every
+    /// action has to widen from zero at the same rate instead, so at half a
+    /// reveal each shows exactly half of itself.
+    func test_reveal_growsEveryLeadingActionAtTheSameRate() {
+        let cell = makeCell(layoutDirection: .forceLeftToRight)
+        cell.leadingActionsView.configure(items: unevenItems)
+        cell.layoutIfNeeded()
+
+        let full = cell.leadingActionsView.fullRevealWidth
+        cell.setSwipeOffset(full / 2, animated: false)
+        cell.layoutIfNeeded()
+
+        // The leading row is clipped at the cell's leading edge, so each button's
+        // slice runs from where the previous one ended to its own trailing edge.
+        var previousEdge: CGFloat = 0
+        for button in cell.leadingActionsView.buttons {
+            let edge = button.convert(button.bounds, to: cell.contentView).maxX
+            XCTAssertEqual(edge - previousEdge, button.bounds.width / 2, accuracy: 0.5,
+                           "Every action must expose the same fraction of itself")
+            previousEdge = edge
+        }
+        XCTAssertEqual(previousEdge, full / 2, accuracy: 0.5,
+                       "The slices must tile the revealed width with no gap or overlap")
+    }
+
+    func test_reveal_growsEveryTrailingActionAtTheSameRate() {
+        let cell = makeCell(layoutDirection: .forceLeftToRight)
+        cell.trailingActionsView.configure(items: unevenItems)
+        cell.layoutIfNeeded()
+
+        let full = cell.trailingActionsView.fullRevealWidth
+        cell.setSwipeOffset(-full / 2, animated: false)
+        cell.layoutIfNeeded()
+
+        // Mirror image: the trailing row is clipped at the cell's trailing edge,
+        // so a button's slice starts at its own leading edge and ends where the
+        // next one begins.
+        let buttons = cell.trailingActionsView.buttons
+        let edges = buttons.map { $0.convert($0.bounds, to: cell.contentView).minX }
+        XCTAssertEqual(edges.first ?? .nan, cell.contentView.bounds.width - full / 2, accuracy: 0.5,
+                       "The innermost action must sit flush against the content")
+        for (index, button) in buttons.enumerated() {
+            let next = index + 1 < edges.count ? edges[index + 1] : cell.contentView.bounds.width
+            XCTAssertEqual(next - edges[index], button.bounds.width / 2, accuracy: 0.5,
+                           "Every action must expose the same fraction of itself")
+        }
+    }
+
+    /// A button's content stays laid out at full width and overhangs the inner
+    /// edge, so a title slides out from behind the row rather than being squeezed
+    /// into a narrow slice. That is what keeps the button from re-laying out mid
+    /// drag, so it is worth pinning down.
+    func test_reveal_keepsButtonsAtTheirNaturalWidth() {
+        let cell = makeCell(layoutDirection: .forceLeftToRight)
+        cell.leadingActionsView.configure(items: unevenItems)
+        cell.layoutIfNeeded()
+
+        let widths = cell.leadingActionsView.buttons.map(\.bounds.width)
+        cell.setSwipeOffset(cell.leadingActionsView.fullRevealWidth / 3, animated: false)
+        cell.layoutIfNeeded()
+
+        XCTAssertEqual(cell.leadingActionsView.buttons.map(\.bounds.width), widths,
+                       "Revealing must translate the buttons, never resize them")
+    }
+
+    /// The lag is a reveal-time effect only: once the row is open the buttons sit
+    /// at their laid-out positions, so the open state and the over-drag stretch
+    /// behave exactly as they did before.
+    func test_reveal_atFullWidth_leavesTheButtonsUntransformed() {
+        let cell = makeCell(layoutDirection: .forceLeftToRight)
+        cell.leadingActionsView.configure(items: unevenItems)
+        cell.trailingActionsView.configure(items: unevenItems)
+
+        cell.setSwipeOffset(cell.leadingActionsView.fullRevealWidth, animated: false)
+        XCTAssertTrue(cell.leadingActionsView.buttons.allSatisfy { $0.transform == .identity })
+
+        cell.setSwipeOffset(-cell.trailingActionsView.fullRevealWidth - 40, animated: false)
+        XCTAssertTrue(cell.trailingActionsView.buttons.allSatisfy { $0.transform == .identity },
+                      "Over-drag is absorbed by the width constraint, not by the lag")
+    }
+
+    /// Mid-reveal the buttons overlap, and the seam the row shows is the outer
+    /// button's inner edge — so the outer button has to paint on top. Drawing
+    /// order must not disturb the layout order the stack view arranges by.
+    func test_reveal_stacksTheOutermostActionOnTop() {
+        let leading = ChannelSwipeActionsView()
+        leading.side = .leading
+        leading.configure(items: unevenItems)
+        XCTAssertEqual(leading.stackView.subviews.last, leading.buttons.first,
+                       "On the leading side the outermost action is laid out first")
+        XCTAssertEqual(leading.stackView.arrangedSubviews, leading.buttons,
+                       "Reordering for drawing must leave the layout order alone")
+
+        let trailing = ChannelSwipeActionsView()
+        trailing.side = .trailing
+        trailing.configure(items: unevenItems)
+        XCTAssertEqual(trailing.stackView.subviews.last, trailing.buttons.last,
+                       "On the trailing side it is laid out last")
+        XCTAssertEqual(trailing.stackView.arrangedSubviews, trailing.buttons)
+    }
+
+    func test_reveal_isMirroredInRightToLeft() {
+        let ltr = makeCell(layoutDirection: .forceLeftToRight)
+        ltr.leadingActionsView.configure(items: unevenItems)
+        ltr.setSwipeOffset(ltr.leadingActionsView.fullRevealWidth / 2, animated: false)
+
+        let rtl = makeCell(layoutDirection: .forceRightToLeft)
+        rtl.leadingActionsView.configure(items: unevenItems)
+        rtl.setSwipeOffset(rtl.leadingActionsView.fullRevealWidth / 2, animated: false)
+
+        for (left, right) in zip(ltr.leadingActionsView.buttons, rtl.leadingActionsView.buttons) {
+            XCTAssertEqual(left.transform.tx, -right.transform.tx, accuracy: 0.001,
+                           "The lag points toward the content, which swaps sides in RTL")
+        }
+    }
+
+    /// Two actions whose titles are far enough apart that an implementation
+    /// which gave every button the same share of the reveal would still pass the
+    /// proportionality assertions.
+    private var unevenItems: [Config.ActionItem] {
+        [Config.ActionItem(action: .read,
+                           appearance: .init(title: "Mark as unread and archive")),
+         Config.ActionItem(action: .pin, appearance: .init(title: "Pin"))]
+    }
+
     // MARK: - Helpers
 
 
@@ -542,6 +670,12 @@ final class ChannelSwipeActionsTests: XCTestCase {
         cell.frame = CGRect(x: 0, y: 0, width: 390, height: 72)
         cell.semanticContentAttribute = layoutDirection
         cell.swipeContentView.semanticContentAttribute = layoutDirection
+        // `TableViewCell` defers `setupLayout()` to `didMoveToSuperview`, so a
+        // cell that never gets a host never builds its view hierarchy — and the
+        // action containers would silently stay out of it.
+        let host = UIView(frame: cell.bounds)
+        host.semanticContentAttribute = layoutDirection
+        host.addSubview(cell)
         cell.layoutIfNeeded()
         return cell
     }
@@ -589,3 +723,4 @@ private final class CountingCell: ChannelListViewController.ChannelCell {
         thresholdCrossings += 1
     }
 }
+

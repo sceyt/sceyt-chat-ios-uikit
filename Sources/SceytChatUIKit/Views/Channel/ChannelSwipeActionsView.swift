@@ -14,6 +14,10 @@ import UIKit
 /// progressive reveal falls out of the cell's `clipsToBounds` for free and a
 /// drag costs no layout pass. Only over-drag past `fullRevealWidth` mutates a
 /// constraint, and only on a single button.
+///
+/// On top of that slide, `setRevealedWidth(_:mirrored:)` gives each button its
+/// own translation so all of them grow from zero together — see that method for
+/// why the row would otherwise arrive one button at a time.
 open class ChannelSwipeActionsView: View {
 
     public enum Side {
@@ -36,6 +40,21 @@ open class ChannelSwipeActionsView: View {
     public private(set) var buttons: [ChannelSwipeActionButton] = []
 
     private var widthConstraints: [NSLayoutConstraint] = []
+
+    /// The buttons' unstretched widths and their cumulative distance from the
+    /// container's leading edge, in layout order.
+    ///
+    /// Kept apart from `widthConstraints` because `setOverDrag(_:)` mutates one
+    /// of those constants, and the reveal maths has to keep working off the
+    /// natural geometry while it does.
+    private var naturalWidths: [CGFloat] = []
+    private var naturalOffsets: [CGFloat] = []
+
+    /// How much of this side is currently exposed, and whether the row is
+    /// mirrored. Retained so a rebuild or a Dynamic Type change can re-apply the
+    /// reveal without the cell having to drive it again.
+    private var revealedWidth: CGFloat = 0
+    private var isMirrored = false
 
     /// Sum of the buttons' natural widths — the offset at which the row reads as
     /// fully open. `0` means this side has no actions, and the cell must refuse
@@ -85,6 +104,8 @@ open class ChannelSwipeActionsView: View {
         }
         buttons = []
         widthConstraints = []
+        naturalWidths = []
+        naturalOffsets = []
         stretchingWidthConstraint = nil
         stretchingNaturalWidth = 0
         fullRevealWidth = 0
@@ -105,6 +126,8 @@ open class ChannelSwipeActionsView: View {
             let constraint = button.widthAnchor.pin(constant: width)
             buttons.append(button)
             widthConstraints.append(constraint)
+            naturalOffsets.append(fullRevealWidth)
+            naturalWidths.append(width)
             fullRevealWidth += width
         }
 
@@ -113,6 +136,26 @@ open class ChannelSwipeActionsView: View {
             stretchingWidthConstraint = widthConstraints[outerIndex]
             stretchingNaturalWidth = widthConstraints[outerIndex].constant
         }
+
+        updateButtonDepths()
+        applyReveal()
+    }
+
+    /// Stacks the buttons so the one nearest the swiped edge paints over its
+    /// neighbours.
+    ///
+    /// Mid-reveal every button is wider than the slice of it the row is showing
+    /// and hangs over the button further in (see
+    /// `setRevealedWidth(_:mirrored:)`); the seam the row must show is the outer
+    /// button's inner edge, so the outer button has to win.
+    ///
+    /// Drawing order rather than `zPosition`, which `CALayer.render(in:)` — and
+    /// so any snapshot-based test — ignores. `UIStackView` keeps `subviews`
+    /// order independent of `arrangedSubviews`, so reordering here changes only
+    /// what paints on top, not the layout.
+    private func updateButtonDepths() {
+        let backToFront = side == .leading ? Array(buttons.reversed()) : buttons
+        backToFront.forEach(stackView.bringSubviewToFront)
     }
 
     /// Recomputes the button widths for the current Dynamic Type category.
@@ -123,10 +166,52 @@ open class ChannelSwipeActionsView: View {
             guard let item = button.item else { continue }
             let width = naturalWidth(for: item)
             widthConstraints[index].constant = width
+            naturalOffsets[index] = fullRevealWidth
+            naturalWidths[index] = width
             fullRevealWidth += width
         }
         if let stretchingWidthConstraint {
             stretchingNaturalWidth = stretchingWidthConstraint.constant
+        }
+        applyReveal()
+    }
+
+    /// Positions the buttons for `revealed` points of exposure, `mirrored` when
+    /// the row lays out right-to-left.
+    ///
+    /// Sliding the container alone reveals it edge-first: the button nearest the
+    /// content is out from behind the row immediately at full width, and the
+    /// outer ones only start appearing once it has cleared. Reference behaviour
+    /// is that every action widens from zero at the same rate.
+    ///
+    /// So each button additionally *lags* the container by the natural width of
+    /// everything between it and the content — the buttons it is still waiting
+    /// on — scaled by how much of the reveal is left. That makes button `i`'s
+    /// exposed slice exactly `progress × width`, while its content stays laid out
+    /// at full width and hangs off the inner edge, so a title slides in rather
+    /// than squeezing. The lag reaches zero at full reveal, so this is purely a
+    /// reveal-time effect: the open row and any over-drag past it are untouched.
+    ///
+    /// Translation only — no constraint is disturbed, so a drag still costs no
+    /// layout pass.
+    open func setRevealedWidth(_ revealed: CGFloat, mirrored: Bool) {
+        revealedWidth = max(0, revealed)
+        isMirrored = mirrored
+        applyReveal()
+    }
+
+    private func applyReveal() {
+        guard fullRevealWidth > 0 else { return }
+        let remaining = 1 - min(1, revealedWidth / fullRevealWidth)
+        // Positive lag points from the swiped edge toward the content, which is
+        // the +x direction for a leading row and -x for a trailing one — flipped
+        // again when the whole row is mirrored.
+        let direction: CGFloat = (side == .leading ? 1 : -1) * (isMirrored ? -1 : 1)
+        for (index, button) in buttons.enumerated() {
+            let lag = side == .leading
+                ? fullRevealWidth - naturalOffsets[index] - naturalWidths[index]
+                : naturalOffsets[index]
+            button.transform = CGAffineTransform(translationX: direction * remaining * lag, y: 0)
         }
     }
 
