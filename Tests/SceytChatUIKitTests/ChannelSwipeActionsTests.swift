@@ -344,6 +344,71 @@ final class ChannelSwipeActionsTests: XCTestCase {
                      "A short drag fires nothing")
     }
 
+    // MARK: - Full-swipe haptic
+
+    /// `UISwipeActionsConfiguration` bumps *while* dragging, the moment a full
+    /// swipe becomes armed — that is what tells you releasing will perform the
+    /// action. So the feedback is driven from the drag, once per crossing.
+    func test_fullSwipeHaptic_firesOnceWhenTheThresholdIsCrossed() {
+        let cell = makeFullSwipeCell()
+        let past = -(cell.bounds.width * cell.fullSwipeThresholdFraction + 1)
+
+        cell.updateFullSwipeActivation(for: -10)
+        XCTAssertEqual(cell.thresholdCrossings, 0, "Short drags must not buzz")
+
+        cell.updateFullSwipeActivation(for: past)
+        XCTAssertEqual(cell.thresholdCrossings, 1, "Crossing the threshold buzzes once")
+
+        // Still dragging past it — the latch must hold.
+        cell.updateFullSwipeActivation(for: past - 20)
+        cell.updateFullSwipeActivation(for: past - 40)
+        XCTAssertEqual(cell.thresholdCrossings, 1,
+                       "Continuing past the threshold must not buzz on every touch move")
+    }
+
+    func test_fullSwipeHaptic_reArmsAfterFallingBackBelowTheThreshold() {
+        let cell = makeFullSwipeCell()
+        let past = -(cell.bounds.width * cell.fullSwipeThresholdFraction + 1)
+
+        cell.updateFullSwipeActivation(for: past)
+        cell.updateFullSwipeActivation(for: -10)
+        XCTAssertEqual(cell.thresholdCrossings, 1,
+                       "Dragging back out is silent, as it is natively")
+
+        cell.updateFullSwipeActivation(for: past)
+        XCTAssertEqual(cell.thresholdCrossings, 2, "Crossing again buzzes again")
+    }
+
+    func test_fullSwipeHaptic_isSilentWhenFullSwipeIsOff() {
+        let cell = makeFullSwipeCell()
+        cell.performsFirstActionWithFullSwipe = false
+        cell.updateFullSwipeActivation(for: -(cell.bounds.width))
+        XCTAssertEqual(cell.thresholdCrossings, 0,
+                       "No full swipe means no armed state to announce")
+    }
+
+    /// The leading side arms — and therefore buzzes — on its own actions.
+    func test_fullSwipeHaptic_appliesToTheLeadingSideToo() {
+        let cell = makeFullSwipeCell()
+        cell.updateFullSwipeActivation(for: cell.bounds.width * cell.fullSwipeThresholdFraction + 1)
+        XCTAssertEqual(cell.thresholdCrossings, 1)
+    }
+
+    private func makeFullSwipeCell() -> CountingCell {
+        let cell = CountingCell(style: .default, reuseIdentifier: nil)
+        cell.frame = CGRect(x: 0, y: 0, width: 390, height: 72)
+        cell.performsFirstActionWithFullSwipe = true
+        cell.trailingActionsView.configure(items: [
+            Config.ActionItem(action: .mute, appearance: Config.appearance(for: .mute)),
+            Config.ActionItem(action: .delete, appearance: Config.appearance(for: .delete))
+        ])
+        cell.leadingActionsView.configure(items: [
+            Config.ActionItem(action: .read, appearance: Config.appearance(for: .read))
+        ])
+        cell.layoutIfNeeded()
+        return cell
+    }
+
     // MARK: - Customization seam
 
     /// Integrators change *which* actions a channel offers by subclassing
@@ -512,5 +577,15 @@ private final class TestSwipeActionsConfiguration: ChannelSwipeActionsConfigurat
 
     override class func leadingActions(chatChannel: ChatChannel) -> [Actions] {
         []
+    }
+}
+
+/// Counts full-swipe threshold crossings instead of buzzing, so the latch can be
+/// asserted without a Taptic Engine.
+private final class CountingCell: ChannelListViewController.ChannelCell {
+    var thresholdCrossings = 0
+
+    override func fullSwipeThresholdDidCross() {
+        thresholdCrossings += 1
     }
 }

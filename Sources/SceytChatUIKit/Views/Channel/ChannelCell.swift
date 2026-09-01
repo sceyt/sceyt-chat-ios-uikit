@@ -100,6 +100,16 @@ extension ChannelListViewController {
         /// Offset at the start of the current pan.
         private var panStartOffset: CGFloat = 0
 
+        /// Whether the current drag is past the full-swipe threshold. Latched so
+        /// the haptic fires once per crossing rather than on every touch move,
+        /// and re-armed when the drag falls back below it.
+        private var isFullSwipeActivated = false
+
+        /// Feedback for crossing the full-swipe threshold. `.medium` matches the
+        /// message list's swipe-to-reply, the other pan-threshold gesture in the
+        /// SDK.
+        open lazy var fullSwipeFeedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+
         private var isRightToLeft: Bool {
             effectiveUserInterfaceLayoutDirection == .rightToLeft
         }
@@ -236,6 +246,7 @@ extension ChannelListViewController {
             // `cellForRowAt` for the row that is actually open.
             onSwipeEvent = nil
             boundSwipeActions = nil
+            isFullSwipeActivated = false
             setSwipeOffset(0, animated: false)
         }
         
@@ -1020,6 +1031,12 @@ extension ChannelListViewController {
             switch sender.state {
             case .began:
                 panStartOffset = swipeOffset
+                isFullSwipeActivated = false
+                if performsFirstActionWithFullSwipe {
+                    // Warm the Taptic Engine so the bump lands with the crossing
+                    // rather than a beat after it.
+                    fullSwipeFeedbackGenerator.prepare()
+                }
                 onSwipeEvent?(.began)
 
             case .changed:
@@ -1032,10 +1049,13 @@ extension ChannelListViewController {
                     rubberBandFactor: effectiveRubberBandFactor)
                 setSwipeOffset(offset, animated: false)
                 onSwipeEvent?(.changed(offset))
+                updateFullSwipeActivation(for: offset)
 
             case .ended, .cancelled, .failed:
                 let physicalVx = sender.velocity(in: self).x
                 let vx = isRightToLeft ? -physicalVx : physicalVx
+
+                isFullSwipeActivated = false
 
                 if performsFirstActionWithFullSwipe,
                    let action = fullSwipeAction(for: swipeOffset) {
@@ -1058,6 +1078,36 @@ extension ChannelListViewController {
             default:
                 break
             }
+        }
+
+        /// Tracks whether the drag is past the full-swipe threshold and reports
+        /// each crossing.
+        ///
+        /// `UISwipeActionsConfiguration` gives a haptic *while* dragging, the
+        /// moment a full swipe becomes armed — the bump is what tells you that
+        /// releasing now performs the action rather than just opening the row. So
+        /// this is driven from `.changed`, not from the release.
+        func updateFullSwipeActivation(for offset: CGFloat) {
+            guard performsFirstActionWithFullSwipe else {
+                isFullSwipeActivated = false
+                return
+            }
+            let activated = fullSwipeAction(for: offset) != nil
+            guard activated != isFullSwipeActivated else { return }
+            isFullSwipeActivated = activated
+            // Only the crossing into the armed state is worth feeling; dragging
+            // back out again is silent, as it is natively.
+            if activated { fullSwipeThresholdDidCross() }
+        }
+
+        /// Called when a drag crosses the full-swipe threshold, so the user feels
+        /// that releasing now performs the row's first action.
+        ///
+        /// Override to change the feedback, or to silence it.
+        open func fullSwipeThresholdDidCross() {
+            fullSwipeFeedbackGenerator.impactOccurred()
+            // Re-arm for a possible second crossing within the same drag.
+            fullSwipeFeedbackGenerator.prepare()
         }
 
         /// Resistance applied to drag past the full reveal width.
