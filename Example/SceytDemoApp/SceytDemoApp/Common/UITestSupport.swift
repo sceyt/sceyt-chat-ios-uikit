@@ -825,15 +825,19 @@ enum UITestSupport {
     /// never see them.
     static func installMessageInjector(on viewController: UIViewController) {
         guard isActive, isInjectionEnabled else { return }
-        let short = UIBarButtonItem(title: "InjectShort", style: .plain,
+        let short = UIBarButtonItem(title: "S", style: .plain,
                                     target: UITestMessageInjector.shared,
                                     action: #selector(UITestMessageInjector.injectShort))
         short.accessibilityIdentifier = "uitest.injectShort"
-        let long = UIBarButtonItem(title: "InjectLong", style: .plain,
+        let long = UIBarButtonItem(title: "L", style: .plain,
                                    target: UITestMessageInjector.shared,
                                    action: #selector(UITestMessageInjector.injectLong))
         long.accessibilityIdentifier = "uitest.injectLong"
-        viewController.navigationItem.leftBarButtonItems = [short, long]
+        let markUnread = UIBarButtonItem(title: "U", style: .plain,
+                                         target: UITestMessageInjector.shared,
+                                         action: #selector(UITestMessageInjector.markTargetUnread))
+        markUnread.accessibilityIdentifier = "uitest.markUnread"
+        viewController.navigationItem.leftBarButtonItems = [short, long, markUnread]
     }
     #endif
 }
@@ -857,6 +861,15 @@ final class UITestMessageInjector: NSObject {
             channelId: UITestSupport.injectTargetChannelId,
             text: UITestSupport.injectedLongText,
             incoming: false
+        )
+    }
+
+    /// Marks the injector's target channel unread locally. The real
+    /// `markAs(read:)` needs a server round trip, so this is the only way a UI
+    /// test can change a channel's unread state while it is on screen.
+    @objc func markTargetUnread() {
+        SceytChatUIKit.shared.markUITestChannelUnread(
+            channelId: UITestSupport.injectTargetChannelId
         )
     }
 

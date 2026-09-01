@@ -122,7 +122,9 @@ class BaseUITestCase: XCTestCase {
                    poll: Bool = false,
                    pollAllowsMultipleVotes: Bool = false,
                    pollDoubleVoteGapMs: Int? = nil,
-                   dynamicTypeCategory: String? = nil) -> XCUIApplication {
+                   dynamicTypeCategory: String? = nil,
+                   imperativeDataSource: Bool = false,
+                   fullSwipeActions: Bool = false) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["--uitest"]
         if empty {
@@ -187,6 +189,12 @@ class BaseUITestCase: XCTestCase {
         }
         if let category = dynamicTypeCategory {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", category]
+        }
+        if imperativeDataSource {
+            app.launchArguments += ["--uitest-imperative"]
+        }
+        if fullSwipeActions {
+            app.launchArguments += ["--uitest-full-swipe"]
         }
         app.launch()
         return app

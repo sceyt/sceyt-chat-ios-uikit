@@ -185,6 +185,8 @@ extension SceytChatUIKit {
         public static var channelMessagesCollectionView: ChannelViewController.MessagesCollectionView.Type = ChannelViewController.MessagesCollectionView.self
         public static var channelMessagesCollectionViewLayout: ChannelViewController.MessagesCollectionViewLayout.Type = ChannelViewController.MessagesCollectionViewLayout.self
         public static var channelScrollDownView: ChannelViewController.ScrollDownView.Type = ChannelViewController.ScrollDownView.self
+        public static var channelSwipeActionButton: ChannelSwipeActionButton.Type = ChannelSwipeActionButton.self
+        public static var channelSwipeActionsView: ChannelSwipeActionsView.Type = ChannelSwipeActionsView.self
         public static var channelUnreadMentionCountView: ChannelViewController.UnreadMentionCountView.Type = ChannelViewController.UnreadMentionCountView.self
         public static var channelMentionScrollDownView: ChannelViewController.ScrollDownView.Type = ChannelViewController.ScrollDownView.self
         public static var channelInfoMediaCollectionView: ChannelInfoViewController.MediaCollectionView.Type = ChannelInfoViewController.MediaCollectionView.self
@@ -296,6 +298,7 @@ extension SceytChatUIKit {
         
         // MARK: - Other Components
         
+        public static var channelSwipeActionsConfiguration: ChannelSwipeActionsConfiguration.Type = ChannelSwipeActionsConfiguration.self
         public static var markableTextField: MarkableTextField.Type = MarkableTextField.self
     }
 }

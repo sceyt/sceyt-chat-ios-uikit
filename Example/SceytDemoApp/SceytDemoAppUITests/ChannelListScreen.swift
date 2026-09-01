@@ -37,9 +37,18 @@ struct ChannelListScreen {
         static let pinIcon = "sceyt_chat_channel_list_cell_pin_icon"
         static let ticks = "sceyt_chat_channel_list_cell_ticks"
 
+        static let swipeActionsLeading = "sceyt_chat_channel_list_cell_swipe_actions_leading"
+        static let swipeActionsTrailing = "sceyt_chat_channel_list_cell_swipe_actions_trailing"
+        /// Locale-independent action names, mirroring
+        /// `ChannelSwipeActionsConfiguration.Actions.identifierName`.
+        static func swipeAction(_ name: String) -> String {
+            "sceyt_chat_channel_list_cell_swipe_action.\(name)"
+        }
+
         // Test-only message injector buttons (see UITestSupport, --uitest-inject).
         static let injectShort = "uitest.injectShort"
         static let injectLong = "uitest.injectLong"
+        static let markUnread = "uitest.markUnread"
     }
 
     /// Mirror of the texts injected by `UITestSupport` so assertions can match them.
@@ -55,6 +64,7 @@ struct ChannelListScreen {
     var searchField: XCUIElement { app.searchFields.firstMatch }
     var injectShortButton: XCUIElement { app.buttons[AID.injectShort] }
     var injectLongButton: XCUIElement { app.buttons[AID.injectLong] }
+    var markUnreadButton: XCUIElement { app.buttons[AID.markUnread] }
 
     /// All visible channel cells, in display order.
     var visibleCells: [XCUIElement] {
@@ -78,6 +88,19 @@ struct ChannelListScreen {
     func muteIcon(in cell: XCUIElement) -> XCUIElement { cell.anyDescendant(AID.muteIcon) }
     func pinIcon(in cell: XCUIElement) -> XCUIElement { cell.anyDescendant(AID.pinIcon) }
     func ticks(in cell: XCUIElement) -> XCUIElement { cell.anyDescendant(AID.ticks) }
+
+    // MARK: - Swipe actions
+
+    /// A swipe action button inside a specific row, e.g. `swipeAction("delete", in: cell(1))`.
+    func swipeAction(_ name: String, in cell: XCUIElement) -> XCUIElement {
+        cell.anyDescendant(AID.swipeAction(name))
+    }
+
+    /// A swipe action button anywhere on screen. Only one row can be open at a
+    /// time, so this is unambiguous.
+    func swipeAction(_ name: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: AID.swipeAction(name)).firstMatch
+    }
 
     // MARK: - Waiting
 

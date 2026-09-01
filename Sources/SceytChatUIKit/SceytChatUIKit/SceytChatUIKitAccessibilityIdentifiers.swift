@@ -45,6 +45,21 @@ extension SceytChatUIKit {
                 public static let muteIcon = "sceyt_chat_channel_list_cell_mute_icon"
                 public static let pinIcon = "sceyt_chat_channel_list_cell_pin_icon"
                 public static let ticks = "sceyt_chat_channel_list_cell_ticks"
+
+                /// The container holding the leading (Read/Unread, Pin/Unpin)
+                /// swipe action buttons.
+                public static let swipeActionsLeading = "sceyt_chat_channel_list_cell_swipe_actions_leading"
+
+                /// The container holding the trailing (Delete/Leave, Mute/Unmute)
+                /// swipe action buttons.
+                public static let swipeActionsTrailing = "sceyt_chat_channel_list_cell_swipe_actions_trailing"
+
+                /// A single swipe action button, addressed by its
+                /// locale-independent name, e.g.
+                /// `sceyt_chat_channel_list_cell_swipe_action.delete`.
+                public static func swipeAction(_ name: String) -> String {
+                    "sceyt_chat_channel_list_cell_swipe_action.\(name)"
+                }
             }
         }
 

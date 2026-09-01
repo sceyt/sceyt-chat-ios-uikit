@@ -300,6 +300,23 @@ extension SceytChatUIKit {
         }
     }
 
+    /// Marks a channel unread locally, without a network round trip.
+    ///
+    /// The real `markAs(read:)` goes through the SDK's channel operator and only
+    /// persists on success, so it cannot be driven in `--uitest` mode. This
+    /// writes the same local state directly, letting UI tests exercise behaviour
+    /// that depends on a channel's unread state changing while on screen.
+    ///
+    /// UI-test only.
+    public func markUITestChannelUnread(channelId: ChannelId, newMessageCount: UInt64 = 1) {
+        try? database.syncWrite { context in
+            guard let channelDTO = ChannelDTO.fetch(id: channelId, context: context)
+            else { return }
+            channelDTO.unread = true
+            channelDTO.newMessageCount = Int64(newMessageCount)
+        }
+    }
+
     /// Simulates a *batch* of freshly-arrived messages landing in one database
     /// transaction — the shape a server sync delivers when several messages
     /// arrived while the client was catching up. All rows are inserted in a

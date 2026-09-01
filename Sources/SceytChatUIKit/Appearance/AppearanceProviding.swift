@@ -151,6 +151,28 @@ extension ChannelSwipeActionsConfiguration: AppearanceProviding {
             title: L10n.Channel.List.Action.unpin,
             backgroundColor: .accent3
         )
+
+        /// Title styling for the in-cell swipe action buttons.
+        ///
+        /// `UISwipeActionsConfiguration` supplied the font and foreground color
+        /// itself, which is why `ContextualActionAppearance` carries neither.
+        public static var titleLabelAppearance = LabelAppearance(
+            foregroundColor: .onPrimary,
+            font: Fonts.regular.withSize(13))
+
+        /// Duration of the spring that settles a released swipe open or closed.
+        public static var settleAnimationDuration: TimeInterval = 0.3
+
+        /// Damping of that spring. 1 is critically damped (no overshoot).
+        public static var settleSpringDamping: CGFloat = 0.9
+
+        /// Fraction of the full reveal width — after projecting the release
+        /// velocity — past which a released swipe settles open instead of closed.
+        public static var openThreshold: CGFloat = 0.5
+
+        /// Resistance applied to drag past the full reveal width. 0 is a hard
+        /// stop, 1 is no resistance.
+        public static var rubberBandFactor: CGFloat = 0.35
         
         public init() {}
     }

@@ -25,6 +25,88 @@ extension ChannelListViewController {
         //    └─ bottomRowStackView (H)        [ messageLabel ──spacer── badgeStackView ]
         //       └─ badgeStackView (H)          [ atView  unreadCount pinView ]
 
+        /// The view that slides under the finger, hosting everything the row
+        /// draws. `contentView` itself is never transformed: UIKit re-frames it
+        /// on every layout pass, which would reset or double-apply the
+        /// translation.
+        open lazy var swipeContentView = UIView().withoutAutoresizingMask
+
+        /// The superview the row's content is laid out against.
+        ///
+        /// Defaults to `swipeContentView`, so the content travels with the
+        /// swipe. Override to return `contentView` to opt a subclass's layout
+        /// out of sliding — the actions then reveal underneath a static row.
+        open var contentContainerView: UIView { swipeContentView }
+
+        /// Leading (Read/Unread, Pin/Unpin) actions, parked just outside the
+        /// cell's leading edge.
+        open lazy var leadingActionsView: ChannelSwipeActionsView = {
+            let view = Components.channelSwipeActionsView.init().withoutAutoresizingMask
+            view.side = .leading
+            return view
+        }()
+
+        /// Trailing (Delete/Leave, Mute/Unmute) actions, parked just outside the
+        /// cell's trailing edge.
+        open lazy var trailingActionsView: ChannelSwipeActionsView = {
+            let view = Components.channelSwipeActionsView.init().withoutAutoresizingMask
+            view.side = .trailing
+            return view
+        }()
+
+        open lazy var swipePanGestureRecognizer = UIPanGestureRecognizer(
+            target: self, action: #selector(handleSwipePan(_:)))
+
+        /// Set to `false` to disable the in-cell swipe for this cell. The
+        /// channel list sets it from `usesNativeSwipeActions`.
+        open var swipeActionsEnabled = true
+
+        /// Whether an over-drag performs the outermost action, the way
+        /// `UISwipeActionsConfiguration.performsFirstActionWithFullSwipe` does.
+        /// The channel list sets this from its own property of the same name.
+        open var performsFirstActionWithFullSwipe = false
+
+        /// Fraction of the row's width past which a full swipe fires, when
+        /// `performsFirstActionWithFullSwipe` is on.
+        open var fullSwipeThresholdFraction: CGFloat = 0.6
+
+        /// Signed, **leading-relative** content offset: negative always reveals
+        /// the trailing actions, in both LTR and RTL. `0` is closed.
+        ///
+        /// Keeping the offset direction-independent confines RTL handling to the
+        /// two places that deal in physical pixels — `handleSwipePan(_:)` and
+        /// `setSwipeOffset(_:animated:velocity:completion:)` — instead of
+        /// scattering sign flips through the file.
+        public private(set) var swipeOffset: CGFloat = 0
+
+        public enum SwipeEvent {
+            case began
+            /// Live offset while dragging.
+            case changed(CGFloat)
+            /// Offset the row settled at; `0` means closed.
+            case settled(CGFloat)
+            case action(ChannelSwipeActionsConfiguration.Actions)
+        }
+
+        /// Set by the channel list, which owns the open-swipe state keyed by
+        /// channel id so it survives reorders and cell reuse.
+        open var onSwipeEvent: ((SwipeEvent) -> Void)?
+
+        /// The action lists the current buttons were built from, so the frequent
+        /// re-binds (presence, typing, reconfigure) don't rebuild the views.
+        private var boundSwipeActions: (leading: [ChannelSwipeActionsConfiguration.Actions],
+                                        trailing: [ChannelSwipeActionsConfiguration.Actions])?
+
+        /// Offset at the start of the current pan.
+        private var panStartOffset: CGFloat = 0
+
+        private var isRightToLeft: Bool {
+            effectiveUserInterfaceLayoutDirection == .rightToLeft
+        }
+
+        /// Shorthand for the swipe styling statics.
+        private typealias SwipeAppearance = ChannelSwipeActionsConfiguration.Appearance
+
         open lazy var contentStackView = UIStackView(arrangedSubviews: [avatarContainer, rightStackView])
             .withoutAutoresizingMask
 
@@ -149,11 +231,22 @@ extension ChannelListViewController {
             super.prepareForReuse()
             clearEvents()
             subscriptions.removeAll(keepingCapacity: true)
+            // A recycled cell must never arrive half-open showing another
+            // channel's actions. The channel list restores the offset in
+            // `cellForRowAt` for the row that is actually open.
+            onSwipeEvent = nil
+            boundSwipeActions = nil
+            setSwipeOffset(0, animated: false)
         }
         
         override open func setup() {
             super.setup()
             backgroundView = UIView()
+
+            swipePanGestureRecognizer.delegate = self
+            addGestureRecognizer(swipePanGestureRecognizer)
+            leadingActionsView.onAction = { [weak self] in self?.onSwipeEvent?(.action($0)) }
+            trailingActionsView.onAction = { [weak self] in self?.onSwipeEvent?(.action($0)) }
 
             contentStackView.axis = .horizontal
             contentStackView.distribution = .fill
@@ -269,23 +362,43 @@ extension ChannelListViewController {
             ])
             retentionBadgeView.resize(anchors: [.width(22), .height(22)])
 
-            contentView.addSubview(contentStackView)
-            contentView.addSubview(separatorView)
+            // The swipe machinery lives inside `contentView`: the action
+            // containers sit just outside its edges and are clipped away until
+            // the row slides, so progressive reveal costs no layout pass.
+            contentView.clipsToBounds = true
+            contentView.addSubview(leadingActionsView)
+            contentView.addSubview(trailingActionsView)
+            contentView.addSubview(swipeContentView)
+
+            swipeContentView.pin(to: contentView)
+
+            leadingActionsView.pin(to: contentView, anchors: [.top(), .bottom()])
+            leadingActionsView.trailingAnchor.pin(to: contentView.leadingAnchor)
+
+            trailingActionsView.pin(to: contentView, anchors: [.top(), .bottom()])
+            trailingActionsView.leadingAnchor.pin(to: contentView.trailingAnchor)
+
+            contentContainerView.addSubview(contentStackView)
+            // The separator has to slide with the content: its leading is pinned
+            // to `rightStackView`, a descendant of `contentStackView`, and Auto
+            // Layout ignores `transform`. Left in `contentView` it would stay put
+            // while the content moved, drifting away from the avatar inset.
+            contentContainerView.addSubview(separatorView)
 
             // Pin the content to the top so the subject row is fixed there. The
             // cell height is a constant sized for a full preview, and the avatar
             // is the tallest item, so a top inset of avatarVerticalPadding leaves
             // the avatar exactly where centering used to put it — while the
             // message preview now grows downward instead of shifting the subject.
-            contentStackView.pin(to: contentView, anchors: [
+            contentStackView.pin(to: contentContainerView, anchors: [
                 .leading(Layouts.horizontalPadding),
                 .top(Layouts.avatarVerticalPadding)
             ])
-            contentStackView.trailingAnchor.pin(to: contentView.trailingAnchor, constant: -Layouts.horizontalPadding)
+            contentStackView.trailingAnchor.pin(to: contentContainerView.trailingAnchor, constant: -Layouts.horizontalPadding)
             // Fixed bottom: the cell height is a constant, so the content fills the
             // vertical area exactly (8…56…8). With `.top` alignment the avatar fills
             // it and the subject stays pinned to the top.
-            contentStackView.bottomAnchor.pin(to: contentView.bottomAnchor, constant: -Layouts.avatarVerticalPadding)
+            contentStackView.bottomAnchor.pin(to: contentContainerView.bottomAnchor, constant: -Layouts.avatarVerticalPadding)
 
             // The pin icon has no fixed size: it's driven by these constraints,
             // recomputed from a 20pt square base scaled for the current Dynamic
@@ -314,7 +427,7 @@ extension ChannelListViewController {
 
             atView.heightAnchor.pin(to: unreadCount.heightAnchor).isActive = true
 
-            separatorView.pin(to: contentView, anchors: [.bottom(), .trailing(-Layouts.horizontalPadding)])
+            separatorView.pin(to: contentContainerView, anchors: [.bottom(), .trailing(-Layouts.horizontalPadding)])
             separatorView.leadingAnchor.pin(to: rightStackView.leadingAnchor)
             separatorView.heightAnchor.pin(constant: 1)
         }
@@ -368,6 +481,7 @@ extension ChannelListViewController {
                 updatePinViewSize()
                 updateMuteViewSize()
                 updateTopRowAxis()
+                updateSwipeActionWidths()
             }
         }
 
@@ -385,6 +499,15 @@ extension ChannelListViewController {
         ///
         /// The fixed cell height accounts for that extra line under the same
         /// accessibility condition — see `Layouts.cellHeight`.
+        /// Re-measures the swipe action buttons for the current Dynamic Type
+        /// category. The channel list closes any open swipe before its own
+        /// reload, so there is no open offset to preserve here.
+        open func updateSwipeActionWidths() {
+            leadingActionsView.recomputeWidths()
+            trailingActionsView.recomputeWidths()
+            if swipeOffset != 0 { clampSwipeOffsetToFullReveal() }
+        }
+
         open func updateTopRowAxis() {
             let category = UIApplication.shared.preferredContentSizeCategory
             if Layouts.prefersVerticalTopRow(for: category) {
@@ -590,6 +713,8 @@ extension ChannelListViewController {
             // final state.
             updateContentAlignment()
 
+            configureSwipeActions(for: data.channel)
+
             data.$avatar
                 .sink { [weak self] image in
                     guard let self else { return }
@@ -724,7 +849,288 @@ extension ChannelListViewController {
         override open func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
                                              shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool
         {
+            // The swipe pan has to be able to begin while the table's own pan is
+            // already tracking — a scroll view starts on any direction, so it
+            // would otherwise always win. Once the swipe begins, the channel list
+            // disables table scrolling for its duration, so the two never
+            // actually run together.
             true
+        }
+
+        override open func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard gestureRecognizer === swipePanGestureRecognizer else {
+                return super.gestureRecognizerShouldBegin(gestureRecognizer)
+            }
+            guard swipeActionsEnabled, data != nil else { return false }
+
+            // Horizontal-dominant only, so a vertical drag scrolls the list
+            // untouched. Velocity rather than translation: at `.began` the
+            // translation is still ~zero, which makes a translation-based test
+            // jittery.
+            let velocity = swipePanGestureRecognizer.velocity(in: self)
+            guard abs(velocity.x) > abs(velocity.y) else { return false }
+
+            let towardTrailing = isRightToLeft ? velocity.x > 0 : velocity.x < 0
+
+            // Don't fight the navigation controller's interactive pop, which is a
+            // leading-edge horizontal pan. Only relevant when the channel list is
+            // pushed onto a non-empty stack — in the demo app it is the root, so
+            // no UI test can catch this.
+            if !towardTrailing, canBePopped {
+                let location = swipePanGestureRecognizer.location(in: self)
+                let distanceFromLeadingEdge = isRightToLeft
+                    ? bounds.maxX - location.x
+                    : location.x - bounds.minX
+                if distanceFromLeadingEdge < Layouts.interactivePopEdgeWidth { return false }
+            }
+
+            // A closed row only opens toward a side that actually has actions;
+            // an open row can always be dragged closed.
+            if swipeOffset == 0 {
+                return towardTrailing
+                    ? trailingActionsView.fullRevealWidth > 0
+                    : leadingActionsView.fullRevealWidth > 0
+            }
+            return true
+        }
+
+        /// Whether this cell's view controller sits on a navigation stack that
+        /// can be popped by the interactive back gesture.
+        private var canBePopped: Bool {
+            var responder: UIResponder? = self
+            while let current = responder {
+                if let viewController = current as? UIViewController {
+                    return (viewController.navigationController?.viewControllers.count ?? 0) > 1
+                }
+                responder = current.next
+            }
+            return false
+        }
+
+        // MARK: - Swipe actions
+
+        /// Rebuilds the action buttons when — and only when — the channel's state
+        /// changed which actions it offers.
+        ///
+        /// This is what keeps a persistently open swipe honest: a channel that
+        /// receives a message while its row is open flips Unread to Read, so the
+        /// button is re-labelled in place rather than performing a stale action.
+        /// Because a title change also changes the button's width, the open
+        /// offset is re-clamped to the new full reveal.
+        open func configureSwipeActions(for channel: ChatChannel) {
+            let config = Components.channelSwipeActionsConfiguration
+            let leading = config.leadingActions(chatChannel: channel)
+            let trailing = config.trailingActions(chatChannel: channel)
+            guard boundSwipeActions?.leading != leading
+                    || boundSwipeActions?.trailing != trailing
+            else { return }
+            boundSwipeActions = (leading, trailing)
+            leadingActionsView.configure(items: config.leadingActionItems(chatChannel: channel))
+            trailingActionsView.configure(items: config.trailingActionItems(chatChannel: channel))
+            setupSwipeAccessibilityCustomActions(for: channel)
+            if swipeOffset != 0 { clampSwipeOffsetToFullReveal() }
+        }
+
+        /// Donates the swipe actions to VoiceOver, Switch Control and Full
+        /// Keyboard Access, all of which `UISwipeActionsConfiguration` reached
+        /// automatically and a custom implementation does not.
+        open func setupSwipeAccessibilityCustomActions(for channel: ChatChannel) {
+            let config = Components.channelSwipeActionsConfiguration
+            let items = config.leadingActionItems(chatChannel: channel)
+                + config.trailingActionItems(chatChannel: channel)
+            accessibilityCustomActions = items.compactMap { item in
+                guard let name = item.appearance.title, !name.isEmpty else { return nil }
+                return UIAccessibilityCustomAction(name: name) { [weak self] _ in
+                    self?.onSwipeEvent?(.action(item.action))
+                    return true
+                }
+            }
+        }
+
+        /// The two-finger-Z escape gesture closes the row, as it did with native
+        /// swipe actions.
+        override open func accessibilityPerformEscape() -> Bool {
+            guard swipeOffset != 0 else { return false }
+            onSwipeEvent?(.settled(0))
+            setSwipeOffset(0, animated: true)
+            return true
+        }
+
+        /// Re-clamps the offset after the action set — and therefore the reveal
+        /// width — changed underneath an open row.
+        open func clampSwipeOffsetToFullReveal() {
+            let clamped: CGFloat
+            if swipeOffset < 0 {
+                clamped = -min(-swipeOffset, trailingActionsView.fullRevealWidth)
+            } else {
+                clamped = min(swipeOffset, leadingActionsView.fullRevealWidth)
+            }
+            guard clamped != swipeOffset else { return }
+            setSwipeOffset(clamped, animated: false)
+        }
+
+        /// Moves the row to `offset`, sliding the content and both action
+        /// containers by the same physical distance.
+        open func setSwipeOffset(_ offset: CGFloat,
+                                 animated: Bool,
+                                 velocity: CGFloat = 0,
+                                 completion: (() -> Void)? = nil) {
+            let distance = max(1, abs(offset - swipeOffset))
+            swipeOffset = offset
+
+            let apply = { [self] in
+                let dx = isRightToLeft ? -offset : offset
+                let translation = CGAffineTransform(translationX: dx, y: 0)
+                swipeContentView.transform = translation
+                leadingActionsView.transform = translation
+                trailingActionsView.transform = translation
+                trailingActionsView.setOverDrag(-offset - trailingActionsView.fullRevealWidth)
+                leadingActionsView.setOverDrag(offset - leadingActionsView.fullRevealWidth)
+                // Over-drag mutates a width constraint, so it has to be laid out
+                // inside the animation block to be animated with the transform.
+                layoutIfNeeded()
+            }
+
+            // While the row is open its actions are the primary target; the
+            // selection highlight underneath would otherwise paint through.
+            selectionStyle = offset == 0 ? .default : .none
+            leadingActionsView.accessibilityElementsHidden = offset <= 0
+            trailingActionsView.accessibilityElementsHidden = offset >= 0
+
+            guard animated, !UIAccessibility.isReduceMotionEnabled else {
+                UIView.performWithoutAnimation { apply() }
+                completion?()
+                return
+            }
+            UIView.animate(withDuration: SwipeAppearance.settleAnimationDuration,
+                           delay: 0,
+                           usingSpringWithDamping: SwipeAppearance.settleSpringDamping,
+                           initialSpringVelocity: min(3, abs(velocity) / distance),
+                           // Without `.allowUserInteraction` a fast
+                           // open-then-tap-the-button sequence drops the tap.
+                           options: [.allowUserInteraction, .beginFromCurrentState],
+                           animations: apply,
+                           completion: { _ in completion?() })
+        }
+
+        @objc open func handleSwipePan(_ sender: UIPanGestureRecognizer) {
+            let fullTrailing = trailingActionsView.fullRevealWidth
+            let fullLeading = leadingActionsView.fullRevealWidth
+
+            switch sender.state {
+            case .began:
+                panStartOffset = swipeOffset
+                onSwipeEvent?(.began)
+
+            case .changed:
+                let physicalDx = sender.translation(in: self).x
+                let dx = isRightToLeft ? -physicalDx : physicalDx
+                let offset = ChannelCell.clampedSwipeOffset(
+                    panStartOffset + dx,
+                    fullLeading: fullLeading,
+                    fullTrailing: fullTrailing,
+                    rubberBandFactor: effectiveRubberBandFactor)
+                setSwipeOffset(offset, animated: false)
+                onSwipeEvent?(.changed(offset))
+
+            case .ended, .cancelled, .failed:
+                let physicalVx = sender.velocity(in: self).x
+                let vx = isRightToLeft ? -physicalVx : physicalVx
+
+                if performsFirstActionWithFullSwipe,
+                   let action = fullSwipeAction(for: swipeOffset) {
+                    onSwipeEvent?(.settled(0))
+                    setSwipeOffset(0, animated: true, velocity: vx) { [weak self] in
+                        self?.onSwipeEvent?(.action(action))
+                    }
+                    return
+                }
+
+                let target = ChannelCell.settleTarget(
+                    offset: swipeOffset,
+                    velocity: vx,
+                    fullLeading: fullLeading,
+                    fullTrailing: fullTrailing,
+                    openThreshold: SwipeAppearance.openThreshold)
+                setSwipeOffset(target, animated: true, velocity: vx)
+                onSwipeEvent?(.settled(target))
+
+            default:
+                break
+            }
+        }
+
+        /// Resistance applied to drag past the full reveal width.
+        ///
+        /// Normally the reveal is a dead end, and the rubber band says so. With
+        /// `performsFirstActionWithFullSwipe` on it is not: dragging further is
+        /// the gesture that fires the action, so the row has to follow the finger
+        /// or the threshold sits beyond the width of the screen and can never be
+        /// reached.
+        open var effectiveRubberBandFactor: CGFloat {
+            performsFirstActionWithFullSwipe ? 1 : SwipeAppearance.rubberBandFactor
+        }
+
+        /// The outermost action, when the row was dragged far enough for a full
+        /// swipe to fire it.
+        open func fullSwipeAction(for offset: CGFloat) -> ChannelSwipeActionsConfiguration.Actions? {
+            let threshold = bounds.width * fullSwipeThresholdFraction
+            if offset < 0, -offset > threshold {
+                // On the trailing side the outermost button is laid out last.
+                return trailingActionsView.buttons.last?.item?.action
+            }
+            if offset > 0, offset > threshold {
+                return leadingActionsView.buttons.first?.item?.action
+            }
+            return nil
+        }
+
+        // MARK: - Swipe geometry
+        //
+        // Pure functions so the drag maths can be unit-tested without a table.
+
+        /// Clamps a raw drag offset, rubber-banding past the full reveal and
+        /// hard-stopping at a side with no actions.
+        public static func clampedSwipeOffset(_ offset: CGFloat,
+                                              fullLeading: CGFloat,
+                                              fullTrailing: CGFloat,
+                                              rubberBandFactor: CGFloat) -> CGFloat {
+            if offset < 0 {
+                guard fullTrailing > 0 else { return 0 }
+                return -rubberBanded(-offset, limit: fullTrailing, factor: rubberBandFactor)
+            }
+            if offset > 0 {
+                guard fullLeading > 0 else { return 0 }
+                return rubberBanded(offset, limit: fullLeading, factor: rubberBandFactor)
+            }
+            return 0
+        }
+
+        /// Where a released drag settles: fully open on the side it is already
+        /// showing, or closed.
+        public static func settleTarget(offset: CGFloat,
+                                        velocity: CGFloat,
+                                        fullLeading: CGFloat,
+                                        fullTrailing: CGFloat,
+                                        openThreshold: CGFloat) -> CGFloat {
+            guard offset != 0 else { return 0 }
+            // Project where the finger was heading, the way a scroll view does.
+            // The projection decides open-versus-closed only; the *side* comes
+            // from the current offset. Otherwise a hard flick back past zero
+            // would fling the row open on the opposite side instead of closing it.
+            let projected = offset + velocity * Layouts.swipeVelocityProjectionInterval
+            if offset < 0 {
+                guard fullTrailing > 0 else { return 0 }
+                return -projected > fullTrailing * openThreshold ? -fullTrailing : 0
+            }
+            guard fullLeading > 0 else { return 0 }
+            return projected > fullLeading * openThreshold ? fullLeading : 0
+        }
+
+        private static func rubberBanded(_ magnitude: CGFloat,
+                                         limit: CGFloat,
+                                         factor: CGFloat) -> CGFloat {
+            magnitude <= limit ? magnitude : limit + (magnitude - limit) * factor
         }
     }
 }
@@ -737,6 +1143,14 @@ public extension ChannelListViewController.ChannelCell {
 
         /// Minimum inset between the avatar and the cell's top/bottom edges.
         public static var avatarVerticalPadding: CGFloat = 8
+
+        /// Width of the leading strip reserved for the navigation controller's
+        /// interactive pop gesture, where a leading swipe will not begin.
+        public static var interactivePopEdgeWidth: CGFloat = 20
+
+        /// How far ahead a released swipe's velocity is projected when deciding
+        /// whether it settles open or closed. Matches `UIScrollView`'s feel.
+        public static var swipeVelocityProjectionInterval: CGFloat = 0.15
         /// Top inset of the message stack inside the cell.
         public static var messageStackTopPadding: CGFloat = 10
         /// Bottom inset of the message stack inside the cell.
