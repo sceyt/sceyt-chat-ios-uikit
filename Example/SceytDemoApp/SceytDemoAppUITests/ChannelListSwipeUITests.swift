@@ -105,6 +105,48 @@ final class ChannelListSwipeUITests: BaseUITestCase {
                       "Tapping Delete should ask for confirmation for the moved channel")
     }
 
+    func test_openSwipe_survivesFullListReload_diffable() {
+        assertOpenSwipeSurvivesFullReload(imperative: false)
+    }
+
+    func test_openSwipe_survivesFullListReload_imperative() {
+        assertOpenSwipeSurvivesFullReload(imperative: true)
+    }
+
+    /// Opens a row's trailing actions and then rebuilds the whole table the way a
+    /// finished channel sync does — a batch of channel writes the view model
+    /// escalates to `.reload`. The row must come back still open: the offset is
+    /// keyed by channel id and re-applied when the cell is dequeued, so a reload
+    /// has no business snapping the actions shut under the user's finger.
+    private func assertOpenSwipeSurvivesFullReload(imperative: Bool) {
+        start(imperative: imperative, injection: true)
+
+        let cell = screen.cell(bumpedChannelId)
+        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+        let closedSubjectX = screen.subject(in: cell).frame.minX
+
+        cell.swipeLeft()
+        XCTAssertTrue(screen.swipeAction("delete", in: screen.cell(bumpedChannelId))
+                        .waitForExistence(timeout: 3),
+                      "Swiping left should reveal the trailing actions")
+
+        screen.forceReloadButton.tap()
+
+        let reloadedCell = screen.cell(bumpedChannelId)
+        let delete = screen.swipeAction("delete", in: reloadedCell)
+        XCTAssertTrue(delete.waitForExistence(timeout: 3),
+                      "A full reload must not close the open swipe")
+        XCTAssertTrue(delete.isHittable,
+                      "The actions must still be tappable after the reload")
+        XCTAssertLessThan(screen.subject(in: reloadedCell).frame.minX, closedSubjectX,
+                          "The row must still be held open at its swipe offset")
+
+        // And the restored actions still target the channel that was swiped.
+        delete.tap()
+        XCTAssertTrue(app.buttons["Delete"].waitForExistence(timeout: 3),
+                      "Tapping Delete should ask for confirmation for the swiped channel")
+    }
+
     // MARK: - Opening and closing
 
     func test_swipeLeft_revealsTrailingActions() {

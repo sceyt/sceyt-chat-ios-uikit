@@ -51,6 +51,17 @@ open class ChannelListViewController: ViewController,
     /// open, and its action still targets the channel the user swiped.
     public private(set) var openSwipe: SwipeState?
 
+    /// Drops the open state when its channel is no longer in the list — the only
+    /// case where an update genuinely has nothing left to restore the offset onto.
+    /// Everything else keeps it: the offset is keyed by channel id and re-applied
+    /// in ``bindSwipe(on:channelId:)``, so it survives a re-dequeue.
+    private func dropOpenSwipeIfChannelIsGone() {
+        guard let open = openSwipe,
+              channelListViewModel.channel(id: open.channelId) == nil
+        else { return }
+        openSwipe = nil
+    }
+
     /// Renders swipe actions with `UISwipeActionsConfiguration` instead of the
     /// in-cell implementation.
     ///
@@ -300,6 +311,14 @@ open class ChannelListViewController: ViewController,
         }
         if let openSwipe, openSwipe.channelId == channelId {
             cell.setSwipeOffset(openSwipe.offset, animated: false)
+            // The rebind may have changed which actions the channel offers, and
+            // with them the reveal width, so the restored offset is re-clamped
+            // and the clamped value written back — otherwise the stored offset
+            // and what the row shows drift apart.
+            cell.clampSwipeOffsetToFullReveal()
+            if cell.swipeOffset != openSwipe.offset {
+                self.openSwipe = swipeState(channelId: channelId, offset: cell.swipeOffset)
+            }
         } else {
             cell.setSwipeOffset(0, animated: false)
         }
@@ -573,9 +592,14 @@ open class ChannelListViewController: ViewController,
     }
 
     open func reloadTableView() {
-        // A full reload rebuilds every cell, so there is nothing for an open
-        // swipe to stay attached to.
-        closeOpenSwipe(animated: false)
+        // The open swipe survives a full reload. It is keyed by channel id, not
+        // by a cell or an index path, and `configure(cell:with:at:)` re-applies
+        // it to whichever cell the channel is dequeued into — so a reload that
+        // fires while a row is open (a sync landing a batch of channel writes is
+        // the common one) re-draws the row still open, instead of snapping it
+        // shut under the user's finger. Only a channel that left the list has
+        // nothing to restore onto.
+        dropOpenSwipeIfChannelIsGone()
         if dataSourceMode == .diffable {
             applyCurrentSnapshot()
         } else {
@@ -598,9 +622,7 @@ open class ChannelListViewController: ViewController,
         // The swiped channel may have been deleted elsewhere. Drop the state
         // before applying, so nothing tries to restore an offset onto a row that
         // no longer exists.
-        if let open = openSwipe, channelListViewModel.channel(id: open.channelId) == nil {
-            openSwipe = nil
-        }
+        dropOpenSwipeIfChannelIsGone()
         if dataSourceMode == .diffable {
             let hasStructuralChanges = !paths.inserts.isEmpty
                 || !paths.deletes.isEmpty

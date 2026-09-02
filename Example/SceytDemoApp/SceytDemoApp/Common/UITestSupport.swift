@@ -837,7 +837,15 @@ enum UITestSupport {
                                          target: UITestMessageInjector.shared,
                                          action: #selector(UITestMessageInjector.markTargetUnread))
         markUnread.accessibilityIdentifier = "uitest.markUnread"
-        viewController.navigationItem.leftBarButtonItems = [short, long, markUnread]
+        // Stands in for what a finished channel sync does to the list: a batch of
+        // channel writes lands, the view model escalates the change cycle to
+        // `.reload`, and the whole table is rebuilt.
+        let reload = UIBarButtonItem(title: "R", style: .plain,
+                                     target: UITestMessageInjector.shared,
+                                     action: #selector(UITestMessageInjector.forceChannelListReload))
+        reload.accessibilityIdentifier = "uitest.forceReload"
+        UITestMessageInjector.shared.channelList = viewController as? ChannelListViewController
+        viewController.navigationItem.leftBarButtonItems = [short, long, markUnread, reload]
     }
     #endif
 }
@@ -847,6 +855,17 @@ enum UITestSupport {
 /// test-only message injection. UI-test only.
 final class UITestMessageInjector: NSObject {
     static let shared = UITestMessageInjector()
+
+    /// The channel list the injector drives, for the actions that go through the
+    /// controller rather than through the database.
+    weak var channelList: ChannelListViewController?
+
+    /// Emits the view model's `.reload` event — the same event a bulk channel
+    /// write (a finished sync) produces once the change count crosses
+    /// `ChannelListViewModel.reloadThreshold`.
+    @objc func forceChannelListReload() {
+        channelList?.channelListViewModel.event = .reload
+    }
 
     @objc func injectShort() {
         SceytChatUIKit.shared.receiveUITestMessage(

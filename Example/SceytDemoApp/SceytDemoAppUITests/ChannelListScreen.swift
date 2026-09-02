@@ -49,6 +49,7 @@ struct ChannelListScreen {
         static let injectShort = "uitest.injectShort"
         static let injectLong = "uitest.injectLong"
         static let markUnread = "uitest.markUnread"
+        static let forceReload = "uitest.forceReload"
     }
 
     /// Mirror of the texts injected by `UITestSupport` so assertions can match them.
@@ -65,6 +66,7 @@ struct ChannelListScreen {
     var injectShortButton: XCUIElement { app.buttons[AID.injectShort] }
     var injectLongButton: XCUIElement { app.buttons[AID.injectLong] }
     var markUnreadButton: XCUIElement { app.buttons[AID.markUnread] }
+    var forceReloadButton: XCUIElement { app.buttons[AID.forceReload] }
 
     /// All visible channel cells, in display order.
     var visibleCells: [XCUIElement] {
