@@ -97,13 +97,41 @@ public class SceytChatUIKit {
             )
     }()
     
+    /// The id of the signed-in user.
+    ///
+    /// A *connected* chat client is authoritative. A disconnected one is not:
+    /// it keeps reporting the user it last connected as until it reconnects, so
+    /// during an account switch it still names the outgoing account for as long
+    /// as the new account's login round-trip takes. In that window the value
+    /// the host app declared via `setCurrentUserId(_:)` is the correct one.
+    ///
+    /// Falling back to the live id last keeps this self-healing: an account
+    /// transition that forgets to declare is wrong only until the client
+    /// connects, never permanently.
     public var currentUserId: UserId? {
-        let userId = SceytChatUIKit.shared.chatClient.user.id
-        if !userId.isEmpty {
-            return userId
-        } else {
-            return UserDefaults.currentUserId
+        let liveUserId = SceytChatUIKit.shared.chatClient.user.id
+        if !liveUserId.isEmpty, SceytChatUIKit.shared.chatClient.connectionState == .connected {
+            return liveUserId
         }
+        if let declaredUserId = UserDefaults.currentUserId, !declaredUserId.isEmpty {
+            return declaredUserId
+        }
+        return liveUserId.isEmpty ? nil : liveUserId
+    }
+    
+    /// Declares which user the host app has bound its UI to.
+    ///
+    /// Call this the moment the app rebinds to a different account, *before*
+    /// anything renders the new account's data — the chat client cannot be
+    /// asked, because it goes on reporting the previous user until it
+    /// reconnects. Everything the UIKit resolves against the signed-in user
+    /// reads `currentUserId`: a direct channel's peer (and so its name and its
+    /// avatar), message marker and reaction ownership, poll vote attribution,
+    /// and the mention-list predicate.
+    ///
+    /// Pass `nil` to forget the declared id; `logout(completion:)` already does.
+    public func setCurrentUserId(_ userId: UserId?) {
+        UserDefaults.currentUserId = userId
     }
     
     // MARK: - Log Level

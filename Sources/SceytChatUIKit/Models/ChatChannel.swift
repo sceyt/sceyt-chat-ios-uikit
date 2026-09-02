@@ -304,6 +304,21 @@ internal extension ChatChannel {
         guard let currentUserId = SceytChatUIKit.shared.currentUserId,
               !currentUserId.isEmpty
         else { return nil }
-        return members?.first(where: { $0.id != currentUserId })
+        // The lookup below identifies the peer by elimination — "the member who
+        // is not me" — so it is only meaningful if `currentUserId` actually is
+        // one of the members. When it isn't, nothing gets eliminated and
+        // `first(where:)` degenerates into `members[0]`, which is the signed-in
+        // user whenever their id sorts first (direct members are ordered by user
+        // id, descending), and the channel then reports *itself* as the peer:
+        // the row renders your own name and avatar as the person you're talking
+        // to. Bail out instead — an unresolvable peer is better reported as
+        // unknown than as the wrong person.
+        //
+        // Reachable whenever the identity and the channel disagree: mid-account
+        // switch, while the outgoing account's channels are still in CoreData,
+        // or before the chat client has reconnected as the incoming one.
+        guard let members, members.contains(where: { $0.id == currentUserId })
+        else { return nil }
+        return members.first(where: { $0.id != currentUserId })
     }
 }
