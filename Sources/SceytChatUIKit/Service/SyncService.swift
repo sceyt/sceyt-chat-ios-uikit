@@ -16,6 +16,13 @@ public final class SyncService: NSObject {
     public static var workerQueue = DispatchQueue(label: "com.sceytchat.uikit.syncService")
     private static let syncStateLock = NSLock()
     private static var _isSyncing = false
+    /// Bumped for every sync that starts and for every `cancelSync()`. A completion block
+    /// carries the generation it was created with, so a block belonging to an abandoned
+    /// session can no longer clear a newer sync's state.
+    private static var syncGeneration: UInt64 = 0
+    /// Queues of the sync currently in flight, so `cancelSync()` has something to cancel —
+    /// they are created inside `syncChannels` and would otherwise be unreachable.
+    private static var activeSyncQueues = [OperationQueue]()
 
     public static var isSyncing: Bool {
         syncStateLock.lock()
@@ -23,19 +30,88 @@ public final class SyncService: NSObject {
         return _isSyncing
     }
 
-    private static func startSyncIfNeeded() -> Bool {
+    /// Claims the sync slot. Returns the generation identifying this sync, or `nil` if a
+    /// sync is already in flight.
+    private static func startSyncIfNeeded() -> UInt64? {
         syncStateLock.lock()
         defer { syncStateLock.unlock() }
 
-        guard !_isSyncing else { return false }
+        guard !_isSyncing else { return nil }
         _isSyncing = true
+        syncGeneration += 1
+        activeSyncQueues = []
+        return syncGeneration
+    }
+
+    private static func register(queues: [OperationQueue], generation: UInt64) {
+        syncStateLock.lock()
+        defer { syncStateLock.unlock() }
+
+        guard generation == syncGeneration else { return }
+        activeSyncQueues = queues
+    }
+
+    /// Ends the sync started as `generation`. Returns `false` — and changes nothing — when
+    /// that session was cancelled or superseded, so a stale completion block can't release
+    /// a newer sync's slot or announce a finish that never happened.
+    @discardableResult
+    private static func finishSync(generation: UInt64) -> Bool {
+        syncStateLock.lock()
+        defer { syncStateLock.unlock() }
+
+        guard generation == syncGeneration, _isSyncing else {
+            logger.verbose("SyncService: ignoring stale sync completion (generation \(generation), current \(syncGeneration))")
+            return false
+        }
+        _isSyncing = false
+        activeSyncQueues = []
         return true
     }
 
-    private static func finishSync() {
+    private static func isCurrent(generation: UInt64) -> Bool {
         syncStateLock.lock()
+        defer { syncStateLock.unlock() }
+
+        return generation == syncGeneration
+    }
+
+    /// Abandons the channel sync in flight: unstarted operations are cancelled and the
+    /// generation bump neuters any completion block still to fire, so the sync slot is free
+    /// immediately for the next session.
+    ///
+    /// Call this when the session the sync belongs to ends — chat disconnect, and account
+    /// switch — and *before* wiping the database, so the wipe is the barrier for pages that
+    /// were already in flight (`FetchAllChannelsOperation` only checks `isCancelled` between
+    /// pages). Without it a sync interrupted mid-flight leaves `_isSyncing` true until its
+    /// operations drain, and the next `syncChannels()` is skipped as "already syncing".
+    ///
+    /// - Parameter includingPendingItems: also cancel the shared resend queues (reactions,
+    ///   poll votes, markers, message deletes). Pass `true` on account switch, where those
+    ///   operations carry the outgoing account's pending items and must not be replayed
+    ///   under the incoming session. Leave `false` for a plain disconnect, where they are
+    ///   still this account's work and should finish or be retried on reconnect.
+    public class func cancelSync(includingPendingItems: Bool = false) {
+        syncStateLock.lock()
+        let queues = activeSyncQueues
+        let wasSyncing = _isSyncing
         _isSyncing = false
+        activeSyncQueues = []
+        syncGeneration += 1
         syncStateLock.unlock()
+
+        if wasSyncing {
+            logger.verbose("SyncService: cancelSync — abandoning in-flight channel sync")
+            queues.forEach { $0.cancelAllOperations() }
+            Components.channelMessageMarkerProvider.canMarkMessage = true
+        }
+
+        if includingPendingItems {
+            logger.verbose("SyncService: cancelSync — cancelling pending item queues")
+            reactionQueue.cancelAllOperations()
+            pollVoteQueue.cancelAllOperations()
+            markersQueue.cancelAllOperations()
+            messageDeleteQueue.cancelAllOperations()
+        }
     }
 
     /// Signals that channel sync has finished so open screens can reconcile a stale local
@@ -306,13 +382,13 @@ public final class SyncService: NSObject {
     public class func syncChannels(
         task: BGAppRefreshTask? = nil,
         completion: ((Bool) -> Void)? = nil) {
-            guard Self.startSyncIfNeeded() else {
+            guard let generation = Self.startSyncIfNeeded() else {
                 logger.verbose("SyncService: syncChannels skipped — already syncing")
                 task?.setTaskCompleted(success: true)
                 completion?(false)
                 return
             }
-            logger.verbose("SyncService: syncChannels started")
+            logger.verbose("SyncService: syncChannels started (generation \(generation))")
             Components.channelMessageMarkerProvider.canMarkMessage = false
             Self.sendPendingReactions()
 
@@ -320,6 +396,7 @@ public final class SyncService: NSObject {
             channelSyncQueue.maxConcurrentOperationCount = 1
             let messageSyncQueue = OperationQueue()
             messageSyncQueue.maxConcurrentOperationCount = 1
+            Self.register(queues: [channelSyncQueue, messageSyncQueue], generation: generation)
 
             let completionOperator = Operation()
             let channelCompletionOperator = Operation()
@@ -370,7 +447,10 @@ public final class SyncService: NSObject {
             }
             guard !operations.isEmpty else {
                 Components.channelMessageMarkerProvider.canMarkMessage = true
-                Self.finishSync()
+                guard Self.finishSync(generation: generation) else {
+                    completion?(false)
+                    return
+                }
                 Self.notifyChannelsSyncFinished()
                 completion?(true)
                 return
@@ -388,21 +468,42 @@ public final class SyncService: NSObject {
                 task.expirationHandler = {
                     channelSyncQueue.cancelAllOperations()
                     messageSyncQueue.cancelAllOperations()
-                    Self.finishSync()
+                    Self.finishSync(generation: generation)
                 }
 
                 completionOperator.completionBlock = {
-                    completion?(completionOperator.isFinished)
-                    Self.finishSync()
-                    Self.notifyChannelsSyncFinished()
+                    // The BG task has to be completed even for a superseded session, or the
+                    // scheduler counts it as never finished — only the sync state and the
+                    // finished notification are gated on the generation.
+                    let isCurrent = Self.finishSync(generation: generation)
+                    completion?(isCurrent && completionOperator.isFinished)
+                    if isCurrent {
+                        Self.notifyChannelsSyncFinished()
+                    }
                     task.setTaskCompleted(success: !completionOperator.isCancelled)
                 }
             } else {
                 completionOperator.completionBlock = {
-                    Self.finishSync()
+                    guard Self.finishSync(generation: generation) else {
+                        completion?(false)
+                        return
+                    }
                     Self.notifyChannelsSyncFinished()
                     completion?(completionOperator.isFinished)
                 }
+            }
+            // Cancellation can land between claiming the slot and here — the database read
+            // above is not instant. Enqueueing then would run a whole sync for a session
+            // that no longer exists, writing the previous account's channels into a database
+            // that was just wiped for the incoming one.
+            guard Self.isCurrent(generation: generation) else {
+                logger.verbose("SyncService: sync generation \(generation) cancelled before enqueue — dropping operations")
+                Components.channelMessageMarkerProvider.canMarkMessage = true
+                completionOperator.completionBlock = nil
+                channelCompletionOperator.completionBlock = nil
+                task?.setTaskCompleted(success: false)
+                completion?(false)
+                return
             }
             channelSyncQueue.addOperations(operations + [channelCompletionOperator] + markerOperations + [completionOperator], waitUntilFinished: false)
         }
