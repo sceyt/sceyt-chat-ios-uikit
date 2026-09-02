@@ -144,6 +144,10 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         database.write {
             $0.update(messageMarkers: marker)
         } completion: { _ in
+            // A marker for an id we have never stored, in a channel holding an outgoing message
+            // stuck at `id == 0`, means one of our sends landed but its ack was lost. Recover the
+            // server id so the tick can be applied.
+            PendingSendReconciler.reconcile(marker: marker, channelId: channel.id)
         }
     }
     

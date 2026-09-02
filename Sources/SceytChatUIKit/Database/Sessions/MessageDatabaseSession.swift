@@ -736,7 +736,15 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         guard !messageMarkers.messageIds.isEmpty else { return [] }
         let maxId = messageMarkers.messageIds.max(by: { $0.int64Value < $1.int64Value }) ?? messageMarkers.messageIds.last!
         guard let channelId = MessageDTO.fetch(id: MessageId(maxId.int64Value), context: self)?.channelId
-        else { return [] }
+        else {
+            // The marker names a server id this device has never stored — which is exactly the
+            // case when the send ack was lost and the local row still sits at id 0.
+            MessageSendTrace.log(
+                "marker.unknownMessage", messageId: MessageId(maxId.int64Value),
+                "name=\(messageMarkers.name) ids=\(messageMarkers.messageIds) markerUser=\(messageMarkers.user.id)"
+            )
+            return []
+        }
         let predicate = NSPredicate(
             format: "channelId == %lld AND id <= %@ AND deliveryStatus != %d AND deliveryStatus != %d AND deliveryStatus < %d AND incoming == false",
             channelId,

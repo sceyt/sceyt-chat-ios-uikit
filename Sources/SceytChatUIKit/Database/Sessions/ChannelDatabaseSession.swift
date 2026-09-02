@@ -61,6 +61,39 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         return apply(channel: channel, to: channelDTO, created: created, forceUpdate: forceUpdate)
     }
 
+    /// The local row a channel payload's `lastMessage` would overwrite, when that payload is the
+    /// SDK's own cached copy of one of *our* sends rather than anything the server told us —
+    /// meaning it must be ignored. `nil` means the payload is safe to apply.
+    ///
+    /// The SDK hands out a live reference to its local message cache here. Right after a send
+    /// times out it flips that copy to `deliveryStatus == .failed` while leaving `id == 0`, and a
+    /// channel-list page read a few milliseconds later carries it. Applying it runs
+    /// `MessageDTO.map` over the row we created in `storePending` and downgrades `pending ->
+    /// failed`, which is what raises the warning tick even though the message reached the
+    /// receiver. Worse, `MessageDTO.fetchOrCreate` matches by tid and then assigns the incoming
+    /// id, so an `id == 0` payload can also reset a row that had already been repaired.
+    ///
+    /// An outgoing message with no server id can only exist locally, so when we already hold that
+    /// row there is nothing to learn from this payload: the row is resolved by the send ack, or by
+    /// `PendingSendReconciler` once a marker proves the message landed. If we *don't* hold it, the
+    /// write goes ahead as before so a message is never silently dropped.
+    private func staleCachedLastMessageRow(_ message: Message, channelId: ChannelId) -> MessageDTO? {
+        guard !message.incoming, message.id == 0, message.tid != 0 else { return nil }
+        return MessageDTO.fetch(tid: Int64(message.tid), channelId: Int64(channelId), context: self)
+    }
+
+    /// Records a skip only when it prevented real damage — a row that already carries its server
+    /// id would have had it zeroed. Skipping a payload for a row that is still `id == 0` is the
+    /// routine case and says nothing worth logging.
+    private func noteSkippedLastMessage(_ message: Message, row: MessageDTO, channelId: ChannelId, path: String) {
+        guard row.id != 0 else { return }
+        MessageSendTrace.log(
+            "channel.lastMessage.clobberPrevented", tid: Int64(message.tid),
+            channelId: channelId, messageId: MessageId(row.id),
+            "path=\(path) \(MessageSendTrace.describe(dto: row)) \(MessageSendTrace.describe(ack: message))"
+        )
+    }
+
     @discardableResult
     private func apply(channel: Channel, to channelDTO: ChannelDTO, created: Bool, forceUpdate: Bool) -> ChannelDTO {
         let dto = channelDTO.map(channel)
@@ -90,7 +123,11 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
 
         if created || forceUpdate {
             if let message = channel.lastMessage {
-                createOrUpdate(message: message, channelId: channel.id)
+                if let stale = staleCachedLastMessageRow(message, channelId: channel.id) {
+                    noteSkippedLastMessage(message, row: stale, channelId: channel.id, path: "createOrUpdate")
+                } else {
+                    createOrUpdate(message: message, channelId: channel.id)
+                }
             }
         }
 
@@ -145,7 +182,11 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         
         
         if let message = channel.lastMessage {
-            createOrUpdate(message: message, channelId: channel.id)
+            if let stale = staleCachedLastMessageRow(message, channelId: channel.id) {
+                noteSkippedLastMessage(message, row: stale, channelId: channel.id, path: "update")
+            } else {
+                createOrUpdate(message: message, channelId: channel.id)
+            }
         }
         
         if let messages = channel.messages {

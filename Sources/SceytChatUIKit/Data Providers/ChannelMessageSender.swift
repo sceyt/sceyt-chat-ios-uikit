@@ -61,12 +61,24 @@ open class ChannelMessageSender: DataProvider {
         }
         func handleAck(sentMessage: Message?, error: Error?) {
             Self.endSend(tid: Int64(message.tid))
+            // `didSend` can hand back `nil` from a host delegate, which is a different situation
+            // from the SDK not producing an ack at all — don't report one as the other.
+            let ackWasEmpty = sentMessage == nil
             let sentMessage = didSend(sentMessage, error: error)
             guard let sentMessage = sentMessage,
                   sentMessage.deliveryStatus != .failed,
                   sentMessage.deliveryStatus != .pending
             else {
-                logger.errorIfNotNil(error, "Sent message filed status: \(String(describing: sentMessage?.deliveryStatus)), tid \(message.tid)")
+                // The row keeps whatever `storePending` wrote (`pending`), so this is the branch
+                // that leaves the spinner up even when the server already fanned the message out.
+                let reason = sentMessage.map { "status=\($0.deliveryStatus)" }
+                    ?? (ackWasEmpty ? "noAckMessage" : "ackSuppressedByDelegate")
+                MessageSendTrace.outcome(
+                    "handleAck.rejected", tid: Int64(message.tid), channelId: channelId, error: error,
+                    "reason=\(reason) "
+                    + "localRowStaysPending=true badParamDelete=\(error?.sceytChatCode?.isBadParam ?? false) "
+                    + "\(MessageSendTrace.describe(error: error))"
+                )
                 if error?.sceytChatCode?.isBadParam ?? false {
                     self.database.write {
                         $0.deleteMessage(tid: Int64(message.tid))
@@ -166,6 +178,7 @@ open class ChannelMessageSender: DataProvider {
         } else {
             logger.info("Resending message with tid \(chatMessage.tid) upload attachments if needed")
         }
+        let traceTid = Int64(chatMessage.tid)
         uploadAttachmentsIfNeeded(message: chatMessage) { message, error in
             if error == nil, let message {
                 let sendableMessage = message.builder.build()
@@ -178,9 +191,6 @@ open class ChannelMessageSender: DataProvider {
                 
                 func callback(sentMessage: Message?, error: Error?) {
                     Self.endSend(tid: Int64(sendableMessage.tid))
-                    if error != nil || sentMessage?.deliveryStatus == .failed {
-                         logger.errorIfNotNil(error, "Resending message with tid \(String(describing: sentMessage?.tid)) failed")
-                    }
                     self.didResend(sentMessage, error: error)
                     guard let sentMessage = sentMessage
                     else {
@@ -189,12 +199,23 @@ open class ChannelMessageSender: DataProvider {
                                 $0.deleteMessage(tid: Int64(message.tid))
                             }
                         }
-                        logger.error("Message with tid \(String(describing: sentMessage?.tid)) build failed can't store message")
+                        MessageSendTrace.outcome(
+                            "resend.rejected", tid: traceTid, channelId: self.channelId, error: error,
+                            "reason=noAckMessage badParamDelete=\(error?.sceytChatCode == .badMessageParam) "
+                            + "\(MessageSendTrace.describe(error: error))"
+                        )
                         completion?(error)
                         return
                     }
                     if sentMessage.deliveryStatus == .pending || sentMessage.deliveryStatus == .failed {
-                        logger.error("Resending message with tid \(String(describing: sentMessage.tid)) failed error: \(error)")
+                        // Nothing is written here, so the row keeps the status it already had —
+                        // a `failed` row stays failed and keeps the channel-list warning tick up.
+                        MessageSendTrace.outcome(
+                            "resend.rejected", tid: traceTid, channelId: self.channelId,
+                            messageId: sentMessage.id, error: error,
+                            "reason=status=\(sentMessage.deliveryStatus) localRowUnchanged=true "
+                            + "\(MessageSendTrace.describe(error: error))"
+                        )
                         completion?(error)
                         return
                     }
@@ -266,6 +287,17 @@ open class ChannelMessageSender: DataProvider {
                      logger.info("Redeleting message with tid \(chatMessage.tid)")
                     self.channelOperator.deleteMessage(sendableMessage, type: .deleteForMe, completion: callback(sentMessage:error:))
                 }
+            } else {
+                // The resend is abandoned, so the row stays pending until the next attempt. The
+                // completion must still fire: `SyncService.resendPendingMessage` counts it against
+                // the number of messages it queued, and only flushes the pending poll votes and
+                // message deletes once that count is reached. Mirrors `sendMessage`, which
+                // already reports this same branch.
+                MessageSendTrace.log(
+                    "resend.attachmentUploadFailed", tid: traceTid, channelId: self.channelId,
+                    "\(MessageSendTrace.describe(error: error))"
+                )
+                completion?(error)
             }
         }
     }
@@ -525,7 +557,16 @@ open class ChannelMessageSender: DataProvider {
         completion: @escaping (Message?, Error?) -> Void
     ) {
         channelOperator.sendMessage(message) { [weak self] sentMessage, error in
-            guard let self else { return }
+            guard let self else {
+                // No `handleAck` will ever run for this tid, so the row is stranded as pending and
+                // `endSend` is never called — the tid keeps blocking a pending delete for it until
+                // `inFlightSendStaleInterval` expires.
+                MessageSendTrace.error(
+                    "request.senderDeallocated", tid: Int64(message.tid),
+                    "attempt=\(attempt) \(MessageSendTrace.describe(ack: sentMessage)) \(MessageSendTrace.describe(error: error))"
+                )
+                return
+            }
             
             guard self.shouldRetrySend(sentMessage: sentMessage, error: error, attempt: attempt) else {
                 completion(sentMessage, error)
@@ -547,6 +588,10 @@ open class ChannelMessageSender: DataProvider {
         guard message.deliveryStatus == .pending else { return false }
         guard chatClient.connectionState == .connected else { return false }
         guard attempt < max(0, maxSendRetryCount) else { return false }
+        // A transport failure is indeterminate, not a refusal, and it arrives as a plain
+        // `NSError` — so `sdkError` is nil and `isResendable` cannot see it. Without this the
+        // retry never fires on the failures it exists for.
+        if error?.sceytChatCode?.isTransport == true { return true }
         return error?.sdkError?.isResendable == true
     }
     

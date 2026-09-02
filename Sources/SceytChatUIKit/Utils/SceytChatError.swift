@@ -18,6 +18,9 @@ public enum SceytChatError: Int, Error {
     case badMessageParam = 1234
     case markMessageNotfoundMessagesWithIds = 1241
     case networkConnection = 9904
+    /// The SDK gave up waiting for a response. Note this says nothing about whether the server
+    /// acted on the request — see `isTransport`.
+    case requestTimeout = 9902
     
     case queryInProgress = 10008
     
@@ -27,6 +30,16 @@ public enum SceytChatError: Int, Error {
         self == .badMessageAttachmentParam ||
         self == .badMessageParam
     }
+
+    /// The request never got an answer, so the outcome is **indeterminate**: the server may have
+    /// acted on it anyway. These arrive as plain `NSError` rather than `SceytError`, so
+    /// `Error.sdkError` is `nil` for them and `SDKErrorTypeEnum.isResendable` cannot classify
+    /// them — which is why anything deciding whether to retry has to consult this too.
+    var isTransport: Bool {
+        self == .networkConnection ||
+        self == .notConnect ||
+        self == .requestTimeout
+    }
 }
 
 extension SceytChatError: LocalizedError {
@@ -35,7 +48,7 @@ extension SceytChatError: LocalizedError {
     /// error 9001.)" — which is not something to put in an alert.
     public var errorDescription: String? {
         switch self {
-        case .notConnect, .networkConnection:
+        case .notConnect, .networkConnection, .requestTimeout:
             return L10n.Connection.Error.networkLost
         default:
             return L10n.Connection.Error.Try.again
