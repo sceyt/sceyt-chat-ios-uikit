@@ -2027,6 +2027,71 @@ open class ChannelViewController: ViewController,
         return channelViewModel.layoutModels[key]
     }
 
+    /// UI index path of a laid-out message, resolved through `appliedSnapshot`
+    /// (the collection view's own source of truth) rather than the observer,
+    /// which may already have advanced past what is on screen.
+    open func uiIndexPath(forLayoutModel model: MessageLayoutModel) -> IndexPath? {
+        let key = ChannelViewModel.Key(message: model.message)
+        for (sectionIdx, items) in appliedSnapshot.items.enumerated() {
+            if let itemIdx = items.firstIndex(of: key) {
+                return IndexPath(item: itemIdx, section: sectionIdx)
+            }
+        }
+        return nil
+    }
+
+    /// Re-lays out a message whose text was just expanded by "Read more",
+    /// holding the reading position steady.
+    ///
+    /// The data source is newest-first in content space, so growing a cell keeps
+    /// its content-space `minY` pinned and pushes only OLDER content away. In the
+    /// mirrored `.newestAtBottom` order that content-space `minY` is the bubble's
+    /// visual BOTTOM, so a plain reload anchors the bottom and grows the bubble
+    /// UPWARD: the lines the user had just finished reading slide off the top of
+    /// the screen and they are dropped at the very end of the message. That is the
+    /// "it jumped and I lost my place" behaviour — and it is specific to the
+    /// mirrored list, since upright the natural anchor is already the visual top.
+    ///
+    /// Fix: anchor the bubble's visual TOP across the relayout. The text already
+    /// on screen does not move at all and the revealed lines fill in below it,
+    /// which is what tapping "Read more" should feel like. The anchor edge is
+    /// `maxY` when mirrored and `minY` when upright, so the one formula covers
+    /// both orders (and resolves to a no-op in the upright one).
+    open func expandText(for model: MessageLayoutModel) {
+        let order = appearance.messageListOrder
+        let indexPath = uiIndexPath(forLayoutModel: model)
+
+        // Capture BEFORE the relayout: distance from the anchored bubble edge to
+        // the viewport's newest-facing edge.
+        let anchorDistance: CGFloat? = indexPath
+            .flatMap { collectionView.layoutAttributesForItem(at: $0) }
+            .map { (order.isMirrored ? $0.frame.maxY : $0.frame.minY) - collectionView.contentOffset.y }
+
+        // Kill any residual deceleration so it can't fight the offset we set below.
+        collectionView.setContentOffset(collectionView.contentOffset, animated: false)
+
+        // The cell already updated its own layout model in `readMoreButtonAction`;
+        // only that one measurement changed, so there is no need to re-measure
+        // every loaded message. Re-binding the cell is still required — the text
+        // height constraint and the read-more button come from
+        // `shouldDisplayReadMoreButton` at `makeConstraints()` time.
+        collectionView.collectionViewLayout.invalidateLayout()
+        collectionView.reloadData()
+
+        guard let indexPath,
+              let anchorDistance,
+              let attrs = collectionView.layoutAttributesForItem(at: indexPath)
+        else { return }
+        let anchor = order.isMirrored ? attrs.frame.maxY : attrs.frame.minY
+        let targetY = min(
+            max(anchor - anchorDistance, collectionView.bottomContentOffsetY),
+            collectionView.maxContentOffsetY
+        )
+        if abs(targetY - collectionView.contentOffset.y) > 0.5 {
+            collectionView.setContentOffset(CGPoint(x: 0, y: targetY), animated: false)
+        }
+    }
+
     // MARK: Newest-first presentation index mapping
 
     /// The view model keeps messages oldest-first; the collection view presents
@@ -2489,11 +2554,7 @@ open class ChannelViewController: ViewController,
             case .didTapPollOption(let optionIndex, let pollViewModel):
                 self.didTapPollOption(layoutModel: model, optionIndex: optionIndex, pollViewModel: pollViewModel)
             case .didTapReadMore:
-
-                self.channelViewModel.invalidateLayout()
-                // Invalidate the collection view layout
-                self.collectionView.collectionViewLayout.invalidateLayout()
-                self.collectionView.reloadData()
+                self.expandText(for: model)
             }
         }
         cell.contextMenu = contextMenu
