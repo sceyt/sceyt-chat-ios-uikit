@@ -135,7 +135,31 @@ extension MessageCell {
             // deallocated observers itself, so no removal on reuse/teardown is needed.
             AttachmentSharpThumbnailRelay.default.add(self)
             AttachmentTransferStatusRelay.default.add(self)
+            #if DEBUG
+            // Surfaces this view to XCUITest so a test can compare the thumbnail the
+            // bubble renders against the one the reply preview quoting it renders.
+            isAccessibilityElement = true
+            accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.attachmentImage
+            #endif
         }
+
+        #if DEBUG
+        /// Publishes which thumbnail this view is actually painting — the counterpart of
+        /// `MessageCell.ReplyView.accessibilityValue`, computed on read for the same
+        /// reason (several async paths write the image; a getter cannot go stale).
+        open override var accessibilityValue: String? {
+            get {
+                guard let data, data.type == .image || data.type == .video
+                else { return nil }
+                guard imageView.image != nil
+                else { return SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.thumbnailNone }
+                return data.isThumbnailLoadedFromFile
+                    ? SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.thumbnailSharp
+                    : SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.thumbnailBlurred
+            }
+            set { super.accessibilityValue = newValue }
+        }
+        #endif
 
         /// Backstop delivery of a pause/resume/failure raised somewhere other than this cell
         /// (see `AttachmentTransferStatusRelay`). `update(status:)` otherwise runs only from

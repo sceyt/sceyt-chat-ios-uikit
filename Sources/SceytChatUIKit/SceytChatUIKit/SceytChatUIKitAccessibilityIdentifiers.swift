@@ -152,6 +152,13 @@ extension SceytChatUIKit {
                 /// The "New messages" separator shown on the last displayed message.
                 public static let unreadSeparator = "sceyt_chat_channel_message_cell_unread_separator"
                 /// The quoted reply preview; tapping it scrolls to the parent message.
+                ///
+                /// When the quoted message carries a media attachment, the view's
+                /// `accessibilityValue` publishes which thumbnail it is actually
+                /// painting — `thumbnailSharp` / `thumbnailBlurred` / `thumbnailNone`
+                /// (DEBUG builds only). A reply preview that stays `thumbnailBlurred`
+                /// after the parent's own bubble has gone sharp is the "reply preview
+                /// never un-blurs" bug.
                 public static let replyView = "sceyt_chat_channel_message_cell_reply_view"
                 /// The sender-name label (group chats).
                 public static let senderName = "sceyt_chat_channel_message_cell_sender_name"
@@ -159,6 +166,22 @@ extension SceytChatUIKit {
                 public static let avatar = "sceyt_chat_channel_message_cell_avatar"
                 /// The attachments container (image/video/file/voice).
                 public static let attachments = "sceyt_chat_channel_message_cell_attachments"
+                /// A single attachment view inside `attachments`. Publishes the same
+                /// `thumbnailSharp` / `thumbnailBlurred` / `thumbnailNone` value as
+                /// `replyView`, so a test can compare what the message bubble renders
+                /// against what the reply preview quoting it renders. DEBUG only.
+                public static let attachmentImage = "sceyt_chat_channel_message_cell_attachment_image"
+
+                /// `accessibilityValue` of a thumbnail slot painting the real,
+                /// file-backed image — the sharp preview a user sees once the
+                /// attachment is on disk.
+                public static let thumbnailSharp = "thumbnail_sharp"
+                /// `accessibilityValue` of a thumbnail slot still painting the low-res
+                /// `thumbHash` placeholder decoded from the attachment's metadata —
+                /// the blurred preview shown before the file is downloaded.
+                public static let thumbnailBlurred = "thumbnail_blurred"
+                /// `accessibilityValue` of a thumbnail slot with nothing painted in it.
+                public static let thumbnailNone = "thumbnail_none"
                 /// The link-preview view.
                 public static let linkPreview = "sceyt_chat_channel_message_cell_link_preview"
                 /// The in-bubble poll view.

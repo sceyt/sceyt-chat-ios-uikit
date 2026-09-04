@@ -73,6 +73,19 @@ struct ChannelScreen {
         // Floating rapid-vote-change driver (`--uitest-poll-double-vote=<gapMs>`):
         // votes for the first poll option, then for the second one.
         static let pollDoubleVote = "uitest.pollDoubleVote"
+
+        // Floating attachment-download driver (`--uitest-reply-attachment`): lands
+        // the seeded image's bytes and flips its rows to `.done`. Stamps `ok` /
+        // `failed` into its own value on commit.
+        static let completeAttachmentDownload = "uitest.completeAttachmentDownload"
+
+        // A single attachment view inside a message bubble.
+        static let attachmentImage = "sceyt_chat_channel_message_cell_attachment_image"
+        /// Thumbnail states published by `attachmentImage` and `replyView` (mirror of
+        /// `AccessibilityIdentifiers.Channel.Cell.thumbnail*`).
+        static let thumbnailSharp = "thumbnail_sharp"
+        static let thumbnailBlurred = "thumbnail_blurred"
+        static let thumbnailNone = "thumbnail_none"
     }
 
     /// Mirror of the conversation seeded by `UITestSupport` (`--uitest-conversation`).
@@ -136,6 +149,13 @@ struct ChannelScreen {
                 + "ABOVE the received messages without moving the viewport."
         }
 
+        /// The reply-to-image fixture seeded by `--uitest-reply-attachment`: an
+        /// incoming image with no local file (index 21) and an incoming reply
+        /// quoting it (index 22). Mirror of `UITestSupport.image*`.
+        static let imageMessageId = messageId(21)
+        static let imageReplyMessageId = messageId(22)
+        static let imageReplyText = "Nice shot!"
+
         /// The poll fixture seeded by `--uitest-poll`: a poll as the newest message
         /// of a short history. Mirror of `UITestSupport.poll*`.
         static let pollMessageId = messageId(20)
@@ -178,6 +198,38 @@ struct ChannelScreen {
     /// configured gap, for the second one (present only with
     /// `--uitest-poll-double-vote=<gapMs>`).
     var pollDoubleVoteButton: XCUIElement { app.buttons[AID.pollDoubleVote] }
+
+    /// Floating button that lands the seeded image attachment's download
+    /// (present only with `--uitest-reply-attachment`).
+    var completeAttachmentDownloadButton: XCUIElement {
+        app.buttons[AID.completeAttachmentDownload]
+    }
+
+    // MARK: - Attachment thumbnails
+
+    /// The attachment view inside the given message cell. Its `value` says which
+    /// thumbnail is on screen: `thumbnailBlurred` while it is still the low-res
+    /// `thumbHash` placeholder, `thumbnailSharp` once the downloaded file is
+    /// painted.
+    func attachmentImage(in cell: XCUIElement) -> XCUIElement {
+        cell.otherElements[AID.attachmentImage]
+    }
+
+    /// The thumbnail state a message bubble's attachment currently renders, or nil
+    /// when the view is not on screen.
+    func attachmentThumbnailState(in cell: XCUIElement) -> String? {
+        let element = attachmentImage(in: cell)
+        guard element.exists else { return nil }
+        return element.value as? String
+    }
+
+    /// The thumbnail state a cell's reply preview currently renders, or nil when
+    /// there is no reply preview on screen.
+    func replyThumbnailState(in cell: XCUIElement) -> String? {
+        let element = replyView(in: cell)
+        guard element.exists else { return nil }
+        return element.value as? String
+    }
 
     /// The "New messages" separator, shown on the last-read message.
     var unreadSeparator: XCUIElement { app.staticTexts[AID.unreadSeparator] }

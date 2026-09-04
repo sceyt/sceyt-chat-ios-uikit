@@ -169,6 +169,16 @@ enum UITestSupport {
     /// voted. Implies conversation mode and, since UI-test mode never connects,
     /// switches poll-vote requests to completing locally
     /// (`SceytChatUIKit.uiTestPollVotesCompleteLocally`).
+    /// `--uitest-reply-attachment` — seeds a short conversation whose two newest
+    /// messages are an incoming, NOT-yet-downloaded image and an incoming reply
+    /// quoting it, so both the bubble and the reply preview start out blurred.
+    /// Installs a floating button (`uitest.completeAttachmentDownload`) that lands
+    /// the image's bytes and flips its database rows to `.done` — the moment the
+    /// real download completes.
+    private static var isReplyAttachment: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-reply-attachment")
+    }
+
     private static var isPoll: Bool {
         let arguments = ProcessInfo.processInfo.arguments
         return arguments.contains("--uitest-poll")
@@ -232,7 +242,10 @@ enum UITestSupport {
         guard isActive else { return }
         #if DEBUG
         SceytChatUIKit.shared.startUITestSession()
-        if isPoll {
+        if isReplyAttachment {
+            seedReplyAttachmentConversation()
+            installFloatingAttachmentDownloadInjector()
+        } else if isPoll {
             // No live connection here, so a vote request never comes back; without
             // this the in-flight guard would swallow every tap after the first and
             // a *changed* vote could not be driven at all.
@@ -444,6 +457,88 @@ enum UITestSupport {
                 unreadCount: isConversationUnread ? 3 : 0,
                 lastDisplayedMessageId: isConversationUnread ? conversationMessageId(16) : 0
             )
+        }
+    }
+
+    // MARK: - Reply-to-image conversation (gated behind --uitest-reply-attachment)
+
+    static let imageMessageBody = ""
+    static let imageReplyText = "Nice shot!"
+    /// The incoming image message — second newest, so both it and the reply
+    /// quoting it are on screen the moment the channel opens.
+    static var imageMessageId: UInt64 { conversationMessageId(21) }
+    /// The incoming message replying to `imageMessageId`.
+    static var imageReplyMessageId: UInt64 { conversationMessageId(22) }
+
+    /// The seeded attachment. The url's parent path component is its transfer id,
+    /// so the file storage keys the "downloaded" bytes by `uitest-attachment-1`.
+    static let imageAttachmentSeed = SceytChatUIKit.UITestImageAttachmentSeed(
+        id: 900_001,
+        url: "https://uitest.sceyt.invalid/uitest-attachment-1/uitest-photo.jpg",
+        name: "uitest-photo.jpg"
+    )
+
+    /// A short history, then an incoming image with no local file, then an incoming
+    /// reply quoting it. Both render the blurred `thumbHash` placeholder until the
+    /// download lands.
+    private static func seedReplyAttachmentConversation() {
+        SceytChatUIKit.shared.seedChannelsForUITests([
+            .init(id: conversationChannelId, subject: conversationSubject)
+        ])
+        var messages = Array(conversationMessages.prefix(4))
+        messages.append(
+            .init(id: imageMessageId,
+                  body: imageMessageBody,
+                  incoming: true,
+                  senderId: "bob",
+                  senderName: "Bob",
+                  imageAttachment: imageAttachmentSeed)
+        )
+        messages.append(
+            .init(id: imageReplyMessageId,
+                  body: imageReplyText,
+                  incoming: true,
+                  senderId: "bob",
+                  senderName: "Bob",
+                  parentId: imageMessageId)
+        )
+        SceytChatUIKit.shared.seedMessagesForUITests(
+            channelId: conversationChannelId,
+            messages: messages
+        )
+    }
+
+    /// Button-tap entry point for `--uitest-reply-attachment`: completes the seeded
+    /// image's download and stamps `ok` / `failed` into the button's accessibility
+    /// value, so a test that never actually delivered the bytes fails as a harness
+    /// problem instead of passing vacuously.
+    static func completeAttachmentDownloadFromButton() {
+        let landed = SceytChatUIKit.shared
+            .completeUITestAttachmentDownload(imageAttachmentSeed)
+        findWindowButton(identifier: "uitest.completeAttachmentDownload")?
+            .accessibilityValue = landed ? "ok" : "failed"
+    }
+
+    /// A floating, window-level button that lands the seeded image's download on
+    /// tap — so a test can sequence it *after* the conversation is on screen and
+    /// both previews are confirmed blurred.
+    private static func installFloatingAttachmentDownloadInjector() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            let windows = UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .flatMap { $0.windows }
+            guard let window = windows.first(where: { $0.isKeyWindow }) ?? windows.first
+            else { return }
+            let button = UIButton(type: .system)
+            button.setTitle("⤓", for: .normal)
+            button.accessibilityIdentifier = "uitest.completeAttachmentDownload"
+            button.backgroundColor = .systemOrange
+            button.frame = CGRect(x: 0, y: window.safeAreaInsets.top + 160, width: 44, height: 44)
+            button.layer.zPosition = .greatestFiniteMagnitude
+            button.addTarget(UITestMessageInjector.shared,
+                             action: #selector(UITestMessageInjector.completeAttachmentDownload),
+                             for: .touchUpInside)
+            window.addSubview(button)
         }
     }
 
@@ -898,6 +993,10 @@ final class UITestMessageInjector: NSObject {
 
     @objc func pollDoubleVote() {
         UITestSupport.performPollDoubleVoteFromButton()
+    }
+
+    @objc func completeAttachmentDownload() {
+        UITestSupport.completeAttachmentDownloadFromButton()
     }
 }
 #endif

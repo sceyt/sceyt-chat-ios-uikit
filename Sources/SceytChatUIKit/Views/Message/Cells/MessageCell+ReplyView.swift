@@ -11,7 +11,7 @@ import SceytChat
 
 extension MessageCell {
 
-    open class ReplyView: Control, MessageCellMeasurable {
+    open class ReplyView: Control, MessageCellMeasurable, AttachmentSharpThumbnailObserver {
 
         open lazy var nameLabel = UILabel()
             .withoutAutoresizingMask
@@ -79,6 +79,41 @@ extension MessageCell {
 
             borderView.clipsToBounds = true
             borderView.layer.cornerRadius = 2
+
+            // Weak registration for the view's whole lifetime — the relay prunes dead
+            // observers itself. See `attachmentSharpThumbnailDidLoad` for why the reply
+            // preview needs this backstop at all.
+            AttachmentSharpThumbnailRelay.default.add(self)
+        }
+
+        /// Backstop delivery of the blurry→sharp swap (see `AttachmentSharpThumbnailRelay`).
+        ///
+        /// A reply preview is the one thumbnail consumer that gets no help from the
+        /// database: `LazyMessagesObserver` refreshes a message row for
+        /// `attachments.status`/`attachments.filePath`, which reaches the message that
+        /// OWNS the image — never the message quoting it. So the parent's bubble heals
+        /// through a full rebind while this view is left to heal itself, off a single
+        /// overwritable `onLoadThumbnail` slot and a progress observer that any rebind,
+        /// duplicate layout instance or already-in-flight transfer can leave it out of.
+        /// The relay is keyed by attachment identity and per-view, so none of that can
+        /// steal the image.
+        open func attachmentSharpThumbnailDidLoad(_ attachment: ChatMessage.Attachment, image: UIImage) {
+            guard let layout = data?.attachment,
+                  layout.type != .link,
+                  layout.attachment == attachment
+            else { return }
+            // One attachment is consumed at several design sizes, each with its own
+            // size-keyed thumbnail file. Anything at least as big as this 32pt slot is an
+            // upgrade over the thumbHash blur; a smaller sibling result is not.
+            let displayScale = traitCollection.displayScale > 0 ? traitCollection.displayScale : UIScreen.main.scale
+            let requiredPxMaxSide = max(Measure.imageSize.width, Measure.imageSize.height) * displayScale
+            let imagePxMaxSide = max(image.size.width, image.size.height) * image.scale
+            guard imagePxMaxSide >= requiredPxMaxSide else { return }
+            if !(layout.isThumbnailLoadedFromFile && layout.thumbnail === image) {
+                layout.setFileBackedThumbnail(image)
+            }
+            insertImageViewIfNeeded()
+            imageView.image = image
         }
        
         open override func setupLayout() {
@@ -226,6 +261,13 @@ extension MessageCell {
             else { return }
             let message = data.message
             let chatAttachment = attachment.attachment
+            // Captured by value, not recomputed from `self` in the completion: when the
+            // view is gone by the time the transfer ends, deriving the key there yields
+            // "", and `removeProgressObserver` reads an empty key as "drop the whole
+            // bucket" — silently unsubscribing every OTHER view on this attachment,
+            // including the parent bubble's live progress ring. A captured key always
+            // removes exactly this view's own registration.
+            let observerKey = AttachmentTransfer.observerKey(for: self, prefix: "reply")
 
             // Refresh the preview whenever the thumbnail finishes loading — at bind,
             // after `update(attachment:)`, or once the parent's file downloads. The
@@ -245,15 +287,15 @@ extension MessageCell {
                 .progress(
                     message: message,
                     attachment: chatAttachment,
-                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "reply")
+                    objectIdKey: observerKey
                 ) { _ in
 
-                } completion: { [weak self, weak data] done in
+                } completion: { [weak data] done in
                     if done.error == nil {
                         fileProvider.removeProgressObserver(
                             message: done.message,
                             attachment: done.attachment,
-                            objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "reply") } ?? ""
+                            objectIdKey: observerKey
                         )
                     }
                     // Reloads the thumbnail from the now-downloaded file; the
@@ -278,6 +320,28 @@ extension MessageCell {
             }
         }
         
+        #if DEBUG
+        /// Publishes which thumbnail this preview is actually painting, so a UI test can
+        /// tell the blurred `thumbHash` placeholder from the sharp file-backed image.
+        ///
+        /// Computed on read rather than stamped on write: the thumbnail arrives through
+        /// several asynchronous paths (bind, `onLoadThumbnail`, a transfer completing),
+        /// and a getter cannot go stale the way a cached value assigned at only some of
+        /// those sites would — which is exactly the failure mode under test here.
+        open override var accessibilityValue: String? {
+            get {
+                guard let attachment = data?.attachment, attachment.type != .link
+                else { return nil }
+                guard imageView.image != nil, imageView.superview != nil
+                else { return SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.thumbnailNone }
+                return attachment.isThumbnailLoadedFromFile
+                    ? SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.thumbnailSharp
+                    : SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.thumbnailBlurred
+            }
+            set { super.accessibilityValue = newValue }
+        }
+        #endif
+
         open class func measure(
             model: MessageLayoutModel,
             appearance: MessageCell.Appearance

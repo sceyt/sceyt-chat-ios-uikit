@@ -84,6 +84,11 @@ class BaseUITestCase: XCTestCase {
     ///     the seeded conversation itself, between the last-read message and
     ///     the unread tail — a cold start whose sync completed BEFORE the
     ///     channel was opened (requires `conversationUnreadCount`).
+    ///   - replyAttachment: seed a short conversation whose two newest messages are
+    ///     an incoming, NOT-yet-downloaded image and an incoming reply quoting it —
+    ///     both start on the blurred `thumbHash` placeholder. Installs
+    ///     `uitest.completeAttachmentDownload`, which lands the image's bytes and
+    ///     flips its database rows to `.done`, exactly as a real download does.
     ///   - poll: seed a short conversation whose newest message is a poll, so the
     ///     in-bubble poll view is on screen as soon as the channel opens. Poll-vote
     ///     requests complete locally (this mode never connects), so a *changed*
@@ -119,6 +124,7 @@ class BaseUITestCase: XCTestCase {
                    webSyncOnOpenCount: Int = 8,
                    webSyncOnOpenRestart: Bool = false,
                    webSyncSeededCount: Int? = nil,
+                   replyAttachment: Bool = false,
                    poll: Bool = false,
                    pollAllowsMultipleVotes: Bool = false,
                    pollDoubleVoteGapMs: Int? = nil,
@@ -178,6 +184,9 @@ class BaseUITestCase: XCTestCase {
         }
         if let count = webSyncSeededCount {
             app.launchArguments += ["--uitest-web-sync-seeded=\(count)"]
+        }
+        if replyAttachment {
+            app.launchArguments += ["--uitest-reply-attachment"]
         }
         if poll {
             app.launchArguments += pollAllowsMultipleVotes

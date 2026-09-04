@@ -118,6 +118,44 @@ extension SceytChatUIKit {
         }
     }
 
+    /// A declarative description of an incoming image attachment to hang off a
+    /// seeded message, in the state a just-received image is in: a remote `url`,
+    /// a `thumbHash` placeholder in the metadata, **no local file** and a
+    /// `.pending` transfer status — i.e. the blurred preview.
+    ///
+    /// `completeUITestAttachmentDownload(messageId:)` moves it to the downloaded
+    /// state, writing the same rows the real transfer writes.
+    public struct UITestImageAttachmentSeed {
+
+        public var id: AttachmentId
+        /// Remote url. Its parent path component is the `transferId` the file
+        /// storage keys the downloaded file by, so give each seed its own.
+        public var url: String
+        public var name: String
+        /// The colour the blurred `thumbHash` placeholder decodes to.
+        public var placeholderColor: UIColor
+        /// The colour of the "downloaded" image, deliberately different from
+        /// `placeholderColor` so blurred and sharp are distinguishable.
+        public var downloadedColor: UIColor
+        public var pixelSize: CGSize
+
+        public init(
+            id: AttachmentId,
+            url: String,
+            name: String = "uitest-photo.jpg",
+            placeholderColor: UIColor = .systemRed,
+            downloadedColor: UIColor = .systemGreen,
+            pixelSize: CGSize = CGSize(width: 900, height: 900)
+        ) {
+            self.id = id
+            self.url = url
+            self.name = name
+            self.placeholderColor = placeholderColor
+            self.downloadedColor = downloadedColor
+            self.pixelSize = pixelSize
+        }
+    }
+
     /// A declarative description of a single message to seed into a channel for
     /// UI tests of the open-channel (conversation) screen.
     public struct UITestMessageSeed {
@@ -145,6 +183,10 @@ extension SceytChatUIKit {
         /// renders the in-bubble poll view instead of a text bubble. `body` is
         /// still stored (the real send path puts the question there too).
         public var poll: UITestPollSeed?
+        /// When set, the message carries an undownloaded image attachment, so the
+        /// bubble renders the blurred `thumbHash` preview (and any message replying
+        /// to it renders the same blur in its reply preview).
+        public var imageAttachment: UITestImageAttachmentSeed?
 
         public init(
             id: MessageId,
@@ -155,7 +197,8 @@ extension SceytChatUIKit {
             deliveryStatus: ChatMessage.DeliveryStatus = .displayed,
             parentId: MessageId? = nil,
             createdAt: Date? = nil,
-            poll: UITestPollSeed? = nil
+            poll: UITestPollSeed? = nil,
+            imageAttachment: UITestImageAttachmentSeed? = nil
         ) {
             self.id = id
             self.body = body
@@ -166,6 +209,7 @@ extension SceytChatUIKit {
             self.parentId = parentId
             self.createdAt = createdAt
             self.poll = poll
+            self.imageAttachment = imageAttachment
         }
     }
 
@@ -490,6 +534,14 @@ extension SceytChatUIKit {
                 if let pollSeed = seed.poll {
                     self.createUITestPoll(pollSeed, on: message, context: context)
                 }
+                if let attachmentSeed = seed.imageAttachment {
+                    self.createUITestImageAttachment(
+                        attachmentSeed,
+                        on: message,
+                        channelId: channelId,
+                        context: context
+                    )
+                }
                 created[seed.id] = message
                 newestMessage = message
             }
@@ -499,6 +551,116 @@ extension SceytChatUIKit {
                 channelDTO.lastDisplayedMessageId = Int64(lastDisplayedMessageId)
             }
         }
+    }
+
+    // MARK: - Image attachment seeding (test-only)
+
+    /// Builds the `AttachmentDTO` an incoming, not-yet-downloaded image message
+    /// carries: a remote url, a `thumbHash` of `placeholderColor` in the metadata
+    /// (what the blurred preview decodes from), no `filePath`, and `.pending`.
+    ///
+    /// Any file a previous launch left at this attachment's storage path is
+    /// removed, so a re-run really does start from the blurred state — otherwise
+    /// `getFilePath` would resolve the stale file and the fixture would be sharp
+    /// before the test has done anything.
+    private func createUITestImageAttachment(_ seed: UITestImageAttachmentSeed,
+                                             on message: MessageDTO,
+                                             channelId: ChannelId,
+                                             context: NSManagedObjectContext) {
+        Self.removeUITestAttachmentFile(seed)
+
+        let attachment = AttachmentDTO.fetchOrCreate(id: seed.id, context: context)
+        attachment.tid = 0
+        attachment.messageId = message.id
+        attachment.channelId = Int64(channelId)
+        attachment.userId = message.user?.id ?? ""
+        attachment.url = seed.url
+        attachment.filePath = nil
+        attachment.type = "image"
+        attachment.name = seed.name
+        attachment.uploadedFileSize = 0
+        attachment.status = Int16(ChatMessage.Attachment.TransferStatus.pending.rawValue)
+        attachment.transferProgress = 0
+        attachment.createdAt = message.createdAt
+        attachment.metadata = ChatMessage.Attachment.Metadata(
+            width: Int(seed.pixelSize.width),
+            height: Int(seed.pixelSize.height),
+            thumbnail: Self.uiTestThumbHash(color: seed.placeholderColor) ?? ""
+        ).build()
+        attachment.message = message
+    }
+
+    /// The thumbHash string a blurred placeholder decodes from, for a solid colour.
+    private static func uiTestThumbHash(color: UIColor) -> String? {
+        // thumbHash encodes a handful of DCT coefficients, so it needs a real (if
+        // tiny) raster; a 1x1 image degenerates.
+        Components.imageBuilder.init(image: uiTestSolidImage(color: color, size: CGSize(width: 32, height: 32)))
+            .thumbHashBase64()
+    }
+
+    /// A solid-colour JPEG-able image, used for both the placeholder source and the
+    /// "downloaded" file.
+    private static func uiTestSolidImage(color: UIColor, size: CGSize) -> UIImage {
+        UIGraphicsImageRenderer(size: size).image { context in
+            color.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+
+    /// Where `SCTSession.getFilePath` will look for this attachment's bytes:
+    /// the transfer id is the url's parent path component, the file name its own.
+    private static func uiTestAttachmentStoragePath(_ seed: UITestImageAttachmentSeed,
+                                                    create: Bool) -> String? {
+        guard let url = URL(string: seed.url) else { return nil }
+        let transferId = url.deletingLastPathComponent().lastPathComponent
+        let storage = FileStorage()
+        return create
+            ? storage.createPath(transferId: transferId, fileName: seed.name)
+            : storage.path(transferId: transferId, fileName: seed.name)
+    }
+
+    private static func removeUITestAttachmentFile(_ seed: UITestImageAttachmentSeed) {
+        if let existing = uiTestAttachmentStoragePath(seed, create: false) {
+            try? FileManager.default.removeItem(atPath: existing)
+        }
+        // The size-keyed thumbnails derived from it would otherwise survive too, and
+        // a cached sharp thumbnail is indistinguishable from a freshly loaded one.
+        let thumbnails = FileStorage().thumbnailPath
+        try? FileManager.default.removeItem(atPath: thumbnails)
+    }
+
+    /// Simulates the moment the parent image's download lands: writes the real
+    /// bytes to the path the file storage resolves for this attachment, then
+    /// commits `filePath` + `.done` to the database — the same two rows
+    /// `AttachmentTransfer.handle(tasks:)`/`didEndTask` write when a genuine
+    /// download completes.
+    ///
+    /// Deliberately does NOT touch any layout, view, relay or progress observer:
+    /// everything downstream must heal off the database write alone, exactly as it
+    /// does in production. Returns whether the bytes and the rows really landed, so
+    /// a test can reject a vacuous run instead of asserting on a download that
+    /// never happened.
+    ///
+    /// UI-test only.
+    @discardableResult
+    public func completeUITestAttachmentDownload(_ seed: UITestImageAttachmentSeed) -> Bool {
+        guard let destination = Self.uiTestAttachmentStoragePath(seed, create: true),
+              let data = Self.uiTestSolidImage(color: seed.downloadedColor, size: seed.pixelSize)
+                  .jpegData(compressionQuality: 0.9),
+              (try? data.write(to: URL(fileURLWithPath: destination), options: .atomic)) != nil
+        else { return false }
+
+        var committed = false
+        try? database.syncWrite { context in
+            guard let attachment = AttachmentDTO.fetch(id: seed.id, context: context)
+            else { return }
+            attachment.filePath = destination
+            attachment.status = Int16(ChatMessage.Attachment.TransferStatus.done.rawValue)
+            attachment.transferProgress = 1
+            attachment.uploadedFileSize = Int64(data.count)
+            committed = true
+        }
+        return committed
     }
 
     // MARK: - Poll seeding (test-only)
