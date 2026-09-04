@@ -915,6 +915,10 @@ public extension MessageCell {
         /// height) top and bottom. The gap to the name/size labels and their trailing inset stay
         /// `horizontalPadding`.
         public static var attachmentFilePadding: CGFloat = 8
+        /// Clear space between the file row's size label and the bubble's date/tick InfoView,
+        /// which is drawn over that same line. Reserved both in the row's measured width and in
+        /// the size label's trailing constraint, so measurement and layout always agree.
+        public static var attachmentFileInfoSpacing: CGFloat = 8
         /// Diameter of the transfer loader drawn over that slot. Smaller than the slot, so a
         /// previewable document stays partly visible while it downloads.
         public static var attachmentFileProgressSize: CGFloat = 40

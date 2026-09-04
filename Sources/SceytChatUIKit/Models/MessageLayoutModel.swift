@@ -325,6 +325,7 @@ open class MessageLayoutModel {
         }
 
         reactions = createReactions(message: message)
+        updateAttachmentRowMetrics()
         attachmentsContainerSize = calculateAttachmentsContainerSize()
         if !isForwarded && !contentOptions.contains(.unsupported) {
             if contentOptions.isEmpty || contentOptions == [.name] {
@@ -650,7 +651,18 @@ open class MessageLayoutModel {
             self.updateOptions.insert(.reaction)
         }
         reactions = newReactions
+        // After `self.message`/`self.channel` are in place: the reserve tracks the InfoView, which
+        // grows with the delivery state, the "edited" mark and the broadcast view count.
+        updateAttachmentRowMetrics()
+        let previousAttachmentsContainerSize = attachmentsContainerSize
         attachmentsContainerSize = calculateAttachmentsContainerSize()
+        if previousAttachmentsContainerSize != attachmentsContainerSize {
+            // The `.file` branch of the cells pins `bubbleView.widthAnchor` to a *constant*, so a
+            // row that grew (a byte count that was unknown at first layout, say) only reaches the
+            // screen if the cell reconfigures. `measureSize` below is gated on `isUpdated` too.
+            isUpdated = true
+            self.updateOptions.insert(.reload)
+        }
         if isUpdated || force {
             let textLength = attributedView.content.string.count
             if message.state == .deleted {
@@ -852,6 +864,34 @@ open class MessageLayoutModel {
         } ?? [])
     }
     
+    /// Hands every attachment row the two geometry facts only the bubble knows: how much trailing
+    /// space the date/tick InfoView needs over it, and how wide the row may get.
+    ///
+    /// The InfoView is a sibling of the attachment stack pinned to the bubble's bottom-right, so
+    /// it overlaps the *bottom-most* row and nothing above it — reserving on every row would
+    /// truncate size labels that nothing is covering.
+    open func updateAttachmentRowMetrics() {
+        // A file-only bubble may run wider than the media cap; one that also holds an image or
+        // video keeps that cap, because media rows take the stack's width at a fixed height and
+        // would be stretched out of aspect by a wider file row. The -4 is the stack's own inset,
+        // which the cell adds back when it turns this width into the bubble's.
+        let cap = hasMediaAttachments
+            ? Self.defaults.imageAttachmentSize.width
+            : min(Self.defaults.fileAttachmentSize.width, Self.defaults.messageWidth - 4)
+        let reserve: CGFloat
+        if attachments.last?.type == .file, message.state != .deleted {
+            reserve = Components.messageCellInfoView
+                .measure(channel: channel, message: message, appearance: appearance).width
+                + MessageCell.Layouts.attachmentFileInfoSpacing
+        } else {
+            reserve = 0
+        }
+        for (index, layout) in attachments.enumerated() {
+            layout.maxRowWidth = cap
+            layout.reservedTrailingWidth = index == attachments.count - 1 ? reserve : 0
+        }
+    }
+
     open func updateAttachmentLayouts(message: ChatMessage) {
         // Hide attachments if message has opened marker
         if message.hasOpenedMarker {
@@ -1262,6 +1302,36 @@ extension MessageLayoutModel {
         public var appearance: MessageCell.Appearance
         public var thumbnail: UIImage?
         public var thumbnailSize: CGSize = .zero
+
+        /// Trailing space this row must keep clear for the bubble's date/tick InfoView, plus the
+        /// gap that separates them. `MessageLayoutModel` sets it on the bottom-most row only —
+        /// the InfoView is pinned to the bubble's bottom-right, so it overlaps nothing above that
+        /// row. Stays zero wherever there is no InfoView at all (the shared-media and
+        /// global-search lists build their layouts directly).
+        public var reservedTrailingWidth: CGFloat = 0 {
+            didSet {
+                guard oldValue != reservedTrailingWidth else { return }
+                recalculateThumbnailSizeIfNeeded()
+            }
+        }
+
+        /// Cap for this row's measured width. `MessageLayoutModel` lets a file-only bubble grow to
+        /// the message width, but keeps the media cap when the bubble also carries an image or
+        /// video: media rows take the stack's width at a fixed height
+        /// (`AttachmentStackView.addImageView`), so a wider file row would stretch a sibling out
+        /// of aspect.
+        public var maxRowWidth: CGFloat = Components.messageLayoutModel.defaults.imageAttachmentSize.width {
+            didSet {
+                guard oldValue != maxRowWidth else { return }
+                recalculateThumbnailSizeIfNeeded()
+            }
+        }
+
+        /// True when the caller pinned `thumbnailSize` up front — the shared-media and
+        /// global-search lists do, because their cells have a fixed geometry. Nothing here may
+        /// re-derive a size under those.
+        private let hasFixedThumbnailSize: Bool
+
         public var voiceWaveform: [Float]?
         /// Cached link metadata for link-type attachments. Set once on first load; checked before re-fetching.
         public var linkMetadata: LinkMetadata?
@@ -1310,6 +1380,33 @@ extension MessageLayoutModel {
         open func fileSize(using formatter: any UIntFormatting) -> String {
             formatter.format(UInt64(fileSizeBytes))
         }
+
+        /// The widest line `AttachmentFileView.setProgress` can put under the name:
+        /// "<downloaded> • <total>". The two halves are formatted *independently*, so the
+        /// downloaded one can be longer than the total — "999.99KB • 1.50MB" runs 14pt past the
+        /// "1.50MB • 1.50MB" this row used to be measured against, which is exactly how much of
+        /// the line then truncated as soon as a transfer started.
+        ///
+        /// Deliberately status-independent: the row is always sized for the widest state it can
+        /// reach, so the bubble does not resize the moment a transfer begins or ends.
+        open func widestTransferSizeText(using formatter: any UIntFormatting) -> String {
+            let total = UInt64(fileSizeBytes)
+            let formattedTotal = formatter.format(total)
+            // The long values sit just below a unit boundary ("999.99KB", "1023.99KB"). Cover the
+            // decimal and the binary boundaries both, so a host-supplied formatter of either kind
+            // is measured against its own worst case.
+            let boundaries: [UInt64] = [1_000, 1_000_000, 1_000_000_000, 1 << 10, 1 << 20, 1 << 30]
+            var widest = formattedTotal
+            for boundary in boundaries where boundary - 1 < total {
+                let candidate = formatter.format(boundary - 1)
+                // Character count as the proxy for width: every candidate is digits, a decimal
+                // separator and a unit, so counting avoids measuring half a dozen strings per
+                // row. A miss costs a few points, which the size label's trailing constraint
+                // absorbs by truncating.
+                if candidate.count > widest.count { widest = candidate }
+            }
+            return "\(widest) • \(formattedTotal)"
+        }
         
         @Atomic private var isLoadedThumbnail: Bool = false
         public var onLoadThumbnail: ((UIImage?) -> Void)? {
@@ -1335,6 +1432,9 @@ extension MessageLayoutModel {
             self.ownerMessage = ownerMessage
             self.ownerChannel = ownerChannel
             self.appearance = appearance
+            // Before the size below: this is what tells `recalculateThumbnailSizeIfNeeded` never
+            // to re-derive a size the caller pinned.
+            self.hasFixedThumbnailSize = thumbnailSize != nil
             self.thumbnailSize = thumbnailSize ?? calculateAttachmentsContainerSize()
             self.onLoadThumbnail = onLoadThumbnail
             if asyncLoadThumbnail {
@@ -1484,9 +1584,24 @@ extension MessageLayoutModel {
             }
         }
         
+        /// `thumbnailSize` is derived once in `init`, but a file row's width depends on the name
+        /// and the byte count — both of which routinely arrive *after* the first layout (the
+        /// upload ack, the download's metadata). Left stale, the bubble keeps a width measured
+        /// against the old, shorter text while the labels render the new, longer one, and the size
+        /// line runs under the bubble's timestamp.
+        ///
+        /// Files only: re-deriving an image/video size here would resize media bubbles mid-scroll.
+        open func recalculateThumbnailSizeIfNeeded() {
+            guard !hasFixedThumbnailSize, type == .file else { return }
+            let size = calculateAttachmentsContainerSize()
+            guard size != thumbnailSize else { return }
+            thumbnailSize = size
+        }
+
         open func update(attachment: ChatMessage.Attachment) {
             self.attachment = attachment
             cachedFileSizeBytes = nil
+            recalculateThumbnailSizeIfNeeded()
             if !isThumbnailLoadedFromFile {
                 isLoadedThumbnail = false
                 DispatchQueue.global(qos: .userInteractive).async { [weak self] in
@@ -1540,6 +1655,7 @@ extension MessageLayoutModel {
             if self.ownerMessage == nil,
                self.attachment.messageId == ownerMessage.id {
                 self.ownerMessage = ownerMessage
+                recalculateThumbnailSizeIfNeeded()
                 return true
             }
             return false
@@ -1579,18 +1695,19 @@ extension MessageLayoutModel {
                 // "<downloaded> • <total>" form that `setProgress` writes.
                 // (This used to interpolate the `fileSize(using:)` *method*, so every file
                 // bubble was measured against the literal string "(Function) • (Function)".)
-                let formattedSize = fileSize(using: appearance.attachmentFileSizeFormatter)
-                var sizeWidth = TextSizeMeasure.calculateSize(
-                    of: "\(formattedSize) • \(formattedSize)",
+                let sizeTextWidth = TextSizeMeasure.calculateSize(
+                    of: widestTransferSizeText(using: appearance.attachmentFileSizeFormatter),
                     config: config).textSize.width
-                if let ownerChannel, let ownerMessage {
-                    sizeWidth += MessageCell.InfoView.measure(channel: ownerChannel, message: ownerMessage, appearance: MessageCell.appearance).width
-                }
                 // Chrome around the labels: the slot's leading inset (row-relative, so minus the
                 // stack's own) + the slot itself, then the gap to the labels and their trailing
                 // inset (both `horizontalPadding`).
                 let slotLeading = MessageCell.Layouts.attachmentFilePadding - MessageCell.Layouts.attachmentStackBubbleInset
-                size.width = min(size.width, max(nameWidth, sizeWidth) + slotLeading + MessageCell.Layouts.attachmentFileIconSize + MessageCell.Layouts.horizontalPadding * 2)
+                let chrome = slotLeading + MessageCell.Layouts.attachmentFileIconSize + MessageCell.Layouts.horizontalPadding * 2
+                // Only the size line shares its row with the bubble's InfoView; the name line owns
+                // the full width. Reserving *inside* the `max` — as this used to — let a long file
+                // name silently swallow the space the timestamp needs, which is how the size text
+                // ended up drawn under the clock.
+                size.width = min(maxRowWidth, max(nameWidth, sizeTextWidth + reservedTrailingWidth) + chrome)
             case .voice:
                 size.height = defaults.audioAttachmentSize.height
             case .link:

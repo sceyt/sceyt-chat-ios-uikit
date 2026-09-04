@@ -57,6 +57,11 @@ extension MessageCell {
         /// Spans the name + size labels so they can be centered on the thumbnail as one block.
         open lazy var textLayoutGuide = UILayoutGuide()
 
+        /// Keeps the size line inside the space the layout model reserved for the bubble's
+        /// date/tick InfoView. Its constant is re-applied on every bind, since the reserve
+        /// depends on the message the row belongs to.
+        public private(set) var sizeLabelTrailingConstraint: NSLayoutConstraint?
+
         open override func setupAppearance() {
             super.setupAppearance()
             imageView.clipsToBounds = true
@@ -68,6 +73,11 @@ extension MessageCell {
 
             sizeLabel.font = appearance.attachmentFileSizeLabelAppearance.font
             sizeLabel.textColor = appearance.attachmentFileSizeLabelAppearance.foregroundColor
+            // Explicit, not UILabel's defaults: this line shares its row with the bubble's
+            // timestamp, so truncating is the contract, not a host-tunable detail.
+            sizeLabel.numberOfLines = 1
+            sizeLabel.lineBreakMode = .byTruncatingTail
+            sizeLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
             updateProgressViewBackground()
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
@@ -97,6 +107,20 @@ extension MessageCell {
             titleLabel.trailingAnchor.pin(lessThanOrEqualTo: trailingAnchor, constant: -Layouts.horizontalPadding)
             sizeLabel.leadingAnchor.pin(to: titleLabel.leadingAnchor)
             sizeLabel.topAnchor.pin(to: titleLabel.bottomAnchor, constant: 4)
+            // The bubble draws its date/tick InfoView over this line (the icon is centered in a
+            // 62pt row, so the size label and the InfoView share a vertical band). The layout
+            // model already widened the row to fit both, so this only bites in the residual cases
+            // — the row cap reached, or the running "<downloaded> • <total>" string a couple of
+            // points wider than the "<total> • <total>" it was measured against. Truncating there
+            // is the intended fallback; without any trailing anchor the label just ran under the
+            // clock. 999 rather than required so a host that shrinks the row cap below icon +
+            // reserve degrades to that overlap instead of breaking the row's layout.
+            // Priority is set before activation: UIKit refuses to move an installed constraint
+            // across the required boundary.
+            sizeLabelTrailingConstraint = sizeLabel.trailingAnchor
+                .pin(lessThanOrEqualTo: trailingAnchor, constant: -Layouts.horizontalPadding, activate: false)
+                .priority(999)
+                .activate(true)
 
             // Center the name/size pair on the thumbnail as one block. A guide rather than an
             // offset from the icon's top so it stays centered whatever the two label fonts are
@@ -205,6 +229,7 @@ extension MessageCell {
                 }
                 titleLabel.text = data.name
                 sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
+                updateSizeLabelTrailingInset()
 
                 // The file-preview thumbnail is loaded asynchronously (and re-loaded after a
                 // download completes), so at bind time data.thumbnail may still be nil or the
@@ -225,6 +250,13 @@ extension MessageCell {
                     reloadThumbnailFromFile(for: data.attachment)
                 }
             }
+        }
+
+        /// Reads the reserve off `data`, so the file-view recycling path in
+        /// `AttachmentStackView.bind` — which rebinds an existing row to a different attachment —
+        /// picks up the new message's InfoView width for free.
+        open func updateSizeLabelTrailingInset() {
+            sizeLabelTrailingConstraint?.constant = -(Layouts.horizontalPadding + (data?.reservedTrailingWidth ?? 0))
         }
 
         open override func setProgress(_ progress: AttachmentTransfer.AttachmentProgress) {

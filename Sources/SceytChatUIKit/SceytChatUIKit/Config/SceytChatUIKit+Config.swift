@@ -76,7 +76,7 @@ extension SceytChatUIKit {
 
         
         // MARK: - Chat Configuration
-        public var messageEditTimeout: TimeInterval = 1.hours
+        public var messageEditTimeout: TimeInterval = 2.hours
         public var avatarResizeConfig: ResizeConfig = .low
         public var imageAttachmentResizeConfig: ResizeConfig = .medium
         public var videoAttachmentResizeConfig: VideoResizeConfig = .medium
