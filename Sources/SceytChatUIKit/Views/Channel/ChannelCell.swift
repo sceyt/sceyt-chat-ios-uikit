@@ -239,6 +239,20 @@ extension ChannelListViewController {
 
         override open func prepareForReuse() {
             super.prepareForReuse()
+            // A live swipe pan survives recycling — UIKit does not cancel a cell's
+            // gesture recognizers on reuse. Cancel it here, while `onSwipeEvent` is
+            // still wired: toggling `isEnabled` on a recognizing gesture sends
+            // `.cancelled`, which `handleSwipePan` reports as `.settled`, so the
+            // channel list gets the end event it needs to re-enable table
+            // scrolling. Clearing the callback first would drop that event and
+            // leave the list frozen until the next `viewWillAppear`.
+            switch swipePanGestureRecognizer.state {
+            case .began, .changed:
+                swipePanGestureRecognizer.isEnabled = false
+                swipePanGestureRecognizer.isEnabled = true
+            default:
+                break
+            }
             clearEvents()
             subscriptions.removeAll(keepingCapacity: true)
             // A recycled cell must never arrive half-open showing another

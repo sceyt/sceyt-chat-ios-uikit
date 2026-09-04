@@ -108,15 +108,55 @@ public class SceytChatUIKit {
     /// Falling back to the live id last keeps this self-healing: an account
     /// transition that forgets to declare is wrong only until the client
     /// connects, never permanently.
+    ///
+    /// The connection state is consulted *last*, and only when the two ids
+    /// actually disagree. This is a fast path, not a change of meaning — the
+    /// value is identical to asking first in every case:
+    ///
+    /// - nothing declared: the live id, either way;
+    /// - declared == live: that id, either way;
+    /// - declared != live (an account switch in flight, or a client that has
+    ///   not reconnected as the incoming user): the connection state decides,
+    ///   exactly as before.
+    ///
+    /// Ordering matters because `connectionState` is the one expensive term
+    /// here: it crosses into the native client, which logs a line per call at
+    /// `.info`. This property backs `ChatChannel.peer` and every marker,
+    /// reaction and poll-vote ownership test, so it is read several times per
+    /// cell bind — asking first put those reads on every frame of a list
+    /// scroll, for an answer that almost never depended on them.
     public var currentUserId: UserId? {
-        let liveUserId = SceytChatUIKit.shared.chatClient.user.id
-        if !liveUserId.isEmpty, SceytChatUIKit.shared.chatClient.connectionState == .connected {
+        Self.resolveCurrentUserId(
+            live: SceytChatUIKit.shared.chatClient.user.id,
+            declared: UserDefaults.currentUserId,
+            isConnected: SceytChatUIKit.shared.chatClient.connectionState == .connected
+        )
+    }
+
+    /// The decision behind ``currentUserId``, split out so it can be tested
+    /// exhaustively against the ordering it replaced.
+    ///
+    /// `isConnected` is an autoclosure precisely so the fast paths can skip it:
+    /// evaluating it is the expensive part, and the whole point of the ordering
+    /// is that the answer rarely depends on it.
+    static func resolveCurrentUserId(
+        live liveUserId: UserId,
+        declared declaredUserId: UserId?,
+        isConnected: @autoclosure () -> Bool
+    ) -> UserId? {
+        guard let declaredUserId, !declaredUserId.isEmpty
+        else { return liveUserId.isEmpty ? nil : liveUserId }
+
+        if declaredUserId == liveUserId {
             return liveUserId
         }
-        if let declaredUserId = UserDefaults.currentUserId, !declaredUserId.isEmpty {
-            return declaredUserId
+
+        // The ids disagree, so who is authoritative finally matters: only a
+        // connected client outranks what the host app declared.
+        if !liveUserId.isEmpty, isConnected() {
+            return liveUserId
         }
-        return liveUserId.isEmpty ? nil : liveUserId
+        return declaredUserId
     }
     
     /// Declares which user the host app has bound its UI to.

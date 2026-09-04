@@ -84,6 +84,18 @@ open class ChannelListViewController: ViewController,
     /// `tableView.isScrollEnabled` as it was before a swipe suppressed it.
     private var tableScrollWasEnabledBeforeSwipe = true
 
+    /// Whether a swipe is currently holding table scrolling off. Gates the
+    /// capture above: a second `.began` arriving before the first `.settled`
+    /// would otherwise record the already-suppressed `false` as the value to
+    /// restore, and the restore would then freeze the list permanently.
+    private var isSuppressingScrollForSwipe = false
+
+    /// The cell whose pan justified the current suppression, so
+    /// ``reconcileScrollSuppression()`` can check that gesture rather than
+    /// trusting an event to arrive. Weak: a recycled-away cell that never
+    /// reported its end is exactly the case being guarded against.
+    private weak var swipingCell: ChannelCell?
+
     // MARK: -
 
     open lazy var channelListViewModel = Components.channelListViewModel
@@ -372,6 +384,10 @@ open class ChannelListViewController: ViewController,
     /// begins its pan on any direction, so without this the list would scroll
     /// under a horizontal drag.
     open func swipeDidBegin(on cell: ChannelCell) {
+        // Capture only on the first begin — see `isSuppressingScrollForSwipe`.
+        guard !isSuppressingScrollForSwipe else { return }
+        isSuppressingScrollForSwipe = true
+        swipingCell = cell
         tableScrollWasEnabledBeforeSwipe = tableView.isScrollEnabled
         tableView.isScrollEnabled = false
     }
@@ -380,10 +396,36 @@ open class ChannelListViewController: ViewController,
         restoreTableScrollAfterSwipe()
     }
 
-    /// Restored unconditionally — a scroll left disabled is a frozen list, the
-    /// one severe failure mode of suppressing it during a gesture.
+    /// Safe to call from any path, at any time — a scroll left disabled is a
+    /// frozen list, the one severe failure mode of suppressing it during a
+    /// gesture, so every path that can end a swipe calls this. A no-op unless a
+    /// swipe actually suppressed scrolling, which keeps it from clobbering an
+    /// `isScrollEnabled` the host app set for its own reasons.
     private func restoreTableScrollAfterSwipe() {
+        guard isSuppressingScrollForSwipe else { return }
+        isSuppressingScrollForSwipe = false
+        swipingCell = nil
         tableView.isScrollEnabled = tableScrollWasEnabledBeforeSwipe
+    }
+
+    /// Re-enables scrolling when the gesture that suppressed it is no longer
+    /// running, whether or not it reported that itself.
+    ///
+    /// Suppression is driven by `.began`/`.settled` events, and an event that
+    /// goes missing leaves the list frozen — the one severe failure mode here.
+    /// Rather than enumerate the ways an event can be lost (a cell recycled or
+    /// deallocated mid-pan, a touch cancelled by backgrounding, a callback
+    /// severed before the end arrives), this asks the gesture itself. A pan
+    /// that is not `.began` or `.changed` is not holding anything, and a cell
+    /// that has gone away cannot be swiping.
+    private func reconcileScrollSuppression() {
+        guard isSuppressingScrollForSwipe else { return }
+        switch swipingCell?.swipePanGestureRecognizer.state {
+        case .began, .changed:
+            return
+        default:
+            restoreTableScrollAfterSwipe()
+        }
     }
 
     /// Closes the open swipe, unless it belongs to `channelId`.
@@ -442,6 +484,16 @@ open class ChannelListViewController: ViewController,
             .sink { [weak self] notification in
                 self?.didSendUserMessage(notification)
             }.store(in: &subscriptions)
+
+        // Backgrounding mid-drag cancels the touch, but `viewWillAppear` does
+        // not fire on the way back — the list stays on screen throughout — so
+        // this is the only hook that catches a swipe interrupted that way.
+        NotificationCenter.default
+            .publisher(for: UIApplication.didBecomeActiveNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.reconcileScrollSuppression()
+            }.store(in: &subscriptions)
     }
 
     /// A message was sent somewhere in the app. If it went to the channel this search
@@ -461,6 +513,14 @@ open class ChannelListViewController: ViewController,
         isViewDidAppear = true
     }
 
+    open override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Every list change lays the table out again, so this is the cheapest
+        // place that reliably runs while a leaked suppression would still be
+        // observable. A no-op unless a swipe is holding scrolling off.
+        reconcileScrollSuppression()
+    }
+
     open override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         tableView.visibleCells.forEach {
@@ -468,6 +528,8 @@ open class ChannelListViewController: ViewController,
         }
         // Back on the list: nothing was sent in the opened channel, so the search stays.
         searchOpenedChannelId = nil
+        // A leaked suppression must not survive coming back to the list.
+        reconcileScrollSuppression()
     }
 
     open override func viewWillDisappear(_ animated: Bool) {
@@ -820,10 +882,19 @@ open class ChannelListViewController: ViewController,
                         didSelectRowAt indexPath: IndexPath) {
         // A tap while a row is open dismisses its actions instead of navigating
         // — the escape hatch UIKit's swipe actions gave by swallowing that tap.
-        if openSwipe != nil {
-            tableView.deselectRow(at: indexPath, animated: false)
-            closeOpenSwipe(animated: true)
-            return
+        //
+        // Only when that row is on screen. `openSwipe` is keyed by channel id and
+        // deliberately survives reorders and re-dequeues, so it stays set while
+        // the open row is scrolled out of view or bumped away by a sync. Eating
+        // the tap then dismisses nothing the user can see: the row they actually
+        // tapped just fails to open, and only a second tap navigates.
+        if let open = openSwipe {
+            if visibleCell(for: open.channelId) != nil {
+                tableView.deselectRow(at: indexPath, animated: false)
+                closeOpenSwipe(animated: true)
+                return
+            }
+            openSwipe = nil
         }
         channelListRouter.showChannelViewController(at: indexPath)
         channelListViewModel.selectChannel(at: indexPath)
