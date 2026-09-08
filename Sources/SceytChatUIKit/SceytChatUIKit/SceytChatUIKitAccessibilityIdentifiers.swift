@@ -117,6 +117,37 @@ extension SceytChatUIKit {
             public static let scrollDownButton = "sceyt_chat_channel_scroll_down_button"
             /// The floating "jump to unread mention" button.
             public static let unreadMentionButton = "sceyt_chat_channel_unread_mention_button"
+            /// A row in the message context menu. Suffixed with the action's key, e.g.
+            /// `sceyt_chat_context_menu_item.pin`.
+            public static let contextMenuItemRoot = "sceyt_chat_context_menu_item"
+            public static func contextMenuItem(_ key: String) -> String {
+                "\(contextMenuItemRoot).\(key)"
+            }
+
+            /// A system-message row — "X pinned: …", "X joined via invite link".
+            public enum SystemCell {
+                /// Base identifier shared by every system-message row.
+                public static let root = "sceyt_chat_channel_system_message_cell"
+
+                /// Per-row identifier. A row that has not been acked by the server yet
+                /// carries id 0, so a freshly-posted one is matched on `root` and its text
+                /// rather than on this.
+                public static func identifier(for id: MessageId) -> String {
+                    "\(root).\(id)"
+                }
+
+                /// The row's text label, which carries the formatted system message.
+                public static let title = "sceyt_chat_channel_system_message_cell_title"
+            }
+
+            /// The pinned-messages banner under the navigation bar.
+            public static let pinnedMessagesView = "sceyt_chat_channel_pinned_messages_view"
+            /// The banner's static "Pinned Messages" title.
+            public static let pinnedMessagesTitle = "sceyt_chat_channel_pinned_messages_title"
+            /// The banner's one-line preview of the pin currently shown.
+            public static let pinnedMessagesPreview = "sceyt_chat_channel_pinned_messages_preview"
+            /// The banner's trailing pin button, which opens the pinned list.
+            public static let pinnedMessagesButton = "sceyt_chat_channel_pinned_messages_button"
             /// The "Join" button shown for a channel the user has not joined.
             public static let joinButton = "sceyt_chat_channel_join_button"
             /// The empty-state placeholder shown when the channel has no messages.
@@ -149,6 +180,8 @@ extension SceytChatUIKit {
                 public static let body = "sceyt_chat_channel_message_cell_body"
                 /// The timestamp label.
                 public static let date = "sceyt_chat_channel_message_cell_date"
+                /// The small pin beside the timestamp, present only while the message is pinned.
+                public static let pinnedIcon = "sceyt_chat_channel_message_cell_pinned_icon"
                 /// The "New messages" separator shown on the last displayed message.
                 public static let unreadSeparator = "sceyt_chat_channel_message_cell_unread_separator"
                 /// The quoted reply preview; tapping it scrolls to the parent message.
@@ -619,6 +652,35 @@ extension SceytChatUIKit {
             public static let cancelButton = "sceyt_chat_message_info_cancel_button"
             /// A read/delivered marker row (one per user).
             public static let markerCell = "sceyt_chat_message_info_marker_cell"
+        }
+
+        /// The standalone pinned-messages screen driven by
+        /// `ChannelPinnedMessageListViewController`.
+        public enum PinnedMessageList {
+            /// The pinned-messages table.
+            public static let tableView = "sceyt_chat_pinned_message_list_table_view"
+            /// Base identifier shared by every pinned-message row.
+            public static let cell = "sceyt_chat_pinned_message_list_cell"
+
+            /// Per-row identifier so a specific pin can be addressed directly, e.g.
+            /// `app.cells["sceyt_chat_pinned_message_list_cell.42"]`.
+            public static func identifier(for id: MessageId) -> String {
+                "\(cell).\(id)"
+            }
+
+            // A row is the conversation's own message cell, so everything inside it —
+            // the body, the date, the sender's name, the attachments — carries the
+            // identifiers under `Channel.Cell`.
+
+            /// A row's arrow button — the one control that jumps the conversation to that
+            /// pinned message.
+            public static let navigateButton = "sceyt_chat_pinned_message_list_navigate_button"
+
+            /// The "X" bar button that dismisses the presented screen.
+            public static let closeButton = "sceyt_chat_pinned_message_list_close_button"
+
+            /// The placeholder shown once the last pin goes away.
+            public static let emptyView = "sceyt_chat_pinned_message_list_empty_view"
         }
 
         /// The poll-results screen driven by `PollResultsViewController`.

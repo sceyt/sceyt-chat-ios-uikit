@@ -269,6 +269,13 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
             }
         }
+
+        // Every message write funnels through here — server page, incoming event, edit ack,
+        // send ack, forward, notification payload — so this one call keeps a pinned message's
+        // preview snapshot fresh, auto-unpins a soft delete, and promotes tid -> server id.
+        // It cannot be done with a relationship key path: RelationshipKeyPathsObserver
+        // resolves a single hop. See PinnedMessageDTO.
+        syncPin(for: dto)
         return dto
     }
 
@@ -966,6 +973,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     }
                 }
             }
+            dropPin(for: dto)
             delete(dto)
         }
     }
@@ -993,6 +1001,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     }
                 }
             }
+            dropPin(for: dto)
             delete(dto)
         }
     }
@@ -1115,6 +1124,12 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 let keptParents = MessageDTO.fetch(request: parentsRequest, context: self)
                 for parent in keptParents {
                     parent.replied = true
+                    // The stub survives the sweep, but its pin row does not — drop its
+                    // pin details or the bubble keeps claiming to be pinned.
+                    if let details = parent.pinDetails {
+                        delete(details)
+                        parent.pinDetails = nil
+                    }
                 }
                 request.predicate = NSCompoundPredicate(type: .and, subpredicates: [
                     predicate,
@@ -1122,6 +1137,9 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 ])
             }
             try batchDelete(fetchRequest: request)
+            // NSBatchDeleteRequest ignores deletion rules and PinnedMessageDTO holds no
+            // relationship anyway, so the pin rows have to be swept by hand.
+            unpinMessages(channelId: channelId, before: date)
             try? deleteAllAttachments(channelId: channelId, before: date)
             if let date,
                let channel = ChannelDTO.fetch(id: channelId, context: self)
@@ -1468,6 +1486,9 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             logger.verbose("Deleting \(expiredMessages.count) expired auto-delete messages")
 
             for message in expiredMessages {
+                // Deleted straight through the context, with nothing to cascade to the
+                // pin table — drop the pin explicitly or it outlives its message.
+                dropPin(for: message)
                 delete(message)
             }
         } catch {

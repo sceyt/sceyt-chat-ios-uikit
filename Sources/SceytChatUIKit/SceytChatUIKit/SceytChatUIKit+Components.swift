@@ -37,6 +37,7 @@ extension SceytChatUIKit {
         public static var joinGroupViewModel: JoinGroupViewModel.Type = JoinGroupViewModel.self
         public static var channelProfileViewModel: ChannelProfileViewModel.Type = ChannelProfileViewModel.self
         public static var channelViewModel: ChannelViewModel.Type = ChannelViewModel.self
+        public static var channelPinnedMessageListViewModel: ChannelPinnedMessageListViewModel.Type = ChannelPinnedMessageListViewModel.self
         public static var createNewChannelViewModel: CreateNewChannelViewModel.Type = CreateNewChannelViewModel.self
         public static var createPollViewModel: CreatePollViewModel.Type = CreatePollViewModel.self
         public static var createPrivateChannelViewModel: CreatePrivateChannelViewModel.Type = CreatePrivateChannelViewModel.self
@@ -66,6 +67,7 @@ extension SceytChatUIKit {
         public static var globalSearchResultsViewController: GlobalSearchResultsViewController.Type = GlobalSearchResultsViewController.self
         public static var globalSearchChatsPageViewController: GlobalSearchResultsViewController.ChatsPageViewController.Type = GlobalSearchResultsViewController.ChatsPageViewController.self
         public static var channelViewController: ChannelViewController.Type = ChannelViewController.self
+        public static var channelPinnedMessageListViewController: ChannelPinnedMessageListViewController.Type = ChannelPinnedMessageListViewController.self
         public static var createChannelViewController: CreateChannelViewController.Type = CreateChannelViewController.self
         public static var createGroupViewController: CreateGroupViewController.Type = CreateGroupViewController.self
         public static var createPollViewController: CreatePollViewController.Type = CreatePollViewController.self
@@ -118,6 +120,8 @@ extension SceytChatUIKit {
         public static var channelIncomingMessageCell: ChannelViewController.IncomingMessageCell.Type = ChannelViewController.IncomingMessageCell.self
         public static var channelMemberCell: ChannelMemberListViewController.MemberCell.Type = ChannelMemberListViewController.MemberCell.self
         public static var channelOutgoingMessageCell: ChannelViewController.OutgoingMessageCell.Type = ChannelViewController.OutgoingMessageCell.self
+        public static var channelPinnedMessageIncomingCell: ChannelPinnedMessageListViewController.IncomingMessageCell.Type = ChannelPinnedMessageListViewController.IncomingMessageCell.self
+        public static var channelPinnedMessageOutgoingCell: ChannelPinnedMessageListViewController.OutgoingMessageCell.Type = ChannelPinnedMessageListViewController.OutgoingMessageCell.self
         public static var channelSystemMessageCell: ChannelViewController.SystemMessageCell.Type = ChannelViewController.SystemMessageCell.self
         public static var channelInfoContainerCell: ChannelInfoViewController.ContainerCell.Type = ChannelInfoViewController.ContainerCell.self
         public static var channelInfoDateSeparatorView: ChannelInfoViewController.DateSeparatorView.Type = ChannelInfoViewController.DateSeparatorView.self
@@ -185,6 +189,7 @@ extension SceytChatUIKit {
         public static var channelMessagesCollectionView: ChannelViewController.MessagesCollectionView.Type = ChannelViewController.MessagesCollectionView.self
         public static var channelMessagesCollectionViewLayout: ChannelViewController.MessagesCollectionViewLayout.Type = ChannelViewController.MessagesCollectionViewLayout.self
         public static var channelScrollDownView: ChannelViewController.ScrollDownView.Type = ChannelViewController.ScrollDownView.self
+        public static var channelPinnedMessagesView: ChannelViewController.PinnedMessagesView.Type = ChannelViewController.PinnedMessagesView.self
         public static var channelSwipeActionButton: ChannelSwipeActionButton.Type = ChannelSwipeActionButton.self
         public static var channelSwipeActionsView: ChannelSwipeActionsView.Type = ChannelSwipeActionsView.self
         public static var channelUnreadMentionCountView: ChannelViewController.UnreadMentionCountView.Type = ChannelViewController.UnreadMentionCountView.self
@@ -263,6 +268,7 @@ extension SceytChatUIKit {
         public static var channelMessageProvider: ChannelMessageProvider.Type = ChannelMessageProvider.self
         public static var channelMessageSender: ChannelMessageSender.Type = ChannelMessageSender.self
         public static var channelProvider: ChannelProvider.Type = ChannelProvider.self
+        public static var channelPinnedMessageProvider: ChannelPinnedMessageProvider.Type = ChannelPinnedMessageProvider.self
         public static var loadRangeProvider: LoadRangeProvider.Type = LoadRangeProvider.self
         public static var messageReactionProvider: MessageReactionProvider.Type = MessageReactionProvider.self
         public static var presenceProvider: PresenceProvider.Type = PresenceProvider.self

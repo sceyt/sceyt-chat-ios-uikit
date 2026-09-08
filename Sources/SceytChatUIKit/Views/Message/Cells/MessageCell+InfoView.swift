@@ -24,6 +24,19 @@ extension MessageCell {
         open lazy var stateLabel = UILabel()
             .contentHuggingPriorityH(.required)
         
+        /// Shown when the message is pinned. Sits immediately before the timestamp.
+        ///
+        /// Marked as an accessibility element: a `UIImageView` is not one by default, so
+        /// without this the pin is invisible to UI tests even while on screen.
+        open lazy var pinView = UIImageView()
+            .contentMode(.center)
+            .contentHuggingPriorityH(.required)
+            // The row is laid out to a fixed width, and a stack view short of it squeezes
+            // whichever item gives way first. An image view drawn `.center` does not clip,
+            // so squeezing the pin puts the icon on top of the timestamp — the labels are
+            // the ones that should give (and truncate) instead.
+            .contentCompressionResistancePriorityH(.required)
+
         open lazy var dateLabel = UILabel()
             .contentHuggingPriorityH(.required)
 
@@ -32,7 +45,7 @@ extension MessageCell {
             .contentHuggingPriorityH(.required)
         
         open lazy var hStack = UIStackView(
-            row: [eyeView, displayedLabel, stateLabel, dateLabel, tickView],
+            row: [eyeView, displayedLabel, stateLabel, pinView, dateLabel, tickView],
             spacing: 4,
             alignment: .center)
             .withoutAutoresizingMask
@@ -57,6 +70,8 @@ extension MessageCell {
             backgroundView.layer.cornerRadius = 12
             backgroundView.isHidden = true
             eyeView.image = appearance.viewCountIcon.withRenderingMode(.alwaysTemplate)
+            pinView.image = appearance.pinnedIcon.withRenderingMode(.alwaysTemplate)
+            pinView.isAccessibilityElement = true
             stateLabel.font = appearance.messageStateLabelAppearance.font
             stateLabel.textColor = appearance.messageStateLabelAppearance.foregroundColor
             dateLabel.font = appearance.messageDateLabelAppearance.font
@@ -102,6 +117,10 @@ extension MessageCell {
                     tickView.isHidden = true
                 }
                 dateLabel.text = appearance.messageDateFormatter.format(message.createdAt)
+                pinView.isHidden = !message.isPinned
+                pinView.tintColor = hasBackground
+                    ? appearance.onOverlayColor
+                    : appearance.messageDateLabelAppearance.foregroundColor
                 if message.state == .edited {
                     stateLabel.isHidden = false
                     stateLabel.text = appearance.editedStateText
@@ -113,6 +132,18 @@ extension MessageCell {
             }
         }
         
+        /// The width the row's *live* content needs: the views as they are bound right now,
+        /// rather than as they measured when the layout model was last built.
+        ///
+        /// The row is laid out to a fixed width taken from `MessageLayoutModel.infoViewMeasure`,
+        /// and a stack view pays for a width that is short of its content by squeezing an
+        /// item's slot — for `pinView`, whose `contentMode` is `.center` and which does not
+        /// clip, that means the pin is drawn straight over the timestamp. Reserving at least
+        /// this much makes that impossible whatever left the measure behind.
+        open var contentWidth: CGFloat {
+            hStack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width
+        }
+
         open class func measure(
             model: MessageLayoutModel,
             appearance: MessageCell.Appearance
@@ -152,6 +183,12 @@ extension MessageCell {
                 }
             }
             
+            if message.isPinned {
+                let pinSize = appearance.pinnedIcon.size
+                size.width += 4 + pinSize.width
+                size.height = max(size.height, pinSize.height)
+            }
+
             if message.state == .edited {
                 config.font = appearance.messageStateLabelAppearance.font
                 let stateLabelText = appearance.editedStateText

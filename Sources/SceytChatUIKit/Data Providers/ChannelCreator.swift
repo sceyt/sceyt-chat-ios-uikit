@@ -77,6 +77,18 @@ open class ChannelCreator: DataProvider {
                         toChannelId: sceytChannel.id,
                         context: $0
                     )
+                    // Same reason: pins are keyed by channel id and would be stranded on
+                    // the local id. Explicitly old -> new.
+                    PinnedMessageDTO.move(
+                        fromChannelId: ChannelId(oldId),
+                        toChannelId: sceytChannel.id,
+                        context: $0
+                    )
+                    PinDetailsDTO.move(
+                        fromChannelId: ChannelId(oldId),
+                        toChannelId: sceytChannel.id,
+                        context: $0
+                    )
                 }
                 chatChannel = $0.createOrUpdate(channel: sceytChannel)
                     .convert()

@@ -272,6 +272,8 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         DraftMessageDTO.delete(channelId: id, context: self)
         // Their messages are gone, so retrying these would only fail with `channelNotExists`.
         PendingMessageDeleteDTO.deleteAll(channelId: id, context: self)
+        PinnedMessageDTO.deleteAll(channelId: id, context: self)
+        PinDetailsDTO.deleteAll(channelId: id, context: self)
         if let dto = ChannelDTO.fetch(id: id, context: self) {
             let deletedObjects: [AnyHashable: Any] = [
                 NSDeletedObjectsKey: [dto.objectID]

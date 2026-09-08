@@ -218,6 +218,30 @@ public extension Appearance {
             AssetComposer.shared.compose(from: .init(image: Assets.actionSelect.image,
                                                      renderingMode: .template(.primaryText)))!
         }()
+        public static var messageActionPin: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionPin.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        public static var messageActionUnpin: UIImage = {
+            AssetComposer.shared.compose(from: .init(image: Assets.actionUnpin.image,
+                                                     renderingMode: .template(.primaryText)))!
+        }()
+        /// The small pin shown beside a pinned message's timestamp. Tinted at bind time to
+        /// match the date label, so it is composed as a plain template.
+        public static var messagePinned: UIImage = {
+            Assets.messagePinned.image.withRenderingMode(.alwaysTemplate)
+        }()
+        /// The pin button at the trailing edge of the pinned-messages banner.
+        public static var pinnedMessagesIndicator: UIImage = {
+            Assets.pinnedMessagesIndicator.image.withRenderingMode(.alwaysTemplate)
+        }()
+        /// The arrow beside a row in the pinned-messages list, the one control that jumps
+        /// to the message. The artwork is the glyph alone — the disc behind it is the
+        /// button's own background, so both colors stay separately themeable — and the
+        /// glyph is a template tinted from the appearance.
+        public static var pinnedMessageNavigate: UIImage = {
+            Assets.pinnedMessageNavigate.image.withRenderingMode(.alwaysTemplate)
+        }()
         public static var messageActionRemove: UIImage = {
             AssetComposer.shared.compose(from: .init(image: Assets.actionRemove.image,
                                                      renderingMode: .template(.accent)))!
@@ -733,6 +757,11 @@ extension UIImage {
     public static var messageActionCopy: UIImage { Images.messageActionCopy }
     public static var messageActionDelete: UIImage { Images.messageActionDelete }
     public static var messageActionSelect: UIImage { Images.messageActionSelect }
+    public static var messageActionPin: UIImage { Images.messageActionPin }
+    public static var messageActionUnpin: UIImage { Images.messageActionUnpin }
+    public static var messagePinned: UIImage { Images.messagePinned }
+    public static var pinnedMessagesIndicator: UIImage { Images.pinnedMessagesIndicator }
+    public static var pinnedMessageNavigate: UIImage { Images.pinnedMessageNavigate }
     public static var messageActionRemove: UIImage { Images.messageActionRemove }
     public static var messageActionReport: UIImage { Images.messageActionReport }
     public static var messageActionEndPoll: UIImage { Images.messageActionEndPoll }

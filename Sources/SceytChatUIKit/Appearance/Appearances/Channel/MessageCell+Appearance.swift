@@ -115,6 +115,7 @@ extension MessageCell: AppearanceProviding {
         // Icons
         messageDeliveryStatusIcons: MessageDeliveryStatusIcons(),
         viewCountIcon: .eye,
+        pinnedIcon: .messagePinned,
         videoIcon: .galleryVideoAsset,
         videoPlayIcon: .videoPlay,
         swipeToReplyIcon: .channelReply,
@@ -289,6 +290,10 @@ extension MessageCell: AppearanceProviding {
         
         @Trackable<Appearance, UIImage>
         public var viewCountIcon: UIImage
+
+        /// Shown next to the timestamp when the message is pinned.
+        @Trackable<Appearance, UIImage>
+        public var pinnedIcon: UIImage
         
         @Trackable<Appearance, UIImage>
         public var videoIcon: UIImage
@@ -378,6 +383,13 @@ extension MessageCell: AppearanceProviding {
         @Trackable<Appearance, UIFont>
         public var systemMessageFont: UIFont
 
+        /// The font of everything but the actor's name in a system row that emphasizes one —
+        /// the "pinned: …" half of "Adam pinned: …". A row rendered as a single run (a member
+        /// added, a group created) uses `systemMessageFont` throughout, and so does the
+        /// emphasized name itself.
+        @Trackable<Appearance, UIFont>
+        public var systemMessageBodyFont: UIFont
+
         @Trackable<Appearance, UIColor>
         public var systemMessageTextColor: UIColor
 
@@ -438,6 +450,7 @@ extension MessageCell: AppearanceProviding {
             // Icons
             messageDeliveryStatusIcons: MessageDeliveryStatusIcons,
             viewCountIcon: UIImage,
+            pinnedIcon: UIImage,
             videoIcon: UIImage,
             videoPlayIcon: UIImage,
             swipeToReplyIcon: UIImage,
@@ -472,6 +485,7 @@ extension MessageCell: AppearanceProviding {
             messageBodyFormatter: any MessageBodyFormatting,
             unsupportedMessageFormatter: any UnsupportedMessageFormatting,
             systemMessageFont: UIFont = Fonts.semiBold.withSize(12),
+            systemMessageBodyFont: UIFont = Fonts.regular.withSize(12),
             systemMessageTextColor: UIColor = .white,
             collapsedCharacterLimit: Int = Int.max,
             readMoreText: String = L10n.Message.readMore,
@@ -525,6 +539,7 @@ extension MessageCell: AppearanceProviding {
             // Icons
             self._messageDeliveryStatusIcons = Trackable(value: messageDeliveryStatusIcons)
             self._viewCountIcon = Trackable(value: viewCountIcon)
+            self._pinnedIcon = Trackable(value: pinnedIcon)
             self._videoIcon = Trackable(value: videoIcon)
             self._videoPlayIcon = Trackable(value: videoPlayIcon)
             self._swipeToReplyIcon = Trackable(value: swipeToReplyIcon)
@@ -559,6 +574,7 @@ extension MessageCell: AppearanceProviding {
             self._messageBodyFormatter = Trackable(value: messageBodyFormatter)
             self._unsupportedMessageFormatter = Trackable(value: unsupportedMessageFormatter)
             self._systemMessageFont = Trackable(value: systemMessageFont)
+            self._systemMessageBodyFont = Trackable(value: systemMessageBodyFont)
             self._systemMessageTextColor = Trackable(value: systemMessageTextColor)
             self._collapsedCharacterLimit = Trackable(value: collapsedCharacterLimit)
             self._readMoreText = Trackable(value: readMoreText)
@@ -613,6 +629,7 @@ extension MessageCell: AppearanceProviding {
             // Icons
             messageDeliveryStatusIcons: MessageDeliveryStatusIcons? = nil,
             viewCountIcon: UIImage? = nil,
+            pinnedIcon: UIImage? = nil,
             videoIcon: UIImage? = nil,
             videoPlayIcon: UIImage? = nil,
             swipeToReplyIcon: UIImage? = nil,
@@ -688,6 +705,7 @@ extension MessageCell: AppearanceProviding {
             self._attachmentFileSizeLabelAppearance = Trackable(reference: reference, referencePath: \.attachmentFileSizeLabelAppearance)
             self._messageDeliveryStatusIcons = Trackable(reference: reference, referencePath: \.messageDeliveryStatusIcons)
             self._viewCountIcon = Trackable(reference: reference, referencePath: \.viewCountIcon)
+            self._pinnedIcon = Trackable(reference: reference, referencePath: \.pinnedIcon)
             self._videoIcon = Trackable(reference: reference, referencePath: \.videoIcon)
             self._videoPlayIcon = Trackable(reference: reference, referencePath: \.videoPlayIcon)
             self._swipeToReplyIcon = Trackable(reference: reference, referencePath: \.swipeToReplyIcon)
@@ -716,6 +734,7 @@ extension MessageCell: AppearanceProviding {
             self._messageBodyFormatter = Trackable(reference: reference, referencePath: \.messageBodyFormatter)
             self._unsupportedMessageFormatter = Trackable(reference: reference, referencePath: \.unsupportedMessageFormatter)
             self._systemMessageFont = Trackable(reference: reference, referencePath: \.systemMessageFont)
+            self._systemMessageBodyFont = Trackable(reference: reference, referencePath: \.systemMessageBodyFont)
             self._systemMessageTextColor = Trackable(reference: reference, referencePath: \.systemMessageTextColor)
             self._collapsedCharacterLimit = Trackable(reference: reference, referencePath: \.collapsedCharacterLimit)
             self._readMoreText = Trackable(reference: reference, referencePath: \.readMoreText)
@@ -761,6 +780,7 @@ extension MessageCell: AppearanceProviding {
             if let attachmentFileSizeLabelAppearance { self.attachmentFileSizeLabelAppearance = attachmentFileSizeLabelAppearance }
             if let messageDeliveryStatusIcons { self.messageDeliveryStatusIcons = messageDeliveryStatusIcons }
             if let viewCountIcon { self.viewCountIcon = viewCountIcon }
+            if let pinnedIcon { self.pinnedIcon = pinnedIcon }
             if let videoIcon { self.videoIcon = videoIcon }
             if let videoPlayIcon { self.videoPlayIcon = videoPlayIcon }
             if let swipeToReplyIcon { self.swipeToReplyIcon = swipeToReplyIcon }

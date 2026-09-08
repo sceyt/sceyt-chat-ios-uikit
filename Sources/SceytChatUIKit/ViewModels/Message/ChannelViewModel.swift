@@ -39,6 +39,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     public private(set) var messageMarkerProvider: ChannelMessageMarkerProvider
     public private(set) lazy var channelProvider = Components.channelProvider
         .init(channelId: channel.id)
+    public private(set) lazy var pinnedMessageProvider = Components.channelPinnedMessageProvider
+        .init(channelId: channel.id)
     
     public var chatClient: ChatClient {
         SceytChatUIKit.shared.chatClient
@@ -265,6 +267,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         logger.verbose("ChannelViewModel deinit for channel \(channel.id)")
         channelObserver.stopObserver()
         messageObserver.stopObserver()
+        // Only if it was ever started — touching the lazy var here would otherwise build
+        // an FRC just to tear it down.
+        if didStartPinnedMessageObserver {
+            pinnedMessageObserver.stopObserver()
+        }
         NotificationCenter.default.removeObserver(self)
         //        unsubscribeToPeerPresence()
         SceytChatUIKit.shared.chatClient.removeDelegate(identifier: clientDelegateIdentifier)
@@ -298,6 +305,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         channelObserver.onDidChange = { [weak self] in
             self?.onDidChangeChannelEvent(items: $0)
         }
+
+        startPinnedMessageObserver()
         let initialMessageId: MessageId
         if scrollToRepliedMessageId != 0 {
             initialMessageId = scrollToRepliedMessageId
@@ -1961,6 +1970,118 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
     }
     
+    // MARK: Pinned messages
+
+    /// The channel's live pins, in timeline order (oldest first).
+    public private(set) var pinnedMessages: [PinnedMessage] = []
+
+    /// Feeds the pinned banner and the pinned list.
+    ///
+    /// A plain `DatabaseObserver`, not a lazy one: the set is small and fully materialized.
+    /// It needs no `relationshipKeyPathsForRefreshing` — `PinnedMessageDTO` holds no
+    /// relationships, and its preview snapshot is refreshed from the write side by
+    /// `NSManagedObjectContext.syncPin(for:)`. See `PinnedMessageDTO`.
+    public private(set) lazy var pinnedMessageObserver: DatabaseObserver<PinnedMessageDTO, PinnedMessage> = {
+        DatabaseObserver<PinnedMessageDTO, PinnedMessage>(
+            request: PinnedMessageDTO.fetchRequest(channelId: channel.id),
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext
+        ) { $0.convert() }
+    }()
+
+    private var didStartPinnedMessageObserver = false
+
+    open func startPinnedMessageObserver() {
+        didStartPinnedMessageObserver = true
+        pinnedMessageObserver.onDidChange = { [weak self] _ in
+            self?.reloadPinnedMessages()
+        }
+        try? pinnedMessageObserver.startObserver()
+        reloadPinnedMessages()
+    }
+
+    open func reloadPinnedMessages() {
+        // `items` is dictionary-backed and unordered; the banner's paging depends on the
+        // request's timeline sort, so read the ordered view.
+        let items = pinnedMessageObserver.orderedItems.filter { !$0.isExpired }
+        pinnedMessages = items
+        event = .updatePinnedMessages(items)
+    }
+
+    /// Pins a message for this channel.
+    ///
+    /// - Parameter pinnedUntil: when the pin lapses; `nil` is open-ended.
+    ///
+    /// The write is local-only for now — the SceytChat SDK has no message-pin API — but it
+    /// goes through `ChannelPinnedMessageProvider` so the server call slots in there later
+    /// without touching this call site.
+    open func pinMessage(
+        layoutModel: MessageLayoutModel,
+        scope: PinnedMessage.Scope,
+        pinnedUntil: Date? = nil
+    ) {
+        pinnedMessageProvider.pin(
+            message: layoutModel.message,
+            scope: scope,
+            pinnedUntil: pinnedUntil
+        ) { [weak self] error in
+            logger.errorIfNotNil(error, "Pin message")
+            // Only a pin for everyone is a channel event worth recording in the
+            // conversation. A personal pin is invisible to the other members, so it gets
+            // no system message.
+            guard error == nil, scope == .forAll else { return }
+            self?.pinnedMessageProvider.sendPinSystemMessage(for: layoutModel.message)
+        }
+    }
+
+    open func unpinMessage(layoutModel: MessageLayoutModel) {
+        pinnedMessageProvider.unpin(message: layoutModel.message) { error in
+            logger.errorIfNotNil(error, "Unpin message")
+        }
+    }
+
+    /// A message can be pinned when it exists on this channel, is not ephemeral, and has
+    /// reached the server.
+    ///
+    /// The ephemeral half mirrors the guard in `NSManagedObjectContext.pinMessage`, so the
+    /// menu never offers an action the store will refuse. The delivery-status half is a UI
+    /// rule: a pending or failed message has no server id yet, so a pin taken on it would
+    /// be invisible to the other members and would not survive the resend (which allocates
+    /// a new message id). `model.messageDeliveryStatus` is checked alongside
+    /// `message.deliveryStatus` because attachment uploads move the cell's status ahead of
+    /// the stored one — the same pairing `canShare(model:)` uses.
+    ///
+    /// Override to apply your own rule — e.g. to restrict pinning to channel admins:
+    ///
+    /// ```swift
+    /// override func canPin(model: MessageLayoutModel) -> Bool {
+    ///     super.canPin(model: model) && model.channel.userRole == "admin"
+    /// }
+    /// ```
+    open func canPin(model: MessageLayoutModel) -> Bool {
+        let message = model.message
+        guard message.state != .deleted,
+              !message.transient,
+              !message.viewOnce,
+              message.autoDeleteAt == nil,
+              !Self.unpinnableDeliveryStatuses.contains(message.deliveryStatus),
+              !Self.unpinnableDeliveryStatuses.contains(model.messageDeliveryStatus)
+        else { return false }
+        return true
+    }
+
+    /// Delivery statuses that block pinning: the message is not on the server, so a pin on
+    /// it has nothing to point at for the other members.
+    open class var unpinnableDeliveryStatuses: Set<ChatMessage.DeliveryStatus> {
+        [.pending, .failed]
+    }
+
+    /// An existing pin can always be lifted, whatever `canPin(model:)` says about taking a
+    /// new one — otherwise a pin could be stranded on a message that later stops meeting the
+    /// pinning conditions.
+    open func canUnpin(model: MessageLayoutModel) -> Bool {
+        model.message.isPinned && model.message.state != .deleted
+    }
+
     open func deleteSelectedMessages(type: DeleteMessageType) {
         selectedMessages.forEach {
             deleteMessage(layoutModel: $0, type: type)
@@ -3495,6 +3616,8 @@ public extension ChannelViewModel {
         case pumpPrevPagination
         case providerFinishedPrevPagination(beforeMessageId: MessageId)
         case showError(Error)
+        /// The channel's live pins changed — membership, order, or a preview snapshot.
+        case updatePinnedMessages([PinnedMessage])
     }
 }
 

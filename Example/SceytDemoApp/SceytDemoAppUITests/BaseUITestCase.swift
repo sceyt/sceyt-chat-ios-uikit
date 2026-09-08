@@ -107,6 +107,8 @@ class BaseUITestCase: XCTestCase {
                    conversation: Bool = false,
                    conversationUnread: Bool = false,
                    conversationUnreadCount: Int? = nil,
+                   conversationEdited: Bool = false,
+                   conversationPending: Bool = false,
                    conversationUnreadLong: Bool = false,
                    conversationUnreadRecent: Bool = false,
                    injectOnOpenDelayMs: Int? = nil,
@@ -126,6 +128,8 @@ class BaseUITestCase: XCTestCase {
                    webSyncSeededCount: Int? = nil,
                    replyAttachment: Bool = false,
                    poll: Bool = false,
+                   pinnedMessages: Bool = false,
+                   pinnedMessagesSingle: Bool = false,
                    pollAllowsMultipleVotes: Bool = false,
                    pollDoubleVoteGapMs: Int? = nil,
                    dynamicTypeCategory: String? = nil,
@@ -142,11 +146,23 @@ class BaseUITestCase: XCTestCase {
         if conversation {
             app.launchArguments += ["--uitest-conversation"]
         }
+        if pinnedMessages {
+            app.launchArguments += ["--uitest-pinned-messages"]
+        }
+        if pinnedMessagesSingle {
+            app.launchArguments += ["--uitest-pinned-messages-single"]
+        }
         if conversationUnread {
             app.launchArguments += ["--uitest-conversation-unread"]
         }
         if let count = conversationUnreadCount {
             app.launchArguments += ["--uitest-conversation-unread-count=\(count)"]
+        }
+        if conversationEdited {
+            app.launchArguments += ["--uitest-conversation-edited"]
+        }
+        if conversationPending {
+            app.launchArguments += ["--uitest-conversation-pending"]
         }
         if conversationUnreadLong {
             app.launchArguments += ["--uitest-conversation-unread-long"]

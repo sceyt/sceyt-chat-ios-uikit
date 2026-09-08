@@ -72,6 +72,16 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     toChannelId: ChannelId(channel.id),
                     context: $0
                 )
+                PinnedMessageDTO.move(
+                    fromChannelId: ChannelId(oldId),
+                    toChannelId: ChannelId(channel.id),
+                    context: $0
+                )
+                PinDetailsDTO.move(
+                    fromChannelId: ChannelId(oldId),
+                    toChannelId: ChannelId(channel.id),
+                    context: $0
+                )
                 let chatChannel = $0.createOrUpdate(channel: channel).convert()
                 NotificationCenter.default
                     .post(name: .didUpdateLocalCreateChannelOnEventChannelCreate,

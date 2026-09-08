@@ -83,6 +83,38 @@ open class MessageLayoutModel {
         shouldShowReadMore && !isTextExpanded && message.state != .deleted && !message.isViewOnceMessage
     }
     public private(set) var infoViewMeasure: CGSize = .zero
+    /// The pin state `infoViewMeasure` was taken for. The pin beside the timestamp lives
+    /// inside that row, so a measure taken while the message was unpinned is the pin's
+    /// width plus its spacing too narrow.
+    ///
+    /// Compared against the message itself on every update rather than only diffing the
+    /// incoming message against the previous one: a pin can be installed by a path that
+    /// leaves the measure behind, and from then on the diff reads as "no change" forever —
+    /// the row stays short until the channel is reopened.
+    private var measuredPinState = false
+
+    /// The message state `infoViewMeasure` was taken for.
+    ///
+    /// The "edited" mark lives in the same row as the pin and the timestamp, so a measure
+    /// taken while the message was unedited is the mark's width plus its spacing too narrow —
+    /// and one taken while it *was* edited is that much too wide, which the bubble spends on
+    /// an empty gap in front of the pin.
+    ///
+    /// Tracked against the message itself for the same reason as `measuredPinState`:
+    /// `updateOptions` accumulates until a cell binds, so once `.body` is in the set a later
+    /// state change diffs as "no change" and the row keeps the width it measured for the
+    /// state before it.
+    private var measuredMessageState: ChatMessage.State = .none
+
+    /// The system-message text `systemMessageMeasure` was calculated for.
+    ///
+    /// A system row renders from its PARENT — an "X pinned: …" row shows the pinned
+    /// message's body — so editing that parent changes this row's text, and with it the
+    /// number of lines it needs. Tracked separately for the same reason
+    /// `measuredPinState` is: `updateOptions` accumulates across updates, so once
+    /// `.parentMessageBody` is in the set a later edit diffs as "no change" and the row
+    /// keeps the height it measured for the old text.
+    private var measuredSystemMessageText: String?
     public private(set) var linkViewMeasure: CGSize = .zero
     public private(set) var pollViewMeasure: CGSize = .zero
     public private(set) var systemMessageMeasure: CGSize = .zero
@@ -359,6 +391,21 @@ open class MessageLayoutModel {
         if replyCount != message.replyCount {
             replyCount = message.replyCount
             updateOptions.insert(.replyCount)
+        }
+        // The pin beside the timestamp is part of the info view, so a pin/unpin changes
+        // both what it renders and how wide it measures. Without this the cached
+        // `infoViewMeasure` keeps the old width and the cell is never reconfigured.
+        let didChangePinState = self.message.isPinned != message.isPinned
+            || measuredPinState != message.isPinned
+        if didChangePinState {
+            updateOptions.insert(.pin)
+        }
+        // The "edited" mark shares the info row with the pin, so the same reasoning applies:
+        // compare against what was last *measured*, not only against the previous message.
+        let didChangeMessageState = self.message.state != message.state
+            || measuredMessageState != message.state
+        if didChangeMessageState {
+            updateOptions.insert(.body)
         }
         var hasUpdatesInAttachments = false
         if self.message.attachments?.count != message.attachments?.count {
@@ -641,7 +688,22 @@ open class MessageLayoutModel {
             updateOptions.insert(.reload)
         }
 
-        var isUpdated = self.updateOptions != updateOptions
+        // Read off the incoming message: `isSystemMessage` consults `self.message`, which
+        // is still the previous one this far up the method.
+        var didChangeSystemMessageText = false
+        if message.type == ChatMessage.MessageType.system, message.state != .deleted {
+            let text = SceytChatUIKit.shared.formatters.systemMessageBodyFormatter.format(message)
+            didChangeSystemMessageText = measuredSystemMessageText != text
+            if didChangeSystemMessageText {
+                updateOptions.insert(.reload)
+            }
+        }
+
+        // Not folded into the options diff: `updateOptions` accumulates across updates, so
+        // once `.pin` is set the diff would read as unchanged on every later toggle. The
+        // same is true of `.reload` and the system text, hence its own flag.
+        var isUpdated = self.updateOptions != updateOptions || didChangePinState
+            || didChangeMessageState || didChangeSystemMessageText
         self.updateOptions = updateOptions
         self.channel = channel
         self.message = message
@@ -1122,9 +1184,17 @@ open class MessageLayoutModel {
 
     open func measure() -> CGSize {
         infoViewMeasure = Components.messageCellInfoView.measure(model: self, appearance: appearance)
+        measuredPinState = message.isPinned
+        measuredMessageState = message.state
         linkViewMeasure = hasPoll ? .zero : Components.messageCellLinkStackView.measure(model: self, appearance: appearance)
         pollViewMeasure = hasPoll ? Components.messageCellPollView.measure(model: self, appearance: appearance) : .zero
-        systemMessageMeasure = isSystemMessage ? Components.channelSystemMessageCell.measure(model: self, appearance: appearance) : .zero
+        if isSystemMessage {
+            measuredSystemMessageText = SceytChatUIKit.shared.formatters.systemMessageBodyFormatter.format(message)
+            systemMessageMeasure = Components.channelSystemMessageCell.measure(model: self, appearance: appearance)
+        } else {
+            measuredSystemMessageText = nil
+            systemMessageMeasure = .zero
+        }
         unsupportedViewMeasure = Components.messageCellUnsupportedMessageView.measure(model: self, appearance: appearance)
 
         if isSystemMessage {
@@ -1193,8 +1263,9 @@ public extension MessageLayoutModel {
         public static let link                  = MessageUpdateOptions(rawValue: 1 << 8)
         public static let reload                = MessageUpdateOptions(rawValue: 1 << 9)
         public static let poll                  = MessageUpdateOptions(rawValue: 1 << 10)
+        public static let pin                   = MessageUpdateOptions(rawValue: 1 << 11)
         
-        public static let all: MessageUpdateOptions = [.body, .user, .replyCount, parentMessageUser, .parentMessageBody, .attachment, .link, deliveryStatus, .poll]
+        public static let all: MessageUpdateOptions = [.body, .user, .replyCount, parentMessageUser, .parentMessageBody, .attachment, .link, deliveryStatus, .poll, .pin]
     }
     
     struct Defaults {

@@ -114,7 +114,7 @@ extension ChannelViewController {
                     readMoreButton.leadingAnchor.pin(to: textLabel.leadingAnchor),
                 ]
                 
-                let infoWidth = layout.infoViewMeasure.width
+                let infoWidth = infoViewWidth(for: layout)
                 let maxSpace = infoWidth == 0 ? 70 : infoWidth + 12
                 if shouldDisplayReadMoreButton {
                     layoutConstraint += [
@@ -139,7 +139,13 @@ extension ChannelViewController {
                 }
                 layoutConstraint += [
                     infoView.leadingAnchor.pin(greaterThanOrEqualTo: bubbleView.leadingAnchor, constant: 10),
-                    infoView.widthAnchor.pin(constant: infoWidth)
+                    infoView.widthAnchor.pin(constant: infoWidth),
+                    // The row's width is required and its edges are pinned to the bubble, so
+                    // a bubble narrower than the row leaves those constraints unsatisfiable.
+                    // `measure` already reserves this much (`lastCharRect + maxSpace + 24`);
+                    // stating it keeps the pair consistent when the row turns out wider than
+                    // the model's measure — a message pinned after it was last measured.
+                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: infoWidth + 24)
                 ]
             } else if layout.contentOptions == .image {
                 infoView.dateLabel.textColor = appearance.onOverlayColor
@@ -183,7 +189,7 @@ extension ChannelViewController {
                     bubbleView.trailingAnchor.pin(to: containerView.trailingAnchor, constant: -12),
                     bubbleView.topAnchor.pin(to: containerView.topAnchor),
                     bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.linkViewMeasure.width + 24),
-                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.infoViewMeasure.width + 24),
+                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: infoViewWidth(for: layout) + 24),
                     bubbleView.widthAnchor.pin(lessThanOrEqualToConstant: Components.messageLayoutModel.defaults.messageWidth).priority(.required),
 
                     infoView.leadingAnchor.pin(greaterThanOrEqualTo: bubbleView.leadingAnchor, constant: 10),

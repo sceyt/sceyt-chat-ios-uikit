@@ -11,6 +11,11 @@ import SceytChat
 
 public typealias SceytImageView = ImageView
 
+/// The conversation's message cell under a second name, for scopes where the bare
+/// `MessageCell` resolves to something else — `ChannelPinnedMessageListViewController`
+/// nests a row class of the same name and hosts one of these inside it.
+public typealias ChatMessageCell = MessageCell
+
 open class MessageCell: CollectionViewCell,
                         UITextViewDelegate,
                         MessageCellMeasurable,
@@ -320,6 +325,7 @@ open class MessageCell: CollectionViewCell,
         textLabel.attributedText = data.attributedView.content
         textLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.body
         infoView.dateLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.date
+        infoView.pinView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.pinnedIcon
         do {
             typealias CellAID = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell
             nameLabel.accessibilityIdentifier = CellAID.senderName
@@ -424,6 +430,14 @@ open class MessageCell: CollectionViewCell,
                 contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.top(data.contentInsets.top)])
             }
             contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.leading(data.contentInsets.left), .trailing(-data.contentInsets.right)])
+            // The info row (date, tick, "edited", pin) renders from the model at `bind()`
+            // time, and the width it is laid out to is taken from what it renders. A layout
+            // pass is not always preceded by a bind — `messageListOrder` rebuilds the
+            // constraints on its own, and the layout model is updated *in place* (off the
+            // main thread, at that), so the row can be measured while it still shows the
+            // state before an edit or a pin: the bubble then reserves a slot the row never
+            // draws. Re-applying here is idempotent and keeps the two in step.
+            infoView.data = data
             contentConstraints! += layoutConstraints(layout: data)
             contentConstraints! += [replyIcon.trailingAnchor.pin(to: contentView.trailingAnchor, constant: 44)]
             contentConstraints! += [replyIcon.bottomAnchor.pin(to: bubbleView.bottomAnchor)]
@@ -457,6 +471,22 @@ open class MessageCell: CollectionViewCell,
     
     open func layoutConstraints(layout: MessageLayoutModel) -> [NSLayoutConstraint] {
         return []
+    }
+
+    /// The width to reserve for the info row beside the timestamp — never less than what
+    /// the row's live content needs.
+    ///
+    /// `layout.infoViewMeasure` is taken when the layout model is (re)measured, and the pin
+    /// beside the timestamp is part of that row: a measure taken while the message was
+    /// unpinned is the pin's width plus its spacing too narrow. Left at that, the row's own
+    /// labels end up drawn on top of each other, and only reopening the channel — which
+    /// builds the model again from scratch — puts it right. Taking the larger of the two
+    /// keeps the reserve self-correcting; `bind()` runs before the constraints are built, so
+    /// the live width already reflects the message being laid out.
+    open func infoViewWidth(for layout: MessageLayoutModel) -> CGFloat {
+        let measured = layout.infoViewMeasure.width
+        let live = infoView.contentWidth
+        return max(measured, live)
     }
     
     open class func measure(

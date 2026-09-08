@@ -637,6 +637,23 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
            !updatedObjectIDs.isEmpty {
             self.updatedObjectIDs = self.updatedObjectIDs.union(updatedObjectIDs)
         }
+
+        // A watched related object appearing or disappearing changes what the row renders
+        // just as much as one of its fields changing — pinning a message inserts a
+        // `PinDetailsDTO` and unpinning deletes one, and neither shows up under
+        // `NSUpdatedObjectsKey`. Without this the cell is never reconfigured, silently:
+        // nothing errors, the row just keeps rendering its old state.
+        if let objs = userInfo[NSInsertedObjectsKey] as? Set<NSManagedObject>,
+           let insertedObjectIDs = objs.updatedObjectIDs(for: keyPaths),
+           !insertedObjectIDs.isEmpty {
+            self.updatedObjectIDs = self.updatedObjectIDs.union(insertedObjectIDs)
+        }
+
+        // Deletes are deliberately NOT walked here. Resolving a deleted object's inverse
+        // means faulting it, which throws once Core Data invalidates the object during
+        // context teardown — it crashed the app on exit. A delete that matters to a row
+        // also mutates the row itself (unpinning nils `MessageDTO.pinDetails`), so the
+        // update arrives through the normal path.
     }
 }
 

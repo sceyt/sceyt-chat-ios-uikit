@@ -32,6 +32,10 @@ public class ChatMessage {
     public var disableMentionsCount: Bool
     public let viewOnce: Bool
 
+    /// This message's pin state, as the server reports it. `nil` means never pinned. The
+    /// durable record — who pinned it, when, and to whom it is visible — is `PinnedMessageDTO`.
+    public let pinDetails: PinDetails?
+
     public let attachments: [Attachment]?
     public let userReactions: [Reaction]?
     public let userPendingReactions: [Reaction]?
@@ -48,6 +52,10 @@ public class ChatMessage {
     public let forwardingDetails: ForwardingDetails?
     public let bodyAttributes: [BodyAttribute]?
     public let poll: PollDetails?
+
+    /// This message is pinned and the pin has not lapsed. Backed by `pinDetails`, whose key
+    /// paths are registered on `LazyMessagesObserver`, so a pin/unpin reconfigures the cell.
+    public var isPinned: Bool { pinDetails?.isCurrentlyPinned == true }
 
     var hasDisplayedFromMe: Bool {
         userMarkers?.contains(where: { $0.user?.id == SceytChatUIKit.shared.currentUserId && $0.name == DeliveryStatus.displayed.rawValue} ) == true
@@ -84,7 +92,8 @@ public class ChatMessage {
                 changedBy: ChatUser? = nil,
                 forwardingDetails: ForwardingDetails? = nil,
                 bodyAttributes: [BodyAttribute]? = nil,
-                poll: PollDetails? = nil
+                poll: PollDetails? = nil,
+                pinDetails: PinDetails? = nil
     ) {
         self.id = id
         self.tid = tid
@@ -127,6 +136,7 @@ public class ChatMessage {
         self.reactionScores = reactionScores
         self.bodyAttributes = bodyAttributes
         self.poll = poll
+        self.pinDetails = pinDetails
     }
     
     public init(dto: MessageDTO) {
@@ -149,6 +159,7 @@ public class ChatMessage {
         displayCount = Int(dto.displayCount)
         disableMentionsCount = dto.disableMentionsCount
         viewOnce = dto.viewOnce
+        pinDetails = dto.pinDetails?.convert()
         markerCount = dto.markerTotal
         if let user = dto.user {
             self.user = user.convert()
@@ -594,9 +605,40 @@ public extension ChatMessage {
         public static let viewOnce = "view_once"
     }
 
+    /// The `body` values that say what a system message is about — what
+    /// `SystemMessageBodyFormatter` switches on. Only the codes this UIKit generates itself
+    /// are named here; the ones the backend sends (`CG`, `AM`, `JL`, …) stay literals in the
+    /// formatter.
+    struct SystemMessageType {
+        /// Someone pinned a message for everyone. The pinned message is the system
+        /// message's parent.
+        public static let pinnedMessage = "PM"
+    }
+
     /// Returns true if this is a system message
     var isSystemMessage: Bool {
         return type == MessageType.system
+    }
+
+    /// The message a system message points at, and `nil` for every system message that has
+    /// no target — which is what keeps the tap gesture off "Adam joined via invite link".
+    ///
+    /// Today only a pin system message ("PM") has one: the message that was pinned. Prefers
+    /// the linked parent and falls back to the id in the metadata, because
+    /// `SCTMessage.parentMessage` is populated by the server — on the sender's own copy the
+    /// metadata is what makes the tap work before the echo arrives.
+    var systemMessageTargetId: MessageId? {
+        guard isSystemMessage,
+              body == SystemMessageType.pinnedMessage
+        else { return nil }
+        if let parentId = parent?.id, parentId != 0 {
+            return parentId
+        }
+        guard let metadata,
+              let pinned = SystemMessageMetadata.PinnedMessage.from(jsonString: metadata),
+              pinned.id != 0
+        else { return nil }
+        return pinned.id
     }
 
     /// Returns true if this is a poll message

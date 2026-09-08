@@ -40,10 +40,31 @@ struct ChannelScreen {
         static let emptyView = "sceyt_chat_channel_empty_view"
         static let searchBar = "sceyt_chat_channel_search_bar"
 
+        // Pinned-messages banner and the context-menu actions that create it.
+        static let pinnedMessagesView = "sceyt_chat_channel_pinned_messages_view"
+        static let pinnedMessagesTitle = "sceyt_chat_channel_pinned_messages_title"
+        static let pinnedMessagesPreview = "sceyt_chat_channel_pinned_messages_preview"
+        static let pinnedMessagesButton = "sceyt_chat_channel_pinned_messages_button"
+        static let pinnedIcon = "sceyt_chat_channel_message_cell_pinned_icon"
+
+        // The standalone pinned-messages screen the banner's pin button presents.
+        static let pinnedListTable = "sceyt_chat_pinned_message_list_table_view"
+        static let pinnedListCellRoot = "sceyt_chat_pinned_message_list_cell"
+        static func pinnedListCell(_ id: UInt64) -> String { "\(pinnedListCellRoot).\(id)" }
+        static let pinnedListNavigateButton = "sceyt_chat_pinned_message_list_navigate_button"
+        static let pinnedListCloseButton = "sceyt_chat_pinned_message_list_close_button"
+        static let pinnedListEmptyView = "sceyt_chat_pinned_message_list_empty_view"
+        static let contextMenuItemRoot = "sceyt_chat_context_menu_item"
+        static func contextMenuItem(_ key: String) -> String { "\(contextMenuItemRoot).\(key)" }
+
         // In-conversation message search controls.
         static let searchNextButton = "sceyt_chat_channel_search_next_button"
         static let searchPreviousButton = "sceyt_chat_channel_search_previous_button"
         static let searchResultLabel = "sceyt_chat_channel_search_result_label"
+
+        // System message cell ("X pinned: ...", "X joined via invite link").
+        static let systemCellRoot = "sceyt_chat_channel_system_message_cell"
+        static let systemCellTitle = "sceyt_chat_channel_system_message_cell_title"
 
         // Message cell.
         static let cellRoot = "sceyt_chat_channel_message_cell"
@@ -99,6 +120,9 @@ struct ChannelScreen {
         static let lastReadText = "This is the last read message"
         static let outgoingText = "My outgoing reply"
         static let lastText = "This is the newest message"
+        /// The outgoing message left in the `.pending` delivery state by
+        /// `--uitest-conversation-pending`.
+        static let pendingText = "Still sending this one"
 
         /// Body of the message the floating injector delivers (mirror of
         /// `UITestSupport.injectedShortText`).
@@ -107,6 +131,7 @@ struct ChannelScreen {
         static func messageId(_ index: UInt64) -> UInt64 { channelId * 10_000 + index }
         static let outgoingId = messageId(18)
         static let lastId = messageId(19)
+        static let pendingId = messageId(20)
         static let afterReadId = messageId(17)
         static let lastReadId = messageId(16)
         static let firstId = messageId(1)
@@ -261,11 +286,154 @@ struct ChannelScreen {
             .joined(separator: ", ")
     }
 
+    // MARK: - Pinned messages
+
+    /// The banner under the navigation bar. Present in the hierarchy only while the
+    /// channel has at least one live pin.
+    var pinnedMessagesView: XCUIElement { app.otherElements[AID.pinnedMessagesView] }
+    var pinnedMessagesTitle: XCUIElement { app.staticTexts[AID.pinnedMessagesTitle] }
+    /// The one-line preview of the pin currently on screen.
+    var pinnedMessagesPreview: XCUIElement { app.staticTexts[AID.pinnedMessagesPreview] }
+    /// The banner's trailing pin button, which opens the pinned list.
+    var pinnedMessagesButton: XCUIElement { app.buttons[AID.pinnedMessagesButton] }
+
+    /// The small pin beside a message's timestamp. Only exists while pinned.
+    func pinnedIcon(in cell: XCUIElement) -> XCUIElement { cell.images[AID.pinnedIcon] }
+
+    /// A row in the message context menu, addressed by its unlocalized key
+    /// (`pin`, `unpin`, `pinAll`, `pinMe`).
+    func contextMenuItem(_ key: String) -> XCUIElement {
+        app.cells[AID.contextMenuItem(key)]
+    }
+
+    /// Long-presses a message to raise its context menu, then waits for a known row so
+    /// the menu is definitely interactive before the caller taps.
+    @discardableResult
+    func openContextMenu(on cell: XCUIElement, expecting key: String,
+                         timeout: TimeInterval = 5) -> Bool {
+        cell.press(forDuration: 1.0)
+        return contextMenuItem(key).waitForExistence(timeout: timeout)
+    }
+
+    /// Pins a message through the real UI: long-press -> Pin -> Pin For All/Me.
+    func pinMessage(cell: XCUIElement, forAll: Bool = true, timeout: TimeInterval = 5) {
+        XCTAssertTrue(openContextMenu(on: cell, expecting: "pin", timeout: timeout),
+                      "the Pin action never appeared in the context menu")
+        contextMenuItem("pin").tap()
+        let sub = forAll ? "pinAll" : "pinMe"
+        XCTAssertTrue(contextMenuItem(sub).waitForExistence(timeout: timeout),
+                      "the Pin For All/Me sub-step never appeared")
+        contextMenuItem(sub).tap()
+    }
+
+    /// Unpins a message through the real UI.
+    func unpinMessage(cell: XCUIElement, timeout: TimeInterval = 5) {
+        XCTAssertTrue(openContextMenu(on: cell, expecting: "unpin", timeout: timeout),
+                      "the Unpin action never appeared in the context menu")
+        contextMenuItem("unpin").tap()
+    }
+
+    /// Drags the banner to move to the next / previous pinned message.
+    ///
+    /// A coordinate drag rather than `swipeUp()`: XCUITest confines a swipe to the
+    /// element's frame, and the banner is only ~52pt tall, so the gesture is too short to
+    /// read as directional. The drag starts on the banner and travels well past it.
+    func swipeToNextPinnedMessage() { dragPinnedBanner(dy: -160) }
+    func swipeToPreviousPinnedMessage() { dragPinnedBanner(dy: 160) }
+
+    private func dragPinnedBanner(dy: CGFloat) {
+        let start = pinnedMessagesView.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5))
+        let end = start.withOffset(CGVector(dx: 0, dy: dy))
+        start.press(forDuration: 0.02, thenDragTo: end)
+    }
+
+    /// Taps the banner body, which jumps the list to the pin on screen and moves the banner
+    /// onto the next one. Off-centre on purpose, so the tap cannot land on the pin button.
+    func tapPinnedBanner() {
+        pinnedMessagesView.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5)).tap()
+    }
+
+    /// `"<index>/<count>"` — lets a test tell "showing pin 1 of 3" from "only one pin landed".
+    var pinnedMessagesValue: String { (pinnedMessagesView.value as? String) ?? "" }
+
+    // MARK: - Pinned-messages list (the screen the banner's pin button presents)
+
+    var pinnedListTable: XCUIElement { app.tables[AID.pinnedListTable] }
+    var pinnedListEmptyView: XCUIElement { app.otherElements[AID.pinnedListEmptyView] }
+    /// The "X" that dismisses the presented list — it has no back button.
+    var pinnedListCloseButton: XCUIElement { app.buttons[AID.pinnedListCloseButton] }
+    /// A row in the pinned-messages list, addressable by its seeded message id.
+    func pinnedListCell(_ id: UInt64) -> XCUIElement { app.cells[AID.pinnedListCell(id)] }
+
+    /// A row's arrow button: the one control on the screen that leaves it, jumping the
+    /// conversation to that message. Tapping the bubble does what it does in the
+    /// conversation instead.
+    func pinnedListNavigateButton(in cell: XCUIElement) -> XCUIElement {
+        cell.buttons[AID.pinnedListNavigateButton]
+    }
+
+    /// A row's body text. The rows are the conversation's own message cells, so it is the
+    /// message body label, not a preview of its own.
+    func pinnedListBody(in cell: XCUIElement) -> XCUIElement {
+        cell.staticTexts[AID.body]
+    }
+
+    /// Every row currently realized in the list, top to bottom, by its identifier — which
+    /// is what tells "all three pins are listed, in timeline order" from "some rows
+    /// appeared". Filtered by prefix because a row *hosts* a message cell, so the message
+    /// cell shows up as a cell of its own.
+    var pinnedListRowIdentifiers: [String] {
+        pinnedListTable.cells.allElementsBoundByIndex
+            .map(\.identifier)
+            .filter { $0.hasPrefix(AID.pinnedListCellRoot) }
+    }
+
+    /// Every message body currently realized in the list, top to bottom. A pin with no
+    /// text of its own — a caption-less video, a poll — contributes nothing.
+    var pinnedListBodies: [String] {
+        pinnedListTable.staticTexts.matching(identifier: AID.body)
+            .allElementsBoundByIndex
+            .map(\.label)
+    }
+
+    /// Opens the pinned-messages list through the real UI and waits for its table.
+    @discardableResult
+    func openPinnedMessageList(timeout: TimeInterval = 5) -> Bool {
+        pinnedMessagesButton.tap()
+        return pinnedListTable.waitForExistence(timeout: timeout)
+    }
+
+    /// Dismisses the presented pinned-messages list through its "X".
+    func closePinnedMessageList() {
+        pinnedListCloseButton.tap()
+    }
+
     /// A specific message cell, addressable by its seeded id.
     func cell(_ id: UInt64) -> XCUIElement { app.cells[AID.cell(id)] }
 
+    /// A system-message row carrying exactly `text`.
+    ///
+    /// Matched on the text rather than on a message id: a system message the app has just
+    /// posted has no server id yet, so its row identifier is still `...cell.0`.
+    func systemMessage(_ text: String) -> XCUIElement {
+        systemMessages
+            .staticTexts
+            .matching(NSPredicate(format: "identifier == %@ AND label == %@",
+                                  AID.systemCellTitle, text))
+            .firstMatch
+    }
+
+    /// Every system-message row currently rendered.
+    var systemMessages: XCUIElementQuery {
+        app.cells.matching(NSPredicate(format: "identifier BEGINSWITH %@", AID.systemCellRoot + "."))
+    }
+
     /// The body text of a specific message cell.
     func body(in cell: XCUIElement) -> XCUIElement { cell.staticTexts[AID.body] }
+
+    /// The timestamp inside a specific message cell — the info row's anchor, and what a
+    /// pin or an "edited" mark has to make room beside rather than land on top of.
+    func date(in cell: XCUIElement) -> XCUIElement { cell.staticTexts[AID.date] }
 
     /// The quoted reply preview inside a specific message cell.
     func replyView(in cell: XCUIElement) -> XCUIElement { cell.buttons[AID.replyView] }

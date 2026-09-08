@@ -132,6 +132,9 @@ extension SceytChatUIKit {
         /// storage keys the downloaded file by, so give each seed its own.
         public var url: String
         public var name: String
+        /// Attachment type — "image" (default) or "video". Drives which name the preview
+        /// formatters produce ("Photo" vs "Video").
+        public var type: String
         /// The colour the blurred `thumbHash` placeholder decodes to.
         public var placeholderColor: UIColor
         /// The colour of the "downloaded" image, deliberately different from
@@ -143,6 +146,7 @@ extension SceytChatUIKit {
             id: AttachmentId,
             url: String,
             name: String = "uitest-photo.jpg",
+            type: String = "image",
             placeholderColor: UIColor = .systemRed,
             downloadedColor: UIColor = .systemGreen,
             pixelSize: CGSize = CGSize(width: 900, height: 900)
@@ -150,6 +154,7 @@ extension SceytChatUIKit {
             self.id = id
             self.url = url
             self.name = name
+            self.type = type
             self.placeholderColor = placeholderColor
             self.downloadedColor = downloadedColor
             self.pixelSize = pixelSize
@@ -187,6 +192,10 @@ extension SceytChatUIKit {
         /// bubble renders the blurred `thumbHash` preview (and any message replying
         /// to it renders the same blur in its reply preview).
         public var imageAttachment: UITestImageAttachmentSeed?
+        /// `true` seeds the message as edited, so its bubble carries the "edited" mark
+        /// beside the timestamp — the widest the info row gets, and what a pin has to
+        /// make room beside.
+        public var edited: Bool
 
         public init(
             id: MessageId,
@@ -198,7 +207,8 @@ extension SceytChatUIKit {
             parentId: MessageId? = nil,
             createdAt: Date? = nil,
             poll: UITestPollSeed? = nil,
-            imageAttachment: UITestImageAttachmentSeed? = nil
+            imageAttachment: UITestImageAttachmentSeed? = nil,
+            edited: Bool = false
         ) {
             self.id = id
             self.body = body
@@ -210,6 +220,7 @@ extension SceytChatUIKit {
             self.createdAt = createdAt
             self.poll = poll
             self.imageAttachment = imageAttachment
+            self.edited = edited
         }
     }
 
@@ -484,6 +495,52 @@ extension SceytChatUIKit {
     ///     from it (see `ChannelViewModel.init`).
     ///
     /// UI-test only.
+    /// Pins already-seeded messages, for the pinned-messages UI tests.
+    ///
+    /// Returns how many pins actually landed. The harness's `try? syncWrite` can drop a write
+    /// silently, which makes a "banner shows N pins" assertion pass vacuously — the test polls
+    /// this count before asserting. Idempotent: pinning the same ids twice is a no-op.
+    @discardableResult
+    public func pinMessagesForUITests(
+        channelId: ChannelId,
+        messageIds: [MessageId],
+        scope: PinnedMessage.Scope = .forAll,
+        pinnedUntil: Date? = nil
+    ) -> Int {
+        var landed = 0
+        try? database.syncWrite { context in
+            // A fixed, ordered pin date keeps the banner's ordering deterministic.
+            let base = Self.uiTestMessageSeedBaseDate
+            for (index, id) in messageIds.enumerated() {
+                guard let message = MessageDTO.fetch(id: id, context: context) else { continue }
+                let pinned = context.pinMessage(
+                    id: id,
+                    tid: message.tid,
+                    channelId: channelId,
+                    scope: scope,
+                    pinnedAt: base.addingTimeInterval(TimeInterval(index)),
+                    pinnedUntil: pinnedUntil,
+                    pinnedBy: SceytChatUIKit.shared.currentUserId
+                )
+                if pinned != nil { landed += 1 }
+            }
+        }
+        return landed
+    }
+
+    /// Unpins everything in the channel. Returns `true` when the write went through.
+    @discardableResult
+    public func unpinAllMessagesForUITests(channelId: ChannelId) -> Bool {
+        do {
+            try database.syncWrite { context in
+                context.unpinAllMessages(channelId: channelId)
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+
     public func seedMessagesForUITests(
         channelId: ChannelId,
         messages: [UITestMessageSeed],
@@ -497,6 +554,10 @@ extension SceytChatUIKit {
             request.predicate = NSPredicate(format: "channelId == %lld", Int64(channelId))
             let existing = (try? context.fetch(request)) ?? []
             existing.forEach { context.delete($0) }
+            // Pins survive their messages by design — `PinnedMessageDTO` holds no
+            // relationship, so nothing cascades to it. Without this, pins from an earlier
+            // launch leak into the next one and the banner shows stale entries.
+            context.unpinAllMessages(channelId: channelId)
         }
 
         guard !messages.isEmpty else { return }
@@ -518,7 +579,9 @@ extension SceytChatUIKit {
                 message.type = seed.poll != nil ? "poll" : "text"
                 message.channelId = Int64(channelId)
                 message.incoming = seed.incoming
-                message.state = 0 // ChatMessage.State.none
+                message.state = Int16(seed.edited
+                    ? ChatMessage.State.edited.intValue
+                    : ChatMessage.State.none.intValue)
                 message.deliveryStatus = Int16(seed.deliveryStatus.intValue)
                 message.createdAt = date.bridgeDate
                 if let senderId = seed.senderId {
@@ -576,7 +639,7 @@ extension SceytChatUIKit {
         attachment.userId = message.user?.id ?? ""
         attachment.url = seed.url
         attachment.filePath = nil
-        attachment.type = "image"
+        attachment.type = seed.type
         attachment.name = seed.name
         attachment.uploadedFileSize = 0
         attachment.status = Int16(ChatMessage.Attachment.TransferStatus.pending.rawValue)

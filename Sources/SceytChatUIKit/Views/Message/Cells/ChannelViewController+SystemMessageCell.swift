@@ -6,12 +6,30 @@
 //
 
 import UIKit
+import SceytChat
 
 extension ChannelViewController {
 
     open class SystemMessageCell: CollectionViewCell, MessageCellMeasurable {
 
         public static var titleContentInsets: UIEdgeInsets = .init(top: 2, left: 8, bottom: 2, right: 8)
+
+        public enum Action {
+            /// The row points at another message — a pin system message at the message that
+            /// was pinned — and the user tapped it.
+            case didTapTargetMessage(MessageId)
+        }
+
+        open var onAction: ((Action) -> Void)?
+
+        /// The message this row jumps to, `nil` when it has none. Drives whether
+        /// `tapGesture` is live, so only the rows that go somewhere react to a tap.
+        public private(set) var targetMessageId: MessageId?
+
+        open lazy var tapGesture: UITapGestureRecognizer = {
+            $0.isEnabled = false
+            return $0
+        }(UITapGestureRecognizer(target: self, action: #selector(didTapTitleContent)))
 
         open var highlightMode: MessageCell.HighlightMode = .none {
             didSet {
@@ -47,6 +65,7 @@ extension ChannelViewController {
             $0.textAlignment = .center
             $0.numberOfLines = 0
             $0.clipsToBounds = true
+            $0.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.SystemCell.title
             return $0.withoutAutoresizingMask
         }(UILabel())
 
@@ -73,6 +92,8 @@ extension ChannelViewController {
         open override func setupLayout() {
             super.setupLayout()
             contentView.addSubview(titleContentView)
+            titleContentView.isUserInteractionEnabled = true
+            titleContentView.addGestureRecognizer(tapGesture)
             contentView.addSubview(unreadView)
             titleContentView.addSubview(blurView)
             titleContentView.addSubview(titleLabel)
@@ -100,14 +121,14 @@ extension ChannelViewController {
         open var data: MessageLayoutModel! {
             didSet {
                 guard let data else { return }
+                accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.SystemCell
+                    .identifier(for: data.message.id)
+                targetMessageId = data.message.systemMessageTargetId
+                tapGesture.isEnabled = targetMessageId != nil
                 // Format system message using the system message body formatter
-                let formattedText = SceytChatUIKit.shared.formatters.systemMessageBodyFormatter.format(data.message)
-                titleLabel.attributedText = NSAttributedString(
-                    string: formattedText,
-                    attributes: [
-                        .font: MessageCell.appearance.systemMessageFont,
-                        .foregroundColor: MessageCell.appearance.systemMessageTextColor
-                    ]
+                titleLabel.attributedText = Self.attributedText(
+                    for: data.message,
+                    appearance: MessageCell.appearance
                 )
                 var cn = contentInsets
                 cn.top = data.contentInsets.top
@@ -118,25 +139,67 @@ extension ChannelViewController {
             }
         }
 
-        open class func measure(
-            model: MessageLayoutModel,
+        @objc
+        open func didTapTitleContent() {
+            guard let targetMessageId else { return }
+            onAction?(.didTapTargetMessage(targetMessageId))
+        }
+
+        open override func prepareForReuse() {
+            super.prepareForReuse()
+            // One cell class serves every system message type, so a reused row must not
+            // keep the previous row's target or its handler.
+            onAction = nil
+            targetMessageId = nil
+            tapGesture.isEnabled = false
+        }
+
+        /// The row's styled text: one run for most system messages, two for a row that
+        /// emphasizes the actor's name — "Adam" in `systemMessageFont`, "pinned: …" in the
+        /// lighter `systemMessageBodyFont`.
+        ///
+        /// Shared by `data` and `measure` so the height is calculated from the very string
+        /// the label draws. The two fonts are what make that matter: a regular run is
+        /// narrower than a semibold one and wraps in a different place.
+        open class func attributedText(
+            for message: ChatMessage,
             appearance: MessageCell.Appearance
-        ) -> CGSize {
-            let text = SceytChatUIKit.shared.formatters.systemMessageBodyFormatter.format(model.message)
-            let attributedText = NSAttributedString(
-                string: text,
+        ) -> NSAttributedString {
+            let formatter = SceytChatUIKit.shared.formatters.systemMessageBodyFormatter
+            let text = NSMutableAttributedString(
+                string: formatter.format(message),
                 attributes: [
                     .font: appearance.systemMessageFont,
                     .foregroundColor: appearance.systemMessageTextColor
                 ]
             )
+            // The range is measured against the same `format(_:)` output, but a custom
+            // formatter can return one that does not fit this string — a mismatched range
+            // would trap in `addAttribute`.
+            if let nameRange = formatter.emphasizedNameRange(in: message),
+               nameRange.location >= 0,
+               NSMaxRange(nameRange) <= text.length {
+                let whole = NSRange(location: 0, length: text.length)
+                text.addAttribute(.font, value: appearance.systemMessageBodyFont, range: whole)
+                text.addAttribute(.font, value: appearance.systemMessageFont, range: nameRange)
+            }
+            return text
+        }
+
+        open class func measure(
+            model: MessageLayoutModel,
+            appearance: MessageCell.Appearance
+        ) -> CGSize {
+            let attributedText = attributedText(for: model.message, appearance: appearance)
             let insets = titleContentInsets
+            // No `font` in the config: it would overwrite the string's own fonts, flattening
+            // an emphasized-name row onto one of the two and measuring a width the label
+            // never draws.
             var size: CGSize = TextSizeMeasure
                 .calculateSize(
                     of: attributedText,
                     config: .init(
                         restrictingWidth: UIScreen.main.bounds.width - 48 - 48 - insets.left - insets.right,
-                        font: appearance.systemMessageFont,
                         lastFragmentUsedRect: false
                     )).textSize
             if size.height < 22 {

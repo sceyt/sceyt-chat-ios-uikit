@@ -58,6 +58,32 @@ enum UITestSupport {
         launchArgumentValue("--uitest-inject-on-open")
     }
 
+    /// `--uitest-pinned-messages` — seeds a conversation with three already-pinned
+    /// messages (a text, a video attachment and a poll), for the pinned banner tests.
+    static var isPinnedMessages: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pinned-messages")
+    }
+
+    /// `--uitest-pinned-messages-single` — the same fixture with only one pin, for the
+    /// "unpin the last pin and the banner goes away" case.
+    static var isPinnedMessagesSingle: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pinned-messages-single")
+    }
+
+    /// `--uitest-conversation-edited` — seeds the conversation's outgoing message as
+    /// edited, so its bubble carries the "edited" mark beside the timestamp. The widest
+    /// the info row gets, and what a pin added later has to make room beside.
+    static var isConversationEdited: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-conversation-edited")
+    }
+
+    /// `--uitest-conversation-pending` — appends an outgoing message still in the
+    /// `.pending` delivery state (index 20), for the "a message that has not reached the
+    /// server cannot be pinned" case.
+    static var isConversationPending: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-conversation-pending")
+    }
+
     /// `--uitest-conversation-unread-long` — makes the parametrized unread tail
     /// use long multi-line bodies instead of one-liners, so the newest cells are
     /// several lines tall. Exposes initial-scroll positions computed from
@@ -254,6 +280,8 @@ enum UITestSupport {
             if let gapMs = pollDoubleVoteGapMs {
                 installFloatingPollDoubleVoteInjector(gapMs: gapMs)
             }
+        } else if isPinnedMessages || isPinnedMessagesSingle {
+            seedPinnedMessagesConversation()
         } else if isConversation || isConversationUnread || conversationUnreadCountOverride != nil {
             seedConversation()
             if isInjectionEnabled {
@@ -354,6 +382,7 @@ enum UITestSupport {
     static let conversationLastReadText = "This is the last read message"
     static let conversationOutgoingText = "My outgoing reply"
     static let conversationLastText = "This is the newest message"
+    static let conversationPendingText = "Still sending this one"
 
     private static func conversationMessageId(_ index: UInt64) -> UInt64 {
         conversationChannelId * 10_000 + index
@@ -392,12 +421,23 @@ enum UITestSupport {
             .init(id: conversationMessageId(18),
                   body: conversationOutgoingText,
                   incoming: false, senderId: me, senderName: "Me",
-                  parentId: conversationMessageId(1)),
+                  parentId: conversationMessageId(1),
+                  edited: isConversationEdited),
             // Newest message; incoming so the unread separator can render.
             .init(id: conversationMessageId(19),
                   body: conversationLastText,
                   incoming: true, senderId: "bob", senderName: "Bob")
         ])
+        if isConversationPending {
+            // Appended only behind the flag, so the fixture every other test reads keeps
+            // index 19 as its newest message.
+            messages.append(
+                .init(id: conversationMessageId(20),
+                      body: conversationPendingText,
+                      incoming: false, senderId: me, senderName: "Me",
+                      deliveryStatus: .pending)
+            )
+        }
         return messages
     }
 
@@ -458,6 +498,88 @@ enum UITestSupport {
                 lastDisplayedMessageId: isConversationUnread ? conversationMessageId(16) : 0
             )
         }
+    }
+
+    // MARK: - Pinned messages (gated behind --uitest-pinned-messages)
+
+    static let pinnedTextBody = "Do you know what time is it?"
+    static let pinnedPollQuestion = "With title"
+
+    static var pinnedTextMessageId: UInt64 { conversationMessageId(31) }
+    static var pinnedVideoMessageId: UInt64 { conversationMessageId(32) }
+    static var pinnedPollMessageId: UInt64 { conversationMessageId(33) }
+    static var pinnedPollId: String { "uitest-pinned-poll" }
+
+    /// The three previews the banner must render, in timeline order — this is exactly what
+    /// `PinnedMessageBodyFormatter` is expected to produce.
+    static let pinnedTextPreview = pinnedTextBody
+    static let pinnedVideoPreview = "Video"
+    static var pinnedPollPreview: String { "Poll: \(pinnedPollQuestion)" }
+
+    /// A short history plus three pinnable messages: a plain text, a caption-less video
+    /// attachment, and a poll. Pinned oldest-first so the banner's order is deterministic,
+    /// and (multi-pin only) followed by enough filler that the pins sit off the top of the
+    /// list on open, which is what makes a banner tap's jump observable.
+    private static func seedPinnedMessagesConversation() {
+        SceytChatUIKit.shared.seedChannelsForUITests([
+            .init(id: conversationChannelId, subject: conversationSubject)
+        ])
+        var messages = Array(conversationMessages.prefix(5))
+        messages.append(
+            .init(id: pinnedTextMessageId,
+                  body: pinnedTextBody,
+                  incoming: true, senderId: "bob", senderName: "Bob")
+        )
+        messages.append(
+            // No body, so the preview falls through to the attachment type name.
+            .init(id: pinnedVideoMessageId,
+                  body: "",
+                  incoming: true, senderId: "bob", senderName: "Bob",
+                  imageAttachment: .init(
+                      id: 900_101,
+                      url: "https://uitest.sceyt.invalid/uitest-pinned-video/clip.mp4",
+                      name: "clip.mp4",
+                      type: "video"))
+        )
+        messages.append(
+            .init(id: pinnedPollMessageId,
+                  body: pinnedPollQuestion,
+                  incoming: true, senderId: "bob", senderName: "Bob",
+                  poll: .init(
+                      id: pinnedPollId,
+                      question: pinnedPollQuestion,
+                      options: [.init(id: "\(pinnedPollId)-1", text: "Yes"),
+                                .init(id: "\(pinnedPollId)-2", text: "No")],
+                      anonymous: true))
+        )
+        // Filler *after* the pins, so every pin starts scrolled off the top and a tap on
+        // the banner has somewhere to travel to. Multi-pin only: the single-pin fixture is
+        // the one whose tests reach for the pinned bubble's context menu, and that needs
+        // the bubble on screen from the start.
+        if isPinnedMessages {
+            for n in 34...48 {
+                let incoming = !n.isMultiple(of: 2)
+                messages.append(.init(
+                    id: conversationMessageId(UInt64(n)),
+                    body: "Message number \(n)",
+                    incoming: incoming,
+                    senderId: incoming ? "bob" : SceytChatUIKit.uiTestUserId,
+                    senderName: incoming ? "Bob" : "Me"))
+            }
+        }
+
+        SceytChatUIKit.shared.seedMessagesForUITests(
+            channelId: conversationChannelId,
+            messages: messages
+        )
+
+        let toPin = isPinnedMessagesSingle
+            ? [pinnedTextMessageId]
+            : [pinnedTextMessageId, pinnedVideoMessageId, pinnedPollMessageId]
+        SceytChatUIKit.shared.pinMessagesForUITests(
+            channelId: conversationChannelId,
+            messageIds: toPin
+        )
     }
 
     // MARK: - Reply-to-image conversation (gated behind --uitest-reply-attachment)

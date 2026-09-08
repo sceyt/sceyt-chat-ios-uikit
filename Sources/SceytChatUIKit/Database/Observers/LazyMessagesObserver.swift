@@ -9,6 +9,34 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
     public private(set) var loadRangeProvider: LoadRangeProvider
     
     public let channelId: ChannelId
+
+    /// Related-object changes that must reconfigure a message cell.
+    ///
+    /// `RelationshipKeyPathsObserver` resolves exactly **one** hop — it splits on `.` and
+    /// walks the relationship's inverse — so every entry here has to be
+    /// `MessageDTO.<toOneOrToMany>.<field>` with an inverse defined. A deeper path (a
+    /// reply's `parent.attachments.filePath`, say) silently does nothing; those cases need
+    /// an in-view backstop instead.
+    ///
+    /// Named rather than inlined so it can be asserted on in tests: forgetting to list a
+    /// field here fails silently at runtime, with the cell simply never updating.
+    public static let relationshipKeyPaths: [String] = [
+        #keyPath(MessageDTO.attachments.status),
+        #keyPath(MessageDTO.attachments.filePath),
+        #keyPath(MessageDTO.user.avatarUrl),
+        #keyPath(MessageDTO.user.firstName),
+        #keyPath(MessageDTO.user.lastName),
+        #keyPath(MessageDTO.parent.state),
+        #keyPath(MessageDTO.bodyAttributes),
+        #keyPath(MessageDTO.linkMetadatas),
+        // Without these the bubble never repaints on pin/unpin.
+        #keyPath(MessageDTO.pinDetails.isPinned),
+        #keyPath(MessageDTO.pinDetails.pinnedUntil),
+        #keyPath(MessageDTO.poll.votesPerOption),
+        #keyPath(MessageDTO.poll.votes),
+        #keyPath(MessageDTO.poll.ownVotes),
+        #keyPath(MessageDTO.poll.closed)
+    ]
     
     public init(
         channelId: ChannelId,
@@ -33,20 +61,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             ],
             sectionNameKeyPath: #keyPath(MessageDTO.daySectionIdentifier),
             fetchPredicate: defaultFetchPredicate,
-            relationshipKeyPathsObserver: [
-                #keyPath(MessageDTO.attachments.status),
-                #keyPath(MessageDTO.attachments.filePath),
-                #keyPath(MessageDTO.user.avatarUrl),
-                #keyPath(MessageDTO.user.firstName),
-                #keyPath(MessageDTO.user.lastName),
-                #keyPath(MessageDTO.parent.state),
-                #keyPath(MessageDTO.bodyAttributes),
-                #keyPath(MessageDTO.linkMetadatas),
-                #keyPath(MessageDTO.poll.votesPerOption),
-                #keyPath(MessageDTO.poll.votes),
-                #keyPath(MessageDTO.poll.ownVotes),
-                #keyPath(MessageDTO.poll.closed)
-            ],
+            relationshipKeyPathsObserver: Self.relationshipKeyPaths,
             itemCreator: itemCreator
         )
     }

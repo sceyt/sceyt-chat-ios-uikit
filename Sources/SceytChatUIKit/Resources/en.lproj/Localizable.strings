@@ -192,6 +192,9 @@
 "channel.forward.chatsGroups" = "Chats & Groups";
 "channel.forward.channels" = "Channels";
 
+"channel.pinnedMessages.title" = "Pinned Messages";
+"channel.pinnedMessages.empty" = "No pinned messages";
+
 "message.action.title.info" = "Info";
 "message.action.title.add" = "Add";
 "message.action.title.edit" = "Edit";
@@ -204,6 +207,8 @@
 "message.action.title.reply-in-thread" = "Reply in thread";
 "message.action.title.forward" = "Forward";
 "message.action.title.select" = "Select";
+"message.action.title.pin" = "Pin";
+"message.action.title.unpin" = "Unpin";
 
 "message.action.title.call" = "Call";
 "message.action.title.copyNumber" = "Copy Number";
@@ -213,6 +218,8 @@
 
 "message.action.subtitle.deleteAll" = "Delete For All";
 "message.action.subtitle.deleteMe" = "Delete For Me";
+"message.action.subtitle.pinAll" = "Pin For All";
+"message.action.subtitle.pinMe" = "Pin For Me";
 "message.alert.delete.title" = "Delete message?";
 "message.alert.delete.description" = "Are you sure you want to delete this message?";
 "message.reply.count" = "%d Replies";
@@ -221,6 +228,8 @@
 "message.list.borders-today" = "Today";
 "message.deleted" = "Message was deleted.";
 "message.info.edited" = "edited";
+"message.pinned.poll" = "Poll: %@";
+"message.pinned.voice" = "%1$@: %2$@";
 "message.readMore" = "Read more";
 "message.attachment.image" = "Photo";
 "message.attachment.video" = "Video";
@@ -258,6 +267,13 @@
 "system.message.joinByInviteLink" = "%@ joined via invite link";
 "system.message.setDisappearingMessageTime" = "%@ set the disappearing messages timer to %@";
 "system.message.disableDisappearingMessages" = "%@ disabled disappearing messages";
+"system.message.pinnedBody" = "%1$@ pinned: \"%2$@\"";
+"system.message.pinnedPhoto" = "%@ pinned a photo";
+"system.message.pinnedVideo" = "%@ pinned a video";
+"system.message.pinnedVoice" = "%@ pinned a voice message";
+"system.message.pinnedFile" = "%@ pinned a file";
+"system.message.pinnedPoll" = "%@ pinned a poll";
+"system.message.pinnedMessage" = "%@ pinned a message";
 
 //Time Intervals
 "time.interval.off" = "Off";

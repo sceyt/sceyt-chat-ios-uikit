@@ -165,6 +165,10 @@ open class DeleteChannelsOperation: AsyncOperation {
                 for id in doomed {
                     DraftMessageDTO.delete(channelId: id, context: $0)
                     DraftAttachmentDTO.deleteAll(channelId: id, context: $0)
+                    // This path never reaches `deleteChannel(id:)`, so the pin rows would
+                    // otherwise be stranded on a channel that no longer exists.
+                    PinnedMessageDTO.deleteAll(channelId: id, context: $0)
+                    PinDetailsDTO.deleteAll(channelId: id, context: $0)
                 }
             } catch {
                 logger.errorIfNotNil(error, "")

@@ -241,6 +241,28 @@ open class ChannelRouter: Router<ChannelViewController> {
         rootViewController.present(nav, animated: true)
     }
 
+    /// Presents the standalone pinned-messages list.
+    ///
+    /// The screen sits over this conversation and closes itself — through its own "X", or
+    /// through a row's arrow, which hands the pin to `onSelect` so the message list
+    /// underneath jumps to it.
+    @discardableResult
+    open func showPinnedMessageList(
+        onSelect: @escaping (PinnedMessage) -> Void
+    ) -> ChannelPinnedMessageListViewController {
+        let viewController = Components.channelPinnedMessageListViewController.init()
+        viewController.viewModel = Components.channelPinnedMessageListViewModel
+            .init(channel: rootViewController.channelViewModel.channel)
+        viewController.onSelect = onSelect
+        // The list renders the conversation's own message cells, so its rows raise the
+        // conversation's actions; it hands the ones it cannot serve itself back here.
+        viewController.channelViewController = rootViewController
+        let navigationController = Components.navigationController.init()
+        navigationController.viewControllers = [viewController]
+        rootViewController.present(navigationController, animated: true)
+        return viewController
+    }
+
     open func showPollResults(pollResults: PollDetails, messageID: MessageId) {
         let viewController = Components.pollResultsViewController.init()
         viewController.viewModel = Components.pollResultsViewModel.init(pollResults: pollResults, messageID: messageID)

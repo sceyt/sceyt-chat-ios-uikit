@@ -25,8 +25,16 @@ open class DatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetchedResu
     public private(set) var changeSections = [DBChangeSection]()
     private var cache = [NSManagedObjectID: Item]()
     
+    /// Every item, in **unspecified** order — this is backed by a dictionary.
+    /// Use `orderedItems` whenever the request's sort descriptors matter.
     public var items: [Item] {
         Array(cache.values)
+    }
+
+    /// Every item in the order the fetch request asked for.
+    public var orderedItems: [Item] {
+        guard let objects = controller.fetchedObjects else { return [] }
+        return objects.map { cache[$0.objectID] ?? itemCreator($0) }
     }
     
     private var relationshipKeyPathsObserver: RelationshipKeyPathsObserver<DTO>?
