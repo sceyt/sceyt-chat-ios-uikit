@@ -87,8 +87,12 @@ extension ChannelViewController {
         open lazy var contentView = UIView()
             .withoutAutoresizingMask
 
-        /// Everything that changes from pin to pin, in one view so a page can slide the
-        /// thumbnail and the text together instead of animating them separately.
+        /// The window the preview travels past: static, and clipping, so a page shows the
+        /// outgoing and incoming previews crossing one line of text and nothing else.
+        ///
+        /// Only the preview pages. The title reads the same on every pin, so it sits above
+        /// this window rather than inside it, and the thumbnail crossfades its slot open or
+        /// shut in place — see `apply(thumbnail:reservingSlot:animated:)`.
         open lazy var pageView = UIView()
             .withoutAutoresizingMask
 
@@ -110,10 +114,13 @@ extension ChannelViewController {
         open lazy var separatorView = UIView()
             .withoutAutoresizingMask
 
+        /// The title over the paging window. `.fill`, not `.fillProportionally`: `pageView`
+        /// has no intrinsic size of its own to be proportional to — it takes the height of
+        /// the label inside it.
         open lazy var titleMessageVStack = UIStackView(
-            column: [titleLabel, messageLabel],
+            column: [titleLabel, pageView],
             spacing: 2,
-            distribution: .fillProportionally)
+            distribution: .fill)
             .withoutAutoresizingMask
 
         /// Thumbnails already resolved, keyed by `messageTid`. Paging back to a pin then
@@ -130,8 +137,13 @@ extension ChannelViewController {
         /// over where the image would have been.
         private var titleMessageVStackLeadingConstraint: NSLayoutConstraint?
 
-        /// The outgoing pin, held over the window while it slides away.
+        /// The outgoing preview, held over the window while it slides away.
         private weak var transitionSnapshot: UIView?
+
+        /// Whether the pin on screen has a thumbnail, as of the last `apply(thumbnail:…)`.
+        /// The crossfade's completion clears the outgoing image only while this still says
+        /// there is none.
+        private var showsThumbnail = false
 
         open override func setup() {
             super.setup()
@@ -142,6 +154,7 @@ extension ChannelViewController {
             imageView.clipsToBounds = true
             imageView.layer.cornerRadius = Layouts.thumbnailCornerRadius
             contentView.clipsToBounds = true
+            pageView.clipsToBounds = true
 
             let tap = UITapGestureRecognizer(target: self, action: #selector(onTap))
             addGestureRecognizer(tap)
@@ -173,9 +186,9 @@ extension ChannelViewController {
             addSubview(contentView)
             addSubview(pinButton)
             addSubview(separatorView)
-            contentView.addSubview(pageView)
-            pageView.addSubview(imageView)
-            pageView.addSubview(titleMessageVStack)
+            contentView.addSubview(imageView)
+            contentView.addSubview(titleMessageVStack)
+            pageView.addSubview(messageLabel)
 
             segmentIndicatorView.pin(to: self, anchors: [.leading(Layouts.horizontalPadding)])
             segmentIndicatorView.resize(anchors: [.width(Layouts.indicatorWidth)])
@@ -188,16 +201,16 @@ extension ChannelViewController {
             contentView.trailingAnchor.pin(to: pinButton.leadingAnchor, constant: -Layouts.horizontalPadding)
             contentView.pin(to: self, anchors: [.top(Layouts.verticalPadding), .bottom(-Layouts.verticalPadding)])
 
-            pageView.pin(to: contentView)
-
-            imageView.pin(to: pageView, anchors: [.leading])
-            imageView.centerYAnchor.pin(to: pageView.centerYAnchor)
+            imageView.pin(to: contentView, anchors: [.leading])
+            imageView.centerYAnchor.pin(to: contentView.centerYAnchor)
             imageView.resize(anchors: [.height(Layouts.thumbnailSize)])
             imageViewWidthConstraint = imageView.resize(anchors: [.width(Layouts.thumbnailSize)]).first
 
             titleMessageVStackLeadingConstraint = titleMessageVStack.leadingAnchor.pin(to: imageView.trailingAnchor, constant: Layouts.contentSpacing)
-            titleMessageVStack.centerYAnchor.pin(to: pageView.centerYAnchor)
-            titleMessageVStack.trailingAnchor.pin(lessThanOrEqualTo: pageView.trailingAnchor)
+            titleMessageVStack.centerYAnchor.pin(to: contentView.centerYAnchor)
+            titleMessageVStack.trailingAnchor.pin(lessThanOrEqualTo: contentView.trailingAnchor)
+
+            messageLabel.pin(to: pageView)
 
             pinButton.pin(to: self, anchors: [.trailing(-Layouts.horizontalPadding)])
             pinButton.centerYAnchor.pin(to: centerYAnchor)
@@ -254,9 +267,13 @@ extension ChannelViewController {
             select(index: selectedIndex - 1, animated: animated)
         }
 
-        /// Cross-slides `pageView` over a snapshot of the pin it is replacing, so a page
-        /// reads as the pins moving past a window rather than the preview being retyped
+        /// Cross-slides `messageLabel` over a snapshot of the preview it is replacing, so a
+        /// page reads as the pins moving past a window rather than the preview being retyped
         /// in place.
+        ///
+        /// The preview is the only thing that travels: the title is static, and the
+        /// thumbnail's slot opens and shuts under its own crossfade, which `changes()`
+        /// starts by way of `apply(thumbnail:reservingSlot:animated:)`.
         open func animatePaging(direction: PagingDirection, changes: () -> Void) {
             // Collapse anything still in flight first, so a flurry of swipes pages once per
             // swipe instead of stacking snapshots on top of each other.
@@ -264,8 +281,8 @@ extension ChannelViewController {
 
             guard !UIAccessibility.isReduceMotionEnabled,
                   window != nil,
-                  contentView.bounds.height > 0,
-                  let snapshot = pageView.snapshotView(afterScreenUpdates: false)
+                  pageView.bounds.height > 0,
+                  let snapshot = messageLabel.snapshotView(afterScreenUpdates: false)
             else {
                 // Reduce Motion, or nothing on screen to snapshot: the swap still has to
                 // happen, just without the slide.
@@ -273,35 +290,38 @@ extension ChannelViewController {
                 return
             }
 
-            // The snapshot belongs to `contentView`, not `pageView` — a child would travel
+            // The snapshot belongs to `pageView`, not `messageLabel` — a child would travel
             // with the transform instead of staying behind to slide the other way.
-            snapshot.frame = pageView.frame
+            snapshot.frame = messageLabel.frame
             snapshot.isUserInteractionEnabled = false
-            contentView.addSubview(snapshot)
+            pageView.addSubview(snapshot)
             transitionSnapshot = snapshot
 
             changes()
+            // The thumbnail's crossfade already laid the banner out inside its own animation
+            // block, so this settles only what is left over. The incoming preview has to be
+            // at its final size before it is offset, or it would slide and resize at once.
             contentView.layoutIfNeeded()
 
-            let distance = contentView.bounds.height
+            let distance = pageView.bounds.height
             let offset: CGFloat
             switch direction {
             case .forward: offset = distance
             case .backward: offset = -distance
             }
 
-            // The incoming pin starts on the side the outgoing one is heading away from, so
-            // the pair reads as one strip moving past the window.
-            pageView.transform = CGAffineTransform(translationX: 0, y: offset)
-            pageView.alpha = 0
+            // The incoming preview starts on the side the outgoing one is heading away from,
+            // so the pair reads as one strip moving past the window.
+            messageLabel.transform = CGAffineTransform(translationX: 0, y: offset)
+            messageLabel.alpha = 0
 
             UIView.animate(
                 withDuration: Layouts.pagingAnimationDuration,
                 delay: 0,
                 options: [.allowUserInteraction, .beginFromCurrentState, .curveEaseOut],
                 animations: { [self] in
-                    pageView.transform = .identity
-                    pageView.alpha = 1
+                    messageLabel.transform = .identity
+                    messageLabel.alpha = 1
                     snapshot.transform = CGAffineTransform(translationX: 0, y: -offset)
                     snapshot.alpha = 0
                 },
@@ -314,21 +334,21 @@ extension ChannelViewController {
             )
         }
 
-        /// Drops the outgoing snapshot and returns the content to rest. Safe at any point,
+        /// Drops the outgoing snapshot and returns the preview to rest. Safe at any point,
         /// including when no page is running.
         open func finishPaging() {
             transitionSnapshot?.removeFromSuperview()
             transitionSnapshot = nil
-            pageView.layer.removeAllAnimations()
-            pageView.transform = .identity
-            pageView.alpha = 1
+            messageLabel.layer.removeAllAnimations()
+            messageLabel.transform = .identity
+            messageLabel.alpha = 1
         }
 
         open func reload(animated: Bool = false) {
             updateSegmentIndicatorInsets()
             guard let item = selectedItem else {
                 messageLabel.attributedText = nil
-                apply(thumbnail: nil)
+                apply(thumbnail: nil, animated: animated)
                 segmentIndicatorView.update(count: 0, selected: 0)
                 accessibilityValue = "0/0"
                 return
@@ -351,7 +371,11 @@ extension ChannelViewController {
             // not start at the indicator for a frame and then shift right when the image
             // lands. It collapses again if nothing resolves.
             let cached = thumbnailCache[item.messageTid]
-            apply(thumbnail: cached, reservingSlot: cached != nil || expectsThumbnail(for: item))
+            apply(
+                thumbnail: cached,
+                reservingSlot: cached != nil || expectsThumbnail(for: item),
+                animated: animated
+            )
             loadThumbnail(for: item)
 
             segmentIndicatorView.update(count: items.count, selected: selectedIndex, animated: animated)
@@ -379,12 +403,151 @@ extension ChannelViewController {
         /// `reservingSlot` keeps the space (and the gap) while a thumbnail is still being
         /// resolved, which is the only thing that separates "this pin has no image" from
         /// "its image has not arrived yet".
-        open func apply(thumbnail: UIImage?, reservingSlot: Bool = false) {
+        ///
+        /// `animated` grows the image in — alpha and scale together, 0 to 1 — when the slot
+        /// opens, and shrinks it back down when the slot closes, with the slot's width, and
+        /// the gap the text keeps from it, travelling along.
+        ///
+        /// A slot that stays open across a page does **not** resize: the size it would
+        /// animate between is the same size twice. See the switch below.
+        open func apply(thumbnail: UIImage?, reservingSlot: Bool = false, animated: Bool = false) {
             let showsSlot = thumbnail != nil || reservingSlot
-            imageView.image = thumbnail
-            imageView.isHidden = thumbnail == nil
+            showsThumbnail = thumbnail != nil
             imageViewWidthConstraint?.constant = showsSlot ? Layouts.thumbnailSize : 0
             titleMessageVStackLeadingConstraint?.constant = showsSlot ? Layouts.contentSpacing : 0
+
+            guard animated, window != nil, !UIAccessibility.isReduceMotionEnabled else {
+                imageView.layer.removeAllAnimations()
+                imageView.image = thumbnail
+                imageView.isHidden = thumbnail == nil
+                imageView.alpha = thumbnail == nil ? 0 : 1
+                // Left collapsed while there is nothing to show, so the next animated pin
+                // grows out of nothing rather than snapping to full size and fading.
+                imageView.transform = thumbnail == nil ? Self.collapsedThumbnailTransform : .identity
+                return
+            }
+
+            // Before anything else, because every branch below reads where the image is
+            // now and animates on from there.
+            takeOverThumbnailAnimation()
+
+            switch (thumbnail, reservingSlot) {
+            case (nil, true):
+                // The slot is being held open for a thumbnail that has not resolved yet, so
+                // the image is left exactly as it is — including the outgoing pin's
+                // thumbnail, on a page from one media pin to the next. It stays up for the
+                // frame or two the resolve takes and is then crossed over in place.
+                //
+                // Shrinking it away here instead is what made a media -> media page look
+                // wrong: the slot never changes size, so there is nothing to shrink, and the
+                // shrink then overlapped the arriving thumbnail's grow-in — see
+                // `takeOverThumbnailAnimation()` for what two crossing scale animations do
+                // to each other. Which is also why it only showed up sometimes: whether
+                // they overlapped at all was a race with the disk.
+                animateThumbnailSlot(alpha: nil, transform: nil)
+
+            case (nil, false):
+                // Nothing to show and no slot to keep: shrink the image away with the slot.
+                animateThumbnailSlot(
+                    alpha: 0,
+                    transform: Self.collapsedThumbnailTransform,
+                    clearingImageWhenDone: true
+                )
+
+            case (let thumbnail?, _) where imageView.image != nil && imageView.alpha > 0:
+                // One thumbnail replacing another in a slot that is already open and full
+                // size: only the contents cross over.
+                UIView.transition(
+                    with: imageView,
+                    duration: Layouts.pagingAnimationDuration,
+                    options: [.transitionCrossDissolve, .allowUserInteraction, .beginFromCurrentState],
+                    animations: { [self] in imageView.image = thumbnail },
+                    completion: nil
+                )
+                animateThumbnailSlot(alpha: 1, transform: .identity)
+
+            case (let thumbnail?, _):
+                // Growing into an empty slot: painted, and squeezed down to nothing, before
+                // the animation, so there is something for it to grow out of.
+                imageView.image = thumbnail
+                imageView.isHidden = false
+                imageView.alpha = 0
+                imageView.transform = Self.collapsedThumbnailTransform
+                animateThumbnailSlot(alpha: 1, transform: .identity)
+            }
+        }
+
+        /// Hands the image's alpha and scale over from wherever an animation still in
+        /// flight has got them to, and clears that animation, so the next one starts from a
+        /// known state.
+        ///
+        /// Two transform animations overlapping on one view do not blend: UIKit runs the
+        /// second one additively, as the *delta* between its ends applied on top of whatever
+        /// else is running. Two scale animations crossing in opposite directions therefore
+        /// compose rather than average, and a delta between 1 and the collapsed scale
+        /// composes to a factor of a hundred. That is what magnified the thumbnail to ten
+        /// times its size — clipped by `contentView`, so it read as a full-width band — for
+        /// a few frames before it shrank into the slot.
+        ///
+        /// `messageLabel` needs none of this only because `finishPaging()` already clears
+        /// its animations before every page.
+        private func takeOverThumbnailAnimation() {
+            guard let keys = imageView.layer.animationKeys(), !keys.isEmpty else { return }
+            // Read before removing: afterwards the presentation layer is back at the model
+            // value and there is nothing to take over from.
+            let presentation = imageView.layer.presentation()
+            // By prefix, not `removeAllAnimations()`: an in-flight width or cross-dissolve
+            // is animating the slot correctly and only the scale and fade are being redone.
+            for key in keys where key.hasPrefix("transform") || key.hasPrefix("opacity") {
+                imageView.layer.removeAnimation(forKey: key)
+            }
+            guard let presentation else { return }
+            imageView.alpha = CGFloat(presentation.opacity)
+            imageView.transform = presentation.affineTransform()
+        }
+
+        /// The slot's own animation: its width, the leading gap the text keeps from it, and
+        /// the image's alpha and scale when those are moving too.
+        ///
+        /// `nil` targets leave the image where it is, which is how a slot held open for an
+        /// unresolved thumbnail keeps showing what it has.
+        private func animateThumbnailSlot(
+            alpha: CGFloat?,
+            transform: CGAffineTransform?,
+            clearingImageWhenDone: Bool = false
+        ) {
+            // No `.beginFromCurrentState`: that is the option that makes the scale additive.
+            // `takeOverThumbnailAnimation()` has already moved the model values to what is
+            // on screen, which is the same continuity without the matrix arithmetic.
+            UIView.animate(
+                withDuration: Layouts.pagingAnimationDuration,
+                delay: 0,
+                options: [.allowUserInteraction, .curveEaseOut],
+                animations: { [self] in
+                    if let alpha { imageView.alpha = alpha }
+                    if let transform { imageView.transform = transform }
+                    // Inside the block: this is what makes the slot's width and the text's
+                    // leading gap animate rather than snap.
+                    contentView.layoutIfNeeded()
+                },
+                completion: { [weak self] _ in
+                    // A pin paged in mid-shrink has a thumbnail of its own by now; this
+                    // completion must not clear the image that superseded ours.
+                    guard clearingImageWhenDone, let self, !self.showsThumbnail else { return }
+                    self.imageView.image = nil
+                    self.imageView.isHidden = true
+                }
+            )
+        }
+
+        /// The scale an absent thumbnail rests at. Not a true zero: a non-invertible matrix
+        /// is what makes Core Animation drop the layer's contents outright rather than
+        /// interpolate them, and the grow-in has to start from something.
+        private static var collapsedThumbnailTransform: CGAffineTransform {
+            CGAffineTransform(
+                scaleX: Layouts.thumbnailCollapsedScale,
+                y: Layouts.thumbnailCollapsedScale
+            )
         }
 
         /// Whether this pin is the kind that has a thumbnail at all — a photo, a video, or a
@@ -428,7 +591,7 @@ extension ChannelViewController {
                     guard self.selectedItem?.messageTid == tid else { return }
                     // Nothing resolved — a video with no metadata and nothing downloaded —
                     // so the slot `reload` held open closes rather than leaving an empty box.
-                    self.apply(thumbnail: image)
+                    self.apply(thumbnail: image, animated: true)
                 }
             }
         }
@@ -523,6 +686,9 @@ extension ChannelViewController {
             public static var contentSpacing: CGFloat = 8
             public static var thumbnailSize: CGFloat = 32
             public static var thumbnailCornerRadius: CGFloat = 8
+            /// How small the thumbnail is squeezed while a pin has none, which is the size
+            /// an arriving one grows out of.
+            public static var thumbnailCollapsedScale: CGFloat = 0.01
             public static var pinButtonSize: CGFloat = 24
             /// Vertical drag, in points, that pages the banner.
             public static var pagingTranslationThreshold: CGFloat = 12
