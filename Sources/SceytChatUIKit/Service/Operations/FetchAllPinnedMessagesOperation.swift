@@ -54,7 +54,10 @@ open class FetchAllPinnedMessagesOperation: AsyncOperation {
             return
         }
 
-        finish(result: .failure(SyncOperation.OperationError.cancelled))
+        // NB: nothing may call `finish` on this path before the pages are walked. `finish`
+        // latches on `didComplete`, so an early call both discards the real `.success` result
+        // *and* lets the queue release the operation — at which point `loadNext`'s `[weak self]`
+        // callback drops the page instead of storing it.
         DispatchQueue.global().asyncAfter(deadline: .now() + Self.watchdogTimeout) { [weak self] in
             guard let self, !self.didCompleteValue else { return }
             logger.error("SyncService: pin sync for channel \(self.query.channelId) timed out")

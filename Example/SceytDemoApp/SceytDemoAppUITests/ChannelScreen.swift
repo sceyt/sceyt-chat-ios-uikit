@@ -338,8 +338,12 @@ struct ChannelScreen {
     /// A coordinate drag rather than `swipeUp()`: XCUITest confines a swipe to the
     /// element's frame, and the banner is only ~52pt tall, so the gesture is too short to
     /// read as directional. The drag starts on the banner and travels well past it.
-    func swipeToNextPinnedMessage() { dragPinnedBanner(dy: -160) }
-    func swipeToPreviousPinnedMessage() { dragPinnedBanner(dy: 160) }
+    ///
+    /// Downward for the *next* pin: the banner opens on the newest pin, at the bottom
+    /// segment, and the walk runs up the bar toward the older ones — so the strip travels
+    /// down as the finger does.
+    func swipeToNextPinnedMessage() { dragPinnedBanner(dy: 160) }
+    func swipeToPreviousPinnedMessage() { dragPinnedBanner(dy: -160) }
 
     private func dragPinnedBanner(dy: CGFloat) {
         let start = pinnedMessagesView.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5))
@@ -348,7 +352,8 @@ struct ChannelScreen {
     }
 
     /// Taps the banner body, which jumps the list to the pin on screen and moves the banner
-    /// onto the next one. Off-centre on purpose, so the tap cannot land on the pin button.
+    /// onto the next one — the older pin, one segment up. Off-centre on purpose, so the tap
+    /// cannot land on the pin button.
     func tapPinnedBanner() {
         pinnedMessagesView.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5)).tap()
     }

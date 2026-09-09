@@ -65,14 +65,24 @@ open class ChannelPinnedMessageProvider: DataProvider {
     /// diffs against: filtering to `.shared` would make every personal pin look server-deleted
     /// and the reconcile would delete them all.
     ///
-    /// `.asc` so pages arrive in the same direction as `PinnedMessageDTO.defaultSortDescriptors`
-    /// — the banner fills in its final order as pages land instead of reshuffling per page.
+    /// `.desc` so the newest pins arrive first, which is the end the banner rests on: it
+    /// opens on the newest pin (see `PinnedMessagesView.items`), so that pin is on screen
+    /// from the first page instead of after the whole sweep.
+    ///
+    /// Ascending arrival is what the banner cannot use. It holds the pin the user is
+    /// looking at across every rewrite of the array, so the newest pin of the *first*
+    /// page becomes the pin it stays on, and the genuinely newest one — landing last —
+    /// never takes its place.
+    ///
+    /// The local sort (`PinnedMessageDTO.defaultSortDescriptors`) stays ascending
+    /// regardless: it, not the arrival order, is what the banner and the pinned list are
+    /// drawn from, so pages still fill in their final order as they land.
     open func createDefaultQuery() -> PinnedMessagesListQuery {
         PinnedMessagesListQuery
             .Builder(channelId: channelId)
             .limit(SceytChatUIKit.shared.config.queryLimits.pinnedMessageListQueryLimit)
             .pinType(.all)
-            .order(.asc)
+            .order(.desc)
             .build()
     }
 

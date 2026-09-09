@@ -3127,7 +3127,8 @@ open class ChannelViewController: ViewController,
             guard let item = pinnedMessagesView.selectedItem else { return }
             jumpToPinnedMessage(item)
             // A tap both takes the list to the pin on screen and hands the banner the
-            // next one, so repeated taps walk the whole set and wrap back to the first.
+            // next one, so repeated taps walk the whole set — up from the newest pin the
+            // banner opens on — and wrap back round to it.
             pinnedMessagesView.selectNext(animated: true)
         case .showList:
             showPinnedMessageList()
@@ -3167,9 +3168,11 @@ open class ChannelViewController: ViewController,
     /// walks forward instead of re-jumping to the pin the user just landed on.
     open func didSelectPinnedMessage(_ item: PinnedMessage) {
         if let index = pinnedMessagesView.items.firstIndex(where: { $0.messageTid == item.messageTid }) {
-            // `select` wraps, so the pin after the last one is the first, and a channel with
-            // a single pin keeps the banner where it is.
-            pinnedMessagesView.select(index: index + 1, animated: true)
+            // One step along the banner's walk, which runs up the segment bar toward the
+            // older pins — hence `- 1` against an `items` ordered oldest first. `select`
+            // wraps, so the pin after the oldest one is the newest, and a channel with a
+            // single pin keeps the banner where it is.
+            pinnedMessagesView.select(index: index - 1, animated: true)
         }
         jumpToPinnedMessage(item)
     }

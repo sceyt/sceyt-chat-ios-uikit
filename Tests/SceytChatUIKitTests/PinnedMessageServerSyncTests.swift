@@ -192,6 +192,48 @@ final class PinnedMessageServerSyncTests: XCTestCase {
                        "the value is load-bearing: see defaultSortDescriptors")
     }
 
+    /// The pinned-messages screen reads the same pins as the banner, in the opposite
+    /// direction. Every tiebreaker has to flip with the leading key: one left ascending
+    /// would leave the rows that tie on `serverPinId` in an unstable order, which is what
+    /// makes the FRC emit phantom `.move` events.
+    func testNewestFirstSortDescriptors_areTheDefaultOnesReversed() {
+        let ascending = PinnedMessageDTO.defaultSortDescriptors
+        let descending = PinnedMessageDTO.newestFirstSortDescriptors
+
+        XCTAssertEqual(descending.map(\.key), ascending.map(\.key),
+                       "the two orders must sort on the same keys, in the same priority")
+        XCTAssertTrue(ascending.allSatisfy { $0.ascending },
+                      "the banner's order is oldest pin first")
+        XCTAssertTrue(descending.allSatisfy { !$0.ascending },
+                      "and the list's is newest pin first, tiebreakers included")
+    }
+
+    func testFetchRequest_takesTheNewestFirstOrderOnlyWhenAsked() {
+        let banner = PinnedMessageDTO.fetchRequest(channelId: channelId)
+        let list = PinnedMessageDTO.fetchRequest(channelId: channelId, newestFirst: true)
+
+        XCTAssertEqual(banner.sortDescriptors, PinnedMessageDTO.defaultSortDescriptors,
+                       "the default stays the banner's order")
+        XCTAssertEqual(list.sortDescriptors, PinnedMessageDTO.newestFirstSortDescriptors)
+        // Compared with the expiry cutoff redacted: `unexpiredPredicate()` stamps `Date()`
+        // into the predicate, so two requests built a microsecond apart are never equal
+        // outright — the clause that matters is that both carry the same one.
+        XCTAssertEqual(Self.redactingExpiryCutoff(list.predicate),
+                       Self.redactingExpiryCutoff(banner.predicate),
+                       "one predicate for both: the screens must agree on which pins are live")
+    }
+
+    /// `channelId == 77 AND (pinnedUntil == nil OR pinnedUntil > CAST(<now>, "NSDate")) AND …`
+    /// with `<now>` taken out, so two predicates built at different instants can be compared.
+    private static func redactingExpiryCutoff(_ predicate: NSPredicate?) -> String {
+        guard let predicate else { return "nil" }
+        return predicate.predicateFormat.replacingOccurrences(
+            of: "CAST\\([0-9.]+, \"NSDate\"\\)",
+            with: "CAST(<now>, \"NSDate\")",
+            options: .regularExpression
+        )
+    }
+
     func testPinMessage_stampsTheSentinelAndTheAttemptTime() {
         let before = Int64(Date().timeIntervalSince1970 * 1000)
         let row = pin(seedMessage(id: 2, channelId: channelId))
@@ -458,7 +500,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
     // MARK: - Provider: query
 
-    func testCreateDefaultQuery_isAllScopesAscendingAtTheConfiguredLimit() {
+    func testCreateDefaultQuery_isAllScopesDescendingAtTheConfiguredLimit() {
         let provider = ChannelPinnedMessageProvider(channelId: channelId)
         let query = provider.createDefaultQuery()
 
@@ -466,8 +508,8 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         XCTAssertEqual(query.limit, SceytChatUIKit.shared.config.queryLimits.pinnedMessageListQueryLimit)
         XCTAssertEqual(query.pinType, .all,
                        "a scope filter would make every personal pin look server-deleted")
-        XCTAssertEqual(query.order, .asc,
-                       "pages must arrive in the same direction as the local sort")
+        XCTAssertEqual(query.order, .desc,
+                       "the newest pins must land first — the banner opens on that end")
     }
 
     func testDefaultPinnedMessageQueryLimit_isRaisedAboveTheSdkDefaultOfTen() {

@@ -30,14 +30,15 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
             "sceyt_chat_pinned_message_list_cell.\(id)"
         }
 
-        /// The pinned rows in the order the list must show them in.
+        /// The pinned rows in the order the list must show them in: **newest pin first**,
+        /// which is the reverse of the banner's segment bar.
         ///
         /// The fixture seeds no server pin ids, so every row ties on the primary
         /// `serverPinId` descriptor and the timeline tiebreakers decide — which is why this is
-        /// still timeline order. `--uitest-pinned-messages-pin-order` is the fixture that
-        /// exercises real pin ids.
+        /// still timeline order, just read backwards. `--uitest-pinned-messages-pin-order` is
+        /// the fixture that exercises real pin ids.
         static var allRowIdentifiers: [String] {
-            [textId, videoId, pollId].map(rowIdentifier)
+            [pollId, videoId, textId].map(rowIdentifier)
         }
 
         static let bannerTitle = "Pinned Messages"
@@ -101,9 +102,9 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
                        "nothing is pinned, so the banner must stay down")
     }
 
-    /// The banner's resting state: up, titled, and showing the *oldest* pin — it has to walk
-    /// the conversation forward and stay put while the user scrolls.
-    func testSeededPins_showTheBannerOnTheOldestPin() {
+    /// The banner's resting state: up, titled, and showing the *newest* pin — the bottom
+    /// segment of the bar, which is where the walk up through the older pins starts.
+    func testSeededPins_showTheBannerOnTheNewestPin() {
         openPinnedConversation()
 
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5),
@@ -114,38 +115,39 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
 
         // Without this, "showing pin 1 of 3" and "only one pin ever landed" look identical
         // from the preview alone, and every paging assertion could pass vacuously.
-        XCTAssertEqual(screen.pinnedMessagesValue, "1/3",
-                       "all three seeded pins must have landed")
+        XCTAssertEqual(screen.pinnedMessagesValue, "3/3",
+                       "all three seeded pins must have landed, and the banner rests on the last")
         // The fixture assigns no server pin ids, so all three tie on the primary descriptor
-        // and the timeline tiebreakers order them — the text message is the oldest.
-        XCTAssertEqual(screen.pinnedMessagesPreview.label, Pinned.textPreview,
+        // and the timeline tiebreakers order them — the poll is the newest.
+        XCTAssertEqual(screen.pinnedMessagesPreview.label, Pinned.pollPreview,
                        "pins with no server id fall back to conversation order")
     }
 
     /// The primary sort key is the server's pin id, not the message's timestamp.
     ///
     /// This fixture pins poll -> text -> video (ids 100, 200, 300) while their timeline order
-    /// is text -> video -> poll, so the banner can only start on the poll if it is genuinely
-    /// reading `serverPinId`.
+    /// is text -> video -> poll. The banner rests on the highest pin id, so it can only start
+    /// on the video if it is genuinely reading `serverPinId` — by timeline it would start on
+    /// the poll.
     func testSeededPinsWithServerPinIds_areOrderedByPinIdNotTimeline() {
         openPinOrderConversation()
 
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5),
                       "three messages are pinned, so the banner must be up")
-        XCTAssertEqual(screen.pinnedMessagesValue, "1/3",
+        XCTAssertEqual(screen.pinnedMessagesValue, "3/3",
                        "all three seeded pins must have landed")
         XCTAssertTrue(
-            waitForPreview(Pinned.pollPreview),
-            "the lowest pin id leads, even though its message is the newest — got \"\(screen.pinnedMessagesPreview.label)\""
+            waitForPreview(Pinned.videoPreview),
+            "the highest pin id rests at the bottom segment, even though its message is not the newest — got \"\(screen.pinnedMessagesPreview.label)\""
         )
 
         screen.swipeToNextPinnedMessage()
         XCTAssertTrue(waitForPreview(Pinned.textPreview),
-                      "pin id 200 comes next, walking backwards through the conversation")
+                      "pin id 200 comes next, walking up the bar")
 
         screen.swipeToNextPinnedMessage()
-        XCTAssertTrue(waitForPreview(Pinned.videoPreview),
-                      "pin id 300 is last")
+        XCTAssertTrue(waitForPreview(Pinned.pollPreview),
+                      "pin id 100 ends the walk, at the top segment")
     }
 
     // MARK: - Preview formatting
@@ -156,8 +158,8 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
 
-        XCTAssertEqual(screen.pinnedMessagesPreview.label, Pinned.textPreview,
-                       "a text message previews as its body")
+        XCTAssertEqual(screen.pinnedMessagesPreview.label, Pinned.pollPreview,
+                       "the banner opens on the newest pin, and a poll previews as \"Poll: <question>\"")
 
         screen.swipeToNextPinnedMessage()
         XCTAssertTrue(
@@ -167,8 +169,8 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
 
         screen.swipeToNextPinnedMessage()
         XCTAssertTrue(
-            waitForPreview(Pinned.pollPreview),
-            "a poll must preview as \"Poll: <question>\", got \"\(screen.pinnedMessagesPreview.label)\""
+            waitForPreview(Pinned.textPreview),
+            "a text message must preview as its body, got \"\(screen.pinnedMessagesPreview.label)\""
         )
     }
 
@@ -177,37 +179,38 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
     func testSwipingTheBanner_walksThePinsAndWraps() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertEqual(screen.pinnedMessagesPreview.label, Pinned.textPreview)
+        XCTAssertEqual(screen.pinnedMessagesPreview.label, Pinned.pollPreview)
 
         screen.swipeToNextPinnedMessage()
         XCTAssertTrue(waitForPreview(Pinned.videoPreview))
         screen.swipeToNextPinnedMessage()
-        XCTAssertTrue(waitForPreview(Pinned.pollPreview))
+        XCTAssertTrue(waitForPreview(Pinned.textPreview))
 
-        // Third of three: the next swipe must wrap rather than dead-end.
+        // The top segment: the next swipe must wrap rather than dead-end.
         screen.swipeToNextPinnedMessage()
-        XCTAssertTrue(waitForPreview(Pinned.textPreview),
-                      "swiping past the last pin must wrap to the first")
+        XCTAssertTrue(waitForPreview(Pinned.pollPreview),
+                      "swiping past the oldest pin must wrap round to the newest")
     }
 
     func testSwipingBack_walksThePinsInReverse() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
 
-        // Backwards from the first pin wraps to the last.
+        // Backwards from the newest pin — where the banner rests — wraps to the oldest.
         screen.swipeToPreviousPinnedMessage()
-        XCTAssertTrue(waitForPreview(Pinned.pollPreview),
-                      "swiping back from the first pin must wrap to the last")
+        XCTAssertTrue(waitForPreview(Pinned.textPreview),
+                      "swiping back from the newest pin must wrap to the oldest")
     }
 
     // MARK: - Tapping the banner
 
-    /// The point of the tap gesture: it hands the banner the *next* pin, so repeated taps
-    /// walk the pins without the user ever finding the swipe or the full list.
+    /// The point of the tap gesture: it hands the banner the *next* pin — the older one, a
+    /// segment up — so repeated taps walk the pins without the user ever finding the swipe
+    /// or the full list.
     func testTappingTheBanner_advancesToTheNextPin() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertEqual(screen.pinnedMessagesValue, "1/3")
+        XCTAssertEqual(screen.pinnedMessagesValue, "3/3")
 
         screen.tapPinnedBanner()
 
@@ -216,20 +219,20 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(waitForPreview(Pinned.videoPreview))
     }
 
-    func testTappingThroughAllPins_wrapsToTheFirst() {
+    func testTappingThroughAllPins_wrapsToTheNewest() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
 
         screen.tapPinnedBanner()
         XCTAssertTrue(waitForBannerValue("2/3"))
         screen.tapPinnedBanner()
-        XCTAssertTrue(waitForBannerValue("3/3"))
+        XCTAssertTrue(waitForBannerValue("1/3"))
 
-        // Third of three: the next tap must come back round rather than dead-end.
+        // The top segment: the next tap must come back round rather than dead-end.
         screen.tapPinnedBanner()
-        XCTAssertTrue(waitForBannerValue("1/3"),
-                      "tapping past the last pin must return to the first")
-        XCTAssertTrue(waitForPreview(Pinned.textPreview))
+        XCTAssertTrue(waitForBannerValue("3/3"),
+                      "tapping past the oldest pin must return to the newest")
+        XCTAssertTrue(waitForPreview(Pinned.pollPreview))
     }
 
     /// A tap has to move the *list* as well as the banner, and it goes to the pin that was
@@ -238,13 +241,13 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
     func testTappingTheBanner_jumpsTheListToThePinItWasShowing() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertEqual(screen.pinnedMessagesValue, "1/3")
-        XCTAssertFalse(screen.cell(Pinned.textId).exists,
-                       "the oldest pin starts above the visible window")
+        XCTAssertEqual(screen.pinnedMessagesValue, "3/3")
+        XCTAssertFalse(screen.cell(Pinned.pollId).exists,
+                       "every pin, the newest included, starts above the visible window")
 
         screen.tapPinnedBanner()
 
-        XCTAssertTrue(screen.cell(Pinned.textId).waitForExistence(timeout: 10),
+        XCTAssertTrue(screen.cell(Pinned.pollId).waitForExistence(timeout: 10),
                       "the tap must take the list to the pin the banner was showing")
         XCTAssertTrue(waitForBannerValue("2/3"),
                       "and leave the banner on the next pin")
@@ -413,8 +416,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(app.navigationBars[Pinned.bannerTitle].waitForExistence(timeout: 5),
                       "the presented screen is titled like the banner")
 
-        // Every seeded pin must be listed, in the same timeline order the banner pages
-        // through — not just "some rows appeared".
+        // Every seeded pin must be listed, newest pin first — not just "some rows appeared".
         XCTAssertEqual(screen.pinnedListRowIdentifiers, Pinned.allRowIdentifiers)
         // The rows are the conversation's own bubbles, so a pin reads as the message
         // itself: its body, and for the poll its question — never the banner's "Video" /
@@ -422,7 +424,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         // has no text of its own, and a bubble always realizes its body label, so it
         // contributes an empty one.
         XCTAssertEqual(screen.pinnedListBodies,
-                       [Pinned.textPreview, "", Pinned.pollQuestion])
+                       [Pinned.pollQuestion, "", Pinned.textPreview])
     }
 
     /// The screen is presented, not pushed: it carries an "X" instead of a back button,
@@ -431,7 +433,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
     func testPinnedListCloseButton_dismissesTheListAndLeavesTheBannerAlone() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertEqual(screen.pinnedMessagesValue, "1/3")
+        XCTAssertEqual(screen.pinnedMessagesValue, "3/3")
 
         XCTAssertTrue(screen.openPinnedMessageList())
         XCTAssertTrue(screen.pinnedListCloseButton.waitForExistence(timeout: 5),
@@ -441,7 +443,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(waitForPinnedListToClose(), "the \"X\" must dismiss the list")
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5),
                       "the conversation is back, banner included")
-        XCTAssertEqual(screen.pinnedMessagesValue, "1/3",
+        XCTAssertEqual(screen.pinnedMessagesValue, "3/3",
                        "closing picks no pin, so the banner must not move")
     }
 
@@ -451,7 +453,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
     func testPinnedListNavigateButton_closesTheListAndAdvancesPastThatPin() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertEqual(screen.pinnedMessagesValue, "1/3")
+        XCTAssertEqual(screen.pinnedMessagesValue, "3/3")
 
         XCTAssertTrue(screen.openPinnedMessageList())
         let videoRow = screen.pinnedListCell(Pinned.videoId)
@@ -464,32 +466,33 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(waitForPinnedListToClose(), "the arrow must close the list")
         XCTAssertTrue(screen.cell(Pinned.videoId).waitForExistence(timeout: 10),
                       "the arrow must take the list to the pin it belongs to")
-        // The second of three: the banner lands on the third, not on the one just picked.
-        XCTAssertTrue(waitForBannerValue("3/3"),
+        // The second of three: the banner lands on the first — the older pin one segment up
+        // — not on the one just picked.
+        XCTAssertTrue(waitForBannerValue("1/3"),
                       "the banner must move past the picked pin, got \(screen.pinnedMessagesValue)")
-        XCTAssertTrue(waitForPreview(Pinned.pollPreview))
+        XCTAssertTrue(waitForPreview(Pinned.textPreview))
     }
 
-    /// The last pin has nowhere forward to go, so the banner wraps to the first — the same
-    /// way tapping past the last pin does.
-    func testPinnedListNavigateButtonOnTheLastPin_wrapsTheBannerToTheFirst() {
+    /// The oldest pin has nowhere further up to go, so the banner wraps round to the newest —
+    /// the same way tapping past the oldest pin does.
+    func testPinnedListNavigateButtonOnTheOldestPin_wrapsTheBannerToTheNewest() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertEqual(screen.pinnedMessagesValue, "1/3")
-        // Move off the first pin, so the wrap back onto it is a real change rather than the
+        XCTAssertEqual(screen.pinnedMessagesValue, "3/3")
+        // Move off the newest pin, so the wrap back onto it is a real change rather than the
         // banner having never moved at all.
         screen.tapPinnedBanner()
         XCTAssertTrue(waitForBannerValue("2/3"))
 
         XCTAssertTrue(screen.openPinnedMessageList())
-        let pollRow = screen.pinnedListCell(Pinned.pollId)
-        XCTAssertTrue(pollRow.waitForExistence(timeout: 5), "the poll pin must have a row")
-        screen.pinnedListNavigateButton(in: pollRow).tap()
+        let textRow = screen.pinnedListCell(Pinned.textId)
+        XCTAssertTrue(textRow.waitForExistence(timeout: 5), "the text pin must have a row")
+        screen.pinnedListNavigateButton(in: textRow).tap()
 
         XCTAssertTrue(waitForPinnedListToClose(), "the arrow must close the list")
-        XCTAssertTrue(waitForBannerValue("1/3"),
-                      "past the last pin the banner must come back round, got \(screen.pinnedMessagesValue)")
-        XCTAssertTrue(waitForPreview(Pinned.textPreview))
+        XCTAssertTrue(waitForBannerValue("3/3"),
+                      "past the oldest pin the banner must come back round, got \(screen.pinnedMessagesValue)")
+        XCTAssertTrue(waitForPreview(Pinned.pollPreview))
     }
 
     /// The rows are the conversation's own bubbles, so they raise the conversation's own
@@ -508,7 +511,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(screen.pinnedListTable.exists,
                       "unpinning needs nothing from the conversation, so the list must stay up")
         XCTAssertEqual(screen.pinnedListRowIdentifiers,
-                       [Pinned.rowIdentifier(Pinned.videoId), Pinned.rowIdentifier(Pinned.pollId)])
+                       [Pinned.rowIdentifier(Pinned.pollId), Pinned.rowIdentifier(Pinned.videoId)])
     }
 
     /// The arrow lives on whichever side the bubble leaves free, so it can never cover the
@@ -571,7 +574,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         // to it when it opened.
         XCTAssertTrue(waitForRowToDisappear(textRow), "the unpinned row must leave the list")
         XCTAssertEqual(screen.pinnedListRowIdentifiers,
-                       [Pinned.rowIdentifier(Pinned.videoId), Pinned.rowIdentifier(Pinned.pollId)])
+                       [Pinned.rowIdentifier(Pinned.pollId), Pinned.rowIdentifier(Pinned.videoId)])
     }
 
     /// Emptying the list one pin at a time — there is no Unpin All — must leave the
@@ -609,7 +612,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
 
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 10),
                       "pins must come back from the database")
-        XCTAssertEqual(screen.pinnedMessagesPreview.label, Pinned.textPreview)
+        XCTAssertEqual(screen.pinnedMessagesPreview.label, Pinned.pollPreview)
     }
 
     // MARK: - Pin system message
@@ -763,7 +766,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
     func testUnpinningAnAckedPinWithNoConnection_hidesItAtOnce() {
         openConversation(launchApp(pinnedMessagesPinOrder: true, pinsStayPending: true))
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForBannerValue("1/3"))
+        XCTAssertTrue(waitForBannerValue("3/3"))
 
         XCTAssertTrue(screen.openPinnedMessageList())
         let row = screen.pinnedListCell(Pinned.pollId)
@@ -782,7 +785,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
     func testUnpinningAnAckedPin_completesWhenTheServerAgrees() {
         openPinOrderConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForBannerValue("1/3"))
+        XCTAssertTrue(waitForBannerValue("3/3"))
 
         XCTAssertTrue(screen.openPinnedMessageList())
         let row = screen.pinnedListCell(Pinned.pollId)
@@ -884,7 +887,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
     func testUnpinningEveryPinInQuickSuccession_takesTheBannerAway() {
         openPinnedConversation()
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForBannerValue("1/3"))
+        XCTAssertTrue(waitForBannerValue("3/3"))
 
         XCTAssertTrue(screen.openPinnedMessageList(), "the pinned list should open")
 
@@ -935,7 +938,8 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
 
         screen.swipeToNextPinnedMessage()
-        XCTAssertTrue(waitForPreview(Pinned.videoPreview))
+        XCTAssertTrue(waitForPreview(Pinned.videoPreview),
+                      "one step up from the newest pin the banner opens on")
 
         // Unpin a *different* pin than the one on show.
         let cell = screen.cell(Pinned.textId)
@@ -976,7 +980,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         }
 
         XCTAssertTrue(screen.pinnedMessagesView.exists)
-        XCTAssertTrue(waitForBannerValue("1/3"),
+        XCTAssertTrue(waitForBannerValue("3/3"),
                       "reopening the list must not disturb the pin set, got \(screen.pinnedMessagesValue)")
     }
 

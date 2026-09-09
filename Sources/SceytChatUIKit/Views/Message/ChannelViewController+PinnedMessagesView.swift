@@ -43,7 +43,11 @@ extension ChannelViewController {
 
         open var onAction: ((Action) -> Void)?
 
-        /// The pins to page through, in timeline order.
+        /// The pins to page through, in pin order — oldest first, so the array runs the
+        /// same way the segment bar does, top to bottom.
+        ///
+        /// The banner rests on the *last* of them: the newest pin, at the bottom segment.
+        /// See `selectNext(animated:)` for the walk that leads away from it.
         open var items: [PinnedMessage] = [] {
             didSet {
                 // A page still in flight would leave its snapshot stranded over the new pin.
@@ -58,7 +62,11 @@ extension ChannelViewController {
                 if let previousTid,
                    let index = items.firstIndex(where: { $0.messageTid == previousTid }) {
                     selectedIndex = index
-                } else if selectedIndex >= items.count {
+                } else {
+                    // Nothing left to hold on to — the first pins to land, or the pin that
+                    // was on screen has just been unpinned. Both cases put the banner back
+                    // where it rests by default: on the newest pin, which the ascending
+                    // order puts last, at the bottom segment.
                     selectedIndex = max(0, items.count - 1)
                 }
                 // Unpinned messages leave their thumbnails behind otherwise, and the cache
@@ -70,6 +78,9 @@ extension ChannelViewController {
         }
 
         /// Which pin is on screen. Wraps at both ends.
+        ///
+        /// `0` only until the first pins land: `items` then moves it to the last of them,
+        /// the newest pin, and every walk starts from there.
         open private(set) var selectedIndex: Int = 0
 
         open var selectedItem: PinnedMessage? {
@@ -160,8 +171,9 @@ extension ChannelViewController {
             addGestureRecognizer(tap)
             pinButton.addTarget(self, action: #selector(onPinButton), for: .touchUpInside)
 
-            // Dragging the banner walks the pins: up for the next, down for the previous,
-            // matching the list itself, which runs oldest -> newest downward.
+            // Dragging the banner walks the pins, with the previews following the finger:
+            // down for the next pin — the older one, in the segment above — and up for the
+            // previous one below it, the segment bar running oldest -> newest downward.
             //
             // A pan rather than a `UISwipeGestureRecognizer`: the banner is only ~52pt tall
             // and a swipe recognizer's distance threshold is most of that, so short drags
@@ -259,12 +271,21 @@ extension ChannelViewController {
             }
         }
 
+        /// The next pin in walk order, which runs *upward* from where the banner rests:
+        /// from the newest pin at the bottom segment to the older ones above it, wrapping
+        /// off the top back round to the newest.
+        ///
+        /// Index-wise that is a step *back* through `items`, which is ordered oldest first
+        /// — the array and the walk run opposite ways on purpose, so the walk starts on the
+        /// pin a reader is most likely to care about.
         open func selectNext(animated: Bool = false) {
-            select(index: selectedIndex + 1, animated: animated)
+            select(index: selectedIndex - 1, animated: animated)
         }
 
+        /// Back down the walk: toward the newer pins below, wrapping off the bottom round
+        /// to the oldest at the top.
         open func selectPrevious(animated: Bool = false) {
-            select(index: selectedIndex - 1, animated: animated)
+            select(index: selectedIndex + 1, animated: animated)
         }
 
         /// Cross-slides `messageLabel` over a snapshot of the preview it is replacing, so a
@@ -668,12 +689,16 @@ extension ChannelViewController {
             // Announce the page *before* running it, so the handler still sees the pin the
             // user was looking at. A swipe then reads exactly like a tap: the list travels
             // to the pin on screen, and the banner is left on the one that follows.
+            //
+            // Dragging up carries the strip up and brings in the segment below — a newer
+            // pin, so the walk's *previous*. Dragging down brings in the one above, which
+            // is where the walk itself goes.
             if goesUp {
-                onAction?(.next)
-                selectNext(animated: true)
-            } else {
                 onAction?(.previous)
                 selectPrevious(animated: true)
+            } else {
+                onAction?(.next)
+                selectNext(animated: true)
             }
         }
 
