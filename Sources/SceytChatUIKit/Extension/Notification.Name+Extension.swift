@@ -16,5 +16,8 @@ extension Notification.Name {
     static let didClosePoll = Notification.Name("didClosePoll")
     static let didOpenViewOnceMessage = Notification.Name("didOpenViewOnceMessage")
     static let didFinishChannelsSync = Notification.Name("didFinishChannelsSync")
+    /// One channel's pinned-message sweep finished and reconciled. `userInfo["channelId"]`
+    /// carries the `ChannelId`.
+    static let didFinishChannelPinsSync = Notification.Name("didFinishChannelPinsSync")
     static let didSendUserMessage = Notification.Name("didSendUserMessage")
 }

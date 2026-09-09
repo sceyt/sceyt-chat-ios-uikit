@@ -70,6 +70,21 @@ enum UITestSupport {
         ProcessInfo.processInfo.arguments.contains("--uitest-pinned-messages-single")
     }
 
+    /// `--uitest-pins-stay-pending` — leaves pin/unpin requests unacked, so a pin behaves the
+    /// way it does with no connection: queued, visible, and unannounced. Without it, UI-test
+    /// mode acks instantly (see `SceytChatUIKit.uiTestPinRequestsCompleteLocally`), because
+    /// otherwise nothing that depends on a server ack could be driven at all.
+    static var pinsStayPending: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pins-stay-pending")
+    }
+
+    /// `--uitest-pinned-messages-pin-order` — the three-pin fixture with explicit server pin
+    /// ids assigned **against** timeline order, so the banner's order can only be right if it
+    /// is reading `serverPinId` and not `messageCreatedAt`.
+    static var isPinnedMessagesPinOrder: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pinned-messages-pin-order")
+    }
+
     /// `--uitest-conversation-edited` — seeds the conversation's outgoing message as
     /// edited, so its bubble carries the "edited" mark beside the timestamp. The widest
     /// the info row gets, and what a pin added later has to make room beside.
@@ -280,9 +295,11 @@ enum UITestSupport {
             if let gapMs = pollDoubleVoteGapMs {
                 installFloatingPollDoubleVoteInjector(gapMs: gapMs)
             }
-        } else if isPinnedMessages || isPinnedMessagesSingle {
+        } else if isPinnedMessages || isPinnedMessagesSingle || isPinnedMessagesPinOrder {
+            SceytChatUIKit.uiTestPinRequestsCompleteLocally = !pinsStayPending
             seedPinnedMessagesConversation()
         } else if isConversation || isConversationUnread || conversationUnreadCountOverride != nil {
+            SceytChatUIKit.uiTestPinRequestsCompleteLocally = !pinsStayPending
             seedConversation()
             if isInjectionEnabled {
                 installFloatingConversationInjector()
@@ -556,7 +573,7 @@ enum UITestSupport {
         // the banner has somewhere to travel to. Multi-pin only: the single-pin fixture is
         // the one whose tests reach for the pinned bubble's context menu, and that needs
         // the bubble on screen from the start.
-        if isPinnedMessages {
+        if isPinnedMessages || isPinnedMessagesPinOrder {
             for n in 34...48 {
                 let incoming = !n.isMultiple(of: 2)
                 messages.append(.init(
@@ -573,9 +590,24 @@ enum UITestSupport {
             messages: messages
         )
 
+        if isPinnedMessagesPinOrder {
+            // Pin ids ascend poll -> text -> video, which is the reverse-ish of the timeline
+            // order (text 31, video 32, poll 33). Passing them explicitly also marks the rows
+            // `.synced`, the way a server sweep would.
+            SceytChatUIKit.shared.pinMessagesForUITests(
+                channelId: conversationChannelId,
+                messageIds: [pinnedPollMessageId, pinnedTextMessageId, pinnedVideoMessageId],
+                serverPinIds: [100, 200, 300]
+            )
+            return
+        }
+
         let toPin = isPinnedMessagesSingle
             ? [pinnedTextMessageId]
             : [pinnedTextMessageId, pinnedVideoMessageId, pinnedPollMessageId]
+        // No `serverPinIds`: every row keeps `unknownServerPinId`, ties on the leading sort
+        // descriptor and falls through to the timeline tiebreakers — so these fixtures stay in
+        // seeding order, which is what the rest of the pinned tests assert against.
         SceytChatUIKit.shared.pinMessagesForUITests(
             channelId: conversationChannelId,
             messageIds: toPin

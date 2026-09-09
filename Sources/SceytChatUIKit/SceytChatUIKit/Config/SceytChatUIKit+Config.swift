@@ -18,7 +18,8 @@ extension SceytChatUIKit {
                                                           messageListQueryLimit: 50,
                                                           attachmentListQueryLimit: 20,
                                                           reactionListQueryLimit: 30,
-                                                          pollVotersListQueryLimit: 30)
+                                                          pollVotersListQueryLimit: 30,
+                                                          pinnedMessageListQueryLimit: 30)
         
         public var presenceConfig: PresenceConfig = PresenceConfig(defaultPresenceState: .online,
                                                                    defaultPresenceStatus: "")
@@ -55,6 +56,17 @@ extension SceytChatUIKit {
         public var channelInviteDeepLinkConfig: ChannelInviteDeepLinkConfig?
         
         public var syncChannelsAfterConnect: Bool = true
+
+        /// Whether pinning a message for everyone also sends the client's own "X pinned: …"
+        /// system message into the conversation.
+        ///
+        /// Since pins replicate through the server, other members already learn about a pin from
+        /// `ChannelDelegate.channel(_:didPinMessages:)` — this message is the visible audit trail
+        /// in the timeline, not the delivery mechanism.
+        ///
+        /// Kept `true` because that is the behaviour shipped so far. **Set it to `false` if your
+        /// backend generates its own pin system message**, or members will see the notice twice.
+        public var sendsPinSystemMessage: Bool = true
 
         public var showGroupsInCommon: Bool = false
 

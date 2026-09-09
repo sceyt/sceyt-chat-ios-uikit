@@ -13,6 +13,13 @@ import CoreData
 import SceytChat
 import XCTest
 
+// `PinnedMessage` is ambiguous in this file, and not by accident: the SDK now has its own
+// `SceytChat.PinnedMessage` (the server's pin record — id, pinnedBy, message) next to the
+// UIKit's `PinnedMessage` (the row snapshot the banner renders). Inside the SceytChatUIKit
+// module same-module lookup picks the UIKit one; here, and in any integrator file importing
+// both, they are peers — hence `PinnedMessageScope`, which the UIKit exports for exactly this.
+private typealias PinScope = PinnedMessageScope
+
 final class PinnedMessageTests: XCTestCase {
 
     private var mockDB: MockDatabase!
@@ -65,7 +72,7 @@ final class PinnedMessageTests: XCTestCase {
     @discardableResult
     private func pin(
         _ message: MessageDTO,
-        scope: PinnedMessage.Scope = .forAll,
+        scope: PinScope = .forAll,
         at date: Date = Date(),
         until: Date? = nil
     ) -> PinnedMessageDTO? {
@@ -84,6 +91,13 @@ final class PinnedMessageTests: XCTestCase {
 
     private func pinRow(tid: Int64, channelId: ChannelId? = nil) -> PinnedMessageDTO? {
         PinnedMessageDTO.fetch(messageTid: tid, channelId: channelId ?? self.channelId, context: ctx)
+    }
+
+    /// Marks every pin row `.synced`, so a reconcile treats them as server truth rather than as
+    /// optimistic writes inside the grace window.
+    private func markSynced() {
+        PinnedMessageDTO.fetchAll(context: ctx).forEach { $0.sync = .synced }
+        try? ctx.save()
     }
 
     // MARK: - Pin / unpin
@@ -123,6 +137,189 @@ final class PinnedMessageTests: XCTestCase {
         XCTAssertNotEqual(PinnedMessageDTO.StoredScope.forMe.rawValue, 0)
         XCTAssertNotEqual(PinnedMessageDTO.StoredScope.forAll.rawValue, 0)
         XCTAssertEqual(PinnedMessageDTO.StoredScope.unspecified.scope, .forMe, "least surprising fallback")
+    }
+
+    // MARK: - Pending intents
+
+    /// A pin the server has never seen is simply dropped: there is nothing to unpin remotely, so
+    /// unpinning cancels the queued pin outright.
+    func testUnpinningAPendingPin_dropsTheRowWithNothingToSend() {
+        let message = seedMessage(id: 70, channelId: channelId)
+        pin(message)
+        XCTAssertEqual(pinRow(tid: 70)?.sync, .pendingPin)
+
+        let intent = ctx.unpinMessage(id: 70, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertNil(intent, "nothing to send — the server never knew about it")
+        XCTAssertNil(pinRow(tid: 70))
+        XCTAssertNil(message.pinDetails)
+    }
+
+    /// A pin the server acked has to be unpinned *there* too, so the row is kept as a durable
+    /// intent instead of deleted.
+    func testUnpinningASyncedPin_keepsAPendingUnpinIntent() {
+        let message = seedMessage(id: 71, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 600
+        row?.sync = .synced
+        try? ctx.save()
+
+        let intent = ctx.unpinMessage(id: 71, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertNotNil(intent, "the removal has to be sent")
+        XCTAssertEqual(pinRow(tid: 71)?.sync, .pendingUnpin)
+        XCTAssertEqual(pinRow(tid: 71)?.serverPinId, 600, "the pin id is what identifies it to the server")
+        XCTAssertNil(message.pinDetails, "but the bubble loses its pin at once")
+    }
+
+    /// The kept row must be invisible everywhere the user can see, or unpinning offline would
+    /// look like it did nothing.
+    func testPendingUnpin_isHiddenFromEveryDisplayFetch() {
+        let message = seedMessage(id: 72, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 601
+        row?.sync = .synced
+        try? ctx.save()
+        XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 1)
+
+        ctx.unpinMessage(id: 72, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertEqual(ctx.pinnedMessages(channelId: channelId).count, 0)
+        XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 0)
+        XCTAssertEqual(PinnedMessageDTO.fetchUnexpired(channelId: channelId, context: ctx).count, 0)
+        XCTAssertEqual(
+            PinnedMessageDTO.fetchAll(channelId: channelId, context: ctx).count, 1,
+            "the maintenance fetch must still see it — it is the work the sync has to do"
+        )
+    }
+
+    func testUnpinningAnAlreadyQueuedUnpin_isIdempotent() {
+        let message = seedMessage(id: 73, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 602
+        row?.sync = .synced
+        try? ctx.save()
+
+        ctx.unpinMessage(id: 73, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+        let first = pinRow(tid: 73)?.lastAttemptAt
+
+        let intent = ctx.unpinMessage(id: 73, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertNotNil(intent)
+        XCTAssertEqual(pinRow(tid: 73)?.sync, .pendingUnpin)
+        XCTAssertEqual(pinRow(tid: 73)?.lastAttemptAt, first, "re-asking must not re-date the attempt")
+        XCTAssertEqual(PinnedMessageDTO.fetchAll(channelId: channelId, context: ctx).count, 1)
+    }
+
+    func testConfirmUnpin_dropsTheRowAndTheMirror() {
+        let message = seedMessage(id: 74, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 603
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 74, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        ctx.confirmUnpin(messageTid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertNil(pinRow(tid: 74))
+        XCTAssertNil(message.pinDetails)
+    }
+
+    /// `confirmPin` reports whether *this* ack is the one that completed the intent. That boolean
+    /// is what stops a retry landing twice from posting two "X pinned" system messages.
+    func testConfirmPin_reportsTheTransitionOnlyOnce() {
+        let message = seedMessage(id: 75, channelId: channelId)
+        pin(message)
+        try? ctx.save()
+
+        XCTAssertTrue(
+            ctx.confirmPin(messageTid: message.tid, channelId: channelId,
+                           serverPinId: 700, pinnedUntil: nil, scope: .forAll),
+            "the first ack completes the pending pin"
+        )
+        try? ctx.save()
+
+        XCTAssertFalse(
+            ctx.confirmPin(messageTid: message.tid, channelId: channelId,
+                           serverPinId: 700, pinnedUntil: nil, scope: .forAll),
+            "a second ack for an already-synced pin is not a transition"
+        )
+    }
+
+    func testConfirmPin_onAnUnknownRow_reportsNoTransition() {
+        XCTAssertFalse(
+            ctx.confirmPin(messageTid: 99_999, channelId: channelId,
+                           serverPinId: 1, pinnedUntil: nil, scope: .forAll)
+        )
+    }
+
+    func testRecordPinAttemptFailure_bumpsTheRetryCountAndKeepsTheIntent() {
+        let message = seedMessage(id: 76, channelId: channelId)
+        pin(message)
+        try? ctx.save()
+
+        ctx.recordPinAttemptFailure(messageTid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        let row = pinRow(tid: 76)
+        XCTAssertEqual(row?.retryCount, 1)
+        XCTAssertEqual(row?.sync, .pendingPin, "a failed attempt must not discard the intent")
+    }
+
+    func testFetchPending_returnsBothDirectionsOldestAttemptFirst() {
+        let a = seedMessage(id: 80, channelId: channelId)
+        let b = seedMessage(id: 81, channelId: channelId)
+        let c = seedMessage(id: 82, channelId: channelId)
+
+        pin(a)?.lastAttemptAt = 3_000
+        let synced = pin(b)
+        synced?.serverPinId = 800
+        synced?.sync = .synced
+        pin(c)?.lastAttemptAt = 1_000
+        try? ctx.save()
+
+        ctx.unpinMessage(id: 81, tid: b.tid, channelId: channelId)
+        pinRow(tid: 81)?.lastAttemptAt = 2_000
+        try? ctx.save()
+
+        let pending = PinnedMessageDTO.fetchPending(context: ctx)
+        XCTAssertEqual(pending.map(\.messageTid), [82, 81, 80])
+        XCTAssertEqual(pending.map(\.sync), [.pendingPin, .pendingUnpin, .pendingPin])
+    }
+
+    func testFetchPending_ignoresSyncedRows() {
+        let message = seedMessage(id: 83, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 900
+        row?.sync = .synced
+        try? ctx.save()
+
+        XCTAssertTrue(PinnedMessageDTO.fetchPending(context: ctx).isEmpty)
+    }
+
+    /// A queued unpin must not keep the bubble marked, and the repair must not put the mirror
+    /// back — the user has already unpinned it.
+    func testRepairPinMirrors_doesNotReMarkABubbleForAPendingUnpin() {
+        let message = seedMessage(id: 84, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 901
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 84, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        ctx.repairPinMirrors(channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertNil(message.pinDetails, "a pin awaiting removal must not mark its bubble")
+        XCTAssertEqual(pinRow(tid: 84)?.sync, .pendingUnpin, "and the intent must survive the repair")
     }
 
     func testUnpin_clearsBothSides() {
@@ -412,21 +609,65 @@ final class PinnedMessageTests: XCTestCase {
 
     /// Timeline order, oldest first — not pin recency, or the banner reshuffles the moment
     /// somebody pins an old message.
-    func testPinnedOrder_isTimelineOrderNotPinOrder() {
+    /// The primary sort key is the server's pin id, ascending.
+    func testPinnedOrder_isPinOrderByServerPinId() {
         let older = seedMessage(id: 1, channelId: channelId, createdAt: Date(timeIntervalSince1970: 1_000))
         let newer = seedMessage(id: 2, channelId: channelId, createdAt: Date(timeIntervalSince1970: 2_000))
 
-        // Pin the NEWER one first, so pin order and timeline order disagree.
-        pin(newer, at: Date(timeIntervalSince1970: 5_000))
-        pin(older, at: Date(timeIntervalSince1970: 6_000))
+        // Pin the NEWER message first, so pin order and timeline order disagree.
+        pin(newer)?.serverPinId = 100
+        pin(older)?.serverPinId = 200
+        try? ctx.save()
 
         XCTAssertEqual(
-            ctx.pinnedMessages(channelId: channelId).map(\.messageId), [1, 2],
-            "the banner walks the conversation forward"
+            ctx.pinnedMessages(channelId: channelId).map(\.messageId), [2, 1],
+            "the banner walks pin order, oldest pin first — not the conversation"
         )
     }
 
-    func testPendingPin_sortsByCreatedAtNotById() {
+    /// With no pin ids yet every row ties on the leading descriptor, so the timeline
+    /// tiebreakers decide. This is what keeps seeded fixtures and UI tests in seeding order.
+    func testPinsWithNoServerId_fallBackToTimelineOrder() {
+        let older = seedMessage(id: 1, channelId: channelId, createdAt: Date(timeIntervalSince1970: 1_000))
+        let newer = seedMessage(id: 2, channelId: channelId, createdAt: Date(timeIntervalSince1970: 2_000))
+
+        pin(newer, at: Date(timeIntervalSince1970: 5_000))
+        pin(older, at: Date(timeIntervalSince1970: 6_000))
+
+        XCTAssertEqual(ctx.pinnedMessages(channelId: channelId).map(\.messageId), [1, 2])
+    }
+
+    /// An optimistic pin is the newest pin by definition, and must read that way *before* the
+    /// server tells us its id. That is the whole reason the sentinel is `.max` and not `0`.
+    func testOptimisticPin_sortsAsTheNewestPin() {
+        let confirmed = seedMessage(id: 1, channelId: channelId, createdAt: Date(timeIntervalSince1970: 9_000))
+        let optimistic = seedMessage(id: 2, channelId: channelId, createdAt: Date(timeIntervalSince1970: 1_000))
+
+        pin(confirmed)?.serverPinId = 500
+        pin(optimistic)   // keeps `unknownServerPinId`
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 2)?.serverPinId, PinnedMessageDTO.unknownServerPinId)
+        XCTAssertEqual(
+            ctx.pinnedMessages(channelId: channelId).map(\.messageId), [1, 2],
+            "the in-flight pin sorts last even though its message is the older one"
+        )
+    }
+
+    /// A row written before the server pin API carries `serverPinId == 0`, which sorts ahead of
+    /// every real pin. Harmless: `reconcilePins` sweeps it, or `storePin` stamps it by tid.
+    func testLegacyPinWithoutServerId_sortsAheadOfServerPins() {
+        let legacy = seedMessage(id: 1, channelId: channelId, createdAt: Date(timeIntervalSince1970: 9_000))
+        let server = seedMessage(id: 2, channelId: channelId, createdAt: Date(timeIntervalSince1970: 1_000))
+
+        pin(legacy)?.serverPinId = 0
+        pin(server)?.serverPinId = 700
+        try? ctx.save()
+
+        XCTAssertEqual(ctx.pinnedMessages(channelId: channelId).map(\.messageId), [1, 2])
+    }
+
+    func testPendingPin_withoutAServerId_sortsByCreatedAtNotById() {
         seedMessage(id: 5, channelId: channelId, createdAt: Date(timeIntervalSince1970: 1_000))
         let pending = seedMessage(id: 0, tid: 400, channelId: channelId,
                                   createdAt: Date(timeIntervalSince1970: 2_000))
@@ -437,6 +678,419 @@ final class PinnedMessageTests: XCTestCase {
             ctx.pinnedMessages(channelId: channelId).map(\.messageTid), [5, 400],
             "messageId 0 must not sort the pending pin to the head"
         )
+    }
+
+    func testFetchByServerPinId_ignoresTheSentinelAndZero() {
+        let message = seedMessage(id: 1, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 900
+        try? ctx.save()
+
+        XCTAssertEqual(
+            PinnedMessageDTO.fetch(serverPinId: 900, channelId: channelId, context: ctx)?.messageTid, 1
+        )
+        XCTAssertNil(
+            PinnedMessageDTO.fetch(serverPinId: 0, channelId: channelId, context: ctx),
+            "0 is not a pin id, it is the absence of one"
+        )
+        XCTAssertNil(
+            PinnedMessageDTO.fetch(
+                serverPinId: PinnedMessageDTO.unknownServerPinId,
+                channelId: channelId,
+                context: ctx
+            ),
+            "the sentinel is not a pin id either"
+        )
+    }
+
+    // MARK: - Server sync
+
+    /// The regression test for the "never insert a `MessageDTO`" decision. Routing pin sync
+    /// through `createOrUpdate(message:)` would make every pinned message a visible bubble
+    /// floating in a history gap, and would flip `parent.replied` on a pinned reply — which,
+    /// because the message list fetches on `replied == false`, deletes the parent from the
+    /// conversation.
+    func testStorePin_buildsTheSnapshotWithoutInsertingAMessageRow() {
+        let message = Message.Builder()
+            .id(77)
+            .tid(77)
+            .body("pinned from the server")
+            .type("text")
+            .build()
+
+        let row = ctx.storePin(
+            message: message,
+            channelId: channelId,
+            serverPinId: 4242,
+            pinnedBy: ChatUser(id: "them"),
+            pinnedUntil: nil,
+            scope: .forAll
+        )
+        try? ctx.save()
+
+        XCTAssertNotNil(row)
+        XCTAssertNil(
+            MessageDTO.fetch(id: 77, context: ctx),
+            "the pin must not conjure a message row the conversation never fetched"
+        )
+        XCTAssertEqual(row?.serverPinId, 4242)
+        XCTAssertEqual(row?.body, "pinned from the server")
+        XCTAssertEqual(row?.pinnedByUserId, "them")
+        XCTAssertEqual(row?.sync, .synced)
+        XCTAssertEqual(row?.scope, .forAll)
+    }
+
+    /// The pin table is keyed by `(messageTid, channelId)`, and the server does not always echo
+    /// an outgoing message's tid — so the tid has to come from the local row or a message that
+    /// already has a pin gets a second one.
+    func testStorePin_adoptsTheExistingRowByTid_andStampsTheServerId() {
+        let message = seedMessage(id: 80, tid: 9_001, channelId: channelId)
+        pin(message)
+        XCTAssertEqual(PinnedMessageDTO.count(channelId: channelId, context: ctx), 1)
+
+        let sdkMessage = Message.Builder().id(80).tid(0).body("edited").type("text").build()
+        ctx.storePin(
+            message: sdkMessage,
+            channelId: channelId,
+            serverPinId: 5555,
+            pinnedBy: ChatUser(id: "them"),
+            pinnedUntil: nil,
+            scope: .forMe
+        )
+        try? ctx.save()
+
+        XCTAssertEqual(
+            PinnedMessageDTO.count(channelId: channelId, context: ctx), 1,
+            "no duplicate row"
+        )
+        let row = pinRow(tid: 9_001)
+        XCTAssertEqual(row?.serverPinId, 5555)
+        XCTAssertEqual(row?.body, "edited")
+        XCTAssertEqual(row?.scope, .forMe)
+        XCTAssertEqual(
+            MessageDTO.fetch(id: 80, context: ctx)?.pinDetails?.isPinned, true,
+            "the mirror is written in the same transaction"
+        )
+    }
+
+    /// The pin table is keyed by `(messageTid, channelId)`. With no local row to read the tid
+    /// from, the lookup key and the snapshot's tid have to be derived the same way — deriving
+    /// them separately inserted a second row for an outgoing message on the next sweep.
+    func testStorePin_isIdempotentForAnOutgoingMessageWithNoLocalRow() {
+        func store() -> PinnedMessageDTO? {
+            ctx.storePin(
+                message: Message.Builder().id(90).tid(7_777).body("outgoing").type("text").build(),
+                channelId: channelId,
+                serverPinId: 6_600,
+                pinnedBy: ChatUser(id: "me"),
+                pinnedUntil: nil,
+                scope: .forAll
+            )
+        }
+
+        let first = store()
+        try? ctx.save()
+        XCTAssertEqual(first?.messageTid, 7_777, "an outgoing message keys off its tid")
+
+        store()   // a second sweep reporting the same pin
+        try? ctx.save()
+
+        XCTAssertEqual(
+            PinnedMessageDTO.count(channelId: channelId, context: ctx), 1,
+            "the lookup key and the snapshot must agree, or the sweep duplicates the row"
+        )
+    }
+
+    func testStorePin_refusesAMessageWithNoServerId() {
+        XCTAssertNil(
+            ctx.storePin(
+                message: Message.Builder().tid(500).build(),
+                channelId: channelId,
+                serverPinId: 1,
+                pinnedBy: ChatUser(id: "me"),
+                pinnedUntil: nil,
+                scope: .forAll
+            )
+        )
+        XCTAssertEqual(PinnedMessageDTO.count(channelId: channelId, context: ctx), 0)
+    }
+
+    func testStorePin_refusesViewOnceTransientAndDeletedMessages() {
+        func store(_ message: Message, pinId: Int64) -> PinnedMessageDTO? {
+            ctx.storePin(
+                message: message,
+                channelId: channelId,
+                serverPinId: pinId,
+                pinnedBy: ChatUser(id: "them"),
+                pinnedUntil: nil,
+                scope: .forAll
+            )
+        }
+
+        XCTAssertNil(store(Message.Builder().id(1).transient(true).build(), pinId: 1))
+        XCTAssertNil(store(Message.Builder().id(2).viewOnce(true).build(), pinId: 2))
+        XCTAssertEqual(PinnedMessageDTO.count(channelId: channelId, context: ctx), 0)
+
+        // A soft-deleted message would flap: the sweep creates the row, `syncPin` deletes it on
+        // the next message write, the next sweep creates it again.
+        let deleted = seedMessage(id: 3, channelId: channelId)
+        deleted.state = Int16(ChatMessage.State.deleted.intValue)
+        try? ctx.save()
+        XCTAssertNil(store(Message.Builder().id(3).build(), pinId: 3))
+        XCTAssertEqual(PinnedMessageDTO.count(channelId: channelId, context: ctx), 0)
+    }
+
+    func testConfirmPin_replacesTheSentinelAndMarksItSynced() {
+        let message = seedMessage(id: 12, channelId: channelId)
+        pin(message)
+        XCTAssertEqual(pinRow(tid: 12)?.sync, .pendingPin)
+        XCTAssertEqual(pinRow(tid: 12)?.serverPinId, PinnedMessageDTO.unknownServerPinId)
+
+        let until = Date(timeIntervalSince1970: 4_000_000_000)
+        ctx.confirmPin(
+            messageTid: 12,
+            channelId: channelId,
+            serverPinId: 8_800,
+            pinnedUntil: until,
+            scope: .forMe
+        )
+        try? ctx.save()
+
+        let row = pinRow(tid: 12)
+        XCTAssertEqual(row?.serverPinId, 8_800)
+        XCTAssertEqual(row?.sync, .synced)
+        XCTAssertEqual(row?.retryCount, 0)
+        XCTAssertEqual(row?.scope, .forMe)
+        XCTAssertEqual(row?.pinnedUntil?.bridgeDate, until)
+        XCTAssertEqual(MessageDTO.fetch(id: 12, context: ctx)?.pinDetails?.isPinned, true)
+    }
+
+    func testDeletePin_dropsTheRowAndTheMirror() {
+        let message = seedMessage(id: 20, channelId: channelId)
+        pin(message)?.serverPinId = 3_000
+        try? ctx.save()
+
+        ctx.deletePin(serverPinId: 3_000, messageId: 20, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertNil(pinRow(tid: 20))
+        XCTAssertNil(MessageDTO.fetch(id: 20, context: ctx)?.pinDetails)
+    }
+
+    /// An unpin can name a pin this device never stored — a personal pin from another device, or
+    /// a row a batch delete swept.
+    func testDeletePin_fallsBackToMessageIdWhenThePinIdIsUnknownHere() {
+        let message = seedMessage(id: 21, channelId: channelId)
+        pin(message)   // still carries the sentinel, no server id
+        try? ctx.save()
+
+        ctx.deletePin(serverPinId: 6_000, messageId: 21, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertNil(pinRow(tid: 21))
+        XCTAssertNil(MessageDTO.fetch(id: 21, context: ctx)?.pinDetails)
+    }
+
+    // MARK: - Reconcile
+
+    func testReconcilePins_deletesWhatTheServerDidNotReport_withItsMirror() {
+        let kept = seedMessage(id: 30, channelId: channelId)
+        let dropped = seedMessage(id: 31, channelId: channelId)
+        pin(kept)?.serverPinId = 10
+        pin(dropped)?.serverPinId = 11
+        markSynced()
+
+        ctx.reconcilePins(channelId: channelId, keeping: [10])
+        try? ctx.save()
+
+        XCTAssertNotNil(pinRow(tid: 30))
+        XCTAssertNil(pinRow(tid: 31))
+        XCTAssertEqual(MessageDTO.fetch(id: 30, context: ctx)?.pinDetails?.isPinned, true)
+        XCTAssertNil(
+            MessageDTO.fetch(id: 31, context: ctx)?.pinDetails,
+            "a swept pin must not leave the bubble marked"
+        )
+    }
+
+    /// The server has not been told about a pending pin, so its absence from the server's answer
+    /// is not evidence against it. This is what makes an offline pin survive to be sent.
+    func testReconcilePins_neverDeletesAPendingPin() {
+        let message = seedMessage(id: 40, channelId: channelId)
+        pin(message)   // .pendingPin
+        try? ctx.save()
+
+        ctx.reconcilePins(channelId: channelId, keeping: [])
+        try? ctx.save()
+
+        XCTAssertNotNil(pinRow(tid: 40))
+        XCTAssertEqual(pinRow(tid: 40)?.sync, .pendingPin)
+    }
+
+    /// And however stale it looks. A pin taken offline days ago is still an intent the user
+    /// expressed and the server has never seen — the same contract a pending reaction has.
+    func testReconcilePins_neverDeletesAStalePendingPin() {
+        let message = seedMessage(id: 41, channelId: channelId)
+        let row = pin(message)
+        row?.lastAttemptAt = Int64(Date().addingTimeInterval(-7 * 24 * 3600).timeIntervalSince1970 * 1000)
+        row?.retryCount = 12
+        try? ctx.save()
+
+        ctx.reconcilePins(channelId: channelId, keeping: [])
+        try? ctx.save()
+
+        XCTAssertNotNil(pinRow(tid: 41), "a queued pin is not garbage, however many attempts it has cost")
+    }
+
+    /// Nor a queued *unpin*: dropping it would resurrect the pin on the next sweep, because the
+    /// server still reports it.
+    func testReconcilePins_neverDeletesAPendingUnpin() {
+        let message = seedMessage(id: 42, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 500
+        row?.sync = .synced
+        try? ctx.save()
+
+        ctx.unpinMessage(id: 42, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+        XCTAssertEqual(pinRow(tid: 42)?.sync, .pendingUnpin)
+
+        // The server still reports pin 500 — it has not been told about the removal yet.
+        ctx.reconcilePins(channelId: channelId, keeping: [500])
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 42)?.sync, .pendingUnpin, "the queued removal must survive")
+    }
+
+    func testReconcilePins_sweepsALegacyRowWithNoServerId() {
+        let message = seedMessage(id: 42, channelId: channelId)
+        pin(message)?.serverPinId = 0
+        markSynced()
+
+        ctx.reconcilePins(channelId: channelId, keeping: [55])
+        try? ctx.save()
+
+        XCTAssertNil(pinRow(tid: 42))
+    }
+
+    func testReconcilePins_touchesOnlyTheGivenChannel() {
+        seedChannel(id: 99)
+        let mine = seedMessage(id: 50, channelId: channelId)
+        let other = seedMessage(id: 51, channelId: 99)
+        pin(mine)?.serverPinId = 1
+        pin(other)?.serverPinId = 2
+        markSynced()
+
+        ctx.reconcilePins(channelId: channelId, keeping: [])
+        try? ctx.save()
+
+        XCTAssertNil(pinRow(tid: 50))
+        XCTAssertNotNil(pinRow(tid: 51, channelId: 99))
+    }
+
+    /// A lapsed pin the server has also dropped has to be swept too — which is why the reconcile
+    /// reads through the maintenance fetch rather than the display request.
+    func testReconcilePins_alsoSweepsExpiredRows() {
+        let message = seedMessage(id: 52, channelId: channelId)
+        let row = pin(message, until: Date().addingTimeInterval(-60))
+        row?.serverPinId = 3
+        markSynced()
+
+        ctx.reconcilePins(channelId: channelId, keeping: [])
+        try? ctx.save()
+
+        XCTAssertNil(pinRow(tid: 52))
+    }
+
+    // MARK: - message.pin ingest
+
+    /// Nil pin details is not "unpinned": locally built messages, notification payloads and any
+    /// pre-pin-API server payload all carry nil, so treating it as unpinned would wipe good
+    /// state on every such write.
+    func testApplyPinDetails_nilLeavesPinStateUntouched() {
+        let message = seedMessage(id: 60, channelId: channelId)
+        pin(message)?.serverPinId = 20
+        markSynced()
+
+        ctx.applyPinDetails(nil, to: message)
+        try? ctx.save()
+
+        XCTAssertNotNil(pinRow(tid: 60))
+        XCTAssertEqual(message.pinDetails?.isPinned, true)
+    }
+
+    func testApplyPinState_unpinnedDropsTheRowAndTheMirror() {
+        let message = seedMessage(id: 61, channelId: channelId)
+        pin(message)?.serverPinId = 21
+        markSynced()
+
+        ctx.applyPinState(isPinned: false, pinnedUntil: nil, scope: .forAll, to: message)
+        try? ctx.save()
+
+        XCTAssertNil(pinRow(tid: 61))
+        XCTAssertNil(message.pinDetails)
+    }
+
+    /// A stale message page landing right after an optimistic pin must not wipe it before its
+    /// ack arrives — the same guard, for the same reason, as the pending-delete check.
+    func testApplyPinState_unpinnedIsIgnoredWhileThePinIsStillInFlight() {
+        let message = seedMessage(id: 62, channelId: channelId)
+        pin(message)   // .pendingPin
+        try? ctx.save()
+
+        ctx.applyPinState(isPinned: false, pinnedUntil: nil, scope: .forAll, to: message)
+        try? ctx.save()
+
+        XCTAssertNotNil(pinRow(tid: 62))
+        XCTAssertEqual(message.pinDetails?.isPinned, true)
+    }
+
+    /// The message payload carries no pin id and no `pinnedBy`, so it may mark the bubble but
+    /// must never invent a row — one with `serverPinId == 0` would sort to the head of the
+    /// banner and then be swept by the next reconcile.
+    func testApplyPinState_pinnedSetsTheMirrorButCreatesNoPinRow() {
+        let message = seedMessage(id: 63, channelId: channelId)
+        let until = Date(timeIntervalSince1970: 4_000_000_000)
+
+        ctx.applyPinState(isPinned: true, pinnedUntil: until, scope: .forMe, to: message)
+        try? ctx.save()
+
+        XCTAssertEqual(message.pinDetails?.isPinned, true)
+        XCTAssertEqual(message.pinDetails?.pinnedUntil?.bridgeDate, until)
+        XCTAssertEqual(
+            PinnedMessageDTO.count(channelId: channelId, context: ctx), 0,
+            "the sweep and the pin events are what create rows"
+        )
+    }
+
+    func testApplyPinState_pinnedRefreshesAnExistingRow() {
+        let message = seedMessage(id: 64, channelId: channelId)
+        pin(message, scope: .forAll)?.serverPinId = 22
+        markSynced()
+
+        let until = Date(timeIntervalSince1970: 4_000_000_000)
+        ctx.applyPinState(isPinned: true, pinnedUntil: until, scope: .forMe, to: message)
+        try? ctx.save()
+
+        let row = pinRow(tid: 64)
+        XCTAssertEqual(row?.scope, .forMe)
+        XCTAssertEqual(row?.pinnedUntil?.bridgeDate, until)
+        XCTAssertEqual(row?.serverPinId, 22, "the pin id survives a payload refresh")
+    }
+
+    /// `syncPin` clears the mirror when there is no pin row; `applyPinDetails` runs after it and
+    /// re-asserts the server's answer. The residual "mirror set, no row" is what a personal pin
+    /// from another device looks like, and what the window before the sweep lands looks like.
+    func testMessageWrite_withServerPinState_leavesTheMirrorSetWithNoRow() {
+        let message = seedMessage(id: 65, channelId: channelId)
+        ctx.syncPin(for: message)
+        ctx.applyPinState(isPinned: true, pinnedUntil: nil, scope: .forAll, to: message)
+        try? ctx.save()
+
+        XCTAssertEqual(
+            message.pinDetails?.isPinned, true,
+            "syncPin must not undo the more authoritative server signal"
+        )
+        XCTAssertEqual(PinnedMessageDTO.count(channelId: channelId, context: ctx), 0)
     }
 
     // MARK: - Offline

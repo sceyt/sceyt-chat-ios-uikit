@@ -239,8 +239,12 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         startDatabaseObserver {}
         if chatClient.connectionState == .connected {
             loadLastMessages()
+            // Already connected, so no `.connected` transition will arrive to trigger this.
+            syncPinnedMessages()
         } else {
             loadLastMessagesAfterConnect = true
+            // Nothing deferred to remember: `chatClient(_:didChange:error:)` sweeps on every
+            // transition to `.connected`.
         }
         newMessageCount = channel.newMessageCount
         event = .updateChannel
@@ -1972,7 +1976,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     // MARK: Pinned messages
 
-    /// The channel's live pins, in timeline order (oldest first).
+    /// The channel's live pins, in pin order (oldest pin first).
     public private(set) var pinnedMessages: [PinnedMessage] = []
 
     /// Feeds the pinned banner and the pinned list.
@@ -2001,19 +2005,37 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
 
     open func reloadPinnedMessages() {
         // `items` is dictionary-backed and unordered; the banner's paging depends on the
-        // request's timeline sort, so read the ordered view.
+        // request's pin-id sort, so read the ordered view.
         let items = pinnedMessageObserver.orderedItems.filter { !$0.isExpired }
         pinnedMessages = items
         event = .updatePinnedMessages(items)
+    }
+
+    /// Reconciles this channel's pins against the server, the way `syncChannels` reconciles the
+    /// channel list.
+    ///
+    /// Nothing here feeds the UI directly: the observer above has already started, so the banner
+    /// is showing whatever was on disk the moment the screen opened, and this sweep only writes
+    /// to the database. Pages land progressively and the reconcile drops what the server no
+    /// longer reports; the observer repaints either way.
+    ///
+    /// `open` so a host that manages pin state itself can suppress it.
+    open func syncPinnedMessages() {
+        SyncService.syncChannelPins(channelId: channel.id)
     }
 
     /// Pins a message for this channel.
     ///
     /// - Parameter pinnedUntil: when the pin lapses; `nil` is open-ended.
     ///
-    /// The write is local-only for now — the SceytChat SDK has no message-pin API — but it
-    /// goes through `ChannelPinnedMessageProvider` so the server call slots in there later
-    /// without touching this call site.
+    /// Stores the pin as an intent, then sends it — `ChannelPinnedMessageProvider` owns both
+    /// halves, which is why this call site did not have to move when pinning stopped being
+    /// local-only.
+    ///
+    /// An error here is not a failure to pin: the intent is on disk and the next sync sends it.
+    /// The "X pinned" system message is **not** posted from here — it is posted from the server's
+    /// ack, which for a pin taken offline is minutes later. See
+    /// `ChannelPinnedMessageProvider.confirm`.
     open func pinMessage(
         layoutModel: MessageLayoutModel,
         scope: PinnedMessage.Scope,
@@ -2023,13 +2045,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             message: layoutModel.message,
             scope: scope,
             pinnedUntil: pinnedUntil
-        ) { [weak self] error in
+        ) { error in
             logger.errorIfNotNil(error, "Pin message")
-            // Only a pin for everyone is a channel event worth recording in the
-            // conversation. A personal pin is invisible to the other members, so it gets
-            // no system message.
-            guard error == nil, scope == .forAll else { return }
-            self?.pinnedMessageProvider.sendPinSystemMessage(for: layoutModel.message)
         }
     }
 
@@ -3334,6 +3351,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 loadLastMessages()
                 loadLastMessagesAfterConnect = false
             }
+            // Every (re)connection, not just the first: pin and unpin events that landed while
+            // this device was offline were dropped, and a sweep is the only way to learn about
+            // them. Same reason `syncChannels` runs on connect. The per-channel guard in
+            // `SyncService` collapses this when a sweep is already in flight.
+            syncPinnedMessages()
             // A sync usually follows (re)connection after a DB wipe; resolve a stale local
             // direct placeholder to the real synced channel as soon as it lands in the DB.
             reconcileDirectChannelAfterSyncIfNeeded()

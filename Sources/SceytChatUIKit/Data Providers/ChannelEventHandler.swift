@@ -329,7 +329,48 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             logger.debug(error?.localizedDescription ?? "")
         }
     }
-    
+
+    // MARK: - Pinned messages
+    //
+    // Not to be confused with `channelDidPin` / `channelDidUnpin` directly above, which are the
+    // pre-existing "this channel is pinned to the top of the channel list" events.
+    //
+    // These two are the **other half** of the pin write. The SDK resolves a pin request's pending
+    // id and hands the acting device its answer through the completion handler *instead of* this
+    // delegate, so the device that performed the pin never lands here — see
+    // `ChannelPinnedMessageProvider.flushPendingPin`, which does the same write for that case.
+    // Both paths must therefore be idempotent, and are: `storePin` keys off `(messageTid,
+    // channelId)` via `fetchOrCreate` and overwrites `serverPinId`.
+    //
+    // `ChannelEventHandler` is started globally from `SceytChatUIKit.startEventHandler`, so this
+    // works whether or not the channel is on screen.
+
+    open func channel(_ channel: Channel, didPinMessages pinnedMessages: [SceytChat.PinnedMessage]) {
+        guard !pinnedMessages.isEmpty else { return }
+        database.write {
+            for pinnedMessage in pinnedMessages {
+                $0.storePin(pinnedMessage, channelId: channel.id)
+            }
+        } completion: { error in
+            logger.errorIfNotNil(error, "Store \(pinnedMessages.count) pinned message(s) for channel \(channel.id)")
+        }
+    }
+
+    open func channel(_ channel: Channel, didUnpinMessages pinnedMessages: [SceytChat.PinnedMessage]) {
+        guard !pinnedMessages.isEmpty else { return }
+        database.write {
+            for pinnedMessage in pinnedMessages {
+                $0.deletePin(
+                    serverPinId: Int64(pinnedMessage.id),
+                    messageId: pinnedMessage.message.id,
+                    channelId: channel.id
+                )
+            }
+        } completion: { error in
+            logger.errorIfNotNil(error, "Delete \(pinnedMessages.count) unpinned message(s) for channel \(channel.id)")
+        }
+    }
+
     open func channelDidMarkAsRead(_ channel: Channel) {
         database.write {
             $0.createOrUpdate(channel: channel)

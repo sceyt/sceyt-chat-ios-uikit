@@ -24,6 +24,87 @@ public final class SyncService: NSObject {
     /// they are created inside `syncChannels` and would otherwise be unreachable.
     private static var activeSyncQueues = [OperationQueue]()
 
+    // MARK: - Pinned message sync state
+    //
+    // Deliberately a *separate*, per-channel guard rather than the single global slot above:
+    // `syncChannels` claims that slot for the whole channel list, so sharing it would mean
+    // opening a conversation blocks a channel-list sync and vice versa. Same generation
+    // pattern, keyed by channel.
+    private static let pinSyncLock = NSLock()
+    private static var pinSyncGenerations = [ChannelId: UInt64]()
+    private static var activePinSyncQueues = [ChannelId: OperationQueue]()
+    private static var pinSyncCounter: UInt64 = 0
+
+    private static func startPinSyncIfNeeded(channelId: ChannelId) -> UInt64? {
+        pinSyncLock.lock()
+        defer { pinSyncLock.unlock() }
+
+        guard activePinSyncQueues[channelId] == nil, pinSyncGenerations[channelId] == nil else {
+            return nil
+        }
+        pinSyncCounter += 1
+        pinSyncGenerations[channelId] = pinSyncCounter
+        return pinSyncCounter
+    }
+
+    private static func registerPinSync(queue: OperationQueue, channelId: ChannelId, generation: UInt64) {
+        pinSyncLock.lock()
+        defer { pinSyncLock.unlock() }
+
+        guard pinSyncGenerations[channelId] == generation else { return }
+        activePinSyncQueues[channelId] = queue
+    }
+
+    /// Ends the pin sync started as `generation`. Returns `false` — and changes nothing — when
+    /// that session was cancelled or superseded, so a stale completion block cannot release a
+    /// newer sweep's slot.
+    @discardableResult
+    private static func finishPinSync(channelId: ChannelId, generation: UInt64) -> Bool {
+        pinSyncLock.lock()
+        defer { pinSyncLock.unlock() }
+
+        guard pinSyncGenerations[channelId] == generation else {
+            logger.verbose("SyncService: ignoring stale pin sync completion for channel \(channelId) (generation \(generation))")
+            return false
+        }
+        pinSyncGenerations[channelId] = nil
+        activePinSyncQueues[channelId] = nil
+        return true
+    }
+
+    private static func isCurrentPinSync(channelId: ChannelId, generation: UInt64) -> Bool {
+        pinSyncLock.lock()
+        defer { pinSyncLock.unlock() }
+
+        return pinSyncGenerations[channelId] == generation
+    }
+
+    /// Abandons the pin sweep in flight for one channel. Clearing the generation neuters any
+    /// completion block still to fire, so the slot is free immediately.
+    public class func cancelPinSync(channelId: ChannelId) {
+        pinSyncLock.lock()
+        let queue = activePinSyncQueues[channelId]
+        pinSyncGenerations[channelId] = nil
+        activePinSyncQueues[channelId] = nil
+        pinSyncLock.unlock()
+
+        queue?.cancelAllOperations()
+    }
+
+    /// Abandons every pin sweep. Called from `cancelSync` — which runs *before* the database is
+    /// wiped on account switch, so the wipe is the barrier for pages already in flight.
+    public class func cancelAllPinSyncs() {
+        pinSyncLock.lock()
+        let queues = Array(activePinSyncQueues.values)
+        pinSyncGenerations.removeAll()
+        activePinSyncQueues.removeAll()
+        pinSyncLock.unlock()
+
+        guard !queues.isEmpty else { return }
+        logger.verbose("SyncService: cancelAllPinSyncs — abandoning \(queues.count) in-flight pin sweep(s)")
+        queues.forEach { $0.cancelAllOperations() }
+    }
+
     public static var isSyncing: Bool {
         syncStateLock.lock()
         defer { syncStateLock.unlock() }
@@ -105,12 +186,15 @@ public final class SyncService: NSObject {
             Components.channelMessageMarkerProvider.canMarkMessage = true
         }
 
+        cancelAllPinSyncs()
+
         if includingPendingItems {
             logger.verbose("SyncService: cancelSync — cancelling pending item queues")
             reactionQueue.cancelAllOperations()
             pollVoteQueue.cancelAllOperations()
             markersQueue.cancelAllOperations()
             messageDeleteQueue.cancelAllOperations()
+            pinQueue.cancelAllOperations()
         }
     }
 
@@ -127,6 +211,14 @@ public final class SyncService: NSObject {
     }()
 
     public static var pollVoteQueue: OperationQueue = {
+        let op = OperationQueue()
+        op.maxConcurrentOperationCount = 1
+        return op
+    }()
+
+    /// Drains stored pin/unpin intents. Serial, like the other pending-item queues: two pins for
+    /// the same message must not race, and the "X pinned" system message is posted from the ack.
+    public static var pinQueue: OperationQueue = {
         let op = OperationQueue()
         op.maxConcurrentOperationCount = 1
         return op
@@ -249,6 +341,44 @@ public final class SyncService: NSObject {
                             operations.append(op)
                         }
                     }
+                }
+                completion(operations)
+            }
+    }
+
+    /// Sends every stored pin/unpin intent. The `sendPendingReactions()` analogue.
+    ///
+    /// Called from `syncChannels` on connect and from `syncChannelPins` when a channel opens, so
+    /// a pin taken with no connection goes out at the first opportunity either way.
+    public class func sendPendingPins() {
+        workerQueue
+            .async {
+                makePendingPinOperations {
+                    guard !$0.isEmpty else { return }
+                    logger.info("[Pin] sync: \($0.count) pending pin intent(s) to send")
+                    pinQueue.addOperations($0, waitUntilFinished: false)
+                }
+            }
+    }
+
+    /// One operation per stored intent, grouped so a channel shares its provider.
+    ///
+    /// - Parameter channelId: Restricts the batch to one channel, for the channel-open sweep.
+    ///   `nil` takes every channel, which is what the connect-time sync wants.
+    public class func makePendingPinOperations(
+        channelId: ChannelId? = nil,
+        completion: @escaping ([PinResendOperation]) -> Void
+    ) {
+        Components.channelPinnedMessageProvider
+            .fetchPendingPins { records in
+                let scoped = channelId.map { id in records.filter { $0.channelId == id } } ?? records
+                var providers = [ChannelId: ChannelPinnedMessageProvider]()
+                var operations = [PinResendOperation]()
+                for record in scoped {
+                    let provider = providers[record.channelId]
+                        ?? Components.channelPinnedMessageProvider.init(channelId: record.channelId)
+                    providers[record.channelId] = provider
+                    operations.append(PinResendOperation(provider: provider, record: record))
                 }
                 completion(operations)
             }
@@ -391,6 +521,7 @@ public final class SyncService: NSObject {
             logger.verbose("SyncService: syncChannels started (generation \(generation))")
             Components.channelMessageMarkerProvider.canMarkMessage = false
             Self.sendPendingReactions()
+            Self.sendPendingPins()
 
             let channelSyncQueue = OperationQueue()
             channelSyncQueue.maxConcurrentOperationCount = 1
@@ -509,6 +640,80 @@ public final class SyncService: NSObject {
         }
 }
 
+extension SyncService {
+
+    /// Reconciles one channel's pinned messages against the server.
+    ///
+    /// The `syncChannels` shape, scoped to a channel: paginate the server's pins, storing each
+    /// page as it lands so the banner fills progressively, then delete the local pins the server
+    /// did not report. The conversation shows whatever is already on disk the instant it opens —
+    /// this only mutates the database, and the existing `pinnedMessageObserver` repaints.
+    ///
+    /// Safe to call from several places for the same channel (the conversation and the pinned
+    /// list both do): the per-channel guard makes the second call a no-op.
+    public class func syncChannelPins(channelId: ChannelId, completion: ((Bool) -> Void)? = nil) {
+        guard channelId != 0 else {
+            completion?(false)
+            return
+        }
+        guard let generation = Self.startPinSyncIfNeeded(channelId: channelId) else {
+            logger.verbose("SyncService: syncChannelPins skipped for channel \(channelId) — already syncing")
+            completion?(false)
+            return
+        }
+        logger.verbose("SyncService: syncChannelPins started for channel \(channelId) (generation \(generation))")
+
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        Self.registerPinSync(queue: queue, channelId: channelId, generation: generation)
+
+        // The channel's own stored intents go out **first**, on the same serial queue, so a pin
+        // taken offline is on the server before the fetch reads the server's answer — otherwise
+        // the sweep's first page would simply not contain it. (Nothing would be lost either way:
+        // `reconcilePins` never deletes a pending row. This just means the pin arrives synced
+        // instead of staying queued for another round.)
+        Self.makePendingPinOperations(channelId: channelId) { pendingOperations in
+            if !pendingOperations.isEmpty {
+                logger.info("[Pin] channel \(channelId): \(pendingOperations.count) pending pin intent(s) to send before the sweep")
+            }
+            let operations = pendingOperations + Operations.syncChannelPinOperations(channelId: channelId)
+            let completionOperator = Operation()
+            completionOperator.addDependency(operations.last!)
+            completionOperator.completionBlock = {
+                guard Self.finishPinSync(channelId: channelId, generation: generation) else {
+                    completion?(false)
+                    return
+                }
+                Self.notifyChannelPinsSyncFinished(channelId: channelId)
+                completion?(completionOperator.isFinished)
+            }
+
+            // Cancellation can land between claiming the slot and here — and the read above is
+            // not instant. Enqueueing then would run a whole sweep for a session that no longer
+            // exists, and on account switch reconcile the incoming account's pins against the
+            // outgoing account's answer.
+            guard Self.isCurrentPinSync(channelId: channelId, generation: generation) else {
+                logger.verbose("SyncService: pin sync generation \(generation) for channel \(channelId) cancelled before enqueue")
+                completionOperator.completionBlock = nil
+                Self.finishPinSync(channelId: channelId, generation: generation)
+                completion?(false)
+                return
+            }
+            queue.addOperations(operations + [completionOperator], waitUntilFinished: false)
+        }
+    }
+
+    /// Signals that one channel's pin sweep finished, so an open screen can react to the
+    /// reconcile rather than only to the observer's row-level changes.
+    private static func notifyChannelPinsSyncFinished(channelId: ChannelId) {
+        NotificationCenter.default.post(
+            name: .didFinishChannelPinsSync,
+            object: nil,
+            userInfo: ["channelId": channelId]
+        )
+    }
+}
+
 public struct Operations {
 
     public static func syncChannelOperations(undeleteChannelIds: [ChannelId] = [], onLoad: (([Channel]) -> Void)? = nil) -> [Operation] {
@@ -540,6 +745,35 @@ public struct Operations {
                 fetchChannels,
                 fetchDone,
                 deleteChannels]
+    }
+
+    /// `fetchPins -> fetchDone -> reconcilePins`, the same three-step graph as
+    /// `syncChannelOperations`.
+    ///
+    /// `fetchDone` is where the safety lives: it seeds the reconcile's keep set from the fetch's
+    /// accumulated result, and **cancels the reconcile outright when the fetch failed**. Without
+    /// that single line a dropped connection mid-sweep reads as "the server has no pins" and
+    /// deletes every local pin in the channel.
+    public static func syncChannelPinOperations(channelId: ChannelId) -> [Operation] {
+        let provider = Components.channelPinnedMessageProvider.init(channelId: channelId)
+
+        let fetchPins = FetchAllPinnedMessagesOperation(
+            query: provider.createDefaultQuery(),
+            provider: provider
+        )
+        let reconcilePins = ReconcilePinnedMessagesOperation(channelId: channelId, provider: provider)
+
+        let fetchDone = BlockOperation { [unowned fetchPins, unowned reconcilePins] in
+            guard case let .success(pins)? = fetchPins.result else {
+                reconcilePins.cancel()
+                return
+            }
+            reconcilePins.addPin(serverPinIds: pins.map { Int64($0.id) })
+        }
+        fetchDone.addDependency(fetchPins)
+        reconcilePins.addDependency(fetchDone)
+
+        return [fetchPins, fetchDone, reconcilePins]
     }
 
     public static func syncChannelMessagesOperations(

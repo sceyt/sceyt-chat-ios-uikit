@@ -27,7 +27,7 @@ open class ChannelPinnedMessageListViewModel: NSObject {
 
     @Published public var event: Event?
 
-    /// The channel's live pins in timeline order (oldest first) — the same order the banner
+    /// The channel's live pins in pin order (oldest pin first) — the same order the banner
     /// pages through, so a row index maps straight onto the banner's selected index.
     public private(set) var items: [PinnedMessage] = []
 
@@ -96,6 +96,17 @@ open class ChannelPinnedMessageListViewModel: NSObject {
         try? pinnedMessageObserver.startObserver()
         try? messageObserver.startObserver()
         reload()
+        // The screen shows whatever is on disk immediately (above), then reconciles against the
+        // server. Usually a no-op: the conversation kicked the same sweep when it opened, and
+        // `SyncService`'s per-channel guard collapses the second call. It matters when this
+        // screen is reached without one — a deep link, or a sweep that has since finished.
+        //
+        // Deferred a turn so none of it — claiming the channel's sweep slot, building the query,
+        // enqueueing — lands inside the presentation that is calling this.
+        let channelId = channel.id
+        DispatchQueue.main.async {
+            SyncService.syncChannelPins(channelId: channelId)
+        }
     }
 
     open func reload() {
@@ -201,9 +212,11 @@ open class ChannelPinnedMessageListViewModel: NSObject {
         model.contentInsets = contentInsets
     }
 
-    /// Whether the row offers Unpin. Always true while pinning is local-only — there is no
-    /// server-side permission to consult yet; override once `ChannelPinnedMessageProvider`
-    /// gains its network step.
+    /// Whether the row offers Unpin.
+    ///
+    /// Unconditional: the server decides whether an unpin is allowed and answers with an error,
+    /// and a rejected unpin is restored by the channel's next pin sweep. Override to hide the
+    /// action up front — e.g. to let only the pinner or an admin unpin.
     open func canUnpin(_ item: PinnedMessage) -> Bool { true }
 
     open func unpin(_ item: PinnedMessage, completion: ((Error?) -> Void)? = nil) {

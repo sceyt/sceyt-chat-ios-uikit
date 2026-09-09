@@ -130,6 +130,8 @@ class BaseUITestCase: XCTestCase {
                    poll: Bool = false,
                    pinnedMessages: Bool = false,
                    pinnedMessagesSingle: Bool = false,
+                   pinnedMessagesPinOrder: Bool = false,
+                   pinsStayPending: Bool = false,
                    pollAllowsMultipleVotes: Bool = false,
                    pollDoubleVoteGapMs: Int? = nil,
                    dynamicTypeCategory: String? = nil,
@@ -151,6 +153,12 @@ class BaseUITestCase: XCTestCase {
         }
         if pinnedMessagesSingle {
             app.launchArguments += ["--uitest-pinned-messages-single"]
+        }
+        if pinnedMessagesPinOrder {
+            app.launchArguments += ["--uitest-pinned-messages-pin-order"]
+        }
+        if pinsStayPending {
+            app.launchArguments += ["--uitest-pins-stay-pending"]
         }
         if conversationUnread {
             app.launchArguments += ["--uitest-conversation-unread"]

@@ -500,12 +500,23 @@ extension SceytChatUIKit {
     /// Returns how many pins actually landed. The harness's `try? syncWrite` can drop a write
     /// silently, which makes a "banner shows N pins" assertion pass vacuously — the test polls
     /// this count before asserting. Idempotent: pinning the same ids twice is a no-op.
+    ///
+    /// Nothing here is reconciled away, because **UI-test mode never connects** (see the note on
+    /// `uiTestSkipsConnect`) and `ChannelViewModel.syncPinnedMessages` defers until it does. The
+    /// day UI tests do gain a connection, a successful *empty* pin sweep would delete every pin
+    /// seeded here — that is the moment this needs a bypass, not before.
+    ///
+    /// - Parameter serverPinIds: Pin ids to stamp on the rows, marking them `.synced`. Supply
+    ///   these to drive genuine pin-id ordering, which is the store's primary sort key. Omitted,
+    ///   every row carries `PinnedMessageDTO.unknownServerPinId`, ties on that leading descriptor
+    ///   and falls through to the timeline tiebreakers — so seeding order is preserved.
     @discardableResult
     public func pinMessagesForUITests(
         channelId: ChannelId,
         messageIds: [MessageId],
         scope: PinnedMessage.Scope = .forAll,
-        pinnedUntil: Date? = nil
+        pinnedUntil: Date? = nil,
+        serverPinIds: [Int64]? = nil
     ) -> Int {
         var landed = 0
         try? database.syncWrite { context in
@@ -522,7 +533,13 @@ extension SceytChatUIKit {
                     pinnedUntil: pinnedUntil,
                     pinnedBy: SceytChatUIKit.shared.currentUserId
                 )
-                if pinned != nil { landed += 1 }
+                if let pinned {
+                    if let serverPinId = serverPinIds?[safe: index] {
+                        pinned.serverPinId = serverPinId
+                        pinned.sync = .synced
+                    }
+                    landed += 1
+                }
             }
         }
         return landed
@@ -810,6 +827,35 @@ extension SceytChatUIKit {
     ///
     /// UI-test only.
     public static var uiTestPollVotesCompleteLocally = false
+
+    /// Treats every pin/unpin request as instantly acked by the server.
+    ///
+    /// Same problem as `uiTestPollVotesCompleteLocally`: UI-test mode never connects, and a pin
+    /// is only *announced* — and an unpin only finalized — when the server acks it. Without this
+    /// a pin taken in a UI test would sit correctly but forever in `.pendingPin`, and no
+    /// "X pinned" system message would ever appear, so none of that behaviour could be driven.
+    ///
+    /// With it on, `flushPendingPin` / `flushPendingUnpin` route straight into the real
+    /// `confirm` / `confirmUnpin` paths — so what the tests exercise is the production ack
+    /// logic, including the once-only system message, not a stand-in for it.
+    ///
+    /// Leave it off to drive the offline behaviour instead: the intent stays queued, the pin
+    /// stays visible, and nothing is announced.
+    ///
+    /// UI-test only.
+    public static var uiTestPinRequestsCompleteLocally = false
+
+    /// Hands out the synthetic pin ids `uiTestPinRequestsCompleteLocally` stamps, ascending so
+    /// the banner's pin-id ordering is exercised too.
+    static func nextUITestPinId() -> Int64 {
+        uiTestPinIdLock.lock()
+        defer { uiTestPinIdLock.unlock() }
+        uiTestPinIdCounter += 1
+        return uiTestPinIdCounter
+    }
+
+    private static let uiTestPinIdLock = NSLock()
+    private static var uiTestPinIdCounter: Int64 = 1_000
 
     /// Fires poll-option taps on the poll message currently on screen in the open
     /// conversation, `gapMs` milliseconds apart, through the same

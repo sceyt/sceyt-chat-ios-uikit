@@ -276,6 +276,10 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         // It cannot be done with a relationship key path: RelationshipKeyPathsObserver
         // resolves a single hop. See PinnedMessageDTO.
         syncPin(for: dto)
+        // ...and this applies the pin state the server nests on the message itself. Must run
+        // after `syncPin`, which owns the pin-row -> mirror direction; this is the more
+        // authoritative server -> mirror signal. See `applyPinDetails`.
+        applyPinDetails(message.pin, to: dto)
         return dto
     }
 

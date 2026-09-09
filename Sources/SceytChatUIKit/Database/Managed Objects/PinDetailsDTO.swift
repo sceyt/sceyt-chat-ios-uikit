@@ -123,15 +123,33 @@ public class PinDetailsDTO: NSManagedObject {
             if rows.count > 1 {
                 rows.dropFirst().forEach { context.delete($0) }
             }
-            mo.message = message
+            attach(mo, to: message)
             return mo
         }
 
         let mo = insertNewObject(into: context)
         mo.messageTid = messageTid
         mo.channelId = Int64(channelId)
-        mo.message = message
+        attach(mo, to: message)
         return mo
+    }
+
+    /// Links the two sides, writing **both** keys rather than relying on the inverse.
+    ///
+    /// `mo.message = message` alone is not enough. Both entities carry a
+    /// `(messageTid, channelId)` uniqueness constraint, so a constraint merge can leave this
+    /// row's `message` already pointing at the right message while `MessageDTO.pinDetails` was
+    /// written nil by the context that lost the merge. Assigning the inverse is then a no-op
+    /// assignment — Core Data sees no change — and the forward key is never repaired, which
+    /// leaves the bubble unmarked *and* mute: `RelationshipKeyPathsObserver` walks the inverse,
+    /// so it never notices either.
+    private static func attach(_ details: PinDetailsDTO, to message: MessageDTO) {
+        if message.pinDetails !== details {
+            message.pinDetails = details
+        }
+        if details.message !== message {
+            details.message = message
+        }
     }
 
     public static func delete(

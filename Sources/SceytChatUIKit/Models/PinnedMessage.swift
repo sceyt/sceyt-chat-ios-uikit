@@ -16,8 +16,9 @@ import SceytChat
 /// batch delete. See `PinnedMessageDTO` for why that snapshot exists.
 public struct PinnedMessage {
 
-    /// Who a pin is visible to. Local-only today — the SceytChat SDK has no
-    /// message-pin API — but persisted so the server flip needs no migration.
+    /// Who a pin is visible to. Mirrors the SDK's `PinType`: a `.forAll` pin is the
+    /// server's shared scope, visible to every channel member; `.forMe` is its personal
+    /// scope, visible only on the pinning user's own devices.
     public enum Scope {
         case forMe
         case forAll
@@ -146,5 +147,52 @@ extension PinnedMessage {
         syncState = PinnedMessageDTO.StoredSyncState(rawValue: dto.syncState) ?? .unspecified
         retryCount = Int(dto.retryCount)
         lastAttemptAt = dto.lastAttemptAt
+    }
+}
+
+/// Unambiguous spelling of the UIKit's `PinnedMessage`.
+///
+/// Same problem as `PinnedMessageScope` below: `SceytChat.PinnedMessage` (the server's pin
+/// record) collides with this type in any file importing both modules, and the module cannot be
+/// used to disambiguate because the module `SceytChatUIKit` and the class `SceytChatUIKit` share
+/// a name. Write `PinnedMessageRecord` where the bare name would be ambiguous.
+public typealias PinnedMessageRecord = PinnedMessage
+
+/// Unambiguous spelling of `PinnedMessage.Scope`.
+///
+/// Needed because `PinnedMessage` is ambiguous in any file that imports both SceytChatUIKit and
+/// SceytChat — the SDK has its own `SceytChat.PinnedMessage` (the server's pin record) — and the
+/// usual escape hatch of module-qualifying it does not work here: the module `SceytChatUIKit`
+/// and the class `SceytChatUIKit` share a name, so `SceytChatUIKit.PinnedMessage` resolves
+/// against the class and fails.
+public typealias PinnedMessageScope = PinnedMessage.Scope
+
+// MARK: - Scope <-> SDK PinType
+
+/// The one place the UIKit scope and the SDK's `PinType` are translated.
+///
+/// Lives here rather than on `PinDetails`, for the same reason `StoredScope` lives on
+/// `PinnedMessageDTO`: the mapping belongs beside the type it maps. `PinDetails` and
+/// `PinDetailsDTO` deliberately carry no scope at all — the message bubble only asks
+/// "is this pinned", and adding a column there would cost a Core Data model version
+/// for nothing.
+extension PinnedMessage.Scope {
+
+    public init(_ pinType: PinType) {
+        switch pinType {
+        case .shared: self = .forAll
+        case .personal: self = .forMe
+        // `PinType` is an imported NS_ENUM, so it is not exhaustive to Swift.
+        // A scope the SDK grows later is safest read as the shared one, matching
+        // the server's own default.
+        @unknown default: self = .forAll
+        }
+    }
+
+    public var pinType: PinType {
+        switch self {
+        case .forAll: return .shared
+        case .forMe: return .personal
+        }
     }
 }
