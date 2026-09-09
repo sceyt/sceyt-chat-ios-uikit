@@ -72,33 +72,48 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
     
     private var observersCache = [PreviewItem: PreviewDataSourceItemObservable]()
     
-    open lazy var attachmentObserver: DatabaseObserver<AttachmentDTO, ChatMessage.Attachment> = {
-        let predicate: NSPredicate
-        if attachmentTypes.isEmpty {
-            predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
-                NSPredicate(format: "channelId == %lld", channel.id),
-                NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce)
-            ])
-        } else {
-            predicate =
-                NSCompoundPredicate(andPredicateWithSubpredicates: [
-                    NSPredicate(format: "channelId == %lld", channel.id),
-                    NSCompoundPredicate(orPredicateWithSubpredicates:
-                        attachmentTypes.map { NSPredicate(format: "type = %@", $0) }
-                    ),
-                    NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce)
-                ])
+    /// The observer's scope: this channel, the requested attachment types, and never
+    /// view-once media. Named and computed so refresh paths can re-apply it — clearing
+    /// the predicate instead widens the previewer to every attachment in the database,
+    /// across all channels.
+    open var defaultFetchPredicate: NSPredicate {
+        var subpredicates = [NSPredicate(format: "channelId == %lld", channel.id)]
+        if !attachmentTypes.isEmpty {
+            subpredicates.append(
+                NSCompoundPredicate(orPredicateWithSubpredicates:
+                    attachmentTypes.map { NSPredicate(format: "type = %@", $0) }
+                )
+            )
         }
+        subpredicates.append(NSPredicate(format: "message.type != %@", ChatMessage.MessageType.viewOnce))
+        return NSCompoundPredicate(andPredicateWithSubpredicates: subpredicates)
+    }
 
-        return DatabaseObserver<AttachmentDTO, ChatMessage.Attachment>(
+    open lazy var attachmentObserver: DatabaseObserver<AttachmentDTO, ChatMessage.Attachment> = {
+        DatabaseObserver<AttachmentDTO, ChatMessage.Attachment>(
             request: AttachmentDTO.fetchRequest()
                 .sort(descriptors: [.init(keyPath: \AttachmentDTO.createdAt, ascending: ascending),
                     .init(keyPath: \AttachmentDTO.id, ascending: ascending)])
-                .fetch(predicate: predicate)
+                .fetch(predicate: defaultFetchPredicate)
                 .fetch(batchSize: 10),
             context: SceytChatUIKit.shared.database.viewContext
         ) { $0.convert() }
     }()
+
+    /// Re-runs the observer's fetch against `defaultFetchPredicate`. Needed after another
+    /// process (share extension / notification service extension) writes attachments into
+    /// the shared store: `NSPersistentStoreRemoteChange` is disabled, so the fetched-results
+    /// controller never learns that the rows on disk changed.
+    ///
+    /// Never clear the predicate to force a refresh — the predicate is the only thing
+    /// scoping the previewer to this channel, its types, and non-view-once media.
+    open func refreshObserver() {
+        do {
+            try attachmentObserver.update(predicate: defaultFetchPredicate)
+        } catch {
+            logger.errorIfNotNil(error, "attachmentObserver.update(predicate:)")
+        }
+    }
 
     public var channel: ChatChannel
     public let attachmentTypes: [String]

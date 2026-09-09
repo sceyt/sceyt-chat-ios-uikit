@@ -89,7 +89,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open lazy var linkMetadataProvider = LinkMetadataProvider()
     
-    open lazy var previewer = AttachmentPreviewDataSource(channel: channel)
+    private var _previewer: AttachmentPreviewDataSource?
+
+    open var previewer: AttachmentPreviewDataSource {
+        if let _previewer { return _previewer }
+        let previewer = AttachmentPreviewDataSource(channel: channel)
+        _previewer = previewer
+        return previewer
+    }
+
+    /// The previewer only when it has already been built. Refresh paths use this so a
+    /// channel where no media was ever opened does not pay for a data source, an
+    /// attachment provider and a live DB observer just to be refreshed.
+    open var loadedPreviewer: AttachmentPreviewDataSource? { _previewer }
     
     public let attachmentUploadInfo = MessageAttachmentUploadInfo.default
     open var isUnsubscribedChannel: Bool {
