@@ -77,7 +77,7 @@ extension ChannelViewController {
             }
         }
 
-        /// Which pin is on screen. Wraps at both ends.
+        /// Which pin is on screen. Stops at both ends — the walk never wraps round.
         ///
         /// `0` only until the first pins land: `items` then moves it to the last of them,
         /// the newest pin, and every walk starts from there.
@@ -252,15 +252,12 @@ extension ChannelViewController {
 
         open func select(index: Int, animated: Bool = false) {
             guard !items.isEmpty else { return }
-            // Wrap, so a swipe never dead-ends at either edge.
-            let wrapped = ((index % items.count) + items.count) % items.count
-            guard wrapped != selectedIndex else { return }
-            // Take the shorter way round the ring. A pin picked straight from the full list
-            // then animates as the single step it is, rather than unwinding all the way back
-            // through the ones in between.
-            let forwardSteps = (wrapped - selectedIndex + items.count) % items.count
-            let direction: PagingDirection = forwardSteps <= items.count / 2 ? .forward : .backward
-            selectedIndex = wrapped
+            // Clamp rather than wrap: at either end of the walk there is nothing further to
+            // page to, and the banner stays put instead of jumping to the opposite end.
+            let target = min(max(index, 0), items.count - 1)
+            guard target != selectedIndex else { return }
+            let direction: PagingDirection = target > selectedIndex ? .forward : .backward
+            selectedIndex = target
 
             guard animated else {
                 reload()
@@ -271,20 +268,33 @@ extension ChannelViewController {
             }
         }
 
+        /// Whether the walk can still go forward — toward the older pins above. `false`
+        /// once the banner is on the oldest pin, at the top segment.
+        open var canSelectNext: Bool {
+            !items.isEmpty && selectedIndex > 0
+        }
+
+        /// Whether the walk can still go back — toward the newer pins below. `false` once
+        /// the banner is on the newest pin, at the bottom segment.
+        open var canSelectPrevious: Bool {
+            !items.isEmpty && selectedIndex < items.count - 1
+        }
+
         /// The next pin in walk order, which runs *upward* from where the banner rests:
-        /// from the newest pin at the bottom segment to the older ones above it, wrapping
-        /// off the top back round to the newest.
+        /// from the newest pin at the bottom segment to the older ones above it, stopping
+        /// on the oldest.
         ///
         /// Index-wise that is a step *back* through `items`, which is ordered oldest first
         /// — the array and the walk run opposite ways on purpose, so the walk starts on the
         /// pin a reader is most likely to care about.
         open func selectNext(animated: Bool = false) {
+            guard canSelectNext else { return }
             select(index: selectedIndex - 1, animated: animated)
         }
 
-        /// Back down the walk: toward the newer pins below, wrapping off the bottom round
-        /// to the oldest at the top.
+        /// Back down the walk: toward the newer pins below, stopping on the newest.
         open func selectPrevious(animated: Bool = false) {
+            guard canSelectPrevious else { return }
             select(index: selectedIndex + 1, animated: animated)
         }
 
@@ -694,9 +704,13 @@ extension ChannelViewController {
             // pin, so the walk's *previous*. Dragging down brings in the one above, which
             // is where the walk itself goes.
             if goesUp {
+                // At the end of the walk the swipe is a no-op: no page, and no jump either,
+                // so the list is left exactly where it is.
+                guard canSelectPrevious else { return }
                 onAction?(.previous)
                 selectPrevious(animated: true)
             } else {
+                guard canSelectNext else { return }
                 onAction?(.next)
                 selectNext(animated: true)
             }
