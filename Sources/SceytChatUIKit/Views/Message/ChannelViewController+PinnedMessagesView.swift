@@ -56,9 +56,15 @@ extension ChannelViewController {
                 // rewrites the whole array, and a bare clamp would slide the banner onto a
                 // different message underneath them — which matters far more now that
                 // tapping walks the pins one by one.
-                let previousTid = oldValue.indices.contains(selectedIndex)
-                    ? oldValue[selectedIndex].messageTid
-                    : nil
+                //
+                // Unless the banner has been asked to come back to rest: a pin the user has
+                // just taken themselves puts the banner back where it opens, on the newest
+                // pin — which is the one they have just pinned.
+                var previousTid: Int64?
+                if !resetsSelectionOnNextUpdate, oldValue.indices.contains(selectedIndex) {
+                    previousTid = oldValue[selectedIndex].messageTid
+                }
+                resetsSelectionOnNextUpdate = false
                 if let previousTid,
                    let index = items.firstIndex(where: { $0.messageTid == previousTid }) {
                     selectedIndex = index
@@ -82,6 +88,16 @@ extension ChannelViewController {
         /// `0` only until the first pins land: `items` then moves it to the last of them,
         /// the newest pin, and every walk starts from there.
         open private(set) var selectedIndex: Int = 0
+
+        /// Set to drop the "hold the banner where the user left it" rule for the **next**
+        /// `items` assignment, so the banner returns to the state it opens in: resting on
+        /// the newest pin, at the bottom segment.
+        ///
+        /// One-shot — cleared by the assignment it applies to. `ChannelViewController` arms
+        /// it when the user takes a pin themselves, since the pin they have just taken is
+        /// the newest one and holding the banner on the pin behind it would hide the result
+        /// of their own action.
+        open var resetsSelectionOnNextUpdate = false
 
         open var selectedItem: PinnedMessage? {
             items.indices.contains(selectedIndex) ? items[selectedIndex] : nil

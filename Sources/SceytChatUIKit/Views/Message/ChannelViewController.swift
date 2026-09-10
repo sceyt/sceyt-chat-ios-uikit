@@ -264,6 +264,12 @@ open class ChannelViewController: ViewController,
     /// `userSelectOnRepliedMessage` would also arm the return-jump in
     /// `showRepliedMessage`, which a pinned jump must not do.
     private var pinnedJumpMessageId: MessageId = 0
+
+    /// `messageTid` of a pin the user has just taken on this screen, held until the pin
+    /// shows up in the banner's items. The pin is written as an intent and the observer
+    /// reports it a moment later, so the banner cannot be moved at the moment of the tap —
+    /// the pin it should land on does not exist yet. See `updatePinnedMessages(_:)`.
+    private var pendingPinnedMessageTid: Int64?
     private let impactFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
 
     /// What UIKit has been told exists. Mutated only inside `performUpdates`
@@ -2849,6 +2855,15 @@ open class ChannelViewController: ViewController,
         scope: PinnedMessage.Scope,
         pinnedUntil: Date? = nil
     ) {
+        // Both "Pin for all" and "Pin for me" come through here, and either one should
+        // leave the banner showing what the user has just pinned rather than the pin they
+        // happened to have paged to.
+        //
+        // Resolved the way `NSManagedObjectContext.pinMessage` resolves it, so an incoming
+        // message — which carries no tid of its own — is recognized by the id the pin row
+        // is keyed under instead.
+        let message = layoutModel.message
+        pendingPinnedMessageTid = message.tid != 0 ? message.tid : Int64(message.id)
         channelViewModel.pinMessage(
             layoutModel: layoutModel,
             scope: scope,
@@ -3163,6 +3178,13 @@ open class ChannelViewController: ViewController,
     /// Pushes the channel's live pins into the banner and makes room for it.
     open func updatePinnedMessages(_ items: [PinnedMessage]? = nil) {
         let pins = items ?? channelViewModel.pinnedMessages
+        // The pin the user took has landed: send the banner back to the state it opens in,
+        // resting on the newest pin, instead of holding it on the one they were paged to.
+        if let tid = pendingPinnedMessageTid,
+           pins.contains(where: { $0.messageTid == tid }) {
+            pendingPinnedMessageTid = nil
+            pinnedMessagesView.resetsSelectionOnNextUpdate = true
+        }
         pinnedMessagesView.items = pins
 
         let shouldShow = !pins.isEmpty

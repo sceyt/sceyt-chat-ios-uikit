@@ -42,6 +42,12 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
             [textId, videoId, pollId].map(rowIdentifier)
         }
 
+        /// The filler messages seeded *after* the three pins — unpinned, so a test can pin
+        /// one through the real UI on top of them. Which of them the list opens on is not
+        /// fixed, hence `fillerCellOnScreen()` rather than a named id.
+        static let fillerRange = 34...48
+        static func fillerPreview(_ n: Int) -> String { "Message number \(n)" }
+
         static let bannerTitle = "Pinned Messages"
         static let textPreview = "Do you know what time is it?"
         static let videoPreview = "Video"
@@ -92,6 +98,53 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
     /// `.pending` delivery state.
     private func openConversationWithPendingMessage() {
         openConversation(launchApp(conversation: true, conversationPending: true))
+    }
+
+    /// An unpinned filler message the list is showing, with the preview the banner must
+    /// carry once it is pinned.
+    ///
+    /// Picked at run time rather than named: which fillers are realized depends on the
+    /// fixture, the device and where the list opens — so the list is first taken to its
+    /// newest message, which is where the unpinned filler lives, and only a bubble whose
+    /// whole frame is inside the list is offered. One hanging past an edge is clipped, and
+    /// a long press on it lands on the banner or the composer instead of on the message.
+    ///
+    /// Nothing here scrolls while it is choosing: a frame read mid-scroll is stale by the
+    /// time the caller presses it.
+    private func fillerCellOnScreen(timeout: TimeInterval = 10) -> (cell: XCUIElement, preview: String)? {
+        let deadline = Date().addingTimeInterval(timeout)
+        if screen.scrollDownButton.exists, screen.scrollDownButton.isHittable {
+            screen.scrollDownButton.tap()
+            // The button hides itself once the list reaches the newest message.
+            while Date() < deadline, screen.scrollDownButton.exists {
+                usleep(200_000)
+            }
+        }
+        repeat {
+            if let found = pickFillerCell() { return found }
+            usleep(200_000)
+        } while Date() < deadline
+        return nil
+    }
+
+    /// The realized filler bubble closest to the middle of the list, or `nil` if none is
+    /// wholly inside it. The banner overlays the top of the list, so that band is excluded.
+    private func pickFillerCell() -> (cell: XCUIElement, preview: String)? {
+        let list = screen.collectionView.frame
+        let safe = CGRect(x: list.minX,
+                          y: list.minY + 60,
+                          width: list.width,
+                          height: list.height - 60)
+        var best: (cell: XCUIElement, preview: String, distance: CGFloat)?
+        for n in Pinned.fillerRange {
+            let cell = screen.cell(Pinned.messageId(UInt64(n)))
+            guard cell.exists, cell.isHittable, safe.contains(cell.frame) else { continue }
+            let distance = abs(cell.frame.midY - list.midY)
+            if best == nil || distance < best!.distance {
+                best = (cell, Pinned.fillerPreview(n), distance)
+            }
+        }
+        return best.map { ($0.cell, $0.preview) }
     }
 
     // MARK: - Banner presence
@@ -344,6 +397,58 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
 
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
         XCTAssertTrue(screen.pinnedIcon(in: cell).waitForExistence(timeout: 5))
+    }
+
+    /// Taking a pin puts the banner back where it opens: on the newest pin, which is the
+    /// one just taken. Without that the "hold the banner where the user left it" rule keeps
+    /// it on the pin they had paged to, and their own pin lands out of sight.
+    ///
+    /// The `serverPinId` fixture, not the plain one: those seeded pins carry the
+    /// "id unknown yet" sentinel, which sorts *after* the real id a fresh pin is acked with
+    /// — so in that fixture the new pin changes segment when the ack lands and there is no
+    /// stable resting index to assert. Here the seeded ids are 100/200/300 and a new pin's
+    /// is higher, so it is the newest pin both before and after its ack.
+    func testPinningWhilePagedAway_bringsTheBannerBackToTheNewestPin() {
+        openPinOrderConversation()
+        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForBannerValue("3/3"))
+
+        // Page away from the newest pin, so holding position and coming back to rest are
+        // distinguishable.
+        screen.swipeToNextPinnedMessage()
+        XCTAssertTrue(waitForBannerValue("2/3"),
+                      "one step up from the newest pin, got \(screen.pinnedMessagesValue)")
+
+        guard let filler = fillerCellOnScreen() else {
+            return XCTFail("no unpinned message on screen to pin")
+        }
+        screen.pinMessage(cell: filler.cell, forAll: true)
+
+        XCTAssertTrue(waitForPreview(filler.preview),
+                      "the banner must show the pin just taken, got \"\(screen.pinnedMessagesPreview.label)\"")
+        XCTAssertTrue(waitForBannerValue("4/4"),
+                      "and rest on it at the bottom segment, got \(screen.pinnedMessagesValue)")
+    }
+
+    /// The same for a personal pin: "Pin for me" is the other half of the sub-step and goes
+    /// through the same action, so it must land the banner in the same place.
+    func testPinningForMeWhilePagedAway_bringsTheBannerBackToTheNewestPin() {
+        openPinOrderConversation()
+        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
+        XCTAssertTrue(waitForBannerValue("3/3"))
+
+        screen.swipeToNextPinnedMessage()
+        XCTAssertTrue(waitForBannerValue("2/3"))
+
+        guard let filler = fillerCellOnScreen() else {
+            return XCTFail("no unpinned message on screen to pin")
+        }
+        screen.pinMessage(cell: filler.cell, forAll: false)
+
+        XCTAssertTrue(waitForPreview(filler.preview),
+                      "a personal pin must show on the banner too, got \"\(screen.pinnedMessagesPreview.label)\"")
+        XCTAssertTrue(waitForBannerValue("4/4"),
+                      "and rest at the bottom segment, got \(screen.pinnedMessagesValue)")
     }
 
     /// A message that has not reached the server yet has no id the other members could
@@ -907,9 +1012,9 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
 
         XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
         // The denominator is the assertion: both optimistic rows survived the other being
-        // written. The *index* is deliberately not asserted — the banner holds its place on the
-        // message it was already showing, so pinning an older message moves that one to 2/2
-        // rather than resetting to 1/2.
+        // written. The *index* is deliberately not asserted — each pin sends the banner back
+        // to rest on the newest pin, and which of the two rows that is depends on the order
+        // the writes land in.
         XCTAssertTrue(
             waitForBannerValueMatchingOneOf(["1/\(ids.count)", "2/\(ids.count)"]),
             "every pin must land, got \(screen.pinnedMessagesValue)"
