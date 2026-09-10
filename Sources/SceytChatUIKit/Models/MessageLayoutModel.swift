@@ -12,6 +12,11 @@ import SceytChat
 open class MessageLayoutModel {
     
     public static var defaults = Defaults()
+
+    /// Effectively immutable after `init` — and it must stay that way. It is a struct holding
+    /// fonts, colors and formatters, so copying it retains a dozen objects; if anything ever
+    /// wrote to it after construction it would need the same `stateLock` treatment as the
+    /// properties below. Nothing in the SDK or the host app assigns it outside `init`.
     public var appearance: MessageCell.Appearance
     public static var textSizeMeasure = TextSizeMeasure.self
     
@@ -24,11 +29,122 @@ open class MessageLayoutModel {
     /// relying on observer-emitted reload hints. See ChannelViewController+SnapshotDiff.
     public private(set) var contentVersion: UInt = 0
 
-    public private(set) var channel: ChatChannel
-    public private(set) var message: ChatMessage
-    public private(set) var attachments: [AttachmentLayout]
-    public private(set) var linkAttachments: [AttachmentLayout]
-    public private(set) var replyLayout: ReplyLayout?
+    /// Everything guarded by `stateLock` below holds refcounted storage and is written on the
+    /// CoreData private queue — LazyDatabaseObserver.didChangeObjects → reload(dto:) → the mapper
+    /// closure in ChannelViewModel.createMessageObserver() → createLayoutModel(for:force:), which
+    /// returns the *cached* model and calls update(channel:message:force:) on it in place — while
+    /// the main thread reads the same instance to bind cells (ChannelViewController.onEvent →
+    /// reconfigureItems → cellForItemAt → MessageCell.bind).
+    ///
+    /// ARC reads a strong property as two non-atomic steps: load the pointer, then retain it. The
+    /// writer's store releases the old value. When that release drops the last reference between
+    /// the reader's load and its retain, the reader retains an object already inside
+    /// swift_deallocClassInstance and the runtime aborts with "deallocated with non-zero retain
+    /// count" — a SIGABRT with no lastExceptionBacktrace. Assigning to a local *inside* the lock
+    /// makes the load+retain atomic against the store+release, which is also inside the lock.
+    /// Same fix, and same reason, as `AttachmentLayout.attachment` further down this file.
+    ///
+    /// One lock for the whole model: each critical section is a load plus a retain, so contention
+    /// between the two queues is negligible, and `update()` touches these in natural groups
+    /// (attachments+linkAttachments, reactions+groupedReactions) — leaving room to widen a
+    /// critical section over a pair later without introducing a lock-ordering hazard. Recursive
+    /// because no accessor nests inside another *today*, and the cost of a future one that does
+    /// would be a deadlocked CoreData queue in production, i.e. a frozen chat screen.
+    ///
+    /// What this does NOT buy: a logically consistent snapshot. `update()` publishes these one at
+    /// a time, so a concurrent bind can see the new `attachments` beside the old `contentOptions`
+    /// or `measureSize`. Those are cosmetic and self-correcting — `update()` bumps
+    /// `contentVersion` and the snapshot diff reconfigures the cell on the next main-thread hop.
+    /// The POD properties (CGSize/CGRect/Bool/OptionSet) are deliberately left unguarded for the
+    /// same reason: a torn read there costs one frame at a wrong height, not memory safety.
+    /// Note in particular that `updateOptions` has a main-thread writer of its own —
+    /// MessageCell.bind() ends with `data.updateOptions = []` — racing update()'s
+    /// read-modify-write here; a lost update means an occasional missed reconfigure. Pre-existing,
+    /// cosmetic, and out of scope for the crash fix.
+    private let stateLock = NSRecursiveLock()
+
+    private var _channel: ChatChannel
+    public private(set) var channel: ChatChannel {
+        get {
+            // Assign to a local under the lock so the ARC retain of the returned value happens
+            // before the unlock — the optimizer must not sink it past the release side.
+            var v: ChatChannel!
+            stateLock.lock()
+            v = _channel
+            stateLock.unlock()
+            return v!
+        }
+        set {
+            stateLock.lock()
+            _channel = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _message: ChatMessage
+    public private(set) var message: ChatMessage {
+        get {
+            var v: ChatMessage!
+            stateLock.lock()
+            v = _message
+            stateLock.unlock()
+            return v!
+        }
+        set {
+            stateLock.lock()
+            _message = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _attachments: [AttachmentLayout] = []
+    public private(set) var attachments: [AttachmentLayout] {
+        get {
+            var v: [AttachmentLayout] = []
+            stateLock.lock()
+            v = _attachments
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _attachments = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _linkAttachments: [AttachmentLayout] = []
+    public private(set) var linkAttachments: [AttachmentLayout] {
+        get {
+            var v: [AttachmentLayout] = []
+            stateLock.lock()
+            v = _linkAttachments
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _linkAttachments = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _replyLayout: ReplyLayout?
+    public private(set) var replyLayout: ReplyLayout? {
+        get {
+            var v: ReplyLayout?
+            stateLock.lock()
+            v = _replyLayout
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _replyLayout = newValue
+            stateLock.unlock()
+        }
+    }
+
     public private(set) var lastDisplayedMessageId: MessageId = 0
     
     public let userSendMessage: UserSendMessage?
@@ -68,10 +184,10 @@ open class MessageLayoutModel {
     public private(set) var hasVoiceAttachments: Bool = false
     public private(set) var showUserInfo: Bool = false
     public private(set) var messageUserTitleSize: CGSize = .zero
-    public private(set) var parentMessageUserTitleSize: CGSize
-    public private(set) var textSize: CGSize
+    public private(set) var parentMessageUserTitleSize: CGSize = .zero
+    public private(set) var textSize: CGSize = .zero
     public private(set) var truncatedTextSize: CGSize = .zero
-    public private(set) var parentTextSize: CGSize
+    public private(set) var parentTextSize: CGSize = .zero
     public var isTextExpanded: Bool = false
     public var shouldShowReadMore: Bool = false
     public private(set) var readMoreButtonHeight: CGFloat = 0
@@ -114,12 +230,26 @@ open class MessageLayoutModel {
     /// `measuredPinState` is: `updateOptions` accumulates across updates, so once
     /// `.parentMessageBody` is in the set a later edit diffs as "no change" and the row
     /// keeps the height it measured for the old text.
-    private var measuredSystemMessageText: String?
+    private var _measuredSystemMessageText: String?
+    private var measuredSystemMessageText: String? {
+        get {
+            var v: String?
+            stateLock.lock()
+            v = _measuredSystemMessageText
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _measuredSystemMessageText = newValue
+            stateLock.unlock()
+        }
+    }
     public private(set) var linkViewMeasure: CGSize = .zero
     public private(set) var pollViewMeasure: CGSize = .zero
     public private(set) var systemMessageMeasure: CGSize = .zero
     public private(set) var unsupportedViewMeasure: CGSize = .zero
-    public private(set) var lastCharRect: CGRect
+    public private(set) var lastCharRect: CGRect = .zero
     public private(set) var replyCount = 0
     public var contentInsets: UIEdgeInsets = .zero {
         didSet {
@@ -128,15 +258,118 @@ open class MessageLayoutModel {
             }
         }
     }
-    public private(set) var messageDeliveryStatus: ChatMessage.DeliveryStatus
-    public private(set) var messageUserTitle: String = ""
-    public private(set) var parentMessageUserTitle: String
-    public private(set) var attributedView: AttributedView
-    public private(set) var parentAttributedView: AttributedView?
-    public private(set) var reactions: [ReactionInfo]?
-    public private(set) var groupedReactions: [ArraySlice<ReactionInfo>]?
-    
-    public private(set) var linkPreviews: [LinkPreview]?
+    public private(set) var messageDeliveryStatus: ChatMessage.DeliveryStatus = .pending
+    private var _messageUserTitle: String = ""
+    public private(set) var messageUserTitle: String {
+        get {
+            var v = ""
+            stateLock.lock()
+            v = _messageUserTitle
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _messageUserTitle = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _parentMessageUserTitle: String = ""
+    public private(set) var parentMessageUserTitle: String {
+        get {
+            var v = ""
+            stateLock.lock()
+            v = _parentMessageUserTitle
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _parentMessageUserTitle = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _attributedView: AttributedView = .init(content: NSAttributedString())
+    public private(set) var attributedView: AttributedView {
+        get {
+            var v: AttributedView!
+            stateLock.lock()
+            v = _attributedView
+            stateLock.unlock()
+            return v!
+        }
+        set {
+            stateLock.lock()
+            _attributedView = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _parentAttributedView: AttributedView?
+    public private(set) var parentAttributedView: AttributedView? {
+        get {
+            var v: AttributedView?
+            stateLock.lock()
+            v = _parentAttributedView
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _parentAttributedView = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _reactions: [ReactionInfo]?
+    public private(set) var reactions: [ReactionInfo]? {
+        get {
+            var v: [ReactionInfo]?
+            stateLock.lock()
+            v = _reactions
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _reactions = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _groupedReactions: [ArraySlice<ReactionInfo>]?
+    public private(set) var groupedReactions: [ArraySlice<ReactionInfo>]? {
+        get {
+            var v: [ArraySlice<ReactionInfo>]?
+            stateLock.lock()
+            v = _groupedReactions
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _groupedReactions = newValue
+            stateLock.unlock()
+        }
+    }
+
+    private var _linkPreviews: [LinkPreview]?
+    public private(set) var linkPreviews: [LinkPreview]? {
+        get {
+            var v: [LinkPreview]?
+            stateLock.lock()
+            v = _linkPreviews
+            stateLock.unlock()
+            return v
+        }
+        set {
+            stateLock.lock()
+            _linkPreviews = newValue
+            stateLock.unlock()
+        }
+    }
     public private(set) var reactionType: ReactionViewType = .withTotalScore
     public private(set) var estimatedReactionsNumberPerRow: Int = 0
     
@@ -167,13 +400,18 @@ open class MessageLayoutModel {
         lastDisplayedMessageId: MessageId = 0,
         appearance: MessageCell.Appearance
     ) {
-        self.channel = channel
-        self.message = message
-        self.lastDisplayedMessageId = lastDisplayedMessageId
+        // These four are the only stored properties without a default, so assigning them makes
+        // `self` fully initialized — everything below can then go through the guarded accessors
+        // unchanged. `channel`/`message` write their backing storage directly because a computed
+        // setter is not callable until initialization completes.
         self.appearance = appearance
+        self.userSendMessage = userSendMessage
+        _channel = channel
+        _message = message
+
+        self.lastDisplayedMessageId = lastDisplayedMessageId
         messageDeliveryStatus = message.deliveryStatus
         replyCount = message.replyCount
-        self.userSendMessage = userSendMessage
         attributedView = Self.attributedView(
             message: message,
             userSendMessage: userSendMessage,
@@ -246,7 +484,8 @@ open class MessageLayoutModel {
         lastCharRect = size.lastCharRect
 
         // Calculate truncated text size and read more button height
-        let textLength = attributedView.content.string.count
+        let content = attributedView.content
+        let textLength = content.string.count
         if message.state == .deleted {
             isTextExpanded = false
             shouldShowReadMore = false
@@ -254,8 +493,8 @@ open class MessageLayoutModel {
             readMoreButtonHeight = 0
         } else {
             if textLength > appearance.collapsedCharacterLimit {
-                let truncatedString = String(attributedView.content.string.prefix(appearance.collapsedCharacterLimit))
-                let mutableAttributed = NSMutableAttributedString(attributedString: attributedView.content)
+                let truncatedString = String(content.string.prefix(appearance.collapsedCharacterLimit))
+                let mutableAttributed = NSMutableAttributedString(attributedString: content)
                 mutableAttributed.mutableString.setString(truncatedString)
 
                 let truncatedSize = Self.textSizeMeasure.calculateSize(
@@ -615,13 +854,32 @@ open class MessageLayoutModel {
                 parentTextSize = parentSize.textSize
                 updateOptions.insert(.parentMessageBody)
             }
-            replyLayout = Components.messageReplyLayoutModel.init(
-                message: parent,
-                byMe: message.user.id == SceytChatUIKit.shared.currentUserId,
-                channel: channel,
-                thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
-                attributedBody: parentAttributedView?.content,
-                appearance: appearance)
+            // Rebuild only when something the layout is built FROM actually changed. It used to
+            // be rebuilt on every update, and ReplyLayout.init is expensive: it constructs a
+            // nested AttachmentLayout, resizes an icon and re-runs the reply-body formatter — on
+            // whichever thread called update(), which is the CoreData queue for every change
+            // notification the channel receives.
+            //
+            // `ReplyLayout.message` is a `let`, so a different parent always needs a new instance;
+            // for the same parent, updateAttachment() refreshes the attachment in place.
+            let existingReply = replyLayout
+            let needsNewReplyLayout = existingReply == nil
+                || existingReply?.message.id != parent.id
+                || existingReply?.message.tid != parent.tid
+                || force
+                || updateOptions.contains(.parentMessageBody)
+                || updateOptions.contains(.parentMessageUser)
+            if needsNewReplyLayout {
+                replyLayout = Components.messageReplyLayoutModel.init(
+                    message: parent,
+                    byMe: message.user.id == SceytChatUIKit.shared.currentUserId,
+                    channel: channel,
+                    thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
+                    attributedBody: parentAttributedView?.content,
+                    appearance: appearance)
+            } else {
+                existingReply?.updateAttachment(message: parent)
+            }
         } else {
             parentTextSize = .zero
             parentMessageUserTitle = ""
@@ -638,9 +896,27 @@ open class MessageLayoutModel {
             updateOptions.insert(.reload)
         }
         if attachments.isEmpty {
-            linkPreviews?.removeAll()
-            for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
+            // This used to `linkPreviews?.removeAll()` and rebuild the whole array. Emptying it
+            // first defeated addLinkPreview's own dedup guard, so every change notification for a
+            // link message — an edit, a reaction, a pin, a delivery receipt — re-ran a JPEG resize
+            // and disk write (loadThumbnail) plus two text-measurement passes per preview, and
+            // churned the array the main thread reads while binding cells.
+            //
+            // Add/refresh in place instead, then drop the previews whose URL is no longer in the
+            // body. That removal is the one thing the removeAll was genuinely covering.
+            let links = Self.createLinkPreviews(message: message, linkAttachments: linkAttachments)
+            for link in links {
                 if addLinkPreview(linkMetadata: link) {
+                    self.updateOptions.remove(.link)
+                    updateOptions.insert(.link)
+                }
+            }
+            if let previews = linkPreviews, !previews.isEmpty {
+                let kept = previews.filter { preview in
+                    links.contains { $0.url.isEqual(url: preview.url) }
+                }
+                if kept.count != previews.count {
+                    linkPreviews = kept
                     self.updateOptions.remove(.link)
                     updateOptions.insert(.link)
                 }
@@ -726,7 +1002,10 @@ open class MessageLayoutModel {
             self.updateOptions.insert(.reload)
         }
         if isUpdated || force {
-            let textLength = attributedView.content.string.count
+            // One read of the guarded property, so the measured length and the truncated string
+            // are guaranteed to come from the same value.
+            let content = attributedView.content
+            let textLength = content.string.count
             if message.state == .deleted {
                 isTextExpanded = false
                 shouldShowReadMore = false
@@ -734,8 +1013,8 @@ open class MessageLayoutModel {
                 readMoreButtonHeight = 0
             } else {
                 if textLength > appearance.collapsedCharacterLimit {
-                    let truncatedString = String(attributedView.content.string.prefix(appearance.collapsedCharacterLimit))
-                    let mutableAttributed = NSMutableAttributedString(attributedString: attributedView.content)
+                    let truncatedString = String(content.string.prefix(appearance.collapsedCharacterLimit))
+                    let mutableAttributed = NSMutableAttributedString(attributedString: content)
                     mutableAttributed.mutableString.setString(truncatedString)
 
                     let truncatedSize = Self.textSizeMeasure.calculateSize(
@@ -858,6 +1137,9 @@ open class MessageLayoutModel {
             estimatedReactionsNumberPerRow = 0
         }
         if estimatedReactionsNumberPerRow != 0, !reactions.isEmpty {
+            // `reactions` here is the LOCAL built above, not the lock-guarded property of the
+            // same name — the caller assigns the return value to that. Do not "simplify" this
+            // into a self-read.
             groupedReactions = reactions.chunked(into: estimatedReactionsNumberPerRow)
         }
         return reactions
@@ -940,17 +1222,21 @@ open class MessageLayoutModel {
         let cap = hasMediaAttachments
             ? Self.defaults.imageAttachmentSize.width
             : min(Self.defaults.fileAttachmentSize.width, Self.defaults.messageWidth - 4)
+        // One read of the guarded property, not one per loop iteration. The element mutations
+        // below are on class instances, so there is no writeback to the array and no CoW copy —
+        // and their didSets reach AttachmentLayout's own lock, which is a different lock.
+        let rows = attachments
         let reserve: CGFloat
-        if attachments.last?.type == .file, message.state != .deleted {
+        if rows.last?.type == .file, message.state != .deleted {
             reserve = Components.messageCellInfoView
                 .measure(channel: channel, message: message, appearance: appearance).width
                 + MessageCell.Layouts.attachmentFileInfoSpacing
         } else {
             reserve = 0
         }
-        for (index, layout) in attachments.enumerated() {
+        for (index, layout) in rows.enumerated() {
             layout.maxRowWidth = cap
-            layout.reservedTrailingWidth = index == attachments.count - 1 ? reserve : 0
+            layout.reservedTrailingWidth = index == rows.count - 1 ? reserve : 0
         }
     }
 
@@ -969,12 +1255,25 @@ open class MessageLayoutModel {
             return
         }
 
+        // One snapshot of each array, taken BEFORE either property is reassigned: the reuse
+        // lookups below have to search the previous layouts. Reading `attachments` inside the
+        // closure would also be a second lock-guarded access, with the index taken from a
+        // different read than the one it subscripts.
+        //
+        // `linkAttachments` used to search `previousAttachments` — i.e. the array the line above
+        // had just reassigned, with every `.link` layout filtered out. The lookup could therefore
+        // never match, so a brand-new AttachmentLayout was built for every link attachment on
+        // every single update, each one dispatching a fresh loadThumbnail() and each one starting
+        // with `thumbnail == nil` (which is what made link images flick back to the placeholder).
+        let previousAttachments = attachments
+        let previousLinkAttachments = linkAttachments
+
         attachments =
         (message.attachments?.compactMap { attachment in
             logger.verbose("[Attachment] attachmentLayout update attachment \(attachment.description)")
-            if let index = attachments.firstIndex(where: { $0.attachment == attachment }) {
-                attachments[index].update(attachment: attachment)
-                return attachments[index]
+            if let existing = previousAttachments.first(where: { $0.attachment == attachment }) {
+                existing.update(attachment: attachment)
+                return existing
             }
             let layout = Components.messageAttachmentLayoutModel.init(attachment: attachment, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type == .link ? nil : layout
@@ -988,11 +1287,12 @@ open class MessageLayoutModel {
         linkAttachments =
         (message.attachments?.compactMap { attachment in
             logger.verbose("[Attachment] link attachmentLayout update attachment \(attachment.description)")
-            if let index = attachments.firstIndex(where: { $0.attachment == attachment }) {
-                attachments[index].update(attachment: attachment)
-                return attachments[index]
+            if let existing = previousLinkAttachments.first(where: { $0.attachment == attachment }) {
+                existing.update(attachment: attachment)
+                return existing
             }
-            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
+            // Was `AttachmentLayout(...)`, bypassing the factory used for media rows above.
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: attachment, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type != .link || attachment.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
@@ -1102,12 +1402,32 @@ open class MessageLayoutModel {
         guard message.state != .deleted
         else { return false }
         let url = linkMetadata.url
+        // Before the dedup check below, not after. The check asks whether the stored preview
+        // already has the same image/icon state as this metadata, and a metadata object freshly
+        // converted from its DTO reports "no image" until loadImages() reads it off disk — so
+        // checking first would make a preview whose image has since arrived look unchanged, and
+        // it would never refresh. This is cheap when there is nothing new (a path lookup, and
+        // UIImage(contentsOfFile:) decodes lazily); the expensive work is all below the guard.
+        linkMetadata.loadImages()
+        // Skip only when nothing that this preview RENDERS has changed. The url/image/icon triple
+        // is not enough: `update()` used to empty the array before refilling it, so this guard
+        // never actually fired and its gaps never showed. Now that the array is refreshed in
+        // place it is load-bearing, and the missing comparisons are exactly the cases that matter
+        // — Open Graph text arriving after the first fetch, and a placeholder `isThumbnailData`
+        // preview being replaced by the real fetched metadata. Both keep the same image state, so
+        // the old triple would have skipped them and left the stale title on screen.
         if let linkPreviews = linkPreviews,
-           linkPreviews.contains(where: { $0.url.isEqual(url: url) && $0.hasImage == linkMetadata.hasImage && $0.hasIcon == linkMetadata.hasIcon}) {
+           linkPreviews.contains(where: {
+               $0.url.isEqual(url: url)
+               && $0.hasImage == linkMetadata.hasImage
+               && $0.hasIcon == linkMetadata.hasIcon
+               && $0.isThumbnailData == linkMetadata.isThumbnailData
+               && $0.title?.string == linkMetadata.title
+               && $0.description?.string == linkMetadata.summary
+           }) {
             return false
         }
 
-        linkMetadata.loadImages()
         var preview = LinkPreview(url: url, isThumbnailData: linkMetadata.isThumbnailData, icon: linkMetadata.icon)
         preview.metadata = linkMetadata
         preview.iconOriginalSize = linkMetadata.iconOriginalSize
@@ -1156,14 +1476,17 @@ open class MessageLayoutModel {
                                              maximumNumberOfLines: 2)).textSize
             preview.title = text
         }
-        if linkPreviews == nil {
-            linkPreviews = []
-        }
-        if let index = linkPreviews?.firstIndex(where: { $0.url.isEqual(url: preview.url)}) {
-            linkPreviews?[index] = preview
+        // One snapshot, mutated locally, written back once. Reading the array, taking an index
+        // into it and then subscripting a *second* read would be two separate accesses now that
+        // `linkPreviews` is lock-guarded — and the concurrent writer could have shortened it in
+        // between, trapping with "Index out of range".
+        var previews = linkPreviews ?? []
+        if let index = previews.firstIndex(where: { $0.url.isEqual(url: preview.url) }) {
+            previews[index] = preview
         } else {
-            linkPreviews?.append(preview)
+            previews.append(preview)
         }
+        linkPreviews = previews
         if !hasPoll && !(contentOptions.contains(.link) || contentOptions.contains(.file) || contentOptions.contains(.image) || contentOptions.contains(.voice)) {
             contentOptions.insert(.link)
         }
@@ -1209,15 +1532,16 @@ open class MessageLayoutModel {
     }
     
     private func calculateAttachmentsContainerSize() -> CGSize {
-        guard !attachments.isEmpty
+        let rows = attachments
+        guard !rows.isEmpty
         else { return .zero }
         
         var size = CGSize.zero
-        for attachment in attachments {
+        for attachment in rows {
             size.width = max(size.width, attachment.thumbnailSize.width)
             size.height += attachment.thumbnailSize.height
         }
-        size.height += CGFloat(4 * (attachments.count - 1))
+        size.height += CGFloat(4 * (rows.count - 1))
         return size
     }
 }
@@ -1872,11 +2196,17 @@ extension MessageLayoutModel {
                 if message.isViewOnceMessage {
                     self.attachment = nil
                 } else if let attachment = message.attachments?.first {
+                    // asyncLoadThumbnail: the synchronous branch does Data(contentsOf:) plus an
+                    // image decode on the calling thread, and this initializer runs on the
+                    // CoreData queue during every change notification. ReplyView wires
+                    // `onLoadThumbnail` and also heals via AttachmentSharpThumbnailRelay, so the
+                    // thumbnail simply arrives a frame later.
                     self.attachment = .init(
                         attachment: attachment,
                         ownerMessage: message,
                         ownerChannel: channel,
                         thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize,
+                        asyncLoadThumbnail: true,
                         appearance: appearance)
                 }
 
@@ -1940,11 +2270,19 @@ extension MessageLayoutModel {
             guard self.message == message
             else { return }
             if let attachment = message.attachments?.first {
+                // Reuse the existing layout when it already describes this attachment: building a
+                // new one throws away a thumbnail that is already loaded, so the reply image would
+                // flick back to its placeholder on every update.
+                if let existing = self.attachment, existing.attachment == attachment {
+                    existing.update(attachment: attachment)
+                    return
+                }
                 self.attachment = Components.messageAttachmentLayoutModel.init(
                     attachment: attachment,
                     ownerMessage: message,
                     ownerChannel: self.attachment?.ownerChannel,
                     thumbnailSize: thumbnailSize ?? Components.messageCellReplyView.Measure.imageSize,
+                    asyncLoadThumbnail: true,
                     appearance: appearance)
             }
         }
