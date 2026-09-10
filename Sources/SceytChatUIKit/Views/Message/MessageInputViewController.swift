@@ -203,8 +203,15 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                     self.updateState()
                     self.updateMentions()
                     self.findLink()
-                case let .contentSizeUpdate(old: _, new: new):
-                    self.update(height: max(0, new))
+                case .contentSizeUpdate:
+                    // Recompute from the live content size rather than the event payload:
+                    // this delivery is always a hop late (`receive(on:)`), and by the time it
+                    // lands the text view may have re-laid out at a different width — feeding
+                    // a stale height into `update(height:)` animates the bar to a value it
+                    // then has to animate back from. Reading live state also makes the
+                    // delivery idempotent, so a height already installed synchronously (a
+                    // draft restore) is recognised as unchanged and dropped.
+                    self.update(height: max(0, self.inputTextView.contentSize.height))
                 case .pastedImage:
                     guard let images = UIPasteboard.general.images else { return }
                     images.forEach { image in

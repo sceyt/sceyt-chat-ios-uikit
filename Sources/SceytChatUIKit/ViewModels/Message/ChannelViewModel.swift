@@ -2636,6 +2636,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         channelProvider.fetchDraft(completion: completion)
     }
 
+    /// The draft, read inline. See `ChannelProvider.fetchDraft()`.
+    open func loadDraft() -> DraftMessage? {
+        channelProvider.fetchDraft()
+    }
+
     /// The reply/edit target as the input bar's own state, ready to persist.
     open var draftTarget: DraftMessage.Target? {
         guard let (message, action) = selectedMessageForAction else { return nil }

@@ -243,6 +243,12 @@ open class ChannelViewController: ViewController,
     /// Restoring is a one-shot per screen; `viewDidAppear` fires again on every return from a
     /// pushed screen, and by then the bar already holds whatever the user left in it.
     private var hasRestoredDraft = false
+    /// Set only for the duration of the synchronous draft-restore pass, so
+    /// `onContentHeightUpdate` moves the input bar without animating it. The draft read is
+    /// async and resolves *after* the push transition, where a bar growing into place reads
+    /// as a glitch rather than as feedback for something the user just did. A subclass that
+    /// overrides `restoreDraftIfNeeded()` wholesale opts out of the suppression.
+    private var isRestoringDraft = false
     private var contextMenu: ContextMenu!
     private var scrollTimer: Timer?
     private var isAppActive: Bool = true
@@ -314,6 +320,17 @@ open class ChannelViewController: ViewController,
         super.viewWillLayoutSubviews()
         
     }
+
+    override open func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // The earliest point where the collection view holds its final bounds, which is what
+        // the restore's inset/offset math needs. Measured on an iPhone 17 simulator, this runs
+        // ~30ms after `viewDidLoad` while `viewDidAppear` only fires at ~540ms — the whole push
+        // transition later. Restoring here is what puts a saved reply bar on screen *with* the
+        // channel instead of dropping it in half a second afterwards.
+        restoreDraftIfNeeded()
+    }
+
     
     override open func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
@@ -550,32 +567,22 @@ open class ChannelViewController: ViewController,
         customInputViewController.onContentHeightUpdate = { [weak self] height, completion in
             guard let self else { return }
             if height != self.messageInputViewHeightConstraint.constant {
+                // A draft restore applies the whole composer state in one synchronous pass
+                // and has to land already in place. `completion` is invoked explicitly here:
+                // `UIView.animate` does run its block inline while animations are disabled,
+                // but *when* it calls the completion is undocumented — and
+                // `removeActionView()` hides the action bar and clears its re-entrancy flag
+                // only from inside that closure.
+                if self.isRestoringDraft {
+                    self.isUpdatingInputViewHeight = true
+                    self.applyInputContentHeight(height)
+                    self.isUpdatingInputViewHeight = false
+                    completion?()
+                    return
+                }
                 self.isUpdatingInputViewHeight = true
                 UIView.animate(withDuration: 0.25) { [weak self] in
-                    guard let self else { return }
-                    // Mirrored: the input bar occupies contentInset.top (the
-                    // anchored edge), so the offset shifts opposite to the inset
-                    // growth to keep the visible content riding above the input
-                    // bar; at the newest edge this lands exactly on the new minimum
-                    // offset. Upright: the inset grows the far edge and the content
-                    // does not move, so only the clamp applies.
-                    let previousAnchoringInset = self.offsetAnchoringInset
-                    let previousOffsetY = self.collectionView.contentOffset.y
-                    self.messageInputViewHeightConstraint.constant = height
-                    self.updateCollectionViewInsets()
-                    self.coverView.layoutIfNeeded()
-                    self.collectionView.layoutIfNeeded()
-                    let contentOffsetY = self.offsetAfterInsetChange(
-                        from: previousOffsetY,
-                        previousAnchoringInset: previousAnchoringInset
-                    )
-                    self.collectionView.setContentOffset(
-                        .init(
-                            x: 0,
-                            y: contentOffsetY
-                        ),
-                        animated: false
-                    )
+                    self?.applyInputContentHeight(height)
                 } completion: { [weak self] _ in
                     self?.isUpdatingInputViewHeight = false
                     completion?()
@@ -840,6 +847,61 @@ open class ChannelViewController: ViewController,
         )
     }
     
+    /// Drives the input bar to the height its restored content needs, now, instead of
+    /// leaving it to the deferred `.contentSizeUpdate` delivery — that subscription is
+    /// `receive(on:)`-bound, so it always lands a main-queue hop late and would animate a
+    /// second time on top of the restore.
+    ///
+    /// Iterated rather than one-shot: `update(height:)` rounds the height it reports *up*,
+    /// so with fractional line heights the first pass can still leave a point on the table
+    /// and the second is what reaches the fixed point. Once there, every later pass — the
+    /// deferred delivery included — recomputes the same number and the equality guard in
+    /// `onContentHeightUpdate` drops it. Bounded so a layout that never settles cannot spin.
+    private func settleInputContentHeight() {
+        var settled = messageInputViewHeightConstraint.constant
+        for _ in 0 ..< 3 {
+            // `contentSize` is only final once the trailing-button constraints that
+            // `apply(draft:)`'s `updateState()` rewrote are laid out — width is its only
+            // geometric input.
+            customInputViewController.view.layoutIfNeeded()
+            customInputViewController.update(height: inputTextView.contentSize.height)
+            let updated = messageInputViewHeightConstraint.constant
+            if updated == settled { return }
+            settled = updated
+        }
+    }
+
+    /// Moves the input bar to `height` and re-anchors the message list so the visible
+    /// content stays put. Shared by the animated and the non-animated (draft restore)
+    /// paths so both run identical offset math. Callers own `isUpdatingInputViewHeight`,
+    /// which must cover the `setContentOffset` below — `scrollViewDidScroll` fires
+    /// synchronously from it and reads that flag to suppress `addMoreMessage`.
+    private func applyInputContentHeight(_ height: CGFloat) {
+        // Mirrored: the input bar occupies contentInset.top (the
+        // anchored edge), so the offset shifts opposite to the inset
+        // growth to keep the visible content riding above the input
+        // bar; at the newest edge this lands exactly on the new minimum
+        // offset. Upright: the inset grows the far edge and the content
+        // does not move, so only the clamp applies.
+        let previousAnchoringInset = offsetAnchoringInset
+        let previousOffsetY = collectionView.contentOffset.y
+        messageInputViewHeightConstraint.constant = height
+        updateCollectionViewInsets()
+        coverView.layoutIfNeeded()
+        collectionView.layoutIfNeeded()
+        let contentOffsetY = offsetAfterInsetChange(
+            from: previousOffsetY,
+            previousAnchoringInset: previousAnchoringInset
+        )
+        collectionView.setContentOffset(
+            .init(
+                x: 0,
+                y: contentOffsetY
+            ),
+            animated: false
+        )
+    }
+
     private func removePrevUnreadSeparatorView(
         escape messageId: UInt64
     ) {
@@ -4216,19 +4278,37 @@ open class ChannelViewController: ViewController,
 
     /// Restores the input bar from the last saved draft, once per screen.
     ///
-    /// Runs from `viewDidAppear` rather than `setupDone`: `addReply`/`addEdit` drive
-    /// `onContentHeightUpdate`, which animates the input height and re-anchors the collection
-    /// view's content offset — at `setupDone` the collection view has no final bounds yet.
+    /// Driven from the first `viewDidLayoutSubviews` (~30ms after `viewDidLoad`) rather than
+    /// from `viewDidAppear` (~540ms, the far side of the push transition) — that timing, not
+    /// the read, is what used to make a restored reply bar drop in late.
+    ///
+    /// Read inline rather than through the async `loadDraft(completion:)`: it is one row plus
+    /// its relationships on the main context, measured at ~0.8ms, so the bar is already correct
+    /// in the frame the channel first draws. The async path costs about the same to execute but
+    /// goes through the *shared* `backgroundReadOnlyContext`, which channel-open work contends
+    /// for, and lands its result a queue hop later — i.e. possibly a frame after the screen is
+    /// already up.
+    ///
+    /// `viewDidAppear` still calls this as a backstop for a screen that appears without a
+    /// layout pass; the one-shot guard makes that a no-op in the normal flow.
     open func restoreDraftIfNeeded() {
         guard !hasRestoredDraft else { return }
         hasRestoredDraft = true
 
-        channelViewModel.loadDraft { [weak self] draft in
-            guard let self, let draft else { return }
-            DispatchQueue.main.async {
-                self.apply(draft: draft)
-            }
+        guard let draft = channelViewModel.loadDraft() else { return }
+
+        // Nothing here may animate: at first layout the screen has not been drawn yet, and by
+        // `viewDidAppear` the push transition has already settled — either way a bar growing
+        // into place reads as a glitch. `isRestoringDraft` takes `onContentHeightUpdate` down
+        // its immediate path, and `performWithoutAnimation` covers the animations the input bar
+        // runs itself, which never reach that callback (`updateMediaButtonAppearance` inside
+        // `addEdit`, unhiding the recorded-voice preview).
+        isRestoringDraft = true
+        UIView.performWithoutAnimation {
+            apply(draft: draft)
+            settleInputContentHeight()
         }
+        isRestoringDraft = false
     }
 
     open func apply(draft: DraftMessage) {
