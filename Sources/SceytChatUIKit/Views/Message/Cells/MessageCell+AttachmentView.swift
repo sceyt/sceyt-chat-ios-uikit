@@ -121,6 +121,18 @@ extension MessageCell {
         /// animation gets to render the 100% state first. Cancelled whenever a
         /// newer progress value arrives (e.g. the attachment starts re-downloading).
         private var pendingHideWorkItem: DispatchWorkItem?
+
+        /// The largest value the ring has rendered for the transfer currently on screen.
+        /// Reset to 0 whenever the ring leaves the screen or its stroke is taken off
+        /// (pause/failure), i.e. whenever there is no longer a drawn value to regress from.
+        open private(set) var highestRenderedProgress: CGFloat = 0
+
+        /// True while the transfer overlay occupies the centre of the thumbnail — including
+        /// the shrink-out it plays on completion. Anything else that draws in that slot (the
+        /// video views' play button) must stay hidden until this goes false.
+        open var isTransferOverlayVisible: Bool {
+            !progressView.isHidden
+        }
         
         override open func setup() {
             super.setup()
@@ -286,6 +298,8 @@ extension MessageCell {
         }
         
         open func setProgress(_ progress: AttachmentTransfer.AttachmentProgress) {
+            guard !isStaleProgress(progress.progress)
+            else { return }
             let total = progress.attachment.uploadedFileSize
             if total <= 0 {
                 progressLabel.text = L10n.Upload.preparing
@@ -306,6 +320,8 @@ extension MessageCell {
         }
         
         open func setProgress(_ progress: CGFloat) {
+            guard !isStaleProgress(progress)
+            else { return }
             if let message = data.ownerMessage,
                let task = AttachmentTransfer.default.taskFor(message: message, attachment: data.attachment),
                task.transferType == .upload,
@@ -317,10 +333,12 @@ extension MessageCell {
             else { return }
             pendingHideWorkItem?.cancel()
             pendingHideWorkItem = nil
-            progressView.progress = progress
+            highestRenderedProgress = progress <= 0 ? 0 : max(highestRenderedProgress, progress)
             if progress <= 0 {
+                progressView.progress = progress
                 hideProgressView()
             } else if progress >= 1 {
+                progressView.progress = progress
                 if progressView.isHidden || progressView.isHiddenProgress {
                     hideProgressView()
                 } else {
@@ -339,10 +357,49 @@ extension MessageCell {
                     )
                 }
             } else {
-                progressView.isHidden = false
+                if progressView.isHidden {
+                    // Seed the ring before it comes back on screen: the stored value is
+                    // still the last transfer's, and animating from it plays that one
+                    // rewinding over the first frames of this one.
+                    progressView.setProgressWithoutAnimation(progress)
+                    progressView.isHidden = false
+                } else {
+                    progressView.progress = progress
+                }
                 progressLabel.isHidden = (progressLabel.text ?? "").isEmpty || progressView.isHidden || progressView.isHiddenProgress
                 pauseButton.isHidden = false
             }
+        }
+
+        /// A tick reporting less than the ring already draws.
+        ///
+        /// Progress reaches this view from more than one place — the transfer's own stream,
+        /// and `attachmentTransferStatusDidChange` reading the transfer's cached percent when
+        /// a status change lands — each with its own latency, and every tick is hopped onto
+        /// the main queue individually. An older value arriving after a newer one used to be
+        /// rendered as an animated stroke, which is the ring running *backwards* for a moment
+        /// near the end of a download and then forward again on the next tick.
+        ///
+        /// Only a *drawn* value can regress, so this holds nothing back while the overlay is
+        /// off screen — a transfer that starts again after one finished still gets its ring
+        /// from its first tick. A genuine restart of a visible overlay comes in as `<= 0`, or
+        /// through `clearTransferOverlay`/a pause, all of which drop the mark back to 0 first.
+        open func isStaleProgress(_ progress: CGFloat) -> Bool {
+            isTransferOverlayVisible && progress > 0 && progress < highestRenderedProgress
+        }
+
+        /// Brings the overlay (the disc and its action button) on screen without touching
+        /// `progress`. The paused/failed states need the container and their resume icon, not
+        /// a new value — they used to ask for it by pushing ~0 through `setProgress`, which
+        /// animated the stroke back down to empty first: on a download paused at 90% that is
+        /// the ring visibly rewinding.
+        open func showTransferOverlay() {
+            pendingHideWorkItem?.cancel()
+            pendingHideWorkItem = nil
+            progressView.transform = .identity
+            pauseButton.transform = .identity
+            progressView.isHidden = false
+            pauseButton.isHidden = false
         }
         
         open func hideProgressView() {
@@ -362,6 +419,7 @@ extension MessageCell {
                 if progress <= 0 || progress >= 1 {
                     self.progressView.isHidden = true
                     self.pauseButton.isHidden = true
+                    self.highestRenderedProgress = 0
                     self.progressView.transform = .identity
                     self.pauseButton.transform = .identity
                     self.didHideProgressView()
@@ -390,20 +448,26 @@ extension MessageCell {
             case .downloading:
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
             case .pauseUploading, .failedUploading:
-                setProgress(0.0001)
+                showTransferOverlay()
                 progressView.isHiddenProgress = true
+                highestRenderedProgress = 0
                 progressLabel.isHidden = true
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.uploadIcon, for: .normal)
             case .pauseDownloading, .failedDownloading:
-                setProgress(0.0001)
+                showTransferOverlay()
                 progressView.isHiddenProgress = true
+                highestRenderedProgress = 0
                 progressLabel.isHidden = true
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.downloadIcon, for: .normal)
             case .done:
                 if progressView.progress > 0 {
                     setProgress(1)
                 } else {
-                    setProgress(0)
+                    // `hideProgressView` directly, not `setProgress(0)`: that short-circuits
+                    // when 0 is already the stored value, and the overlay can be on screen at
+                    // zero — an attachment that was never downloaded shows it for its download
+                    // button, without ever having received a tick.
+                    hideProgressView()
                 }
             }
         }
@@ -517,6 +581,7 @@ extension MessageCell {
             CATransaction.commit()
             progressView.isHidden = true
             progressView.isHiddenProgress = false
+            highestRenderedProgress = 0
             progressLabel.isHidden = true
             progressLabel.text = nil
             pauseButton.isHidden = true

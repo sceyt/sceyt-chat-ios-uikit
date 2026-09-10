@@ -373,6 +373,63 @@ final class PinnedMessageTests: XCTestCase {
         XCTAssertEqual(model.attachment?.type, "video")
     }
 
+    /// An integrator's own message type has to survive the round trip, because the banner
+    /// renders from the snapshot and a host formatter can only tell a shared location from a
+    /// plain photo by the type — both carry an image attachment and an empty body. Losing the
+    /// type here would silently make every custom share preview as its attachment.
+    func testPin_snapshotsACustomMessageTypeThroughToThePreviewMessage() {
+        let message = seedMessage(id: 1, channelId: channelId, body: "")
+        message.type = "location"
+
+        let attachment = AttachmentDTO.insertNewObject(into: ctx)
+        attachment.type = "image"
+        attachment.name = "map.jpg"
+        attachment.message = message
+        try? ctx.save()
+
+        pin(message)
+
+        guard let row = pinRow(tid: message.tid) else { return XCTFail("no pin row") }
+        XCTAssertEqual(row.messageType, "location")
+
+        let preview = row.convert().previewMessage
+        XCTAssertEqual(preview.type, "location", "the type is what a host formatter switches on")
+        XCTAssertEqual(
+            preview.attachments?.first?.type, "image",
+            "and the attachment still has to be there, or a location loses its map thumbnail"
+        )
+    }
+
+    /// The same guarantee on the other write path: a pin learned from the server sweep, whose
+    /// message may never have been fetched into the local store.
+    func testStorePin_snapshotsACustomMessageTypeFromTheServerPath() {
+        let stored = ctx.storePin(
+            message: Message.Builder().id(91).tid(9_100).body("").type("video_post").build(),
+            channelId: channelId,
+            serverPinId: 6_700,
+            pinnedBy: ChatUser(id: "them"),
+            pinnedUntil: nil,
+            scope: .forAll
+        )
+        try? ctx.save()
+
+        XCTAssertEqual(stored?.messageType, "video_post")
+        XCTAssertEqual(stored?.convert().previewMessage.type, "video_post")
+    }
+
+    /// A row written before the snapshot carried a type — or by any path that leaves it unset —
+    /// must read back as a plain text message rather than as an empty type no formatter matches.
+    func testPinSnapshot_withNoMessageTypeReadsBackAsText() {
+        let message = seedMessage(id: 1, channelId: channelId)
+        pin(message)
+
+        guard let row = pinRow(tid: message.tid) else { return XCTFail("no pin row") }
+        row.messageType = nil
+        try? ctx.save()
+
+        XCTAssertEqual(row.convert().messageType, "text")
+    }
+
     /// A pinned view-once or auto-deleting message would keep a full body snapshot on disk
     /// after it had vanished from the timeline.
     func testPin_refusesViewOnceTransientAndAutoDeleteMessages() {

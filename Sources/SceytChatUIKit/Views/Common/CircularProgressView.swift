@@ -86,6 +86,23 @@ open class CircularProgressView: View {
             progressLayer.add(animation, forKey: "animateprogress")
         }
     }
+
+    /// Applies a value without the stroke-fill animation.
+    ///
+    /// Assigning `progress` always animates from whatever it held before, which is right
+    /// while the ring is on screen and wrong while it is not: nothing resets the stored
+    /// value when the ring is hidden, so seeding a new transfer plays the previous one
+    /// rewinding from 100% over the first frames after the ring is shown again.
+    open func setProgressWithoutAnimation(_ newValue: CGFloat) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let duration = animationDuration
+        animationDuration = 0
+        progress = newValue
+        animationDuration = duration
+        progressLayer.removeAnimation(forKey: "animateprogress")
+        CATransaction.commit()
+    }
     
     open func createRotateZAnimation() {
         func perform() {
