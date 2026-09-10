@@ -86,8 +86,8 @@ open class ChannelPinnedMessageListViewController: ViewController,
 
     /// Menu actions that need the conversation itself on screen: they drive its composer,
     /// switch it into selection mode, or present over it. The screen closes and hands
-    /// those over; everything else — copy, pin, unpin, delete, retract vote, message
-    /// info — runs right here, the way the row's swipe action does.
+    /// those over; everything else — copy, pin, unpin, delete, retract vote — runs right
+    /// here, the way the row's swipe action does.
     open var menuActionTitlesReturningToConversation: Set<String> = [
         L10n.Message.Action.Title.reply,
         L10n.Message.Action.Title.edit,
@@ -96,6 +96,14 @@ open class ChannelPinnedMessageListViewController: ViewController,
         // `ChannelViewController` builds this one from a bare string, and it opens a
         // confirmation alert over the conversation.
         "End Poll"
+    ]
+
+    /// Menu actions this screen leaves out of the message menu entirely. Message info is
+    /// the conversation's own screen — it lists who received and read the message, which
+    /// is a detour from a list whose one job is finding a pin and jumping to it — so the
+    /// pinned rows drop it and keep the menu to the actions that act on the pin itself.
+    open var hiddenMenuActionTitles: Set<String> = [
+        L10n.Message.Action.Title.info
     ]
 
     open override func setup() {
@@ -450,8 +458,8 @@ open class ChannelPinnedMessageListViewController: ViewController,
         channelViewController?.selectedEmojis(contextMenu: contextMenu, identifier: identifier) ?? []
     }
 
-    /// The conversation's own menu, item for item — the same actions, built by the same
-    /// code, so the two screens can never drift apart. Only the handful that need the
+    /// The conversation's own menu, built by the same code so the two screens can never
+    /// drift apart — minus `hiddenMenuActionTitles`. Only the handful that need the
     /// conversation on screen are wrapped, to close this one first.
     open func items(contextMenu: ContextMenu, identifier: Identifier) -> [MenuItem] {
         guard let channelViewController,
@@ -461,6 +469,7 @@ open class ChannelPinnedMessageListViewController: ViewController,
         let conversationModel = conversationLayoutModel(for: model)
         return channelViewController
             .items(contextMenu: contextMenu, identifier: .init(value: conversationModel))
+            .filter { !hiddenMenuActionTitles.contains($0.title) }
             .map { item in
                 guard menuActionTitlesReturningToConversation.contains(item.title)
                 else { return item }
