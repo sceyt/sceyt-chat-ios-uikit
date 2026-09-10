@@ -213,47 +213,23 @@ public class PinnedMessageDTO: NSManagedObject {
         ]
     }
 
-    /// The same order read the other way: **newest pin first**.
-    ///
-    /// What the standalone pinned-messages screen lists, where there is no walk to start
-    /// from a resting position — the top row is simply the most recent pin, and a new pin
-    /// arrives there rather than at the bottom of a long scroll.
-    ///
-    /// Every descriptor is reversed, tiebreakers included: dropping one would leave the
-    /// pre-server-API rows and the in-flight pins in an unstable order, which is what makes
-    /// the FRC emit phantom `.move` events.
-    public static var newestFirstSortDescriptors: [NSSortDescriptor] {
-        [
-            NSSortDescriptor(keyPath: \PinnedMessageDTO.serverPinId, ascending: false),
-            NSSortDescriptor(keyPath: \PinnedMessageDTO.messageCreatedAt, ascending: false),
-            NSSortDescriptor(keyPath: \PinnedMessageDTO.messageId, ascending: false),
-            NSSortDescriptor(keyPath: \PinnedMessageDTO.messageTid, ascending: false)
-        ]
-    }
-
     @nonobjc
     public static func fetchRequest() -> NSFetchRequest<PinnedMessageDTO> {
         return NSFetchRequest<PinnedMessageDTO>(entityName: entityName)
     }
 
-    /// The request the banner and the pinned list both observe. Lapsed pins are excluded —
-    /// see `unexpiredPredicate(now:)` for the one caveat about when that is evaluated.
-    ///
-    /// - Parameter newestFirst: `true` for `newestFirstSortDescriptors`, which is what the
-    ///   standalone pinned-messages screen lists in. One predicate for both, so the two
-    ///   screens can never disagree about *which* pins are live — only about the direction
-    ///   they are read in.
-    public static func fetchRequest(
-        channelId: ChannelId,
-        newestFirst: Bool = false
-    ) -> NSFetchRequest<PinnedMessageDTO> {
+    /// The request the banner and the standalone pinned-messages screen both observe —
+    /// one predicate and one order for both, so the two can never disagree about which
+    /// pins are live or about which one is the newest. Lapsed pins are excluded; see
+    /// `unexpiredPredicate(now:)` for the one caveat about when that is evaluated.
+    public static func fetchRequest(channelId: ChannelId) -> NSFetchRequest<PinnedMessageDTO> {
         let request = fetchRequest()
         request.predicate = NSCompoundPredicate(type: .and, subpredicates: [
             NSPredicate(format: "channelId == %lld", channelId),
             unexpiredPredicate(),
             notPendingUnpinPredicate()
         ])
-        request.sortDescriptors = newestFirst ? newestFirstSortDescriptors : defaultSortDescriptors
+        request.sortDescriptors = defaultSortDescriptors
         return request
     }
 

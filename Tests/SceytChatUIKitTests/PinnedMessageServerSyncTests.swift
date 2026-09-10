@@ -192,29 +192,25 @@ final class PinnedMessageServerSyncTests: XCTestCase {
                        "the value is load-bearing: see defaultSortDescriptors")
     }
 
-    /// The pinned-messages screen reads the same pins as the banner, in the opposite
-    /// direction. Every tiebreaker has to flip with the leading key: one left ascending
-    /// would leave the rows that tie on `serverPinId` in an unstable order, which is what
-    /// makes the FRC emit phantom `.move` events.
-    func testNewestFirstSortDescriptors_areTheDefaultOnesReversed() {
-        let ascending = PinnedMessageDTO.defaultSortDescriptors
-        let descending = PinnedMessageDTO.newestFirstSortDescriptors
-
-        XCTAssertEqual(descending.map(\.key), ascending.map(\.key),
-                       "the two orders must sort on the same keys, in the same priority")
-        XCTAssertTrue(ascending.allSatisfy { $0.ascending },
-                      "the banner's order is oldest pin first")
-        XCTAssertTrue(descending.allSatisfy { !$0.ascending },
-                      "and the list's is newest pin first, tiebreakers included")
+    /// The banner and the standalone pinned-messages screen read the pins in one order:
+    /// oldest pin first, newest last — the conversation's own direction, which is what puts
+    /// the newest pin at the bottom of the list and at the end of the banner's walk.
+    ///
+    /// Every tiebreaker sorts the same way as the leading key: one left descending would
+    /// leave the rows that tie on `serverPinId` in an unstable order, which is what makes
+    /// the FRC emit phantom `.move` events.
+    func testDefaultSortDescriptors_readOldestPinFirst_tiebreakersIncluded() {
+        XCTAssertTrue(PinnedMessageDTO.defaultSortDescriptors.allSatisfy { $0.ascending },
+                      "oldest pin first, tiebreakers included")
     }
 
-    func testFetchRequest_takesTheNewestFirstOrderOnlyWhenAsked() {
+    func testFetchRequest_isOneOrderAndOnePredicateForBothScreens() {
         let banner = PinnedMessageDTO.fetchRequest(channelId: channelId)
-        let list = PinnedMessageDTO.fetchRequest(channelId: channelId, newestFirst: true)
+        let list = PinnedMessageDTO.fetchRequest(channelId: channelId)
 
-        XCTAssertEqual(banner.sortDescriptors, PinnedMessageDTO.defaultSortDescriptors,
-                       "the default stays the banner's order")
-        XCTAssertEqual(list.sortDescriptors, PinnedMessageDTO.newestFirstSortDescriptors)
+        XCTAssertEqual(banner.sortDescriptors, PinnedMessageDTO.defaultSortDescriptors)
+        XCTAssertEqual(list.sortDescriptors, PinnedMessageDTO.defaultSortDescriptors,
+                       "the list reads the pins in the banner's order, not its reverse")
         // Compared with the expiry cutoff redacted: `unexpiredPredicate()` stamps `Date()`
         // into the predicate, so two requests built a microsecond apart are never equal
         // outright — the clause that matters is that both carry the same one.

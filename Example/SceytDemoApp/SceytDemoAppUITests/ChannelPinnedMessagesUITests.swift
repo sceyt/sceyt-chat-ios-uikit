@@ -30,15 +30,16 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
             "sceyt_chat_pinned_message_list_cell.\(id)"
         }
 
-        /// The pinned rows in the order the list must show them in: **newest pin first**,
-        /// which is the reverse of the banner's segment bar.
+        /// The pinned rows in the order the list must show them in: **oldest pin first**,
+        /// the conversation's own direction, so the newest pin is the bottom row — the same
+        /// order the banner's segment bar walks in.
         ///
         /// The fixture seeds no server pin ids, so every row ties on the primary
-        /// `serverPinId` descriptor and the timeline tiebreakers decide — which is why this is
-        /// still timeline order, just read backwards. `--uitest-pinned-messages-pin-order` is
-        /// the fixture that exercises real pin ids.
+        /// `serverPinId` descriptor and the timeline tiebreakers decide — which is why this
+        /// is plain timeline order. `--uitest-pinned-messages-pin-order` is the fixture that
+        /// exercises real pin ids.
         static var allRowIdentifiers: [String] {
-            [pollId, videoId, textId].map(rowIdentifier)
+            [textId, videoId, pollId].map(rowIdentifier)
         }
 
         static let bannerTitle = "Pinned Messages"
@@ -416,7 +417,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(app.navigationBars[Pinned.bannerTitle].waitForExistence(timeout: 5),
                       "the presented screen is titled like the banner")
 
-        // Every seeded pin must be listed, newest pin first — not just "some rows appeared".
+        // Every seeded pin must be listed, oldest pin first — not just "some rows appeared".
         XCTAssertEqual(screen.pinnedListRowIdentifiers, Pinned.allRowIdentifiers)
         // The rows are the conversation's own bubbles, so a pin reads as the message
         // itself: its body, and for the poll its question — never the banner's "Video" /
@@ -424,7 +425,40 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         // has no text of its own, and a bubble always realizes its body label, so it
         // contributes an empty one.
         XCTAssertEqual(screen.pinnedListBodies,
-                       [Pinned.pollQuestion, "", Pinned.textPreview])
+                       [Pinned.textPreview, "", Pinned.pollQuestion])
+    }
+
+    /// The list opens where the conversation opens: resting on the newest pin, at the
+    /// bottom of the screen, with whatever empty space there is *above* the pins rather
+    /// than below them.
+    ///
+    /// The fixture's three pins do not fill a phone screen, so there is nothing to scroll
+    /// — which is exactly the case the screen has to hold itself in, and the one an
+    /// upright table gets wrong by default by hanging its rows off the navigation bar.
+    func testPinnedList_opensRestingOnTheNewestPinAtTheBottom() {
+        openPinnedConversation()
+        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
+        XCTAssertTrue(screen.openPinnedMessageList())
+
+        // The poll is the newest pin and therefore the last row; the text is the oldest
+        // and therefore the first.
+        let newest = screen.pinnedListCell(Pinned.pollId)
+        let oldest = screen.pinnedListCell(Pinned.textId)
+        XCTAssertTrue(newest.waitForExistence(timeout: 5))
+        XCTAssertTrue(oldest.waitForExistence(timeout: 5))
+
+        let table = screen.pinnedListTable.frame
+        let spaceBelow = table.maxY - newest.frame.maxY
+        let spaceAbove = oldest.frame.minY - table.minY
+
+        XCTAssertLessThan(spaceBelow, spaceAbove,
+                          "the pins must rest at the bottom: the empty space belongs above "
+                          + "them, not below — got \(spaceAbove) above, \(spaceBelow) below")
+        // Nothing but the home indicator and the list's own trailing padding under the
+        // newest pin. The navigation bar overlays the top, so the gap above is compared
+        // against, not measured.
+        XCTAssertLessThan(spaceBelow, 80,
+                          "the newest pin must sit on the bottom edge, got \(spaceBelow)pt of space under it")
     }
 
     /// The screen is presented, not pushed: it carries an "X" instead of a back button,
@@ -511,7 +545,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(screen.pinnedListTable.exists,
                       "unpinning needs nothing from the conversation, so the list must stay up")
         XCTAssertEqual(screen.pinnedListRowIdentifiers,
-                       [Pinned.rowIdentifier(Pinned.pollId), Pinned.rowIdentifier(Pinned.videoId)])
+                       [Pinned.rowIdentifier(Pinned.videoId), Pinned.rowIdentifier(Pinned.pollId)])
     }
 
     /// The arrow lives on whichever side the bubble leaves free, so it can never cover the
@@ -574,7 +608,7 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         // to it when it opened.
         XCTAssertTrue(waitForRowToDisappear(textRow), "the unpinned row must leave the list")
         XCTAssertEqual(screen.pinnedListRowIdentifiers,
-                       [Pinned.rowIdentifier(Pinned.pollId), Pinned.rowIdentifier(Pinned.videoId)])
+                       [Pinned.rowIdentifier(Pinned.videoId), Pinned.rowIdentifier(Pinned.pollId)])
     }
 
     /// Emptying the list one pin at a time — there is no Unpin All — must leave the

@@ -12,7 +12,9 @@ import UIKit
 ///
 /// The rows are the conversation's own message cells, so the screen behaves like the
 /// conversation: long press opens the same context menu with the same actions and the same
-/// reaction row, media opens in the same previewer, polls take votes, links follow.
+/// reaction row, media opens in the same previewer, polls take votes, links follow. It also
+/// reads in the conversation's direction — oldest pin at the top, newest at the bottom, the
+/// screen opening on the newest one and scrolling up through the older ones.
 ///
 /// The screen is presented modally over the conversation, so it closes itself through the
 /// "X" at the trailing edge of its navigation bar rather than a back button.
@@ -76,6 +78,22 @@ open class ChannelPinnedMessageListViewController: ViewController,
     /// the way `ChannelViewController` holds it.
     public var longPressItem: ChatMessageCell.LongPressItem?
 
+    /// `true` while the screen is still opening onto the newest pin — the last row — the
+    /// way the conversation opens on the newest message.
+    ///
+    /// One attempt is not enough. The first reload can land before the table has rows or a
+    /// height; the pins themselves can arrive later, from the sweep the view model kicks
+    /// off; and the content size and the safe-area insets both settle over several layout
+    /// passes on the way in, so an offset that was the bottom in one pass is short of it in
+    /// the next. So the anchor is re-applied — cheaply, and only when it would actually
+    /// move — from every reload and every layout pass until the screen is up and showing
+    /// pins, or until the user takes over by dragging.
+    public private(set) var needsInitialScrollToBottom = true
+
+    /// Whether the screen is on screen. Until it is, the layout is still settling, so the
+    /// opening anchor is not considered final.
+    public private(set) var hasAppeared = false
+
     public private(set) lazy var contextMenu: ContextMenu = {
         let contextMenu = ContextMenu(parent: self)
         contextMenu.dataSource = self
@@ -129,6 +147,12 @@ open class ChannelPinnedMessageListViewController: ViewController,
         tableView.contentInset.bottom = Layouts.bottomPadding
         tableView.sectionFooterHeight = 0
         tableView.estimatedSectionHeaderHeight = 0
+        // No estimates anywhere: every row's height is already known — its layout model
+        // measured it — and an estimated `contentSize` is a guess that keeps changing as
+        // rows are realized, which is not something the screen can anchor its opening
+        // position against.
+        tableView.estimatedRowHeight = 0
+        tableView.estimatedSectionFooterHeight = 0
         tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PinnedMessageList.tableView
         emptyStateView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PinnedMessageList.emptyView
 
@@ -192,9 +216,105 @@ open class ChannelPinnedMessageListViewController: ViewController,
     open func onEvent(_ event: ChannelPinnedMessageListViewModel.Event) {
         switch event {
         case .reload:
+            // Read before the reload: whether the list was resting on the newest pin is what
+            // decides if it follows a pin taken while the screen is open. The conversation
+            // follows a new message on the same terms — only from the bottom, so a user who
+            // has scrolled back through the older pins is left where they are.
+            let wasAtBottom = isAtBottom
             tableView.reloadData()
             updateEmptyState()
+            // The pins that just arrived — or the one that just left — decide how much of
+            // the screen the content fills, and therefore how far down it has to be pushed.
+            tableView.layoutIfNeeded()
+            updateTopPaddingForShortContent()
+            if needsInitialScrollToBottom {
+                scrollToBottom(animated: false)
+            } else if wasAtBottom {
+                scrollToBottom(animated: true)
+            }
         }
+    }
+
+    open override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+
+        updateTopPaddingForShortContent()
+        // Every pass while the screen is still opening: the one that first gives the table
+        // a height, and each later one that changes what "the bottom" is.
+        if needsInitialScrollToBottom {
+            scrollToBottom(animated: false)
+        }
+    }
+
+    open override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+
+        hasAppeared = true
+        // The last word on the opening position: the presentation has finished, so the
+        // insets and the content size are final.
+        if needsInitialScrollToBottom {
+            scrollToBottom(animated: false)
+        }
+    }
+
+    /// Holds the pins against the bottom of the screen when there are too few of them to
+    /// fill it, by padding the empty space above them.
+    ///
+    /// This is what the conversation gets for free from being mirrored — a handful of
+    /// messages rests on the input bar, not under the navigation bar. This screen's table
+    /// is upright, because mirroring a table view turns its trailing unpin swipe upside
+    /// down, so the same resting position is an inset instead.
+    open func updateTopPaddingForShortContent() {
+        let viewport = tableView.bounds.height
+            - tableView.safeAreaInsets.top
+            - tableView.safeAreaInsets.bottom
+            - Layouts.bottomPadding
+        // `contentSize` does not depend on `contentInset`, so writing one from the other
+        // settles in a single pass rather than chasing itself.
+        let padding = max(0, viewport - tableView.contentSize.height)
+        guard abs(tableView.contentInset.top - padding) > 0.5 else { return }
+        tableView.contentInset.top = padding
+    }
+
+    /// Whether the list is resting on the newest pin, within a row's worth of slack so a
+    /// list nudged a few points off the end still counts as being at the end.
+    open var isAtBottom: Bool {
+        tableView.contentOffset.y >= bottomContentOffsetY - Layouts.followBottomThreshold
+    }
+
+    /// Puts the newest pin — the last row — at the bottom of the screen. A list too short
+    /// to scroll is already there, held by `updateTopPaddingForShortContent()`, and the two
+    /// agree on the offset that means it.
+    open func scrollToBottom(animated: Bool) {
+        guard !viewModel.isEmpty, tableView.bounds.height > 0 else { return }
+        // `contentSize` is only current once the reload this follows has been laid out.
+        tableView.layoutIfNeeded()
+        // The opening anchor is settled only once the screen is actually up: before that
+        // the insets and the content size are still moving under it, so the next layout
+        // pass has to be allowed to re-apply it.
+        if hasAppeared {
+            needsInitialScrollToBottom = false
+        }
+
+        let offsetY = max(-tableView.adjustedContentInset.top, bottomContentOffsetY)
+        guard abs(tableView.contentOffset.y - offsetY) > 0.5 else { return }
+        tableView.setContentOffset(CGPoint(x: 0, y: offsetY), animated: animated)
+    }
+
+    /// The user taking hold of the list ends the opening anchor, whatever it was doing —
+    /// a screen that opened with no pins and received them later must not yank the list
+    /// out from under a finger.
+    open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        needsInitialScrollToBottom = false
+    }
+
+    /// The offset at which the last row's bottom — the list's trailing padding included —
+    /// sits at the bottom of the visible area. For content too short to scroll this is the
+    /// resting offset itself, `-adjustedContentInset.top`.
+    open var bottomContentOffsetY: CGFloat {
+        tableView.contentSize.height
+            + tableView.adjustedContentInset.bottom
+            - tableView.bounds.height
     }
 
     open func updateEmptyState() {
@@ -537,5 +657,9 @@ public extension ChannelPinnedMessageListViewController {
         /// Trailing space under the last bubble; the spacing above every bubble is the
         /// conversation's own, carried by the layout models.
         public static var bottomPadding: CGFloat = 8
+
+        /// How far off the end the list may rest and still follow a pin taken while the
+        /// screen is open.
+        public static var followBottomThreshold: CGFloat = 40
     }
 }

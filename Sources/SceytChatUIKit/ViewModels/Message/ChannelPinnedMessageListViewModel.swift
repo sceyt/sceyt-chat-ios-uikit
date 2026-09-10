@@ -13,8 +13,8 @@ import UIKit
 
 /// Backs the standalone pinned-messages screen: every live pin in one channel.
 ///
-/// It observes the same request the banner does — `PinnedMessageDTO.fetchRequest(channelId:)`,
-/// read newest pin first — rather than reading `ChannelViewModel.pinnedMessages` once, so
+/// It observes the very request the banner does — `PinnedMessageDTO.fetchRequest(channelId:)`,
+/// in the same order — rather than reading `ChannelViewModel.pinnedMessages` once, so
 /// unpinning from the list updates the list itself with no reload plumbing between the two
 /// screens.
 ///
@@ -28,13 +28,13 @@ open class ChannelPinnedMessageListViewModel: NSObject {
 
     @Published public var event: Event?
 
-    /// The channel's live pins in pin order, **newest pin first**: the most recent pin is
-    /// the top row, and a pin taken while the screen is open arrives there rather than at
-    /// the bottom of a long scroll.
+    /// The channel's live pins in pin order, **oldest pin first** — the conversation's own
+    /// direction: the most recent pin is the last row, the screen opens on it, and a pin
+    /// taken while the screen is open arrives under it rather than jumping the list.
     ///
-    /// The banner reads the same pins the other way round, so a row index here is *not* a
-    /// banner index — `ChannelViewController.didSelectPinnedMessage` looks the picked pin up
-    /// by `messageTid` rather than carrying a row number across.
+    /// This is the banner's order too, but a row index is still *not* a banner index —
+    /// `ChannelViewController.didSelectPinnedMessage` looks the picked pin up by
+    /// `messageTid` rather than carrying a row number across.
     public private(set) var items: [PinnedMessage] = []
 
     /// One layout model per pin, keyed by the pinned message's tid — the only id a pending
@@ -52,7 +52,7 @@ open class ChannelPinnedMessageListViewModel: NSObject {
     /// same request on the background observable context; both are read-only.
     public private(set) lazy var pinnedMessageObserver: DatabaseObserver<PinnedMessageDTO, PinnedMessage> = {
         DatabaseObserver<PinnedMessageDTO, PinnedMessage>(
-            request: PinnedMessageDTO.fetchRequest(channelId: channel.id, newestFirst: true),
+            request: PinnedMessageDTO.fetchRequest(channelId: channel.id),
             context: SceytChatUIKit.shared.database.viewContext
         ) { $0.convert() }
     }()
