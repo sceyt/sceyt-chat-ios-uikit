@@ -117,7 +117,7 @@ extension MessageCell {
                     tickView.isHidden = true
                 }
                 dateLabel.text = appearance.messageDateFormatter.format(message.createdAt)
-                pinView.isHidden = !message.isPinned
+                pinView.isHidden = !type(of: self).showsPin(for: message)
                 pinView.tintColor = hasBackground
                     ? appearance.onOverlayColor
                     : appearance.messageDateLabelAppearance.foregroundColor
@@ -142,6 +142,16 @@ extension MessageCell {
         /// this much makes that impossible whatever left the measure behind.
         open var contentWidth: CGFloat {
             hStack.systemLayoutSizeFitting(UIView.layoutFittingCompressedSize).width
+        }
+
+        /// Whether the row draws the pin beside the timestamp. A deleted message renders as
+        /// "Message was deleted" only, so it shows no pin — whatever the store or the server
+        /// still report about its pin state.
+        ///
+        /// The one rule for both `data`'s render and `measure`, so the row never reserves a
+        /// slot for a pin it does not draw (or draws one it did not reserve for).
+        open class func showsPin(for message: ChatMessage) -> Bool {
+            message.isPinned && message.state != .deleted
         }
 
         open class func measure(
@@ -183,7 +193,7 @@ extension MessageCell {
                 }
             }
             
-            if message.isPinned {
+            if showsPin(for: message) {
                 let pinSize = appearance.pinnedIcon.size
                 size.width += 4 + pinSize.width
                 size.height = max(size.height, pinSize.height)

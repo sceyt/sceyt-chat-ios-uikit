@@ -199,9 +199,10 @@ open class MessageLayoutModel {
         shouldShowReadMore && !isTextExpanded && message.state != .deleted && !message.isViewOnceMessage
     }
     public private(set) var infoViewMeasure: CGSize = .zero
-    /// The pin state `infoViewMeasure` was taken for. The pin beside the timestamp lives
-    /// inside that row, so a measure taken while the message was unpinned is the pin's
-    /// width plus its spacing too narrow.
+    /// The pin *visibility* `infoViewMeasure` was taken for — `InfoView.showsPin(for:)`, not
+    /// the raw `isPinned`: a deleted message draws no pin even while its pin details still say
+    /// pinned. The pin beside the timestamp lives inside that row, so a measure taken while
+    /// the pin was hidden is the pin's width plus its spacing too narrow.
     ///
     /// Compared against the message itself on every update rather than only diffing the
     /// incoming message against the previous one: a pin can be installed by a path that
@@ -634,8 +635,12 @@ open class MessageLayoutModel {
         // The pin beside the timestamp is part of the info view, so a pin/unpin changes
         // both what it renders and how wide it measures. Without this the cached
         // `infoViewMeasure` keeps the old width and the cell is never reconfigured.
-        let didChangePinState = self.message.isPinned != message.isPinned
-            || measuredPinState != message.isPinned
+        // Compared by what the row *draws*: a deleted message shows no pin, so a pin/unpin
+        // landing on a deleted row changes nothing, while deleting a pinned one drops the slot.
+        let infoView = Components.messageCellInfoView
+        let showsPin = infoView.showsPin(for: message)
+        let didChangePinState = infoView.showsPin(for: self.message) != showsPin
+            || measuredPinState != showsPin
         if didChangePinState {
             updateOptions.insert(.pin)
         }
@@ -1507,7 +1512,7 @@ open class MessageLayoutModel {
 
     open func measure() -> CGSize {
         infoViewMeasure = Components.messageCellInfoView.measure(model: self, appearance: appearance)
-        measuredPinState = message.isPinned
+        measuredPinState = Components.messageCellInfoView.showsPin(for: message)
         measuredMessageState = message.state
         linkViewMeasure = hasPoll ? .zero : Components.messageCellLinkStackView.measure(model: self, appearance: appearance)
         pollViewMeasure = hasPoll ? Components.messageCellPollView.measure(model: self, appearance: appearance) : .zero
