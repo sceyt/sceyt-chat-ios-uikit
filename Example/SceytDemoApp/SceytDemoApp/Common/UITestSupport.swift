@@ -99,6 +99,15 @@ enum UITestSupport {
         ProcessInfo.processInfo.arguments.contains("--uitest-conversation-pending")
     }
 
+    /// `--uitest-conversation-tail-count=N` — appends N already-read *incoming*
+    /// messages (ids 30+1…30+N) after the newest one, pushing the inline reply at
+    /// index 18 well away from the bottom of the list. Without it the reply and the
+    /// newest message are adjacent, so "returned to the reply" and "jumped to the
+    /// bottom" are the same screen and no assertion can tell them apart.
+    private static var conversationTailCountOverride: Int? {
+        launchArgumentValue("--uitest-conversation-tail-count")
+    }
+
     /// `--uitest-conversation-unread-long` — makes the parametrized unread tail
     /// use long multi-line bodies instead of one-liners, so the newest cells are
     /// several lines tall. Exposes initial-scroll positions computed from
@@ -455,8 +464,27 @@ enum UITestSupport {
                       deliveryStatus: .pending)
             )
         }
+        if let tailCount = conversationTailCountOverride, tailCount > 0 {
+            // Also appended only behind its flag, for the same reason. Ids start at 30
+            // to stay clear of the pending message's index 20, and `createdAt` is left
+            // implicit — `seedMessagesForUITests` dates array index `i` as
+            // `uiTestMessageSeedBaseDate + i` seconds, so appending here is already
+            // chronologically ascending.
+            for n in 1...tailCount {
+                messages.append(
+                    .init(id: conversationMessageId(UInt64(30 + n)),
+                          body: conversationTailText(n),
+                          incoming: true, senderId: "bob", senderName: "Bob")
+                )
+            }
+        }
         return messages
     }
+
+    /// Body of the `n`-th message in the read tail seeded by
+    /// `--uitest-conversation-tail-count=N`. Mirrored in the UI-test bundle
+    /// (`ChannelScreen.Convo.tailText`).
+    static func conversationTailText(_ n: Int) -> String { "Tail \(n)" }
 
     /// Body of the `n`-th message in the parametrized unread tail seeded by
     /// `--uitest-conversation-unread-count=N`. Mirrored in the UI-test bundle

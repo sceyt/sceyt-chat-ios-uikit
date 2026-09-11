@@ -149,6 +149,13 @@ struct ChannelScreen {
         static func unreadTailId(_ n: Int) -> UInt64 { messageId(UInt64(16 + n)) }
         static func unreadTailText(_ n: Int) -> String { "Unread incoming \(n)" }
 
+        /// The read tail (`--uitest-conversation-tail-count=N`): id/body of the
+        /// `n`-th (1-based) incoming message seeded *after* the newest one
+        /// (index 19), which pushes `replyMessageId` away from the bottom.
+        /// Mirror of `UITestSupport.conversationTailText`.
+        static func tailId(_ n: Int) -> UInt64 { messageId(UInt64(30 + n)) }
+        static func tailText(_ n: Int) -> String { "Tail \(n)" }
+
         /// Bodies of the messages the `--uitest-message-storm` knob inserts —
         /// the `n`-th (1-based) outgoing / incoming storm message. Mirror of
         /// `UITestSupport.conversationStormSentText/conversationStormReceivedText`.
@@ -344,6 +351,21 @@ struct ChannelScreen {
     /// down as the finger does.
     func swipeToNextPinnedMessage() { dragPinnedBanner(dy: 160) }
     func swipeToPreviousPinnedMessage() { dragPinnedBanner(dy: -160) }
+
+    /// Moves the message list by roughly `dy` points and stops there.
+    ///
+    /// `swipeUp()`/`swipeDown()` are flicks: they carry enough momentum to cross a
+    /// whole conversation, which is the wrong gesture for "the user nudged the list a
+    /// little". The slow press-then-drag below lands where it is told.
+    ///
+    /// The initial press has to stay under the message list's own
+    /// `longPressGestureRecognizer.minimumPressDuration` of 0.2s, or the gesture opens
+    /// a bubble's context menu instead of scrolling.
+    func nudgeMessageList(dy: CGFloat) {
+        let start = collectionView.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let end = start.withOffset(CGVector(dx: 0, dy: dy))
+        start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .slow, thenHoldForDuration: 0.1)
+    }
 
     private func dragPinnedBanner(dy: CGFloat) {
         let start = pinnedMessagesView.coordinate(withNormalizedOffset: CGVector(dx: 0.35, dy: 0.5))

@@ -265,6 +265,15 @@ open class ChannelViewController: ViewController,
     /// `showRepliedMessage`, which a pinned jump must not do.
     private var pinnedJumpMessageId: MessageId = 0
 
+    /// Whether the reply recorded in `userSelectOnRepliedMessage` has actually left
+    /// the viewport since it was armed. `showReply` arms the anchor while the reply
+    /// is still on screen — the user just tapped it — and the jump to the parent can
+    /// take a round trip (`findReplayedMessage`'s uncached path hits the network), so
+    /// "the reply is visible, nothing to return to" is only a true statement once the
+    /// reply has been off screen at least once. See
+    /// `releaseRepliedReturnAnchorIfNeeded()`.
+    private var hasRepliedReturnAnchorLeftViewport = false
+
     /// `messageTid` of a pin the user has just taken on this screen, held until the pin
     /// shows up in the banner's items. The pin is written as an intent and the observer
     /// reports it a moment later, so the banner cannot be moved at the moment of the tap —
@@ -1214,9 +1223,28 @@ open class ChannelViewController: ViewController,
     
     @objc
     open func unreadButtonAction(_ sender: ChannelViewController.ScrollDownView) {
-        // Always jump to the latest message — release any active pin and any
-        // pending replied-message navigation so the .reloadDataAndScrollToBottom
-        // branch (or scrollToBottom() below) can actually land at the bottom.
+        // One step back first: the user arrived at this message by tapping a reply
+        // preview, so the button returns them to the reply they came from rather
+        // than abandoning their place in the history. Consumed here — the next tap
+        // falls through to the jump-to-latest below, so they are never stranded.
+        if let userSelectOnRepliedMessage {
+            // The reply jump's landing anchored the viewport to the *parent*
+            // (.scrollAndSelect / .reloadDataAndSelect). Left set, the next
+            // structural update restores that offset and undoes this scroll.
+            pinnedScrollMessageId = 0
+            pinnedJumpMessageId = 0
+            showRepliedMessage(userSelectOnRepliedMessage)
+            self.userSelectOnRepliedMessage = nil
+            // Deliberately none of the jump-to-latest bookkeeping below: the user
+            // is still up in the history, so the button has to stay available, and
+            // resetToInitialStateIfNeeded() would restart the observer at the
+            // channel tail — throwing away the window the reply lives in.
+            return
+        }
+
+        // Jump to the latest message — release any active pin and any pending
+        // replied-message navigation so the .reloadDataAndScrollToBottom branch
+        // (or scrollToBottom() below) can actually land at the bottom.
         pinnedScrollMessageId = 0
         userSelectOnRepliedMessage = nil
         if !channelViewModel.resetToInitialStateIfNeeded() {
@@ -1548,10 +1576,7 @@ open class ChannelViewController: ViewController,
     }
     
     open func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-        if let userSelectOnRepliedMessage,
-           !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
-            self.userSelectOnRepliedMessage = nil
-        }
+        releaseRepliedReturnAnchorIfNeeded()
 
         if lastScrollDirection == .down,
            let indexPath = addMoreMessage(scrollDirection: lastScrollDirection, force: false) {
@@ -1567,6 +1592,7 @@ open class ChannelViewController: ViewController,
     }
 
     public func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        releaseRepliedReturnAnchorIfNeeded()
         if let lastAnimatedIndexPath, !isCollectionViewUpdating {
             if !self.isCollectionViewUpdating {
 //                self.channelViewModel.loadNearMessages(arMessageAt: lastAnimatedIndexPath)
@@ -1576,12 +1602,49 @@ open class ChannelViewController: ViewController,
     }
 
     open func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        if let userSelectOnRepliedMessage,
-           !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
-            self.userSelectOnRepliedMessage = nil
-        }
+        releaseRepliedReturnAnchorIfNeeded()
         if !decelerate {
             drainPendingPrevDBFetch()
+        }
+    }
+
+    /// Drops the "back to the reply" target recorded by `showReply` once there is
+    /// nothing left to return to — either the user has scrolled back to the reply
+    /// themselves, or they are resting at the newest message.
+    ///
+    /// It deliberately does *not* release the anchor merely because the reply is off
+    /// screen: after the jump to the parent the reply is always off screen, so that
+    /// condition would discard the return target on the user's first drag — exactly
+    /// when `unreadButtonAction` needs it. The latch is what makes "the reply is
+    /// visible again" mean the user came back rather than never having left.
+    ///
+    /// Releasing at the bottom matters beyond tidiness: a live anchor suppresses the
+    /// newest-insert animation and the auto-scroll to a newly arrived message
+    /// (see `performUpdates`), and the button is hidden down there anyway, so the
+    /// anchor could never be consumed.
+    private func releaseRepliedReturnAnchorIfNeeded() {
+        guard let userSelectOnRepliedMessage else { return }
+        // Against `visibleContentRect`, not bare `visibleCells`: UIKit keeps cells
+        // that sit behind the composer in `visibleCells`, and counting one of those
+        // as "the user can see the reply again" releases the anchor while the reply
+        // is still hidden — the same distinction `syncSeenUnreadMessagesFromVisibleCells`
+        // draws.
+        let visibleRect = collectionView.visibleContentRect
+        let isReplyVisible = visibleRect.height > 0 && collectionView.visibleCells.contains {
+            ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id
+            && $0.frame.intersects(visibleRect)
+        }
+        guard hasRepliedReturnAnchorLeftViewport else {
+            // Still on the way out. Nothing may release the anchor yet — a reply
+            // tapped near the newest message arms it while sitting on screen *and*
+            // at the bottom, and the jump to the parent only lands later.
+            if !isReplyVisible {
+                hasRepliedReturnAnchorLeftViewport = true
+            }
+            return
+        }
+        if isReplyVisible || collectionView.isAtBottom() {
+            self.userSelectOnRepliedMessage = nil
         }
     }
 
@@ -3170,6 +3233,8 @@ open class ChannelViewController: ViewController,
         pinnedScrollMessageId = 0
         pinnedJumpMessageId = 0
         userSelectOnRepliedMessage = layoutModel.message
+        // Armed while the reply is still on screen — the user just tapped it.
+        hasRepliedReturnAnchorLeftViewport = false
         channelViewModel.findReplayedMessage(messageId: parent.id)
     }
     
@@ -3266,6 +3331,12 @@ open class ChannelViewController: ViewController,
         let paths = channelViewModel.indexPaths(for: [message])
         guard let dataPath = paths.values.first,
               let indexPath = uiIndexPath(fromData: dataPath) else {
+            // The reply has paged out of the loaded window, so the return jump has
+            // to go through the loader. Release the anchor first: the landing reads
+            // `userSelectOnRepliedMessage != nil` as "flash this bubble", which would
+            // contradict the no-highlight contract below and hand the user a second
+            // highlight. Nil plus `pinnedJumpMessageId == 0` resolves to `.none`.
+            userSelectOnRepliedMessage = nil
             channelViewModel.findReplayedMessage(messageId: message.id)
             return
         }

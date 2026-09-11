@@ -16,6 +16,9 @@
 //    index 16  "This is the last read message" — unread-separator anchor
 //    index 18  "My outgoing reply"           — outgoing (right-aligned)
 //    index 19  "This is the newest message"  — newest, at the visual bottom
+//  `--uitest-conversation-tail-count=N` appends N read incoming messages after
+//  index 19 (ids 30+1…30+N, "Tail n"), which moves the reply at index 18 away from
+//  the bottom — see the reply return-jump tests.
 //
 
 import XCTest
@@ -29,10 +32,13 @@ final class ChannelUITests: BaseUITestCase {
     private var screen: ChannelScreen!
 
     /// Launches the conversation fixture and opens the channel screen.
-    private func openConversation(unread: Bool = false, inject: Bool = false) {
+    private func openConversation(unread: Bool = false,
+                                  inject: Bool = false,
+                                  tailCount: Int? = nil) {
         app = launchApp(injectionEnabled: inject,
                         conversation: !unread,
-                        conversationUnread: unread)
+                        conversationUnread: unread,
+                        conversationTailCount: tailCount)
         list = ChannelListScreen(app: app)
         screen = ChannelScreen(app: app)
 
@@ -275,6 +281,51 @@ final class ChannelUITests: BaseUITestCase {
                        "The quoted message body should be shown after scrolling")
     }
 
+    /// The reported bug: after a reply preview takes the user up to the quoted
+    /// message, the scroll-down button jumped all the way to the newest message
+    /// instead of returning them to the reply they came from.
+    ///
+    /// Needs the read tail: in the plain fixture the reply (index 18) and the newest
+    /// message (index 19) are neighbours, so both behaviours land on one screen and
+    /// the assertion below would pass either way.
+    func test_scrollDownAfterReplyJump_returnsToReplyNotBottom() {
+        openConversation(tailCount: Self.replyReturnTailCount)
+
+        jumpToQuotedMessageFromReply()
+
+        // Back to the reply — not to the newest message.
+        XCTAssertTrue(screen.scrollDownButton.waitForExistence(timeout: 10),
+                      "The scroll-down button should be showing while parked on the quoted message")
+        screen.scrollDownButton.tap()
+        assertReturnedToReply()
+
+        // The anchor is consumed, so a second tap means "go to the newest message"
+        // and the user is never stranded up in the history.
+        XCTAssertTrue(waitFor(timeout: 10) { self.screen.scrollDownButton.isHittable },
+                      "The scroll-down button should still be showing at the reply")
+        screen.scrollDownButton.tap()
+        XCTAssertTrue(waitFor(timeout: 10) { self.newestTailCell.isHittable },
+                      "A second tap should fall through to the newest message")
+    }
+
+    /// The return target has to survive the user nudging the list while they read the
+    /// quoted message — releasing it on any drag would put the button straight back
+    /// to jumping to the bottom.
+    func test_scrollDownAfterReplyJump_survivesManualScroll() {
+        openConversation(tailCount: Self.replyReturnTailCount)
+
+        jumpToQuotedMessageFromReply()
+
+        // A nudge, not a flick: it has to leave the list well short of the newest
+        // message, which is where the return target is legitimately dropped.
+        screen.nudgeMessageList(dy: -120)
+
+        XCTAssertTrue(screen.scrollDownButton.waitForExistence(timeout: 10),
+                      "The scroll-down button should be showing after the nudge")
+        screen.scrollDownButton.tap()
+        assertReturnedToReply()
+    }
+
     // MARK: - Navigation
 
     func test_backButton_returnsToChannelList() {
@@ -282,6 +333,55 @@ final class ChannelUITests: BaseUITestCase {
         screen.goBack()
         XCTAssertTrue(waitFor { self.list.table.isHittable },
                       "Tapping back should return to the channel list")
+    }
+
+    // MARK: - Helpers (reply return-jump)
+
+    /// Enough read messages after the reply that a `.centeredVertically` scroll to it
+    /// cannot clamp to the bottom, while still being only a few swipes away.
+    private static let replyReturnTailCount = 15
+
+    private var newestTailCell: XCUIElement { screen.cell(Convo.tailId(Self.replyReturnTailCount)) }
+
+    /// Scrolls the reply into view, taps its quoted preview, and waits for the jump to
+    /// the quoted message to land — the starting state both return-jump tests assert from.
+    private func jumpToQuotedMessageFromReply() {
+        let reply = screen.cell(Convo.replyMessageId)
+        XCTAssertTrue(waitFor(timeout: 15) {
+            if reply.exists, reply.isHittable { return true }
+            self.screen.collectionView.swipeDown()
+            return false
+        }, "The reply message should be reachable by scrolling up from the tail")
+
+        let preview = screen.replyView(in: reply)
+        XCTAssertTrue(preview.waitForExistence(timeout: 5),
+                      "The reply message should render a quoted preview")
+        preview.tap()
+
+        XCTAssertTrue(waitFor(timeout: 15) { self.screen.cell(Convo.repliedToId).isHittable },
+                      "Tapping the reply preview should scroll to the quoted message")
+    }
+
+    /// Ids of the message cells the user can actually reach, for failure messages.
+    private func hittableMessageCellIds() -> String {
+        let cells = app.cells.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", ChannelScreen.AID.cellRoot + ".")
+        )
+        let ids = (0..<cells.count)
+            .map { cells.element(boundBy: $0) }
+            .filter { $0.isHittable }
+            .map { $0.identifier.replacingOccurrences(of: ChannelScreen.AID.cellRoot + ".", with: "") }
+        return ids.isEmpty ? "<none>" : ids.joined(separator: ", ")
+    }
+
+    /// The assertion the bug fails: the button lands back on the reply, and *not* on the
+    /// newest message. The second half is what separates the fix from a jump to the bottom.
+    private func assertReturnedToReply() {
+        XCTAssertTrue(waitFor(timeout: 10) { self.screen.cell(Convo.replyMessageId).isHittable },
+                      "The scroll-down button should return to the reply that was tapped; "
+                      + "hittable cells: \(hittableMessageCellIds())")
+        XCTAssertFalse(newestTailCell.isHittable,
+                       "It should stop at the reply, not carry on to the newest message")
     }
 
     // MARK: - Helpers

@@ -109,6 +109,7 @@ class BaseUITestCase: XCTestCase {
                    conversationUnreadCount: Int? = nil,
                    conversationEdited: Bool = false,
                    conversationPending: Bool = false,
+                   conversationTailCount: Int? = nil,
                    conversationUnreadLong: Bool = false,
                    conversationUnreadRecent: Bool = false,
                    injectOnOpenDelayMs: Int? = nil,
@@ -171,6 +172,9 @@ class BaseUITestCase: XCTestCase {
         }
         if conversationPending {
             app.launchArguments += ["--uitest-conversation-pending"]
+        }
+        if let count = conversationTailCount {
+            app.launchArguments += ["--uitest-conversation-tail-count=\(count)"]
         }
         if conversationUnreadLong {
             app.launchArguments += ["--uitest-conversation-unread-long"]
