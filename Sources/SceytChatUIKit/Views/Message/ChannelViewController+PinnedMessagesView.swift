@@ -18,7 +18,10 @@ extension ChannelViewController {
     /// A plain `View`, not a `Control`: the tap and the two swipes are all gesture
     /// recognizers, so UIKit arbitrates between them. A `UIControl`'s own touch tracking
     /// competes with the swipe recognizers and swallows the gesture.
-    open class PinnedMessagesView: View {
+    ///
+    /// The two relay conformances are what sharpen a media pin's blurred placeholder when
+    /// its file lands — see `attachmentSharpThumbnailDidLoad(_:image:)`.
+    open class PinnedMessagesView: View, AttachmentSharpThumbnailObserver, AttachmentTransferStatusObserver {
 
         public enum Action {
             /// About to advance to the next pinned message. Sent while the banner is still
@@ -156,6 +159,12 @@ extension ChannelViewController {
         /// Only final ones are kept — see `isThumbnailFinal(for:)`.
         private var thumbnailCache: [Int64: UIImage] = [:]
 
+        /// Pins whose thumbnail is being resolved right now. A landing media file announces
+        /// itself twice — once as a sharp thumbnail, once as the transfer's own `.done` —
+        /// and both routes reach the same pin, so without this the resolve would run twice
+        /// and crossfade an image in over an identical copy of itself.
+        private var resolvingThumbnailTids: Set<Int64> = []
+
         private var imageViewWidthConstraint: NSLayoutConstraint?
         /// Relaxed to zero once the bar scrolls — see `updateSegmentIndicatorInsets()`.
         private var segmentIndicatorTopConstraint: NSLayoutConstraint?
@@ -199,6 +208,12 @@ extension ChannelViewController {
             // The tap must lose to a drag, or a slightly-vertical tap jumps the list
             // instead of paging the banner.
             tap.require(toFail: pan)
+
+            // Weak registrations for the banner's whole lifetime — both relays prune dead
+            // observers themselves. See `attachmentSharpThumbnailDidLoad(_:image:)` for why
+            // the banner needs them at all.
+            AttachmentSharpThumbnailRelay.default.add(self)
+            AttachmentTransferStatusRelay.default.add(self)
 
             isAccessibilityElement = false
             accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.pinnedMessagesView
@@ -622,13 +637,18 @@ extension ChannelViewController {
         /// and the banner is built during the channel's first frames.
         open func loadThumbnail(for item: PinnedMessage) {
             let tid = item.messageTid
-            guard item.attachment != nil, thumbnailCache[tid] == nil else { return }
+            guard item.attachment != nil,
+                  thumbnailCache[tid] == nil,
+                  !resolvingThumbnailTids.contains(tid)
+            else { return }
+            resolvingThumbnailTids.insert(tid)
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 guard let self else { return }
                 let image = self.thumbnail(for: item)
                 let isFinal = self.isThumbnailFinal(for: item)
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
+                    self.resolvingThumbnailTids.remove(tid)
                     // A blurred thumbHash is deliberately not kept: it is what the pin shows
                     // until its media lands, and caching it would freeze the blur in place
                     // for as long as the pin exists.
@@ -689,6 +709,72 @@ extension ChannelViewController {
             guard let attachment = item.previewMessage.attachments?.first else { return true }
             return fileProvider.filePath(attachment: attachment) != nil
                 || fileProvider.cachedVideoThumbnailPath(attachment: attachment) != nil
+        }
+
+        // MARK: - Healing a blurred pin
+
+        /// Backstop delivery of the blurry -> sharp swap (see `AttachmentSharpThumbnailRelay`).
+        ///
+        /// The banner is in the same position as a reply preview: it renders from the pin
+        /// row's own snapshot, never from the message that owns the media, so nothing on the
+        /// database side tells it that the file has landed — `LazyMessagesObserver` refreshes
+        /// the *message*, and the pin snapshot carries the attachment's `filePath` only from
+        /// whenever it was last written. Until this, a pin whose image arrived after the
+        /// banner was built kept its thumbHash blur for as long as the channel stayed open.
+        ///
+        /// Nothing is painted from the announced image directly: it was sized for whichever
+        /// view resolved it, and the banner has its own resolution order (sharp on-disk
+        /// thumbnail, then the downloaded poster frame, then the blur). Re-resolving runs
+        /// that order again, which is now guaranteed to reach something sharp — and caches
+        /// it, since `isThumbnailFinal(for:)` is true once the bytes are on disk.
+        open func attachmentSharpThumbnailDidLoad(_ attachment: ChatMessage.Attachment, image: UIImage) {
+            reloadThumbnailIfNeeded(for: attachment)
+        }
+
+        /// The other half of the same healing, for the pin nobody else is showing: a message
+        /// scrolled out of the list (or never in it) has no cell to resolve a sharp thumbnail
+        /// and post it, so the only announcement its download makes is the transfer's own.
+        open func attachmentTransferStatusDidChange(
+            _ attachment: ChatMessage.Attachment,
+            status: ChatMessage.Attachment.TransferStatus
+        ) {
+            guard status == .done else { return }
+            reloadThumbnailIfNeeded(for: attachment)
+        }
+
+        /// Re-resolves the pin on screen if `attachment` is the media it is showing a blurred
+        /// placeholder for.
+        ///
+        /// Only the pin on screen: a blurred thumbnail is never cached, so every other pin
+        /// resolves again by itself the moment it is paged to.
+        open func reloadThumbnailIfNeeded(for attachment: ChatMessage.Attachment) {
+            guard let item = selectedItem,
+                  thumbnailCache[item.messageTid] == nil,
+                  isThumbnailSource(attachment, of: item)
+            else { return }
+            loadThumbnail(for: item)
+        }
+
+        /// Whether a transfer event belongs to the pin's attachment.
+        ///
+        /// Compared by url rather than by `AttachmentTransfer.transferIdentity(of:)`: a pin
+        /// renders from a snapshot row that stores no attachment tid, and the attachment
+        /// `PinnedMessage.previewMessage` synthesizes therefore carries the *message* tid —
+        /// which the identity function prefers over everything else, so it would compare a
+        /// message tid against an attachment tid and never match. The url the snapshot does
+        /// store is the same one the transfer downloads from.
+        open func isThumbnailSource(_ attachment: ChatMessage.Attachment, of item: PinnedMessage) -> Bool {
+            guard let pinned = item.attachment else { return false }
+            if let url = pinned.url, !url.isEmpty, url == attachment.url {
+                return true
+            }
+            // A pin taken before its own upload finished has no url yet. The file name is
+            // what survives the local path being rewritten as the file moves into storage.
+            if let path = pinned.filePath, !path.isEmpty,
+               let transferred = attachment.filePath, !transferred.isEmpty {
+                return (path as NSString).lastPathComponent == (transferred as NSString).lastPathComponent
+            }
+            return false
         }
 
         // MARK: - Actions
