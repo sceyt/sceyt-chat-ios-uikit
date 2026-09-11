@@ -331,6 +331,13 @@ extension MessageCell {
                 av.update(status: .pauseDownloading)
                 av.setProgressHandler()
                 onAction?(.pauseTransfer(message, attachment))
+            case .pending where av.isQueuedUpload:
+                // A queued upload has no task to stop (it is waiting for the upload queue or
+                // for a connection), but its loader carries a cancel button all the same —
+                // the pause is what keeps the next connect from sending it.
+                av.update(status: .pauseUploading)
+                av.setProgressHandler()
+                onAction?(.pauseTransfer(message, attachment))
             default:
                 break
             }

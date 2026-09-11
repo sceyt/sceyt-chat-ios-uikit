@@ -133,6 +133,29 @@ extension MessageCell {
         open var isTransferOverlayVisible: Bool {
             !progressView.isHidden
         }
+
+        /// True when the bound attachment is an outgoing file that has not been uploaded yet.
+        /// `.pending` on such an attachment means "queued to upload" — waiting behind the
+        /// serialized upload queue, or waiting for a connection after an offline attempt —
+        /// and has to read as an active transfer, not as nothing at all.
+        open var isQueuedUpload: Bool {
+            guard let data else { return false }
+            return data.attachment.isPendingUpload
+        }
+
+        /// Puts the ring at the floor a just-started transfer draws, so a queued upload is
+        /// visible while it waits. The transfer-side twin is
+        /// `AttachmentTransfer.initialUploadProgress`, seeded once a task exists; this covers
+        /// the window before that (and the whole offline wait, where no task survives).
+        /// Routed through the `AttachmentProgress` overload so the byte-count label is seeded
+        /// too, and past `setProgress`'s own staleness guard so it can never rewind a ring
+        /// that is already drawing a real percentage.
+        open func seedQueuedUploadProgress() {
+            guard let data, let message = data.ownerMessage else { return }
+            setProgress(
+                .init(message: message, attachment: data.attachment, progress: 0.0001)
+            )
+        }
         
         override open func setup() {
             super.setup()
@@ -442,7 +465,15 @@ extension MessageCell {
             progressLabel.isHidden = true
             switch status {
             case .pending:
-                break
+                // A queued upload. Offline this is where the attachment sits for the whole
+                // wait — the upload fails the moment it is attempted and is parked back here
+                // until the next connect resends the message — so the loader has to stay on
+                // screen for it. An incoming `.pending` attachment keeps the old behaviour:
+                // its own download path drives the overlay.
+                guard isQueuedUpload else { break }
+                showTransferOverlay()
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
+                seedQueuedUploadProgress()
             case .uploading:
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
             case .downloading:
@@ -606,6 +637,11 @@ extension MessageCell {
             guard let data,
                   let message = data.ownerMessage,
                   AttachmentTransfer.healableDownloadStatuses.contains(stored),
+                  // `.pending` is in that set for downloads. On an upload the local file is
+                  // the source, not the result, so healing it hides the loader over a file
+                  // that has not been sent — the whole of an offline send would render as
+                  // delivered.
+                  !isQueuedUpload,
                   fileProvider.currentProgressPercent(message: message, attachment: data.attachment) == nil,
                   fileProvider.taskFor(message: message, attachment: data.attachment) == nil,
                   fileProvider.filePath(attachment: data.attachment) != nil

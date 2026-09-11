@@ -41,6 +41,13 @@ open class AttachmentTransfer: DataProvider {
     /// at 0.
     public static var initialUploadProgress: Double = 0.001
 
+    /// Whether the client currently has no connection to the server. An upload failure
+    /// raised in this state says nothing about the file or the server — only that there is
+    /// nothing to send over — so it is treated as "wait", not as "failed".
+    open class var isOffline: Bool {
+        SceytChatUIKit.shared.chatClient.connectionState != .connected
+    }
+
     public private(set) var uploadStopedOperations = [AsyncOperationBlock]()
     public var allTasks: [SCTDataSessionTaskInfo] {
         taskGroups.values.flatMap({ $0 })
@@ -279,6 +286,13 @@ open class AttachmentTransfer: DataProvider {
             let resolvedLocalFilePath = dataSession(for: message)?.getFilePath(attachment: att)
             if let filePath = resolvedLocalFilePath, !filePath.isEmpty {
                 guard Self.healableDownloadStatuses.contains(att.status),
+                      // `.pending` is shared by both directions and this rule reads a local
+                      // file as proof the transfer finished — true for a download, false for
+                      // an upload whose source file is exactly what has not been sent yet.
+                      // Without this an outgoing attachment waiting to upload is marked
+                      // `.done` the first time its cell is displayed, which takes the loader
+                      // off screen and makes an unsent photo look delivered.
+                      !att.isPendingUpload,
                       taskFor(message: message, attachment: att) == nil
                 else { continue }
                 logger.verbose("[Attachment] reconciling stale \(att.status) to .done, file is on disk \(att.description)")
@@ -414,6 +428,12 @@ open class AttachmentTransfer: DataProvider {
                 case .downloading:
                     attachment.status = .pauseDownloading
                 case .uploading:
+                    attachment.status = .pauseUploading
+                case .pending where attachment.isPendingUpload:
+                    // A queued upload: no task yet (waiting on the upload queue, or waiting
+                    // for a connection after an offline attempt). The pause still has to
+                    // stick — `SyncService` skips resending a message whose attachments are
+                    // paused, which is what keeps it from going out on the next connect.
                     attachment.status = .pauseUploading
                 default:
                     completion?(false)
@@ -774,7 +794,14 @@ open class AttachmentTransfer: DataProvider {
                                 }
                             case .upload:
                                 if atch.status != .pauseUploading {
-                                    atch.status = .failedUploading
+                                    // Being offline is not a refusal. The upload is a plain
+                                    // REST request, so it fails the instant there is no
+                                    // network — and `.failedUploading` swaps the loader for a
+                                    // retry arrow on a message the app resends by itself on
+                                    // the next connect (`SyncService.resendPendingMessage`).
+                                    // Park it back in the queue instead, so the bubble keeps
+                                    // showing that the file is still on its way out.
+                                    atch.status = Self.isOffline ? .pending : .failedUploading
                                 }
                             }
                             onCompletion(taskInfo: taskInfo, attachment: atch, error: error)
