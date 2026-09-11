@@ -538,18 +538,7 @@ open class ChannelPinnedMessageListViewController: ViewController,
         _ tableView: UITableView,
         trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath
     ) -> UISwipeActionsConfiguration? {
-        guard let item = viewModel.item(at: indexPath),
-              viewModel.canUnpin(item)
-        else { return nil }
-        let unpin = UIContextualAction(
-            style: .destructive,
-            title: appearance.unpinActionTitleText
-        ) { [weak self] _, _, handler in
-            self?.unpin(at: indexPath)
-            handler(true)
-        }
-        unpin.backgroundColor = appearance.unpinActionBackgroundColor
-        return UISwipeActionsConfiguration(actions: [unpin])
+        return nil
     }
 
     // MARK: - ContextMenuDataSource
