@@ -91,13 +91,23 @@ open class ChannelForwardViewModel: NSObject, ChannelSearchResultsUpdating {
         select(channel)
     }
     
+    /// Maximum number of destination chats selectable at once. 0 or less means no limit.
+    open var selectionLimit: Int { SceytChatUIKit.shared.config.forwardChannelSelectionLimit }
+
+    open var canSelectMore: Bool { selectionLimit <= 0 || selectedChannels.count < selectionLimit }
+
     open func select(_ channel: ChatChannel) {
-        if !selectedChannels.contains(channel) {
-            selectedChannels.append(channel)
-            event.send(.update(channel, isSelected: true))
-        } else {
+        // Deselect always wins, so reaching the cap never traps the user.
+        guard !selectedChannels.contains(channel) else {
             deselect(channel)
+            return
         }
+        guard canSelectMore else {
+            event.send(.selectionLimitReached(selectionLimit))
+            return
+        }
+        selectedChannels.append(channel)
+        event.send(.update(channel, isSelected: true))
     }
     
     open func deselect(at indexPath: IndexPath) {
@@ -146,5 +156,6 @@ public extension ChannelForwardViewModel {
     enum Event {
         case reload, reloadSearch
         case update(ChatChannel, isSelected: Bool)
+        case selectionLimitReached(Int)
     }
 }

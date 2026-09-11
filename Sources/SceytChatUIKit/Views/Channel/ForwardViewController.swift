@@ -157,6 +157,8 @@ open class ForwardViewController: ViewController,
                 }
             }
             navigationItem.rightBarButtonItem?.isEnabled = !viewModel.selectedChannels.isEmpty
+        case let .selectionLimitReached(limit):
+            showAlert(message: L10n.Error.maxValueItems(limit))
         }
     }
     

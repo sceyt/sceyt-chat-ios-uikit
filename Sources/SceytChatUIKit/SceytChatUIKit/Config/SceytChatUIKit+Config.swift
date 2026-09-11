@@ -94,6 +94,9 @@ extension SceytChatUIKit {
         public var videoAttachmentResizeConfig: VideoResizeConfig = .medium
         public var attachmentSelectionLimit: Int = 20
         public var messageMultiselectLimit: Int = 30
+        /// Maximum number of destination chats selectable at once on the Forward screen.
+        /// Set to 0 or less for no limit.
+        public var forwardChannelSelectionLimit: Int = 10
         public var maximumMessageLength: Int = 5000
         public var messageReactionPerUserLimit: UInt = 6 {
             didSet {
