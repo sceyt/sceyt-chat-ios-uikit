@@ -33,6 +33,9 @@ open class AttachmentTransfer: DataProvider {
     @Atomic private var progressCache = ProgressCache()
     @Atomic private var taskGroups = [Int64: [SCTDataSessionTaskInfo]]()
     @Atomic private var inFlightVideoThumbOrigins = Set<String>()
+    /// Transfer keys already reported as having no progress observer, so the warning is
+    /// emitted once per transfer instead of once per byte-chunk.
+    @Atomic private var unobservedProgressKeys = Set<String>()
     
     /// Progress reported for an upload the moment its task is created, before any
     /// byte-level callback exists. Small enough to read as "just started" (the UI shows
@@ -686,12 +689,12 @@ open class AttachmentTransfer: DataProvider {
                 blocks.forEach {
                     $0.progress?(attachmentProgress)
                 }
-            } else {
+            } else if self.unobservedProgressKeys.insert(key).inserted {
                 // The transfer is running but nothing is listening on this key. Either
                 // no view is on screen for it, or the emitter and the subscriber
                 // disagree on the attachment's identity — the latter shows up as a ring
                 // frozen at its bind-time floor until the download completes.
-                logger.warn("[Attachment] onProgress has no observers for KEY \(key) — progress \(progress) will not be rendered \(taskInfo.attachment.description)")
+                logger.warn("[Attachment] onProgress has no observers for KEY \(key) — progress will not be rendered \(taskInfo.attachment.description)")
             }
             self.progressCache[key] = progress
         }
@@ -843,6 +846,7 @@ open class AttachmentTransfer: DataProvider {
             // reads a stale `.downloading` status can't restore a progress ring that
             // nothing would ever hide.
             self.progressCache[key] = nil
+            self.unobservedProgressKeys.remove(key)
             var storedMessage: ChatMessage?
             self.database.write(resultQueue: .global()) {
                 storedMessage = $0.update(chatMessage: message, attachments: attachments)?.convert()

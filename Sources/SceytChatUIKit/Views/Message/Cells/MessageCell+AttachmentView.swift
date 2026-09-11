@@ -201,6 +201,10 @@ extension MessageCell {
         /// `data`'s `didSet` — i.e. on bind — and a status-only change bumps no
         /// `contentVersion`, so nothing reconfigures this cell and it keeps rendering the
         /// state the transfer was in when it was last bound.
+        /// Last foreign-tick identity reported by `setProgressHandler`, so the warning is
+        /// emitted once per mismatched attachment rather than once per byte-chunk.
+        private var lastReportedForeignTick: String?
+
         open func attachmentTransferStatusDidChange(
             _ attachment: ChatMessage.Attachment,
             status: ChatMessage.Attachment.TransferStatus
@@ -218,6 +222,17 @@ extension MessageCell {
                    let live = fileProvider.currentProgressPercent(message: message, attachment: data.attachment) {
                     setProgress(live)
                 }
+            case .done:
+                // The transfer is over and the bytes are on disk, but this relay is the *only*
+                // thing that hears about it: a transfer-only change bumps no `contentVersion`,
+                // so nothing reconfigures this cell and nothing calls the layout's
+                // `update(attachment:)` — the sole other trigger for a thumbnail reload. Without
+                // this the bubble keeps the thumbHash blur it loaded before the file existed,
+                // and only a scroll away and back clears it.
+                //
+                // The layout guards the reload on `isThumbnailLoadedFromFile`, so an upload
+                // finishing (already sharp from its local source file) costs nothing here.
+                data.reloadThumbnailFromFileIfNeeded()
             default:
                 break
             }
@@ -676,17 +691,18 @@ extension MessageCell {
                 return
             }
             var needsToUpdateStatus = false
+            // Per bind, so a view reused for a different attachment can report its own mismatch.
+            lastReportedForeignTick = nil
             fileProvider
                 .progress(
                     message: message,
                     attachment: data.attachment,
                     objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "messagecell")
                 ) { [weak self, weak data] progress in
+                    // Silent: a tick arriving after this view was rebound or torn down is the
+                    // normal end of every scroll, and it fires per byte-chunk.
                     guard let self, let data, self.data == data
-                    else {
-                        logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(progress.attachment.description)")
-                        return
-                    }
+                    else { return }
                     // A tick for a different attachment is not ours to render: its
                     // percent against this attachment's total would produce a byte
                     // count belonging to neither.
@@ -698,7 +714,14 @@ extension MessageCell {
                     guard AttachmentTransfer.transferIdentity(of: data.attachment)
                             == AttachmentTransfer.transferIdentity(of: progress.attachment)
                     else {
-                        logger.warn("[Attachment] dropping a tick for another attachment — bound \(AttachmentTransfer.transferIdentity(of: data.attachment)) received \(AttachmentTransfer.transferIdentity(of: progress.attachment))")
+                        // Reported once per bound attachment: the mismatch holds for the whole
+                        // transfer, so a per-tick warning says the same thing hundreds of times.
+                        let bound = AttachmentTransfer.transferIdentity(of: data.attachment)
+                        let received = AttachmentTransfer.transferIdentity(of: progress.attachment)
+                        if self.lastReportedForeignTick != received {
+                            self.lastReportedForeignTick = received
+                            logger.warn("[Attachment] dropping a tick for another attachment — bound \(bound) received \(received)")
+                        }
                         return
                     }
 
@@ -708,10 +731,7 @@ extension MessageCell {
                     // after this view has correctly rendered the paused state.
                     guard ![.pauseDownloading, .pauseUploading,
                             .failedDownloading, .failedUploading].contains(data.attachment.status)
-                    else {
-                        logger.verbose("[Attachment] dropping a tick for a paused transfer \(AttachmentTransfer.transferIdentity(of: data.attachment))")
-                        return
-                    }
+                    else { return }
 
                     DispatchQueue.main.async { [weak self] in
                         if needsToUpdateStatus {

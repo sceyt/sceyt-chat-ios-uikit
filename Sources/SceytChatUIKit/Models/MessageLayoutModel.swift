@@ -2012,6 +2012,36 @@ extension MessageLayoutModel {
             }
         }
 
+        /// Re-runs the thumbnail load in place now that the attachment's bytes are on disk.
+        ///
+        /// A finished transfer changes only the attachment's status and file path, which leaves
+        /// `updateOptions` empty — so `contentVersion` never bumps, the snapshot diff
+        /// reconfigures nothing, and `update(attachment:)` (the only other caller of
+        /// `loadThumbnail`) never runs. The bubble therefore keeps painting the thumbHash blur it
+        /// loaded back when no file existed, until a scroll rebinds the cell and a fresh load
+        /// happens to find the file. That is the "download finished but the image is still
+        /// blurry, scrolling away and back fixes it" bug.
+        ///
+        /// Unlike `resetThumbnail()` the current image is left in place, so there is no
+        /// nil/blur window while the sharp load runs. Unlike `update(attachment:)` no fresh
+        /// attachment object is needed: the file resolves from the attachment already held,
+        /// because `getFilePath` falls back to the url-derived storage path — so even a
+        /// pre-download copy with a nil `filePath` finds the downloaded bytes.
+        ///
+        /// `isLoadedThumbnail` is deliberately left true: a view binding mid-reload should get
+        /// the blurred image it can paint now, with the sharp one arriving over
+        /// `AttachmentSharpThumbnailRelay` when the load lands.
+        ///
+        /// A no-op once a sharp file-backed thumbnail is loaded, which is also what stops an
+        /// upload's completion from redoing work it already did.
+        open func reloadThumbnailFromFileIfNeeded() {
+            guard !isThumbnailLoadedFromFile else { return }
+            logger.verbose("[Attachment] reloading thumbnail after transfer \(attachment.description)")
+            DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+                self?.loadThumbnail()
+            }
+        }
+
         open func resetThumbnail() {
             thumbnail = nil
             isThumbnailLoadedFromFile = false
