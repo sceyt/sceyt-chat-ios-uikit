@@ -684,7 +684,6 @@ open class AttachmentTransfer: DataProvider {
                 attachment: taskInfo.attachment,
                 progress: progress
             )
-            logger.verbose("[Attachment] onProgress KEY \(key)")
             if let blocks = self.cache[key], !blocks.isEmpty {
                 blocks.forEach {
                     $0.progress?(attachmentProgress)
