@@ -351,6 +351,12 @@ public final class SyncService: NSObject {
     /// Called from `syncChannels` on connect and from `syncChannelPins` when a channel opens, so
     /// a pin taken with no connection goes out at the first opportunity either way.
     public class func sendPendingPins() {
+        // Intents queued before the feature was switched off stay on disk rather than going out
+        // behind the user's back — a pin they can no longer see or lift is worse than a late one.
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else {
+            logger.verbose("SyncService: sendPendingPins skipped — config.isMessagePinningEnabled is false")
+            return
+        }
         workerQueue
             .async {
                 makePendingPinOperations {
@@ -653,6 +659,11 @@ extension SyncService {
     /// list both do): the per-channel guard makes the second call a no-op.
     public class func syncChannelPins(channelId: ChannelId, completion: ((Bool) -> Void)? = nil) {
         guard channelId != 0 else {
+            completion?(false)
+            return
+        }
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else {
+            logger.verbose("SyncService: syncChannelPins skipped for channel \(channelId) — config.isMessagePinningEnabled is false")
             completion?(false)
             return
         }

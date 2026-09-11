@@ -220,10 +220,14 @@ open class ChannelPinnedMessageListViewModel: NSObject {
 
     /// Whether the row offers Unpin.
     ///
-    /// Unconditional: the server decides whether an unpin is allowed and answers with an error,
-    /// and a rejected unpin is restored by the channel's next pin sweep. Override to hide the
-    /// action up front — e.g. to let only the pinner or an admin unpin.
-    open func canUnpin(_ item: PinnedMessage) -> Bool { true }
+    /// Unconditional but for the feature's master switch: the server decides whether an unpin is
+    /// allowed and answers with an error, and a rejected unpin is restored by the channel's next
+    /// pin sweep. Override to hide the action up front — e.g. to let only the pinner or an admin
+    /// unpin. (With `config.isMessagePinningEnabled` off this screen is unreachable anyway; the
+    /// check is here so a host that presents it directly gets no live action either.)
+    open func canUnpin(_ item: PinnedMessage) -> Bool {
+        SceytChatUIKit.shared.config.isMessagePinningEnabled
+    }
 
     open func unpin(_ item: PinnedMessage, completion: ((Error?) -> Void)? = nil) {
         pinnedMessageProvider.unpin(item) { error in

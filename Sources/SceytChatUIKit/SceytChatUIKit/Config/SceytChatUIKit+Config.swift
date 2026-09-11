@@ -57,8 +57,42 @@ extension SceytChatUIKit {
         
         public var syncChannelsAfterConnect: Bool = true
 
+        /// Master switch for the pinned-messages feature.
+        ///
+        /// While `false` the SDK behaves as though pinning does not exist:
+        ///
+        /// - the message context menu offers neither Pin nor Unpin — `ChannelViewModel.canPin(model:)`
+        ///   and `canUnpin(model:)` both refuse, and `ChannelPinnedMessageListViewModel.canUnpin(_:)`
+        ///   with them;
+        /// - the banner under the navigation bar never appears and the pinned-messages screen never
+        ///   opens (`ChannelViewController.updatePinnedMessages(_:)`, `showPinnedMessageList()`);
+        /// - no pin is drawn beside a bubble's timestamp (`MessageCell.InfoView.showsPin(for:)`), and
+        ///   the info row measures without one;
+        /// - nothing about pins is read, written or synced: the pin observer never starts
+        ///   (`ChannelViewModel.startPinnedMessageObserver()`), the channel-open sweep and the
+        ///   pending-intent drain are skipped (`SyncService.syncChannelPins(channelId:)`,
+        ///   `sendPendingPins()`), the server's `didPinMessages` / `didUnpinMessages` events are
+        ///   ignored, and `ChannelPinnedMessageProvider.pin`/`unpin` complete with
+        ///   `ChannelPinnedMessageProvider.PinningError.pinningDisabled` instead of writing.
+        ///
+        /// Set it before the first conversation opens — flipping it while one is on screen leaves
+        /// that screen with whatever it has already built (the observer it did or did not start).
+        ///
+        /// State on disk is left alone, deliberately: pins already stored stay stored, invisible,
+        /// and pin intents queued before the switch are not sent while this is `false` — they go
+        /// out if it is turned back on, rather than being dropped behind the user's back.
+        ///
+        /// Two things this cannot switch off, because they are ordinary messages on the server:
+        /// an "X pinned: …" system message another member's client already posted still renders,
+        /// and `pinDetails` still arrives on the messages it belongs to. Only the UI and the
+        /// pin-specific storage go quiet.
+        public var isMessagePinningEnabled: Bool = true
+
         /// Whether pinning a message for everyone also sends the client's own "X pinned: …"
         /// system message into the conversation.
+        ///
+        /// No effect while `isMessagePinningEnabled` is `false`: no pin is taken, so nothing
+        /// announces one.
         ///
         /// Since pins replicate through the server, other members already learn about a pin from
         /// `ChannelDelegate.channel(_:didPinMessages:)` — this message is the visible audit trail

@@ -3278,7 +3278,8 @@ open class ChannelViewController: ViewController,
         }
         pinnedMessagesView.items = pins
 
-        let shouldShow = !pins.isEmpty
+        let shouldShow = SceytChatUIKit.shared.config.isMessagePinningEnabled
+            && !pins.isEmpty
             && !channelViewModel.isEditing
             && !channelViewModel.isSearching
         guard pinnedMessagesView.isHidden == shouldShow else { return }
@@ -3332,6 +3333,9 @@ open class ChannelViewController: ViewController,
     /// Opens the standalone pinned-messages screen. Picking a row there comes back through
     /// `didSelectPinnedMessage`.
     open func showPinnedMessageList() {
+        // Unreachable through the banner while pinning is off — it is never shown — but a host
+        // can call this directly, and the screen it opens would be permanently empty.
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
         // The keyboard would otherwise stay up behind the pushed screen and come back with
         // it, on top of the jump the selection triggers.
         inputTextView.resignFirstResponder()

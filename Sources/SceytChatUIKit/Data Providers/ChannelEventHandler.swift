@@ -346,6 +346,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
     // works whether or not the channel is on screen.
 
     open func channel(_ channel: Channel, didPinMessages pinnedMessages: [SceytChat.PinnedMessage]) {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
         guard !pinnedMessages.isEmpty else { return }
         database.write {
             for pinnedMessage in pinnedMessages {
@@ -357,6 +358,7 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
     }
 
     open func channel(_ channel: Channel, didUnpinMessages pinnedMessages: [SceytChat.PinnedMessage]) {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
         guard !pinnedMessages.isEmpty else { return }
         database.write {
             for pinnedMessage in pinnedMessages {

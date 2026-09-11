@@ -2007,6 +2007,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     private var didStartPinnedMessageObserver = false
 
     open func startPinnedMessageObserver() {
+        // Pinning off: no observer, so `pinnedMessages` stays empty and the banner has nothing
+        // to show even for pins an earlier run of the app left on disk.
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
         didStartPinnedMessageObserver = true
         pinnedMessageObserver.onDidChange = { [weak self] _ in
             self?.reloadPinnedMessages()
@@ -2033,6 +2036,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     ///
     /// `open` so a host that manages pin state itself can suppress it.
     open func syncPinnedMessages() {
+        // `SyncService.syncChannelPins` refuses too — this is the early exit for the two call
+        // sites here (channel open, and every reconnection) so a disabled feature logs nothing.
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
         SyncService.syncChannelPins(channelId: channel.id)
     }
 
@@ -2053,6 +2059,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         scope: PinnedMessage.Scope,
         pinnedUntil: Date? = nil
     ) {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else {
+            logger.warn("Pin message ignored: config.isMessagePinningEnabled is false")
+            return
+        }
         pinnedMessageProvider.pin(
             message: layoutModel.message,
             scope: scope,
@@ -2063,6 +2073,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
 
     open func unpinMessage(layoutModel: MessageLayoutModel) {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else {
+            logger.warn("Unpin message ignored: config.isMessagePinningEnabled is false")
+            return
+        }
         pinnedMessageProvider.unpin(message: layoutModel.message) { error in
             logger.errorIfNotNil(error, "Unpin message")
         }
@@ -2087,6 +2101,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     /// }
     /// ```
     open func canPin(model: MessageLayoutModel) -> Bool {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return false }
         let message = model.message
         guard message.state != .deleted,
               !message.transient,
@@ -2108,7 +2123,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     /// new one — otherwise a pin could be stranded on a message that later stops meeting the
     /// pinning conditions.
     open func canUnpin(model: MessageLayoutModel) -> Bool {
-        model.message.isPinned && model.message.state != .deleted
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return false }
+        return model.message.isPinned && model.message.state != .deleted
     }
 
     open func deleteSelectedMessages(type: DeleteMessageType) {

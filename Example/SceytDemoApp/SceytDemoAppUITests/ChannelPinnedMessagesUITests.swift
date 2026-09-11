@@ -1148,6 +1148,64 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(screen.waitUntilReady(), "and the conversation must still be usable")
     }
 
+    // MARK: - The master switch (config.isMessagePinningEnabled)
+
+    /// The three-pin fixture with the feature switched off. The pins are seeded straight into
+    /// the store, so they are on disk throughout — which is the point: none of them may reach
+    /// the screen, and none of them may be lifted either.
+    private func openPinnedConversationWithPinningDisabled() {
+        openConversation(launchApp(pinnedMessages: true, pinningDisabled: true))
+    }
+
+    /// The one-pin fixture with the feature off. That fixture keeps the pinned bubble on
+    /// screen from the start, which the three-pin one does not — its pins sit above fifteen
+    /// fillers, and with no banner there is nothing to jump to them with.
+    private func openSinglePinnedConversationWithPinningDisabled() {
+        openConversation(launchApp(pinnedMessagesSingle: true, pinningDisabled: true))
+    }
+
+    func testPinningDisabled_showsNoBanner() {
+        openPinnedConversationWithPinningDisabled()
+
+        XCTAssertFalse(screen.pinnedMessagesView.waitForExistence(timeout: 3),
+                       "the banner must stay away even though the channel has pins on disk")
+        XCTAssertNotNil(fillerCellOnScreen(),
+                        "and the conversation itself must be unaffected")
+    }
+
+    func testPinningDisabled_drawsNoPinBesideTheTimestamp() {
+        openSinglePinnedConversationWithPinningDisabled()
+
+        let cell = screen.cell(Pinned.textId)
+        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+        XCTAssertFalse(screen.pinnedIcon(in: cell).exists,
+                       "a stored pin must not mark the bubble while the feature is off")
+    }
+
+    func testPinningDisabled_offersNeitherPinNorUnpin() {
+        openSinglePinnedConversationWithPinningDisabled()
+
+        let cell = screen.cell(Pinned.textId)
+        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+        XCTAssertTrue(screen.openContextMenu(on: cell, expecting: "reply"),
+                      "the context menu itself must still open")
+        XCTAssertFalse(screen.contextMenuItem("pin").exists,
+                       "Pin must be gone")
+        XCTAssertFalse(screen.contextMenuItem("unpin").exists,
+                       "and so must Unpin, on a message that *is* pinned on disk")
+    }
+
+    /// The same menu on a message nothing has ever pinned — the branch `canPin` decides.
+    func testPinningDisabled_offersNoPinOnAnUnpinnedMessage() {
+        openConversation(launchApp(conversation: true, pinningDisabled: true))
+
+        let cell = screen.cell(ChannelScreen.Conversation.outgoingId)
+        XCTAssertTrue(cell.waitForExistence(timeout: 5))
+        XCTAssertTrue(screen.openContextMenu(on: cell, expecting: "reply"))
+        XCTAssertFalse(screen.contextMenuItem("pin").exists,
+                       "a delivered, unpinned message must not offer Pin while the feature is off")
+    }
+
     // MARK: - Waiters
 
     private func waitForPreview(_ expected: String, timeout: TimeInterval = 5) -> Bool {

@@ -31,6 +31,19 @@ import SceytChat
 /// have to be idempotent.
 open class ChannelPinnedMessageProvider: DataProvider {
 
+    /// Why a pin or unpin was refused before it was attempted.
+    public enum PinningError: Error, LocalizedError {
+        /// `SceytChatUIKit.shared.config.isMessagePinningEnabled` is `false`.
+        case pinningDisabled
+
+        public var errorDescription: String? {
+            switch self {
+            case .pinningDisabled:
+                return "Message pinning is disabled (SceytChatUIKit.shared.config.isMessagePinningEnabled == false)"
+            }
+        }
+    }
+
     public let channelId: ChannelId
 
     /// The SDK handle every pin/unpin request goes through.
@@ -94,6 +107,13 @@ open class ChannelPinnedMessageProvider: DataProvider {
         pinnedUntil: Date? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
+        // The data-layer refusal, so custom pin UI cannot write a pin the rest of the SDK has
+        // been told not to show. Reported rather than silently succeeding: nothing is stored.
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else {
+            logger.warn("Pin refused for channel \(channelId): config.isMessagePinningEnabled is false")
+            completion?(PinningError.pinningDisabled)
+            return
+        }
         var record: PinnedMessage?
         database.write {
             record = $0.pinMessage(
@@ -193,6 +213,11 @@ open class ChannelPinnedMessageProvider: DataProvider {
         messageTid: Int64,
         completion: ((Error?) -> Void)? = nil
     ) {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else {
+            logger.warn("Unpin refused for channel \(channelId): config.isMessagePinningEnabled is false")
+            completion?(PinningError.pinningDisabled)
+            return
+        }
         var needsSending = false
         database.write {
             needsSending = $0.unpinMessage(

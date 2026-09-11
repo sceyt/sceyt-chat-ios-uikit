@@ -151,7 +151,8 @@ extension MessageCell {
         /// The one rule for both `data`'s render and `measure`, so the row never reserves a
         /// slot for a pin it does not draw (or draws one it did not reserve for).
         open class func showsPin(for message: ChatMessage) -> Bool {
-            message.isPinned && message.state != .deleted
+            guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return false }
+            return message.isPinned && message.state != .deleted
         }
 
         open class func measure(

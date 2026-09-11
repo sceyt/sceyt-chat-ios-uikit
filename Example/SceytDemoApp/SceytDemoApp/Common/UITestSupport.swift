@@ -78,6 +78,15 @@ enum UITestSupport {
         ProcessInfo.processInfo.arguments.contains("--uitest-pins-stay-pending")
     }
 
+    /// `--uitest-pinning-disabled` — runs with
+    /// `SceytChatUIKit.shared.config.isMessagePinningEnabled = false`, the feature's master
+    /// switch, while the fixture still seeds its pins straight into the store (seeding goes
+    /// through `pinMessagesForUITests`, which writes below the switch). So the pins exist on
+    /// disk and nothing about them may reach the screen.
+    static var isPinningDisabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pinning-disabled")
+    }
+
     /// `--uitest-pinned-messages-pin-order` — the three-pin fixture with explicit server pin
     /// ids assigned **against** timeline order, so the banner's order can only be right if it
     /// is reading `serverPinId` and not `messageCreatedAt`.
@@ -292,6 +301,11 @@ enum UITestSupport {
         guard isActive else { return }
         #if DEBUG
         SceytChatUIKit.shared.startUITestSession()
+        // Before any seeding: the fixtures write pins directly to the store, and the flag is
+        // read by the screens that would show them, not by the writes.
+        if isPinningDisabled {
+            SceytChatUIKit.shared.config.isMessagePinningEnabled = false
+        }
         if isReplyAttachment {
             seedReplyAttachmentConversation()
             installFloatingAttachmentDownloadInjector()
