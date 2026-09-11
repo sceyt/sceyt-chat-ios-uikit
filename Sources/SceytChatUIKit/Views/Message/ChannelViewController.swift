@@ -274,6 +274,19 @@ open class ChannelViewController: ViewController,
     /// `releaseRepliedReturnAnchorIfNeeded()`.
     private var hasRepliedReturnAnchorLeftViewport = false
 
+    /// Message id of an in-flight *return* jump — the one `unreadButtonAction` makes
+    /// back to the reply the user came from. That jump must scroll without flashing
+    /// the bubble: the user is going back to where they already were, and a highlight
+    /// there reads as "look at this new thing".
+    ///
+    /// A flag is needed because the flash is not driven by the jump's caller. Both
+    /// `willDisplay` and the `.scrollAndSelect` / `.reloadDataAndSelect` landings key
+    /// it off `channelViewModel.scrollToRepliedMessageId` alone, which is identical
+    /// for a forward reply jump (flash — the user asked to be shown that message) and
+    /// a return jump (don't). This names the exception. Released by the next armed
+    /// jump and by the user's next drag, so it can never mask a later highlight.
+    private var silentJumpMessageId: MessageId = 0
+
     /// `messageTid` of a pin the user has just taken on this screen, held until the pin
     /// shows up in the banner's items. The pin is written as an intent and the observer
     /// reports it a moment later, so the banner cannot be moved at the moment of the tap —
@@ -1554,6 +1567,7 @@ open class ChannelViewController: ViewController,
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         isStartedDragging = true
         pinnedScrollMessageId = 0
+        silentJumpMessageId = 0
         // Drag starting while pinned to the oldest loaded edge (content end in the
         // mirrored order) reopens the prev-fetch gate so a failed server page can
         // be retried once connectivity returns.
@@ -2060,6 +2074,16 @@ open class ChannelViewController: ViewController,
         layout.invalidateLayout(with: context)
     }
     
+    /// The pending reply-jump target a cell scrolling into view should flash, or 0.
+    ///
+    /// `scrollToRepliedMessageId` says *where* the list is going, not whether the
+    /// arrival deserves a highlight; a silent return jump is the case where it does
+    /// not. See `silentJumpMessageId`.
+    private var repliedMessageIdToHighlight: MessageId {
+        let messageId = channelViewModel.scrollToRepliedMessageId
+        return messageId == silentJumpMessageId ? 0 : messageId
+    }
+
     open func collectionView(
         _ collectionView: UICollectionView,
         willDisplay cell: UICollectionViewCell,
@@ -2067,7 +2091,7 @@ open class ChannelViewController: ViewController,
     ) {
         if let systemCell = cell as? SystemMessageCell, systemCell.data != nil {
             var repliedMessageId: MessageId {
-                channelViewModel.scrollToRepliedMessageId
+                repliedMessageIdToHighlight
             }
             if repliedMessageId != 0,
                systemCell.data.message.id == repliedMessageId {
@@ -2084,7 +2108,7 @@ open class ChannelViewController: ViewController,
         else { return }
 
         var repliedMessageId: MessageId {
-            channelViewModel.scrollToRepliedMessageId
+            repliedMessageIdToHighlight
         }
         if selectMessageId != 0, cell.data.message.id == selectMessageId {
             cell.highlightMode = .search
@@ -3232,6 +3256,8 @@ open class ChannelViewController: ViewController,
         else { return }
         pinnedScrollMessageId = 0
         pinnedJumpMessageId = 0
+        // A forward jump is exactly the case that should flash.
+        silentJumpMessageId = 0
         userSelectOnRepliedMessage = layoutModel.message
         // Armed while the reply is still on screen — the user just tapped it.
         hasRepliedReturnAnchorLeftViewport = false
@@ -3299,6 +3325,7 @@ open class ChannelViewController: ViewController,
         // lands the jump in the wrong place.
         pinnedScrollMessageId = 0
         pinnedJumpMessageId = messageId
+        silentJumpMessageId = 0
         channelViewModel.findReplayedMessage(messageId: messageId)
     }
 
@@ -3328,6 +3355,10 @@ open class ChannelViewController: ViewController,
     }
 
     open func showRepliedMessage(_ message: ChatMessage) {
+        // Scroll there, but silently — see `silentJumpMessageId`. Armed for both
+        // routes below: the cached one never flashes anyway, and the loader route
+        // has three separate places that would.
+        silentJumpMessageId = message.id
         let paths = channelViewModel.indexPaths(for: [message])
         guard let dataPath = paths.values.first,
               let indexPath = uiIndexPath(fromData: dataPath) else {
@@ -4183,7 +4214,12 @@ open class ChannelViewController: ViewController,
                 // A pinned-banner jump arms no `userSelectOnRepliedMessage` — it must not
                 // set up the return-jump — but it still deserves the same flash, which is
                 // what `willDisplay` already gives a pin that scrolls in from off screen.
-                if userSelectOnRepliedMessage != nil || pinnedJumpMessageId == messageId {
+                if silentJumpMessageId == messageId {
+                    // A return jump: scroll, don't flash. Stated here rather than
+                    // inferred from a cleared `userSelectOnRepliedMessage`, so the
+                    // contract does not depend on the caller's ordering.
+                    mode = .none
+                } else if userSelectOnRepliedMessage != nil || pinnedJumpMessageId == messageId {
                     mode = .reply
                     pinnedJumpMessageId = 0
                 } else {
@@ -4256,7 +4292,12 @@ open class ChannelViewController: ViewController,
                 // A pinned-banner jump arms no `userSelectOnRepliedMessage` — it must not
                 // set up the return-jump — but it still deserves the same flash, which is
                 // what `willDisplay` already gives a pin that scrolls in from off screen.
-                if userSelectOnRepliedMessage != nil || pinnedJumpMessageId == messageId {
+                if silentJumpMessageId == messageId {
+                    // A return jump: scroll, don't flash. Stated here rather than
+                    // inferred from a cleared `userSelectOnRepliedMessage`, so the
+                    // contract does not depend on the caller's ordering.
+                    mode = .none
+                } else if userSelectOnRepliedMessage != nil || pinnedJumpMessageId == messageId {
                     mode = .reply
                     pinnedJumpMessageId = 0
                 } else {
