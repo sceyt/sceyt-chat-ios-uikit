@@ -270,6 +270,7 @@ open class ChannelPinnedMessageProvider: DataProvider {
         // UI-test mode never connects; see `SceytChatUIKit.uiTestPinRequestsCompleteLocally`.
         // Routed through the real `confirm` so the ack logic — including the once-only system
         // message — is what the tests exercise.
+        #if DEBUG
         if SceytChatUIKit.uiTestPinRequestsCompleteLocally {
             confirm(
                 record,
@@ -280,6 +281,7 @@ open class ChannelPinnedMessageProvider: DataProvider {
             )
             return
         }
+        #endif
 
         guard canReachServer else {
             logger.info("[Pin] not sending pin for message \(record.messageId): offline — the intent stays queued for the next sync")
@@ -375,6 +377,7 @@ open class ChannelPinnedMessageProvider: DataProvider {
             completion?(nil)
             return
         }
+        #if DEBUG
         if SceytChatUIKit.uiTestPinRequestsCompleteLocally {
             database.write {
                 $0.confirmUnpin(messageTid: messageTid, channelId: self.channelId)
@@ -383,6 +386,7 @@ open class ChannelPinnedMessageProvider: DataProvider {
             }
             return
         }
+        #endif
 
         guard canReachServer else {
             logger.info("[Pin] not sending unpin for message \(messageId): offline — the intent stays queued for the next sync")
