@@ -230,14 +230,26 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         )
     }
 
-    func testPinMessage_stampsTheSentinelAndTheAttemptTime() {
-        let before = Int64(Date().timeIntervalSince1970 * 1000)
+    func testPinMessage_stampsTheSentinelButNotAnAttempt() {
         let row = pin(seedMessage(id: 2, channelId: channelId))
 
         XCTAssertEqual(row?.serverPinId, PinnedMessageDTO.unknownServerPinId)
         XCTAssertEqual(row?.sync, .pendingPin)
-        XCTAssertGreaterThanOrEqual(row?.lastAttemptAt ?? 0, before,
-                                    "reconcilePins measures the grace window off this")
+        XCTAssertEqual(row?.lastAttemptAt, 0,
+                       "storing the intent is not an attempt — `wasSentToServer` is what unpin reads")
+    }
+
+    func testRecordPinDispatch_marksTheIntentAsSent() {
+        let message = seedMessage(id: 7, channelId: channelId)
+        pin(message)
+        let before = Int64(Date().timeIntervalSince1970 * 1000)
+
+        XCTAssertTrue(ctx.recordPinDispatch(messageTid: message.tid, channelId: channelId))
+        try? ctx.save()
+
+        XCTAssertTrue(pinRow(tid: 7)?.wasSentToServer ?? false)
+        XCTAssertGreaterThanOrEqual(pinRow(tid: 7)?.lastAttemptAt ?? 0, before)
+        XCTAssertEqual(pinRow(tid: 7)?.sync, .pendingPin, "marking it sent does not resolve it")
     }
 
     func testPinMessage_doesNotOverwriteAnAlreadyKnownServerPinId() {
@@ -440,6 +452,56 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         XCTAssertNotNil(row, "building the snapshot must not trap on a nil user")
     }
 
+    /// The channel-open sweep asks the server what is pinned, and the server still says "this
+    /// one" — it has not been told about the removal yet. Taking that at face value is what put
+    /// the pin back on screen seconds after the connection returned.
+    func testStorePin_doesNotResurrectAPinTheUserHasUnpinned() {
+        let message = seedMessage(id: 705, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 34
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 705, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        ctx.storePin(
+            message: Message.Builder().id(705).tid(Int(message.tid)).body("x").type("text").build(),
+            channelId: channelId,
+            serverPinId: 34,
+            pinnedBy: ChatUser(id: "me"),
+            pinnedUntil: nil,
+            scope: .forAll
+        )
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 705)?.sync, .pendingUnpin,
+                       "the server's answer is not evidence about an intent it has not seen")
+        XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 0)
+        XCTAssertNil(MessageDTO.fetch(id: 705, context: ctx)?.pinDetails,
+                     "and the bubble must not be re-marked")
+    }
+
+    /// One the sweep *does* own: a pin that only ever existed as a queued intent on this device,
+    /// acked by the server, is a real pin now.
+    func testStorePin_stillConfirmsAPendingPin() {
+        let message = seedMessage(id: 706, channelId: channelId)
+        pin(message)
+        try? ctx.save()
+
+        ctx.storePin(
+            message: Message.Builder().id(706).tid(Int(message.tid)).body("x").type("text").build(),
+            channelId: channelId,
+            serverPinId: 35,
+            pinnedBy: ChatUser(id: "me"),
+            pinnedUntil: nil,
+            scope: .forAll
+        )
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 706)?.sync, .synced)
+        XCTAssertEqual(pinRow(tid: 706)?.serverPinId, 35)
+    }
+
     func testStorePin_recordsWhoPinnedItAndPersistsThatUser() {
         ctx.storePin(
             message: Message.Builder().id(700).tid(700).body("x").type("text").build(),
@@ -528,6 +590,45 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         XCTAssertEqual(provider.mockOperator.lastPinTill, until)
         XCTAssertEqual(provider.mockOperator.lastPinType, .personal,
                        "a personal pin must go out as the server's personal scope")
+    }
+
+    /// The provider persists "on the wire" before it sends, and that write is also the last
+    /// chance to notice the user unpinned in the meantime.
+    func testFlushPendingPin_marksTheIntentAsSentBeforeItGoesOut() {
+        let provider = MockPinnedMessageProvider(channelId: channelId)
+        let message = seedMessage(id: 805, channelId: channelId)
+        provider.mockOperator.pinError = sdkError()   // so the row stays pending to inspect
+        let record = pin(message)!.convert()
+
+        let done = expectation(description: "flushed")
+        provider.flushPendingPin(record) { _ in done.fulfill() }
+        wait(for: [done], timeout: 5)
+
+        ctx.refreshAllObjects()
+        XCTAssertEqual(provider.mockOperator.pinnedIds, [[NSNumber(value: 805)]])
+        XCTAssertTrue(pinRow(tid: 805)?.wasSentToServer ?? false,
+                      "an unpin arriving later has to know this request is out there")
+    }
+
+    func testFlushPendingPin_whenTheIntentWasCancelledFirst_sendsNothing() {
+        let provider = MockPinnedMessageProvider(channelId: channelId)
+        let message = seedMessage(id: 806, channelId: channelId)
+        let record = pin(message)!.convert()
+
+        // The user unpins before the attempt starts — the row is gone, the send is called off.
+        ctx.unpinMessage(id: 806, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        let done = expectation(description: "flushed")
+        provider.flushPendingPin(record) { error in
+            XCTAssertNil(error)
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 5)
+
+        XCTAssertTrue(provider.mockOperator.pinnedIds.isEmpty,
+                      "pinning a message the user already unpinned is exactly the bug")
+        XCTAssertNil(pinRow(tid: 806))
     }
 
     func testFlushPendingPin_skipsAMessageWithNoServerId() {

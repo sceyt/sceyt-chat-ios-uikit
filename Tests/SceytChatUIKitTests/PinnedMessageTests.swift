@@ -141,12 +141,13 @@ final class PinnedMessageTests: XCTestCase {
 
     // MARK: - Pending intents
 
-    /// A pin the server has never seen is simply dropped: there is nothing to unpin remotely, so
-    /// unpinning cancels the queued pin outright.
+    /// A pin whose request never left the device is simply dropped: there is nothing to unpin
+    /// remotely, so unpinning cancels the queued pin outright.
     func testUnpinningAPendingPin_dropsTheRowWithNothingToSend() {
         let message = seedMessage(id: 70, channelId: channelId)
         pin(message)
         XCTAssertEqual(pinRow(tid: 70)?.sync, .pendingPin)
+        XCTAssertFalse(pinRow(tid: 70)?.wasSentToServer ?? true, "storing an intent is not sending it")
 
         let intent = ctx.unpinMessage(id: 70, tid: message.tid, channelId: channelId)
         try? ctx.save()
@@ -154,6 +155,83 @@ final class PinnedMessageTests: XCTestCase {
         XCTAssertNil(intent, "nothing to send — the server never knew about it")
         XCTAssertNil(pinRow(tid: 70))
         XCTAssertNil(message.pinDetails)
+    }
+
+    /// The bug this guards: pin with the link down, unpin, restore the link — and the message
+    /// came back pinned.
+    ///
+    /// `connectionState` still reads `.connected` over a link that drops every packet, so the pin
+    /// request *was* handed to the SDK, which delivered it on reconnect. Dropping the row on
+    /// unpin left the server pinning a message with nothing on disk to undo it.
+    func testUnpinningAnInFlightPin_keepsAnIntentToCountermandIt() {
+        let message = seedMessage(id: 77, channelId: channelId)
+        pin(message)
+        XCTAssertTrue(ctx.recordPinDispatch(messageTid: message.tid, channelId: channelId))
+        try? ctx.save()
+
+        let intent = ctx.unpinMessage(id: 77, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertNotNil(intent, "the pin may already have landed — the removal has to be sent")
+        XCTAssertEqual(pinRow(tid: 77)?.sync, .pendingUnpin)
+        XCTAssertNil(message.pinDetails, "and the bubble loses its pin at once either way")
+        XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 0)
+    }
+
+    /// The other half of that race: the user unpins *before* the attempt starts. The send must be
+    /// called off, or it would pin a message the user has already unpinned with no intent left.
+    func testRecordPinDispatch_refusesACancelledIntent() {
+        let message = seedMessage(id: 78, channelId: channelId)
+        pin(message)
+        try? ctx.save()
+
+        ctx.unpinMessage(id: 78, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertFalse(
+            ctx.recordPinDispatch(messageTid: message.tid, channelId: channelId),
+            "the row is gone — the pin must not go out"
+        )
+    }
+
+    /// The pin the user countermanded lands anyway. Its ack is not a reason to pin it again.
+    func testConfirmPin_afterAnUnpin_leavesTheIntentStandingAndAnnouncesNothing() {
+        let message = seedMessage(id: 79, channelId: channelId)
+        pin(message)
+        ctx.recordPinDispatch(messageTid: message.tid, channelId: channelId)
+        try? ctx.save()
+        ctx.unpinMessage(id: 79, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        let didComplete = ctx.confirmPin(
+            messageTid: message.tid, channelId: channelId,
+            serverPinId: 750, pinnedUntil: nil, scope: .forAll
+        )
+        try? ctx.save()
+
+        XCTAssertFalse(didComplete, "a pin on its way out must not post an \"X pinned\" message")
+        XCTAssertEqual(pinRow(tid: 79)?.sync, .pendingUnpin, "the unpin intent survives its own pin's ack")
+        XCTAssertEqual(pinRow(tid: 79)?.serverPinId, 750, "but the id the server assigned is worth keeping")
+        XCTAssertNil(message.pinDetails, "and the bubble stays unpinned")
+    }
+
+    /// `syncPin` runs on every message write, and a `.pendingUnpin` row is an intent, not a pin —
+    /// the server's own payload landing on reconnect must not re-project it onto the bubble.
+    func testSyncPin_doesNotReMarkTheBubbleForAPendingUnpin() {
+        let message = seedMessage(id: 84, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 604
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 84, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        message.body = "edited while the unpin is still queued"
+        ctx.syncPin(for: message)
+        try? ctx.save()
+
+        XCTAssertNil(message.pinDetails, "the pin the user removed must not come back on a message write")
+        XCTAssertEqual(pinRow(tid: 84)?.sync, .pendingUnpin)
     }
 
     /// A pin the server acked has to be unpinned *there* too, so the row is kept as a durable

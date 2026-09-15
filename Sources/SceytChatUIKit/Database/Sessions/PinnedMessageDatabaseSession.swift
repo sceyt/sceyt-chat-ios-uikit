@@ -29,8 +29,9 @@ public protocol PinnedMessageDatabaseSession {
         pinnedBy userId: UserId?
     ) -> PinnedMessageDTO?
 
-    /// Unpins a message. A pin the server has already acked is kept as a `.pendingUnpin`
-    /// intent rather than deleted; one that never reached the server is simply dropped.
+    /// Unpins a message. A pin the server may already know about — one it acked, or one whose
+    /// request has gone out and not come back — is kept as a `.pendingUnpin` intent rather than
+    /// deleted; only a pin that never left the device is simply dropped.
     /// Returns the intent that now needs sending, or `nil` when there is nothing to send.
     @discardableResult
     func unpinMessage(id: MessageId, tid: Int64, channelId: ChannelId) -> PinnedMessageDTO?
@@ -93,6 +94,13 @@ public protocol PinnedMessageDatabaseSession {
     /// Records that an attempt was made and failed, so the retry has a trail.
     func recordPinAttemptFailure(messageTid: Int64, channelId: ChannelId)
 
+    /// Marks a pin intent as about to go out, and answers whether it still should.
+    ///
+    /// `false` means the row is gone or is no longer a pending pin — the user cancelled it while
+    /// the attempt was being prepared — and the caller must not send.
+    @discardableResult
+    func recordPinDispatch(messageTid: Int64, channelId: ChannelId) -> Bool
+
     /// Applies the pin state the server sends nested on a message.
     func applyPinDetails(_ pin: SceytChat.PinDetails?, to dto: MessageDTO)
 
@@ -153,13 +161,15 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
         pin.pinnedByUserId = userId
         pin.sync = .pendingPin
         // The server has not told us this pin's id yet. The sentinel sorts it at the newest-pin
-        // end of the banner (see `defaultSortDescriptors`) until `confirmPin` replaces it, and
-        // `lastAttemptAt` is what tells `reconcilePins` this row is a pin in flight rather than
-        // one stranded by a crash.
+        // end of the banner (see `defaultSortDescriptors`) until `confirmPin` replaces it.
         if !pin.hasServerPinId {
             pin.serverPinId = PinnedMessageDTO.unknownServerPinId
         }
-        pin.lastAttemptAt = Int64(Date().timeIntervalSince1970 * 1000)
+        // `lastAttemptAt` is deliberately *not* stamped here. It means "a request has gone out",
+        // and storing an intent is not going out: `recordPinDispatch` stamps it when one does,
+        // and that is what tells a later unpin whether this pin still has to be countermanded on
+        // the server. Re-pinning a row that was already on the wire keeps the old stamp, which
+        // is the conservative answer — the server's state is unknown either way.
 
         // Projection, same transaction.
         let details = PinDetailsDTO.fetchOrCreate(for: message, context: self)
@@ -184,11 +194,22 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
 
         var intent: PinnedMessageDTO?
         for row in rows {
-            if row.sync == .pendingPin {
-                // Never reached the server, so there is nothing to unpin there. Dropping the row
-                // cancels the queued pin outright.
+            if row.sync == .pendingPin, !row.wasSentToServer {
+                // The pin request never left the device, so there is nothing to unpin there.
+                // Dropping the row cancels the queued pin outright.
                 logger.info("Unpin cancels the still-pending pin for message tid \(row.messageTid)")
                 delete(row)
+            } else if row.sync == .pendingPin {
+                // The pin *has* been sent and has not come back. That is not the same as "the
+                // server never saw it": a request made over a dead socket sits in the SDK's queue
+                // and is delivered when the connection returns, minutes later, long after the
+                // user unpinned. Dropping the row here is what left the message pinned on the
+                // server with nothing on disk to undo it — so the removal is queued instead, and
+                // the drain sends it once the pin's own fate is settled.
+                logger.info("Unpin countermands the in-flight pin for message tid \(row.messageTid): its outcome on the server is unknown")
+                row.sync = .pendingUnpin
+                row.lastAttemptAt = Int64(Date().timeIntervalSince1970 * 1000)
+                intent = row
             } else if row.sync == .pendingUnpin {
                 intent = row   // already queued; leave it alone
             } else {
@@ -296,6 +317,16 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
         )
         pin.applySnapshot(from: message, channelId: channelId, messageTid: pinTid)
         pin.serverPinId = serverPinId
+
+        // The user has unpinned this pin and only the ack is outstanding. The server still
+        // reports it because it has not been told yet, so this page is no evidence against the
+        // intent — take the pin id and leave the row hidden and pending, or the sweep that runs
+        // when the channel opens would put the pin straight back.
+        guard pin.sync != .pendingUnpin else {
+            logger.info("storePin: server pin \(serverPinId) for message tid \(pinTid) is already unpinned locally; keeping the pending unpin intent")
+            return pin
+        }
+
         pin.sync = .synced
         pin.retryCount = 0
         pin.pinnedByUserId = pinnedBy?.id
@@ -462,6 +493,16 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
             context: self
         ) else { return false }
 
+        // The user unpinned while the pin was in flight, and this is that pin landing. The ack
+        // does not revive it: keep the row as the unpin intent it now is and take the id the
+        // server assigned, which is what the drain has to remove. Reported as "no transition",
+        // so no "X pinned" is posted for a pin that is already on its way out.
+        guard pin.sync != .pendingUnpin else {
+            logger.info("[Pin] pin \(serverPinId) acked after the user unpinned message tid \(messageTid); the unpin intent stands")
+            pin.serverPinId = serverPinId
+            return false
+        }
+
         // Captured before the flip: this is what makes the system message fire once, no matter
         // how many acks or retries arrive for the same pin.
         let wasPending = pin.sync != .synced
@@ -510,6 +551,24 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
         ) else { return }
         pin.retryCount = pin.retryCount &+ 1
         pin.lastAttemptAt = Int64(Date().timeIntervalSince1970 * 1000)
+    }
+
+    @discardableResult
+    public func recordPinDispatch(messageTid: Int64, channelId: ChannelId) -> Bool {
+        guard let pin = PinnedMessageDTO.fetch(
+            messageTid: messageTid,
+            channelId: channelId,
+            context: self
+        ) else { return false }
+
+        // Not a pending pin any more: the user unpinned between the intent being stored and this
+        // attempt being prepared. Both writes go through the one serial `Database.write` context,
+        // so this is the whole of that race — and sending now would pin a message the user has
+        // already unpinned, with no intent left to undo it.
+        guard pin.sync == .pendingPin else { return false }
+
+        pin.lastAttemptAt = Int64(Date().timeIntervalSince1970 * 1000)
+        return true
     }
 
     /// Applies the pin state the server nests on a message.
@@ -591,6 +650,15 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
         guard !pin.isExpired else {
             // The pin lapsed. Drop it rather than let a stale row keep the bubble marked.
             delete(pin)
+            clearPinMirror(on: dto)
+            return
+        }
+
+        guard pin.sync != .pendingUnpin else {
+            // Unpinned locally, ack outstanding: the row is an intent now, not a pin, so it must
+            // not mark the bubble. Without this, the next write to the message — the server's own
+            // payload on reconnect, an edit, a marker — would re-project the pin the user just
+            // removed. Same rule `repairPinMirrors` applies.
             clearPinMirror(on: dto)
             return
         }

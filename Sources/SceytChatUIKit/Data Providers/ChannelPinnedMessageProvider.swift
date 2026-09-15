@@ -289,6 +289,38 @@ open class ChannelPinnedMessageProvider: DataProvider {
             return
         }
 
+        // "On the wire" is recorded *before* the request goes out, because after it the answer is
+        // no longer ours to know: `connectionState` can still read `.connected` over a link that
+        // drops every packet, and the SDK holds such a request and delivers it on reconnect. A
+        // later unpin reads this stamp to decide whether it can just cancel the local row or has
+        // to countermand the pin on the server — see `NSManagedObjectContext.unpinMessage`.
+        //
+        // The write doubles as the cancellation check: the user can unpin in the gap between the
+        // intent being stored and this attempt starting, and `recordPinDispatch` answers `false`
+        // when they have. Sending then would pin a message they already unpinned.
+        var shouldSend = false
+        database.write {
+            shouldSend = $0.recordPinDispatch(
+                messageTid: record.messageTid,
+                channelId: self.channelId
+            )
+        } completion: { [weak self] writeError in
+            guard let self else {
+                completion?(writeError)
+                return
+            }
+            guard shouldSend else {
+                logger.info("[Pin] not sending pin for message \(record.messageId): the intent was cancelled before it went out")
+                completion?(writeError)
+                return
+            }
+            self.sendPinRequest(record, completion: completion)
+        }
+    }
+
+    /// The pin request itself, split from `flushPendingPin` so the dispatch marker it depends on
+    /// is durable before anything is sent.
+    open func sendPinRequest(_ record: PinnedMessage, completion: ((Error?) -> Void)? = nil) {
         logger.info("[Pin] sending pin: message \(record.messageId), channel \(channelId), scope \(record.scope), until \(record.pinnedUntil.map { "\($0)" } ?? "never"), attempt \(record.retryCount + 1)")
         channelOperator.pinMessages(
             ids: [NSNumber(value: record.messageId)],

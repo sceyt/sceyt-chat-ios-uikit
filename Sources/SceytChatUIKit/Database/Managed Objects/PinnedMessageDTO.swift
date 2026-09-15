@@ -85,8 +85,12 @@ public class PinnedMessageDTO: NSManagedObject {
     @NSManaged public var serverPinId: Int64
     @NSManaged public var syncState: Int16
     @NSManaged public var retryCount: Int16
-    /// Milliseconds since epoch of the last network attempt. Read by `reconcilePins` to decide
-    /// whether an unsynced row is a pin still in flight or one stranded by a crash.
+    /// Milliseconds since epoch of the last network attempt, and `0` for an intent that has
+    /// never been on the wire.
+    ///
+    /// Stamped when a request is actually handed to the SDK (`recordPinDispatch`, and the
+    /// ack/failure writers), **never** when the intent is merely stored — that difference is
+    /// the whole of `wasSentToServer`.
     @NSManaged public var lastAttemptAt: Int64
 
     /// A pin taken locally whose server id is not known yet.
@@ -157,6 +161,16 @@ public class PinnedMessageDTO: NSManagedObject {
     public var isPendingSync: Bool {
         sync == .pendingPin || sync == .pendingUnpin
     }
+
+    /// A request for this intent has already been handed to the SDK, so what the server ends up
+    /// knowing is out of this device's hands.
+    ///
+    /// It decides exactly one thing: what unpinning a `.pendingPin` row means. A pin that never
+    /// left the device is cancelled by dropping the row, but one already on the wire can still
+    /// land — the SDK holds a request made over a dead socket and delivers it when the
+    /// connection returns — so its removal has to be *sent*, not merely forgotten. See
+    /// `NSManagedObjectContext.unpinMessage`.
+    public var wasSentToServer: Bool { lastAttemptAt != 0 }
 
     /// A pin whose `pinnedUntil` has passed. Lapsed pins stay on disk until something
     /// sweeps them, so every read path has to filter them out.
