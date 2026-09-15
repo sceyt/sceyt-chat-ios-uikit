@@ -3304,8 +3304,8 @@ open class ChannelViewController: ViewController,
             jumpToPinnedMessage(item)
             // A tap both takes the list to the pin on screen and hands the banner the
             // next one, so repeated taps walk the whole set — up from the newest pin the
-            // banner opens on. The walk stops on the oldest pin: a tap there re-jumps to
-            // it rather than starting over from the newest.
+            // banner opens on. The walk wraps: a tap on the oldest pin jumps to it and
+            // brings the banner back round to the newest, so tapping cycles forever.
             pinnedMessagesView.selectNext(animated: true)
         case .showList:
             showPinnedMessageList()

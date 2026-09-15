@@ -86,7 +86,9 @@ extension ChannelViewController {
             }
         }
 
-        /// Which pin is on screen. Stops at both ends — the walk never wraps round.
+        /// Which pin is on screen. The walk wraps round at both ends: stepping off the
+        /// oldest pin comes back on the newest, and stepping off the newest comes back on
+        /// the oldest.
         ///
         /// `0` only until the first pins land: `items` then moves it to the last of them,
         /// the newest pin, and every walk starts from there.
@@ -281,14 +283,26 @@ extension ChannelViewController {
 
         // MARK: - Paging
 
+        /// Moves the banner onto an arbitrary pin, out of walk order — the pinned-message
+        /// list picking a row, say. Clamps, because a caller naming an index means that
+        /// index and nothing else; the wrap belongs to the walk, in `selectNext`/
+        /// `selectPrevious`.
         open func select(index: Int, animated: Bool = false) {
             guard !items.isEmpty else { return }
-            // Clamp rather than wrap: at either end of the walk there is nothing further to
-            // page to, and the banner stays put instead of jumping to the opposite end.
             let target = min(max(index, 0), items.count - 1)
-            guard target != selectedIndex else { return }
-            let direction: PagingDirection = target > selectedIndex ? .forward : .backward
-            selectedIndex = target
+            move(to: target, direction: target > selectedIndex ? .forward : .backward, animated: animated)
+        }
+
+        /// Moves the banner onto `index` with the page running in `direction`, whichever
+        /// way the index itself steps.
+        ///
+        /// The two are only the same thing mid-walk. A wrap steps the index the whole
+        /// length of the array while the page still has to read as one more step the way
+        /// the user was already going — off the oldest pin at the top and back on at the
+        /// bottom — so the direction is passed in rather than derived from the indices.
+        open func move(to index: Int, direction: PagingDirection, animated: Bool = false) {
+            guard items.indices.contains(index), index != selectedIndex else { return }
+            selectedIndex = index
 
             guard animated else {
                 reload()
@@ -299,34 +313,39 @@ extension ChannelViewController {
             }
         }
 
-        /// Whether the walk can still go forward — toward the older pins above. `false`
-        /// once the banner is on the oldest pin, at the top segment.
+        /// Whether the walk can go forward — toward the older pins above, wrapping round to
+        /// the newest once past the top segment. `false` only while there is nothing to
+        /// page to: no pins, or a single one.
         open var canSelectNext: Bool {
-            !items.isEmpty && selectedIndex > 0
+            items.count > 1
         }
 
-        /// Whether the walk can still go back — toward the newer pins below. `false` once
-        /// the banner is on the newest pin, at the bottom segment.
+        /// Whether the walk can go back — toward the newer pins below, wrapping round to
+        /// the oldest once past the bottom segment. Same single-pin floor as `canSelectNext`.
         open var canSelectPrevious: Bool {
-            !items.isEmpty && selectedIndex < items.count - 1
+            items.count > 1
         }
 
         /// The next pin in walk order, which runs *upward* from where the banner rests:
-        /// from the newest pin at the bottom segment to the older ones above it, stopping
-        /// on the oldest.
+        /// from the newest pin at the bottom segment to the older ones above it, and off
+        /// the oldest back round to the newest.
         ///
         /// Index-wise that is a step *back* through `items`, which is ordered oldest first
         /// — the array and the walk run opposite ways on purpose, so the walk starts on the
-        /// pin a reader is most likely to care about.
+        /// pin a reader is most likely to care about. The wrap is therefore the step from
+        /// index `0` to the last index, and it pages the same way every other step does.
         open func selectNext(animated: Bool = false) {
             guard canSelectNext else { return }
-            select(index: selectedIndex - 1, animated: animated)
+            let target = selectedIndex > 0 ? selectedIndex - 1 : items.count - 1
+            move(to: target, direction: .backward, animated: animated)
         }
 
-        /// Back down the walk: toward the newer pins below, stopping on the newest.
+        /// Back down the walk: toward the newer pins below, and off the newest back round
+        /// to the oldest.
         open func selectPrevious(animated: Bool = false) {
             guard canSelectPrevious else { return }
-            select(index: selectedIndex + 1, animated: animated)
+            let target = selectedIndex < items.count - 1 ? selectedIndex + 1 : 0
+            move(to: target, direction: .forward, animated: animated)
         }
 
         /// Cross-slides `messageLabel` over a snapshot of the preview it is replacing, so a
@@ -806,8 +825,9 @@ extension ChannelViewController {
             // pin, so the walk's *previous*. Dragging down brings in the one above, which
             // is where the walk itself goes.
             if goesUp {
-                // At the end of the walk the swipe is a no-op: no page, and no jump either,
-                // so the list is left exactly where it is.
+                // With a single pin there is nothing to page to, and the swipe is a no-op:
+                // no page, and no jump either, so the list is left exactly where it is.
+                // Past either end the walk wraps instead of stopping.
                 guard canSelectPrevious else { return }
                 onAction?(.previous)
                 selectPrevious(animated: true)
