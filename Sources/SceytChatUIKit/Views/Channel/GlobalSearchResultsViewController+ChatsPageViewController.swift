@@ -187,22 +187,47 @@ extension GlobalSearchResultsViewController {
         }
 
         override open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-            switch indexPath.section {
+            cell(in: tableView, dequeueAt: indexPath, dataAt: indexPath)
+        }
+
+        /// Builds a row's cell, with the *dequeue* index path and the *data* index path given separately.
+        ///
+        /// `dequeuePath` must be the index path the table view is currently asking about.
+        /// `dequeueReusableCell(withIdentifier:for:)` books the dequeue against that index path and
+        /// raises `NSInternalInconsistencyException` ("Attempted to dequeue multiple cells for the
+        /// same index path") if a second cell is ever dequeued for it in the same layout pass.
+        ///
+        /// `dataPath` addresses this controller's own two-section model: section 0 = chats,
+        /// section 1 = messages.
+        ///
+        /// A subclass that inserts sections of its own must keep the two apart — forward the real
+        /// index path as `dequeuePath` and the translated one as `dataPath`:
+        ///
+        /// ```swift
+        /// override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        ///     super.cell(in: tableView, dequeueAt: indexPath, dataAt: IndexPath(row: indexPath.row, section: 1))
+        /// }
+        /// ```
+        ///
+        /// Calling `super.tableView(_:cellForRowAt:)` with a rewritten index path instead makes the
+        /// dequeue collide with whatever row really lives at that index path, and crashes.
+        open func cell(in tableView: UITableView, dequeueAt dequeuePath: IndexPath, dataAt dataPath: IndexPath) -> UITableViewCell {
+            switch dataPath.section {
             case 0:
-                guard channelsSnapshot.indices.contains(indexPath.row) else {
+                guard channelsSnapshot.indices.contains(dataPath.row) else {
                     return UITableViewCell()
                 }
-                let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.globalSearchChatsChannelCell)
+                let cell = tableView.dequeueReusableCell(for: dequeuePath, cellType: Components.globalSearchChatsChannelCell)
                 cell.parentAppearance = cellAppearance
-                let channel = channelsSnapshot[indexPath.row]
+                let channel = channelsSnapshot[dataPath.row]
                 cell.data = layoutModels[channel]
                 return cell
             default:
-                guard chatMessagesSnapshot.indices.contains(indexPath.row) else {
+                guard chatMessagesSnapshot.indices.contains(dataPath.row) else {
                     return UITableViewCell()
                 }
-                let message = chatMessagesSnapshot[indexPath.row]
-                let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.globalSearchMessageCell.self)
+                let message = chatMessagesSnapshot[dataPath.row]
+                let cell = tableView.dequeueReusableCell(for: dequeuePath, cellType: Components.globalSearchMessageCell.self)
                 let channel = messagesViewModel.chatMessageChannels[message.channelId]
                 cell.searchQuery = messagesViewModel.searchQuery
                 cell.messageData = channel.map { ($0, message) }
@@ -258,13 +283,24 @@ extension GlobalSearchResultsViewController {
 
         override open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
             tableView.deselectRow(at: indexPath, animated: true)
-            switch indexPath.section {
+            selectRow(at: indexPath)
+        }
+
+        /// Reports the selection of a row at `dataPath` in this controller's own section numbering
+        /// (0 = chats, 1 = messages), without touching the table view.
+        ///
+        /// Separated from `tableView(_:didSelectRowAt:)` for the same reason as
+        /// ``cell(in:dequeueAt:dataAt:)``: a subclass that inserts sections has a translated data
+        /// path, and the table view must only ever be given real ones — it deselects the row itself
+        /// and then calls this.
+        open func selectRow(at dataPath: IndexPath) {
+            switch dataPath.section {
             case 0:
-                guard channelsSnapshot.indices.contains(indexPath.row) else { return }
-                onSelect?(channelsSnapshot[indexPath.row])
+                guard channelsSnapshot.indices.contains(dataPath.row) else { return }
+                onSelect?(channelsSnapshot[dataPath.row])
             default:
-                guard chatMessagesSnapshot.indices.contains(indexPath.row) else { return }
-                let message = chatMessagesSnapshot[indexPath.row]
+                guard chatMessagesSnapshot.indices.contains(dataPath.row) else { return }
+                let message = chatMessagesSnapshot[dataPath.row]
                 let channel = messagesViewModel.chatMessageChannels[message.channelId]
                 onSelectMessage?(message, channel)
             }
