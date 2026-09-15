@@ -3031,8 +3031,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     /// after a failure both blocks link-preview updates and makes the next unrelated
     /// change event scroll to a message the user never reached.
     open func handleRepliedMessageNavigationFailure(messageId: MessageId, error: Error) {
-        logger.errorIfNotNil(error, "[ReplyNavigation] load near messages of replied message \(messageId)")
         clearPendingRepliedMessageNavigation(messageId: messageId)
+        // A jump the user superseded by tapping again is not a failure to report. Every
+        // message load shares one `MessageListQuery`, so a second tap arriving while the
+        // first load is still in flight is rejected purely for being second — the user did
+        // nothing wrong, and an alert for it is noise on top of a jump that was already
+        // being replaced. Releasing the pending navigation above is the whole remedy.
+        guard !error.isQueryInProgress else {
+            logger.info("[ReplyNavigation] jump to \(messageId) superseded by a newer one — query busy, not reported")
+            return
+        }
+        logger.errorIfNotNil(error, "[ReplyNavigation] load near messages of replied message \(messageId)")
         event = .showError(error)
     }
 
