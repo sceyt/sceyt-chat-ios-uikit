@@ -336,7 +336,8 @@ open class ChannelPinnedMessageProvider: DataProvider {
                 self.database.write {
                     $0.recordPinAttemptFailure(
                         messageTid: record.messageTid,
-                        channelId: self.channelId
+                        channelId: self.channelId,
+                        expecting: .pendingPin
                     )
                 } completion: { _ in
                     completion?(error)
@@ -400,6 +401,11 @@ open class ChannelPinnedMessageProvider: DataProvider {
     ///
     /// The row is already hidden from the UI; on success it is deleted, and on any other outcome
     /// it stays a `.pendingUnpin` intent for the next sync.
+    ///
+    /// Symmetrical with `flushPendingPin` throughout, and that symmetry is load-bearing: an unpin
+    /// can be countermanded by a fresh pin exactly as a pin can be countermanded by an unpin, and
+    /// over a dead link — where the request is handed to the SDK, held, and delivered minutes
+    /// later on reconnect — both happen with a request already outstanding.
     open func flushPendingUnpin(
         messageId: MessageId,
         messageTid: Int64,
@@ -425,6 +431,38 @@ open class ChannelPinnedMessageProvider: DataProvider {
             completion?(nil)
             return
         }
+
+        // Re-stamps "on the wire" before the request goes out, and doubles as the cancellation
+        // check, for the same reasons as the pin path: the user can pin the message again in the
+        // gap between the unpin intent being stored and this attempt starting, and sending then
+        // would unpin a message they have just asked to pin.
+        var shouldSend = false
+        database.write {
+            shouldSend = $0.recordUnpinDispatch(
+                messageTid: messageTid,
+                channelId: self.channelId
+            )
+        } completion: { [weak self] writeError in
+            guard let self else {
+                completion?(writeError)
+                return
+            }
+            guard shouldSend else {
+                logger.info("[Pin] not sending unpin for message \(messageId): the intent was cancelled before it went out")
+                completion?(writeError)
+                return
+            }
+            self.sendUnpinRequest(messageId: messageId, messageTid: messageTid, completion: completion)
+        }
+    }
+
+    /// The unpin request itself, split from `flushPendingUnpin` so the dispatch marker it depends
+    /// on is durable before anything is sent — `sendPinRequest`'s twin.
+    open func sendUnpinRequest(
+        messageId: MessageId,
+        messageTid: Int64,
+        completion: ((Error?) -> Void)? = nil
+    ) {
         logger.info("[Pin] sending unpin: message \(messageId), channel \(channelId)")
         channelOperator.unpinMessages(ids: [NSNumber(value: messageId)]) { [weak self] _, error in
             guard let self else {
@@ -434,9 +472,15 @@ open class ChannelPinnedMessageProvider: DataProvider {
             self.database.write {
                 if let error {
                     logger.error("[Pin] unpin FAILED: message \(messageId), channel \(self.channelId), error \(error). The intent stays queued for the next sync.")
-                    $0.recordPinAttemptFailure(messageTid: messageTid, channelId: self.channelId)
+                    $0.recordPinAttemptFailure(
+                        messageTid: messageTid,
+                        channelId: self.channelId,
+                        expecting: .pendingUnpin
+                    )
                 } else {
                     logger.info("[Pin] unpin SUCCESS: message \(messageId), channel \(self.channelId)")
+                    // A no-op when the user has pinned the message again in the meantime; see
+                    // `confirmUnpin`.
                     $0.confirmUnpin(messageTid: messageTid, channelId: self.channelId)
                 }
             } completion: { writeError in

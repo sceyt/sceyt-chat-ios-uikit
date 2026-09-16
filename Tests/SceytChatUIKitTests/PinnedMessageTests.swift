@@ -294,6 +294,169 @@ final class PinnedMessageTests: XCTestCase {
         XCTAssertEqual(PinnedMessageDTO.fetchAll(channelId: channelId, context: ctx).count, 1)
     }
 
+    /// The repro this guards: with the link at 100% packet loss, unpin a *pinned* message, then
+    /// pin it again, then restore the link.
+    ///
+    /// Both requests were handed to the SDK over the dead socket and both are delivered on
+    /// reconnect. The unpin's ack arriving second must not delete the row it now finds — that row
+    /// is the re-pin's intent, and deleting it (with the mirror) left the bubble unpinned while
+    /// the server had the message pinned. The mirror image of
+    /// `testConfirmPin_afterAnUnpin_leavesTheIntentStandingAndAnnouncesNothing`.
+    func testConfirmUnpin_afterARePin_leavesThePinIntentStanding() {
+        let message = seedMessage(id: 85, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 605
+        row?.sync = .synced
+        try? ctx.save()
+
+        // Unpin, request dispatched, no ack yet.
+        ctx.unpinMessage(id: 85, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+        XCTAssertTrue(pinRow(tid: 85)?.wasSentToServer ?? false)
+
+        // Pin again, also dispatched.
+        pin(message)
+        XCTAssertTrue(ctx.recordPinDispatch(messageTid: message.tid, channelId: channelId))
+        try? ctx.save()
+
+        // Reconnect: the queued unpin lands.
+        ctx.confirmUnpin(messageTid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 85)?.sync, .pendingPin, "the unpin's ack must not bury the re-pin")
+        XCTAssertEqual(message.pinDetails?.isPinned, true, "and the bubble keeps the pin the user asked for")
+        XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 1)
+        XCTAssertEqual(
+            pinRow(tid: 85)?.serverPinId, PinnedMessageDTO.unknownServerPinId,
+            "pin 605 was removed by the unpin that just landed — only this pin's own ack can name the row now"
+        )
+
+        // And then the queued pin lands, with the id the server gave it.
+        XCTAssertTrue(
+            ctx.confirmPin(messageTid: message.tid, channelId: channelId,
+                           serverPinId: 606, pinnedUntil: nil, scope: .forAll),
+            "the re-pin still completes its intent — and posts its one \"X pinned\""
+        )
+        try? ctx.save()
+        XCTAssertEqual(pinRow(tid: 85)?.sync, .synced)
+        XCTAssertEqual(pinRow(tid: 85)?.serverPinId, 606)
+    }
+
+    /// The same two acks in the other order. The pin's ack lands first and syncs the row; the
+    /// unpin's ack is then just as stale and must not delete it either.
+    func testConfirmUnpin_afterARePinAlreadyAcked_changesNothing() {
+        let message = seedMessage(id: 86, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 607
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 86, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+        pin(message)
+        ctx.recordPinDispatch(messageTid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        ctx.confirmPin(messageTid: message.tid, channelId: channelId,
+                       serverPinId: 608, pinnedUntil: nil, scope: .forAll)
+        try? ctx.save()
+        ctx.confirmUnpin(messageTid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 86)?.sync, .synced, "the stale unpin ack must not undo a confirmed pin")
+        XCTAssertEqual(pinRow(tid: 86)?.serverPinId, 608, "nor overwrite the id that pin was given")
+        XCTAssertEqual(message.pinDetails?.isPinned, true)
+    }
+
+    /// The other half of that race, mirroring `testRecordPinDispatch_refusesACancelledIntent`:
+    /// the user pins again *before* the unpin attempt starts, so the unpin must be called off.
+    func testRecordUnpinDispatch_refusesAnIntentTakenBackByARePin() {
+        let message = seedMessage(id: 87, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 609
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 87, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertTrue(
+            ctx.recordUnpinDispatch(messageTid: message.tid, channelId: channelId),
+            "while the row is the unpin intent, the request goes out"
+        )
+        pin(message)
+        try? ctx.save()
+
+        XCTAssertFalse(
+            ctx.recordUnpinDispatch(messageTid: message.tid, channelId: channelId),
+            "the row is a pin intent again — the unpin must not go out"
+        )
+        XCTAssertEqual(pinRow(tid: 87)?.sync, .pendingPin)
+    }
+
+    /// A pin re-taken while its unpin is in flight must not keep the dying pin's id: `deletePin`
+    /// and `reconcilePins` both match rows by it, so the id is how the unpin comes back to haunt
+    /// the new intent.
+    func testPinMessage_dropsTheServerPinIdOfAnUnpinAlreadyOnTheWire() {
+        let message = seedMessage(id: 88, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 610
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 88, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        pin(message)
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 88)?.sync, .pendingPin)
+        XCTAssertEqual(pinRow(tid: 88)?.serverPinId, PinnedMessageDTO.unknownServerPinId)
+    }
+
+    /// And the event path: the server's own `didUnpinMessages` for the unpin the user took back
+    /// arrives naming the dead pin id, which is still what finds this row when the id has not
+    /// been dropped yet. It must not delete a pending pin either.
+    func testDeletePin_leavesAPendingPinIntentAlone() {
+        let message = seedMessage(id: 89, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 611
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 89, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+        // Re-pinned, but with the old id still on the row (an intent stored before this fix, or
+        // one whose id the server re-used).
+        pin(message)
+        pinRow(tid: 89)?.serverPinId = 611
+        try? ctx.save()
+
+        ctx.deletePin(serverPinId: 611, messageId: 89, channelId: channelId)
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 89)?.sync, .pendingPin, "the unpin event must not bury the re-pin")
+        XCTAssertEqual(message.pinDetails?.isPinned, true)
+    }
+
+    /// A failed unpin attempt is no longer this row's business once the user has pinned again:
+    /// bumping the retry count would re-date an intent that has not been tried.
+    func testRecordPinAttemptFailure_ignoresAFailureForAnIntentThatIsGone() {
+        let message = seedMessage(id: 90, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 612
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 90, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+        pin(message)
+        try? ctx.save()
+        let attemptedAt = pinRow(tid: 90)?.lastAttemptAt
+
+        ctx.recordPinAttemptFailure(messageTid: message.tid, channelId: channelId, expecting: .pendingUnpin)
+        try? ctx.save()
+
+        XCTAssertEqual(pinRow(tid: 90)?.retryCount, 0, "the pin intent never had a failed attempt")
+        XCTAssertEqual(pinRow(tid: 90)?.lastAttemptAt, attemptedAt)
+        XCTAssertEqual(pinRow(tid: 90)?.sync, .pendingPin)
+    }
+
     func testConfirmUnpin_dropsTheRowAndTheMirror() {
         let message = seedMessage(id: 74, channelId: channelId)
         let row = pin(message)

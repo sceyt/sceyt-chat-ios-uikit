@@ -88,11 +88,21 @@ public protocol PinnedMessageDatabaseSession {
         scope: PinnedMessage.Scope
     ) -> Bool
 
-    /// The server acked an unpin; drop the intent and its row.
+    /// The server acked an unpin; drop the intent and its row — **unless** the row has since
+    /// become a pin intent again, in which case the ack is stale and changes nothing.
     func confirmUnpin(messageTid: Int64, channelId: ChannelId)
 
     /// Records that an attempt was made and failed, so the retry has a trail.
-    func recordPinAttemptFailure(messageTid: Int64, channelId: ChannelId)
+    ///
+    /// - Parameter state: The intent the failed attempt was for. The row is left alone when it
+    ///   no longer carries that intent — the user has since asked for the opposite, and the
+    ///   failure belongs to a request that is no longer this row's business. `nil` skips the
+    ///   check.
+    func recordPinAttemptFailure(
+        messageTid: Int64,
+        channelId: ChannelId,
+        expecting state: PinnedMessageDTO.StoredSyncState?
+    )
 
     /// Marks a pin intent as about to go out, and answers whether it still should.
     ///
@@ -100,6 +110,14 @@ public protocol PinnedMessageDatabaseSession {
     /// the attempt was being prepared — and the caller must not send.
     @discardableResult
     func recordPinDispatch(messageTid: Int64, channelId: ChannelId) -> Bool
+
+    /// The `recordPinDispatch` mirror for the other direction: marks an unpin intent as about to
+    /// go out, and answers whether it still should.
+    ///
+    /// `false` means the row is gone or is no longer a pending unpin — the user pinned the
+    /// message again while the attempt was being prepared — and the caller must not send.
+    @discardableResult
+    func recordUnpinDispatch(messageTid: Int64, channelId: ChannelId) -> Bool
 
     /// Applies the pin state the server sends nested on a message.
     func applyPinDetails(_ pin: SceytChat.PinDetails?, to dto: MessageDTO)
@@ -159,10 +177,17 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
         pin.pinnedAt = pinnedAt.bridgeDate
         pin.pinnedUntil = pinnedUntil?.bridgeDate
         pin.pinnedByUserId = userId
+        // Read before the flip: this pin countermands an unpin that is already on the wire, so
+        // the id the server gave the pin being removed is about to stop existing.
+        let countermandsSentUnpin = pin.sync == .pendingUnpin && pin.wasSentToServer
         pin.sync = .pendingPin
         // The server has not told us this pin's id yet. The sentinel sorts it at the newest-pin
         // end of the banner (see `defaultSortDescriptors`) until `confirmPin` replaces it.
-        if !pin.hasServerPinId {
+        //
+        // A dead id is worse than no id: `deletePin` and `reconcilePins` both match rows by it,
+        // so the unpin event for the pin this one is countermanding would come back and delete
+        // *this* intent. Drop it and let this pin's own ack supply the real one.
+        if !pin.hasServerPinId || countermandsSentUnpin {
             pin.serverPinId = PinnedMessageDTO.unknownServerPinId
         }
         // `lastAttemptAt` is deliberately *not* stamped here. It means "a request has gone out",
@@ -356,6 +381,20 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
             ?? PinnedMessageDTO.fetch(messageId: messageId, channelId: channelId, context: self)
 
         if let pin {
+            // The unpin this event reports is one the user has already countermanded by pinning
+            // the message again: the row is that new intent — and it may be what this event
+            // matched on, since a countermanded row can still carry the dying pin's id.
+            // Deleting it, and clearing the mirror with it, is what loses the re-pin. The pin's
+            // own ack, or the next sweep, settles the row.
+            //
+            // Narrowed to an intent that has been on the wire, because that is the only way this
+            // row can be the countermand of an unpin *this device* sent. A pin that never left
+            // is about some other device's unpin, and there the server's news is the better
+            // answer — which is the existing behaviour.
+            guard !(pin.sync == .pendingPin && pin.wasSentToServer) else {
+                logger.info("deletePin: unpin event for pin \(serverPinId) ignored — message tid \(pin.messageTid) has been pinned again locally and that pin is already on the wire")
+                return
+            }
             delete(pin)
         }
         if messageId != 0, let message = MessageDTO.fetch(id: messageId, context: self) {
@@ -533,6 +572,28 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
             context: self
         ) else { return }
 
+        // The user pinned the message again while this unpin was in flight, and this is that
+        // unpin landing — minutes later, because the SDK holds a request made over a dead socket
+        // and delivers it on reconnect. The row is no longer this intent's to delete: dropping it
+        // and clearing the mirror is what left the bubble unpinned while the server had it
+        // pinned, with nothing on disk to say so. The pin intent stands, and its own ack or the
+        // next drain resolves it.
+        //
+        // The exact mirror of `confirmPin`'s refusal to revive a `.pendingUnpin` row. `.synced`
+        // lands here too: it means the re-pin's ack has already arrived, and this ack is just as
+        // stale — only `confirmPin` and `storePin` can reach that state, and both of those are
+        // newer news than an unpin the user has already taken back.
+        guard pin.sync == .pendingUnpin else {
+            logger.info("[Pin] unpin acked after message tid \(messageTid) was pinned again; the \(pin.sync) intent stands")
+            // The unpin *did* apply, so whatever id the server gave the pin it removed is gone.
+            // Only the pin now on its way can name this row, and `confirmPin` will stamp it.
+            // A `.synced` row already carries that newer id — leave it alone.
+            if pin.sync == .pendingPin {
+                pin.serverPinId = PinnedMessageDTO.unknownServerPinId
+            }
+            return
+        }
+
         if let message = resolveMessage(
             id: MessageId(pin.messageId),
             tid: pin.messageTid,
@@ -543,12 +604,23 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
         delete(pin)
     }
 
-    public func recordPinAttemptFailure(messageTid: Int64, channelId: ChannelId) {
+    public func recordPinAttemptFailure(
+        messageTid: Int64,
+        channelId: ChannelId,
+        expecting state: PinnedMessageDTO.StoredSyncState? = nil
+    ) {
         guard let pin = PinnedMessageDTO.fetch(
             messageTid: messageTid,
             channelId: channelId,
             context: self
         ) else { return }
+        // The failure belongs to the intent that was sent, not to whatever the row says now. If
+        // the user has asked for the opposite since, this attempt's retry count and date are no
+        // longer about this row — bumping them would re-date an intent that has not been tried.
+        if let state, pin.sync != state {
+            logger.info("[Pin] failed \(state) attempt for message tid \(messageTid) ignored — the row is \(pin.sync) now")
+            return
+        }
         pin.retryCount = pin.retryCount &+ 1
         pin.lastAttemptAt = Int64(Date().timeIntervalSince1970 * 1000)
     }
@@ -566,6 +638,24 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
         // so this is the whole of that race — and sending now would pin a message the user has
         // already unpinned, with no intent left to undo it.
         guard pin.sync == .pendingPin else { return false }
+
+        pin.lastAttemptAt = Int64(Date().timeIntervalSince1970 * 1000)
+        return true
+    }
+
+    @discardableResult
+    public func recordUnpinDispatch(messageTid: Int64, channelId: ChannelId) -> Bool {
+        guard let pin = PinnedMessageDTO.fetch(
+            messageTid: messageTid,
+            channelId: channelId,
+            context: self
+        ) else { return false }
+
+        // The same race as `recordPinDispatch`, from the other side: the user pinned the message
+        // again between the unpin intent being stored and this attempt being prepared. Sending
+        // now would unpin a message they have just pinned, and the row that would have to undo
+        // it is the pin intent itself.
+        guard pin.sync == .pendingUnpin else { return false }
 
         pin.lastAttemptAt = Int64(Date().timeIntervalSince1970 * 1000)
         return true

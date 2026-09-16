@@ -922,6 +922,67 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         XCTAssertNil(pinRow(tid: 811))
     }
 
+    /// The user pins the message again before the queued unpin's attempt starts. Sending it
+    /// would unpin what they just asked to pin, and the row that would have to undo that is the
+    /// pin intent itself — the mirror of `testFlushPendingPin_whenTheIntentWasCancelledFirst_sendsNothing`.
+    func testFlushPendingUnpin_whenTheMessageWasPinnedAgainFirst_sendsNothing() {
+        let provider = MockPinnedMessageProvider(channelId: channelId)
+        let message = seedMessage(id: 812, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 904
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 812, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+        pin(message)   // taken back
+
+        let done = expectation(description: "called off")
+        provider.flushPendingUnpin(messageId: 812, messageTid: message.tid) { error in
+            XCTAssertNil(error)
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 5)
+
+        XCTAssertTrue(provider.mockOperator.unpinnedIds.isEmpty)
+        ctx.refreshAllObjects()
+        XCTAssertEqual(pinRow(tid: 812)?.sync, .pendingPin, "the pin the user re-took stands")
+    }
+
+    /// The 100%-packet-loss repro, through the provider: the unpin request went out over the dead
+    /// link (`sendUnpinRequest` — past the dispatch check, which is where it was when the socket
+    /// died), the user pinned the message again, and now the reconnect delivers the unpin's ack.
+    /// It must not take the re-pin down with it.
+    func testUnpinAckArrivingAfterARePin_keepsThePinAndItsIntent() {
+        let provider = MockPinnedMessageProvider(channelId: channelId)
+        let message = seedMessage(id: 813, channelId: channelId)
+        let row = pin(message)
+        row?.serverPinId = 905
+        row?.sync = .synced
+        try? ctx.save()
+        ctx.unpinMessage(id: 813, tid: message.tid, channelId: channelId)
+        try? ctx.save()
+        pin(message)
+        ctx.recordPinDispatch(messageTid: message.tid, channelId: channelId)
+        try? ctx.save()
+
+        let done = expectation(description: "unpin acked")
+        provider.sendUnpinRequest(messageId: 813, messageTid: message.tid) { error in
+            XCTAssertNil(error)
+            done.fulfill()
+        }
+        wait(for: [done], timeout: 5)
+
+        XCTAssertEqual(provider.mockOperator.unpinnedIds, [[NSNumber(value: 813)]])
+        ctx.refreshAllObjects()
+        XCTAssertEqual(pinRow(tid: 813)?.sync, .pendingPin,
+                       "the stale ack must leave the pin intent for the sync to drain")
+        XCTAssertEqual(
+            MessageDTO.fetch(id: 813, context: ctx)?.pinDetails?.isPinned, true,
+            "and the bubble must keep the pin — losing it here is the bug"
+        )
+        XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 1)
+    }
+
     // MARK: - Draining the queue
 
     /// `flushPendingIntent` is what `PinResendOperation` calls; it has to pick the direction from
