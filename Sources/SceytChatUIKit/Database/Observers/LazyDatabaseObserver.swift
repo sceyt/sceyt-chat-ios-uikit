@@ -59,7 +59,27 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
     @Atomic private var updatedObjectIDs: Set<NSManagedObjectID> = []
     
     @Atomic public private(set) var isObserverStarted = false
-    @Atomic private var isObserverRestarting = false
+    @Atomic public private(set) var isObserverRestarting = false
+
+    /// A restart requested while one is already in flight. Only the newest is kept —
+    /// two re-anchors racing each other can only mean the user changed their mind, so
+    /// the older window is never worth fetching — but every superseded request's
+    /// `completion` is carried along and fired when the surviving restart lands, so
+    /// callers that flip state back in it (`isRestartingMessageObserver = .none`) are
+    /// never left hanging. Drained from `startObserver`'s completion, after the
+    /// in-flight restart's `onDidChange` has been delivered: during a restart
+    /// `currentCaches` serves `tmpCaches`, so starting the next one any earlier would
+    /// render the previous window for this landing.
+    private struct PendingRestart {
+        var fetchPredicate: NSPredicate
+        var offset: Int?
+        var completions: [() -> Void]
+    }
+    private var pendingRestart: PendingRestart?
+    /// Serialises the "is a restart in flight / is one queued" decision with the
+    /// flag flips it depends on. Recursive because `restartObserver` is legitimately
+    /// re-entered from a restart's own `completion`.
+    private let restartGate = NSRecursiveLock()
     
     public var viewContext: NSManagedObjectContext {
         SceytChatUIKit.shared.database.viewContext
@@ -133,31 +153,76 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 self.isObserverRestarting = false
                 self.onDidChange?(true, path, userInfo)
                 completion?()
+                self.drainPendingRestartIfNeeded()
             }
         }
         addObservers()
     }
+
+    /// Runs the restart that arrived while the previous one was in flight, if any.
+    /// A restart issued from inside the `completion` above goes into the slot too
+    /// (`pendingRestart != nil` is checked before `isObserverRestarting`), replacing
+    /// whatever was queued and inheriting its completions — so "latest wins" holds
+    /// across the completion window as well.
+    private func drainPendingRestartIfNeeded() {
+        restartGate.lock()
+        let pending = pendingRestart
+        pendingRestart = nil
+        restartGate.unlock()
+        guard let pending else { return }
+        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] running queued restart")
+        restartObserver(fetchPredicate: pending.fetchPredicate, offset: pending.offset) {
+            pending.completions.forEach { $0() }
+        }
+    }
     
     open func stopObserver() {
+        restartGate.lock()
         isObserverStarted = false
+        isObserverRestarting = false
+        // The observer is being torn down, so a queued re-anchor has nothing to land
+        // on; its completions are deliberately not fired. Every caller that stops also
+        // replaces the observer (see `ChannelViewModel.updateLocalChannel`).
+        pendingRestart = nil
+        restartGate.unlock()
         clearCache()
         removeObservers()
     }
     
+    /// Re-anchors the observer on a new predicate/offset.
+    ///
+    /// Returns `true` when the restart started now, `false` when one was already in
+    /// flight and this request was queued behind it (latest wins, see
+    /// `PendingRestart`). Either way the restart is guaranteed to run — or to be
+    /// discarded only by `stopObserver` — and `completion` is guaranteed to fire when
+    /// the restart that finally lands does.
+    @discardableResult
     open func restartObserver(
         fetchPredicate: NSPredicate,
         offset: Int? = nil,
-        completion: (() -> Void)? = nil) {
+        completion: (() -> Void)? = nil) -> Bool {
             logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver")
-            if isObserverRestarting {
-                logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver SKIPPED (already restarting)")
-                return
+            restartGate.lock()
+            if isObserverRestarting || pendingRestart != nil {
+                var completions = pendingRestart?.completions ?? []
+                if let completion {
+                    completions.append(completion)
+                }
+                pendingRestart = PendingRestart(
+                    fetchPredicate: fetchPredicate,
+                    offset: offset,
+                    completions: completions
+                )
+                restartGate.unlock()
+                logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] restartObserver QUEUED (already restarting)")
+                return false
             }
             if isObserverStarted {
                 tmpCaches = mainCaches.copy()
             }
             isObserverRestarting = true
             isObserverStarted = false
+            restartGate.unlock()
             removeObservers()
             writeCache {
                 self.fetchPredicate = fetchPredicate
@@ -168,6 +233,7 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                 fetchPredicate: fetchPredicate,
                 completion: completion
             )
+            return true
         }
     
     open func update(predicate: NSPredicate, fetchOffset: Int = Int.max) {

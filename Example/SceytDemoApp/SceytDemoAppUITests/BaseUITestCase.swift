@@ -118,6 +118,8 @@ class BaseUITestCase: XCTestCase {
                    injectBurstCount: Int = 6,
                    injectOnKeyboardDelayMs: Int? = nil,
                    restartObserverOnOpenDelayMs: Int? = nil,
+                   messagesFetchLimit: Int? = nil,
+                   nearLoadLocalDelayMs: Int? = nil,
                    messageStormPairs: Int? = nil,
                    messageStormIntervalMs: Int = 300,
                    messageStormStartMs: Int = 1500,
@@ -200,6 +202,12 @@ class BaseUITestCase: XCTestCase {
         }
         if let delayMs = restartObserverOnOpenDelayMs {
             app.launchArguments += ["--uitest-restart-observer-on-open=\(delayMs)"]
+        }
+        if let limit = messagesFetchLimit {
+            app.launchArguments += ["--uitest-messages-fetch-limit=\(limit)"]
+        }
+        if let delayMs = nearLoadLocalDelayMs {
+            app.launchArguments += ["--uitest-near-load-local=\(delayMs)"]
         }
         if let pairs = messageStormPairs {
             app.launchArguments +=

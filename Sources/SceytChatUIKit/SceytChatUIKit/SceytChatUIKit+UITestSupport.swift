@@ -845,6 +845,21 @@ extension SceytChatUIKit {
     /// UI-test only.
     public static var uiTestPinRequestsCompleteLocally = false
 
+    /// Answers "load the messages around X" locally, from the seeded database, after
+    /// this many milliseconds instead of asking the server.
+    ///
+    /// A jump to a reply's quoted parent that is outside the loaded window has to fetch
+    /// the page around it first, and UI-test mode never connects — so that whole path,
+    /// and every rapid-tap race on it, was unreachable from a UI test. The stand-in does
+    /// exactly what the real load's side effects are for the caller: it records the load
+    /// range (which the observer's `restartToNear` reads back) and completes with the
+    /// ids it covered. Like the SDK's query it is single-flight: a request made while
+    /// one is pending is rejected with the SDK's own "query in progress" code, so the
+    /// view model's handling of that rejection is exercised, not bypassed.
+    ///
+    /// UI-test only.
+    public static var uiTestNearLoadCompletesLocallyDelayMs: Int?
+
     /// Hands out the synthetic pin ids `uiTestPinRequestsCompleteLocally` stamps, ascending so
     /// the banner's pin-id ordering is exercised too.
     static func nextUITestPinId() -> Int64 {

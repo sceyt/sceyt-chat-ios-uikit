@@ -117,6 +117,24 @@ enum UITestSupport {
         launchArgumentValue("--uitest-conversation-tail-count")
     }
 
+    /// `--uitest-messages-fetch-limit=N` — shrinks the message window the conversation
+    /// opens with (`ChannelViewModel.messagesFetchLimit`, 50 by default). With the
+    /// default every seeded message fits in one window, so a reply's quoted parent is
+    /// always cached and the load-then-restart path a jump takes for an old parent —
+    /// where the rapid-tap bugs live — can never be reached from a UI test.
+    private static var messagesFetchLimitOverride: Int? {
+        launchArgumentValue("--uitest-messages-fetch-limit")
+    }
+
+    /// `--uitest-near-load-local=<ms>` — answers the "load messages around X" server
+    /// request locally, from the seeded database, after this many milliseconds
+    /// (`SceytChatUIKit.uiTestNearLoadCompletesLocallyDelayMs`). UI-test mode never
+    /// connects, so without it a jump to a parent outside the window fails with
+    /// "not connected". The delay is what makes rapid taps race the way they do live.
+    private static var nearLoadLocalDelayMs: Int? {
+        launchArgumentValue("--uitest-near-load-local")
+    }
+
     /// `--uitest-conversation-unread-long` — makes the parametrized unread tail
     /// use long multi-line bodies instead of one-liners, so the newest cells are
     /// several lines tall. Exposes initial-scroll positions computed from
@@ -305,6 +323,12 @@ enum UITestSupport {
         // read by the screens that would show them, not by the writes.
         if isPinningDisabled {
             SceytChatUIKit.shared.config.isMessagePinningEnabled = false
+        }
+        if let limit = messagesFetchLimitOverride {
+            ChannelViewModel.messagesFetchLimit = UInt(limit)
+        }
+        if let delayMs = nearLoadLocalDelayMs {
+            SceytChatUIKit.uiTestNearLoadCompletesLocallyDelayMs = delayMs
         }
         if isReplyAttachment {
             seedReplyAttachmentConversation()

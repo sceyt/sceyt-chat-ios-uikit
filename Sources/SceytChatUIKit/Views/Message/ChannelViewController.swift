@@ -1260,6 +1260,11 @@ open class ChannelViewController: ViewController,
         // (or scrollToBottom() below) can actually land at the bottom.
         pinnedScrollMessageId = 0
         userSelectOnRepliedMessage = nil
+        // Cancel a reply jump still loading before deciding how to reach the tail.
+        // `resetToInitialStateIfNeeded` does this itself when it restarts, but when the
+        // window is already the tail one it returns false without touching the view
+        // model, and the late landing would then override the scrollToBottom() below.
+        channelViewModel.cancelPendingReplyNavigation()
         if !channelViewModel.resetToInitialStateIfNeeded() {
             scrollToBottom()
         }
@@ -3380,6 +3385,11 @@ open class ChannelViewController: ViewController,
                                             object: (userSelectOnRepliedMessage.id, MessageCell.HighlightMode.none))
         }
         
+        // This branch never goes through the view model, so nothing there would notice
+        // that the forward jump (still loading the parent over the network, if the user
+        // was quick) has been superseded. Cancel it, or it lands on the parent after
+        // the user asked for the reply.
+        channelViewModel.cancelPendingReplyNavigation()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             // Deliberately no highlight on this jump: it returns the user from the

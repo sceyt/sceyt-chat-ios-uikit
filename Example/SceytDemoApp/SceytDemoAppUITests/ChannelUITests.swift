@@ -34,11 +34,15 @@ final class ChannelUITests: BaseUITestCase {
     /// Launches the conversation fixture and opens the channel screen.
     private func openConversation(unread: Bool = false,
                                   inject: Bool = false,
-                                  tailCount: Int? = nil) {
+                                  tailCount: Int? = nil,
+                                  fetchLimit: Int? = nil,
+                                  nearLoadDelayMs: Int? = nil) {
         app = launchApp(injectionEnabled: inject,
                         conversation: !unread,
                         conversationUnread: unread,
-                        conversationTailCount: tailCount)
+                        conversationTailCount: tailCount,
+                        messagesFetchLimit: fetchLimit,
+                        nearLoadLocalDelayMs: nearLoadDelayMs)
         list = ChannelListScreen(app: app)
         screen = ChannelScreen(app: app)
 
@@ -326,6 +330,80 @@ final class ChannelUITests: BaseUITestCase {
         assertReturnedToReply()
     }
 
+    // MARK: - Reply, quoted parent outside the loaded window
+
+    /// The three tests below drive the path a jump takes when the quoted parent is *not*
+    /// in the loaded window: a server round trip (answered locally after
+    /// `Self.nearLoadDelayMs`), then an observer restart around the parent. Every
+    /// rapid-tap bug lived on that path; with the default 50-message window the whole
+    /// fixture is cached and none of it could be reached.
+
+    /// A return tap right after the forward jump landed, inside the second the landing
+    /// keeps its target armed for the highlight. That landing's delayed reset used to
+    /// wipe the return jump's freshly armed target, so the restart's first change event
+    /// had nothing to scroll to and the list stayed wherever the new window put it.
+    func test_returnTapInsideHighlightGrace_returnsToReply() {
+        openLoaderReplyFixture()
+
+        jumpToQuotedMessageFromReply()
+
+        XCTAssertTrue(screen.scrollDownButton.waitForExistence(timeout: 5),
+                      "The scroll-down button should be showing while parked on the quoted message")
+        // No settling: the tap has to land well inside the landing's 1 s grace.
+        screen.scrollDownButton.tap()
+        assertReturnedToReply(timeout: Self.loaderJumpTimeout)
+    }
+
+    /// A return tap before the forward jump has even landed. The reply is still in the
+    /// window, so the return is an immediate local scroll — and the forward jump, still
+    /// loading its parent, must not land on it afterwards.
+    func test_returnTapBeforeForwardJumpLands_staysOnReply() {
+        openLoaderReplyFixture()
+
+        let reply = scrollReplyIntoView()
+        let preview = screen.replyView(in: reply)
+        XCTAssertTrue(preview.waitForExistence(timeout: 5),
+                      "The reply message should render a quoted preview")
+        preview.tap()
+        XCTAssertTrue(screen.scrollDownButton.waitForExistence(timeout: 5),
+                      "The scroll-down button should be showing next to the reply")
+        screen.scrollDownButton.tap()
+
+        // Give the superseded forward jump every chance to land wrongly.
+        XCTAssertFalse(waitFor(timeout: Self.loaderJumpTimeout) {
+            self.screen.cell(Convo.repliedToId).isHittable
+        }, "The forward jump was superseded by the return tap and must not land on the quoted message")
+        XCTAssertTrue(reply.isHittable,
+                      "The list should have stayed on the reply; hittable cells: \(hittableMessageCellIds())")
+    }
+
+    /// Two quick taps on the same quoted preview. The server query is single-flight, so
+    /// the second tap used to be rejected as "query in progress" and — worse — release
+    /// the first tap's target while its load was still running, leaving the list on an
+    /// unscrolled window and the user with an error alert. Now the second tap waits for
+    /// the first load and the parent is reached exactly once, with no alert.
+    func test_doubleTapReplyPreview_landsOnParentOnce() {
+        openLoaderReplyFixture()
+
+        let reply = scrollReplyIntoView()
+        let preview = screen.replyView(in: reply)
+        XCTAssertTrue(preview.waitForExistence(timeout: 5),
+                      "The reply message should render a quoted preview")
+        // Two taps on the same screen point, captured once: `XCUIElement.tap()` re-resolves
+        // the element each time, and once the first load lands the reply is outside the
+        // restarted window — the second tap would then fail to find it rather than race it.
+        let point = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: preview.frame.midX, dy: preview.frame.midY))
+        point.tap()
+        point.tap()
+
+        XCTAssertTrue(waitFor(timeout: Self.loaderJumpTimeout) {
+            self.screen.cell(Convo.repliedToId).isHittable
+        }, "Both taps asked for the quoted message; it should be reached; hittable cells: \(hittableMessageCellIds())")
+        XCTAssertFalse(app.alerts.firstMatch.exists,
+                       "A superseded tap is not an error the user should see")
+    }
+
     // MARK: - Navigation
 
     func test_backButton_returnsToChannelList() {
@@ -341,17 +419,46 @@ final class ChannelUITests: BaseUITestCase {
     /// cannot clamp to the bottom, while still being only a few swipes away.
     private static let replyReturnTailCount = 15
 
+    /// Window size for the loader-path tests: 19 seeded messages + the 15-message tail
+    /// is 34, so a 20-message window opens on the tail with the reply (index 18) inside
+    /// it and the quoted parent (index 1) outside — every jump to the parent, and every
+    /// return from the parent's window to the reply, has to go through the loader.
+    private static let loaderFetchLimit = 20
+
+    /// How long the local stand-in for the "load messages around X" request takes.
+    /// Long enough that a second tap reliably arrives while the first is in flight — an
+    /// XCUITest tap can take the better part of a second to resolve and settle — and that
+    /// a return tap after a landing reliably falls inside the landing's 1 s grace.
+    private static let nearLoadDelayMs = 3000
+
+    /// A jump through the loader takes `nearLoadDelayMs` plus the restart; a deferred one
+    /// takes two loads.
+    private static let loaderJumpTimeout: TimeInterval = 12
+
     private var newestTailCell: XCUIElement { screen.cell(Convo.tailId(Self.replyReturnTailCount)) }
 
-    /// Scrolls the reply into view, taps its quoted preview, and waits for the jump to
-    /// the quoted message to land — the starting state both return-jump tests assert from.
-    private func jumpToQuotedMessageFromReply() {
+    private func openLoaderReplyFixture() {
+        openConversation(tailCount: Self.replyReturnTailCount,
+                         fetchLimit: Self.loaderFetchLimit,
+                         nearLoadDelayMs: Self.nearLoadDelayMs)
+    }
+
+    /// Scrolls up from the tail until the reply is on screen.
+    @discardableResult
+    private func scrollReplyIntoView() -> XCUIElement {
         let reply = screen.cell(Convo.replyMessageId)
         XCTAssertTrue(waitFor(timeout: 15) {
             if reply.exists, reply.isHittable { return true }
             self.screen.collectionView.swipeDown()
             return false
         }, "The reply message should be reachable by scrolling up from the tail")
+        return reply
+    }
+
+    /// Scrolls the reply into view, taps its quoted preview, and waits for the jump to
+    /// the quoted message to land — the starting state the return-jump tests assert from.
+    private func jumpToQuotedMessageFromReply() {
+        let reply = scrollReplyIntoView()
 
         let preview = screen.replyView(in: reply)
         XCTAssertTrue(preview.waitForExistence(timeout: 5),
@@ -376,8 +483,8 @@ final class ChannelUITests: BaseUITestCase {
 
     /// The assertion the bug fails: the button lands back on the reply, and *not* on the
     /// newest message. The second half is what separates the fix from a jump to the bottom.
-    private func assertReturnedToReply() {
-        XCTAssertTrue(waitFor(timeout: 10) { self.screen.cell(Convo.replyMessageId).isHittable },
+    private func assertReturnedToReply(timeout: TimeInterval = 10) {
+        XCTAssertTrue(waitFor(timeout: timeout) { self.screen.cell(Convo.replyMessageId).isHittable },
                       "The scroll-down button should return to the reply that was tapped; "
                       + "hittable cells: \(hittableMessageCellIds())")
         XCTAssertFalse(newestTailCell.isHittable,

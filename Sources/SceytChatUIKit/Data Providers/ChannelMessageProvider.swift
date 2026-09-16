@@ -302,27 +302,32 @@ open class ChannelMessageProvider: DataProvider {
         triggerMessage: MessageId? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
+        let startMessageId = messages.min(by: { $0.id < $1.id})?.id
+        let endMessageId = messages.max(by: { $0.id < $1.id})?.id
         database.write ({
             $0.createOrUpdate(
                 messages: messages,
                 channelId: self.channelId
             )
         }) { error in
-            completion?(error)
-        }
-        
-        guard let startMessageId = messages.min(by: { $0.id < $1.id})?.id,
-              let endMessageId = messages.max(by: { $0.id < $1.id})?.id
-        else { return }
-        
-        database.performWriteTask {
-            $0.updateRanges(
-                startMessageId: startMessageId,
-                endMessageId: endMessageId,
-                triggerMessage: triggerMessage,
-                channelId: self.channelId)
-        } completion: { _ in
-            
+            // The range is written on its own context, unordered against the message
+            // write above, and every caller re-anchors the observer from `completion` —
+            // `restartToNear` reads the ranges back (`maxRange`) to build its window.
+            // Completing before the range has landed hands that lookup a stale or
+            // missing range, so the completion waits for both writes.
+            guard error == nil, let startMessageId, let endMessageId else {
+                completion?(error)
+                return
+            }
+            self.database.performWriteTask {
+                $0.updateRanges(
+                    startMessageId: startMessageId,
+                    endMessageId: endMessageId,
+                    triggerMessage: triggerMessage,
+                    channelId: self.channelId)
+            } completion: { _ in
+                completion?(nil)
+            }
         }
     }
     

@@ -9,6 +9,7 @@
 import SceytChat
 import UIKit
 import Combine
+import CoreData
 
 open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, UnreadMentionsManagerDelegate {
     public typealias ChangeItem = LazyDatabaseObserver<MessageDTO, ChatMessage>.ChangeItemPaths
@@ -162,6 +163,21 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     private var lastLoadNearMessageId: MessageId = 0
     private(set) var scrollToMessageIdIfSearching: MessageId = 0
     open private(set) var scrollToRepliedMessageId: MessageId = 0
+
+    /// Identity of the navigation the list is currently trying to reach. Bumped by every
+    /// armed navigation (reply/pin jump, mention, search, jump-to-latest, and anything
+    /// that drops the targets), and captured by each of their async stages, which bail
+    /// when it has moved on. Without it a jump has no identity that survives its own
+    /// round trip: the previous landing's delayed reset wiped the next jump's target, and
+    /// a superseded load still re-anchored the window on the target the user had left.
+    private(set) var navigationGeneration: Int = 0
+    /// The parent a network near-load is currently fetching, or 0. The SDK's message
+    /// query is single-flight, so a second reply jump arriving meanwhile cannot start its
+    /// own load; it waits in `pendingReplyJumpMessageId` and runs when this one returns.
+    private var replyNearLoadInFlight: MessageId = 0
+    /// A reply jump that arrived while `replyNearLoadInFlight` was busy. Only the newest
+    /// is kept: two taps in flight can only mean the user changed their mind.
+    private var pendingReplyJumpMessageId: MessageId = 0
     private(set) var scrollToUnreadMentionMessageId: MessageId = 0
     private(set) var searchDirection: SearchDirection = .none
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
@@ -749,8 +765,14 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     private func resetStateAfterChangeEvent() {
+        // The delay keeps the target armed while the landing's highlight plays out.
+        // It belongs to *this* landing only: a navigation armed inside the second must
+        // not have its fresh target wiped by the previous one's timer — that left the
+        // restart's initial change event with nothing to scroll to.
+        let generation = navigationGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
                 guard let self else { return }
+                guard self.navigationGeneration == generation else { return }
                 self.scrollToRepliedMessageId = 0
                 self.scrollToUnreadMentionMessageId = 0
                 self.isRestartingMessageObserver = .none
@@ -1341,29 +1363,79 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
     }
     
+    /// Fetches the page around `id` from the server and stores it. Load only: it always
+    /// completes and never re-anchors the observer — that is `findReplayedMessage`'s
+    /// decision, taken once and only if the jump is still the one the user wants.
     open func loadNearMessagesOfRepliedMessage(
         id: MessageId,
         completion: (([Message]?, Error?) -> Void)? = nil
     ) {
-        if chatClient.connectionState == .connected {
-            provider.loadNearMessages(near: id) { [weak self] messages, error in
-                guard let self else { return }
-                if error == nil {
-                    
-                    if messages?.first(where: { $0.id == id }) == nil {
-                        return
-                    }
-                    
-                    self.messageObserver.restartToNear(at: id)
-                }
-                completion?(messages, error)
-            }
-        } else {
-            completion?(nil, SceytChatError.notConnect)
+        #if DEBUG
+        if let delayMs = SceytChatUIKit.uiTestNearLoadCompletesLocallyDelayMs,
+           chatClient.connectionState != .connected {
+            completeNearLoadLocallyForUITests(near: id, afterMs: delayMs, completion: completion)
+            return
         }
-
+        #endif
+        guard chatClient.connectionState == .connected else {
+            completion?(nil, SceytChatError.notConnect)
+            return
+        }
+        provider.loadNearMessages(near: id) { messages, error in
+            completion?(messages, error)
+        }
     }
     
+    #if DEBUG
+    /// See `SceytChatUIKit.uiTestNearLoadCompletesLocallyDelayMs`.
+    private static var uiTestNearLoadInFlight = false
+
+    private func completeNearLoadLocallyForUITests(
+        near id: MessageId,
+        afterMs delayMs: Int,
+        completion: (([Message]?, Error?) -> Void)?
+    ) {
+        guard !Self.uiTestNearLoadInFlight else {
+            completion?(nil, NSError(domain: "com.sceytchat.sdk",
+                                     code: SceytChatError.sdkQueryInProgressCode))
+            return
+        }
+        Self.uiTestNearLoadInFlight = true
+        let channelId = channel.id
+        let limit = Int(provider.queryLimit)
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delayMs)) { [weak self] in
+            guard let self else { return }
+            self.provider.database.read { context -> [MessageId] in
+                let request = NSFetchRequest<MessageDTO>(entityName: "MessageDTO")
+                request.predicate = NSPredicate(format: "channelId == %lld", channelId)
+                request.sortDescriptors = [NSSortDescriptor(key: "id", ascending: true)]
+                let ids = try context.fetch(request).map { MessageId($0.id) }
+                guard let index = ids.firstIndex(of: id) else { return [] }
+                let lower = max(0, index - limit / 2)
+                let upper = min(ids.count, lower + limit)
+                return Array(ids[lower..<upper])
+            } completion: { [weak self] result in
+                guard let self else { return }
+                let ids = (try? result.get()) ?? []
+                let finish = {
+                    Self.uiTestNearLoadInFlight = false
+                    completion?(ids.map { Message.Builder().id($0).build() }, nil)
+                }
+                guard let start = ids.first, let end = ids.last else {
+                    finish()
+                    return
+                }
+                self.provider.database.performWriteTask {
+                    $0.updateRanges(startMessageId: start, endMessageId: end,
+                                    triggerMessage: id, channelId: channelId)
+                } completion: { _ in
+                    DispatchQueue.main.async(execute: finish)
+                }
+            }
+        }
+    }
+    #endif
+
     open func loadNearMessagesOfUnreadMention(
         id: MessageId,
         completion: ((Error?) -> Void)? = nil
@@ -1396,6 +1468,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         // restart's initial change event redirects the scroll to the unread
         // separator / replied message instead of the last message.
         resetScrollState()
+        // The deferred tail re-align below belongs to this jump-to-latest only; a reply
+        // jump armed while the tail page is loading must not be yanked to the bottom.
+        let generation = navigationGeneration
         if lastDisplayedMessageId != 0 {
             // Layout models capture the separator at creation; drop this one so it
             // is rebuilt without it, like on a fresh open of a fully read channel.
@@ -1436,6 +1511,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 }
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
+                    guard self.navigationGeneration == generation else {
+                        logger.info("[BugFix][RESET] tail re-align skipped — a newer navigation (#\(self.navigationGeneration)) is armed")
+                        return
+                    }
                     self.isRestartingMessageObserver = .reloadToLatestState
                     // messageId 0 → totalCount(default) - fetchLimit: the tail
                     // window, recounted after the page was inserted.
@@ -1467,6 +1546,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         scrollToRepliedMessageId = 0
         scrollToUnreadMentionMessageId = 0
         searchDirection = .none
+        // A deferred jump is the user's intent from before this reset; it dies with it.
+        pendingReplyJumpMessageId = 0
+        bumpNavigationGeneration(reason: "resetScrollState")
     }
     
     private func resetFetchState() {
@@ -1477,7 +1559,43 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     open func updateLastNavigatedIndexPath(indexPath: IndexPath?) {
         lastNavigatedIndexPath = indexPath
     }
-    
+
+    /// Marks every in-flight navigation stage as superseded. Returns the new generation
+    /// for the caller to capture and compare against later.
+    @discardableResult
+    private func bumpNavigationGeneration(reason: String) -> Int {
+        navigationGeneration += 1
+        return navigationGeneration
+    }
+
+    /// Arms a reply/pin jump to `messageId`. The mention target is dropped at the same
+    /// time: `needsToScrollAtIndexPath` prefers it over the replied one, and now that a
+    /// superseded delayed reset no longer wipes it, a stale mention would win the landing.
+    @discardableResult
+    private func armRepliedNavigation(_ messageId: MessageId) -> Int {
+        scrollToUnreadMentionMessageId = 0
+        scrollToRepliedMessageId = messageId
+        return bumpNavigationGeneration(reason: "reply → \(messageId)")
+    }
+
+    /// Starts the reply jump that was parked behind the single-flight near-load, if any.
+    private func drainPendingReplyJumpIfNeeded() {
+        guard pendingReplyJumpMessageId != 0 else { return }
+        let next = pendingReplyJumpMessageId
+        pendingReplyJumpMessageId = 0
+        findReplayedMessage(messageId: next)
+    }
+
+    /// Drops a reply jump that is still loading, so it can never land after the user
+    /// has moved on — the view controller calls this on its paths that scroll the list
+    /// without going through a navigation here (the cached return to a reply, and a
+    /// jump to the tail that needs no restart). Search and mention state is left alone.
+    open func cancelPendingReplyNavigation() {
+        scrollToRepliedMessageId = 0
+        pendingReplyJumpMessageId = 0
+        bumpNavigationGeneration(reason: "cancel")
+    }
+
     //MARK: mark messages
     
     
@@ -1657,6 +1775,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         scrollToRepliedMessageId = 0
         scrollToMessageIdIfSearching = 0
+        pendingReplyJumpMessageId = 0
+        bumpNavigationGeneration(reason: "send")
         if let lastCacheItem = messageObserver.lastItem,
             let lastMessageItem = channel.lastMessage,
             lastCacheItem.id != lastMessageItem.id {
@@ -1754,6 +1874,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         scrollToRepliedMessageId = 0
         scrollToMessageIdIfSearching = 0
+        pendingReplyJumpMessageId = 0
+        bumpNavigationGeneration(reason: "send")
 
         // Ensure observer is up to date
         if let lastCacheItem = messageObserver.lastItem,
@@ -2900,6 +3022,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             scrollToMessageIdIfSearching = messageId
             searchDirection = .prev
             isSearchResultsLoading = true
+            bumpNavigationGeneration(reason: "search prev → \(messageId)")
             messageObserver.restartToNear(at: messageId) {[weak self] isDone in
                 guard let self else { return }
                 self.isSearchResultsLoading = false
@@ -2941,6 +3064,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             scrollToMessageIdIfSearching = messageId
             searchDirection = .next
             isSearchResultsLoading = true
+            bumpNavigationGeneration(reason: "search next → \(messageId)")
             messageObserver.restartToNear(at: messageId) {[weak self] isDone in
                 guard let self else { return }
                 self.isSearchResultsLoading = false
@@ -2983,8 +3107,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open func findReplayedMessage(messageId: MessageId) {
         guard messageId != 0 else { return }
-        scrollToRepliedMessageId = messageId
         if let (index, indexPath) = cachePosition(messageId: messageId) {
+            // Arming bumps the generation even here, so an older jump still loading
+            // over the network cannot land after this synchronous scroll.
+            armRepliedNavigation(messageId)
             scroll(to: indexPath, messageId: messageId)
             scrollToRepliedMessageId = 0
             updateLastNavigatedIndexPath(indexPath: indexPath)
@@ -2993,36 +3119,59 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
             return
         }
-        
-        messageObserver
-            .loadRangeProvider
-            .fetchLoadRanges(
-                channelId: channel.id,
-                messageId: messageId)
-        {[weak self] ranges in
+        if replyNearLoadInFlight == messageId, scrollToRepliedMessageId == messageId {
+            // The same target, tapped again while its load is in flight: it will land.
+            return
+        }
+        if replyNearLoadInFlight != 0 {
+            // The SDK's message query is single-flight: a second load now would be
+            // rejected as "query in progress", and a jump that neither loads nor bails
+            // strands the user. Park it — latest wins — and arm its target so the load in
+            // flight knows it has been superseded and lands nothing.
+            armRepliedNavigation(messageId)
+            pendingReplyJumpMessageId = messageId
+            return
+        }
+        let token = armRepliedNavigation(messageId)
+        replyNearLoadInFlight = messageId
+        // The jump is user-initiated (a tap on the quoted bubble), so every way it can
+        // fail has to reach the user — a load error left unreported is a tap that
+        // visibly does nothing.
+        loadNearMessagesOfRepliedMessage(id: messageId) { [weak self] messages, error in
             guard let self else { return }
-            // The jump is user-initiated (a tap on the quoted bubble), so every way it
-            // can fail has to reach the user — a load error left unreported is a tap
-            // that visibly does nothing.
-            self.loadNearMessagesOfRepliedMessage(id: messageId) { [weak self] messages, error in
-                guard let self else { return }
-                if let error {
-                    self.handleRepliedMessageNavigationFailure(messageId: messageId, error: error)
-                    return
-                }
-                guard messages?.first(where: { $0.id == messageId }) != nil else {
-                    // The backend answered, but the parent is not in the window it
-                    // returned — deleted, or no longer visible to this user. There is
-                    // no error object to show; just release the pending navigation so
-                    // the next tap is not blocked by stale state.
-                    logger.error("[ReplyNavigation] parent message \(messageId) not found in the loaded range")
-                    self.clearPendingRepliedMessageNavigation(messageId: messageId)
-                    return
-                }
-                if !ranges.isEmpty {
-                    self.messageObserver.restartToNear(at: messageId)
-                }
+            self.replyNearLoadInFlight = 0
+            // Whatever happened to this jump, the one parked behind it gets its turn.
+            defer { self.drainPendingReplyJumpIfNeeded() }
+            // Superseded while loading: a newer navigation owns the list now.
+            guard token == self.navigationGeneration else { return }
+            if let error {
+                self.handleRepliedMessageNavigationFailure(messageId: messageId, error: error)
+                return
             }
+            guard messages?.first(where: { $0.id == messageId }) != nil else {
+                // The backend answered, but the parent is not in the window it
+                // returned — deleted, or no longer visible to this user. There is
+                // no error object to show; just release the pending navigation so
+                // the next tap is not blocked by stale state.
+                self.clearPendingRepliedMessageNavigation(messageId: messageId)
+                return
+            }
+            // The one re-anchor of this jump. `shouldProceed` is asked again after the
+            // observer's own async range lookup, closing the gap between this check
+            // and the restart itself.
+            self.messageObserver.restartToNear(
+                at: messageId,
+                done: { [weak self] isDone in
+                    guard let self, token == self.navigationGeneration else { return }
+                    if !isDone {
+                        self.clearPendingRepliedMessageNavigation(messageId: messageId)
+                    }
+                },
+                shouldProceed: { [weak self] in
+                    guard let self else { return false }
+                    return token == self.navigationGeneration
+                }
+            )
         }
     }
 
@@ -3038,7 +3187,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         // nothing wrong, and an alert for it is noise on top of a jump that was already
         // being replaced. Releasing the pending navigation above is the whole remedy.
         guard !error.isQueryInProgress else {
-            logger.info("[ReplyNavigation] jump to \(messageId) superseded by a newer one — query busy, not reported")
             return
         }
         logger.errorIfNotNil(error, "[ReplyNavigation] load near messages of replied message \(messageId)")
@@ -3053,7 +3201,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     /// Finds and navigates to an unread mention message, loading it if necessary
     open func findUnreadMentionMessage(messageId: MessageId) {
         guard messageId != 0 else { return }
+        // Same identity rules as a reply jump: this navigation supersedes any other.
+        scrollToRepliedMessageId = 0
+        pendingReplyJumpMessageId = 0
         scrollToUnreadMentionMessageId = messageId
+        let token = bumpNavigationGeneration(reason: "mention → \(messageId)")
         if let (index, indexPath) = cachePosition(messageId: messageId) {
             scroll(to: indexPath, messageId: messageId)
             updateLastNavigatedIndexPath(indexPath: indexPath)
@@ -3071,14 +3223,21 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 channelId: channel.id,
                 messageId: messageId)
         {[weak self] ranges in
-            guard let self else { return }
+            guard let self, token == self.navigationGeneration else { return }
             if !ranges.isEmpty {
-                self.messageObserver.restartToNear(at: messageId) {[weak self] isDone in
-                    guard let self else { return }
-                    if !isDone {
-                        self.loadNearMessagesOfUnreadMention(id: messageId)
+                self.messageObserver.restartToNear(
+                    at: messageId,
+                    done: { [weak self] isDone in
+                        guard let self, token == self.navigationGeneration else { return }
+                        if !isDone {
+                            self.loadNearMessagesOfUnreadMention(id: messageId)
+                        }
+                    },
+                    shouldProceed: { [weak self] in
+                        guard let self else { return false }
+                        return token == self.navigationGeneration
                     }
-                }
+                )
             } else {
                 self.loadNearMessagesOfUnreadMention(id: messageId)
             }

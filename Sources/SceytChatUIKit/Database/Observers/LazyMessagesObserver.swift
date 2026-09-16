@@ -201,12 +201,23 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         loadPrev(done: done)
     }
     
+    /// Re-anchors the window around `messageId`.
+    ///
+    /// `done(true)` means a restart is on its way — started now or queued behind the one
+    /// in flight (see `LazyDatabaseObserver.restartObserver`); `done(false)` means none
+    /// will happen: the observer is stopped, no range covers the message, or
+    /// `shouldProceed` said no. `shouldProceed` is asked right before the restart, after
+    /// the asynchronous range lookup: a caller whose intent may have been superseded in
+    /// the meantime (a newer jump) answers `false` there instead of re-anchoring the list
+    /// onto a target the user has already left behind.
     open func restartToNear(
         at messageId: MessageId,
         done: ((Bool) -> Void)? = nil,
-        completion: (() -> Void)? = nil
+        completion: (() -> Void)? = nil,
+        shouldProceed: (() -> Bool)? = nil
     ) {
-        guard isObserverStarted else {
+        // A restart in flight is not a reason to refuse: the request queues behind it.
+        guard isObserverStarted || isObserverRestarting else {
             done?(false)
             return
         }
@@ -216,6 +227,10 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
                 triggeredMessageId: messageId
             ) { [weak self] range in
                 guard let self, let range else {
+                    done?(false)
+                    return
+                }
+                if let shouldProceed, !shouldProceed() {
                     done?(false)
                     return
                 }
