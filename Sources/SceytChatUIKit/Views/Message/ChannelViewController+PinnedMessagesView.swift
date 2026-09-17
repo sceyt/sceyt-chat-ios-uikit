@@ -281,6 +281,17 @@ extension ChannelViewController {
             reload()
         }
 
+        /// The preview is a rendered `NSAttributedString`, and any icon inside it is a raster
+        /// baked at the trait collection that was current when the formatter ran — a dynamic
+        /// colour in it cannot re-resolve itself the way the label's own `textColor` does. So a
+        /// light/dark switch rebuilds the string rather than leaving the icon in the old theme.
+        open override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+            guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection)
+            else { return }
+            reload()
+        }
+
         // MARK: - Paging
 
         /// Moves the banner onto an arbitrary pin, out of walk order — the pinned-message
