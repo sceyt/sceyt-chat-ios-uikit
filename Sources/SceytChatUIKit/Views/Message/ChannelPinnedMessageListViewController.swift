@@ -63,6 +63,11 @@ open class ChannelPinnedMessageListViewController: ViewController,
         action: #selector(closeButtonTapped)
     )
 
+    /// The channel picker while a forward is being addressed, so the handler can close
+    /// exactly it once the copies are away. Weak: the picker is owned by whatever UIKit
+    /// made its presenter.
+    public private(set) weak var presentedForwardViewController: UIViewController?
+
     /// Feeds the carousel a tapped attachment opens. The attachment views present it
     /// themselves, from the window, so this screen owns its own previewer rather than
     /// borrowing the conversation's.
@@ -109,7 +114,6 @@ open class ChannelPinnedMessageListViewController: ViewController,
     open var menuActionTitlesReturningToConversation: Set<String> = [
         L10n.Message.Action.Title.reply,
         L10n.Message.Action.Title.edit,
-        L10n.Message.Action.Title.forward,
         L10n.Message.Action.Title.select,
         // `ChannelViewController` builds this one from a bare string, and it opens a
         // confirmation alert over the conversation.
@@ -455,6 +459,74 @@ open class ChannelPinnedMessageListViewController: ViewController,
         present(reactionsInfoViewController, animated: true)
     }
 
+    /// A menu action this screen runs itself, in place of the conversation's own handler.
+    ///
+    /// The conversation builds the menu, so its handlers present from the conversation. The
+    /// few that this screen can present just as well — forwarding picks its channels in a
+    /// screen of its own — are swapped for a handler that presents from here, so the list
+    /// stays up behind them instead of closing first. Returns `nil` for an action this
+    /// screen does not take over, which is most of them.
+    open func localMenuItem(replacing item: MenuItem, for model: MessageLayoutModel) -> MenuItem? {
+        guard item.title == L10n.Message.Action.Title.forward else { return nil }
+        var item = item
+        item.action = { [weak self] _ in
+            self?.forward(model)
+        }
+        return item
+    }
+
+    /// Forwards one pin, picking the channels in the same screen the conversation uses,
+    /// presented over this one.
+    ///
+    /// Where the user lands afterwards is the conversation's rule, kept: a copy sent into
+    /// this very channel leaves them here, on the pins, with the conversation behind already
+    /// scrolled to it, and a copy sent to a single other channel opens that channel. That
+    /// channel is pushed onto the navigation stack *underneath* this screen, so the list has
+    /// to close before the push — otherwise it happens behind the modal and the user is left
+    /// looking at the pins.
+    open func forward(_ model: MessageLayoutModel) {
+        guard let channelViewController else { return }
+        // A half-recorded voice message is the conversation's to discard, over its own
+        // composer, so that one still goes back.
+        guard !channelViewController.customInputViewController.isRecording else {
+            handOffToConversation(for: model) { channelViewController, conversationModel in
+                channelViewController.forward(messages: [conversationModel.message])
+            }
+            return
+        }
+
+        let messages = [conversationLayoutModel(for: model).message]
+        // The picker outlives this call, so it holds nothing of the two screens: the
+        // conversation is read back off this screen when the channels come in.
+        let forwardViewController = ForwardViewController.build { [weak self] channels in
+            guard let self,
+                  let channelViewController = self.channelViewController
+            else { return }
+
+            loader.show()
+            channelViewController.channelViewModel.share(messages: messages, to: channels.map { $0.id }) { [weak self] in
+                loader.hide()
+                guard let self else { return }
+                // Dismissed through the picker itself rather than through this screen: a
+                // view controller dismisses whatever it presented, and this one may not be
+                // the presenter — inside a navigation controller, UIKit hands the
+                // presentation to the ancestor that covers the screen.
+                self.presentedForwardViewController?.dismiss(animated: true) { [weak self] in
+                    guard let self else { return }
+                    if channels.contains(channelViewController.channelViewModel.channel) {
+                        channelViewController.collectionView.scrollToBottom(animated: false) { _ in }
+                    } else if channels.count == 1 {
+                        self.close {
+                            ChannelListRouter.showChannel(channels[0])
+                        }
+                    }
+                }
+            }
+        }
+        presentedForwardViewController = forwardViewController
+        present(forwardViewController, animated: true)
+    }
+
     /// The cell has already expanded its own model, so the row only has to be measured
     /// again — which is what reloading it does.
     open func expandText(for model: MessageLayoutModel) {
@@ -619,6 +691,9 @@ open class ChannelPinnedMessageListViewController: ViewController,
             .items(contextMenu: contextMenu, identifier: .init(value: conversationModel))
             .filter { !hiddenMenuActionTitles.contains($0.title) }
             .map { item in
+                if let localItem = localMenuItem(replacing: item, for: model) {
+                    return localItem
+                }
                 guard menuActionTitlesReturningToConversation.contains(item.title)
                 else { return item }
                 var item = item

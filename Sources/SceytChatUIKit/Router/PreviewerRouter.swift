@@ -71,10 +71,6 @@ open class PreviewerRouter: Router<MediaPreviewerViewController> {
     }
     
     open func showForward(_ handler: @escaping ([ChatChannel]) -> Void) {
-        let viewController = Components.forwardViewController.init()
-        viewController.viewModel = Components.channelForwardViewModel.init(handler: handler)
-        let nav = Components.navigationController.init()
-        nav.viewControllers = [viewController]
-        rootViewController.present(nav, animated: true)
+        rootViewController.present(ForwardViewController.build(handler), animated: true)
     }
 }
