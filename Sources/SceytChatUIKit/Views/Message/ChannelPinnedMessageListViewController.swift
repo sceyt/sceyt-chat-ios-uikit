@@ -11,8 +11,10 @@ import UIKit
 /// pin button at the trailing edge of `ChannelViewController.PinnedMessagesView`.
 ///
 /// The rows are the conversation's own message cells, so the screen behaves like the
-/// conversation: long press opens the same context menu with the same actions and the same
-/// reaction row, media opens in the same previewer, polls take votes, links follow. It also
+/// conversation: long press opens the conversation's own context menu — minus the actions
+/// that belong to the conversation rather than the pin, see `hiddenMenuActionTitles` — with
+/// the same reaction row, media opens in the same previewer, polls take votes, links
+/// follow. It also
 /// reads in the conversation's direction — oldest pin at the top, newest at the bottom, the
 /// screen opening on the newest one and scrolling up through the older ones.
 ///
@@ -112,8 +114,6 @@ open class ChannelPinnedMessageListViewController: ViewController,
     /// those over; everything else — copy, pin, unpin, delete, retract vote — runs right
     /// here, the way the row's swipe action does.
     open var menuActionTitlesReturningToConversation: Set<String> = [
-        L10n.Message.Action.Title.reply,
-        L10n.Message.Action.Title.edit,
         L10n.Message.Action.Title.select,
         // `ChannelViewController` builds this one from a bare string, and it opens a
         // confirmation alert over the conversation.
@@ -122,10 +122,15 @@ open class ChannelPinnedMessageListViewController: ViewController,
 
     /// Menu actions this screen leaves out of the message menu entirely. Message info is
     /// the conversation's own screen — it lists who received and read the message, which
-    /// is a detour from a list whose one job is finding a pin and jumping to it — so the
-    /// pinned rows drop it and keep the menu to the actions that act on the pin itself.
+    /// is a detour from a list whose one job is finding a pin and jumping to it. Reply and
+    /// edit are composer actions: both would close this screen to hand the conversation a
+    /// quoted or editable draft, which is not what someone scanning the pins is here for —
+    /// so the pinned rows drop all three and keep the menu to the actions that act on the
+    /// pin itself.
     open var hiddenMenuActionTitles: Set<String> = [
-        L10n.Message.Action.Title.info
+        L10n.Message.Action.Title.info,
+        L10n.Message.Action.Title.reply,
+        L10n.Message.Action.Title.edit
     ]
 
     open override func setup() {
