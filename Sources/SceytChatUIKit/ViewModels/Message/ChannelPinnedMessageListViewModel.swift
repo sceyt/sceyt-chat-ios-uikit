@@ -156,15 +156,34 @@ open class ChannelPinnedMessageListViewModel: NSObject {
         var previousModel: MessageLayoutModel?
         for (index, item) in items.enumerated() {
             let model = layoutModel(for: item)
-            // Every pin stands on its own here — there are no runs of messages from one
-            // sender to collapse — so each incoming bubble carries its sender's name and
-            // avatar. The call is a no-op in direct and broadcast channels.
-            model.showUserInfo(true)
+            // Consecutive pins from one sender read as a run, exactly as they do in the
+            // conversation: only the first bubble of the run carries the sender's name and
+            // avatar, the ones under it are bare. The call is a no-op in direct and
+            // broadcast channels.
+            model.showUserInfo(shouldShowUserInfo(for: model, previousModel: previousModel))
             updateContentInsets(for: model, at: index, previousModel: previousModel)
             models[item.messageTid] = model
             previousModel = model
         }
         layoutModels = models
+    }
+
+    /// Whether a row heads its run of messages, and therefore carries the sender's name and
+    /// avatar — the conversation's rule, applied to a flat list.
+    ///
+    /// The name sits at the top of the bubble and the avatar is top-aligned beside it, so
+    /// the row that shows them is the *first* of a run: the one whose neighbour above comes
+    /// from someone else. Only incoming messages have a sender to name; an outgoing bubble
+    /// and a system message never carry one, and a system message between two pins of the
+    /// same sender breaks the run the way it does in the message list.
+    open func shouldShowUserInfo(
+        for model: MessageLayoutModel,
+        previousModel: MessageLayoutModel?
+    ) -> Bool {
+        guard model.message.incoming, !model.isSystemMessage else { return false }
+        guard let previousModel else { return true }
+        guard previousModel.message.incoming, !previousModel.isSystemMessage else { return true }
+        return previousModel.message.user.id != model.message.user.id
     }
 
     open func layoutModel(for item: PinnedMessage) -> MessageLayoutModel {
