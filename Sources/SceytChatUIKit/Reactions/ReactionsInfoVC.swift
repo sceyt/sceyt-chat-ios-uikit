@@ -276,3 +276,28 @@ public extension ReactionsInfoViewController {
         case showUserProfile(ChatUser)
     }
 }
+
+public extension ReactionsInfoViewController {
+
+    /// The reaction-details screen for one message: an "All" page followed by one page per
+    /// reaction, in the order the pills are drawn.
+    ///
+    /// Built here rather than inside a router because more than one screen opens it — the
+    /// conversation and the pinned-messages list — and each presents it from itself, so the
+    /// two can never drift apart in what they build, only in where they put it.
+    static func build(message: ChatMessage) -> ReactionsInfoViewController {
+        let reactionsInfoViewController = Components.reactionsInfoViewController.init()
+        let reactionScores = message.reactionScores?.sorted(by: { $0.key > $1.key && $0.value > $1.value }) ?? []
+        var userReactionViewModels: [UserReactionViewModel] = .init()
+        userReactionViewModels.reserveCapacity(reactionScores.count + 1)
+        userReactionViewModels.append(Components.userReactionViewModel.init(messageId: message.id, reactionKey: nil))
+        reactionScores.forEach { key, _ in
+            userReactionViewModels.append(Components.userReactionViewModel.init(messageId: message.id, reactionKey: key))
+        }
+        reactionsInfoViewController.reactionScoreViewModel = Components.reactionScoreViewModel
+            .init(messageId: message.id, reactionScores: reactionScores)
+        reactionsInfoViewController.userReactionsViewModel = userReactionViewModels
+        reactionsInfoViewController.modalPresentationStyle = .custom
+        return reactionsInfoViewController
+    }
+}

@@ -368,7 +368,8 @@ open class ChannelPinnedMessageListViewController: ViewController,
 
     /// Everything a bubble can ask its screen to do. What needs nothing but the store — a
     /// poll vote, a paused download, a played voice note, a reaction removed from the
-    /// pill — happens here; the rest is the conversation's, and the screen closes before
+    /// pill — happens here, as does anything this screen can present over itself, such as
+    /// the reaction details; the rest is the conversation's, and the screen closes before
     /// handing it over so the user sees where it landed.
     open func handleMessageCellAction(
         _ action: ChatMessageCell.Action,
@@ -377,6 +378,10 @@ open class ChannelPinnedMessageListViewController: ViewController,
         switch action {
         case .didTapReadMore:
             expandText(for: model)
+        case .tapReaction:
+            // Who reacted is about the pinned message itself, so it opens over this screen
+            // rather than sending the user back to the conversation to read it.
+            showReactions(for: model)
         case .didTapPollOption,
              .pauseTransfer,
              .resumeTransfer,
@@ -414,6 +419,40 @@ open class ChannelPinnedMessageListViewController: ViewController,
         close {
             action(channelViewController, conversationModel)
         }
+    }
+
+    /// Who reacted to this pin, opened from this screen. The conversation presents the same
+    /// screen from itself; the two differ only in what the details screen can hand back —
+    /// removing one's own reaction needs nothing on screen and runs right here, while a
+    /// profile is the conversation's to push, so that one closes both screens first.
+    open func showReactions(for model: MessageLayoutModel) {
+        let reactionsInfoViewController = ReactionsInfoViewController.build(message: model.message)
+        reactionsInfoViewController.onEvent = { [weak self, weak reactionsInfoViewController] event in
+            guard let self,
+                  let channelViewController = self.channelViewController
+            else { return }
+
+            switch event {
+            case .removeReaction(let reaction):
+                guard channelViewController.channelViewModel
+                    .canDeleteReaction(message: model.message, key: reaction.key)
+                else { return }
+                reactionsInfoViewController?.dismiss(animated: true) { [weak self] in
+                    guard let self else { return }
+                    channelViewController.deleteReaction(
+                        layoutModel: self.conversationLayoutModel(for: model),
+                        reaction: reaction.key
+                    )
+                }
+            case .showUserProfile(let user):
+                reactionsInfoViewController?.dismiss(animated: true) { [weak self] in
+                    self?.close {
+                        channelViewController.showProfile(user: user)
+                    }
+                }
+            }
+        }
+        present(reactionsInfoViewController, animated: true)
     }
 
     /// The cell has already expanded its own model, so the row only has to be measured
