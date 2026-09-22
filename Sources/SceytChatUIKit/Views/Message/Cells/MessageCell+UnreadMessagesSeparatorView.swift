@@ -36,8 +36,9 @@ extension MessageCell {
 
         open override func setup() {
             super.setup()
-            
+
             titleLabel.textAlignment = .center
+            titleLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.unreadSeparator
         }
         
         open override func setupAppearance() {

@@ -82,6 +82,9 @@ open class ReactedUserListViewController: ViewController,
         if let reactionModel = viewModel.cellModel(at: indexPath) {
             cell.data = reactionModel
         }
+        cell.onTapProfile = { [weak self] user in
+            self?.onEvent?(.showUserProfile(user))
+        }
         if indexPath.item > viewModel.numberOfItems(in: indexPath.section) - 3 {
             viewModel.loadReactions()
         }
@@ -105,6 +108,7 @@ public extension ReactedUserListViewController {
 
     enum Event {
         case onSelect(ChatMessage.Reaction)
+        case showUserProfile(ChatUser)
     }
 
 }

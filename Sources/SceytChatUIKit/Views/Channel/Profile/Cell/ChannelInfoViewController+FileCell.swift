@@ -10,7 +10,7 @@ import UIKit
 import Combine
 
 extension ChannelInfoViewController {
-    open class FileCell: CollectionViewCell {
+    open class FileCell: CollectionViewCell, AttachmentTransferStatusObserver {
         let event = PassthroughSubject<Event, Never>()
         
         open lazy var iconView = UIImageView()
@@ -36,6 +36,7 @@ extension ChannelInfoViewController {
         
         override open func setup() {
             super.setup()
+            AttachmentTransferStatusRelay.default.add(self)
             
             selectedBackgroundView = UIView()
             titleLabel.lineBreakMode = .byTruncatingMiddle
@@ -43,10 +44,17 @@ extension ChannelInfoViewController {
             
             downloadButton.layer.masksToBounds = true
             downloadButton.addTarget(self, action: #selector(onDownloadTapped), for: .touchUpInside)
-            
+
             progressView.isUserInteractionEnabled = false
             progressView.animationDuration = 0.2
             progressView.rotationDuration = 2
+
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.FileCell
+            accessibilityIdentifier = AID.root
+            iconView.accessibilityIdentifier = AID.icon
+            titleLabel.accessibilityIdentifier = AID.name
+            detailLabel.accessibilityIdentifier = AID.detail
+            downloadButton.accessibilityIdentifier = AID.downloadButton
         }
         
         override open func setupAppearance() {
@@ -105,6 +113,22 @@ extension ChannelInfoViewController {
             }
         }
         
+        /// Backstop delivery of a pause/resume/failure raised on another screen (see
+        /// `AttachmentTransferStatusRelay`). `updateStatus()` otherwise runs only from `data`'s
+        /// `didSet` and from this cell's own download button, so a pause issued in the chat
+        /// thread leaves this row rendering the state it was bound with.
+        open func attachmentTransferStatusDidChange(
+            _ attachment: ChatMessage.Attachment,
+            status: ChatMessage.Attachment.TransferStatus
+        ) {
+            guard let data,
+                  AttachmentTransfer.transferIdentity(of: data.attachment)
+                    == AttachmentTransfer.transferIdentity(of: attachment)
+            else { return }
+            data.attachment.status = status
+            updateStatus()
+        }
+
         open func updateStatus() {
             guard let attachment = data?.attachment,
                   let message = data?.ownerMessage
@@ -160,7 +184,8 @@ extension ChannelInfoViewController {
             fileProvider
                 .progress(
                     message: message,
-                    attachment: attachment
+                    attachment: attachment,
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infofile")
                 ) { [weak self] progress in
                     guard let self, self.data == data
                     else {
@@ -171,9 +196,13 @@ extension ChannelInfoViewController {
                     DispatchQueue.main.async { [weak self] in
                         self?.progressView.progress = progress.progress
                     }
-                } completion: { result in
+                } completion: { [weak self] result in
                     logger.debug("[Attachment] completion \(result.attachment.status)")
-                    fileProvider.removeProgressObserver(message: result.message, attachment: result.attachment)
+                    fileProvider.removeProgressObserver(
+                        message: result.message,
+                        attachment: result.attachment,
+                        objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "infofile") } ?? ""
+                    )
                 }
         }
         
@@ -193,11 +222,23 @@ extension ChannelInfoViewController {
         
         open override func prepareForReuse() {
             super.prepareForReuse()
-            
+
             if let message = data?.ownerMessage, let attachment = data?.attachment {
                 fileProvider.removeProgressObserver(
                     message: message,
-                    attachment: attachment)
+                    attachment: attachment,
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infofile"))
+            }
+        }
+
+        deinit {
+            // prepareForReuse only runs on reuse (scrolling); cells visible at screen
+            // dismiss are deallocated without it, so remove the observer here too.
+            if let message = data?.ownerMessage, let attachment = data?.attachment {
+                fileProvider.removeProgressObserver(
+                    message: message,
+                    attachment: attachment,
+                    objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infofile"))
             }
         }
     }

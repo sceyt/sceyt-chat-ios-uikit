@@ -14,15 +14,87 @@ public protocol SCTDataSession: NSObject {
         attachment: ChatMessage.Attachment,
         taskInfo: SCTDataSessionTaskInfo
     )
-    
+
     func download(
         attachment: ChatMessage.Attachment,
         taskInfo: SCTDataSessionTaskInfo
     )
-    
+
     func getFilePath(attachment: ChatMessage.Attachment) -> String?
-    
+
     func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String?
+
+    /// Uploads a poster-frame image for a video attachment. Calls back with the
+    /// opaque origin string stored under the `"video_thumb"` metadata key —
+    /// whatever this session's `downloadAttachmentThumbnail` can later resolve
+    /// (the default session uses a full URL; a host session may use a transfer id).
+    func uploadAttachmentThumbnail(
+        for attachment: ChatMessage.Attachment,
+        fileUrl: URL,
+        completion: @escaping (Result<String, Error>) -> Void
+    )
+
+    /// Downloads the poster-frame image identified by the opaque `origin`
+    /// (the `"video_thumb"` metadata value). Calls back with a local file URL;
+    /// a temporary location is fine — the caller moves it into its own cache.
+    func downloadAttachmentThumbnail(
+        for attachment: ChatMessage.Attachment,
+        origin: String,
+        completion: @escaping (Result<URL, Error>) -> Void
+    )
+}
+
+public enum SCTDataSessionError: Error {
+    case thumbnailUploadFailed
+    case thumbnailDownloadFailed
+    case unsupportedThumbnailOrigin
+}
+
+public extension SCTDataSession {
+    func uploadAttachmentThumbnail(
+        for attachment: ChatMessage.Attachment,
+        fileUrl: URL,
+        completion: @escaping (Result<String, Error>) -> Void
+    ) {
+        SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { _ in
+        } completion: { url, error in
+            if let url {
+                completion(.success(url.absoluteString))
+            } else {
+                completion(.failure(error ?? SCTDataSessionError.thumbnailUploadFailed))
+            }
+        }
+    }
+
+    func downloadAttachmentThumbnail(
+        for attachment: ChatMessage.Attachment,
+        origin: String,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        guard let url = URL(string: origin),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https"
+        else {
+            completion(.failure(SCTDataSessionError.unsupportedThumbnailOrigin))
+            return
+        }
+        URLSession.shared.downloadTask(with: url) { location, _, error in
+            guard let location, error == nil else {
+                completion(.failure(error ?? SCTDataSessionError.thumbnailDownloadFailed))
+                return
+            }
+            // The task's temp file dies when this callback returns — move it first.
+            let stable = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent("video_thumb_\(UUID().uuidString)")
+                .appendingPathExtension("jpg")
+            do {
+                try FileManager.default.moveItem(at: location, to: stable)
+                completion(.success(stable))
+            } catch {
+                completion(.failure(error))
+            }
+        }.resume()
+    }
 }
 
 open class SCTDataSessionTaskInfo: NSObject {

@@ -178,13 +178,15 @@ extension SceytChatUIKit {
         public static var alert: Alert.Type = Alert.self
         public static var audioWaveformView: AudioWaveformView.Type = AudioWaveformView.self
         public static var badgeView: BadgeView.Type = BadgeView.self
+        public static var badgeLabel: BadgeLabel.Type = BadgeLabel.self
         public static var bottomSheet: BottomSheet.Type = BottomSheet.self
         public static var channelDateSeparatorView: ChannelViewController.DateSeparatorView.Type = ChannelViewController.DateSeparatorView.self
-        public static var channelDisplayedTimer: ChannelViewController.DisplayedTimer.Type = ChannelViewController.DisplayedTimer.self
         public static var channelHeaderView: ChannelViewController.HeaderView.Type = ChannelViewController.HeaderView.self
         public static var channelMessagesCollectionView: ChannelViewController.MessagesCollectionView.Type = ChannelViewController.MessagesCollectionView.self
         public static var channelMessagesCollectionViewLayout: ChannelViewController.MessagesCollectionViewLayout.Type = ChannelViewController.MessagesCollectionViewLayout.self
         public static var channelScrollDownView: ChannelViewController.ScrollDownView.Type = ChannelViewController.ScrollDownView.self
+        public static var channelSwipeActionButton: ChannelSwipeActionButton.Type = ChannelSwipeActionButton.self
+        public static var channelSwipeActionsView: ChannelSwipeActionsView.Type = ChannelSwipeActionsView.self
         public static var channelUnreadMentionCountView: ChannelViewController.UnreadMentionCountView.Type = ChannelViewController.UnreadMentionCountView.self
         public static var channelMentionScrollDownView: ChannelViewController.ScrollDownView.Type = ChannelViewController.ScrollDownView.self
         public static var channelInfoMediaCollectionView: ChannelInfoViewController.MediaCollectionView.Type = ChannelInfoViewController.MediaCollectionView.self
@@ -296,6 +298,7 @@ extension SceytChatUIKit {
         
         // MARK: - Other Components
         
+        public static var channelSwipeActionsConfiguration: ChannelSwipeActionsConfiguration.Type = ChannelSwipeActionsConfiguration.self
         public static var markableTextField: MarkableTextField.Type = MarkableTextField.self
     }
 }

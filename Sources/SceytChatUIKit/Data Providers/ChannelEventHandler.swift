@@ -65,6 +65,13 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                 dto.id = Int64(channel.id)
                 dto.unsynched = false
                 try? $0.batchUpdate(object: MessageDTO.self, predicate: .init(format: "channelId == %lld", dto.id), propertiesToUpdate: [#keyPath(MessageDTO.channelId): oldId])
+                // Same reason as in `ChannelCreator.create(channel:)`: a channelId-keyed draft
+                // does not follow the row when its id is rewritten.
+                DraftMessageDTO.move(
+                    fromChannelId: ChannelId(oldId),
+                    toChannelId: ChannelId(channel.id),
+                    context: $0
+                )
                 let chatChannel = $0.createOrUpdate(channel: channel).convert()
                 NotificationCenter.default
                     .post(name: .didUpdateLocalCreateChannelOnEventChannelCreate,
@@ -137,6 +144,10 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
         database.write {
             $0.update(messageMarkers: marker)
         } completion: { _ in
+            // A marker for an id we have never stored, in a channel holding an outgoing message
+            // stuck at `id == 0`, means one of our sends landed but its ack was lost. Recover the
+            // server id so the tick can be applied.
+            PendingSendReconciler.reconcile(marker: marker, channelId: channel.id)
         }
     }
     
@@ -186,7 +197,9 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
             if $0.add(reaction: reaction) == nil {
                 $0.createOrUpdate(message: message, channelId: channel.id)
                     .unlisted = true
-                $0.add(reaction: reaction)
+                // The persisted payload's reactionTotals already include this reaction —
+                // add() must only store the ReactionDTO, not increment the total again.
+                $0.add(reaction: reaction, updateTotal: false)
             }
         }
     }
@@ -233,6 +246,9 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     before: channel.messagesClearedAt
                 )
                 ChannelSyncStateDTO.delete(channelId: channel.id, context: $0)
+                // The messages are gone, so a reply/edit target pointing into them cannot resolve.
+                // The composed text is kept.
+                DraftMessageDTO.clearTarget(channelId: channel.id, context: $0)
             } catch {
                 logger.errorIfNotNil(error, "")
             }
@@ -249,6 +265,9 @@ open class ChannelEventHandler: NSObject, ChannelDelegate {
                     before: channel.messagesClearedAt
                 )
                 ChannelSyncStateDTO.delete(channelId: channel.id, context: $0)
+                // The messages are gone, so a reply/edit target pointing into them cannot resolve.
+                // The composed text is kept.
+                DraftMessageDTO.clearTarget(channelId: channel.id, context: $0)
             } catch {
                 logger.errorIfNotNil(error, "")
             }

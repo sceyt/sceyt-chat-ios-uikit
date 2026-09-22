@@ -24,18 +24,51 @@ open class PreviewerViewModel: PreviewDataSourceItemObservable {
     }
     
     open func save() {
-        let attachment = previewItem.attachment
-        if attachment.type == "video" {
-            PHPhotoLibrary.shared().performChanges({
-                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: attachment.fileUrl ?? attachment.originUrl)
-            }) { _, error in
-                self.event = .videoSaved(error)
+        requestGalleryAccessIfNeeded { [weak self] granted in
+            guard let self else { return }
+            guard granted else {
+                self.event = .saveGalleryAccessDenied
+                return
+            }
+            let attachment = self.previewItem.attachment
+            if attachment.type == "video" {
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: attachment.fileUrl ?? attachment.originUrl)
+                }) { _, error in
+                    self.event = .videoSaved(error)
+                }
+            } else {
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: attachment.fileUrl ?? attachment.originUrl)
+                }) { _, error in
+                    self.event = .photoSaved(error)
+                }
+            }
+        }
+    }
+
+    open func requestGalleryAccessIfNeeded(completion: @escaping (Bool) -> Void) {
+        if #available(iOS 14, *) {
+            switch PHPhotoLibrary.authorizationStatus(for: .addOnly) {
+            case .authorized, .limited:
+                completion(true)
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                    completion(status == .authorized || status == .limited)
+                }
+            default:
+                completion(false)
             }
         } else {
-            PHPhotoLibrary.shared().performChanges({
-                PHAssetChangeRequest.creationRequestForAssetFromImage(atFileURL: attachment.fileUrl ?? attachment.originUrl)
-            }) { _, error in
-                self.event = .photoSaved(error)
+            switch PHPhotoLibrary.authorizationStatus() {
+            case .authorized:
+                completion(true)
+            case .notDetermined:
+                PHPhotoLibrary.requestAuthorization { status in
+                    completion(status == .authorized)
+                }
+            default:
+                completion(false)
             }
         }
     }
@@ -89,6 +122,7 @@ public extension PreviewerViewModel {
     enum Event {
         case photoSaved(Error?)
         case videoSaved(Error?)
+        case saveGalleryAccessDenied
         case didUpdateItem
     }
 }

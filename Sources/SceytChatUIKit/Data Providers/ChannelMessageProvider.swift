@@ -67,7 +67,9 @@ open class ChannelMessageProvider: DataProvider {
                 }
                 self.store(
                     messages: messages,
-                    completion: completion
+                    completion: { error in
+                        completion?(error)
+                    }
                 )
                 self.sendReceivedMarker(messages: messages)
             }
@@ -102,7 +104,9 @@ open class ChannelMessageProvider: DataProvider {
                     self.store(
                         messages: messages,
                         triggerMessage: messageId,
-                        completion: completion
+                        completion: { error in
+                            completion?(error)
+                        }
                     )
                     self.sendReceivedMarker(messages: messages)
                 }
@@ -110,7 +114,7 @@ open class ChannelMessageProvider: DataProvider {
                 completion?(SceytChatError.queryInProgress)
             }
         }
-    
+
     open func loadPrevMessages(
         completion: ((Error?) -> Void)? = nil
     ) {
@@ -119,7 +123,7 @@ open class ChannelMessageProvider: DataProvider {
             completion: completion
         )
     }
-    
+
     open func loadPrevMessages(
         query: MessageListQuery,
         completion: ((Error?) -> Void)? = nil
@@ -292,6 +296,7 @@ open class ChannelMessageProvider: DataProvider {
         }
     }
 
+    // TODO: Optimize this
     open func store(
         messages: [Message],
         triggerMessage: MessageId? = nil,
@@ -437,13 +442,23 @@ open class ChannelMessageProvider: DataProvider {
                 // Store pending votes for each option
                 if let messageDTO = MessageDTO.fetch(id: messageId, context: $0) {
                     if let userId = SceytChatUIKit.shared.currentUserId, !userId.isEmpty {
-                        // Cancel any existing pending vote for the same option
-                        if let existingPendingVote = PendingVoteDTO.fetch(
+                        let pollDTO = messageDTO.poll ?? PollDTO.fetch(id: pollId, context: $0)
+                        if pollDTO?.allowMultipleVotes == false {
+                            // A single-vote poll carries at most one vote, and the server swaps it
+                            // on every add. A new tap therefore supersedes EVERY stored pending
+                            // vote for this poll, not just the one for the same option — otherwise
+                            // the reconnect replay fires one add per option and whichever lands
+                            // last wins, not the user's last tap.
+                            let context = $0
+                            PendingVoteDTO.fetch(pollId: pollId, userId: userId, context: context)
+                                .forEach { context.delete($0) }
+                        } else if let existingPendingVote = PendingVoteDTO.fetch(
                             pollId: pollId,
                             optionId: optionId,
                             userId: userId,
                             context: $0
                         ) {
+                            // Cancel any existing pending vote for the same option
                             $0.delete(existingPendingVote)
                         }
 
@@ -478,7 +493,15 @@ open class ChannelMessageProvider: DataProvider {
                 }
 
                 guard let changedVotes else {
-                    completion?(error)
+                    // No error and no changed votes: the server accepted the request but the vote
+                    // was already in the target state (e.g. re-adding an option that never got
+                    // removed server-side). Clear the pending row — keeping it would replay this
+                    // no-op on every reconnect and hold the stale-snapshot guard engaged forever.
+                    self.database.write { context in
+                        self.deletePendingVote(pollId: pollId, optionId: optionId, context: context)
+                    } completion: { _ in
+                        completion?(nil)
+                    }
                     return
                 }
                 
@@ -567,7 +590,13 @@ open class ChannelMessageProvider: DataProvider {
                 }
 
                 guard let changedVotes else {
-                    completion?(error)
+                    // No error and no changed votes: the vote was already absent server-side.
+                    // Clear the pending row so it is not replayed on every reconnect.
+                    self.database.write { context in
+                        self.deletePendingVote(pollId: pollId, optionId: optionId, context: context)
+                    } completion: { _ in
+                        completion?(nil)
+                    }
                     return
                 }
 
@@ -749,7 +778,7 @@ open class ChannelMessageProvider: DataProvider {
             }, completion: completion)
         }
     }
-    
+
     open func markMessagesAsDisplayed(
         ids: [MessageId],
         storeForResend: Bool = true,
@@ -774,7 +803,7 @@ open class ChannelMessageProvider: DataProvider {
             }, completion: completion)
         }
     }
-    
+
     open func markMessages(
         markerName: String,
         ids: [MessageId],
@@ -821,20 +850,6 @@ open class ChannelMessageProvider: DataProvider {
             }   
         }
     }
-    
-    open func storeMessage(
-        notificationContent userInfo: [AnyHashable : Any],
-        completion: ((Error?) -> Void)? = nil
-    ) {
-        database.write ({
-            if let dto = try $0.createOrUpdate(notificationContent: userInfo) {
-                $0.update(messagePendingMarkers: [MessageId(dto.id)], markerName: DefaultMarker.received.rawValue)
-            }
-        }) { error in
-            completion?(error)
-        }
-    }
-    
 }
 
 extension ChannelMessageProvider {
@@ -850,9 +865,16 @@ extension ChannelMessageProvider {
                     false,
                     ChatMessage.DeliveryStatus.pending.intValue,
                     ChatMessage.DeliveryStatus.failed.intValue)
+                // A message the user already deleted must never be resent, even if some path
+                // recreated its row while the delete was still being retried.
+                let deletedTids = Set(PendingMessageDeleteDTO.fetchAll(context: $0).map { $0.messageTid })
                 return MessageDTO.fetch(request: request, context: $0)
-                    .compactMap {
-                        $0.convert()
+                    .compactMap { dto -> ChatMessage? in
+                        if deletedTids.contains(dto.tid) {
+                            logger.info("Skip resending message with tid \(dto.tid): a pending delete exists for it")
+                            return nil
+                        }
+                        return dto.convert()
                     }
             } completion: { result in
                 switch result {
@@ -860,6 +882,25 @@ extension ChannelMessageProvider {
                     completion(result)
                 case .failure(let error):
                     logger.errorIfNotNil(error, "")
+                    completion([])
+                }
+            }
+        }
+
+    /// Stored delete intents waiting to reach the server, oldest first.
+    ///
+    /// A record is only ever removed once the server has answered, so nothing is filtered here.
+    public class func fetchPendingMessageDeletes(
+        _ completion: @escaping ([PendingMessageDelete]) -> Void) {
+            database.performBgTask(resultQueue: .global()) { context in
+                PendingMessageDeleteDTO.fetchAll(context: context)
+                    .map { $0.convert() }
+            } completion: { result in
+                switch result {
+                case .success(let records):
+                    completion(records)
+                case .failure(let error):
+                    logger.errorIfNotNil(error, "Fetching pending message deletes failed")
                     completion([])
                 }
             }

@@ -17,7 +17,13 @@ open class MessageLayoutModel {
     
     open var contentOptions = MessageContentOptions()
     open var updateOptions: MessageUpdateOptions = []
-    
+
+    /// Monotonic content token, bumped whenever a render-affecting field changes
+    /// in place (the same condition that recomputes `measureSize`). The snapshot
+    /// diff reads this to reconfigure a cell whose *content* changed — without
+    /// relying on observer-emitted reload hints. See ChannelViewController+SnapshotDiff.
+    public private(set) var contentVersion: UInt = 0
+
     public private(set) var channel: ChatChannel
     public private(set) var message: ChatMessage
     public private(set) var attachments: [AttachmentLayout]
@@ -83,7 +89,13 @@ open class MessageLayoutModel {
     public private(set) var unsupportedViewMeasure: CGSize = .zero
     public private(set) var lastCharRect: CGRect
     public private(set) var replyCount = 0
-    public              var contentInsets: UIEdgeInsets = .zero
+    public var contentInsets: UIEdgeInsets = .zero {
+        didSet {
+            if oldValue != contentInsets {
+                contentVersion &+= 1
+            }
+        }
+    }
     public private(set) var messageDeliveryStatus: ChatMessage.DeliveryStatus
     public private(set) var messageUserTitle: String = ""
     public private(set) var parentMessageUserTitle: String
@@ -313,6 +325,7 @@ open class MessageLayoutModel {
         }
 
         reactions = createReactions(message: message)
+        updateAttachmentRowMetrics()
         attachmentsContainerSize = calculateAttachmentsContainerSize()
         if !isForwarded && !contentOptions.contains(.unsupported) {
             if contentOptions.isEmpty || contentOptions == [.name] {
@@ -399,7 +412,26 @@ open class MessageLayoutModel {
                 updateOptions.insert(.attachment)
             }
         }
-        
+
+        // The message just turned into a deleted one: it renders as the
+        // "Message was deleted." text and nothing else. Clearing `attachments`
+        // above is not enough — the content options set when the message still had
+        // its media survives (the attachment comparison only reacts to a changed
+        // *count*, and a stale relationship can report the same one). Left in, the
+        // cell picks the text+attachment layout branch and lays the old thumbnail
+        // out under the deleted text until the channel is reopened.
+        if message.state == .deleted {
+            hasMediaAttachments = false
+            hasFileAttachments = false
+            hasVoiceAttachments = false
+            let staleContent: MessageContentOptions = [.attachment, .link, .unsupported]
+            if !contentOptions.isDisjoint(with: staleContent) {
+                contentOptions.subtract(staleContent)
+                updateOptions.insert(.reload)
+            }
+            linkPreviews?.removeAll()
+        }
+
         let restrictingTextWidth = Self.restrictingWidth(attachments: attachments) - 12 * 2
         
         var isEqualMentionedUsers: Bool {
@@ -503,6 +535,9 @@ open class MessageLayoutModel {
             updateOptions.insert(.user)
         }
         
+        let prevHasReply = self.message.parent != nil && self.message.repliedInThread == false
+        let newHasReply = message.parent != nil && message.repliedInThread == false
+
         if let parent = message.parent {
             let title = appearance.senderNameFormatter.format(parent.user)
             if title != parentMessageUserTitle {
@@ -519,14 +554,14 @@ open class MessageLayoutModel {
                 ).textSize
                 updateOptions.insert(.parentMessageUser)
             }
-            
+
             if force || self.message.parent?.body != message.parent?.body || self.message.parent?.state != message.parent?.state {
                 let parentAttributedView = Self.attributedView(
                     message: parent,
                     userSendMessage: userSendMessage,
                     appearance: appearance
                 )
-                
+
                 let parentSize = Self.textSizeMeasure.calculateSize(of: parentAttributedView.content,
                                                                     config: .init(restrictingWidth: restrictingTextWidth))
                 self.parentAttributedView = parentAttributedView
@@ -534,7 +569,7 @@ open class MessageLayoutModel {
                 updateOptions.insert(.parentMessageBody)
             }
             replyLayout = Components.messageReplyLayoutModel.init(
-                message: parent, 
+                message: parent,
                 byMe: message.user.id == SceytChatUIKit.shared.currentUserId,
                 channel: channel,
                 thumbnailSize: Self.defaults.imageRepliedAttachmentSize,
@@ -547,18 +582,65 @@ open class MessageLayoutModel {
             parentAttributedView = nil
             replyLayout = nil
         }
+
+        // hasReply gates measureSize through reply space in measure(). When it
+        // flips and no other field is dirty, force a measureSize recompute —
+        // otherwise the cell keeps the old (reply-sized) height while bind()
+        // hides replyView, or vice versa.
+        if prevHasReply != newHasReply {
+            updateOptions.insert(.reload)
+        }
         if attachments.isEmpty {
-            var prevLinkPreviews = linkPreviews
             linkPreviews?.removeAll()
             for link in Self.createLinkPreviews(message: message, linkAttachments: linkAttachments) {
                 if addLinkPreview(linkMetadata: link) {
                     self.updateOptions.remove(.link)
                     updateOptions.insert(.link)
                 }
-                
+            }
+            if (linkPreviews?.isEmpty ?? true), contentOptions.contains(.link) {
+                contentOptions.remove(.link)
+                updateOptions.insert(.link)
             }
         }
         
+        // Download-completion edge: force exactly one reconfigure when a media attachment reaches
+        // .done. The attachment comparison above and the classic reload path deliberately ignore
+        // filePath/status (to avoid reload churn during transfer), so without this a download that
+        // completes while the cell is visible would never reconfigure it — leaving a blurry
+        // placeholder until the user scrolls (especially when the sharp load landed on a duplicate
+        // AttachmentLayout instance or no live transfer-completion callback fired). Inserting
+        // .reload keeps the reload hint alive through makeEvents and bumps contentVersion, so the
+        // cell re-binds once and the AttachmentView's bind-time self-heal swaps blurry→sharp.
+        //
+        // Gate on the .done transition specifically — NOT "gained a filePath". The downloader
+        // writes filePath BEFORE flipping status to .done (SCTSession: updateLocalFileLocation
+        // then success), so a filePath-based edge would fire while status is still .downloading
+        // (when the view's self-heal, gated on .done, cannot run) and then miss the real .done
+        // edge. Aligning to .done matches the self-heal gate exactly.
+        let didFinishDownloadingMedia = (message.attachments ?? []).contains { new in
+            guard new.type == "image" || new.type == "video",
+                  new.status == .done,
+                  let old = (self.message.attachments ?? []).first(where: { $0 == new })
+            else { return false }
+            return old.status != .done
+        }
+        if didFinishDownloadingMedia {
+            updateOptions.insert(.reload)
+        }
+
+        func isActiveTransfer(_ status: ChatMessage.Attachment.TransferStatus) -> Bool {
+            status == .pending || status == .downloading || status == .uploading
+        }
+        let didChangeTransferState = (message.attachments ?? []).contains { new in
+            guard let old = (self.message.attachments ?? []).first(where: { $0 == new })
+            else { return false }
+            return isActiveTransfer(old.status) != isActiveTransfer(new.status)
+        }
+        if didChangeTransferState {
+            updateOptions.insert(.reload)
+        }
+
         var isUpdated = self.updateOptions != updateOptions
         self.updateOptions = updateOptions
         self.channel = channel
@@ -569,7 +651,18 @@ open class MessageLayoutModel {
             self.updateOptions.insert(.reaction)
         }
         reactions = newReactions
+        // After `self.message`/`self.channel` are in place: the reserve tracks the InfoView, which
+        // grows with the delivery state, the "edited" mark and the broadcast view count.
+        updateAttachmentRowMetrics()
+        let previousAttachmentsContainerSize = attachmentsContainerSize
         attachmentsContainerSize = calculateAttachmentsContainerSize()
+        if previousAttachmentsContainerSize != attachmentsContainerSize {
+            // The `.file` branch of the cells pins `bubbleView.widthAnchor` to a *constant*, so a
+            // row that grew (a byte count that was unknown at first layout, say) only reaches the
+            // screen if the cell reconfigures. `measureSize` below is gated on `isUpdated` too.
+            isUpdated = true
+            self.updateOptions.insert(.reload)
+        }
         if isUpdated || force {
             let textLength = attributedView.content.string.count
             if message.state == .deleted {
@@ -607,9 +700,12 @@ open class MessageLayoutModel {
             }
             measureSize = measure()
         }
+        if isUpdated {
+            contentVersion &+= 1
+        }
         return true
     }
-    
+
     internal func replace(channel: ChatChannel) {
         self.channel = channel
     }
@@ -632,6 +728,7 @@ open class MessageLayoutModel {
                 showUserInfo = show
                 measureSize = measure()
                 updateOptions.insert(.reload)
+                contentVersion &+= 1
                 if showUserInfo {
                     createMessageUserTitle()
                 } else {
@@ -681,6 +778,13 @@ open class MessageLayoutModel {
                 }
                 return .init(key: rs.key, score: UInt(rs.value), byMe: index != nil, width: 24)
             }.sorted(by: { $0.key > $1.key })
+            let maxDisplayedCount = SceytChatUIKit.shared.config.maxDisplayedReactionsCount
+            if maxDisplayedCount > 0, reactions.count > maxDisplayedCount {
+                reactions = reactions
+                    .sorted(by: { $0.score != $1.score ? $0.score > $1.score : $0.key > $1.key })
+                    .prefix(maxDisplayedCount)
+                    .sorted(by: { $0.key > $1.key })
+            }
             if reactionType == .withTotalScore, commonScore > 1 {
                 let key = "\(commonScore)"
                 let width = key.size(withAttributes: [
@@ -720,9 +824,19 @@ open class MessageLayoutModel {
             return []
         }
 
+        // A deleted message renders as the "Message was deleted." text only. The
+        // delete drops the attachment rows (MessageDatabaseSession.deleteAttachmentsFor),
+        // but the message can still reach us carrying them — the batch delete is not
+        // always visible on the relationship the observer converted from yet. Deriving
+        // this from the state keeps the deleted body from being rendered on top of a
+        // stale thumbnail.
+        if message.state == .deleted {
+            return []
+        }
+
         return (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
-            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type == .link ? nil : layout
         } ?? [])
         .sorted { lh, rh in
@@ -738,16 +852,56 @@ open class MessageLayoutModel {
             return []
         }
 
+        // Deleted messages show no link previews either — see `attachmentLayout`.
+        if message.state == .deleted {
+            return []
+        }
+
         return (message.attachments?.compactMap {
             logger.verbose("[Attachment] attachmentLayout attachment \($0.description)")
-            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: $0, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type != .link || $0.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
     
+    /// Hands every attachment row the two geometry facts only the bubble knows: how much trailing
+    /// space the date/tick InfoView needs over it, and how wide the row may get.
+    ///
+    /// The InfoView is a sibling of the attachment stack pinned to the bubble's bottom-right, so
+    /// it overlaps the *bottom-most* row and nothing above it — reserving on every row would
+    /// truncate size labels that nothing is covering.
+    open func updateAttachmentRowMetrics() {
+        // A file-only bubble may run wider than the media cap; one that also holds an image or
+        // video keeps that cap, because media rows take the stack's width at a fixed height and
+        // would be stretched out of aspect by a wider file row. The -4 is the stack's own inset,
+        // which the cell adds back when it turns this width into the bubble's.
+        let cap = hasMediaAttachments
+            ? Self.defaults.imageAttachmentSize.width
+            : min(Self.defaults.fileAttachmentSize.width, Self.defaults.messageWidth - 4)
+        let reserve: CGFloat
+        if attachments.last?.type == .file, message.state != .deleted {
+            reserve = Components.messageCellInfoView
+                .measure(channel: channel, message: message, appearance: appearance).width
+                + MessageCell.Layouts.attachmentFileInfoSpacing
+        } else {
+            reserve = 0
+        }
+        for (index, layout) in attachments.enumerated() {
+            layout.maxRowWidth = cap
+            layout.reservedTrailingWidth = index == attachments.count - 1 ? reserve : 0
+        }
+    }
+
     open func updateAttachmentLayouts(message: ChatMessage) {
         // Hide attachments if message has opened marker
         if message.hasOpenedMarker {
+            attachments = []
+            linkAttachments = []
+            return
+        }
+
+        // Deleted messages keep no attachments — see `attachmentLayout`.
+        if message.state == .deleted {
             attachments = []
             linkAttachments = []
             return
@@ -760,7 +914,7 @@ open class MessageLayoutModel {
                 attachments[index].update(attachment: attachment)
                 return attachments[index]
             }
-            let layout = Components.messageAttachmentLayoutModel.init(attachment: attachment, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = Components.messageAttachmentLayoutModel.init(attachment: attachment, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type == .link ? nil : layout
         } ?? [])
         .sorted { lh, rh in
@@ -776,7 +930,7 @@ open class MessageLayoutModel {
                 attachments[index].update(attachment: attachment)
                 return attachments[index]
             }
-            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel, appearance: appearance)
+            let layout = AttachmentLayout(attachment: attachment, ownerMessage: message, ownerChannel: channel, asyncLoadThumbnail: true, appearance: appearance)
             return layout.type != .link || attachment.imageDecodedMetadata?.hideLinkDetails == true ? nil : layout
         } ?? [])
     }
@@ -1049,7 +1203,10 @@ public extension MessageLayoutModel {
         public var messageSenderNameWidth = CGFloat(170)
         public var imageAttachmentSize  = CGSize(width: 260, height: 200)
         public var imageRepliedAttachmentSize  = CGSize(width: 40, height: 40)
-        public var fileAttachmentSize   = CGSize(width: CGFloat.infinity, height: 54)
+        /// Height = the icon slot plus the row's own top and bottom inset: 48 + (8 - 2) + 8. The
+        /// top is 2 short because the stack is already inset from the bubble there and flush at
+        /// its bottom, so both edges read as `attachmentFilePadding` — see `MessageCell.Layouts`.
+        public var fileAttachmentSize   = CGSize(width: CGFloat.infinity, height: 62)
         public var audioAttachmentSize  = CGSize(width: CGFloat.infinity, height: 54)
     }
     
@@ -1118,12 +1275,63 @@ public extension MessageLayoutModel {
 extension MessageLayoutModel {
     
     open class AttachmentLayout {
-        public private(set) var attachment: ChatMessage.Attachment
+        // `attachment` is read on a background thread (loadThumbnail) and written on the
+        // main thread (update/init). The lock makes the read+retain atomic with the
+        // concurrent write+release, preventing use-after-free crashes.
+        private let _attachmentLock = NSLock()
+        private var _attachmentValue: ChatMessage.Attachment!
+        public private(set) var attachment: ChatMessage.Attachment {
+            get {
+                // Assign under the lock so the ARC retain of the returned value
+                // happens before the lock is released — prevents the main thread's
+                // concurrent release from dropping the refcount to zero mid-retain.
+                var v: ChatMessage.Attachment!
+                _attachmentLock.lock()
+                v = _attachmentValue
+                _attachmentLock.unlock()
+                return v!
+            }
+            set {
+                _attachmentLock.lock()
+                _attachmentValue = newValue
+                _attachmentLock.unlock()
+            }
+        }
         public private(set) var ownerMessage: ChatMessage?
         public private(set) var ownerChannel: ChatChannel?
         public var appearance: MessageCell.Appearance
         public var thumbnail: UIImage?
         public var thumbnailSize: CGSize = .zero
+
+        /// Trailing space this row must keep clear for the bubble's date/tick InfoView, plus the
+        /// gap that separates them. `MessageLayoutModel` sets it on the bottom-most row only —
+        /// the InfoView is pinned to the bubble's bottom-right, so it overlaps nothing above that
+        /// row. Stays zero wherever there is no InfoView at all (the shared-media and
+        /// global-search lists build their layouts directly).
+        public var reservedTrailingWidth: CGFloat = 0 {
+            didSet {
+                guard oldValue != reservedTrailingWidth else { return }
+                recalculateThumbnailSizeIfNeeded()
+            }
+        }
+
+        /// Cap for this row's measured width. `MessageLayoutModel` lets a file-only bubble grow to
+        /// the message width, but keeps the media cap when the bubble also carries an image or
+        /// video: media rows take the stack's width at a fixed height
+        /// (`AttachmentStackView.addImageView`), so a wider file row would stretch a sibling out
+        /// of aspect.
+        public var maxRowWidth: CGFloat = Components.messageLayoutModel.defaults.imageAttachmentSize.width {
+            didSet {
+                guard oldValue != maxRowWidth else { return }
+                recalculateThumbnailSizeIfNeeded()
+            }
+        }
+
+        /// True when the caller pinned `thumbnailSize` up front — the shared-media and
+        /// global-search lists do, because their cells have a fixed geometry. Nothing here may
+        /// re-derive a size under those.
+        private let hasFixedThumbnailSize: Bool
+
         public var voiceWaveform: [Float]?
         /// Cached link metadata for link-type attachments. Set once on first load; checked before re-fetching.
         public var linkMetadata: LinkMetadata?
@@ -1150,17 +1358,54 @@ extension MessageLayoutModel {
             attachment.name ?? ((attachment.url ?? attachment.filePath) as NSString?)?.lastPathComponent ?? ""
         }
         
-        open func fileSize(using formatter: any UIntFormatting) -> String {
-            let fileSize: UInt
+        /// Memoized because the fallback branch is a `stat` on the main thread, and the file
+        /// cell asks for it on every bind — i.e. once per file row per scroll pass. Cleared
+        /// by `update(attachment:)`, which is the only thing that can change the answer.
+        @Atomic private var cachedFileSizeBytes: UInt?
+
+        open var fileSizeBytes: UInt {
+            if let cachedFileSizeBytes { return cachedFileSizeBytes }
+            let resolved: UInt
             if attachment.uploadedFileSize > 0 {
-                fileSize = attachment.uploadedFileSize
+                resolved = attachment.uploadedFileSize
             } else if let filePath = attachment.filePath {
-                fileSize = Components.storage.sizeOfItem(at: filePath)
+                resolved = Components.storage.sizeOfItem(at: filePath)
             } else {
-                fileSize = 0
+                resolved = 0
             }
-            
-            return formatter.format(UInt64(fileSize))
+            cachedFileSizeBytes = resolved
+            return resolved
+        }
+
+        open func fileSize(using formatter: any UIntFormatting) -> String {
+            formatter.format(UInt64(fileSizeBytes))
+        }
+
+        /// The widest line `AttachmentFileView.setProgress` can put under the name:
+        /// "<downloaded> • <total>". The two halves are formatted *independently*, so the
+        /// downloaded one can be longer than the total — "999.99KB • 1.50MB" runs 14pt past the
+        /// "1.50MB • 1.50MB" this row used to be measured against, which is exactly how much of
+        /// the line then truncated as soon as a transfer started.
+        ///
+        /// Deliberately status-independent: the row is always sized for the widest state it can
+        /// reach, so the bubble does not resize the moment a transfer begins or ends.
+        open func widestTransferSizeText(using formatter: any UIntFormatting) -> String {
+            let total = UInt64(fileSizeBytes)
+            let formattedTotal = formatter.format(total)
+            // The long values sit just below a unit boundary ("999.99KB", "1023.99KB"). Cover the
+            // decimal and the binary boundaries both, so a host-supplied formatter of either kind
+            // is measured against its own worst case.
+            let boundaries: [UInt64] = [1_000, 1_000_000, 1_000_000_000, 1 << 10, 1 << 20, 1 << 30]
+            var widest = formattedTotal
+            for boundary in boundaries where boundary - 1 < total {
+                let candidate = formatter.format(boundary - 1)
+                // Character count as the proxy for width: every candidate is digits, a decimal
+                // separator and a unit, so counting avoids measuring half a dozen strings per
+                // row. A miss costs a few points, which the size label's trailing constraint
+                // absorbs by truncating.
+                if candidate.count > widest.count { widest = candidate }
+            }
+            return "\(widest) • \(formattedTotal)"
         }
         
         @Atomic private var isLoadedThumbnail: Bool = false
@@ -1172,7 +1417,7 @@ extension MessageLayoutModel {
             }
         }
         
-        @Atomic private var isThumbnailLoadedFromFile = false
+        @Atomic internal private(set) var isThumbnailLoadedFromFile = false
         
         public required init(
             attachment: ChatMessage.Attachment,
@@ -1183,10 +1428,13 @@ extension MessageLayoutModel {
             asyncLoadThumbnail: Bool = false,
             appearance: MessageCell.Appearance
         ) {
-            self.attachment = attachment
+            _attachmentValue = attachment  // direct backing-store write — computed setter uses self, which requires all stored props initialized first
             self.ownerMessage = ownerMessage
             self.ownerChannel = ownerChannel
             self.appearance = appearance
+            // Before the size below: this is what tells `recalculateThumbnailSizeIfNeeded` never
+            // to re-derive a size the caller pinned.
+            self.hasFixedThumbnailSize = thumbnailSize != nil
             self.thumbnailSize = thumbnailSize ?? calculateAttachmentsContainerSize()
             self.onLoadThumbnail = onLoadThumbnail
             if asyncLoadThumbnail {
@@ -1198,41 +1446,66 @@ extension MessageLayoutModel {
                 loadThumbnail()
             }
         }
-        
+
         open func loadThumbnail() {
-            defer {
-                isLoadedThumbnail = true
-                if let onLoadThumbnail {
-                    DispatchQueue.main.async { [weak self] in
-                        onLoadThumbnail(self?.thumbnail)
-                    }
-                }
-            }
-            switch type {
+            // Snapshot all inputs before any concurrent work. The switch below runs
+            // only on local variables so the background thread never reads or writes
+            // through self. All writes to self are deferred to the main-thread block.
+            let attachment = self.attachment
+            let attachmentType = AttachmentType(rawValue: attachment.type) ?? .file
+            let thumbnailSize = self.thumbnailSize
+            let appearance = self.appearance
+
+            var resultThumbnail: UIImage?
+            var resultWaveform: [Float]?
+            var resultLoadedFromFile = false
+
+            switch attachmentType {
             case .voice:
-                thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
-                voiceWaveform = attachment.voiceDecodedMetadata?.thumbnail.map { Float($0) }
+                resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                resultWaveform = attachment.voiceDecodedMetadata?.thumbnail.map { Float($0) }
             case .image, .video:
                 if let path = fileProvider.thumbnailFile(for: attachment, preferred: thumbnailSize) {
                     logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
-                        thumbnail = UIImage(data: data)
-                        isThumbnailLoadedFromFile = true
+                        if let image = UIImage(data: data) {
+                            resultThumbnail = image
+                            resultLoadedFromFile = true
+                        } else {
+                            logger.error("[Attachment] thumbnail decode failed, path \(path)")
+                        }
                     } catch {
                         logger.errorIfNotNil(error, "load image from path \(path)")
                     }
                 }
-                if thumbnail == nil {
+                if resultThumbnail == nil, attachmentType == .video,
+                   let path = fileProvider.cachedVideoThumbnailPath(attachment: attachment) {
+                    // Downloaded "video_thumb" poster: sharp preview available before
+                    // the video itself is local. File-backed semantics so the
+                    // no-downgrade guards keep it over the thumbHash blur.
+                    do {
+                        let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
+                        if let image = UIImage(data: data) {
+                            resultThumbnail = image
+                            resultLoadedFromFile = true
+                        } else {
+                            logger.error("[Attachment] video_thumb decode failed, path \(path)")
+                        }
+                    } catch {
+                        logger.errorIfNotNil(error, "load video_thumb from path \(path)")
+                    }
+                }
+                if resultThumbnail == nil {
                     let metadata = attachment.imageDecodedMetadata
                     logger.verbose("[Attachment] thumbnail is nil make from metadata \(attachment.description)")
                     if let data = metadata?.thumbnailImage {
-                        thumbnail = data
+                        resultThumbnail = data
                     } else if let base64 = metadata?.thumbnail,
                               let image = Components.imageBuilder.image(thumbHash: base64) {
-                        thumbnail = image
+                        resultThumbnail = image
                     } else {
-                        thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                        resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
                     }
                 }
             case .file:
@@ -1240,37 +1513,100 @@ extension MessageLayoutModel {
                     logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
-                        thumbnail = UIImage(data: data)
-                        isThumbnailLoadedFromFile = true
+                        if let image = UIImage(data: data) {
+                            resultThumbnail = image
+                            resultLoadedFromFile = true
+                        } else {
+                            logger.error("[Attachment] thumbnail decode failed, path \(path)")
+                        }
                     } catch {
                         logger.errorIfNotNil(error, "load image from path \(path)")
                     }
                 }
-                if thumbnail == nil {
-                    thumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
-                }
-            case .link:
-                if thumbnail == nil {
+                if resultThumbnail == nil {
+                    // Same blurred-placeholder path as image/video: previewable documents carry
+                    // a thumbHash in metadata; decode it until the sharp on-disk thumbnail
+                    // exists (pre-download on the receiver, mid-upload on the sender).
                     let metadata = attachment.imageDecodedMetadata
                     if let data = metadata?.thumbnailImage {
-                        thumbnail = data
+                        resultThumbnail = data
                     } else if let base64 = metadata?.thumbnail,
                               let image = Components.imageBuilder.image(thumbHash: base64) {
-                        thumbnail = image
+                        resultThumbnail = image
                     } else {
-                        thumbnail = appearance.linkPreviewAppearance.placeholderIcon
+                        resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
+                    }
+                }
+            case .link:
+                if resultThumbnail == nil {
+                    let metadata = attachment.imageDecodedMetadata
+                    if let data = metadata?.thumbnailImage {
+                        resultThumbnail = data
+                    } else if let base64 = metadata?.thumbnail,
+                              let image = Components.imageBuilder.image(thumbHash: base64) {
+                        resultThumbnail = image
+                    } else {
+                        resultThumbnail = appearance.linkPreviewAppearance.placeholderIcon
                     }
                 }
             default:
                 break
             }
+
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                // Accept the result when it belongs to the current attachment object, OR when it
+                // was loaded from a real on-disk thumbnail file for the same logical attachment
+                // (same id/tid). The observer fan-out can swap self.attachment for a fresh
+                // ChatMessage.Attachment with the same identity while this load runs; a strict
+                // pointer-identity guard would then discard the sharp thumbnail and leave the
+                // cell stuck on the blurry thumbHash placeholder.
+                let isSameObject = self.attachment === attachment
+                let isSameFileBackedAttachment = resultLoadedFromFile && self.attachment == attachment
+                guard isSameObject || isSameFileBackedAttachment else { return }
+                // Never let a low-res fallback (metadata/thumbHash) clobber an already-loaded
+                // sharp file-backed thumbnail — guards against a stale pre-download load landing
+                // after the sharp one (ordering inversion).
+                if !resultLoadedFromFile, self.isThumbnailLoadedFromFile { return }
+                self.thumbnail = resultThumbnail
+                self.voiceWaveform = resultWaveform
+                self.isThumbnailLoadedFromFile = resultLoadedFromFile
+                self.isLoadedThumbnail = true
+                self.onLoadThumbnail?(resultThumbnail)
+                // onLoadThumbnail is a single overwritable slot: with duplicate layout
+                // instances and attachment-view churn it can be owned by an already-dead
+                // view when the sharp load lands, and the model then reads "healed" while
+                // no live view ever painted. Announce sharp file-backed applies
+                // instance-agnostically so any live view showing this attachment can heal.
+                if resultLoadedFromFile, let image = resultThumbnail {
+                    AttachmentSharpThumbnailRelay.default.post(attachment, image: image)
+                }
+            }
         }
         
+        /// `thumbnailSize` is derived once in `init`, but a file row's width depends on the name
+        /// and the byte count — both of which routinely arrive *after* the first layout (the
+        /// upload ack, the download's metadata). Left stale, the bubble keeps a width measured
+        /// against the old, shorter text while the labels render the new, longer one, and the size
+        /// line runs under the bubble's timestamp.
+        ///
+        /// Files only: re-deriving an image/video size here would resize media bubbles mid-scroll.
+        open func recalculateThumbnailSizeIfNeeded() {
+            guard !hasFixedThumbnailSize, type == .file else { return }
+            let size = calculateAttachmentsContainerSize()
+            guard size != thumbnailSize else { return }
+            thumbnailSize = size
+        }
+
         open func update(attachment: ChatMessage.Attachment) {
             self.attachment = attachment
+            cachedFileSizeBytes = nil
+            recalculateThumbnailSizeIfNeeded()
             if !isThumbnailLoadedFromFile {
                 isLoadedThumbnail = false
-                loadThumbnail()
+                DispatchQueue.global(qos: .userInteractive).async { [weak self] in
+                    self?.loadThumbnail()
+                }
             } else {
                 logger.debug("[Attachment] update(attachment:) SKIPPED loadThumbnail because isThumbnailLoadedFromFile=true")
             }
@@ -1284,12 +1620,42 @@ extension MessageLayoutModel {
                 self?.loadThumbnail()
             }
         }
+
+        /// Applies a sharp thumbnail that was already loaded from a real on-disk file and notifies
+        /// observers. Unlike `resetThumbnail()` this updates the model state in place (so later cell
+        /// rebinds to this layout stay sharp) with no nil/blur window. Safe to call after a download
+        /// completes regardless of which duplicate layout instance won the async load race — the
+        /// caller targets the instance bound to the visible cell. Must be called on the main thread.
+        open func setFileBackedThumbnail(_ image: UIImage) {
+            // Never downgrade: one attachment has several size-keyed thumbnail files (message
+            // bubble vs reply preview), so a smaller sibling result must not replace an
+            // already-loaded bigger one. isThumbnailLoadedFromFile stays true afterwards —
+            // gating every reload path — so a downgrade would stick until the layout is
+            // rebuilt (Case 6).
+            if isThumbnailLoadedFromFile, let current = thumbnail {
+                let currentPxMaxSide = max(current.size.width, current.size.height) * current.scale
+                let incomingPxMaxSide = max(image.size.width, image.size.height) * image.scale
+                if incomingPxMaxSide < currentPxMaxSide {
+                    logger.debug("[IMGQ] setFileBackedThumbnail skipped — would downgrade \(Int(currentPxMaxSide)) -> \(Int(incomingPxMaxSide)) px maxSide, id=\(attachment.id) layout=\(ObjectIdentifier(self))")
+                    return
+                }
+            }
+            thumbnail = image
+            isThumbnailLoadedFromFile = true
+            isLoadedThumbnail = true
+            onLoadThumbnail?(image)
+            // Re-broadcast so sibling layout instances of the same attachment heal too.
+            // Observers gate on their layout state before re-applying, so the nested
+            // post a healing observer triggers terminates after one round trip.
+            AttachmentSharpThumbnailRelay.default.post(attachment, image: image)
+        }
         
         @discardableResult
         open func updateMessageIfNeeded(ownerMessage: ChatMessage) -> Bool {
             if self.ownerMessage == nil,
                self.attachment.messageId == ownerMessage.id {
                 self.ownerMessage = ownerMessage
+                recalculateThumbnailSizeIfNeeded()
                 return true
             }
             return false
@@ -1325,13 +1691,23 @@ extension MessageLayoutModel {
                     of: name,
                     config: config).textSize.width
                 config.font = appearance.attachmentFileSizeLabelAppearance.font
-                var sizeWidth = TextSizeMeasure.calculateSize(
-                    of: "\(fileSize) • \(fileSize)",
+                // Widest thing the size label ever shows: the mid-transfer
+                // "<downloaded> • <total>" form that `setProgress` writes.
+                // (This used to interpolate the `fileSize(using:)` *method*, so every file
+                // bubble was measured against the literal string "(Function) • (Function)".)
+                let sizeTextWidth = TextSizeMeasure.calculateSize(
+                    of: widestTransferSizeText(using: appearance.attachmentFileSizeFormatter),
                     config: config).textSize.width
-                if let ownerChannel, let ownerMessage {
-                    sizeWidth += MessageCell.InfoView.measure(channel: ownerChannel, message: ownerMessage, appearance: MessageCell.appearance).width
-                }
-                size.width = min(size.width, max(nameWidth, sizeWidth) + MessageCell.Layouts.attachmentIconSize + MessageCell.Layouts.horizontalPadding * 3)
+                // Chrome around the labels: the slot's leading inset (row-relative, so minus the
+                // stack's own) + the slot itself, then the gap to the labels and their trailing
+                // inset (both `horizontalPadding`).
+                let slotLeading = MessageCell.Layouts.attachmentFilePadding - MessageCell.Layouts.attachmentStackBubbleInset
+                let chrome = slotLeading + MessageCell.Layouts.attachmentFileIconSize + MessageCell.Layouts.horizontalPadding * 2
+                // Only the size line shares its row with the bubble's InfoView; the name line owns
+                // the full width. Reserving *inside* the `max` — as this used to — let a long file
+                // name silently swallow the space the timestamp needs, which is how the size text
+                // ended up drawn under the clock.
+                size.width = min(maxRowWidth, max(nameWidth, sizeTextWidth + reservedTrailingWidth) + chrome)
             case .voice:
                 size.height = defaults.audioAttachmentSize.height
             case .link:

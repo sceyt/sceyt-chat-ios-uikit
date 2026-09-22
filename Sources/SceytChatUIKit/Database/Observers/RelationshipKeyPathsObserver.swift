@@ -68,14 +68,17 @@ public final class RelationshipKeyPathsObserver<ResultType: NSManagedObject>: NS
     
     @objc
     private func contextDidChangeNotification(_ notification: NSNotification) {
-//        fetchedResultsController.managedObjectContext.perform {
-            guard let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject>
-            else { return }
-            guard let updatedObjectIDs = updatedObjects.updatedObjectIDs(for: self.keyPaths),
-                    !updatedObjectIDs.isEmpty
-            else { return }
-            self.updatedObjectIDs = self.updatedObjectIDs.union(updatedObjectIDs)
-//        }
+        // Runs synchronously on whichever context queue posted the notification
+        // (observer is registered with object: nil). The managed objects may only be
+        // touched here, on their own queue; only their objectIDs may leave it.
+        guard let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject>
+        else { return }
+        guard let updatedObjectIDs = updatedObjects.updatedObjectIDs(for: keyPaths),
+                !updatedObjectIDs.isEmpty
+        else { return }
+        fetchedResultsController.managedObjectContext.perform {
+            self.updatedObjectIDs.formUnion(updatedObjectIDs)
+        }
     }
     
     @objc

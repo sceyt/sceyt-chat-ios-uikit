@@ -62,18 +62,29 @@ open class ActionController: ViewController {
     
     override open func setupLayout() {
         super.setupLayout()
-        guard let contextView, let window = contextView.window else { return }
+        guard let contextView else {
+            logger.warn("[ContextMenu] setupLayout abort (id \(identifier.value)): contextView is nil (view deallocated)")
+            return
+        }
+        guard let window = contextView.window else {
+            logger.warn("[ContextMenu] setupLayout abort (id \(identifier.value)): \(type(of: contextView)).window is nil (left window: recycled/scrolled/deleted). superview=\(contextView.superview != nil)")
+            return
+        }
         let snapshotFrame = contextView.superview?.convert(contextView.frame, to: view) ?? .zero
+        let isSliced = snapshotFrame.height > window.bounds.height
         let snapshotView: UIView?
-        if snapshotFrame.height > window.bounds.height {
+        if isSliced {
             snapshotView = preapreSlicedView(contextView: contextView, window: window)
                 .withoutAutoresizingMask
         } else {
             snapshotView = contextView.snapshotView(afterScreenUpdates: true)?
                 .withoutAutoresizingMask
         }
-        
-        guard let snapshot = snapshotView else { return }
+
+        guard let snapshot = snapshotView else {
+            logger.warn("[ContextMenu] setupLayout abort (id \(identifier.value)): snapshot nil for \(type(of: contextView)) (frame \(snapshotFrame), sliced \(isSliced))")
+            return
+        }
         snapshot.clipsToBounds = true
         snapshot.layer.cornerRadius = 16
         self.snapshot = snapshot
@@ -201,8 +212,18 @@ private extension ActionController {
     
     @objc
     func onBackgroundTapped(_ gesture: UITapGestureRecognizer) {
-        if menuController.view.bounds.contains(gesture.location(in: menuController.view)) {
+        // Only swallow taps that actually land on the laid-out menu; everything else
+        // dismisses. Checking `menuController.view.bounds` is unsafe: if the menu was
+        // never laid into the hierarchy its view reports full-screen default bounds, so
+        // every background tap looks like a menu tap and the user gets trapped on the
+        // blurred overlay. `menuContainer` is a direct subview of `view`, so it shares
+        // this view's coordinate space and is empty (no superview) when not laid out.
+        if menuContainer.superview === view,
+           menuContainer.frame.contains(gesture.location(in: view)) {
             return
+        }
+        if menuContainer.superview == nil {
+            logger.warn("[ContextMenu] Tap-dismissed an un-laid-out menu (id \(identifier.value)) — content-less menu slipped past the present guard")
         }
         dismiss(animated: true)
     }

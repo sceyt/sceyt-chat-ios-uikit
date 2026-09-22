@@ -77,7 +77,8 @@ open class ChannelInfoViewController: ViewController,
             style: .plain,
             target: self,
             action: #selector(moreAction(_:)))
-        
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.moreButton
+
         mediaListViewController.mediaViewModel = profileViewModel.mediaListViewModel
         mediaListViewController.previewer = { [weak self] in
             self?.profileViewModel.previewer
@@ -96,6 +97,12 @@ open class ChannelInfoViewController: ViewController,
         tableView.dataSource = self
         tableView.isDirectionalLockEnabled = true
         tableView.contentInsetAdjustmentBehavior = .never
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.tableView
+        mediaListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.mediaList
+        fileListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.fileList
+        voiceListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.voiceList
+        linkListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.linkList
+        groupListViewController.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.groupList
         
         let footer = UIView()
         footer.frame.size.height = .leastNormalMagnitude
@@ -109,7 +116,7 @@ open class ChannelInfoViewController: ViewController,
 
         groupListViewController.onSelect = { [weak self] channelModel in
             guard let self else { return }
-            router.topToChannelListShowChannel(channelModel.channel)
+            router.showChannel(channelModel.channel)
         }
 
         segmentViewController.parentScrollView = tableView
@@ -173,9 +180,15 @@ open class ChannelInfoViewController: ViewController,
                     self.mediaListViewController.visibleCells
                         .compactMap { $0 as? ChannelInfoViewController.AttachmentCell }
                         .filter { !$0.progressView.isHidden }
-                        .forEach {
-                            $0.progressView.removeRotateZAnimation()
-                            $0.progressView.createRotateZAnimation()
+                        .forEach { cell in
+                            // The ring can be stale after backgrounding (the transfer
+                            // finished while suspended, or its completion observer was
+                            // wiped by cell reuse) — resync it from the layout state
+                            // first, and only revive the spinner for rings that survive.
+                            self.mediaListViewController.syncTransferOverlay(for: cell)
+                            guard !cell.progressView.isHidden, cell.progressView.progress < 1 else { return }
+                            cell.progressView.removeRotateZAnimation()
+                            cell.progressView.createRotateZAnimation()
                         }
                 }
             }.store(in: &subscriptions)
@@ -209,6 +222,22 @@ open class ChannelInfoViewController: ViewController,
         case .update:
             if !profileViewModel.isActive {
                 router.goChannelListViewController()
+                return
+            }
+            // A channel update can change my role/permissions, which adds or
+            // removes rows in the .options / .items sections (e.g. "Admins",
+            // "Auto-delete messages") and can even add/remove whole sections.
+            // reloadRows performs an implicit batch update and crashes with
+            // "invalid number of rows in section" when the row/section counts
+            // changed underneath it. So recompute the layout first and do a
+            // full reload whenever the structure changed; only fall back to the
+            // surgical row reload when the structure is identical (e.g. a plain
+            // name/description edit) to preserve the attachments browser state.
+            let newSections = availableSections()
+            let didChangeLayout = layoutChanged(from: sections, to: newSections)
+            sections = newSections
+            if didChangeLayout {
+                tableView.reloadData()
                 return
             }
             var indexPaths = [IndexPath]()
@@ -330,6 +359,7 @@ open class ChannelInfoViewController: ViewController,
             cell.iconView.image = appearance.optionIcons.uriIcon
             cell.titleLabel.text = SceytChatUIKit.shared.config.channelURIConfig.prefix + (profileViewModel.channel.uri)
             cell.selectionStyle = .none
+            cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.uri
             _cell = cell
         case .options, .items:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoOptionCell.self)
@@ -337,6 +367,7 @@ open class ChannelInfoViewController: ViewController,
             let action = (sections[indexPath.section] == .options ? options() : items())[indexPath.row]
             cell.iconView.image = action.image
             cell.titleLabel.text = action.title
+            cell.accessibilityIdentifier = optionAccessibilityIdentifier(for: action.tag)
 
             // Special handling for autoDelete to show formatted time
             if action.tag == ActionTag.autoDeleteMessages {
@@ -568,7 +599,7 @@ open class ChannelInfoViewController: ViewController,
             default:
                 break
             }
-            if profileViewModel.isOwner || profileViewModel.isAdmin {
+            if profileViewModel.canShowAdmins {
                 actions += [.init(title: appearance.optionTitles.adminsTitleText,
                                   image: appearance.optionIcons.adminsIcon,
                                   tag: ActionTag.admins)]
@@ -583,6 +614,22 @@ open class ChannelInfoViewController: ViewController,
         return actions
     }
     
+    /// Maps an option/item row's `ActionTag` to its stable accessibility
+    /// identifier so UI tests (and assistive tech) can address a specific row
+    /// regardless of its position, which varies with the channel type and the
+    /// current user's role.
+    open func optionAccessibilityIdentifier(for tag: Int) -> String? {
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.Option
+        switch tag {
+        case ActionTag.notifications: return AID.notifications
+        case ActionTag.autoDeleteMessages: return AID.autoDelete
+        case ActionTag.members: return AID.members
+        case ActionTag.admins: return AID.admins
+        case ActionTag.messageSearch: return AID.search
+        default: return nil
+        }
+    }
+
     open func availableSections() -> [Sections] {
         var sections: [Sections] = [.header]
         switch profileViewModel.channelType {
@@ -613,7 +660,28 @@ open class ChannelInfoViewController: ViewController,
         sections += [.attachment]
         return sections
     }
-    
+
+    /// Returns true when the table's structure (its sections, or the number of
+    /// rows in any section) differs between two layouts. When it does, a
+    /// surgical `reloadRows` would crash and a full `reloadData` is required.
+    private func layoutChanged(from old: [Sections], to new: [Sections]) -> Bool {
+        guard old == new else { return true }
+        for (index, section) in new.enumerated() {
+            let newCount: Int
+            switch section {
+            case .options: newCount = options().count
+            case .items: newCount = items().count
+            default: newCount = 1
+            }
+            // Compare against what the table currently displays. If the table
+            // has not been populated for this section yet, treat it as changed.
+            guard index < tableView.numberOfSections,
+                  tableView.numberOfRows(inSection: index) == newCount
+            else { return true }
+        }
+        return false
+    }
+
     @objc
     open func muteAction(_ sender: Any?) {
         if let sender = sender as? UISwitch {
@@ -672,8 +740,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Chat.pin,
                         icon: .chatPin,
-                        handler: { [unowned self] in
-                            pinChat()
+                        handler: { [weak self] in
+                            self?.pinChat()
                         })
                 ]
             } else {
@@ -681,8 +749,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Chat.unpin,
                         icon: .chatUnpin,
-                        handler: { [unowned self] in
-                            unpinChat()
+                        handler: { [weak self] in
+                            self?.unpinChat()
                         })
                 ]
             }
@@ -691,8 +759,8 @@ open class ChannelInfoViewController: ViewController,
                 .init(
                     title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
-                    handler: { [unowned self] in
-                        deleteAllMessages()
+                    handler: { [weak self] in
+                        self?.deleteAllMessages()
                     })
             ]
             
@@ -701,8 +769,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.unblock,
                         icon: .chatUnBlock,
-                        handler: { [unowned self] in
-                            unblock()
+                        handler: { [weak self] in
+                            self?.unblock()
                         })
                 ]
             } else {
@@ -710,8 +778,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.block,
                         icon: .chatBlock,
-                        handler: { [unowned self] in
-                            block()
+                        handler: { [weak self] in
+                            self?.block()
                         })
                 ]
             }
@@ -721,8 +789,8 @@ open class ChannelInfoViewController: ViewController,
                     title: L10n.Channel.Info.Action.Chat.delete,
                     icon: .chatDelete,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        delete()
+                    handler: { [weak self] in
+                        self?.delete()
                     })
             ]
            
@@ -732,8 +800,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Group.edit,
                         icon: .chatEdit,
-                        handler: { [unowned self] in
-                            editAction(nil)
+                        handler: { [weak self] in
+                            self?.editAction(nil)
                         })
                 ]
             }
@@ -743,8 +811,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Group.pin,
                         icon: .chatPin,
-                        handler: { [unowned self] in
-                            pinChat()
+                        handler: { [weak self] in
+                            self?.pinChat()
                         })
                 ]
             } else {
@@ -752,8 +820,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Group.unpin,
                         icon: .chatUnpin,
-                        handler: { [unowned self] in
-                            unpinChat()
+                        handler: { [weak self] in
+                            self?.unpinChat()
                         })
                 ]
             }
@@ -762,22 +830,22 @@ open class ChannelInfoViewController: ViewController,
                 .init(
                     title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
-                    handler: { [unowned self] in
-                        deleteAllMessages()
+                    handler: { [weak self] in
+                        self?.deleteAllMessages()
                     }),
                 .init(
                     title: L10n.Channel.Info.Action.Group.blockAndLeave,
                     icon: .chatBlock,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        blockAndLeave()
+                    handler: { [weak self] in
+                        self?.blockAndLeave()
                     }),
                 .init(
                     title: L10n.Channel.Info.Action.Group.leave,
                     icon: .chatLeave,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        leave()
+                    handler: { [weak self] in
+                        self?.leave()
                     })
             ]
             
@@ -787,8 +855,8 @@ open class ChannelInfoViewController: ViewController,
                         title: L10n.Channel.Info.Action.Group.delete,
                         icon: .chatDelete,
                         style: .destructive,
-                        handler: { [unowned self] in
-                            delete()
+                        handler: { [weak self] in
+                            self?.delete()
                         })
                 ]
             }
@@ -799,8 +867,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Channel.edit,
                         icon: .chatEdit,
-                        handler: { [unowned self] in
-                            editAction(nil)
+                        handler: { [weak self] in
+                            self?.editAction(nil)
                         })
                 ]
             }
@@ -810,8 +878,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Channel.pin,
                         icon: .chatPin,
-                        handler: { [unowned self] in
-                            pinChat()
+                        handler: { [weak self] in
+                            self?.pinChat()
                         })
                 ]
             } else {
@@ -819,8 +887,8 @@ open class ChannelInfoViewController: ViewController,
                     .init(
                         title: L10n.Channel.Info.Action.Channel.unpin,
                         icon: .chatUnpin,
-                        handler: { [unowned self] in
-                            unpinChat()
+                        handler: { [weak self] in
+                            self?.unpinChat()
                         })
                 ]
             }
@@ -829,22 +897,22 @@ open class ChannelInfoViewController: ViewController,
                 .init(
                     title: L10n.Channel.Info.Action.clearHistory,
                     icon: .chatClear,
-                    handler: { [unowned self] in
-                        deleteAllMessages(forEveryone: true)
+                    handler: { [weak self] in
+                        self?.deleteAllMessages(forEveryone: true)
                     }),
                 .init(
                     title: L10n.Channel.Info.Action.Channel.blockAndLeave,
                     icon: .chatBlock,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        blockAndLeave()
+                    handler: { [weak self] in
+                        self?.blockAndLeave()
                     }),
                 .init(
                     title: L10n.Channel.Info.Action.Channel.leave,
                     icon: .chatLeave,
                     style: .destructive,
-                    handler: { [unowned self] in
-                        leave()
+                    handler: { [weak self] in
+                        self?.leave()
                     })
             ]
             
@@ -854,8 +922,8 @@ open class ChannelInfoViewController: ViewController,
                         title: L10n.Channel.Info.Action.Channel.delete,
                         icon: .chatDelete,
                         style: .destructive,
-                        handler: { [unowned self] in
-                            delete()
+                        handler: { [weak self] in
+                            self?.delete()
                         })
                 ]
             }

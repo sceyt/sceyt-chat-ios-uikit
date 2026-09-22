@@ -37,7 +37,8 @@ open class AssetComposer {
     
     open func renderImage(in maxSize: CGSize, assets: [Asset], userInterfaceStyle: UIUserInterfaceStyle) -> UIImage {
         let renderer = UIGraphicsImageRenderer(size: maxSize)
-        
+        let traitCollection = UITraitCollection(userInterfaceStyle: userInterfaceStyle)
+
         return renderer.image { context in
             for asset in assets {
                 var image = asset.image
@@ -45,15 +46,20 @@ open class AssetComposer {
                                                     for: image.size,
                                                     inMaxSize: maxSize),
                                   size: image.size)
-                
+
                 switch asset.renderingMode {
                 case .original:
+                    // Resolve the source asset for the target style so light/dark
+                    // variants render distinctly (mirrors the .template branch).
+                    if let imageAsset = image.imageAsset {
+                        image = imageAsset.image(with: traitCollection)
+                    }
                     image = image.withRenderingMode(.alwaysOriginal)
                 case .template(let color):
-                    image = image.withTintColor(color.resolvedColor(with: .init(userInterfaceStyle: userInterfaceStyle)))
+                    image = image.withTintColor(color.resolvedColor(with: traitCollection))
                     image = image.withRenderingMode(.alwaysTemplate)
                 }
-                
+
                 image.draw(in: rect)
             }
         }

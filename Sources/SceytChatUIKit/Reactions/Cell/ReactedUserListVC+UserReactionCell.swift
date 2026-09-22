@@ -17,13 +17,24 @@ extension ReactedUserListViewController {
             .withoutAutoresizingMask
         open lazy var reactionLabel = UILabel()
             .withoutAutoresizingMask
+        /// Transparent hit area covering the avatar and the user name. Tapping it opens
+        /// the reacted user's profile; it is switched off for the current user's own row
+        /// so the tap falls through to the cell and keeps removing the reaction.
+        open lazy var profileButton = UIButton()
+            .withoutAutoresizingMask
         open var imageTask: Cancellable?
+        
+        open var onTapProfile: ((ChatUser) -> Void)?
         
         open var data: ChatMessage.Reaction! {
             didSet {
                 guard let user = data.user else { return }
                 userLabel.text = appearance.titleFormatter.format(user)
                 reactionLabel.text = appearance.subtitleFormatter.format(data)
+                
+                let isCurrentUser = user.id == SceytChatUIKit.shared.currentUserId
+                profileButton.isEnabled = !isCurrentUser
+                profileButton.isUserInteractionEnabled = !isCurrentUser
                 
                 imageTask = appearance.avatarRenderer.render(
                     user,
@@ -36,6 +47,7 @@ extension ReactedUserListViewController {
         open override func setup() {
             super.setup()
             selectedBackgroundView = UIView()
+            profileButton.addTarget(self, action: #selector(profileButtonAction), for: .touchUpInside)
         }
         
         open override func setupAppearance() {
@@ -60,11 +72,23 @@ extension ReactedUserListViewController {
             reactionLabel.leadingAnchor.pin(greaterThanOrEqualTo: userLabel.trailingAnchor, constant: 8)
             reactionLabel.centerYAnchor.pin(to: avatarView.centerYAnchor)
             reactionLabel.trailingAnchor.pin(to: contentView.trailingAnchor, constant: -18)
+            
+            contentView.addSubview(profileButton)
+            profileButton.leadingAnchor.pin(to: contentView.leadingAnchor)
+            profileButton.trailingAnchor.pin(to: userLabel.trailingAnchor)
+            profileButton.topAnchor.pin(to: contentView.topAnchor)
+            profileButton.bottomAnchor.pin(to: contentView.bottomAnchor)
         }
         
         open override func prepareForReuse() {
             super.prepareForReuse()
             imageTask?.cancel()
+        }
+        
+        @objc
+        open func profileButtonAction() {
+            guard let user = data?.user else { return }
+            onTapProfile?(user)
         }
     }
 }

@@ -40,6 +40,12 @@ extension ChannelInfoViewController {
             avatarView.clipsToBounds = true
             titleLabel.numberOfLines = 1
             subtitleLabel.numberOfLines = 1
+
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.GroupCell
+            accessibilityIdentifier = AID.root
+            avatarView.accessibilityIdentifier = AID.avatar
+            titleLabel.accessibilityIdentifier = AID.title
+            subtitleLabel.accessibilityIdentifier = AID.subtitle
         }
         
         override open func setupAppearance() {

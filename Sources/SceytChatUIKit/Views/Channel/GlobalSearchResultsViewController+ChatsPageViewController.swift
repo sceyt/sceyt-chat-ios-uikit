@@ -17,11 +17,16 @@ extension GlobalSearchResultsViewController {
 
         private var layoutModels: [ChatChannel: ChannelLayoutModel] = [:]
 
-        /// Clears all cached layout models so the next `reloadData()` call recreates them from scratch.
-        /// Call this when something external to the channel (e.g. contact names) has changed so that
-        /// `attributedView` is rebuilt with up-to-date formatter output.
+        /// Rebuilds the formatter output (subject, date, preview, unread count) of every cached
+        /// layout model in place. Call this when something external to the channel (e.g. contact
+        /// names) has changed the formatter output.
+        ///
+        /// The models — and crucially their already-rendered avatars — are kept: an earlier
+        /// version did `layoutModels.removeAll()`, which forced `reloadData()` to recreate all
+        /// models with `avatar == nil`, flashing empty avatars in every visible cell until the
+        /// async avatar render completed.
         open func invalidateLayoutModels() {
-            layoutModels.removeAll()
+            layoutModels.values.forEach { $0.reloadFormattedContent() }
         }
 
         /// Stable snapshot used by both numberOfRowsInSection and cellForRowAt.
@@ -154,11 +159,26 @@ extension GlobalSearchResultsViewController {
             emptyStateView.isHidden = pendingResponseCount > 0 || hasVisibleChannels || !chatMessagesSnapshot.isEmpty
         }
 
+        // MARK: - Dynamic Type
+
+        override open func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+            super.traitCollectionDidChange(previousTraitCollection)
+
+            // Large Text / Dynamic Type changed. On-screen cells' fonts re-scale
+            // themselves (adjustsFontForContentSizeCategory), but the cached
+            // last-message NSAttributedString keeps the fonts it was built with —
+            // so rebuild every cached preview for the new category and reload so
+            // the fixed channel-row height (heightForRowAt) is recomputed too.
+            guard previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory else { return }
+            layoutModels.values.forEach { $0.reloadAttributedView(compatibleWith: traitCollection) }
+            reloadData()
+        }
+
         // MARK: - UITableViewDataSource
 
-        public func numberOfSections(in tableView: UITableView) -> Int { 2 }
+        open func numberOfSections(in tableView: UITableView) -> Int { 2 }
 
-        override public func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        override open func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
             switch section {
             case 0: return viewModel.shouldShowChannelSection ? channelsSnapshot.count : 0
             case 1: return showMessagesSection ? chatMessagesSnapshot.count : 0
@@ -166,7 +186,7 @@ extension GlobalSearchResultsViewController {
             }
         }
 
-        override public func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        override open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
             switch indexPath.section {
             case 0:
                 guard channelsSnapshot.indices.contains(indexPath.row) else {
@@ -190,7 +210,18 @@ extension GlobalSearchResultsViewController {
             }
         }
 
-        public func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        open func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
+            switch indexPath.section {
+            // Channel rows use the same fixed height as the channel list so the
+            // row doesn't change between 1-line and 2-line previews. Sized for the
+            // current Dynamic Type category; recomputed in traitCollectionDidChange.
+            case 0: return ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
+            // Message rows self-size to fit their content.
+            default: return UITableView.automaticDimension
+            }
+        }
+
+        open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
             switch section {
             case 0:
                 guard viewModel.shouldShowChannelSection, !channelsSnapshot.isEmpty else { return nil }
@@ -207,7 +238,7 @@ extension GlobalSearchResultsViewController {
             }
         }
 
-        public func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
             switch section {
             case 0: return (viewModel.shouldShowChannelSection && !channelsSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
             case 1: return (showMessagesSection && !chatMessagesSnapshot.isEmpty) ? Components.separatorHeaderView.Layouts.height : 0
@@ -217,7 +248,7 @@ extension GlobalSearchResultsViewController {
 
         // MARK: - UITableViewDelegate
 
-        public func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
+        open func tableView(_ tableView: UITableView, willDisplay cell: UITableViewCell, forRowAt indexPath: IndexPath) {
             guard indexPath.section == 1,
                   messagesViewModel.hasMoreChatMessages,
                   indexPath.row >= chatMessagesSnapshot.count - 3
@@ -225,7 +256,7 @@ extension GlobalSearchResultsViewController {
             messagesViewModel.loadMoreMessages(in: .chats)
         }
 
-        override public func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        override open func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
             tableView.deselectRow(at: indexPath, animated: true)
             switch indexPath.section {
             case 0:

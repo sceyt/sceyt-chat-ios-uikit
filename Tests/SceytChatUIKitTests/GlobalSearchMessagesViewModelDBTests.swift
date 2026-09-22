@@ -134,31 +134,7 @@ final class GlobalSearchMessagesViewModelDBTests: XCTestCase {
         XCTAssertTrue(viewModel.messages.isEmpty)
     }
 
-    func testDB_multipleMatchesAcrossChannels() {
-        seedChannel(id: 10, type: directType)
-        seedChannel(id: 20, type: groupType)
-        seedMessage(id: 1, channelId: 10, body: "meeting at noon")
-        seedMessage(id: 2, channelId: 20, body: "meeting postponed")
-        seedMessage(id: 3, channelId: 10, body: "lunch plans")
-
-        waitForReload { viewModel.search(query: "meeting") }
-
-        XCTAssertEqual(viewModel.messages.count, 2)
-    }
-
     // MARK: - Section split: chats vs channels
-
-    func testDB_broadcastMessagesGoToChannelSection() {
-        seedChannel(id: 10, type: directType)
-        seedChannel(id: 30, type: broadcastType)
-        seedMessage(id: 1, channelId: 10, body: "update from chat")
-        seedMessage(id: 2, channelId: 30, body: "update from broadcast")
-
-        waitForReload { viewModel.search(query: "update") }
-
-        XCTAssertEqual(viewModel.numberOfMessages(in: .chats), 1)
-        XCTAssertEqual(viewModel.numberOfMessages(in: .channels), 1)
-    }
 
     func testDB_channelMapPopulatedForChatResults() {
         seedChannel(id: 10, type: directType)

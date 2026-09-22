@@ -34,6 +34,7 @@ open class ChannelMemberListViewController: ViewController,
         tableView.register(Components.channelAddMemberCell.self)
         tableView.delegate = self
         tableView.dataSource = self
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelMembers.tableView
         tableView.separatorStyle = .none
         tableView.sectionFooterHeight = 0
         tableView.estimatedSectionHeaderHeight = 0
@@ -103,14 +104,17 @@ open class ChannelMemberListViewController: ViewController,
                 if memberListViewModel.canAddMembers {
                     cell.titleLabel.text = memberListViewModel.addTitle
                     cell.iconView.image = .addMember
+                    cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelMembers.addMemberButton
                 } else if memberListViewModel.canShowInviteLink {
                     cell.titleLabel.text = memberListViewModel.inviteLinkTitle
                     cell.iconView.image = .inviteLink
+                    cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelMembers.inviteLinkButton
                 }
             } else if indexPath.row == 1 {
                 // Row 1 only exists if both canAddMembers and canShowInviteLink are true
                 cell.titleLabel.text = memberListViewModel.inviteLinkTitle
                 cell.iconView.image = .inviteLink
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelMembers.inviteLinkButton
             }
 
             return cell

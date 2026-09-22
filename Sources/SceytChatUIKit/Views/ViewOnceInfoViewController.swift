@@ -70,6 +70,11 @@ open class ViewOnceInfoViewController: ViewController {
         titleLabel.text = appearance.titleText
         subtitleLabel.text = appearance.subtitleText
         okButton.setTitle(appearance.okButtonTitle, for: .normal)
+
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ViewOnceInfo
+        titleLabel.accessibilityIdentifier = AID.title
+        okButton.accessibilityIdentifier = AID.okButton
+        closeButton.accessibilityIdentifier = AID.closeButton
     }
 
     open override func setupLayout() {

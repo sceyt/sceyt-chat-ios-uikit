@@ -26,6 +26,7 @@ extension GlobalSearchResultsViewController {
             tableView.delegate = self
             tableView.dataSource = self
             tableView.separatorStyle = .none
+            tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.GlobalSearch.pageTable
             tableView.register(Components.searchResultChannelCell.self)
             tableView.tableFooterView = UIView()
             tableView.estimatedRowHeight = 56

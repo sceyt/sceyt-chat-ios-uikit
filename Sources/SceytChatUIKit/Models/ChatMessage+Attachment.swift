@@ -28,22 +28,8 @@ extension ChatMessage {
         public var status: TransferStatus
         public var transferProgress: Double
         
-        public private(set) lazy var imageDecodedMetadata: Metadata<String>? = {
-            if let metadata {
-                if type != "voice" {
-                    return try? Metadata<String>.decode(metadata)
-                }
-            }
-            return nil
-        }()
-        public private(set) lazy var voiceDecodedMetadata: Metadata<[Int]>? = {
-            if let metadata {
-                if type == "voice" {
-                    return try? Metadata<[Int]>.decode(metadata)
-                }
-            }
-            return nil
-        }()
+        public private(set) var imageDecodedMetadata: Metadata<String>?
+        public private(set) var voiceDecodedMetadata: Metadata<[Int]>?
         
         @Lazy public var user: ChatUser?
         
@@ -72,6 +58,19 @@ extension ChatMessage {
         }
         
         public var assetFilePath: String?
+
+        /// Replaces the metadata JSON and re-runs the eager decode so
+        /// `imageDecodedMetadata`/`voiceDecodedMetadata` stay in sync — they are
+        /// otherwise only decoded in `init`.
+        public func updateMetadata(_ metadata: String?) {
+            self.metadata = metadata
+            guard let metadata else { return }
+            if type != "voice" {
+                imageDecodedMetadata = try? Metadata<String>.decode(metadata)
+            } else {
+                voiceDecodedMetadata = try? Metadata<[Int]>.decode(metadata)
+            }
+        }
         
         init(
             id: AttachmentId,
@@ -101,6 +100,14 @@ extension ChatMessage {
             self.createdAt = createdAt
             self.status = status
             self.transferProgress = transferProgress
+            // Decode metadata eagerly so the properties are immutable by the time any
+            // thread reads them — lazy var on a class is not thread-safe.
+            if let metadata, type != "voice" {
+                imageDecodedMetadata = try? Metadata<String>.decode(metadata)
+            }
+            if let metadata, type == "voice" {
+                voiceDecodedMetadata = try? Metadata<[Int]>.decode(metadata)
+            }
             $user = {
                 try? DataProvider.database.read {
                      UserDTO.fetch(id: userId, context: $0)?.convert()
@@ -164,7 +171,8 @@ extension ChatMessage {
             public var imageUrl: String?
             public var thumbnailUrl: String?
             public var hideLinkDetails: Bool?
-            
+            public var videoThumbnail: String?
+
             enum CodingKeys: String, CodingKey {
                 case width = "szw"
                 case height = "szh"
@@ -174,9 +182,9 @@ extension ChatMessage {
                 case imageUrl = "iur"
                 case thumbnailUrl = "tur"
                 case hideLinkDetails = "hld"
-                
+                case videoThumbnail = "video_thumb"
             }
-            
+
             public init(
                 width: Int = 0,
                 height: Int = 0,
@@ -185,7 +193,8 @@ extension ChatMessage {
                 description: String? = nil,
                 imageUrl: String? = nil,
                 thumbnailUrl: String? = nil,
-                hideLinkDetails: Bool? = nil
+                hideLinkDetails: Bool? = nil,
+                videoThumbnail: String? = nil
             ) {
                 self.width = width
                 self.height = height
@@ -195,6 +204,7 @@ extension ChatMessage {
                 self.imageUrl = imageUrl
                 self.thumbnailUrl = thumbnailUrl
                 self.hideLinkDetails = hideLinkDetails
+                self.videoThumbnail = videoThumbnail
             }
             
             func build() -> String? {
@@ -219,6 +229,7 @@ extension ChatMessage {
                 imageUrl = (try? container.decode(String.self, forKey: CodingKeys.imageUrl))
                 thumbnailUrl = (try? container.decode(String.self, forKey: CodingKeys.thumbnailUrl))
                 hideLinkDetails = (try? container.decode(Bool.self, forKey: CodingKeys.hideLinkDetails))
+                videoThumbnail = (try? container.decode(String.self, forKey: CodingKeys.videoThumbnail))
                 if let base64 = thumbnail as? String, !base64.isEmpty {
                     thumbnailImage = Components.imageBuilder.image(thumbHash: base64)
                     if thumbnailImage == nil,

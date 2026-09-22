@@ -6,6 +6,7 @@
 //  Copyright © 2023 Sceyt LLC. All rights reserved.
 //
 
+import ImageIO
 import SceytChat
 import UIKit
 
@@ -90,8 +91,13 @@ open class SCTSession: NSObject, SCTDataSession {
     open func download(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo) {
         guard let urlString = attachment.url,
               let url = URL(string: urlString)
-        else { return }
-        Session.download(url: url) { progress in
+        else {
+            // No task is created, so nothing will ever report progress, complete or
+            // fail — the attachment is left in whatever status it already has.
+            logger.error("[Attachment] SCTSession.download: unusable url, download not started \(attachment.description)")
+            return
+        }
+        let downloadTask = Session.download(url: url) { progress in
             taskInfo.updateProgress(progress.fractionCompleted)
         } completion: { result in
             switch result {
@@ -105,14 +111,27 @@ open class SCTSession: NSObject, SCTDataSession {
             }
         }
         
-        taskInfo.onAction = {
-            switch $0 {
+        // Drive the real URLSession task. This handler used to be an empty switch — the
+        // returned Cancellable was discarded — so pausing a download changed only the
+        // persisted status while the bytes kept arriving and `updateProgress` kept ticking
+        // into whatever view was showing the (supposedly paused) transfer.
+        //
+        // `suspend()` rather than `cancel(byProducingResumeData:)`: it keeps the bytes already
+        // received and leaves the task alive, which is what `AttachmentTransfer.resumeTransfer`
+        // assumes — it refuses to resume unless `taskFor(...)` still finds a live task. A task
+        // left suspended long enough can still be timed out by the system; that surfaces as
+        // `.failedDownloading` through the existing failure path, which is the correct outcome.
+        // Weakly: URLSession keeps the task alive until it finishes, and a strong capture
+        // here would close the cycle task -> completion closure -> taskInfo -> onAction -> task.
+        taskInfo.onAction = { [weak task = downloadTask as? URLSessionTask] action in
+            guard let task else { return }
+            switch action {
             case .stop:
-                break
+                task.suspend()
             case .cancel:
-                break
+                task.cancel()
             case .resume:
-                break
+                task.resume()
             }
         }
     }
@@ -133,6 +152,17 @@ open class SCTSession: NSObject, SCTDataSession {
         return nil
     }
     
+    /// True when `path` holds an image whose data is complete and decodable, checked from the
+    /// container's header rather than by decoding the pixels. Catches the truncated/partial
+    /// JPEG that a cached thumbnail write could leave behind, at a fraction of the cost.
+    static func isCompleteImageFile(at path: String) -> Bool {
+        let options = [kCGImageSourceShouldCache: false] as CFDictionary
+        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, options),
+              CGImageSourceGetCount(source) > 0
+        else { return false }
+        return CGImageSourceGetStatus(source) == .statusComplete
+    }
+
     open func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
         let scale = UIScreen.main.traitCollection.displayScale
         let newSize = CGSize(width: size.width * scale, height: size.height * scale)
@@ -143,24 +173,52 @@ open class SCTSession: NSObject, SCTDataSession {
                 image = UIImage(contentsOfFile: path)
             } else if attachment.type == "video" {
                 image = Components.videoProcessor.copyFrame(url: URL(fileURLWithPath: path))
-            } else if attachment.type == "file", URL(fileURLWithPath: path).isImage {
-                image = UIImage(contentsOfFile: path)
+            } else if attachment.type == "file" {
+                let fileURL = URL(fileURLWithPath: path)
+                if fileURL.isImage {
+                    image = UIImage(contentsOfFile: path)
+                } else if fileURL.isVideo {
+                    image = Components.videoProcessor.copyFrame(url: fileURL)
+                }
             }
             if let image,
                let ib = try? Components.imageBuilder.init(image: image).resize(max: newSize.maxSide),
                let data = ib.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality)
             {
-                logger.debug("[thumbnail] 3 stored \(thumbnailPath)")
-                return Storage.storeData(data, filePath: thumbnailPath)?.path
+                // Atomic write: stage to a temp file then atomically replace the destination so a
+                // concurrent reader (loadThumbnail / reloadThumbnailFromFile) never observes a
+                // partially written JPEG. Several in-flight extractions of the same freshly
+                // downloaded video each write a complete file and the last rename wins — this
+                // removes the truncated-read `nil` that left the blurry placeholder in place.
+                let destination = URL(fileURLWithPath: thumbnailPath)
+                do {
+                    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+                    try data.write(to: destination, options: .atomic)
+                    logger.debug("[thumbnail] 3 stored (atomic) \(thumbnailPath)")
+                    return thumbnailPath
+                } catch {
+                    logger.errorIfNotNil(error, "[thumbnail] atomic store failed, falling back \(thumbnailPath)")
+                    return Storage.storeData(data, filePath: thumbnailPath)?.path
+                }
             }
             return nil
         }
-        
+
         if let path = getFilePath(attachment: attachment) {
             let thumbnailPath = fileStorage.thumbnailPath(filePath: path, imageSize: newSize)
             if fileStorage.isFilePath(thumbnailPath) {
-                logger.debug("[thumbnail] found file \(attachment.type)")
-                return thumbnailPath
+                // Validate the cached thumbnail actually decodes. A legacy truncated/partial JPEG
+                // would otherwise be handed back to every reader forever (and a retry just keeps
+                // getting the same undecodable path) — evict it and fall through to regenerate.
+                // Header-only via ImageIO: the caller decodes this file itself immediately after,
+                // so fully decoding it here just to throw the pixels away doubled the cost of
+                // every cached-thumbnail lookup — on the hot path of every file-cell bind.
+                if Self.isCompleteImageFile(at: thumbnailPath) {
+                    logger.debug("[thumbnail] found file \(attachment.type)")
+                    return thumbnailPath
+                }
+                logger.debug("[thumbnail] cached thumbnail unreadable, evicting \(thumbnailPath)")
+                try? FileManager.default.removeItem(atPath: thumbnailPath)
             }
             return makeThumbnail(file: path, thumbnailPath: thumbnailPath)
         } else if let path = attachment.filePath {

@@ -47,6 +47,24 @@ extension NSAttributedString {
         return NSAttributedString(attributedString: modifiedString)
     }
 
+    func replacingLineBreaksWithSpacesForPreview() -> NSAttributedString {
+        guard !isEmpty else { return self }
+
+        let modifiedString = NSMutableAttributedString(attributedString: self)
+        let fullRange = NSRange(location: 0, length: modifiedString.length)
+        let pattern = "\\n[ \\t]*\\n[\\s\\S]*"
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return self
+        }
+
+        regex
+            .matches(in: modifiedString.string, range: fullRange)
+            .reversed()
+            .forEach { modifiedString.replaceCharacters(in: $0.range, with: "\n...") }
+
+        return modifiedString
+    }
+
 }
 
 extension NSMutableAttributedString {

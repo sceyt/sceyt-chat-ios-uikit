@@ -110,7 +110,7 @@ open class MessageCell: CollectionViewCell,
 
     open override func setup() {
         super.setup()
-        
+
         unreadMessagesSeparatorView.isHidden = true
         replyCountView.addTarget(
             self,
@@ -289,6 +289,18 @@ open class MessageCell: CollectionViewCell,
         }
     }
 
+    /// Which visual edge of the list holds the newest message. Only affects which
+    /// side of the cell the "New messages" separator is pinned to: newer messages
+    /// sit below the anchor cell in `.newestAtBottom` and above it in
+    /// `.newestAtTop`, and the bar always faces them. Assign before `data` — that
+    /// setter rebuilds the constraints.
+    open var messageListOrder: ChannelViewController.MessageListOrder = .newestAtBottom {
+        didSet {
+            guard oldValue != messageListOrder, superview != nil, data != nil else { return }
+            makeConstraints()
+        }
+    }
+
     open var data: MessageLayoutModel! {
         didSet {
             if superview != nil {
@@ -306,6 +318,20 @@ open class MessageCell: CollectionViewCell,
 
         readMoreButton.isHidden = true
         textLabel.attributedText = data.attributedView.content
+        textLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.body
+        infoView.dateLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.date
+        do {
+            typealias CellAID = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell
+            nameLabel.accessibilityIdentifier = CellAID.senderName
+            avatarView.accessibilityIdentifier = CellAID.avatar
+            attachmentView.accessibilityIdentifier = CellAID.attachments
+            linkView.accessibilityIdentifier = CellAID.linkPreview
+            pollView.accessibilityIdentifier = CellAID.poll
+            reactionTotalView.accessibilityIdentifier = CellAID.reactions
+            forwardView.accessibilityIdentifier = CellAID.forward
+            replyCountView.accessibilityIdentifier = CellAID.replyCount
+            checkBoxView.accessibilityIdentifier = CellAID.checkbox
+        }
 
         if data.shouldDisplayReadMoreButton {
             readMoreButton.isHidden = false
@@ -323,12 +349,18 @@ open class MessageCell: CollectionViewCell,
         replyView.data = message.repliedInThread ? nil : data.replyLayout
         replyCountView.count = data.replyCount
         deliveryStatus = message.deliveryStatus
+        // Cancel any in-flight avatar download from a previous binding before
+        // starting a new one. `reconfigureItems(at:)` re-binds a cell in place
+        // without calling `prepareForReuse`, so without this a stale download
+        // can complete late and stamp the wrong sender's avatar onto the cell.
+        imageTask?.cancel()
+        imageTask = nil
         if showSenderInfo {
             nameLabel.isHidden = false
             avatarView.isHidden = false
             let scale = UIScreen.main.traitCollection.displayScale
             let avatarRepresentation = appearance.userDefaultAvatarProvider.provideVisual(for: message.user)
-            
+
             imageTask = switch avatarRepresentation {
             case .image(let image):
                 Components.avatarBuilder
@@ -371,19 +403,32 @@ open class MessageCell: CollectionViewCell,
     private func makeConstraints() {
         UIView.performWithoutAnimation {
             NSLayoutConstraint.deactivate(contentConstraints ?? [])
-            contentConstraints = containerView.pin(to: contentView,
-                                                   anchors: [
-                                                    .trailing(-data.contentInsets.right),
-                                                    .top(data.contentInsets.top)
-                                                   ])
-            contentConstraints! += [containerView.bottomAnchor.pin(to: unreadMessagesSeparatorView.topAnchor)]
+            // The "New messages" bar sits on the side of the cell that faces the
+            // newer messages: below the bubble when they are below (mirrored list),
+            // above it when they are above (upright list).
+            if messageListOrder.isMirrored {
+                contentConstraints = containerView.pin(to: contentView,
+                                                       anchors: [
+                                                        .trailing(-data.contentInsets.right),
+                                                        .top(data.contentInsets.top)
+                                                       ])
+                contentConstraints! += [containerView.bottomAnchor.pin(to: unreadMessagesSeparatorView.topAnchor)]
+                contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.bottom(-data.contentInsets.bottom)])
+            } else {
+                contentConstraints = containerView.pin(to: contentView,
+                                                       anchors: [
+                                                        .trailing(-data.contentInsets.right),
+                                                        .bottom(-data.contentInsets.bottom)
+                                                       ])
+                contentConstraints! += [containerView.topAnchor.pin(to: unreadMessagesSeparatorView.bottomAnchor)]
+                contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.top(data.contentInsets.top)])
+            }
             contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.leading(data.contentInsets.left), .trailing(-data.contentInsets.right)])
-            contentConstraints! += unreadMessagesSeparatorView.pin(to: contentView, anchors: [.bottom(-data.contentInsets.bottom)])
             contentConstraints! += layoutConstraints(layout: data)
             contentConstraints! += [replyIcon.trailingAnchor.pin(to: contentView.trailingAnchor, constant: 44)]
             contentConstraints! += [replyIcon.bottomAnchor.pin(to: bubbleView.bottomAnchor)]
             contentConstraints! += replyIcon.resize(anchors: [.height(32), .width(32)])
-            contentConstraints! += [checkBoxView.centerYAnchor.pin(to: contentView.centerYAnchor)]
+            contentConstraints! += [checkBoxView.centerYAnchor.pin(to: containerView.centerYAnchor)]
             contentConstraints! += [checkBoxView.leadingAnchor.pin(to: contentView.leadingAnchor)]
             if isEditing {
                 let checkBoxSize = Layouts.checkBoxSize + 2 * Layouts.checkBoxPadding
@@ -863,6 +908,25 @@ public extension MessageCell {
         public static var checkBoxPadding: CGFloat = 10
         public static var horizontalPadding: CGFloat = 12
         public static var attachmentIconSize: CGFloat = 40
+        /// The file row's icon/preview slot. Separate from `attachmentIconSize` (still the
+        /// voice row's play button) because a previewable document shows a real thumbnail there.
+        public static var attachmentFileIconSize: CGFloat = 48
+        /// Inset around that slot, measured from the *bubble's* edge — leading, and (via the row
+        /// height) top and bottom. The gap to the name/size labels and their trailing inset stay
+        /// `horizontalPadding`.
+        public static var attachmentFilePadding: CGFloat = 8
+        /// Clear space between the file row's size label and the bubble's date/tick InfoView,
+        /// which is drawn over that same line. Reserved both in the row's measured width and in
+        /// the size label's trailing constraint, so measurement and layout always agree.
+        public static var attachmentFileInfoSpacing: CGFloat = 8
+        /// Diameter of the transfer loader drawn over that slot. Smaller than the slot, so a
+        /// previewable document stays partly visible while it downloads.
+        public static var attachmentFileProgressSize: CGFloat = 40
+        /// How far the attachment stack sits inside the bubble on its top and sides; at its
+        /// bottom the stack is flush with the bubble. Mirrors the literals in the `.file` branch
+        /// of Incoming/OutgoingMessageCell, and is what `attachmentFilePadding` is measured
+        /// against: a file row's own insets are this much smaller on the sides it applies to.
+        static var attachmentStackBubbleInset: CGFloat = 2
         public static var cornerRadius: CGFloat = 8
     }
 }

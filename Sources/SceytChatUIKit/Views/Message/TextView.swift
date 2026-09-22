@@ -39,6 +39,10 @@ open class TextLabel: View {
         textContainer.lineBreakMode = .byTruncatingTail
         isUserInteractionEnabled = true
         contentMode = .redraw
+        // The text is custom-drawn (Core Text), so it is invisible to assistive
+        // technologies and UI tests unless the plain string is exposed here.
+        isAccessibilityElement = true
+        accessibilityTraits = .staticText
     }
     
     open override func setupAppearance() {
@@ -59,11 +63,15 @@ open class TextLabel: View {
             updateTextStorage()
         }
     }
-    
-    
+
+
     fileprivate func updateTextStorage() {
-        
+
         textContainer.size = bounds.size
+
+        // Mirror the drawn text into the accessibility label so VoiceOver and UI
+        // tests can read the message body.
+        accessibilityLabel = attributedText?.string
 
         guard attributedText != nil, attributedText!.length > 0
         else {

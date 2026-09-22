@@ -93,7 +93,14 @@ open class JoinGroupViewController: ViewController {
     
     open override func setup() {
         super.setup()
-        
+
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.JoinGroup
+        channelAvatarImageView.accessibilityIdentifier = AID.avatar
+        channelNameLabel.accessibilityIdentifier = AID.name
+        channelDescriptionLabel.accessibilityIdentifier = AID.description
+        joinButton.accessibilityIdentifier = AID.joinButton
+        closeButton.accessibilityIdentifier = AID.closeButton
+
         setupBindings()
 
         // Update UI with pre-loaded data if available

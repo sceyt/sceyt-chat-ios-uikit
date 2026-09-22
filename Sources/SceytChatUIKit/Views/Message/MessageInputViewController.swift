@@ -68,10 +68,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             case .recordingUnavailable:
                 self.showRecordingUnavailable()
             case let .recorded(url, metadata, viewOnce):
-                self.recordedView.isHidden = false
-                self.recordedView.setup(url: url, metadata: metadata, viewOnce: viewOnce)
+                self.showRecordedVoicePreview(url: url, metadata: metadata, viewOnce: viewOnce)
             case let .send(url, metadata, viewOnce):
                 if let url = Components.storage.copyFile(url) {
+                    self.pendingVoiceRecording = nil
                     self.selectedMediaView.insert(view: AttachmentModel(voiceUrl: url, metadata: metadata))
                     self.isViewOnceEnabled = viewOnce
                     self.action = .send(false)
@@ -87,6 +87,28 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     
     open lazy var recordedView = Components.messageInputVoiceRecordPlaybackView.init()
         .withoutAutoresizingMask
+
+    /// A recording that has been made but not sent yet.
+    ///
+    /// It lives in `recordedView`, which keeps its url and metadata private, and it never reaches
+    /// `selectedMediaView` — that only happens on send, which fires immediately. Mirroring it here
+    /// is what lets the draft persist a paused recording.
+    internal private(set) var pendingVoiceRecording: (
+        url: URL,
+        metadata: ChatMessage.Attachment.Metadata<[Int]>,
+        viewOnce: Bool
+    )?
+
+    /// Shows the play/send/cancel preview for a recording, from the recorder or from a draft.
+    open func showRecordedVoicePreview(
+        url: URL,
+        metadata: ChatMessage.Attachment.Metadata<[Int]>,
+        viewOnce: Bool
+    ) {
+        pendingVoiceRecording = (url, metadata, viewOnce)
+        recordedView.isHidden = false
+        recordedView.setup(url: url, metadata: metadata, viewOnce: viewOnce)
+    }
     
     open var shouldHideRecordButton = false {
         didSet {
@@ -219,8 +241,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             switch $0 {
             case .cancel:
                 self.recordedView.isHidden = true
+                self.pendingVoiceRecording = nil
             case let .send(url, metadata, viewOnce):
                 self.recordedView.isHidden = true
+                self.pendingVoiceRecording = nil
                 if let url = Components.storage.copyFile(url) {
                     self.selectedMediaView.insert(view: AttachmentModel(voiceUrl: url, metadata: metadata))
                     self.isViewOnceEnabled = viewOnce
@@ -242,8 +266,25 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         
         actionView.isHidden = true
         separatorViewCenter.isHidden = true
+
+        setupAccessibilityIdentifiers()
     }
-    
+
+    /// Assigns accessibility identifiers to the composer controls so UI tests can
+    /// locate the input field and the send button. The values are mirrored in the
+    /// central registry (`SceytChatUIKit.AccessibilityIdentifiers.MessageInput`).
+    open func setupAccessibilityIdentifiers() {
+        typealias AID = SceytChatUIKit.AccessibilityIdentifiers.MessageInput
+        inputTextView.accessibilityIdentifier = AID.inputField
+        sendButton.accessibilityIdentifier = AID.sendButton
+        addMediaButton.accessibilityIdentifier = AID.attachmentButton
+        cameraButton.accessibilityIdentifier = AID.cameraButton
+        recordButton.accessibilityIdentifier = AID.voiceButton
+        viewOnceButton.accessibilityIdentifier = AID.viewOnceButton
+        actionView.cancelButton.accessibilityIdentifier = AID.actionCancelButton
+        actionView.titleLabel.accessibilityIdentifier = AID.actionTitleLabel
+    }
+
     override open func setupAppearance() {
         super.setupAppearance()
         
@@ -356,8 +397,27 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         }
     }
     
+    /// Whether the input currently holds something worth sending.
+    ///
+    /// Returns `true` when there are selected media items, or when the input
+    /// contains real typed text. Bare object replacement characters (`U+FFFC`)
+    /// — left behind by inline non-text content such as `NSTextAttachment`s or
+    /// adaptive image glyphs (iOS 18+ Genmoji) — are stripped first: that content
+    /// can't be serialized by the send path (`UserSendMessage` sends only the
+    /// plain string), so on its own it must not count as sendable. Genmoji input
+    /// is additionally disabled at the text view via `supportsAdaptiveImageGlyph`,
+    /// so this mainly guards against pasted or restored placeholder content.
+    ///
+    /// Override to customize what counts as sendable (e.g. to require text).
+    open func hasSendableContent() -> Bool {
+        if !selectedMediaView.items.isEmpty { return true }
+
+        let plainText = (inputTextView.text ?? "").replacingOccurrences(of: "\u{fffc}", with: "")
+        return !plainText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     open func updateTrailingInputButtons(_ animated: Bool = true) {
-        let shouldShowSendButton = !inputTextView.text.replacingOccurrences(of: "\u{fffc}", with: "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !selectedMediaView.items.isEmpty
+        let shouldShowSendButton = hasSendableContent()
         let shouldShowViewOnceButton = appearance.enableViewOnce && selectedMediaView.items.count == 1
 
         // Update button visibility
@@ -444,7 +504,10 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     open func update(height: CGFloat) {
         guard view.bounds.height > 0, inputTextView.bounds.height > 0
         else { return }
-        var updateHeight = CGFloat(Int(height + view.bounds.height - inputTextView.bounds.height))
+        // Round up, never down: truncating leaves the container up to a point
+        // shorter than the text view's content, which makes the text view
+        // scrollable by a fraction of a point even though the text visually fits.
+        var updateHeight = ceil(height + view.bounds.height - inputTextView.bounds.height)
         if updateHeight < style.preferredMinHeight {
             updateHeight = style.preferredMinHeight
         } else if updateHeight > style.preferredMaxHeight {
@@ -667,8 +730,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         if isEditState {
             inputTextView.attributedText = cachedMessage
             cachedMessage = nil
-            nextState = nil
         }
+        nextState = nil
         isViewOnceEnabled = false
         removeActionView()
         selectedMediaView.removeAll()
@@ -842,11 +905,44 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             case "voice":
                 image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             case "link":
-                if let metadata = layoutModel.linkPreviews?.first?.metadata {
-                    addOrUpdateLinkPreview(linkDetails: metadata)
-                    return
+                // Render like every other reply (sender + body text); use the link's
+                // preview image only as the thumbnail, never replace the reply with a link card.
+                if attachment.imageDecodedMetadata?.hideLinkDetails == true {
+                    // The sender dismissed the preview for this link — the site image must not
+                    // leak back in through the reply thumbnail (and `linkPreviews` is empty for
+                    // such attachments, so without this the metadata fetch below would do
+                    // exactly that). Show the generic link icon instead.
+                    image = appearance.linkPreviewAppearance.placeholderIcon
+                } else if let metadata = layoutModel.linkPreviews?.first?.metadata {
+                    image = metadata.image
+                } else if let urlString = attachment.url, let url = URL(string: urlString)?.normalizedURL {
+                    // 1. Synchronous in-memory hit → use its image right away.
+                    if let cached = LinkMetadataProvider.default.metadata(for: url) {
+                        image = cached.image
+                    } else {
+                        // 2. Cache miss → DB, then network API if still missing (also downloads the image).
+                        // Drop the image into the existing reply thumbnail when it arrives.
+                        LinkMetadataProvider.default.fetch(url: url, loadFromNetworkIfMissing: true) { [weak self] result in
+                            guard let self, case .success(let metadata) = result, let image = metadata.image else { return }
+                            DispatchQueue.main.async {
+                                guard case .reply(let model) = self.currentState,
+                                      model === layoutModel else { return }
+                                self.actionView.imageView.image = image
+                                self.actionView.imageView.isHidden = false
+                            }
+                        }
+                    }
                 }
-                image = nil
+            case "file":
+                // An image/video sent as a document previews itself here, exactly like its
+                // bubble does. The generic file icon stays the fallback — for a plain
+                // document (pdf/zip/…) and for a previewable one with no preview available yet.
+                if let thumbnail = attachment.filePreviewImage {
+                    image = thumbnail
+                    showPlayIcon = attachment.isVideoFileAttachment
+                } else {
+                    image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
+                }
             default:
                 image = appearance.replyMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
@@ -966,6 +1062,14 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                     return
                 }
                 image = nil
+            case "file":
+                // Same preview-or-icon rule as the reply bar above.
+                if let thumbnail = attachment.filePreviewImage {
+                    image = thumbnail
+                    showPlayIcon = attachment.isVideoFileAttachment
+                } else {
+                    image = appearance.editMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
+                }
             default:
                 image = appearance.editMessageAppearance.attachmentIconProvider.provideVisual(for: attachment)
             }
@@ -1247,7 +1351,16 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         if isRecording {
             return false
         }
-        
+
+        // Enforce the maximum message length on insertions/replacements.
+        if !text.isEmpty {
+            let currentLength = (textView.text as NSString).length
+            let newLength = currentLength - range.length + (text as NSString).length
+            if newLength > SceytChatUIKit.shared.config.maximumMessageLength {
+                return false
+            }
+        }
+
         textView.typingAttributes[.foregroundColor] = appearance.inputAppearance.textInputAppearance.labelAppearance.foregroundColor
         
         if text == " " {

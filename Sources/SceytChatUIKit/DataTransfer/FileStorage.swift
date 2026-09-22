@@ -8,6 +8,7 @@
 
 import Foundation
 import SceytChat
+import CryptoKit
 
 open class FileStorage: Storage {
     public static let `default` = FileStorage()
@@ -154,6 +155,19 @@ open class FileStorage: Storage {
             }
     }
     
+    /// Cache location for a downloaded "video_thumb" poster image, keyed by the
+    /// opaque origin from the attachment metadata (hashed — origins may be URLs
+    /// containing path separators). Creates the cache directory on demand.
+    open func videoThumbnailCachePath(origin: String) -> String {
+        let dir = URL(fileURLWithPath: storagePath).appendingPathComponent("video_thumbs")
+        if !fileManager.fileExists(atPath: dir.path) {
+            try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+        }
+        let digest = SHA256.hash(data: Data(origin.utf8))
+        let name = digest.map { String(format: "%02x", $0) }.joined()
+        return dir.appendingPathComponent(name).appendingPathExtension("jpg").path
+    }
+
     open func remove(path: String) {
         try? fileManager.removeItem(atPath: path)
     }

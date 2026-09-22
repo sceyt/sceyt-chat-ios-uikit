@@ -40,6 +40,9 @@ extension ChannelMemberListViewController {
         open override func setup() {
             super.setup()
             titleLabel.textAlignment = .left
+
+            iconView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelMembers.actionIcon
+            titleLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelMembers.actionTitle
         }
         
         open override func setupAppearance() {

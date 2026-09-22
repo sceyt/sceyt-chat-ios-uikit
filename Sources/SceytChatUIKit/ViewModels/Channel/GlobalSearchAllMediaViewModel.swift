@@ -486,13 +486,24 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     ) {
         let attachment = layout.attachment
         downloadQueue.async { [weak self] in
-            guard let self,
-                  attachment.type != "link",
-                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
-                  attachment.status != .done,
-                  attachment.status != .failedDownloading,
-                  attachment.status != .pauseDownloading,
-                  attachment.status != .failedUploading
+            guard let self
+            else {
+                DispatchQueue.main.async { completion?(layout) }
+                return
+            }
+
+            // The video poster is a separate, tiny fetch, so it runs ahead of the
+            // auto-download gate below — a video that won't auto-download (over the
+            // size limit, or a paused/failed transfer waiting for a tap) is exactly
+            // the case where the grid would otherwise sit on the blurred thumbHash
+            // indefinitely.
+            self.downloadVideoThumbnailIfNeeded(layout)
+
+            guard shouldAutoDownload(attachment),
+                  // A stored `.done` is not proof the bytes are still there (cache
+                  // eviction, restored backup), and a stored `.pending` is not proof
+                  // they are missing. The file itself is the authority.
+                  fileProvider.filePath(attachment: attachment) == nil
             else {
                 DispatchQueue.main.async { completion?(layout) }
                 return
@@ -512,6 +523,22 @@ open class GlobalSearchAllMediaViewModel: NSObject {
                     }
                 }
             }
+        }
+    }
+
+    /// Fetches the small "video_thumb" poster so a video that is not downloaded yet
+    /// still previews sharply in the grid. Independent of the video transfer itself:
+    /// it must happen even when the video won't be (or hasn't been) downloaded.
+    open func downloadVideoThumbnailIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
+        let attachment = layout.attachment
+        guard fileProvider.needsVideoThumbnailDownload(attachment: attachment)
+        else { return }
+        getMessage(layout) { message in
+            guard let message else { return }
+            fileProvider.downloadVideoThumbnailsIfNeeded(
+                message: message,
+                attachments: [attachment]
+            )
         }
     }
 
@@ -542,7 +569,11 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { _ in
+                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                    // stopTransfer persists the paused status itself whenever it had
+                    // something to stop; false means nothing was running (e.g. the
+                    // download already finished) and the stored status must stay.
+                    guard stopped else { return }
                     DataProvider.database.write {
                         let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
                         dto?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue

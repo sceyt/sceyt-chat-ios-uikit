@@ -16,6 +16,8 @@ open class ChannelAttachmentListViewModel: NSObject {
     public let channel: ChatChannel
     public let attachmentTypes: [String]
     public let provider: ChannelAttachmentProvider
+    public lazy var messageProvider: ChannelMessageProvider = Components.channelMessageProvider
+        .init(channelId: channel.id)
     public var appearance: MessageCell.Appearance
     @Published public var event: Event?
     private let downloadQueue = DispatchQueue(label: "com.sceytchat.uikit.attachments", qos: .userInitiated)
@@ -35,8 +37,21 @@ open class ChannelAttachmentListViewModel: NSObject {
             }
         }
     }
-    public var minAutoDownloadSize = 3_000_000
-    
+    public var minAutoDownloadSize = 10_000_000
+
+    /// False until the first server page has reported back. While false, an empty list
+    /// means "not loaded yet" rather than "nothing here", and the view keeps its empty
+    /// state hidden.
+    public private(set) var hasLoadedInitialAttachments = false
+    private var isInitialServerPageRequested = false
+    /// Anchors of the previous-page requests already sent to the server. The anchor is
+    /// the oldest attachment the list holds, so it only moves once a page has landed in
+    /// the database; asking again for the same one — a second reach of the bottom while
+    /// the page is in flight, or a page that came back empty because the channel has
+    /// nothing older — would be a duplicate request. A failed page is dropped from here
+    /// so the next reach of the bottom retries it.
+    private var requestedPreviousPageAnchors = Set<AttachmentId>()
+
     private let thumbnailCache = {
         $0.countLimit = 20
         return $0
@@ -60,7 +75,98 @@ open class ChannelAttachmentListViewModel: NSObject {
 
     open func loadAttachments() {
         attachmentObserver.loadNext()
-        provider.loadPrevAttachment()
+        // Only the first page decides whether the list is genuinely empty; every later
+        // call is pagination and must not re-arm the flag.
+        guard !isInitialServerPageRequested else {
+            loadPreviousServerPage()
+            return
+        }
+        loadInitialServerPage()
+    }
+
+    open var oldestLoadedAttachmentId: AttachmentId? {
+        for section in stride(from: attachmentObserver.numberOfSections - 1, through: 0, by: -1) {
+            for row in stride(from: attachmentObserver.numberOfItems(in: section) - 1, through: 0, by: -1) {
+                if let id = attachmentObserver.item(at: IndexPath(row: row, section: section))?.attachment.id,
+                   id != 0 {
+                    return id
+                }
+            }
+        }
+        return nil
+    }
+
+    open func loadPreviousServerPage() {
+        let loadedCount = attachmentObserver.count
+        guard let anchor = oldestLoadedAttachmentId else {
+            // Nothing loaded to anchor on (the channel is empty, or the initial page
+            // has not landed yet): fall back to the cursor, which the query itself
+            // dedupes while a page is in flight.
+            logger.info("[MediaGallery] previous page: no anchor (loaded=\(loadedCount)), falling back to cursor channelId=\(channel.id)")
+            let channelId = channel.id
+            provider.loadPrevAttachment { error in
+                if let error {
+                    logger.error("[MediaGallery] previous page (cursor) failed channelId=\(channelId): \(error)")
+                }
+            }
+            return
+        }
+        guard !requestedPreviousPageAnchors.contains(anchor) else {
+            logger.info("[MediaGallery] previous page before=\(anchor) skipped — already requested (in flight or end of history) loaded=\(loadedCount) channelId=\(channel.id)")
+            return
+        }
+        requestedPreviousPageAnchors.insert(anchor)
+        logger.info("[MediaGallery] previous page before=\(anchor) requested loaded=\(loadedCount) channelId=\(channel.id)")
+        provider.loadPrevAttachment(before: anchor) { [weak self] fetchedCount, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                if let error {
+                    logger.error("[MediaGallery] previous page before=\(anchor) failed channelId=\(self.channel.id): \(error)")
+                    self.requestedPreviousPageAnchors.remove(anchor)
+                    return
+                }
+                logger.info("[MediaGallery] previous page before=\(anchor) fetched=\(fetchedCount)\(fetchedCount == 0 ? " (end of history)" : "") channelId=\(self.channel.id)")
+            }
+        }
+    }
+
+    open func loadInitialServerPage() {
+        isInitialServerPageRequested = true
+        logger.info("[MediaGallery] initial page requested loaded=\(attachmentObserver.count) channelId=\(channel.id)")
+        provider.loadPrevAttachment(pageCompletion: { [weak self] fetchedCount, error in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                guard let fetchedCount else {
+                    // Nothing was requested (a page was already in flight) — let the
+                    // next loadAttachments() own the initial page.
+                    logger.info("[MediaGallery] initial page not sent (cursor already loading), will retry on next load channelId=\(self.channel.id)")
+                    self.isInitialServerPageRequested = false
+                    return
+                }
+                if let error {
+                    logger.error("[MediaGallery] initial page failed channelId=\(self.channel.id): \(error) — empty state will show as if there were no attachments")
+                } else {
+                    logger.info("[MediaGallery] initial page fetched=\(fetchedCount) channelId=\(self.channel.id)")
+                }
+                self.markInitialAttachmentsLoaded(didFetchItems: fetchedCount > 0)
+            }
+        })
+    }
+
+    /// Counterpart of `ChannelViewModel.markInitialMessagesLoaded()`: until this has run
+    /// the view cannot tell "empty" from "still loading", so it shows no empty state.
+    ///
+    /// A failed fetch also lands here — an attempt that came back, even empty-handed, is
+    /// what the empty state is waiting for; leaving the tab blank offline would be worse.
+    open func markInitialAttachmentsLoaded(didFetchItems: Bool) {
+        guard !hasLoadedInitialAttachments else { return }
+        hasLoadedInitialAttachments = true
+        // Items came back: the database observer is about to deliver them and that event
+        // re-evaluates the empty state on its own. Nudging here would race the merge and
+        // flash the placeholder over a list that is about to fill. Nothing came back: no
+        // database change is coming, so this is the only chance to reveal it.
+        guard !didFetchItems else { return }
+        event = .change(.init(changeItems: []))
     }
 
     public typealias ChangeItemPaths = LazyDatabaseObserver<AttachmentDTO, MessageLayoutModel.AttachmentLayout>.ChangeItemPaths
@@ -142,8 +248,9 @@ open class ChannelAttachmentListViewModel: NSObject {
         if let attachmentLayout {
             let attachment = attachmentLayout.attachment
             if let onLoadThumbnail {
-                attachmentLayout.onLoadThumbnail = { [weak self] in
-                    self?.cacheThumbnail($0, for: attachment)
+                attachmentLayout.onLoadThumbnail = { [weak self, weak attachmentLayout] image in
+                    self?.cacheThumbnail(image, for: attachment)
+                    guard let attachmentLayout else { return }
                     onLoadThumbnail(attachmentLayout)
                 }
             }
@@ -155,21 +262,47 @@ open class ChannelAttachmentListViewModel: NSObject {
                     logger.debug("[LONK LOAD] HAS META \(url)")
                     onLoadLinkMetadata(metadata)
                 } else {
-                    LinkMetadataProvider.default.fetch(url: url) { result in
-                        DispatchQueue.main.async {
-                            switch result {
-                            case .success(let metadata):
-                                logger.debug("[LONK LOAD] HAS META fetch \(url)")
-                                onLoadLinkMetadata(metadata)
-                            case .failure:
-                                onLoadLinkMetadata(nil)
-                            }
-                        }
-                    }
+                    loadLinkMetadata(url: url, for: attachmentLayout, completion: onLoadLinkMetadata)
                 }
             }
         }
         return attachmentLayout
+    }
+
+    /// Resolves link metadata from the local stores first (memory cache, then DB — no
+    /// network); only on a full miss asks the backend and persists the result, so the
+    /// next launch is served from the DB. Without the persist step, metadata resolved
+    /// from this screen would be refetched over the network on every launch.
+    open func loadLinkMetadata(url: URL,
+                               for attachmentLayout: MessageLayoutModel.AttachmentLayout,
+                               completion: @escaping (LinkMetadata?) -> Void) {
+        LinkMetadataProvider.default.fetchFromCacheOrDB(url: url) { [weak self] metadata in
+            if let metadata {
+                completion(metadata)
+                return
+            }
+            LinkMetadataProvider.default.fetch(url: url) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let metadata):
+                        completion(metadata)
+                        self?.storeLinkMetadata(metadata, for: attachmentLayout)
+                    case .failure:
+                        completion(nil)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Persists network-resolved metadata (images to disk, fields to `LinkMetadataDTO`)
+    /// attached to the owner message — the same mechanism `ChannelViewModel` uses when a
+    /// preview resolves in a message cell.
+    open func storeLinkMetadata(_ metadata: LinkMetadata, for layout: MessageLayoutModel.AttachmentLayout) {
+        getMessage(layout) { [weak self] message in
+            guard let self, let message else { return }
+            self.messageProvider.storeLinkMetadata(metadata, to: message)
+        }
     }
 
     open var numberOfSections: Int {
@@ -186,20 +319,33 @@ open class ChannelAttachmentListViewModel: NSObject {
     ) {
         let attachment = layout.attachment
         downloadQueue.async { [weak self] in
-            guard let self,
-                  attachment.type != "link",
-                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
-                  attachment.status != .done,
-                  attachment.status != .failedDownloading,
-                  attachment.status != .pauseDownloading,
-                  attachment.status != .failedUploading
+            guard let self
             else {
                 DispatchQueue.main.async {
                     completion?(layout)
                 }
                 return
             }
-            
+
+            // The video poster is a separate, tiny fetch, so it runs ahead of the
+            // auto-download gate below — a video that won't auto-download (over the
+            // size limit, or a paused/failed transfer waiting for a tap) is exactly
+            // the case where the grid would otherwise sit on the blurred thumbHash
+            // indefinitely.
+            self.downloadVideoThumbnailIfNeeded(layout)
+
+            guard shouldAutoDownload(attachment),
+                  // A stored `.done` is not proof the bytes are still there (cache
+                  // eviction, restored backup), and a stored `.pending` is not proof
+                  // they are missing. The file itself is the authority.
+                  fileProvider.filePath(attachment: attachment) == nil
+            else {
+                DispatchQueue.main.async {
+                    completion?(layout)
+                }
+                return
+            }
+
             self.getMessage(layout) { message in
                 if let message {
                     fileProvider
@@ -221,17 +367,45 @@ open class ChannelAttachmentListViewModel: NSObject {
         }
     }
 
+    /// Fetches the small "video_thumb" poster so a video that is not downloaded yet
+    /// still previews sharply in the grid. Independent of the video transfer itself:
+    /// it must happen even when the video won't be (or hasn't been) downloaded.
+    ///
+    /// The cheap `needsVideoThumbnailDownload` pre-check comes first because
+    /// `getMessage` falls back to a database fetch when the layout carries no owner
+    /// message — this runs for every bound cell, and for images and already-posted
+    /// videos there is nothing to fetch.
+    open func downloadVideoThumbnailIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
+        let attachment = layout.attachment
+        guard fileProvider.needsVideoThumbnailDownload(attachment: attachment)
+        else { return }
+        getMessage(layout) { message in
+            guard let message else { return }
+            fileProvider.downloadVideoThumbnailsIfNeeded(
+                message: message,
+                attachments: [attachment]
+            )
+        }
+    }
+
     open func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
         guard attachment.type != "link"
         else { return }
         if fileProvider.filePath(attachment: attachment) != nil {
+            let done = ChatMessage.Attachment.TransferStatus.done.rawValue
             DataProvider.database.write {
-                let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
-                dto?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+                // Skip the same-value write: Core Data would still mark the object
+                // dirty and emit an update event for a no-op reconcile.
+                guard let dto = AttachmentDTO.fetch(id: attachment.id, context: $0),
+                      dto.status != done
+                else { return }
+                dto.status = done
             } completion: { error in
                 logger.errorIfNotNil(error, "")
             }
+            attachment.status = .done
+            AttachmentTransferStatusRelay.default.post(attachment, status: .done)
             return
         }
         getMessage(layout) { message in
@@ -254,7 +428,13 @@ open class ChannelAttachmentListViewModel: NSObject {
 
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { _ in
+                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                    // stopTransfer persists the paused status itself whenever it had
+                    // something to stop. False means there was no live task and the
+                    // status is not a transfer state — e.g. the download already
+                    // finished — and stamping `.pauseDownloading` over it would mark
+                    // a completed attachment as paused.
+                    guard stopped else { return }
                     DataProvider.database.write {
                         let attachmentDTO = AttachmentDTO.fetch(id: attachment.id, context: $0)
                         attachmentDTO?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue
@@ -311,6 +491,9 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
         _ layout: MessageLayoutModel.AttachmentLayout,
         completion: ((MessageLayoutModel.AttachmentLayout) -> Void)?
     )
+    /// Whether `downloadAttachmentIfNeeded` would start a transfer for this attachment,
+    /// assuming its bytes are not already on disk (callers check that separately).
+    func shouldAutoDownload(_ attachment: ChatMessage.Attachment) -> Bool
     func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout)
     func pauseDownload(_ layout: MessageLayoutModel.AttachmentLayout)
     var eventPublisher: AnyPublisher<ChannelAttachmentListViewModel.Event?, Never> { get }
@@ -323,10 +506,34 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
     var isFiltered: Bool { get }
     /// Returns false when the last load returned no new items (end of data reached).
     var hasMore: Bool { get }
+    /// See `ChannelAttachmentListViewModel.hasLoadedInitialAttachments`. While false the
+    /// view treats an empty list as "still loading" and keeps its empty state hidden.
+    var hasLoadedInitialAttachments: Bool { get }
 }
 
 public extension ChannelAttachmentListViewModelProviding {
+    /// The cell binding asks this the moment a cell is dequeued, to decide whether to
+    /// put the progress ring up *before* the transfer produces its first byte. Keeping
+    /// it as the one predicate both the view and `downloadAttachmentIfNeeded` consult
+    /// is what stops the two from disagreeing — a cell that auto-downloads with no
+    /// overlay, or an overlay spinning on an attachment nobody is fetching.
+    func shouldAutoDownload(_ attachment: ChatMessage.Attachment) -> Bool {
+        guard attachment.type != "link",
+              minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize
+        else { return false }
+        switch attachment.status {
+        case .pauseDownloading, .failedDownloading, .failedUploading:
+            // Paused and failed transfers wait for an explicit tap.
+            return false
+        default:
+            return true
+        }
+    }
+
     var hasMore: Bool { true }
+    /// View models that serve the database only have nothing to wait for, so their empty
+    /// state is meaningful from the start.
+    var hasLoadedInitialAttachments: Bool { true }
     func search(query: String?, filterUser: ChatUser?) {}
     func stopDatabaseObserver() {}
     var isFiltered: Bool { false }

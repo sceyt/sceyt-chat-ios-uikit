@@ -26,6 +26,12 @@ extension ChannelInfoViewController {
         open lazy var emptyStateView = EmptyStateStackView()
             .withoutAutoresizingMask
 
+        /// The view model whose load state gates the empty state. Subclasses each hold
+        /// their own concretely named view model; this is the one thing the base class
+        /// needs from it. `nil` for subclasses that have none — `GroupCollectionView`
+        /// drives its own query — which keeps the empty state ungated for them.
+        open var attachmentViewModel: (any ChannelAttachmentListViewModelProviding)? { nil }
+
         open var shouldReceiveTouch: (() -> Bool)?
         public lazy var scrollingDecelerator = ScrollingDecelerator(scrollView: self)
         
@@ -79,66 +85,126 @@ extension ChannelInfoViewController {
                 // restartObserver (triggered by search) delivers an empty ChangeItemPaths when
                 // the new result set has no overlap with the previous one (e.g. going from N
                 // results to 0 after narrowing a query). There are no diff operations to apply,
-                // but the collection view still holds stale cells. Reload whenever the
-                // data-source section count no longer matches what the collection view has.
-                let currentSections = numberOfSections
-                let newSections = dataSource?.numberOfSections?(in: self) ?? 0
-                if currentSections != newSections {
+                // but the collection view still holds stale cells, so reload whenever what it
+                // renders no longer matches what the data source now reports — item counts as
+                // well as section counts, since a search can narrow a section without changing
+                // how many sections there are.
+                guard let counts = renderedAndSourceCounts(), counts.rendered == counts.source
+                else {
                     reloadData()
+                    updateNoItems()
+                    return
                 }
             } else {
-                // Guard against observer-restart scenarios: when restartObserver fires,
-                // it delivers all new items as insertions while UICollectionView's internal
-                // count still reflects the old data. Applying those inserts would make UIKit
-                // expect (oldCount + inserts) sections, but the data source already reports
-                // the new (smaller) count → crash. Detect the inconsistency and reload instead.
-                let expectedSectionCount = numberOfSections
-                    + paths.sectionInserts.count
-                    - paths.sectionDeletes.count
-                let actualSectionCount = dataSource?.numberOfSections?(in: self) ?? 0
-                guard expectedSectionCount == actualSectionCount else {
+                // A `.move` is applied as delete-from + insert-to, so the two index spaces are
+                // flattened here once and validated together below.
+                let deletes = paths.deletes + paths.moves.map { $0.from }
+                let inserts = paths.inserts + paths.moves.map { $0.to }
+                let updates = Array(Set(paths.updates))
+
+                guard canSafelyApply(deletes: deletes, inserts: inserts, updates: updates, paths: paths)
+                else {
                     reloadData()
                     updateNoItems()
                     return
                 }
-                // Guard against item-count inconsistency (e.g. event from the inactive
-                // observer when GlobalSearchAllMediaViewModel switches between
-                // allAttachmentsObserver and searchObserver). Sections matched, but
-                // per-section item counts may still be wrong → verify the net item delta.
-                let currentTotal = (0..<numberOfSections).reduce(0) { $0 + numberOfItems(inSection: $1) }
-                let expectedTotal = currentTotal + paths.inserts.count - paths.deletes.count
-                let actualTotal = (0..<actualSectionCount).reduce(0) {
-                    $0 + (dataSource?.collectionView(self, numberOfItemsInSection: $1) ?? 0)
-                }
-                guard expectedTotal == actualTotal else {
-                    reloadData()
-                    updateNoItems()
-                    return
-                }
+
                 UIView.performWithoutAnimation {
                     performBatchUpdates {
-                        if !paths.sectionInserts.isEmpty {
-                            insertSections(paths.sectionInserts)
-                        }
-                        if !paths.sectionDeletes.isEmpty {
-                            deleteSections(paths.sectionDeletes)
-                        }
-                        self.insertItems(at: paths.inserts + paths.moves.map { $0.to })
-                        self.reloadItems(at: paths.updates)
-                        self.deleteItems(at: paths.deletes + paths.moves.map { $0.from })
+                        self.insertItems(at: inserts)
+                        self.reloadItems(at: updates)
+                        self.deleteItems(at: deletes)
                     }
                 }
             }
 
             updateNoItems()
         }
-        
-        open func updateNoItems() {
-            if totalNumberOfItems <= 0 {
-                emptyStateView.isHidden = false
-            } else {
-                emptyStateView.isHidden = true
+
+        private func renderedAndSourceCounts() -> (rendered: [Int], source: [Int])? {
+            let sectionCount = numberOfSections
+            guard sectionCount == (dataSource?.numberOfSections?(in: self) ?? 0) else { return nil }
+            var rendered = [Int](repeating: 0, count: sectionCount)
+            var source = [Int](repeating: 0, count: sectionCount)
+            for s in 0 ..< sectionCount {
+                rendered[s] = numberOfItems(inSection: s)
+                source[s] = dataSource?.collectionView(self, numberOfItemsInSection: s) ?? 0
             }
+            return (rendered, source)
+        }
+
+        private func canSafelyApply(
+            deletes: [IndexPath],
+            inserts: [IndexPath],
+            updates: [IndexPath],
+            paths: ChannelAttachmentListViewModel.ChangeItemPaths
+        ) -> Bool {
+            // Section add/remove shifts section indices → per-section item math is fragile
+            // to validate cheaply. Just reload when the section set changes.
+            guard paths.sectionInserts.isEmpty, paths.sectionDeletes.isEmpty else { return false }
+
+            guard let counts = renderedAndSourceCounts() else { return false }
+            let before = counts.rendered
+            let after = counts.source
+            let sectionCount = before.count
+
+            // The same index path listed twice in one batch is an abort on its own.
+            guard Set(deletes).count == deletes.count, Set(inserts).count == inserts.count
+            else { return false }
+
+            // A row cannot be reloaded and structurally changed in the same batch.
+            let deleteSet = Set(deletes), insertSet = Set(inserts)
+            guard updates.allSatisfy({ !deleteSet.contains($0) && !insertSet.contains($0) })
+            else { return false }
+
+            func addressable(_ indexPath: IndexPath) -> Bool {
+                indexPath.section >= 0 && indexPath.section < sectionCount && indexPath.item >= 0
+            }
+
+            // Deletes address the OLD index space.
+            var deletesPerSection = [Int](repeating: 0, count: sectionCount)
+            for indexPath in deletes {
+                guard addressable(indexPath), indexPath.item < before[indexPath.section]
+                else { return false }
+                deletesPerSection[indexPath.section] += 1
+            }
+
+            // Inserts address the NEW index space.
+            var insertsPerSection = [Int](repeating: 0, count: sectionCount)
+            for indexPath in inserts {
+                guard addressable(indexPath), indexPath.item < after[indexPath.section]
+                else { return false }
+                insertsPerSection[indexPath.section] += 1
+            }
+
+            // A reload is applied as delete-then-insert at the same index path, so it has to be
+            // addressable in both spaces.
+            for indexPath in updates {
+                guard addressable(indexPath),
+                      indexPath.item < before[indexPath.section],
+                      indexPath.item < after[indexPath.section]
+                else { return false }
+            }
+
+            // UIKit validates PER SECTION, not in aggregate: an aggregate check passes when one
+            // section is +1 and another is −1, and then aborts.
+            for s in 0 ..< sectionCount
+            where before[s] + insertsPerSection[s] - deletesPerSection[s] != after[s] {
+                return false
+            }
+
+            return true
+        }
+
+        open func updateNoItems() {
+            // Before the first server page has come back, an empty list means "not loaded
+            // yet", not "nothing here": the database starts empty on a channel whose
+            // attachments have never been synced, so deciding from the item count alone
+            // put "No Media" up over a channel that does have media — until the fetch
+            // landed and replaced it with a full grid. Keep the placeholder hidden until
+            // the fetch has actually reported back.
+            let hasLoadedInitialAttachments = attachmentViewModel?.hasLoadedInitialAttachments ?? true
+            emptyStateView.isHidden = totalNumberOfItems > 0 || !hasLoadedInitialAttachments
         }
         
         open var onScrollViewDidScroll: ((UIScrollView) -> Void)?

@@ -3,6 +3,16 @@
     {
       "filename" : "reply_link_placeholder.svg",
       "idiom" : "universal"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "reply_link_dark_placeholder.svg",
+      "idiom" : "universal"
     }
   ],
   "info" : {

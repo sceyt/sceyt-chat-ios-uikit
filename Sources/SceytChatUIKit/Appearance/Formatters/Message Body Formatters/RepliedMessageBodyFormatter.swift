@@ -53,12 +53,19 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
                         }
                     }
             })
-            return attributedBody
+            return attributedBody.replacingLineBreaksWithSpacesForPreview()
         } else {
             return makeBody(messageBodyAttributes)
         }
     }
     
+    /// The name shown for a file attachment, falling back to the last path
+    /// component when the payload carries no explicit name.
+    /// Mirrors `MessageLayoutModel.AttachmentLayout.name`.
+    open func fileName(of attachment: ChatMessage.Attachment) -> String {
+        attachment.name ?? ((attachment.url ?? attachment.filePath) as NSString?)?.lastPathComponent ?? ""
+    }
+
     open func makeBody(_ messageBodyAttributes: RepliedMessageBodyFormatterAttributes) -> NSAttributedString {
         let message = messageBodyAttributes.message
         var body = message.body
@@ -96,14 +103,21 @@ open class RepliedMessageBodyFormatter: RepliedMessageBodyFormatting {
                         ]))
                     }
                     return body
+                case .file:
+                    // Prefer the real file name over the generic "File" label — the
+                    // name is what identifies the attachment in the reply preview.
+                    let name = fileName(of: attachment)
+                    body = name.isEmpty
+                    ? messageBodyAttributes.attachmentNameFormatter.format(attachment)
+                    : name
                 default:
                     body = messageBodyAttributes.attachmentNameFormatter.format(attachment)
                 }
             }
-            return .init(string: body, attributes: [
+            return NSAttributedString(string: body, attributes: [
                 .font: messageBodyAttributes.bodyLabelAppearance.font,
                 .foregroundColor: messageBodyAttributes.bodyLabelAppearance.foregroundColor
-            ])
+            ]).replacingLineBreaksWithSpacesForPreview()
         }
     }
 }

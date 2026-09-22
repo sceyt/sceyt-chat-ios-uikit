@@ -147,7 +147,9 @@ open class GlobalSearchViewModel: NSObject {
             async let groupChats    = searchGroup   ? fetchGroupChats(query: trimmed)        : []
             async let broadcastList = searchBroadcast ? fetchBroadcastChannels(query: trimmed) : []
 
-            let chats = sort(chats: (await directChats) + (await groupChats))
+            let direct = await directChats
+            let group = await groupChats
+            let chats = sort(chats: direct + group)
             let broadcasts = await broadcastList
             let merged = chats + broadcasts
 

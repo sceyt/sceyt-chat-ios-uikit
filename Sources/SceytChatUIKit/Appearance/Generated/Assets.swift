@@ -167,7 +167,6 @@ internal enum Assets {
   internal static let radioSelected = ImageAsset(name: "radio_selected")
   internal static let refresh = ImageAsset(name: "refresh")
   internal static let replyLinkPlaceholder = ImageAsset(name: "reply_link_placeholder")
-  internal static let replyLinkPlaceholderDark = ImageAsset(name: "reply_link_placeholder_dark")
   internal static let replyPlay = ImageAsset(name: "reply_play")
   internal static let roundedRectangle40 = ImageAsset(name: "rounded_rectangle_40")
   internal static let searchFill1 = ImageAsset(name: "search_fill_1")

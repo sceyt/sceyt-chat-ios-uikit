@@ -27,6 +27,7 @@ open class SelectedChannelCell: SelectedBaseCell {
         backgroundColor = appearance.backgroundColor
         label.font = appearance.labelAppearance.font
         label.textColor = appearance.labelAppearance.foregroundColor
+        label.lineBreakMode = .byTruncatingTail
         closeButton.setImage(appearance.removeIcon, for: .normal)
     }
 }

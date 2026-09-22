@@ -37,6 +37,16 @@ public class PendingVoteDTO: NSManagedObject {
     }
     
     public static func fetch(
+        pollId: String,
+        userId: UserId,
+        context: NSManagedObjectContext
+    ) -> [PendingVoteDTO] {
+        let request = fetchRequest()
+        request.predicate = .init(format: "pollId == %@ AND user.id == %@", pollId, userId)
+        return fetch(request: request, context: context)
+    }
+
+    public static func fetch(
         messageTid: Int64,
         context: NSManagedObjectContext
     ) -> [PendingVoteDTO] {

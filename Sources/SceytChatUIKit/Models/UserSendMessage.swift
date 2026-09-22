@@ -173,6 +173,14 @@ public struct AttachmentModel {
     private var needsToUploadInternally: Bool {
         Components.dataSession == nil && isLocalFile
     }
+
+    /// True when `thumbnail` holds a real preview extracted from a picked document (an image
+    /// or a video sent as a file) rather than the `.messageFile` stand-in a plain pdf/zip/…
+    /// gets. Same marker `attachmentBuilder` keys the outgoing thumbHash off — `init(fileUrl:)`
+    /// only sets the dimensions when it managed to decode a preview.
+    public var hasFilePreview: Bool {
+        type == .file && imageWidth > 0 && imageHeight > 0
+    }
     
     public var attachmentBuilder: Attachment.Builder {
         let builder: Attachment.Builder
@@ -201,6 +209,23 @@ public struct AttachmentModel {
             ).build() {
                 builder.metadata(json)
             }
+        } else if type == .file, imageWidth > 0, imageHeight > 0 {
+            // Previewable document (image/video sent as a file): ship a thumbHash so the
+            // receiver renders a blurred placeholder until the download finishes — same
+            // mechanism as image/video attachments. imageWidth/Height > 0 marks that a
+            // real preview was extracted in init(fileUrl:).
+            let tm = Components
+                .imageBuilder.init(image: thumbnail)
+                .thumbHashBase64()
+
+            if let json = ChatMessage.Attachment.Metadata<String>(
+                width: imageWidth,
+                height: imageHeight,
+                thumbnail: tm ?? "",
+                duration: duration
+            ).build() {
+                builder.metadata(json)
+            }
         } else if type == .voice {
             let targetCount = 50
             if let json = ChatMessage.Attachment.Metadata<[Int]>(
@@ -212,7 +237,10 @@ public struct AttachmentModel {
                 builder.metadata(json)
             }
         } else if type == .link {
-            builder.name(linkMetaData?.title ?? name)
+            let titleMaxLength = LinkMetadataProvider.default.titleMaxLength
+            let summaryMaxLength = LinkMetadataProvider.default.summaryMaxLength
+            let truncatedTitle = linkMetaData?.title.map { String($0.prefix(titleMaxLength)) }
+            builder.name(truncatedTitle ?? name)
             var thumbnail = ""
             var width = 0
             var height = 0
@@ -224,12 +252,13 @@ public struct AttachmentModel {
                     .thumbHashBase64() ?? ""
             }
             if let meta = linkMetaData {
+                let truncatedSummary = meta.summary.map { String($0.prefix(summaryMaxLength)) }
                 if let json = ChatMessage.Attachment.Metadata<String>(
                     width: width,
                     height: height,
                     thumbnail: thumbnail,
                     duration: 0,
-                    description: meta.summary,
+                    description: truncatedSummary,
                     imageUrl: meta.imageUrl?.absoluteString,
                     thumbnailUrl: meta.iconUrl?.absoluteString,
                     hideLinkDetails: hideLinkDetails
@@ -312,7 +341,20 @@ public struct AttachmentModel {
         name = url.lastPathComponent
         isLocalFile = true
         type = .file
-        thumbnail = .messageFile
+        // Extract a real preview for previewable documents (image/video files) so the
+        // sender's cell shows it from the very start and a thumbHash of it travels in
+        // the attachment metadata for the receiver's blurred placeholder.
+        if fileUrl.isImage, let image = UIImage(contentsOfFile: fileUrl.path) {
+            thumbnail = image
+            imageWidth = Int(image.size.width)
+            imageHeight = Int(image.size.height)
+        } else if fileUrl.isVideo, let image = Components.videoProcessor.copyFrame(url: fileUrl) {
+            thumbnail = image
+            imageWidth = Int(image.size.width)
+            imageHeight = Int(image.size.height)
+        } else {
+            thumbnail = .messageFile
+        }
         fileSize = Components.storage.sizeOfItem(at: url)
     }
     
@@ -355,10 +397,23 @@ public struct AttachmentModel {
                             let fileUrl = Components.storage.copyFile(fullSizeImageURL) ?? fullSizeImageURL
                             var imageUrl: URL?
                             if let jpeg = Components.imageBuilder.init(imageUrl: fileUrl)?.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality) {
-                                let fileName = fileUrl
+                                let base = fileUrl
                                     .deletingPathExtension()
                                     .appendingPathExtension("jpg")
                                     .lastPathComponent
+                                // iOS exports edited photos under a shared generic name (e.g.
+                                // "FullSizeRender-3.jpg") regardless of which photo it is. Storing under
+                                // that raw name made two different picks collide on the same local path
+                                // AND on the derived thumbnail-cache key (thumbnails/{WxH}/{path}), so one
+                                // image's cached thumbnail was served for another. Prefix the stored
+                                // filename with the asset's stable unique identifier so distinct picks
+                                // never share a file path.
+                                let assetToken = asset.localIdentifier
+                                    .components(separatedBy: CharacterSet(charactersIn: "/\\:"))
+                                    .first
+                                    .flatMap { $0.isEmpty ? nil : $0 } ?? UUID().uuidString
+                                let fileName = "\(assetToken)_\(base)"
+
                                 imageUrl = Components.storage.storeData(jpeg, filename: fileName)
                             }
                             if imageUrl == nil {
