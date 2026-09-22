@@ -158,6 +158,10 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
         playerView.isUserInteractionEnabled = true
         playPauseButton.contentEdgeInsets = .init(top: 16, left: 16, bottom: 16, right: 16)
         playPauseButton.addTarget(self, action: #selector(onTapPlay), for: .touchUpInside)
+
+        imageView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPreviewer.image
+        playPauseButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPreviewer.playButton
+        slider.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MediaPreviewer.slider
         
         currentTimeLabel.text = "0:00"
         
@@ -296,7 +300,9 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     
     override open func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
+
+        // Leave immersive mode when a page appears (shows the nav bar + status bar).
+        (carouselViewController?.navigationController as? MediaPreviewerNavigationController)?.isPreviewStatusBarHidden = false
         UIView.animate(withDuration: animated ? 0.3 : 0) { [weak self] in
             guard let self else { return }
             self.carouselViewController?.navigationController?.navigationBar.alpha = 1.0
@@ -378,12 +384,29 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
             router.showAlert(message: L10n.Previewer.photoSaved)
         case .videoSaved(nil):
             router.showAlert(message: L10n.Previewer.videoSaved)
+        case let .photoSaved(error?), let .videoSaved(error?):
+            router.showAlert(error: error)
+        case .saveGalleryAccessDenied:
+            showGalleryAccessDeniedAlert()
         case .didUpdateItem:
             isPreparingToPlay = false
             bindPreviewItem()
-        default:
-            return
         }
+    }
+
+    open func showGalleryAccessDeniedAlert() {
+        router.showAlert(
+            title: L10n.Previewer.GalleryAccess.title,
+            message: L10n.Previewer.GalleryAccess.message,
+            actions: [
+                .init(title: L10n.Alert.Button.cancel, style: .cancel),
+                .init(title: L10n.Alert.Button.settings, style: .default) {
+                    guard let settingsUrl = URL(string: UIApplication.openSettingsURLString)
+                    else { return }
+                    UIApplication.shared.open(settingsUrl)
+                }
+            ],
+            preferredActionIndex: 1)
     }
     
     open func play() {
@@ -652,11 +675,14 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
     
     @objc
     open func onTap(_ recognizer: UITapGestureRecognizer) {
-        let currentNavAlpha = carouselViewController?.navigationController?.navigationBar.alpha ?? 0.0
+        guard let navigationController = carouselViewController?.navigationController as? MediaPreviewerNavigationController
+        else { return }
+        // Toggle immersive mode. Setting the flag hides/shows the nav bar (via
+        // setNavigationBarHidden) and the status bar; we only animate the player controls.
+        let shouldHide = !navigationController.isPreviewStatusBarHidden
+        navigationController.isPreviewStatusBarHidden = shouldHide
         UIView.animate(withDuration: 0.3) { [weak self] in
-            guard let self else { return }
-            self.carouselViewController?.navigationController?.navigationBar.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
-            self.playerControlContainerView.alpha = currentNavAlpha > 0.5 ? 0.0 : 1.0
+            self?.playerControlContainerView.alpha = shouldHide ? 0.0 : 1.0
         }
     }
     
@@ -816,6 +842,10 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
                 guard let self else { return }
                 self.targetView.center = self.view.center
                 self.backgroundView?.alpha = 1.0
+                // onPan fades navigationBar.alpha proportionally with the drag; restore it
+                // here so a cancelled drag doesn't leave the bar translucent. (Whether the
+                // bar is shown at all is governed by setNavigationBarHidden.)
+                self.carouselViewController?.navigationController?.navigationBar.alpha = 1.0
             }) { [weak self] _ in
                 self?.isAnimating = false
             }

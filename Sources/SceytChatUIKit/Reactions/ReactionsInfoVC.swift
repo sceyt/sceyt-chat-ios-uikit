@@ -36,6 +36,8 @@ open class ReactionsInfoViewController: ViewController,
                     switch event {
                     case .onSelect(let reaction):
                         self?.onEvent?(.removeReaction(reaction))
+                    case .showUserProfile(let user):
+                        self?.onEvent?(.showUserProfile(user))
                     }
                 }
                 return viewController
@@ -271,5 +273,6 @@ open class ReactionsInfoViewController: ViewController,
 public extension ReactionsInfoViewController {
     enum Event {
         case removeReaction(ChatMessage.Reaction)
+        case showUserProfile(ChatUser)
     }
 }

@@ -58,7 +58,7 @@ extension MessageCell {
             blurEffectView.clipsToBounds = true
 
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
-            progressView.backgroundColor = .black.withAlphaComponent(0.3)
+            progressView.backgroundColor = appearance.overlayMediaLoaderAppearance.backgroundColor
 
             playButton.image = appearance.videoPlayIcon
             timeLabel.backgroundColor = appearance.overlayColor
@@ -102,6 +102,7 @@ extension MessageCell {
         override open var data: MessageLayoutModel.AttachmentLayout! {
             didSet {
                 setupPreviewer()
+                updateThumbnailPlaceholderBackground()
                 let duration = data.mediaDuration
                 if duration >= 0 {
                     timeLabel.text = SceytChatUIKit.shared.formatters.mediaDurationFormatter.format(duration)
@@ -121,7 +122,7 @@ extension MessageCell {
                     }
                 }
 
-                update(status: data.transferStatus)
+                applyTransferStatus(data.transferStatus)
 
                 if let filePath = data.attachment.filePath,
                    filePath.hasPrefix("/local/"),
@@ -132,12 +133,26 @@ extension MessageCell {
                     }
                 } else {
                     imageView.image = data.thumbnail
-                    data.onLoadThumbnail = { [weak self] thumbnail in
+                    data.onLoadThumbnail = { [weak self, weak data] thumbnail in
                         guard let self else {
-                            logger.verbose("[Attachment] onLoadThumbnail self is nil")
+                            logger.verbose("[Attachment] onLoadThumbnail self is nil \(data.map { "\($0.attachment.description) layout=\(ObjectIdentifier($0))" } ?? "layout=deallocated")")
+                            return
+                        }
+                        guard let data, self.data === data else {
+                            logger.verbose("[Attachment] self.data !== data case")
                             return
                         }
                         self.imageView.image = thumbnail
+                    }
+
+                    // Self-heal for "blurry placeholder stays after download" (see
+                    // AttachmentImageView for the full rationale). When this view (re)binds a
+                    // downloaded video whose layout still shows the low-res placeholder, pull the
+                    // sharp frame from disk now — instance-agnostic via setFileBackedThumbnail —
+                    // so it recovers even when the post-download load landed on a duplicate layout
+                    // instance or the completion observer never fired for this view.
+                    if data.transferStatus == .done, !data.isThumbnailLoadedFromFile {
+                        reloadThumbnailFromFile(for: data.attachment)
                     }
                 }
             }

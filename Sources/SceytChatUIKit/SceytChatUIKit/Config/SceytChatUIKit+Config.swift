@@ -76,12 +76,13 @@ extension SceytChatUIKit {
 
         
         // MARK: - Chat Configuration
-        public var messageEditTimeout: TimeInterval = 1.hours
+        public var messageEditTimeout: TimeInterval = 2.hours
         public var avatarResizeConfig: ResizeConfig = .low
         public var imageAttachmentResizeConfig: ResizeConfig = .medium
         public var videoAttachmentResizeConfig: VideoResizeConfig = .medium
         public var attachmentSelectionLimit: Int = 20
         public var messageMultiselectLimit: Int = 30
+        public var maximumMessageLength: Int = 5000
         public var messageReactionPerUserLimit: UInt = 6 {
             didSet {
                 if messageReactionPerUserLimit < 1 || messageReactionPerUserLimit > 6 {
@@ -89,10 +90,14 @@ extension SceytChatUIKit {
                 }
             }
         }
+        /// The maximum number of different reactions displayed on a message cell.
+        /// Reactions beyond this limit are hidden; the trailing count still reflects all reactions.
+        /// Set a value less than or equal to 0 to show all reactions.
+        public var maxDisplayedReactionsCount: Int = 3
         public var mentionTriggerPrefix: String = "@"
         public var preventDuplicateAttachmentUpload: Bool = false
         public var messageBubbleTransformScale = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        public var defaultReactions = ["👍", "😍", "❤️", "🤝", "😂", "😏"]
+        public var defaultReactions = ["👍", "😍", "❤", "🤝", "😂", "😏"]
         public var voiceRecorderConfig: VoiceRecorderConfig = .init()
     }
 }

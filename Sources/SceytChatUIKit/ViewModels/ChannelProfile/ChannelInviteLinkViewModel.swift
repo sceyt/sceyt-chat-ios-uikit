@@ -38,10 +38,17 @@ open class ChannelInviteLinkViewModel: NSObject {
     
     public func loadInviteLinkData() {
         guard !isLoading else { return }
-        
+
+        // `channel` is an immutable snapshot handed down from the member list and can
+        // hold a stale `uri`: if the invite link was reset on a previous visit, the old
+        // primary key was permanently deleted server-side. Re-read the channel from the
+        // DB (the source of truth for the current invite key) before querying, otherwise
+        // we send the dead key and the request fails.
+        refreshChannelFromDB()
+
         isLoading = true
         error = nil
-        
+
         SceytChatUIKit.shared.chatClient.getChannelInviteKey(
             channelId: "\(channel.id)",
             key: channel.uri
@@ -110,22 +117,31 @@ open class ChannelInviteLinkViewModel: NSObject {
                 if let error = error {
                     self.error = error
                 } else if let newKey = newKey {
-                    // Update channel URI in database using best practice pattern
-                    SceytChatUIKit.shared.database.write { [weak self] in
-                        guard let self = self else { return }
-                        if channelInviteKey?.isPrimary == false {
-                            let (dto, _) = ChannelDTO.fetchOrCreate(id: channel.id, context: $0)
+                    // The regenerated primary key becomes the channel's invite URI,
+                    // so persist it to the DTO. Non-primary keys are separate invite
+                    // links and must not overwrite channel.uri.
+                    // Capture the id up front so the write persists even if the view model
+                    // is torn down before the background write runs — the DB is the source
+                    // of truth the next visit reads, so this must not depend on `self`.
+                    let channelId = self.channel.id
+                    SceytChatUIKit.shared.database.write { context in
+                        if newKey.isPrimary {
+                            let (dto, _) = ChannelDTO.fetchOrCreate(id: channelId, context: context)
                             dto.uri = newKey.key
                         }
                     } completion: { [weak self] error in
                         DispatchQueue.main.async {
+                            guard let self = self else { return }
                             if let error = error {
-                                self?.error = error
+                                self.error = error
                             } else {
-                                // Update the local channelInviteKey with the new key
-                                self?.channelInviteKey = newKey
-                                self?.refreshChannelFromDB()
-                                self?.event = .reloadData
+                                // Update in-memory channel on the main thread so the
+                                // UI (inviteLink derives from channel.uri) reflects it.
+                                if newKey.isPrimary {
+                                    self.channel.uri = newKey.key
+                                }
+                                self.channelInviteKey = newKey
+                                self.event = .reloadData
                             }
                         }
                     }

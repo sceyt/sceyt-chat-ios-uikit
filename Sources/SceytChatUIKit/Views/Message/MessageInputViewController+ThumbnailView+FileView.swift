@@ -58,5 +58,30 @@ extension MessageInputViewController.ThumbnailView {
             subtitleLabel.pin(to: self, anchors: [.bottom(-12, .lessThanOrEqual), .trailing(-21, .lessThanOrEqual)])
             subtitleLabel.topAnchor.pin(to: imageView.centerYAnchor, constant: 4)
         }
+
+        /// The generic file-type icon, for a document that carries no preview (pdf/zip/…).
+        /// Drawn at its own aspect ratio inside the slot, unclipped.
+        open func showIcon(_ icon: UIImage?) {
+            imageView.image = icon
+            imageView.contentMode = .scaleAspectFit
+            imageView.clipsToBounds = false
+            imageView.layer.cornerRadius = 0
+        }
+
+        /// A real preview for an image or a video picked as a document — filled and rounded
+        /// like the thumbnail its file bubble will show once sent, rather than letterboxed
+        /// the way the icon is.
+        open func showPreview(_ preview: UIImage) {
+            imageView.image = preview
+            imageView.contentMode = .scaleAspectFill
+            imageView.clipsToBounds = true
+            imageView.layer.cornerRadius = Layouts.previewCornerRadius
+        }
+    }
+}
+
+public extension MessageInputViewController.ThumbnailView.FileView {
+    enum Layouts {
+        public static var previewCornerRadius: CGFloat = 8
     }
 }

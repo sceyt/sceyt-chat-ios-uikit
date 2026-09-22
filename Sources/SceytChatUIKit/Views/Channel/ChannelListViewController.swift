@@ -25,7 +25,76 @@ open class ChannelListViewController: ViewController,
 
     private var diffableDataSource: UITableViewDiffableDataSource<Int, ChannelId>?
     private var channelFingerprints: [ChannelId: ChannelFingerprint] = [:]
-    private var swipeOpenIndexPath: IndexPath?
+
+    // MARK: - Swipe Actions
+
+    /// Which side of a row is showing its actions.
+    public enum SwipeSide {
+        case leading
+        case trailing
+    }
+
+    /// The one row whose swipe actions are open.
+    public struct SwipeState: Equatable {
+        public let channelId: ChannelId
+        public let side: SwipeSide
+        public var offset: CGFloat
+    }
+
+    /// The open swipe, keyed by **channel id** rather than index path.
+    ///
+    /// This is the whole reason the channel list draws its own swipe actions:
+    /// UIKit keys its open swipe to a cell instance and an index path, and a
+    /// channel bump invalidates both — there is no public API to carry an open
+    /// swipe across a row move, nor to re-open one. Keying by id means the row
+    /// that moves from position 5 to 0 comes back out of `cellForRowAt` already
+    /// open, and its action still targets the channel the user swiped.
+    public private(set) var openSwipe: SwipeState?
+
+    /// Drops the open state when its channel is no longer in the list — the only
+    /// case where an update genuinely has nothing left to restore the offset onto.
+    /// Everything else keeps it: the offset is keyed by channel id and re-applied
+    /// in ``bindSwipe(on:channelId:)``, so it survives a re-dequeue.
+    private func dropOpenSwipeIfChannelIsGone() {
+        guard let open = openSwipe,
+              channelListViewModel.channel(id: open.channelId) == nil
+        else { return }
+        openSwipe = nil
+    }
+
+    /// Renders swipe actions with `UISwipeActionsConfiguration` instead of the
+    /// in-cell implementation.
+    ///
+    /// The native path cannot keep the actions open across a channel reorder —
+    /// that limitation is why the in-cell implementation exists — but it is kept
+    /// as a one-line escape hatch for integrators who had customized the
+    /// `UITableViewDelegate` swipe methods.
+    open var usesNativeSwipeActions = false
+
+    /// Whether an over-drag performs the outermost action, the way
+    /// `UISwipeActionsConfiguration.performsFirstActionWithFullSwipe` does.
+    ///
+    /// Off by default, unlike UIKit: both trailing actions this SDK ships are
+    /// destructive (`.delete` / `.leave`), and `.delete` opens a confirmation
+    /// sheet, so an accidental over-drag would throw a modal at the user. Turn
+    /// it on if your `trailingActions(chatChannel:)` puts a safe, reversible
+    /// action first.
+    open var performsFirstActionWithFullSwipe = false
+
+    /// `tableView.isScrollEnabled` as it was before a swipe suppressed it.
+    private var tableScrollWasEnabledBeforeSwipe = true
+
+    /// Whether a swipe is currently holding table scrolling off. Gates the
+    /// capture above: a second `.began` arriving before the first `.settled`
+    /// would otherwise record the already-suppressed `false` as the value to
+    /// restore, and the restore would then freeze the list permanently.
+    private var isSuppressingScrollForSwipe = false
+
+    /// The cell whose pan justified the current suppression, so
+    /// ``reconcileScrollSuppression()`` can check that gesture rather than
+    /// trusting an event to arrive. Weak: a recycled-away cell that never
+    /// reported its end is exactly the case being guarded against.
+    private weak var swipingCell: ChannelCell?
 
     // MARK: -
 
@@ -46,8 +115,6 @@ open class ChannelListViewController: ViewController,
 
     open var globalSearchEnabled: Bool = false
     
-    open var pendingOpenChannel: ChatChannel? = nil
-
     open lazy var searchController = Components.channelSearchController
         .init(searchResultsController: searchResultsViewController)
 
@@ -61,6 +128,11 @@ open class ChannelListViewController: ViewController,
 
     private var isViewDidAppear = false
 
+    /// Channel opened from a search result while the search was active. The search is
+    /// ended only if the user actually sends a message there — merely looking into the
+    /// channel and coming back keeps the search and its results.
+    private var searchOpenedChannelId: ChannelId?
+
     open override func setup() {
         super.setup()
         title = L10n.Channel.List.title
@@ -70,17 +142,27 @@ open class ChannelListViewController: ViewController,
                                                   style: .plain,
                                                   target: self,
                                                   action: #selector(newChannelAction(_:)))
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier =
+            SceytChatUIKit.AccessibilityIdentifiers.ChannelList.newChannelButton
 
         tableView.register(Components.channelCell)
+        tableView.accessibilityIdentifier =
+            SceytChatUIKit.AccessibilityIdentifiers.ChannelList.tableView
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
         tableView.separatorStyle = .none
+        // Fixed row height so the cell doesn't change between 1-line and 2-line previews.
+        // Sized for the current Dynamic Type category; recomputed in traitCollectionDidChange.
+        tableView.rowHeight = ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
+        tableView.estimatedRowHeight = ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
         setupTableViewDelegates()
 
         navigationItem.hidesSearchBarWhenScrolling = true
         searchResultsViewController.resultsUpdater = channelListViewModel
         navigationItem.searchController = searchController
         searchController.searchResultsUpdater = self
+        searchController.searchBar.accessibilityIdentifier =
+            SceytChatUIKit.AccessibilityIdentifiers.ChannelList.searchBar
         
         if globalSearchEnabled {
             searchController.showsSearchResultsController = true
@@ -92,6 +174,7 @@ open class ChannelListViewController: ViewController,
                 self?.addUserSearchToken(user)
             }
             globalVC.onSelectMessage = { [weak self] message, channel in
+                self?.searchOpenedChannelId = channel.id
                 self?.channelListRouter.showChannelViewController(channel: channel, scrollToMessageId: message.id)
             }
             globalVC.onSelectAttachment = { [weak self] attachment in
@@ -102,6 +185,8 @@ open class ChannelListViewController: ViewController,
         definesPresentationContext = true
 
         emptyView.isHidden = true
+        emptyView.accessibilityIdentifier =
+            SceytChatUIKit.AccessibilityIdentifiers.ChannelList.emptyView
 
         KeyboardObserver()
             .willShow { [weak self] in
@@ -122,54 +207,241 @@ open class ChannelListViewController: ViewController,
     }
 
     open func setupDiffableDataSource() {
-        let ds = UITableViewDiffableDataSource<Int, ChannelId>(tableView: tableView) { [weak self] tableView, indexPath, _ in
+        let ds = UITableViewDiffableDataSource<Int, ChannelId>(tableView: tableView) { [weak self] tableView, indexPath, channelId in
             guard let self else { return UITableViewCell() }
-            return self.tableView(tableView, cellForRowAt: indexPath)
+            return self.tableView(tableView, cellForRowAt: indexPath, channelId: channelId)
         }
         diffableDataSource = ds
     }
 
     open func applyCurrentSnapshot(animation: Bool = false) {
         var snapshot = NSDiffableDataSourceSnapshot<Int, ChannelId>()
-        let sectionCount = channelListViewModel.numberOfSections
-        let sections = Array(0..<sectionCount)
-        snapshot.appendSections(sections)
+        snapshot.appendSections([0])
 
         var newFingerprints: [ChannelId: ChannelFingerprint] = [:]
         var changedIds: [ChannelId] = []
         var seenIds = Set<ChannelId>()
+        let count = channelListViewModel.numberOfChannel(at: 0)
+        var ids: [ChannelId] = []
+        ids.reserveCapacity(count)
 
-        for section in sections {
-            let ids = (0..<channelListViewModel.numberOfChannel(at: section)).compactMap { row -> ChannelId? in
-                guard let channel = channelListViewModel.channel(at: IndexPath(row: row, section: section)) else { return nil }
-                guard seenIds.insert(channel.id).inserted else { return nil }
-                let fp = makeFingerprint(for: channel)
-                newFingerprints[channel.id] = fp
-                if channelFingerprints[channel.id] != fp {
-                    changedIds.append(channel.id)
-                }
-                return channel.id
+        for row in 0..<count {
+            guard let channel = channelListViewModel.channel(at: IndexPath(row: row, section: 0)) else { continue }
+            guard seenIds.insert(channel.id).inserted else { continue }
+            let fp = makeFingerprint(for: channel)
+            newFingerprints[channel.id] = fp
+            if channelFingerprints[channel.id] != fp {
+                changedIds.append(channel.id)
             }
-            snapshot.appendItems(ids, toSection: section)
+            ids.append(channel.id)
         }
+        snapshot.appendItems(ids, toSection: 0)
 
-        if !changedIds.isEmpty {
-            snapshot.reloadItems(changedIds)
+        // `reloadItems` re-dequeues the cell, which drops an open swipe's offset
+        // for a frame — `cellForRowAt` restores it, but the buttons visibly
+        // rebuild. Rebind the open row in place instead.
+        let openChannelId = openSwipe?.channelId
+        let reloadableIds = openChannelId == nil
+            ? changedIds
+            : changedIds.filter { $0 != openChannelId }
+        if !reloadableIds.isEmpty {
+            snapshot.reloadItems(reloadableIds)
         }
         channelFingerprints = newFingerprints
-        diffableDataSource?.apply(snapshot, animatingDifferences: animation)
+        diffableDataSource?.apply(snapshot, animatingDifferences: animation) { [weak self] in
+            guard let self,
+                  let openChannelId,
+                  changedIds.contains(openChannelId)
+            else { return }
+            self.reconfigureOpenSwipeRow(channelId: openChannelId)
+        }
+    }
+
+    /// Re-binds the open row's content while preserving its cell — and therefore
+    /// its swipe offset.
+    ///
+    /// `reconfigureItems` keeps the cell instance but is iOS 15+; on iOS 13/14
+    /// `updateVisibleCell(indexPath:)` is the equivalent in-place rebind.
+    private func reconfigureOpenSwipeRow(channelId: ChannelId) {
+        guard let dataSource = diffableDataSource,
+              let indexPath = dataSource.indexPath(for: channelId)
+        else { return }
+        if #available(iOS 15.0, *) {
+            var snapshot = dataSource.snapshot()
+            snapshot.reconfigureItems([channelId])
+            dataSource.apply(snapshot, animatingDifferences: false)
+        } else {
+            updateVisibleCell(indexPath: indexPath)
+        }
     }
 
     open func applyDiffableUpdatesOnly(at indexPaths: [IndexPath]) {
         indexPaths.forEach { updateVisibleCell(indexPath: $0) }
     }
 
+    open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        closeOpenSwipe(animated: true)
+        guard let indexPath = tableView.indexPathForSelectedRow else { return }
+        tableView.deselectRow(at: indexPath, animated: true)
+    }
+    
     open func updateVisibleCell(indexPath: IndexPath) {
         guard let cell = tableView.cellForRow(at: indexPath) as? ChannelCell else { return }
         cell.parentAppearance = appearance.cellAppearance
-        if let item = channelListViewModel.layoutModel(at: indexPath) {
-            cell.data = item
+        let item: ChannelLayoutModel?
+        if dataSourceMode == .diffable,
+           let channelId = diffableDataSource?.itemIdentifier(for: indexPath) {
+            item = channelListViewModel.layoutModel(id: channelId)
+        } else {
+            item = channelListViewModel.layoutModel(at: indexPath)
         }
+        if let item {
+            cell.data = item
+            // Re-binding can change which actions the channel offers (a
+            // mute/unmute or read/unread flip), and therefore the reveal width,
+            // so the offset has to be re-applied and re-clamped.
+            bindSwipe(on: cell, channelId: item.channel.id)
+        }
+    }
+
+    /// Attaches the swipe callbacks to a cell and restores this channel's open
+    /// offset, if it is the open one.
+    ///
+    /// Called from both `cellForRowAt` paths and from `updateVisibleCell`. This
+    /// is load-bearing rather than defensive: every update path in this file
+    /// re-dequeues the bumped channel's cell — the imperative branch reloads the
+    /// moved rows after the batch, and the diffable branch's `reloadItems`
+    /// recreates the cell (`reconfigureItems`, which would preserve it, is iOS
+    /// 15+ while this SDK targets iOS 13). So the offset can only survive a
+    /// reorder by being re-applied here.
+    open func bindSwipe(on cell: ChannelCell, channelId: ChannelId) {
+        cell.swipeActionsEnabled = !usesNativeSwipeActions
+        cell.performsFirstActionWithFullSwipe = performsFirstActionWithFullSwipe
+        cell.onSwipeEvent = { [weak self, weak cell] event in
+            guard let self, let cell else { return }
+            self.handleSwipeEvent(event, channelId: channelId, cell: cell)
+        }
+        if let openSwipe, openSwipe.channelId == channelId {
+            cell.setSwipeOffset(openSwipe.offset, animated: false)
+            // The rebind may have changed which actions the channel offers, and
+            // with them the reveal width, so the restored offset is re-clamped
+            // and the clamped value written back — otherwise the stored offset
+            // and what the row shows drift apart.
+            cell.clampSwipeOffsetToFullReveal()
+            if cell.swipeOffset != openSwipe.offset {
+                self.openSwipe = swipeState(channelId: channelId, offset: cell.swipeOffset)
+            }
+        } else {
+            cell.setSwipeOffset(0, animated: false)
+        }
+    }
+
+    /// The cell currently displaying `channelId`, if it is on screen.
+    open func visibleCell(for channelId: ChannelId) -> ChannelCell? {
+        tableView.visibleCells
+            .compactMap { $0 as? ChannelCell }
+            .first { $0.data?.channel.id == channelId }
+    }
+
+    open func handleSwipeEvent(_ event: ChannelCell.SwipeEvent,
+                               channelId: ChannelId,
+                               cell: ChannelCell) {
+        switch event {
+        case .began:
+            // UIKit allowed only one open swipe at a time; so do we.
+            closeOpenSwipe(except: channelId, animated: true)
+            if let selected = tableView.indexPathForSelectedRow {
+                tableView.deselectRow(at: selected, animated: true)
+            }
+            channelListViewModel.deselectChannel()
+            swipeDidBegin(on: cell)
+
+        case let .changed(offset):
+            openSwipe = swipeState(channelId: channelId, offset: offset)
+
+        case let .settled(offset):
+            openSwipe = swipeState(channelId: channelId, offset: offset)
+            swipeDidEnd(on: cell)
+
+        case let .action(action):
+            guard let channel = channelListViewModel.channel(id: channelId) else { return }
+            // Sequenced on the close animation rather than a fixed delay, so an
+            // alert is never presented over a still-collapsing row.
+            closeOpenSwipe(animated: true) { [weak self] in
+                self?.onSwipeAction(action, channel: channel)
+            }
+        }
+    }
+
+    private func swipeState(channelId: ChannelId, offset: CGFloat) -> SwipeState? {
+        guard offset != 0 else { return nil }
+        return SwipeState(channelId: channelId,
+                          side: offset < 0 ? .trailing : .leading,
+                          offset: offset)
+    }
+
+    /// Stops the table scrolling for the duration of a swipe. A scroll view
+    /// begins its pan on any direction, so without this the list would scroll
+    /// under a horizontal drag.
+    open func swipeDidBegin(on cell: ChannelCell) {
+        // Capture only on the first begin — see `isSuppressingScrollForSwipe`.
+        guard !isSuppressingScrollForSwipe else { return }
+        isSuppressingScrollForSwipe = true
+        swipingCell = cell
+        tableScrollWasEnabledBeforeSwipe = tableView.isScrollEnabled
+        tableView.isScrollEnabled = false
+    }
+
+    open func swipeDidEnd(on cell: ChannelCell) {
+        restoreTableScrollAfterSwipe()
+    }
+
+    /// Safe to call from any path, at any time — a scroll left disabled is a
+    /// frozen list, the one severe failure mode of suppressing it during a
+    /// gesture, so every path that can end a swipe calls this. A no-op unless a
+    /// swipe actually suppressed scrolling, which keeps it from clobbering an
+    /// `isScrollEnabled` the host app set for its own reasons.
+    private func restoreTableScrollAfterSwipe() {
+        guard isSuppressingScrollForSwipe else { return }
+        isSuppressingScrollForSwipe = false
+        swipingCell = nil
+        tableView.isScrollEnabled = tableScrollWasEnabledBeforeSwipe
+    }
+
+    /// Re-enables scrolling when the gesture that suppressed it is no longer
+    /// running, whether or not it reported that itself.
+    ///
+    /// Suppression is driven by `.began`/`.settled` events, and an event that
+    /// goes missing leaves the list frozen — the one severe failure mode here.
+    /// Rather than enumerate the ways an event can be lost (a cell recycled or
+    /// deallocated mid-pan, a touch cancelled by backgrounding, a callback
+    /// severed before the end arrives), this asks the gesture itself. A pan
+    /// that is not `.began` or `.changed` is not holding anything, and a cell
+    /// that has gone away cannot be swiping.
+    private func reconcileScrollSuppression() {
+        guard isSuppressingScrollForSwipe else { return }
+        switch swipingCell?.swipePanGestureRecognizer.state {
+        case .began, .changed:
+            return
+        default:
+            restoreTableScrollAfterSwipe()
+        }
+    }
+
+    /// Closes the open swipe, unless it belongs to `channelId`.
+    open func closeOpenSwipe(except channelId: ChannelId? = nil,
+                             animated: Bool,
+                             completion: (() -> Void)? = nil) {
+        guard let open = openSwipe, open.channelId != channelId else {
+            completion?()
+            return
+        }
+        openSwipe = nil
+        guard let cell = visibleCell(for: open.channelId) else {
+            completion?()
+            return
+        }
+        cell.setSwipeOffset(0, animated: animated, completion: completion)
     }
 
     open override func setupLayout() {
@@ -205,6 +477,35 @@ open class ChannelListViewController: ViewController,
             .sink { [weak self] in
                 self?.onEvent($0)
             }.store(in: &subscriptions)
+
+        NotificationCenter.default
+            .publisher(for: .didSendUserMessage)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] notification in
+                self?.didSendUserMessage(notification)
+            }.store(in: &subscriptions)
+
+        // Backgrounding mid-drag cancels the touch, but `viewWillAppear` does
+        // not fire on the way back — the list stays on screen throughout — so
+        // this is the only hook that catches a swipe interrupted that way.
+        NotificationCenter.default
+            .publisher(for: UIApplication.didBecomeActiveNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.reconcileScrollSuppression()
+            }.store(in: &subscriptions)
+    }
+
+    /// A message was sent somewhere in the app. If it went to the channel this search
+    /// opened, the result has served its purpose — end the search now, while the channel
+    /// screen still covers the list, so coming back reveals the plain channel list.
+    open func didSendUserMessage(_ notification: Notification) {
+        guard let openedChannelId = searchOpenedChannelId,
+              let channelId = notification.userInfo?[ChannelViewModel.didSendUserMessageChannelIdKey] as? ChannelId,
+              channelId == openedChannelId
+        else { return }
+        searchOpenedChannelId = nil
+        endSearch()
     }
 
     open override func viewDidAppear(_ animated: Bool) {
@@ -212,16 +513,31 @@ open class ChannelListViewController: ViewController,
         isViewDidAppear = true
     }
 
+    open override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Every list change lays the table out again, so this is the cheapest
+        // place that reliably runs while a leaked suppression would still be
+        // observable. A no-op unless a swipe is holding scrolling off.
+        reconcileScrollSuppression()
+    }
+
     open override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         tableView.visibleCells.forEach {
             ($0 as? ChannelCell)?.subscribeForPresence()
         }
+        // Back on the list: nothing was sent in the opened channel, so the search stays.
+        searchOpenedChannelId = nil
+        // A leaked suppression must not survive coming back to the list.
+        reconcileScrollSuppression()
     }
 
     open override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         isViewDidAppear = false
+        closeOpenSwipe(animated: false)
+        // Unconditional: a mid-gesture navigation must not leave the list frozen.
+        restoreTableScrollAfterSwipe()
     }
 
     open override func viewDidDisappear(_ animated: Bool) {
@@ -230,6 +546,37 @@ open class ChannelListViewController: ViewController,
             tableView.deselectRow(at: indexPath, animated: false)
         }
         channelListViewModel.deselectChannel()
+    }
+
+    /// Clears the search bar text, tokens and dismisses the search controller.
+    /// Called after a search result opened a channel, so coming back shows the plain channel list.
+    open func endSearch() {
+        let searchBar = searchController.searchBar
+        let textField = searchBar.searchTextField
+
+        if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
+            NSObject.cancelPreviousPerformRequests(
+                withTarget: globalVC,
+                selector: #selector(GlobalSearchResultsViewController.search(query:)),
+                object: lastSearchText
+            )
+            globalVC.hasSearchToken = false
+            globalVC.filterUser = nil
+        } else {
+            NSObject.cancelPreviousPerformRequests(
+                withTarget: channelListViewModel,
+                selector: #selector(ChannelListViewModel.search(query:)),
+                object: lastSearchText
+            )
+        }
+        lastSearchText = nil
+
+        while !textField.tokens.isEmpty {
+            textField.removeToken(at: textField.tokens.count - 1)
+        }
+        searchBar.text = nil
+        searchBar.resignFirstResponder()
+        searchController.isActive = false
     }
 
     open func adjustTableViewToKeyboard(notification: Notification) {
@@ -300,17 +647,21 @@ open class ChannelListViewController: ViewController,
             }
         case .showChannel(let channel):
             if searchController.isActive {
-                pendingOpenChannel = channel
-                UIView.performWithoutAnimation {
-                    searchController.isActive = false
-                }
-            } else {
-                channelListRouter.showChannelViewController(channel: channel)
+                searchOpenedChannelId = channel.id
             }
+            channelListRouter.showChannelViewController(channel: channel)
         }
     }
 
     open func reloadTableView() {
+        // The open swipe survives a full reload. It is keyed by channel id, not
+        // by a cell or an index path, and `configure(cell:with:at:)` re-applies
+        // it to whichever cell the channel is dequeued into — so a reload that
+        // fires while a row is open (a sync landing a batch of channel writes is
+        // the common one) re-draws the row still open, instead of snapping it
+        // shut under the user's finger. Only a channel that left the list has
+        // nothing to restore onto.
+        dropOpenSwipeIfChannelIsGone()
         if dataSourceMode == .diffable {
             applyCurrentSnapshot()
         } else {
@@ -318,31 +669,36 @@ open class ChannelListViewController: ViewController,
         }
     }
 
+    open func reloadTableViewAfterContentSizeCategoryChange() {
+        // The action button widths change with the content size category, so an
+        // open offset would no longer match its buttons.
+        closeOpenSwipe(animated: false)
+        UIView.performWithoutAnimation {
+            tableView.reloadData()
+            tableView.setNeedsLayout()
+            tableView.layoutIfNeeded()
+        }
+    }
+
     open func updateTableView(paths: ChannelListViewModel.Paths) {
+        // The swiped channel may have been deleted elsewhere. Drop the state
+        // before applying, so nothing tries to restore an offset onto a row that
+        // no longer exists.
+        dropOpenSwipeIfChannelIsGone()
         if dataSourceMode == .diffable {
             let hasStructuralChanges = !paths.inserts.isEmpty
                 || !paths.deletes.isEmpty
                 || !paths.moves.isEmpty
-                || !paths.sectionInserts.isEmpty
-                || !paths.sectionDeletes.isEmpty
             if hasStructuralChanges || paths.updates.isEmpty {
                 let hasDraftMove = !paths.moves.isEmpty
                 && paths.moves.allSatisfy { move in
                     guard let channel = channelListViewModel.channel(at: move.to) else { return false }
-                    return channel.draftMessage?.string != channelFingerprints[channel.id]?.draftMessageText
+                    return hasDraftChanged(channel)
                 }
                 && paths.inserts.isEmpty
                 && paths.deletes.isEmpty
-                && paths.sectionInserts.isEmpty
-                && paths.sectionDeletes.isEmpty
-                
-                if swipeOpenIndexPath != nil {
-                    swipeOpenIndexPath = nil
-                    tableView.setEditing(false, animated: false)
-                    applyCurrentSnapshot(animation: !hasDraftMove)
-                } else {
-                    applyCurrentSnapshot(animation: !hasDraftMove)
-                }
+
+                applyCurrentSnapshot(animation: !hasDraftMove)
             } else {
                 let hasLastMessageIdChanged = paths.updates.contains { indexPath in
                     guard let channel = channelListViewModel.channel(at: indexPath) else { return false }
@@ -352,15 +708,14 @@ open class ChannelListViewController: ViewController,
                 }
 
                 if hasLastMessageIdChanged {
-                    if let openIndexPath = swipeOpenIndexPath, paths.updates.contains(openIndexPath) {
-                        applyDiffableUpdatesOnly(at: paths.updates)
-                    } else {
-                        applyCurrentSnapshot(animation: false)
-                    }
+                    // No longer special-cased for an open swipe: the offset is
+                    // keyed by channel id and restored in `cellForRowAt`, so the
+                    // list can always apply the correct order.
+                    applyCurrentSnapshot(animation: false)
                 } else {
                     let hasDraftChange = paths.updates.contains { indexPath in
                         guard let channel = channelListViewModel.channel(at: indexPath) else { return false }
-                        return channel.draftMessage?.string != channelFingerprints[channel.id]?.draftMessageText
+                        return hasDraftChanged(channel)
                     }
                     if hasDraftChange {
                         applyCurrentSnapshot(animation: false)
@@ -375,12 +730,6 @@ open class ChannelListViewController: ViewController,
             } else {
                 UIView.performWithoutAnimation {
                     tableView.performBatchUpdates {
-                        if !paths.sectionInserts.isEmpty {
-                            tableView.insertSections(paths.sectionInserts, with: .none)
-                        }
-                        if !paths.sectionDeletes.isEmpty {
-                            tableView.deleteSections(paths.sectionDeletes, with: .none)
-                        }
                         tableView.insertRows(at: paths.inserts, with: .none)
                         tableView.reloadRows(at: paths.updates, with: .none)
                         tableView.deleteRows(at: paths.deletes, with: .none)
@@ -388,8 +737,25 @@ open class ChannelListViewController: ViewController,
                             tableView.moveRow(at: move.from, to: move.to)
                         }
                     } completion: { [weak self] _ in
+                        guard let self else { return }
                         UIView.performWithoutAnimation {
-                            self?.tableView.reloadRows(at: paths.moves.map { $0.to }, with: .none)
+                            let movedTo = paths.moves.map { $0.to }
+                            let openChannelId = self.openSwipe?.channelId
+                            // `reloadRows` re-dequeues, which would rebuild the
+                            // action buttons under the user's finger and drop the
+                            // offset. The open row is rebound in place instead.
+                            let (openRows, reloadableRows) = movedTo.reduce(
+                                into: ([IndexPath](), [IndexPath]())
+                            ) { result, indexPath in
+                                if let openChannelId,
+                                   self.channelListViewModel.channel(at: indexPath)?.id == openChannelId {
+                                    result.0.append(indexPath)
+                                } else {
+                                    result.1.append(indexPath)
+                                }
+                            }
+                            self.tableView.reloadRows(at: reloadableRows, with: .none)
+                            openRows.forEach { self.updateVisibleCell(indexPath: $0) }
                         }
                     }
                 }
@@ -422,75 +788,114 @@ open class ChannelListViewController: ViewController,
         navigationItem.titleView = Components.connectionStateView.init(state: state, appearance: appearance.connectionIndicatorAppearance)
     }
 
+    /// Performs a swipe action on the channel it was invoked for.
+    ///
+    /// Takes the channel, not an index path: the previous index-path form
+    /// resolved its target positionally *after* a delay — and after an
+    /// unbounded, user-driven confirmation sheet for `.delete` and `.mute` — by
+    /// which time an inbound message (or the action's own reorder, for `.pin`
+    /// and `.markAs(read:)`) could have moved a different channel into that row.
+    open func onSwipeAction(_ action: ChannelSwipeActionsConfiguration.Actions,
+                            channel: ChatChannel) {
+        switch action {
+        case .delete:
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            channelListRouter.showAskForDelete { [weak self] confirmed in
+                guard confirmed else { return }
+                self?.channelListViewModel.delete(channel: channel)
+            }
+        case .leave:
+            channelListViewModel.leave(channel: channel)
+        case .read:
+            channelListViewModel.markAs(read: true, channel: channel)
+        case .unread:
+            channelListViewModel.markAs(read: false, channel: channel)
+        case .mute:
+            channelListRouter.showMuteOptionsAlert { [weak self] item in
+                self?.channelListViewModel.mute(item.timeInterval, channel: channel)
+            } canceled: {}
+        case .unmute:
+            channelListViewModel.unmute(channel: channel)
+        case .pin:
+            channelListViewModel.pin(channel: channel)
+        case .unpin:
+            channelListViewModel.unpin(channel: channel)
+        }
+    }
+
+    @available(*, deprecated, renamed: "onSwipeAction(_:channel:)",
+                message: "An index path resolves positionally and mis-targets once the list reorders, which an open swipe now survives. Override onSwipeAction(_:channel:) instead.")
     open func onSwipeAction(actions: ChannelSwipeActionsConfiguration.Actions,
                             indexPath: IndexPath) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-            switchAction()
-        }
-
-        func switchAction() {
-            switch actions {
-            case .delete:
-                UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                channelListRouter.showAskForDelete { [weak self] in
-                    if $0 {
-                        self?.channelListViewModel.delete(at: indexPath)
-                    }
-                }
-            case .leave:
-                channelListViewModel.leave(at: indexPath)
-            case .read:
-                channelListViewModel.markAs(read: true, at: indexPath)
-            case .unread:
-                channelListViewModel.markAs(read: false, at: indexPath)
-            case .mute:
-                channelListRouter.showMuteOptionsAlert { [weak self] item in
-                    self?.channelListViewModel.mute(item.timeInterval, at: indexPath)
-                } canceled: {}
-            case .unmute:
-                channelListViewModel.unmute(at: indexPath)
-            case .pin:
-                channelListViewModel.pin(at: indexPath)
-            case .unpin:
-                channelListViewModel.unpin(at: indexPath)
-            }
-        }
+        guard let channel = channelListViewModel.channel(at: indexPath) else { return }
+        onSwipeAction(actions, channel: channel)
     }
 
     // MARK: UITableViewDelegate
 
+    /// Disables UIKit's editing machinery — and with it the swipe-action
+    /// configuration methods below — unless the native path was opted back into.
+    ///
+    /// This is the only reliable way to stop UIKit consulting the delegate for a
+    /// swipe configuration; returning `nil` from those methods is not enough,
+    /// because UIKit would still run its own gesture alongside the in-cell pan.
+    open func tableView(_ tableView: UITableView, canEditRowAt indexPath: IndexPath) -> Bool {
+        usesNativeSwipeActions
+    }
+
+    @available(*, deprecated, message: "Only consulted when usesNativeSwipeActions is true. The in-cell implementation is driven by ChannelSwipeActionsConfiguration.trailingActions(chatChannel:) and ChannelListViewController.onSwipeAction(_:channel:).")
     open func tableView(_ tableView: UITableView,
                         trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        guard let channel = channelListViewModel.channel(at: indexPath)
+        guard usesNativeSwipeActions,
+              let channel = channelListViewModel.channel(at: indexPath)
         else { return nil }
         return ChannelSwipeActionsConfiguration
             .trailingSwipeActionsConfiguration(for: channel) { [weak self] _,_, actions, handler in
-                self?.onSwipeAction(actions: actions, indexPath: indexPath)
+                self?.onSwipeAction(actions, channel: channel)
                 handler(true)
             }
     }
 
+    @available(*, deprecated, message: "Only consulted when usesNativeSwipeActions is true. The in-cell implementation is driven by ChannelSwipeActionsConfiguration.leadingActions(chatChannel:) and ChannelListViewController.onSwipeAction(_:channel:).")
     open func tableView(_ tableView: UITableView,
                         leadingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
-        guard let channel = channelListViewModel.channel(at: indexPath)
+        guard usesNativeSwipeActions,
+              let channel = channelListViewModel.channel(at: indexPath)
         else { return nil }
         return ChannelSwipeActionsConfiguration
             .leadingSwipeActionsConfiguration(for: channel) { [weak self] _,_, actions, handler in
-                self?.onSwipeAction(actions: actions, indexPath: indexPath)
+                self?.onSwipeAction(actions, channel: channel)
                 handler(true)
             }
     }
 
+    @available(*, deprecated, message: "The channel list no longer uses UITableView editing for swipe actions. Kept so existing overrides still compile; it is called only when usesNativeSwipeActions is true.")
     open func tableView(_ tableView: UITableView, willBeginEditingRowAt indexPath: IndexPath) {
-        swipeOpenIndexPath = indexPath
+        tableView.deselectRow(at: indexPath, animated: true)
+        channelListViewModel.deselectChannel()
     }
 
-    open func tableView(_ tableView: UITableView, didEndEditingRowAt indexPath: IndexPath?) {
-        swipeOpenIndexPath = nil
-    }
+    @available(*, deprecated, message: "The channel list no longer uses UITableView editing for swipe actions. Kept so existing overrides still compile; it is called only when usesNativeSwipeActions is true.")
+    open func tableView(_ tableView: UITableView, didEndEditingRowAt indexPath: IndexPath?) {}
 
     open func tableView(_ tableView: UITableView,
                         didSelectRowAt indexPath: IndexPath) {
+        // A tap while a row is open dismisses its actions instead of navigating
+        // — the escape hatch UIKit's swipe actions gave by swallowing that tap.
+        //
+        // Only when that row is on screen. `openSwipe` is keyed by channel id and
+        // deliberately survives reorders and re-dequeues, so it stays set while
+        // the open row is scrolled out of view or bumped away by a sync. Eating
+        // the tap then dismisses nothing the user can see: the row they actually
+        // tapped just fails to open, and only a second tap navigates.
+        if let open = openSwipe {
+            if visibleCell(for: open.channelId) != nil {
+                tableView.deselectRow(at: indexPath, animated: false)
+                closeOpenSwipe(animated: true)
+                return
+            }
+            openSwipe = nil
+        }
         channelListRouter.showChannelViewController(at: indexPath)
         channelListViewModel.selectChannel(at: indexPath)
     }
@@ -511,21 +916,63 @@ open class ChannelListViewController: ViewController,
         }
         let cell = tableView.dequeueReusableCell(for: indexPath,
                                                  cellType: Components.channelCell)
-        cell.parentAppearance = appearance.cellAppearance
         if let item = channelListViewModel.layoutModel(at: indexPath) {
-            cell.data = item
-            if channelListViewModel.isSelected(item.channel) {
-                tableView.selectRow(at: indexPath, animated: false, scrollPosition: .none)
-            }
+            configure(cell: cell, with: item, at: indexPath)
         }
 
         return cell
+    }
+
+    open func tableView(_ tableView: UITableView,
+                        cellForRowAt indexPath: IndexPath,
+                        channelId: ChannelId) -> UITableViewCell {
+        if indexPath.row > channelListViewModel.numberOfChannel(at: indexPath.section) - 3 {
+            channelListViewModel.loadChannels()
+        }
+        let cell = tableView.dequeueReusableCell(for: indexPath,
+                                                 cellType: Components.channelCell)
+        if let item = channelListViewModel.layoutModel(id: channelId) {
+            configure(cell: cell, with: item, at: indexPath)
+        }
+
+        return cell
+    }
+
+    /// Binds a channel to a freshly dequeued cell.
+    ///
+    /// Shared by both data source modes so the swipe restore cannot be wired up
+    /// in one and forgotten in the other.
+    open func configure(cell: ChannelCell, with item: ChannelLayoutModel, at indexPath: IndexPath) {
+        cell.parentAppearance = appearance.cellAppearance
+        cell.data = item
+        if channelListViewModel.isSelected(item.channel) {
+            tableView.selectRow(at: indexPath, animated: false, scrollPosition: .none)
+        }
+        bindSwipe(on: cell, channelId: item.channel.id)
     }
 
     open override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
         super.traitCollectionDidChange(previousTraitCollection)
 
         searchController.setupAppearance()
+
+        // Large Text / Dynamic Type changed. On-screen cells' fonts re-scale
+        // themselves (adjustsFontForContentSizeCategory), but the cached
+        // last-message NSAttributedString keeps the fonts it was built with —
+        // and a label does not re-scale an attributed string's embedded fonts
+        // when it's assigned to a reused cell. So rebuild every cached preview
+        // for the new category, drop the fingerprints so the reload re-binds
+        // every row (not just rows whose channel data changed), and recompute
+        // the fixed row height so rows grow to fit instead of clipping.
+        if previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory {
+            channelListViewModel.reloadAttributedViews(compatibleWith: traitCollection)
+            channelFingerprints = [:]
+
+            let height = ChannelCell.Layouts.cellHeight(compatibleWith: traitCollection)
+            tableView.rowHeight = height
+            tableView.estimatedRowHeight = height
+            reloadTableViewAfterContentSizeCategoryChange()
+        }
     }
 
     // MARK: - UISearchResultsUpdating
@@ -589,6 +1036,10 @@ private extension ChannelListViewController {
 
         // Draft text (NSAttributedString is not Equatable, use plain string)
         let draftMessageText: String?
+        // An attachments-only draft has no text, so the type is what changes its preview.
+        let draftAttachmentType: String?
+        // Same for a draft that is only a reply/edit target.
+        let draftActionType: String?
 
         // Peer presence (online dot for direct channels)
         let peerPresenceState: ChatUser.Presence.State?
@@ -607,6 +1058,15 @@ private extension ChannelListViewController {
         let lastReactionKey: String?
     }
 
+    /// Whether a channel's draft differs from the one its last-rendered fingerprint captured.
+    /// Covers the attachments-only case, where the text is empty on both sides.
+    func hasDraftChanged(_ channel: ChatChannel) -> Bool {
+        let fingerprint = channelFingerprints[channel.id]
+        return channel.draftMessage?.string != fingerprint?.draftMessageText
+            || channel.draftAttachmentType != fingerprint?.draftAttachmentType
+            || channel.draftActionType != fingerprint?.draftActionType
+    }
+
     func makeFingerprint(for channel: ChatChannel) -> ChannelFingerprint {
         let lastMsg = channel.lastMessage
         return ChannelFingerprint(
@@ -620,6 +1080,8 @@ private extension ChannelListViewController {
             pinnedAt: channel.pinnedAt,
             messageRetentionPeriod: channel.messageRetentionPeriod,
             draftMessageText: channel.draftMessage?.string,
+            draftAttachmentType: channel.draftAttachmentType,
+            draftActionType: channel.draftActionType,
             peerPresenceState: channel.peer?.presence.state,
             lastMessageId: lastMsg?.id,
             lastMessageTid: lastMsg?.tid,
@@ -635,7 +1097,10 @@ private extension ChannelListViewController {
 }
 
 extension ChannelListViewController: UISearchControllerDelegate {
-    public func willPresentSearchController(_ searchController: UISearchController) {
+    open func willPresentSearchController(_ searchController: UISearchController) {
+        // Otherwise the open row lurks behind the results controller and is
+        // revealed again when the search is dismissed.
+        closeOpenSwipe(animated: false)
         if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
             if globalVC.pageViewController == nil {
                 globalVC.buildPages()
@@ -644,13 +1109,9 @@ extension ChannelListViewController: UISearchControllerDelegate {
         }
     }
 
-    public func didDismissSearchController(_ searchController: UISearchController) {
+    open func didDismissSearchController(_ searchController: UISearchController) {
         if let globalVC = searchResultsViewController as? GlobalSearchResultsViewController {
             globalVC.tearDownPages()
-        }
-        if let channel = pendingOpenChannel {
-            channelListRouter.showChannelViewController(channel: channel)
-            pendingOpenChannel = nil
         }
     }
 }

@@ -42,6 +42,7 @@ open class ForwardViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Forward.tableView
         tableView.register(Components.selectableChannelCell.self)
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
@@ -55,13 +56,17 @@ open class ForwardViewController: ViewController,
                                                            style: .done,
                                                            target: self,
                                                            action: #selector(onCancelTapped(_:)))
-        
+        navigationItem.leftBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Forward.cancelButton
+
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: L10n.Nav.Bar.forward,
                                                             style: .done,
                                                             target: self,
                                                             action: #selector(onForwardTapped(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
-        
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Forward.forwardButton
+
+        selectedChannelListView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Forward.selectedList
+
         definesPresentationContext = true
     }
     

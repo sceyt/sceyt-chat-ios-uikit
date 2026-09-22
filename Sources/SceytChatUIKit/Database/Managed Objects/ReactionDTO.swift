@@ -61,6 +61,17 @@ public class ReactionDTO: NSManagedObject {
         return fetch(request: request, context: context).first
     }
 
+    /// Matches the rows to purge when the server returns the authoritative reaction list for
+    /// a message: everything it didn't return, except the user's own pending reactions —
+    /// those are local-only until acknowledged, so the server never lists them and deleting
+    /// them would drop an in-flight reaction from the message and the reactions screen.
+    public static func notExistPredicate(
+        messageId: MessageId,
+        existingIds: [ReactionId]
+    ) -> NSPredicate {
+        .init(format: "messageId == %lld AND pending == false AND (NOT (id IN %@))", messageId, existingIds)
+    }
+
     public static func fetchOrCreate(
         userId: UserId,
         key: String,

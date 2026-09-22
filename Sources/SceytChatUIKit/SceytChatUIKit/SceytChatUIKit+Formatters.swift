@@ -17,6 +17,8 @@ extension SceytChatUIKit {
         public var userPresenceDateFormatter: any UserFormatting = UserPresenceDateFormatter()
         
         public var channelDateFormatter: any DateFormatting = ChannelDateFormatter()
+
+        public var globalSearchMessageDateFormatter: any DateFormatting = GlobalSearchMessageDateFormatter()
         
         public var channelNameFormatter: any ChannelFormatting = ChannelNameFormatter()
         

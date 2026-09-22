@@ -29,6 +29,7 @@ extension MessageInputViewController {
             tableView.register(Components.messageInputMentionUsersCell)
             tableView.delegate = self
             tableView.dataSource = self
+            tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.MentionList.tableView
             tableView.separatorColor = appearance.separatorColor
             tableView.clipsToBounds = true
             tableView.showsVerticalScrollIndicator = false

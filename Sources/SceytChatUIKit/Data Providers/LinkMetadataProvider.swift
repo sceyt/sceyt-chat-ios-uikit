@@ -174,6 +174,7 @@ open class LinkMetadataProvider: DataProvider {
         downloadImage: Bool = true,
         downloadIcon: Bool = true,
         forceFetch: Bool = false,
+        loadFromNetworkIfMissing: Bool = true,
         completion: @escaping (Result<LinkMetadata, Error>) -> Void
     ) {
         fetchCache.insert(url)
@@ -245,6 +246,11 @@ open class LinkMetadataProvider: DataProvider {
                 }
 
                 // No metadata in database, load from network
+                guard loadFromNetworkIfMissing else {
+                    self.fetchCache.remove(url)
+                    completion(.failure(NSError(domain: "LinkMetadataProvider", code: -2, userInfo: [NSLocalizedDescriptionKey: "Metadata not found in database and network load is disabled"])))
+                    return
+                }
                 self.loadLinkMetadataFromNetwork(
                     url: url,
                     log_hv: log_hv,
@@ -254,6 +260,11 @@ open class LinkMetadataProvider: DataProvider {
                 )
 
             case .failure:
+                guard loadFromNetworkIfMissing else {
+                    self.fetchCache.remove(url)
+                    completion(.failure(NSError(domain: "LinkMetadataProvider", code: -2, userInfo: [NSLocalizedDescriptionKey: "Metadata not found in database and network load is disabled"])))
+                    return
+                }
                 // Database error, try network
                 self.loadLinkMetadataFromNetwork(
                     url: url,

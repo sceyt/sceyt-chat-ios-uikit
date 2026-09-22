@@ -48,9 +48,16 @@ extension ChannelInfoViewController {
         open override func setupLayout() {
             super.setupLayout()
             contentView.addSubview(row)
-            
+
             row.pin(to: contentView, anchors: [.leading, .trailing, .top(Components.channelInfoViewController.Layouts.itemVerticalPadding), .bottom(-Components.channelInfoViewController.Layouts.itemVerticalPadding)])
             iconView.resize(anchors: [.height(Components.channelInfoViewController.Layouts.itemIconSize), .width(Components.channelInfoViewController.Layouts.itemIconSize)])
+
+            // The labels share one identifier across every option row; UI tests
+            // scope them to a specific row via the enclosing cell's identifier.
+            typealias AID = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.Option
+            titleLabel.accessibilityIdentifier = AID.title
+            detailLabel.accessibilityIdentifier = AID.detail
+            descriptionLabel.accessibilityIdentifier = AID.description
         }
         
         open override var safeAreaInsets: UIEdgeInsets {

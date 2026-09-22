@@ -17,9 +17,10 @@ extension ChannelInfoViewController {
         
         open override func setup() {
             super.setup()
-            
+
             timeLabel.isUserInteractionEnabled = false
             timeLabel.stackView.spacing = 0
+            timeLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInfo.MediaCell.duration
         }
         
         open override func setupLayout() {
@@ -48,7 +49,7 @@ extension ChannelInfoViewController {
                 }
                 imageView.image = data.thumbnail
                 imageView.setup(
-                    previewer: { self.previewer?() },
+                    previewer: { [weak self] in self?.previewer?() },
                     item: PreviewItem.attachment(data.attachment)
                 )
                 update(status: data.attachment.status)

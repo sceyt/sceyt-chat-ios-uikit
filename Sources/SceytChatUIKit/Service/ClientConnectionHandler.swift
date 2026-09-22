@@ -21,6 +21,10 @@ open class ClientConnectionHandler: NSObject, ChatClientDelegate {
         if state == .connected {
             if SceytChatUIKit.shared.config.syncChannelsAfterConnect {
                 SyncService.syncChannels()
+            } else {
+                // A sync is what normally replays stored message deletes; without it they would
+                // never reach the server.
+                SyncService.sendPendingMessageDeletes()
             }
 
             if !SceytChatUIKit.shared.chatClient.user.id.isEmpty {

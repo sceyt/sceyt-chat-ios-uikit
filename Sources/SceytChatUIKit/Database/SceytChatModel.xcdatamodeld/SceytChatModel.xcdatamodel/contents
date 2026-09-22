@@ -70,6 +70,15 @@
             </uniquenessConstraint>
         </uniquenessConstraints>
     </entity>
+    <entity name="ChannelSyncStateDTO" representedClassName="ChannelSyncStateDTO" syncable="YES">
+        <attribute name="channelId" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="lastSyncedMessageId" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
+        <uniquenessConstraints>
+            <uniquenessConstraint>
+                <constraint value="channelId"/>
+            </uniquenessConstraint>
+        </uniquenessConstraints>
+    </entity>
     <entity name="ChecksumDTO" representedClassName="ChecksumDTO" syncable="YES">
         <attribute name="attachmentTid" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="checksum" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>

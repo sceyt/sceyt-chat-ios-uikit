@@ -38,6 +38,7 @@ extension ChannelViewController: AppearanceProviding {
         reactionPickerAppearance: ReactionPickerViewController.appearance,
         enableDateSeparator: true,
         enableScrollDownButton: true,
+        messageListOrder: .newestAtBottom,
         messageCellAppearance: MessageCell.appearance,
         searchBarAppearance: SearchBarAppearance(
             reference: SearchBarAppearance.appearance,
@@ -81,7 +82,12 @@ extension ChannelViewController: AppearanceProviding {
         
         @Trackable<Appearance, Bool>
         public var enableScrollDownButton: Bool
-        
+
+        /// Which visual edge holds the newest message. Defaults to
+        /// ``ChannelViewController/MessageListOrder/newestAtBottom``.
+        @Trackable<Appearance, ChannelViewController.MessageListOrder>
+        public var messageListOrder: ChannelViewController.MessageListOrder
+
         @Trackable<Appearance, MessageCell.Appearance>
         public var messageCellAppearance: MessageCell.Appearance
         
@@ -106,6 +112,7 @@ extension ChannelViewController: AppearanceProviding {
             reactionPickerAppearance: ReactionPickerViewController.Appearance,
             enableDateSeparator: Bool,
             enableScrollDownButton: Bool,
+            messageListOrder: ChannelViewController.MessageListOrder = .newestAtBottom,
             messageCellAppearance: MessageCell.Appearance,
             searchBarAppearance: SearchBarAppearance,
             messageInputAppearance: MessageInputViewController.Appearance,
@@ -121,6 +128,7 @@ extension ChannelViewController: AppearanceProviding {
             self._reactionPickerAppearance = Trackable(value: reactionPickerAppearance)
             self._enableDateSeparator = Trackable(value: enableDateSeparator)
             self._enableScrollDownButton = Trackable(value: enableScrollDownButton)
+            self._messageListOrder = Trackable(value: messageListOrder)
             self._messageCellAppearance = Trackable(value: messageCellAppearance)
             self._searchBarAppearance = Trackable(value: searchBarAppearance)
             self._messageInputAppearance = Trackable(value: messageInputAppearance)
@@ -139,6 +147,7 @@ extension ChannelViewController: AppearanceProviding {
             reactionPickerAppearance: ReactionPickerViewController.Appearance? = nil,
             enableDateSeparator: Bool? = nil,
             enableScrollDownButton: Bool? = nil,
+            messageListOrder: ChannelViewController.MessageListOrder? = nil,
             messageCellAppearance: MessageCell.Appearance? = nil,
             searchBarAppearance: SearchBarAppearance? = nil,
             messageInputAppearance: MessageInputViewController.Appearance? = nil,
@@ -154,6 +163,7 @@ extension ChannelViewController: AppearanceProviding {
             self._reactionPickerAppearance = Trackable(reference: reference, referencePath: \.reactionPickerAppearance)
             self._enableDateSeparator = Trackable(reference: reference, referencePath: \.enableDateSeparator)
             self._enableScrollDownButton = Trackable(reference: reference, referencePath: \.enableScrollDownButton)
+            self._messageListOrder = Trackable(reference: reference, referencePath: \.messageListOrder)
             self._messageCellAppearance = Trackable(reference: reference, referencePath: \.messageCellAppearance)
             self._searchBarAppearance = Trackable(reference: reference, referencePath: \.searchBarAppearance)
             self._messageInputAppearance = Trackable(reference: reference, referencePath: \.messageInputAppearance)
@@ -169,6 +179,7 @@ extension ChannelViewController: AppearanceProviding {
             if let reactionPickerAppearance { self.reactionPickerAppearance = reactionPickerAppearance }
             if let enableDateSeparator { self.enableDateSeparator = enableDateSeparator }
             if let enableScrollDownButton { self.enableScrollDownButton = enableScrollDownButton }
+            if let messageListOrder { self.messageListOrder = messageListOrder }
             if let messageCellAppearance { self.messageCellAppearance = messageCellAppearance }
             if let searchBarAppearance { self.searchBarAppearance = searchBarAppearance }
             if let messageInputAppearance { self.messageInputAppearance = messageInputAppearance }

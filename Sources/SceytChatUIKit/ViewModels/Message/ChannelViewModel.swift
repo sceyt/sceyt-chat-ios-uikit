@@ -29,6 +29,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     public let channelDelegateIdentifier = NSUUID().uuidString
     
     //MARK: public properties
+    /// `userInfo` key carrying the `ChannelId` of a `.didSendUserMessage` notification.
+    public static let didSendUserMessageChannelIdKey = "channelId"
+
     public private(set) var provider: ChannelMessageProvider
     public private(set) var messageSender: ChannelMessageSender
     public private(set) var channelCreator: ChannelCreator
@@ -46,6 +49,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     // MARK: - Unread Mentions Management
 
     public lazy var unreadMentionsManager = UnreadMentionsManager(channelId: channel.id)
+
+    /// Mention message ids already deducted from `newMentionCount` because the user
+    /// saw them on screen. Prevents double-deduction across display passes and lets
+    /// the deferred cache refresh reconcile against what was already seen.
+    private var displayedMentionMessageIds = Set<MessageId>()
+
+    /// True once `refreshUnreadMentions()` has completed, making
+    /// `unreadMentionsManager.remainingUnreadMentionsCount` authoritative. Until then
+    /// `newMentionCount` holds the server-seeded value and on-screen mentions are
+    /// deducted from it arithmetically.
+    private var isUnreadMentionsCacheLoaded = false
 
     //MARK: Message observer
     open lazy var messageObserver: LazyMessagesObserver = {
@@ -93,7 +107,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open var isDeletedUser: Bool {
-        isDirectChat && channel.peer?.state != .active && !channel.isSelfChannel
+        isDirectChat && channel.peer?.state == .deleted && !channel.isSelfChannel
     }
     
     public var channel: ChatChannel {
@@ -107,6 +121,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     public private(set) var lastDisplayedMessageId: MessageId = 0
     public private(set) var selectedMessageForAction: (ChatMessage, MessageAction)?
+    public private(set) var hasLoadedInitialMessages: Bool = false
     public static var messagesFetchLimit: UInt = 50
 
     open var canUpdateUnreadPosition = true
@@ -115,6 +130,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     private var schedulers = [UserId: Scheduler]()
     private var isFetchingData = false
     private var isInitialLoad = true
+    /// Whether the one-shot unread ("New messages") open-anchor scroll has been
+    /// emitted. Mid-session observer restarts re-deliver `isInitial` change
+    /// events; without this guard they would re-anchor the viewport to the
+    /// stale `lastDisplayedMessageId` on every restart (see `onDidChangeEvent`).
+    private var didEmitUnreadAnchorScroll = false
+    /// Whether any `isInitial` snapshot has been consumed (anchored open,
+    /// scroll-and-select, or the plain first render). Once true, a later
+    /// `isInitial` event can only be a mid-session observer-restart
+    /// redelivery — routed to the position-preserving reload. Kept separate
+    /// from `isInitialLoad`, whose value also steers `loadLastMessages`'
+    /// `before` paging and must keep its original lifecycle.
+    private var hasConsumedInitialSnapshot = false
     private var loadLastMessagesAfterConnect = false
     private var lastLoadPrevMessageId: MessageId = 0
     private var lastLoadNextMessageId: MessageId = 0
@@ -185,6 +212,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         if newMentionCount > 0 {
             Task {
                 await unreadMentionsManager.refreshUnreadMentions()
+                await MainActor.run { [weak self] in
+                    self?.reconcileUnreadMentionsCacheAfterLoad()
+                }
             }
         }
 
@@ -218,7 +248,16 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 selector: #selector(didUpdateLocalChannelNotification(_:)),
                 name: .didUpdateLocalCreateChannelOnEventChannelCreate,
                 object: nil)
+        NotificationCenter.default
+            .addObserver(
+                self,
+                selector: #selector(didFinishChannelsSyncNotification(_:)),
+                name: .didFinishChannelsSync,
+                object: nil)
         searchResult = .init(channelId: channel.id, searchFields: [])
+        // Covers the case where the sync had already finished before this screen was opened
+        // (so no .didFinishChannelsSync notification will fire for us).
+        reconcileDirectChannelAfterSyncIfNeeded()
     }
     
     //MARK: deinit
@@ -497,7 +536,16 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         
         guard !paths.isEmpty else { return events }
-        
+
+        // Hand the unread anchor forward over own messages that follow the
+        // marker (e.g. sent from another device and delivered by sync), so
+        // the "New messages" separator stays on the first unread INCOMING
+        // message. The affected cells re-render and re-measure via reloads.
+        for path in advanceUnreadAnchorOverOwnMessages(cache: cache)
+        where !paths.reloads.contains(path) {
+            paths.reloads.append(path)
+        }
+
         func indexPathOfLastDisplayedMessageId() -> IndexPath? {
             if lastDisplayedMessageId != 0,
                canUpdateUnreadPosition {
@@ -511,7 +559,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
             return nil
         }
-        
+
         if let indexPath = indexPathOfLastDisplayedMessageId() {
             events.append(.didSetUnreadIndexPath(indexPath: indexPath))
         }
@@ -530,6 +578,103 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         return events
     }
     
+    /// Own messages that directly follow the last-read marker — e.g. written on
+    /// the Web client of the same account and delivered later by a server
+    /// sync — are not "new messages" for this user. Walks the unread anchor
+    /// forward over that consecutive outgoing run so the "New messages"
+    /// separator (and the unread open position) sits on the boundary of the
+    /// first unread INCOMING message, leaving the own messages above it as
+    /// plain history. When the run reaches the newest message (nothing
+    /// incoming after it), the anchor disarms entirely — mirroring `init`'s
+    /// "newest message is outgoing → no unread anchor" rule.
+    ///
+    /// The separator's height is measured into the anchor cell, so the two
+    /// affected layout models are rebuilt (the same pattern as
+    /// `updateUnreadIndexIfNeeded`) and their index paths returned for the
+    /// caller to reload.
+    private func advanceUnreadAnchorOverOwnMessages(
+        cache: LazyDatabaseObserver<MessageDTO, ChatMessage>.Cache
+    ) -> [IndexPath] {
+        guard lastDisplayedMessageId != 0 else { return [] }
+
+        // The cache provides the section/item geometry; the mapped items come
+        // from the observer's working cache (the same accessor the rest of
+        // this pipeline uses).
+        func message(at path: IndexPath) -> ChatMessage? {
+            messageObserver.workingCacheItem(at: path)
+        }
+        func itemCount(in section: Int) -> Int {
+            cache[safe: section]?.count ?? 0
+        }
+        func next(after path: IndexPath) -> IndexPath? {
+            if path.item + 1 < itemCount(in: path.section) {
+                return IndexPath(item: path.item + 1, section: path.section)
+            }
+            var section = path.section + 1
+            while section < cache.count {
+                if itemCount(in: section) > 0 {
+                    return IndexPath(item: 0, section: section)
+                }
+                section += 1
+            }
+            return nil
+        }
+
+        // Locate the current anchor in the (post-update) cache.
+        var anchorPath: IndexPath?
+        outer: for section in stride(from: cache.count - 1, through: 0, by: -1) {
+            for row in stride(from: itemCount(in: section) - 1, through: 0, by: -1) {
+                let path = IndexPath(item: row, section: section)
+                if message(at: path)?.id == lastDisplayedMessageId {
+                    anchorPath = path
+                    break outer
+                }
+            }
+        }
+        guard let startPath = anchorPath else { return [] }
+
+        // Walk the consecutive outgoing run that follows the anchor.
+        var runEnd: (path: IndexPath, id: MessageId)?
+        var cursor = next(after: startPath)
+        while let path = cursor, let item = message(at: path), !item.incoming {
+            runEnd = (path, item.id)
+            cursor = next(after: path)
+        }
+        guard let runEnd else { return [] }
+
+        let oldId = lastDisplayedMessageId
+        // A run that reaches the newest message leaves nothing unread below
+        // it — disarm rather than parking the separator under the last own
+        // message.
+        lastDisplayedMessageId = cursor == nil ? 0 : runEnd.id
+
+        // Rebuild the models whose separator flag (and with it the measured
+        // cell height) changed, restoring their grouping insets.
+        var reloadPaths: [IndexPath] = []
+        for (id, path) in [(oldId, startPath), (lastDisplayedMessageId, runEnd.path)]
+        where id != 0 {
+            guard let msg = message(at: path) else { continue }
+            let model = Components.messageLayoutModel.init(
+                channel: channel,
+                message: msg,
+                lastDisplayedMessageId: lastDisplayedMessageId,
+                appearance: MessageCell.appearance)
+            layoutModels[.init(message: msg)] = model
+            let prevIndexPath = findPrevIndexPath(current: path, cache: cache)
+            var prevModel: MessageLayoutModel?
+            if let prevIndexPath, let prevMessage = message(at: prevIndexPath) {
+                prevModel = layoutModel(for: prevMessage)
+            }
+            updateMessageContentInsets(
+                for: model,
+                at: path,
+                prevModel: prevModel,
+                prevIndexPath: prevIndexPath)
+            reloadPaths.append(path)
+        }
+        return reloadPaths
+    }
+
     open func needsToScrollAtIndexPath(
         items: ChangeItem
     ) -> (IndexPath, MessageId)? {
@@ -626,8 +771,20 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
 
             if isInitial {
+                markInitialMessagesLoaded()
+                // The unread ("New messages") anchor is a ONE-SHOT open position.
+                // The observer also restarts mid-session — `createAndSendUserMessage`
+                // rebuilds the window whenever the cached tail lags behind
+                // `channel.lastMessage`, which rapid receive/ACK traffic makes
+                // routine — and that restart's first change event arrives as
+                // `isInitial` again. Re-using `lastDisplayedMessageId` then yanks
+                // a user who is already reading at the bottom back to the
+                // separator, drifting further with every message below it.
+                // Replied/mention targets stay per-navigation: they are re-armed
+                // explicitly each time.
+                let unreadAnchorMessageId = didEmitUnreadAnchorScroll ? 0 : lastDisplayedMessageId
                 let messageId = scrollToRepliedMessageId != 0 ? scrollToRepliedMessageId :
-                               scrollToUnreadMentionMessageId != 0 ? scrollToUnreadMentionMessageId : lastDisplayedMessageId
+                               scrollToUnreadMentionMessageId != 0 ? scrollToUnreadMentionMessageId : unreadAnchorMessageId
                 let batchIds = items.changeItems.compactMap { $0.item?.id }
                 if messageId != 0,
                    let indexPath = items.changeItems
@@ -635,7 +792,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                     .indexPath {
                     needToScroll = false
                     let animated = scrollToUnreadMentionMessageId != 0
+                    if scrollToRepliedMessageId == 0, scrollToUnreadMentionMessageId == 0 {
+                        didEmitUnreadAnchorScroll = true
+                    }
                     event = .reloadDataAndScroll(indexPath: indexPath, animated: animated, pos: .centeredVertically)
+                    hasConsumedInitialSnapshot = true
 
                     // Mark mention as navigated if this is an unread mention
                     if scrollToUnreadMentionMessageId == messageId {
@@ -654,14 +815,36 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                             break
                         }
                         event = .scrollAndSelect(indexPath: indexPath, messageId: messageId, mode: nil)
+                        hasConsumedInitialSnapshot = true
                         resetStateAfterChangeEvent()
                         needToScroll = false
-                    } else {
+                    } else if isRestartingMessageObserver == .reloadToLatestState {
+                        // A deliberate jump-to-latest restart (the scroll-down
+                        // far-jump rebuilds the window on the newest tail):
+                        // landing at the bottom is the point.
+                        event = .reloadDataAndScrollToBottom
+                    } else if !hasConsumedInitialSnapshot {
+                        // The genuine first render with no scroll anchor.
+                        // Publish exactly today's pair: both events reach the
+                        // synchronous sink (the VC renders on the first,
+                        // toggles the empty state on the second);
+                        // `.showNoMessage` must stay LAST because the
+                        // pre-subscription `@Published` replay keeps only the
+                        // final value (see the reconcile note where the VC
+                        // subscribes to `$event`).
+                        hasConsumedInitialSnapshot = true
                         event = .reloadDataAndScrollToBottom
                         if isInitialLoad {
                             event = .showNoMessage
                             isInitialLoad = false
                         }
+                    } else {
+                        // A mid-session observer restart with no scroll target:
+                        // the send path's tail-lag rebuild, a sync's window
+                        // recalculation, or the channel-reconciliation observer
+                        // swap. The user may be reading anywhere — reload the
+                        // data but leave the viewport where it is.
+                        event = .reloadDataAndKeepPosition
                     }
                 }
                 return
@@ -746,14 +929,14 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             if indexPath.item > 0,
                let prevModel {
                 if prevModel.isSystemMessage || model.isSystemMessage {
-                    contentInsets.top = 12
+                    contentInsets.top = Layouts.systemMessageSpacing
                 } else if model.message.incoming == prevModel.message.incoming {
-                    contentInsets.top = 2
+                    contentInsets.top = Layouts.sameSenderSpacing
                 } else {
-                    contentInsets.top = 6
+                    contentInsets.top = Layouts.differentSenderSpacing
                 }
             } else if indexPath.item == 0 {
-                contentInsets.top = 2
+                contentInsets.top = Layouts.firstMessageSpacing
             }
             model.contentInsets = contentInsets
         }
@@ -765,6 +948,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open func numberOfMessages(in section: Int) -> Int {
         messageObserver.numberOfItems(in: section)
+    }
+
+    /// Identifier for the section at `section`, derived from
+    /// `LazyMessagesObserver`'s `sectionNameKeyPath`
+    /// (currently `MessageDTO.daySectionIdentifier`). Used by the view layer
+    /// for diff-based snapshot reconciliation — sections that compare equal
+    /// across snapshots are treated as the same section, even if their index
+    /// changed. Falls back to the section index when the observer hasn't
+    /// populated the section yet (a transient state during inserts).
+    open func sectionName(at section: Int) -> AnyHashable {
+        messageObserver.sectionName(at: section) ?? AnyHashable(section)
     }
     
     open func isLastMessage(at indexPath: IndexPath) -> Bool {
@@ -901,10 +1095,29 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     //MARK: Typing
     
+    private var lastStartTypingSentAt: Date?
+
     open var isTyping = false {
         didSet {
             guard !channel.unSynched else { return }
-            isTyping ? provider.channelOperator.sendEvent(ChannelEvent.startTyping) : provider.channelOperator.sendEvent(ChannelEvent.stopTyping)
+            if isTyping {
+                // The receiving side hides the typing indicator 3 seconds after the
+                // last startTyping event (see handleChannel(_:didStartTyping:)), so
+                // startTyping acts as a keepalive: re-send it at most every 2 seconds
+                // while typing continues, not on every text change (a single QuickType
+                // suggestion tap alone produces two changes: the word and the space).
+                if oldValue,
+                   let lastSentAt = lastStartTypingSentAt,
+                   Date().timeIntervalSince(lastSentAt) < 2 {
+                    return
+                }
+                lastStartTypingSentAt = Date()
+                provider.channelOperator.sendEvent(ChannelEvent.startTyping)
+            } else {
+                guard oldValue else { return }
+                lastStartTypingSentAt = nil
+                provider.channelOperator.sendEvent(ChannelEvent.stopTyping)
+            }
         }
     }
     
@@ -980,40 +1193,61 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     ) {
         guard !isFetchingData,
               ((lastLoadPrevMessageId != messageId && messageId != 0) || messageId == 0)
-        else { return }
+        else {
+            return
+        }
         lastLoadPrevMessageId = messageId
         isFetchingData = true
+
         DispatchQueue.main
             .asyncAfter(deadline: .now() + 1)
         {[weak self] in
             self?.resetFetchState()
         }
-        func fetchPrev() {
-            messageObserver.updatePredicateForPrevMessages(currentMessageId: messageId) {[weak self] result in
-                guard let self else { return }
-                if result {
-                    messageObserver.loadPrev(before: messageId)
-                }
-            }
+
+        // Local DB load drives the UI throttle. Cleared as soon as the observer settles,
+        // independent of provider response — so fast scrolls can chain through cached pages.
+        fetchPrevMessagesFromDB(before: messageId) { [weak self] in
+            guard let self else { return }
+            resetFetchState()
+            event = .pumpPrevPagination
         }
-        fetchPrev()
-        
+
         logger.info("ChannelViewModel loadPrevMessages channel id: \(channel.id), before messageId: \(messageId)")
         provider.loadPrevMessages(
             before: messageId
         ) { [weak self] error in
-            fetchPrev()
-            self?.resetFetchState()
-            logger.errorIfNotNil(error, "on loadPrevMessages")
+            guard let self else { return }
+            isFetchingData = false
+            markInitialMessagesLoaded()
+            event = .providerFinishedPrevPagination(beforeMessageId: messageId)
         }
     }
-    
+
+    private func markInitialMessagesLoaded() {
+        guard !hasLoadedInitialMessages else { return }
+        hasLoadedInitialMessages = true
+        event = .showNoMessage
+    }
+
+    open func fetchPrevMessagesFromDB(before messageId: MessageId, done: (() -> Void)? = nil) {
+        messageObserver.updatePredicateForPrevMessages(currentMessageId: messageId) { [weak self] result in
+            guard let self, result else {
+                done?()
+                return
+            }
+            messageObserver.loadPrev(before: messageId, done: done)
+        }
+    }
+
     open func loadNextMessages(
         after messageId: MessageId
     ) {
         guard !isFetchingData,
               lastLoadNextMessageId != messageId
-        else { return }
+        else {
+            return
+        }
         lastLoadNextMessageId = messageId
         isFetchingData = true
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
@@ -1028,7 +1262,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
         }
         fetchNext()
-        
+
         logger.info("ChannelViewModel loadNextMessages channel id: \(channel.id), after messageId: \(messageId)")
         provider.loadNextMessages(
             after: messageId
@@ -1037,7 +1271,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             self?.resetFetchState()
             logger.errorIfNotNil(error, "on loadNextMessages")
         }
-        
+
     }
     
     open func fetchNearMessages(at indexPath: IndexPath) {
@@ -1123,23 +1357,81 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open func resetToInitialStateIfNeeded() -> Bool {
         guard let lastMessage = channel.lastMessage
-        else { return false}
-        if messageObserver.lastItem?.id == lastMessage.id {
+        else { return false }
+        // Already in the fresh-open state: unbounded (default) predicate and the
+        // latest message present in the loaded window — a plain scroll is enough.
+        // Checking the cache alone is not sufficient: after a jump-to-message the
+        // observer may hold a range predicate whose window happens to end at the
+        // last message, while paging offsets and inserts stay range-bound.
+        if messageObserver.fetchPredicate == messageObserver.defaultFetchPredicate,
+           messageObserver.lastItem?.id == lastMessage.id {
             return false
         }
-        let initialMessageId: MessageId
-        if lastDisplayedMessageId == 0 {
-            initialMessageId = lastMessage.id
-        } else {
-            initialMessageId = lastDisplayedMessageId
+        // Clear every pending scroll anchor before restarting, otherwise the
+        // restart's initial change event redirects the scroll to the unread
+        // separator / replied message instead of the last message.
+        resetScrollState()
+        if lastDisplayedMessageId != 0 {
+            // Layout models capture the separator at creation; drop this one so it
+            // is rebuilt without it, like on a fresh open of a fully read channel.
+            layoutModels[.init(messageId: lastDisplayedMessageId)] = nil
+            lastDisplayedMessageId = 0
         }
         isRestartingMessageObserver = .reloadToLatestState
-        let offset = calculateMessageFetchOffset(messageId: initialMessageId)
+        // Rebuild the same window a fresh open computes for a channel opened at
+        // the bottom: the last `messagesFetchLimit` messages under the default
+        // predicate. The offset must be counted against the default predicate —
+        // the currently active one may still be a range predicate.
+        let offset = messageObserver.calculateMessageFetchOffset(
+            predicate: messageObserver.defaultFetchPredicate,
+            messageId: lastMessage.id,
+            fetchLimit: Int(Self.messagesFetchLimit),
+            direction: .prev
+        )
         messageObserver
             .restartObserver(fetchPredicate: messageObserver.defaultFetchPredicate,
                              offset: offset)
         { [weak self] in
             self?.isRestartingMessageObserver = .none
+        }
+        // Re-anchor the load-ranges table at the channel tail, exactly like a
+        // fresh open does via loadLastMessages(). Scroll-up paging derives its
+        // predicates from these ranges (updatePredicateForPrevMessages): a top
+        // message that no range covers makes fetchPrevMessagesFromDB bail and
+        // kills paging. The DB tail shown by the restart above can contain such
+        // rows — messages stored by sync, which never records ranges — so once
+        // the latest server page is stored and the tail range exists, re-align
+        // the window onto those freshly covered rows.
+        if chatClient.connectionState == .connected {
+            provider.loadPrevMessages(before: MessageId(Int64.max)) { [weak self] error in
+                guard let self else { return }
+                if let error {
+                    logger.info("[BugFix][RESET] tail anchor loadPrevMessages(before: max) FAILED: \(error)")
+                    return
+                }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.isRestartingMessageObserver = .reloadToLatestState
+                    // messageId 0 → totalCount(default) - fetchLimit: the tail
+                    // window, recounted after the page was inserted.
+                    let offset = self.messageObserver.calculateMessageFetchOffset(
+                        predicate: self.messageObserver.defaultFetchPredicate,
+                        messageId: 0,
+                        fetchLimit: Int(Self.messagesFetchLimit),
+                        direction: .prev
+                    )
+                    logger.info("[BugFix][RESET] tail anchor stored, re-aligning window, offset: \(offset)")
+                    self.messageObserver
+                        .restartObserver(fetchPredicate: self.messageObserver.defaultFetchPredicate,
+                                         offset: offset)
+                    { [weak self] in
+                        self?.isRestartingMessageObserver = .none
+                    }
+                }
+            }
+        } else {
+            logger.info("[BugFix][RESET] not connected — tail anchor deferred to reconnect")
+            loadLastMessagesAfterConnect = true
         }
         refreshChannel()
         return true
@@ -1168,19 +1460,23 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         let messages = indexPaths.compactMap {
             message(at: $0)
         }
-        
         if marker == .displayed {
             markMessageAsDisplayed(messages)
         } else {
             markMessages(messages, as: marker)
         }
     }
-    
+
     open func markMessages( _ messages: [ChatMessage], as marker: DefaultMarker) {
+        if marker == .displayed {
+            deductDisplayedUnreadMentions(messages)
+        }
         guard !markMessagesTaskStarted,
                 !messages.isEmpty
-        else { return }
-        
+        else {
+            return
+        }
+
         markMessagesTaskStarted = true
 
         // Capture currentUserId before dispatching to background queue to avoid thread safety issues
@@ -1188,26 +1484,29 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
 
         markMessagesQueue.async { [weak self] in
             guard let self else { return }
-            let filteredMessages = messages.filter {
-                return !$0.incoming ? false :
-                $0.userMarkers?.contains(where: { $0.user?.id == currentUserId && $0.name == marker.rawValue } ) == true ? false : true
+            let ids: [MessageId] = messages.compactMap { m in
+                guard m.incoming else { return nil }
+                if m.userMarkers?.contains(where: { $0.user?.id == currentUserId && $0.name == marker.rawValue }) == true {
+                    return nil
+                }
+                return m.id
             }
-            guard !filteredMessages.isEmpty,
-                    let max = filteredMessages.max(by: { $0.id < $1.id }),
-                    let min = filteredMessages.min(by: { $0.id < $1.id })
+            guard !ids.isEmpty
             else {
                 markMessagesTaskStarted = false
-                newMentionCount = UInt64(unreadMentionsManager.remainingUnreadMentionsCount)
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, self.isUnreadMentionsCacheLoaded else { return }
+                    self.newMentionCount = UInt64(self.unreadMentionsManager.remainingUnreadMentionsCount)
+                }
                 return
             }
-                        //
-            self.messageMarkerProvider.markIfNeeded(
-                after: min.id,
-                before: max.id,
+
+            self.messageMarkerProvider.markMessages(
+                ids: ids,
                 markerName: marker.rawValue)
             {[weak self] error in
                 self?.markMessagesTaskStarted = false
-                
+
                 if error == nil {
                     self?.updateMentionCountAfterMarkingDisplayed(messages: messages)
                 }
@@ -1216,33 +1515,37 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open func markMessageAsDisplayed(_ messages: [ChatMessage]) {
+        deductDisplayedUnreadMentions(messages)
         guard !markMessagesTaskStarted,
                 !messages.isEmpty
-        else { return }
-        
+        else {
+            return
+        }
+
         // Capture currentUserId before dispatching to background queue to avoid thread safety issues
         let currentUserId = SceytChatUIKit.shared.currentUserId
-        
+
         markMessagesQueue.async { [weak self] in
             guard let self
             else { return }
-            
-            let message = messages.filter {
-                return !$0.incoming ? false :
-                $0.userMarkers?.contains(where: { $0.user?.id == currentUserId && $0.name == DefaultMarker.displayed.rawValue } ) == true ? false : true
-            }.max(by: { $0.id < $1.id })
-            
-            guard let message, self.lasMarkDisplayedMessageId != message.id
+
+            let ids: [MessageId] = messages.compactMap { m in
+                guard m.incoming else { return nil }
+                if m.userMarkers?.contains(where: { $0.user?.id == currentUserId && $0.name == DefaultMarker.displayed.rawValue }) == true {
+                    return nil
+                }
+                return m.id
+            }
+
+            guard let maxId = ids.max(), self.lasMarkDisplayedMessageId != maxId
             else {
                 markMessagesTaskStarted = false
                 return
             }
-            let prevLasMarkDisplayedMessageId = self.lasMarkDisplayedMessageId
-            self.lasMarkDisplayedMessageId = message.id
-            
-            self.messageMarkerProvider.markIfNeeded(
-                after: prevLasMarkDisplayedMessageId,
-                before: message.id,
+            self.lasMarkDisplayedMessageId = maxId
+
+            self.messageMarkerProvider.markMessages(
+                ids: ids,
                 markerName: DefaultMarker.displayed.rawValue)
             {[weak self] error in
                 self?.markMessagesTaskStarted = false
@@ -1487,27 +1790,39 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         _ message: Message,
         action: UserSendMessage.Action
     ) {
-        
-        @Sendable func send(storeBeforeSend: Bool = false) {
+        if case .edit = action {} else {
+            // Announces the user's intent to send, not delivery. Observers use it to
+            // react to "the user wrote something in this channel" (e.g. the channel
+            // list ends an in-flight search once its result was actually used).
+            NotificationCenter.default.post(
+                name: .didSendUserMessage,
+                object: nil,
+                userInfo: [Self.didSendUserMessageChannelIdKey: channel.id]
+            )
+        }
+
+        @Sendable func send(storeBeforeSend: Bool = false, completion: (@Sendable (Error?) -> Void)? = nil) {
             logger.verbose("[MESSAGE SEND] sendUserMessage messageSender")
             switch action {
             case .send, .reply, .forward:
                 logger.verbose("[MESSAGE SEND] sendUserMessage messageSender send reply forward")
-                messageSender.sendMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
+                messageSender.sendMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] error in
                     logger.verbose("[MESSAGE SEND] sendUserMessage messageSender send reply forward completion")
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
                     }
+                    completion?(error)
                 }
             case .edit:
                 logger.verbose("[MESSAGE SEND] sendUserMessage messageSender edit")
-                messageSender.editMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] _ in
+                messageSender.editMessage(message, storeBeforeSend: storeBeforeSend) {[weak self] error in
                     logger.verbose("[MESSAGE SEND] sendUserMessage messageSender edit completion")
                     guard let self else { return }
                     if case .reload = isRestartingMessageObserver {
                         isRestartingMessageObserver = .none
                     }
+                    completion?(error)
                 }
             }
         }
@@ -1520,7 +1835,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                     if let channel = try await self.channelCreator.createChannelOnServerIfNeeded(channelId: self.channel.id) {
                         self.updateLocalChannel(channel) {
                             logger.verbose("[MESSAGE SEND] sendUserMessage local channel updated")
-                            send(storeBeforeSend: true)
+                            send(storeBeforeSend: true) { [weak self] error in
+                                guard let self, error == nil else { return }   // only on successful ack
+                                DispatchQueue.main.async {
+                                    logger.verbose("[MESSAGE SEND] sendUserMessage ack — loading previous messages")
+                                    // Mirror reconcileDirectChannelAfterSyncIfNeeded: pull the preceding
+                                    // history from the server now that the channel is real and acked.
+                                    if self.chatClient.connectionState == .connected {
+                                        self.loadLastMessages()
+                                    } else {
+                                        self.loadLastMessagesAfterConnect = true
+                                    }
+                                }
+                            }
                         }
                     } else {
                         logger.verbose("[MESSAGE SEND] sendUserMessage channel exists")
@@ -1556,6 +1883,30 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         builder.parentMessageId(0)
         if forward {
             builder.forwardingMessageId(message.id)
+            // Source link attachments may have empty url/metadata when the source
+            // message is itself a forward — the server doesn't repopulate link details
+            // on forwards. Re-derive them from the body so the recipient gets a real,
+            // openable URL, mirroring the original-send path in `UserSendMessage`.
+            let sourceLinks = (message.attachments ?? []).filter { $0.type == "link" }
+            // Carry forward the user's "hide link preview" choice from the original.
+            // Stored inside each link attachment's metadata JSON as `hld`; keyed here
+            // by the attachment's url so we can match it to the freshly detected one.
+            let hideByURL: [String: Bool] = sourceLinks.reduce(into: [:]) { acc, a in
+                guard let urlStr = a.url, !urlStr.isEmpty,
+                      let hide = a.imageDecodedMetadata?.hideLinkDetails
+                else { return }
+                acc[urlStr] = hide
+            }
+            let nonLinks = (message.attachments ?? [])
+                .filter { $0.type != "link" }
+                .map { $0.builder.build() }
+            let freshLinks = DataDetector.getLinks(text: message.body).map { url -> Attachment in
+                let cached = LinkMetadataProvider.default.metadata(for: url.normalizedURL)
+                let hide = hideByURL[url.absoluteString] ?? false
+                return AttachmentModel(link: url, linkMetaData: cached, hideLinkDetails: hide)
+                    .attachmentBuilder.build()
+            }
+            builder.attachments(nonLinks + freshLinks)
         }
         let group = DispatchGroup()
         for channelId in channelIds {
@@ -1600,8 +1951,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         layoutModel.message.attachments?.forEach {
             AttachmentTransfer.default.taskFor(message: layoutModel.message, attachment: $0)?.cancel()
         }
-        if layoutModel.message.deliveryStatus == .pending {
-            provider.deletePending(message: layoutModel.message.tid)
+        if layoutModel.message.id == 0 {
+            // Pending or failed: the message has no server id, so it is deleted by tid. The
+            // server may already hold it (ack lost, or the send lands later), so the intent is
+            // stored and retried until confirmed.
+            messageSender.deleteMessage(pendingMessage: layoutModel.message, type: type)
         } else {
             messageSender.deleteMessage(id: layoutModel.message.id, type: type)
         }
@@ -1697,6 +2051,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             // Clear pending state when request completes
             self?.pendingPollVotes[layoutModel.message.id] = false
         }
+
+        releasePendingPollVoteGuardIfUITesting(messageId: layoutModel.message.id)
+    }
+
+    /// UI-test hook: the deterministic test session never connects, so the vote
+    /// request above never completes and the guard would swallow every later tap.
+    /// See `SceytChatUIKit.uiTestPollVotesCompleteLocally`.
+    private func releasePendingPollVoteGuardIfUITesting(messageId: MessageId) {
+        #if DEBUG
+        guard SceytChatUIKit.uiTestPollVotesCompleteLocally else { return }
+        pendingPollVotes[messageId] = false
+        #endif
     }
 
     open func deletePollVote(
@@ -1731,6 +2097,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             // Clear pending state when request completes
             self?.pendingPollVotes[layoutModel.message.id] = false
         }
+
+        releasePendingPollVoteGuardIfUITesting(messageId: layoutModel.message.id)
     }
 
     open func retractPollVote(
@@ -2078,9 +2446,54 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open func updateDraftMessage(_ message: NSAttributedString?) {
-        let text = message == nil || message?.isEmpty == true ? nil : message
+        let isEmpty = message?.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true
+        let text = isEmpty ? nil : message
         let date = text == nil ? nil : Date()
         channelProvider.saveDraftMessage(text, at: date)
+    }
+
+    /// Persists the whole input-bar state. `body` is always the next *new* message, so in edit
+    /// mode the caller passes the parked pre-edit draft here and the text being edited as
+    /// `editBody` — that keeps a pending edit out of the channel list's "Draft:" preview.
+    open func updateDraft(
+        body: NSAttributedString?,
+        editBody: NSAttributedString? = nil,
+        attachments: [AttachmentModel] = [],
+        voiceRecording: AttachmentModel? = nil,
+        viewOnce: Bool = false,
+        target: DraftMessage.Target? = nil
+    ) {
+        let draft = DraftMessage(
+            channelId: channel.id,
+            body: body,
+            editBody: editBody,
+            createdAt: Date(),
+            target: target,
+            attachments: attachments,
+            voiceRecording: voiceRecording,
+            viewOnce: viewOnce
+        )
+        channelProvider.saveDraft(draft, at: draft.hasContent ? Date() : nil)
+    }
+
+    /// Clears every trace of the draft — used after a successful send, where the action must be
+    /// dropped explicitly because `selectedMessageForAction` is still set at that point.
+    open func clearDraft() {
+        channelProvider.saveDraft(DraftMessage(channelId: channel.id), at: nil)
+    }
+
+    open func loadDraft(completion: @escaping (DraftMessage?) -> Void) {
+        channelProvider.fetchDraft(completion: completion)
+    }
+
+    /// The reply/edit target as the input bar's own state, ready to persist.
+    open var draftTarget: DraftMessage.Target? {
+        guard let (message, action) = selectedMessageForAction else { return nil }
+        switch action {
+        case .reply: return .init(message: message, isReply: true)
+        case .edit: return .init(message: message, isReply: false)
+        case .forward: return nil
+        }
     }
     
     open func stopFileTransfer(message: ChatMessage, attachment: ChatMessage.Attachment) {
@@ -2095,14 +2508,37 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                     self.messageSender.resendMessage(message)
                 } else if attachment.url != nil {
                     attachment.status = .pending
-                    fileProvider.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
+                    fileProvider.downloadMessageAttachmentsIfNeeded(
+                        message: message,
+                        attachments: [attachment]
+                    ) { [weak self] resolvedMessage, error in
+                        guard let self, let error else {
+                            return
+                        }
+                        let source = resolvedMessage ?? message
+                        let failed = (source.attachments ?? []).filter { $0.status == .failedDownloading }
+                        for atch in failed {
+                            self.didFailDownloadingAttachment(
+                                message: source,
+                                attachment: atch,
+                                error: error
+                            )
+                        }
+                    }
                 }
             }
         }
     }
-    
+
+    open func didFailDownloadingAttachment(
+        message: ChatMessage,
+        attachment: ChatMessage.Attachment,
+        error: Error
+    ) {}
+
     open func downloadMessageAttachmentsIfNeeded(layoutModel: MessageLayoutModel) {
-        DispatchQueue.global().async {
+        DispatchQueue.global().async { [weak self] in
+            guard let self else { return }
             var attachmentsToDownload: [ChatMessage.Attachment]? = nil
             if !layoutModel.contentOptions.contains(.link) {
                 attachmentsToDownload = layoutModel.message.attachments?.filter { $0.type != "link" }
@@ -2112,7 +2548,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 .downloadMessageAttachmentsIfNeeded(
                     message: layoutModel.message,
                     attachments: attachmentsToDownload
-                )
+                ) { [weak self] resolvedMessage, error in
+                    guard let self, let error else { return }
+                    let source = resolvedMessage ?? layoutModel.message
+                    let failed = (source.attachments ?? [])
+                        .filter { $0.status == .failedDownloading }
+                    for attachment in failed {
+                        self.didFailDownloadingAttachment(
+                            message: source,
+                            attachment: attachment,
+                            error: error
+                        )
+                    }
+                }
         }
     }
     
@@ -2382,17 +2830,44 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 messageId: messageId)
         {[weak self] ranges in
             guard let self else { return }
-            if !ranges.isEmpty {
-                self.loadNearMessagesOfRepliedMessage(id: messageId) { messages, error in
-                    if messages?.first(where: { $0.id == messageId }) == nil {
-                        return
-                    }
+            // The jump is user-initiated (a tap on the quoted bubble), so every way it
+            // can fail has to reach the user — a load error left unreported is a tap
+            // that visibly does nothing.
+            self.loadNearMessagesOfRepliedMessage(id: messageId) { [weak self] messages, error in
+                guard let self else { return }
+                if let error {
+                    self.handleRepliedMessageNavigationFailure(messageId: messageId, error: error)
+                    return
+                }
+                guard messages?.first(where: { $0.id == messageId }) != nil else {
+                    // The backend answered, but the parent is not in the window it
+                    // returned — deleted, or no longer visible to this user. There is
+                    // no error object to show; just release the pending navigation so
+                    // the next tap is not blocked by stale state.
+                    logger.error("[ReplyNavigation] parent message \(messageId) not found in the loaded range")
+                    self.clearPendingRepliedMessageNavigation(messageId: messageId)
+                    return
+                }
+                if !ranges.isEmpty {
                     self.messageObserver.restartToNear(at: messageId)
                 }
-            } else {
-                self.loadNearMessagesOfRepliedMessage(id: messageId)
             }
         }
+    }
+
+    /// Releases the pending replied-message navigation and surfaces `error`.
+    /// `scrollToRepliedMessageId` is armed for the whole async load; leaving it set
+    /// after a failure both blocks link-preview updates and makes the next unrelated
+    /// change event scroll to a message the user never reached.
+    open func handleRepliedMessageNavigationFailure(messageId: MessageId, error: Error) {
+        logger.errorIfNotNil(error, "[ReplyNavigation] load near messages of replied message \(messageId)")
+        clearPendingRepliedMessageNavigation(messageId: messageId)
+        event = .showError(error)
+    }
+
+    open func clearPendingRepliedMessageNavigation(messageId: MessageId) {
+        guard scrollToRepliedMessageId == messageId else { return }
+        scrollToRepliedMessageId = 0
     }
     
     /// Finds and navigates to an unread mention message, loading it if necessary
@@ -2485,7 +2960,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                             self?.provider.storeLinkMetadata(metadata, to: model.message)
                         }
                     } else {
-                        linkMetadataProvider.fetch(url: link) { [weak self] result in
+                        let hasImageOriginalSize = (preview.imageOriginalSize.map { $0 != .zero } ?? false)
+                        linkMetadataProvider.fetch(
+                            url: link,
+                            loadFromNetworkIfMissing: hasImageOriginalSize
+                        ) { [weak self] result in
                             guard let self else { return }
                             switch result {
                             case .success(let data):
@@ -2505,7 +2984,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             } else {
                 guard !linkMetadataProvider.isFetching(url: link)
                 else { return }
-                linkMetadataProvider.fetch(url: link) { [weak self] result in
+                let hasImageOriginalSize = (first.linkMetadata?.imageOriginalSize.map { $0 != .zero } ?? false)
+                linkMetadataProvider.fetch(
+                    url: link,
+                    loadFromNetworkIfMissing: hasImageOriginalSize
+                ) { [weak self] result in
                     guard let self else { return }
                     switch result {
                     case .success(let data):
@@ -2592,7 +3075,16 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     open func canReply(model: MessageLayoutModel) -> Bool {
         model.message.state != .deleted && !model.contentOptions.contains(.unsupported)
     }
-    
+
+    open func canSwipeToReply(model: MessageLayoutModel) -> Bool {
+        guard canReply(model: model) else { return false }
+        // Media and file messages don't support the swipe-to-reply gesture while they are still being sent.
+        if !model.contentOptions.isDisjoint(with: [.image, .file]) {
+            return model.message.deliveryStatus != .pending && model.messageDeliveryStatus != .pending
+        }
+        return true
+    }
+
     // MARK: view titles
     open func getTitleForHeader(with appearance: ChannelViewController.HeaderView.Appearance) -> String {
         (isThread ?
@@ -2712,13 +3204,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     // MARK: ChatClient delegate
     
     open func chatClient(_ chatClient: ChatClient, didChange state: ConnectionState, error: SceytError?) {
+        logger.info("[BugFix][CONN] connection state → \(state), error: \(error.map { "\($0)" } ?? "nil"), deferredTailAnchor: \(loadLastMessagesAfterConnect)")
         if state == .connected {
             lastLoadNextMessageId = 0
             lastLoadNextMessageId = 0
             if loadLastMessagesAfterConnect {
+                logger.info("[BugFix][CONN] connected — running deferred tail anchor (loadLastMessages)")
                 loadLastMessages()
                 loadLastMessagesAfterConnect = false
             }
+            // A sync usually follows (re)connection after a DB wipe; resolve a stale local
+            // direct placeholder to the real synced channel as soon as it lands in the DB.
+            reconcileDirectChannelAfterSyncIfNeeded()
         }
         event = .connection(state: state)
     }
@@ -2742,6 +3239,36 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
            let channel = userInfo["channel"] as? ChatChannel,
            channelId == self.channel.id {
             updateLocalChannel(channel)
+        }
+    }
+
+    @objc
+    private func didFinishChannelsSyncNotification(_ notification: Notification) {
+        reconcileDirectChannelAfterSyncIfNeeded()
+    }
+
+    /// When the screen was opened on a local direct placeholder (hashed id, `unsynched`) before
+    /// the sync service stored the real server channel, the channel observer (keyed on the stale
+    /// id) never fires. Re-resolve the real synced channel by peer user and swap to it.
+    private func reconcileDirectChannelAfterSyncIfNeeded() {
+        guard channel.isDirect else { return }   // only direct channels can be matched by peer
+        guard channel.unSynched else { return }  // only the local placeholder is stale
+        guard let peerId = channel.peer?.id else { return }
+
+        let staleId = channel.id
+        channelProvider.getSyncedDirectChannel(peerId: peerId, excludingChannelId: staleId) { [weak self] resolved in
+            guard let self, let resolved else { return }
+            guard resolved.id != self.channel.id, !resolved.unSynched else { return }
+            self.updateLocalChannel(resolved) { [weak self] in
+                guard let self else { return }
+                // Sync only stored the synced channel's last message locally; pull the
+                // preceding history from the server, mirroring a fresh channel open.
+                if self.chatClient.connectionState == .connected {
+                    self.loadLastMessages()
+                } else {
+                    self.loadLastMessagesAfterConnect = true
+                }
+            }
         }
     }
     
@@ -2884,6 +3411,22 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
 }
 
 public extension ChannelViewModel {
+
+    /// Vertical spacing (top content inset, in points) applied between message
+    /// cells by `updateMessageContentInsets(for:at:prevModel:prevIndexPath:)`.
+    /// Override these statics at app startup to customize message list spacing.
+    enum Layouts {
+        /// Spacing above a message when it, or the message above it, is a system message.
+        public static var systemMessageSpacing: CGFloat = 8
+        /// Spacing above a message whose direction matches the message above it
+        /// (both incoming or both outgoing).
+        public static var sameSenderSpacing: CGFloat = 4
+        /// Spacing above a message whose direction differs from the message above it.
+        public static var differentSenderSpacing: CGFloat = 8
+        /// Spacing above the first message in a day section.
+        public static var firstMessageSpacing: CGFloat = 8
+    }
+
     enum MessageAction {
         case edit
         case reply
@@ -2932,6 +3475,12 @@ public extension ChannelViewModel {
         case reload([IndexPath])
         case reloadData
         case reloadDataAndScrollToBottom
+        /// Full data reload that must NOT move the viewport: emitted for
+        /// mid-session observer restarts (send tail-lag rebuilds, sync window
+        /// recalculations, channel-reconciliation observer swaps) whose fresh
+        /// snapshot re-delivers `isInitial` while the user may be reading
+        /// anywhere in the history.
+        case reloadDataAndKeepPosition
         case reloadDataAndScroll(indexPath: IndexPath, animated: Bool, pos: CollectionView.ScrollPosition)
         case reloadDataAndSelect(indexPath: IndexPath, messageId: MessageId)
         case scrollAndSelect(indexPath: IndexPath, messageId: MessageId, mode: MessageCell.HighlightMode?)
@@ -2943,6 +3492,9 @@ public extension ChannelViewModel {
         case showNoMessage
         case connection(state: ConnectionState)
         case close
+        case pumpPrevPagination
+        case providerFinishedPrevPagination(beforeMessageId: MessageId)
+        case showError(Error)
     }
 }
 
@@ -2953,34 +3505,48 @@ private extension ChannelViewModel {
 }
 
 public extension ChannelViewModel {
-    
+
     struct Key: Equatable, Hashable {
         private let id: MessageId
         private let tid: Int64
-        
+
         public init(message: ChatMessage) {
             id = message.id
             tid = message.tid
         }
-        
+
         public init(messageId: MessageId) {
             id = messageId
             tid = 0
         }
-        
+
         public static func == (lhs: Self, rhs: Self) -> Bool {
             if lhs.tid != 0, rhs.tid != 0 {
                 return lhs.tid == rhs.tid
             }
             return lhs.id == rhs.id
         }
-        
+
         public func hash(into hasher: inout Hasher) {
             if tid != 0 {
                 hasher.combine(tid)
             } else if id > 0 {
                 hasher.combine(id)
             }
+        }
+    }
+
+    /// Stable identifier for a section in the snapshot. Wraps whatever the
+    /// observer's `sectionNameKeyPath` yields (today: an `Int` representing
+    /// the start-of-day Unix timestamp from `MessageDTO.daySectionIdentifier`).
+    /// Two sections compare equal when their underlying day identifier is the
+    /// same, which lets the diff treat them as the same section across
+    /// snapshots even if their position shifted.
+    struct SectionId: Hashable {
+        public let name: AnyHashable
+
+        public init(name: AnyHashable) {
+            self.name = name
         }
     }
 
@@ -3050,25 +3616,55 @@ public extension ChannelViewModel {
 
     /// Updates mention count after messages are successfully marked as displayed
     private func updateMentionCountAfterMarkingDisplayed(messages: [ChatMessage]) {
-        // Filter messages that mention the current user
+        // Deduction already happened optimistically when the messages appeared on
+        // screen; this just reconciles in case a path skipped it. Idempotent.
+        DispatchQueue.main.async { [weak self] in
+            self?.deductDisplayedUnreadMentions(messages)
+        }
+    }
+
+    /// Deducts mentions the user is already looking at from `newMentionCount`
+    /// without waiting for the displayed-marker server round trip, so the badge
+    /// never lingers (or shows at all) for messages visible on screen.
+    /// Main-thread only. Idempotent per message id.
+    open func deductDisplayedUnreadMentions(_ messages: [ChatMessage]) {
+        guard newMentionCount > 0 else { return }
+        let currentUserId = SceytChatUIKit.shared.currentUserId
         let mentionedMessages = messages.filter { message in
             message.incoming &&
-            message.mentionedUsers?.contains(where: { $0.id == SceytChatUIKit.shared.currentUserId }) == true
+            !displayedMentionMessageIds.contains(message.id) &&
+            message.mentionedUsers?.contains(where: { $0.id == currentUserId }) == true
         }
-
-        // If any messages had mentions, remove them from the cache and update count
         guard !mentionedMessages.isEmpty else { return }
 
-        // Remove each mention from the cache
         for message in mentionedMessages {
+            displayedMentionMessageIds.insert(message.id)
             unreadMentionsManager.removeMention(message.id)
         }
 
-        // Update the UI count on main thread
-        DispatchQueue.main.async { [weak self] in
-            guard let self else { return }
-            self.newMentionCount = UInt64(self.unreadMentionsManager.remainingUnreadMentionsCount)
+        if isUnreadMentionsCacheLoaded {
+            newMentionCount = UInt64(unreadMentionsManager.remainingUnreadMentionsCount)
+        } else {
+            // Cache fetch still in flight: deduct locally, counting only mentions
+            // that are actually unread so already-read mentions scrolled past
+            // don't drain the seeded server count.
+            let deducted = UInt64(mentionedMessages.filter { $0.id > channel.lastDisplayedMessageId }.count)
+            newMentionCount = newMentionCount >= deducted ? newMentionCount - deducted : 0
         }
+    }
+
+    /// Reconciles the freshly fetched unread-mentions cache with mentions the user
+    /// already saw on screen while the fetch was in flight, then republishes the count.
+    private func reconcileUnreadMentionsCacheAfterLoad() {
+        isUnreadMentionsCacheLoaded = true
+        // If the fetch yielded nothing and nothing was seen on screen (e.g. offline),
+        // keep the server-seeded count instead of zeroing the badge.
+        guard unreadMentionsManager.hasUnreadMentions || !displayedMentionMessageIds.isEmpty
+        else { return }
+        for id in displayedMentionMessageIds {
+            unreadMentionsManager.removeMention(id)
+        }
+        newMentionCount = UInt64(unreadMentionsManager.remainingUnreadMentionsCount)
     }
 
     /// Resets unread mentions cache when mention count becomes 0
@@ -3106,7 +3702,10 @@ public extension ChannelViewModel {
     /// Handles when a new message mentioning the current user is received
     public func handleNewMentionMessage(_ message: ChatMessage) {
         guard message.incoming,
-              message.mentionedUsers?.contains(where: { $0.id == SceytChatUIKit.shared.currentUserId }) == true
+              message.mentionedUsers?.contains(where: { $0.id == SceytChatUIKit.shared.currentUserId }) == true,
+              // Already on screen (cell displayed before this event arrived) —
+              // don't re-add it and flash the badge for a visible message.
+              !displayedMentionMessageIds.contains(message.id)
         else { return }
 
         // Add to unread mentions cache

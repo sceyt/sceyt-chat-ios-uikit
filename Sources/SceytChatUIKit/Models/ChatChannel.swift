@@ -13,7 +13,7 @@ import CoreData
 public class ChatChannel {
     public let id: ChannelId
     public let parentChannelId: ChannelId
-    public let uri: String
+    public var uri: String
     public let type: String
     public let createdAt: Date
     public let updatedAt: Date?
@@ -39,6 +39,12 @@ public class ChatChannel {
     public var unSynched: Bool = false
     
     public var draftMessage: NSAttributedString?
+    /// Type of the draft's first attachment (`AttachmentType` raw value), for the channel-list
+    /// preview of a draft that is attachments-only.
+    public var draftAttachmentType: String?
+    /// `"reply"` / `"edit"` when the draft carries a target, for the channel-list preview of a
+    /// draft that is nothing but a reply.
+    public var draftActionType: String?
     
     public var decodedMetadata: Metadata?
 
@@ -73,6 +79,8 @@ public class ChatChannel {
         userRole: String? = nil,
         messageRetentionPeriod: TimeInterval = 0,
         draftMessage: NSAttributedString? = nil,
+        draftAttachmentType: String? = nil,
+        draftActionType: String? = nil,
         unSynched: Bool = false
     ) {
         self.id = id
@@ -101,6 +109,8 @@ public class ChatChannel {
         self.userRole = userRole
         self.messageRetentionPeriod = messageRetentionPeriod
         self.draftMessage = draftMessage
+        self.draftAttachmentType = draftAttachmentType
+        self.draftActionType = draftActionType
         self.unSynched = unSynched
         if let metadata {
             decodedMetadata = try? Metadata.decode(metadata)
@@ -138,15 +148,26 @@ public class ChatChannel {
             userRole: dto.userRole?.name,
             messageRetentionPeriod: dto.messageRetentionPeriod,
             draftMessage: dto.draft,
+            draftAttachmentType: dto.draftAttachmentType,
+            draftActionType: dto.draftActionType,
             unSynched: dto.unsynched
         )
         if self.channelType == .direct {
-            if let context = dto.managedObjectContext {
-                members = MemberDTO.fetch(channelId: ChannelId(dto.id), context: context).map { $0.convert() }
+            let viaInverse = dto.members?
+                .sorted { ($0.user?.id ?? "") > ($1.user?.id ?? "") }
+                .map { $0.convert() } ?? []
+            if !viaInverse.isEmpty {
+                members = viaInverse
             } else {
-                #if DEBUG
-                fatalError("ChannelDTO managedObjectContext is nil")
-                #endif
+                // Fallback for rows where the ChannelDTO<->MemberDTO inverse
+                // hasn't been wired (legacy data, partial migration).
+                let readContext = SceytChatUIKit.shared.database.backgroundReadOnlyContext
+                var fetched: [ChatChannelMember] = []
+                readContext.performAndWait {
+                    fetched = MemberDTO.fetch(channelId: ChannelId(dto.id), context: readContext)
+                        .map { $0.convert() }
+                }
+                members = fetched
             }
         }
     }
@@ -279,7 +300,25 @@ extension ChatChannel: Hashable {
 internal extension ChatChannel {
     
     var peer: ChatChannelMember? {
-        let _peer = (channelType == .direct ? members?.first(where: {$0.id != SceytChatUIKit.shared.currentUserId }) : nil)
-        return _peer
+        guard channelType == .direct else { return nil }
+        guard let currentUserId = SceytChatUIKit.shared.currentUserId,
+              !currentUserId.isEmpty
+        else { return nil }
+        // The lookup below identifies the peer by elimination — "the member who
+        // is not me" — so it is only meaningful if `currentUserId` actually is
+        // one of the members. When it isn't, nothing gets eliminated and
+        // `first(where:)` degenerates into `members[0]`, which is the signed-in
+        // user whenever their id sorts first (direct members are ordered by user
+        // id, descending), and the channel then reports *itself* as the peer:
+        // the row renders your own name and avatar as the person you're talking
+        // to. Bail out instead — an unresolvable peer is better reported as
+        // unknown than as the wrong person.
+        //
+        // Reachable whenever the identity and the channel disagree: mid-account
+        // switch, while the outgoing account's channels are still in CoreData,
+        // or before the chat client has reconnected as the incoming one.
+        guard let members, members.contains(where: { $0.id == currentUserId })
+        else { return nil }
+        return members.first(where: { $0.id != currentUserId })
     }
 }

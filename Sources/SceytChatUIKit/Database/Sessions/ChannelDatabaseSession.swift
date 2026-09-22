@@ -58,6 +58,44 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     @discardableResult
     public func createOrUpdate(channel: Channel, forceUpdate: Bool) -> ChannelDTO {
         let (channelDTO, created) = ChannelDTO.fetchOrCreate(id: channel.id, context: self)
+        return apply(channel: channel, to: channelDTO, created: created, forceUpdate: forceUpdate)
+    }
+
+    /// The local row a channel payload's `lastMessage` would overwrite, when that payload is the
+    /// SDK's own cached copy of one of *our* sends rather than anything the server told us —
+    /// meaning it must be ignored. `nil` means the payload is safe to apply.
+    ///
+    /// The SDK hands out a live reference to its local message cache here. Right after a send
+    /// times out it flips that copy to `deliveryStatus == .failed` while leaving `id == 0`, and a
+    /// channel-list page read a few milliseconds later carries it. Applying it runs
+    /// `MessageDTO.map` over the row we created in `storePending` and downgrades `pending ->
+    /// failed`, which is what raises the warning tick even though the message reached the
+    /// receiver. Worse, `MessageDTO.fetchOrCreate` matches by tid and then assigns the incoming
+    /// id, so an `id == 0` payload can also reset a row that had already been repaired.
+    ///
+    /// An outgoing message with no server id can only exist locally, so when we already hold that
+    /// row there is nothing to learn from this payload: the row is resolved by the send ack, or by
+    /// `PendingSendReconciler` once a marker proves the message landed. If we *don't* hold it, the
+    /// write goes ahead as before so a message is never silently dropped.
+    private func staleCachedLastMessageRow(_ message: Message, channelId: ChannelId) -> MessageDTO? {
+        guard !message.incoming, message.id == 0, message.tid != 0 else { return nil }
+        return MessageDTO.fetch(tid: Int64(message.tid), channelId: Int64(channelId), context: self)
+    }
+
+    /// Records a skip only when it prevented real damage — a row that already carries its server
+    /// id would have had it zeroed. Skipping a payload for a row that is still `id == 0` is the
+    /// routine case and says nothing worth logging.
+    private func noteSkippedLastMessage(_ message: Message, row: MessageDTO, channelId: ChannelId, path: String) {
+        guard row.id != 0 else { return }
+        MessageSendTrace.log(
+            "channel.lastMessage.clobberPrevented", tid: Int64(message.tid),
+            channelId: channelId, messageId: MessageId(row.id),
+            "path=\(path) \(MessageSendTrace.describe(dto: row)) \(MessageSendTrace.describe(ack: message))"
+        )
+    }
+
+    @discardableResult
+    private func apply(channel: Channel, to channelDTO: ChannelDTO, created: Bool, forceUpdate: Bool) -> ChannelDTO {
         let dto = channelDTO.map(channel)
 
         if channel.newMessageCount > 0 {
@@ -85,7 +123,11 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
 
         if created || forceUpdate {
             if let message = channel.lastMessage {
-                createOrUpdate(message: message, channelId: channel.id)
+                if let stale = staleCachedLastMessageRow(message, channelId: channel.id) {
+                    noteSkippedLastMessage(message, row: stale, channelId: channel.id, path: "createOrUpdate")
+                } else {
+                    createOrUpdate(message: message, channelId: channel.id)
+                }
             }
         }
 
@@ -140,7 +182,11 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         
         
         if let message = channel.lastMessage {
-            createOrUpdate(message: message, channelId: channel.id)
+            if let stale = staleCachedLastMessageRow(message, channelId: channel.id) {
+                noteSkippedLastMessage(message, row: stale, channelId: channel.id, path: "update")
+            } else {
+                createOrUpdate(message: message, channelId: channel.id)
+            }
         }
         
         if let messages = channel.messages {
@@ -172,6 +218,9 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         if let members = channel.members {
             for member in members {
                 let mdto = createOrUpdate(member: member, channelId: channel.id)
+                if mdto.channel !== dto {
+                    mdto.channel = dto
+                }
             }
         }
         
@@ -183,7 +232,23 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(channels: [Channel]) -> [ChannelDTO] {
-        channels.map { createOrUpdate(channel: $0, forceUpdate: true) }
+        guard !channels.isEmpty else { return [] }
+
+        let ids = channels.map { $0.id }
+        var dtosById: [Int64: ChannelDTO] = Dictionary(
+            uniqueKeysWithValues: ChannelDTO.fetch(ids: ids, context: self).map { ($0.id, $0) }
+        )
+
+        return channels.map { channel in
+            let key = Int64(channel.id)
+            if let existing = dtosById[key] {
+                return apply(channel: channel, to: existing, created: false, forceUpdate: true)
+            }
+            let new = ChannelDTO.insertNewObject(into: self)
+            new.id = key
+            dtosById[key] = new
+            return apply(channel: channel, to: new, created: true, forceUpdate: true)
+        }
     }
     
     public func markAsRead(channelId: ChannelId) {
@@ -203,6 +268,10 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     
     public func deleteChannel(id: ChannelId) {
         try? deleteAllMessages(channelId: id)
+        ChannelSyncStateDTO.delete(channelId: id, context: self)
+        DraftMessageDTO.delete(channelId: id, context: self)
+        // Their messages are gone, so retrying these would only fail with `channelNotExists`.
+        PendingMessageDeleteDTO.deleteAll(channelId: id, context: self)
         if let dto = ChannelDTO.fetch(id: id, context: self) {
             let deletedObjects: [AnyHashable: Any] = [
                 NSDeletedObjectsKey: [dto.objectID]
@@ -232,6 +301,46 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         return dto
     }
     
+    /// Realigns `MemberDTO.channel` with the ChannelDTO that `MemberDTO.channelId` names.
+    ///
+    /// A member row states its channel twice — in the `channelId` attribute and in the
+    /// `channel` relationship — and nothing in Core Data keeps the two in sync. When they
+    /// drift apart the channel the member really belongs to reports `members.@count == 0`,
+    /// which hides direct channels from the channel list, while an unrelated channel
+    /// reports members it doesn't own. `channelId` is the authoritative side: message rows,
+    /// member lookups and channel search are all keyed by it.
+    /// - Returns: the number of member rows that were relinked.
+    @discardableResult
+    public func repairMemberChannelLinks() -> Int {
+        let request = MemberDTO.fetchRequest()
+        request.fetchBatchSize = 500
+        request.relationshipKeyPathsForPrefetching = [#keyPath(MemberDTO.channel)]
+        let diverged = MemberDTO.fetch(request: request, context: self)
+            .filter { $0.channel?.id != $0.channelId }
+        guard !diverged.isEmpty else { return 0 }
+
+        // Chunked so a badly drifted store doesn't build one enormous `id IN (…)`.
+        var channelsById = [Int64: ChannelDTO]()
+        let ids = Array(Set(diverged.compactMap { $0.channelId > 0 ? ChannelId($0.channelId) : nil }))
+        for chunk in ids.chunked(into: 500) {
+            for dto in ChannelDTO.fetch(ids: Array(chunk), context: self) {
+                channelsById[dto.id] = dto
+            }
+        }
+
+        var relinked = 0
+        for member in diverged {
+            // A row whose channel isn't in the store belongs to no local channel: nil is
+            // the honest link, and leaving it pointing elsewhere corrupts that channel's
+            // member count.
+            let channel = channelsById[member.channelId]
+            guard member.channel !== channel else { continue }
+            member.channel = channel
+            relinked += 1
+        }
+        return relinked
+    }
+
     @discardableResult
     public func createOrUpdate(member: Member, channelId: ChannelId) -> MemberDTO {
         let dto = MemberDTO.fetchOrCreate(id: member.id, channelId: channelId, context: self).map(member)
@@ -301,13 +410,99 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
         let dto = ChannelDTO.fetch(id: channelId, context: self)
         dto?.draft = message
         dto?.draftDate = date?.bridgeDate
+        // A plain-text draft has no attachments and no reply/edit target; leaving stale values
+        // would preview "Draft: Image" or "Draft: Reply" for a draft that has neither.
+        dto?.draftAttachmentType = nil
+        dto?.draftActionType = nil
         return dto
+    }
+
+    public func draft(channelId: ChannelId) -> DraftMessage? {
+        DraftMessageDTO.fetch(channelId: channelId, context: self)?.convert(context: self)
+    }
+
+    /// Persists the whole input-bar state, and mirrors the composed text into
+    /// `ChannelDTO.draft`/`draftDate` so the channel list preview and `sortingKey` keep working
+    /// without reaching across into the draft row.
+    @discardableResult
+    public func update(draft: DraftMessage, date: Date? = nil) -> ChannelDTO? {
+        applyDraft(draft, date: date)
+    }
+
+    @discardableResult
+    func applyDraft(_ draft: DraftMessage, date: Date?) -> ChannelDTO? {
+        // No channel row means no draft. Without this guard a channelId-keyed side table would
+        // collect rows for channels that do not exist — the same reason the Android DAO checks
+        // `existsChannel` before inserting.
+        guard let channel = ChannelDTO.fetch(id: draft.channelId, context: self) else { return nil }
+
+        let body = draft.channelListBody
+        channel.draft = body
+        // The first attachment's type is all the list needs to render "Draft: Image"; it mirrors
+        // how `ChannelLastMessageBodyFormatter` previews an attachment-only message.
+        channel.draftAttachmentType = (draft.attachments.first ?? draft.voiceRecording)?.type.rawValue
+        channel.draftActionType = draft.target.map { $0.isReply ? "reply" : "edit" }
+        // Everything the cell can preview also sorts as a draft — including a bare reply target,
+        // which shows as "Draft: Reply", so leaving it pending should surface the channel the same
+        // way a typed draft does.
+        let showsInList = body != nil
+            || !draft.attachments.isEmpty
+            || draft.voiceRecording != nil
+            || draft.target != nil
+        channel.draftDate = showsInList ? date?.bridgeDate : nil
+
+        guard draft.hasContent else {
+            channel.draftAttachmentType = nil
+            channel.draftActionType = nil
+            DraftMessageDTO.delete(channelId: draft.channelId, context: self)
+            return channel
+        }
+
+        let dto = DraftMessageDTO.fetchOrCreate(channelId: draft.channelId, context: self)
+        // Stored separately from `channel.draft`: while editing, the list previews the edit but the
+        // draft row keeps the parked pre-edit text, which cancelling restores.
+        dto.body = draft.normalizedBody
+        dto.editBody = draft.editBody
+        dto.createdAt = (draft.createdAt ?? date ?? Date()).bridgeDate
+        dto.viewOnce = draft.viewOnce
+        dto.isReply = draft.target?.isReply ?? false
+        dto.targetMessageId = Int64(draft.target?.message.id ?? 0)
+        dto.targetMessageTid = draft.target.map { Int64($0.message.tid) } ?? 0
+
+        // Replaced wholesale rather than diffed: the strip is an ordered list, and a rewrite also
+        // prunes rows whose files disappeared and were skipped on the last restore.
+        DraftAttachmentDTO.deleteAll(channelId: draft.channelId, context: self)
+        var rows = draft.attachments.enumerated().map { index, model -> DraftAttachmentDTO in
+            let attachment = DraftAttachmentDTO.insertNewObject(into: self)
+            attachment.map(model, channelId: draft.channelId, order: index)
+            return attachment
+        }
+        if let recording = draft.voiceRecording {
+            let attachment = DraftAttachmentDTO.insertNewObject(into: self)
+            attachment.map(
+                recording,
+                channelId: draft.channelId,
+                order: rows.count,
+                isVoiceRecording: true
+            )
+            rows.append(attachment)
+        }
+        dto.attachments = Set(rows)
+        return channel
     }
     
     internal func deleteMembers(predicate: NSPredicate) {
-        let request = NSFetchRequest<NSFetchRequestResult>(entityName: MemberDTO.entityName)
+        // Must delete through the context, not NSBatchDeleteRequest: role rows
+        // (RoleDTO) are shared across all channels, and a batch delete leaves
+        // dangling references to the removed members in the materialized
+        // RoleDTO.members inverse. The next save that touches that role then
+        // traps in _forceRegisterLostFault (EXC_BREAKPOINT).
+        let request = MemberDTO.fetchRequest()
         request.predicate = predicate
-        try? batchDelete(fetchRequest: request)
+        MemberDTO.fetch(request: request, context: self)
+            .forEach {
+                delete($0)
+            }
     }
     
     internal func numberOfPendingMarkers(name: String, in channel: ChannelDTO) -> Int64 {

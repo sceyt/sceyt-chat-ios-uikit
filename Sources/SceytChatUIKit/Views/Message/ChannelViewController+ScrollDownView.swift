@@ -17,13 +17,40 @@ extension ChannelViewController {
             .init()
             .withoutAutoresizingMask
             .contentCompressionResistancePriorityH(.required)
-        
+
+        /// Flips the chevron so it points at the newest message. `false` (down) in
+        /// `.newestAtBottom`, `true` (up) in `.newestAtTop`. Only the icon is
+        /// flipped — the unread badge must stay upright and in the same corner.
+        open var pointsUp: Bool = false {
+            didSet {
+                guard oldValue != pointsUp else { return }
+                bubbleView.transform = pointsUp ? .mirrorY : .identity
+            }
+        }
+
         override open func setup() {
             super.setup()
-            
+
             unreadCount.value = nil
+            // Surface as a single button for VoiceOver and UI tests (a bare
+            // UIControl is not an accessibility element by default).
+            isAccessibilityElement = true
+            accessibilityTraits = .button
         }
-        
+
+        /// Surfacing the button as a single accessibility element collapses the
+        /// child badge, so the unread count is reported as the button's value —
+        /// readable by VoiceOver and by UI tests, without splitting this into
+        /// two unlabeled elements.
+        override open var accessibilityValue: String? {
+            get {
+                guard let count = unreadCount.value, !count.isEmpty
+                else { return nil }
+                return count
+            }
+            set { super.accessibilityValue = newValue }
+        }
+
         override open func setupLayout() {
             super.setupLayout()
             
@@ -41,6 +68,8 @@ extension ChannelViewController {
             backgroundColor = appearance.backgroundColor
             bubbleView.image = Components.imageBuilder.addShadow(to: appearance.icon,
                                                                  blur: 12)
+            // setupAppearance may run after `pointsUp` was set; re-assert it.
+            bubbleView.transform = pointsUp ? .mirrorY : .identity
             unreadCount.font = appearance.unreadCountLabelAppearance.font
             unreadCount.textColor = appearance.unreadCountLabelAppearance.foregroundColor
             unreadCount.backgroundColor = appearance.unreadCountLabelAppearance.backgroundColor

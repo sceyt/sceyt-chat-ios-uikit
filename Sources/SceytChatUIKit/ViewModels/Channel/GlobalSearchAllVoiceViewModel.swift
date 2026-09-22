@@ -321,7 +321,11 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { _ in
+                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                    // stopTransfer persists the paused status itself whenever it had
+                    // something to stop; false means nothing was running (e.g. the
+                    // download already finished) and the stored status must stay.
+                    guard stopped else { return }
                     DataProvider.database.write {
                         let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
                         dto?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue

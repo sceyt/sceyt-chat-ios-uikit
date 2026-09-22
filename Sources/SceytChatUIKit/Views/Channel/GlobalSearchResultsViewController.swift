@@ -119,7 +119,6 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         categoryTabBar.onSelect = { [weak self] index in
             self?.selectPage(at: index, animated: true)
         }
-        buildPages()
     }
 
     /// Creates fresh page VCs, view models, and the pageViewController,
@@ -264,7 +263,8 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
         view.addSubview(searchUserBarView)
         view.addSubview(categoryTabBar) // added last so it stays on top
 
-        pageContainerView.addSubview(pageViewController.view.withoutAutoresizingMask)
+        categoryTabBar.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.GlobalSearch.categoryTabBar
+        searchUserBarView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.GlobalSearch.userBar
 
         userBarBottom = searchUserBarView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor)
 
@@ -285,8 +285,6 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
             userBarBottom
         ])
 
-        pageViewController.view.pin(to: pageContainerView)
-
         searchUserBarView.alpha = 0
         searchUserBarView.isUserInteractionEnabled = false
     }
@@ -301,11 +299,6 @@ open class GlobalSearchResultsViewController: ChannelSearchResultsBaseViewContro
     }
 
     override open func setupDone() {
-        pageViewController.didMove(toParent: self)
-        // Attach live scroll sync after layout
-        DispatchQueue.main.async { [weak self] in
-            self?.attachPageScrollObservation()
-        }
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(keyboardWillChangeFrame(_:)),

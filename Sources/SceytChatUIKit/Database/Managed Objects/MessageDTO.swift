@@ -84,10 +84,14 @@ public class MessageDTO: NSManagedObject {
         return fetch(request: request, context: context).first
     }
 
-    public static func fetch(tid: Int64, context: NSManagedObjectContext) -> MessageDTO? {
+    public static func fetch(tid: Int64, channelId: Int64 = 0, context: NSManagedObjectContext) -> MessageDTO? {
         let request = fetchRequest()
         request.sortDescriptor = NSSortDescriptor(keyPath: \MessageDTO.tid, ascending: false)
-        request.predicate = .init(format: "tid == %lld", tid)
+        if channelId != 0 {
+            request.predicate = .init(format: "tid == %lld AND channelId == %lld", tid, channelId)
+        } else {
+            request.predicate = .init(format: "tid == %lld", tid)
+        }
         return fetch(request: request, context: context).first
     }
     
@@ -98,7 +102,7 @@ public class MessageDTO: NSManagedObject {
         return fetch(request: request, context: context)
     }
 
-    public static func fetchOrCreate(id: MessageId, tid: Int64 = 0, context: NSManagedObjectContext) -> MessageDTO {
+    public static func fetchOrCreate(id: MessageId, tid: Int64 = 0, channelId: Int64 = 0, context: NSManagedObjectContext) -> MessageDTO {
         let request = fetchRequest()
         request.sortDescriptor = NSSortDescriptor(keyPath: \MessageDTO.id, ascending: false)
         if id != 0 {
@@ -109,13 +113,17 @@ public class MessageDTO: NSManagedObject {
             }
         }
         if tid != 0 {
-            request.predicate = NSPredicate(format: "tid == %lld", tid)
+            if channelId != 0 {
+                request.predicate = NSPredicate(format: "tid == %lld AND channelId == %lld", tid, channelId)
+            } else {
+                request.predicate = NSPredicate(format: "tid == %lld", tid)
+            }
             if let dto = fetch(request: request, context: context).first {
                 dto.id = Int64(id)
                 return dto
             }
         }
-        
+
         let mo = insertNewObject(into: context)
         mo.id = Int64(id)
         return mo

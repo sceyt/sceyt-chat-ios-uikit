@@ -81,16 +81,24 @@ extension StartChatViewController {
         
         override open func setupAppearance() {
             super.setupAppearance()
-            
+
             groupIconView.image = appearance.createGroupIcon
             groupTitleLabel.text = appearance.createGroupText
             groupTitleLabel.font = appearance.createGroupLabelAppearance.font
             groupTitleLabel.textColor = appearance.createGroupLabelAppearance.foregroundColor
-            
+
             channelIconView.image = appearance.createChannelIcon
             channelTitleLabel.text = appearance.createChannelText
             channelTitleLabel.font = appearance.createChannelLabelAppearance.font
             channelTitleLabel.textColor = appearance.createChannelLabelAppearance.foregroundColor
+
+            groupView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.createGroupButton
+            groupIconView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.createGroupIcon
+            groupTitleLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.createGroupLabel
+
+            channelView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.createChannelButton
+            channelIconView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.createChannelIcon
+            channelTitleLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.StartChat.createChannelLabel
         }
     }
 }

@@ -27,6 +27,10 @@ open class ChannelProfileViewModel: NSObject {
     public var isAdmin: Bool { channel.userRole == SceytChatUIKit.shared.config.memberRolesConfig.admin }
     public var canEdit: Bool { !channel.isDirect && (isOwner || isAdmin) }
 
+    /// Whether the "Admins" row should be shown in the channel info screen.
+    /// Defaults to owners and admins only; override to change visibility.
+    open var canShowAdmins: Bool { isOwner || isAdmin }
+
     open lazy var channelObserver: DatabaseObserver<ChannelDTO, ChatChannel> = {
         
         DatabaseObserver<ChannelDTO, ChatChannel>(

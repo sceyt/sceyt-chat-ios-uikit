@@ -43,7 +43,7 @@ open class GlobalSearchMessageCell: TableViewCell {
             )
             titleLabel.text = appearance.titleFormatter.format(channel)
             statusLabel.attributedText = attributedStatus(channel: channel, message: message)
-            timeLabel.text = appearance.channelDateFormatter.format(message.updatedAt ?? message.createdAt)
+            timeLabel.text = appearance.dateFormatter.format(message.updatedAt ?? message.createdAt)
         }
     }
 

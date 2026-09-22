@@ -35,6 +35,8 @@ open class ChannelSearchResultsBaseViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.allowsMultipleSelection = true
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SearchResults.tableView
+        emptyStateView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.SearchResults.emptyView
         tableView.register(Components.separatorHeaderView.self)
         tableView.contentInsetAdjustmentBehavior = .automatic
         tableView.tableFooterView = UIView()
@@ -82,7 +84,7 @@ open class ChannelSearchResultsBaseViewController: ViewController,
     }
     
     open func showEmptyViewIfNeeded() {
-        emptyStateView.isHidden = !resultsUpdater.searchResults.isEmpty
+        emptyStateView.isHidden = !(resultsUpdater?.searchResults.isEmpty ?? true)
     }
     
     func adjustTableViewToKeyboard(notification: Notification) {
@@ -107,11 +109,11 @@ open class ChannelSearchResultsBaseViewController: ViewController,
     // MARK: - UITableViewDataSource, UITableViewDelegate
 
     open func numberOfSections(in tableView: UITableView) -> Int {
-        resultsUpdater.searchResults.numberOfSections
+        resultsUpdater?.searchResults.numberOfSections ?? 0
     }
-    
+
     open func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        resultsUpdater.searchResults.numberOfChannels(in: section)
+        resultsUpdater?.searchResults.numberOfChannels(in: section) ?? 0
     }
     
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
@@ -119,11 +121,11 @@ open class ChannelSearchResultsBaseViewController: ViewController,
     }
     
     open func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        resultsUpdater.searchResults.header(for: section) != nil ? Components.separatorHeaderView.Layouts.height : 0
+        resultsUpdater?.searchResults.header(for: section) != nil ? Components.separatorHeaderView.Layouts.height : 0
     }
-    
+
     open func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
-        guard let header = resultsUpdater.searchResults.header(for: section)
+        guard let header = resultsUpdater?.searchResults.header(for: section)
             else { return nil }
         
         let headerView = tableView.dequeueReusableHeaderFooterView(Components.separatorHeaderView.self)

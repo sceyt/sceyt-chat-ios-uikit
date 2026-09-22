@@ -38,6 +38,8 @@ open class CreateGroupViewController: ViewController,
                                                             target: self,
                                                             action: #selector(createAction(_:)))
         navigationItem.rightBarButtonItem?.isEnabled = false
+        navigationItem.rightBarButtonItem?.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreateGroup.createButton
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreateGroup.tableView
         tableView.register(Components.userCell.self)
         tableView.register(Components.separatorHeaderView.self)
         
@@ -181,6 +183,9 @@ open class CreateGroupViewController: ViewController,
             cell.selectionStyle = .none
             if let user = viewModel.user(at: indexPath) {
                 cell.userData = user
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreateGroup.Cell.identifier(for: user.id)
+            } else {
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.CreateGroup.Cell.root
             }
             return cell
         default:

@@ -29,9 +29,18 @@ open class AudioWaveformView: View {
         get { _progress }
     }
     
+    open override func setup() {
+        super.setup()
+
+        // This view paints in draw(rect:). With the default .scaleToFill contentMode a paint at one
+        // width is just stretched when the width later changes, so a first paint at zero width (before
+        // Auto Layout sizes the row) would never repaint into a real waveform. .redraw forces a repaint
+        // on every bounds change.
+        contentMode = .redraw
+    }
+
     open override func setupAppearance() {
         super.setupAppearance()
-        
         backgroundColor = .clear
     }
     

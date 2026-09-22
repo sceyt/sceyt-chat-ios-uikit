@@ -12,62 +12,24 @@ open class ChannelSwipeActionsConfiguration: NSObject {
     
     public typealias Handler = (UIContextualAction, UIView, Actions, @escaping (Bool) -> Void) -> Void
     
+    @available(*, deprecated, message: "The channel list renders its own in-cell swipe actions so they can survive a channel reorder; UIKit can neither carry an open swipe across a row move nor re-open one. Override trailingActions(chatChannel:) to change which actions a channel offers, or ChannelListViewController.onSwipeAction(_:channel:) to change what they do. Set ChannelListViewController.usesNativeSwipeActions = true to keep this UIKit implementation.")
     open class func trailingSwipeActionsConfiguration(
         for chatChannel: ChatChannel,
         handler: @escaping Handler
     ) -> UISwipeActionsConfiguration? {
-        let actions = trailingActions(chatChannel: chatChannel)
-        let contextualActions: [UIContextualAction] = actions.compactMap { action in
-            switch action {
-            case .delete:
-                return UIContextualAction(appearance: Appearance.deleteContextualAction) {
-                        handler($0, $1, .delete, $2)
-                    }
-            case .leave:
-                return UIContextualAction(appearance: Appearance.leaveContextualAction) {
-                    handler($0, $1, .leave, $2)
-                }
-            case .mute:
-                return UIContextualAction(appearance: Appearance.muteContextualAction) {
-                    handler($0, $1, .mute, $2)
-                }
-            case .unmute:
-                return UIContextualAction(appearance: Appearance.unmuteContextualAction) {
-                    handler($0, $1, .unmute, $2)
-                }
-            default:
-                return nil
-            }
+        let contextualActions = trailingActionItems(chatChannel: chatChannel).map { item in
+            UIContextualAction(appearance: item.appearance) { handler($0, $1, item.action, $2) }
         }
         return contextualActions.isEmpty ? nil : UISwipeActionsConfiguration(actions: contextualActions)
     }
     
+    @available(*, deprecated, message: "The channel list renders its own in-cell swipe actions so they can survive a channel reorder; UIKit can neither carry an open swipe across a row move nor re-open one. Override leadingActions(chatChannel:) to change which actions a channel offers, or ChannelListViewController.onSwipeAction(_:channel:) to change what they do. Set ChannelListViewController.usesNativeSwipeActions = true to keep this UIKit implementation.")
     open class func leadingSwipeActionsConfiguration(
         for chatChannel: ChatChannel,
         handler: @escaping Handler
     ) -> UISwipeActionsConfiguration? {
-        let actions = leadingActions(chatChannel: chatChannel)
-        let contextualActions: [UIContextualAction] = actions.compactMap { action in
-            switch action {
-            case .read:
-                return UIContextualAction(appearance: Appearance.readContextualAction) {
-                    handler($0, $1, .read, $2)
-                }
-            case .unread:
-                return UIContextualAction(appearance: Appearance.unreadContextualAction) {
-                    handler($0, $1, .unread, $2)
-                }
-            case .pin:
-                return UIContextualAction(appearance: Appearance.pinContextualAction) {
-                    handler($0, $1, .pin, $2)
-                }
-            case .unpin:
-                return UIContextualAction(appearance: Appearance.unpinContextualAction) {
-                    handler($0, $1, .unpin, $2)
-                }
-            default:
-                return nil
-            }
+        let contextualActions = leadingActionItems(chatChannel: chatChannel).map { item in
+            UIContextualAction(appearance: item.appearance) { handler($0, $1, item.action, $2) }
         }
         return contextualActions.isEmpty ? nil : UISwipeActionsConfiguration(actions: contextualActions)
     }
@@ -103,7 +65,7 @@ open class ChannelSwipeActionsConfiguration: NSObject {
         return actions
     }
     
-    public enum Actions {
+    public enum Actions: Equatable, CaseIterable {
         case delete
         case leave
         case read
@@ -112,6 +74,70 @@ open class ChannelSwipeActionsConfiguration: NSObject {
         case unmute
         case pin
         case unpin
+
+        /// Stable, locale-independent name, used to build accessibility
+        /// identifiers. Deliberately not derived from the localized title.
+        public var identifierName: String {
+            switch self {
+            case .delete: return "delete"
+            case .leave: return "leave"
+            case .read: return "read"
+            case .unread: return "unread"
+            case .mute: return "mute"
+            case .unmute: return "unmute"
+            case .pin: return "pin"
+            case .unpin: return "unpin"
+            }
+        }
+    }
+}
+
+public extension ChannelSwipeActionsConfiguration {
+
+    /// One resolved swipe action: what it does, plus how it looks.
+    struct ActionItem {
+        public let action: Actions
+        public let appearance: ContextualActionAppearance
+
+        public init(action: Actions, appearance: ContextualActionAppearance) {
+            self.action = action
+            self.appearance = appearance
+        }
+    }
+
+    /// The single `Actions` -> appearance mapping, shared by the in-cell swipe
+    /// buttons and the deprecated `UIContextualAction` path, so the two cannot
+    /// drift apart.
+    class func appearance(for action: Actions) -> ContextualActionAppearance {
+        switch action {
+        case .delete: return Appearance.deleteContextualAction
+        case .leave: return Appearance.leaveContextualAction
+        case .read: return Appearance.readContextualAction
+        case .unread: return Appearance.unreadContextualAction
+        case .mute: return Appearance.muteContextualAction
+        case .unmute: return Appearance.unmuteContextualAction
+        case .pin: return Appearance.pinContextualAction
+        case .unpin: return Appearance.unpinContextualAction
+        }
+    }
+
+    /// Resolved trailing actions, in the order `trailingActions(chatChannel:)`
+    /// returned them.
+    ///
+    /// Unlike the deprecated `UISwipeActionsConfiguration` factories — which
+    /// `compactMap`ped a fixed `switch` and so silently dropped anything not on
+    /// their side — nothing is filtered here: whatever
+    /// `trailingActions(chatChannel:)` returns is what gets rendered.
+    class func trailingActionItems(chatChannel: ChatChannel) -> [ActionItem] {
+        trailingActions(chatChannel: chatChannel)
+            .map { ActionItem(action: $0, appearance: appearance(for: $0)) }
+    }
+
+    /// Resolved leading actions, in the order `leadingActions(chatChannel:)`
+    /// returned them.
+    class func leadingActionItems(chatChannel: ChatChannel) -> [ActionItem] {
+        leadingActions(chatChannel: chatChannel)
+            .map { ActionItem(action: $0, appearance: appearance(for: $0)) }
     }
 }
 

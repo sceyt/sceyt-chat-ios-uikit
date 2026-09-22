@@ -102,3 +102,11 @@ extension UICollectionReusableView {
         String(describing: self)
     }
 }
+
+public extension CGAffineTransform {
+    /// Vertical mirror used by the inverted message list: the collection view is
+    /// flipped with this transform and every cell/supplementary view is flipped
+    /// back, so content reads normally while the scroll geometry stays anchored
+    /// to the newest message (contentOffset ≈ 0 is the visual bottom).
+    static let mirrorY = Self(scaleX: 1, y: -1)
+}

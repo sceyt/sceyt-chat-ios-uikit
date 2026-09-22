@@ -47,7 +47,7 @@ extension MessageCell {
             blurEffectView.clipsToBounds = true
 
             progressView.contentInsets = .init(top: 4, left: 4, bottom: 4, right: 4)
-            progressView.backgroundColor = .black.withAlphaComponent(0.3)
+            progressView.backgroundColor = appearance.overlayMediaLoaderAppearance.backgroundColor
         }
 
         override open func setupLayout() {
@@ -85,20 +85,38 @@ extension MessageCell {
             didSet {
                 setupPreviewer()
                 filePath = data.attachment.filePath
+                updateThumbnailPlaceholderBackground()
                 imageView.image = data.thumbnail
 
                 // Show/hide blur and fire icon based on viewOnce
                 let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
                 blurEffectView.isHidden = !isViewOnce
                 logger.verbose("[Attachment] data.didSet — attachment=\(data.attachment.id) status=\(data.transferStatus) hasThumbnail=\(data.thumbnail != nil)")
-                update(status: data.transferStatus)
+                applyTransferStatus(data.transferStatus)
 
-                data.onLoadThumbnail = { [weak self] thumbnail in
+                data.onLoadThumbnail = { [weak self, weak data] thumbnail in
                     guard let self else {
-                        logger.verbose("[Attachment] onLoadThumbnail self is nil")
+                        logger.verbose("[Attachment] onLoadThumbnail self is nil \(data.map { "\($0.attachment.description) layout=\(ObjectIdentifier($0))" } ?? "layout=deallocated")")
+                        return
+                    }
+                    guard let data, self.data === data else {
+                        logger.verbose("[Attachment] self.data !== data case")
                         return
                     }
                     self.imageView.image = thumbnail ?? data.attachment.thumbnailImage
+                }
+
+                // Self-heal for "blurry placeholder stays after download". When this cell (re)binds
+                // a downloaded image/video whose layout still shows the low-res thumbHash placeholder,
+                // pull the sharp thumbnail from disk now. It is instance-agnostic (keyed on attachment
+                // identity, applied via setFileBackedThumbnail), so it recovers even when the
+                // post-download load landed on a duplicate layout instance or no live transfer-completion
+                // callback fired. The live (no-scroll) case is reached because a download that completes
+                // while the cell is visible triggers a reconfigure (MessageLayoutModel.update(message:)
+                // inserts .reload on the completion edge), which re-runs this didSet. Gated on
+                // !isThumbnailLoadedFromFile, so it runs at most once per layout instance.
+                if data.transferStatus == .done, !data.isThumbnailLoadedFromFile {
+                    reloadThumbnailFromFile(for: data.attachment)
                 }
             }
         }

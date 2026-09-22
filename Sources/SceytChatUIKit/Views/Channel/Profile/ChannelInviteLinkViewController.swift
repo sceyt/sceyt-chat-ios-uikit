@@ -55,6 +55,7 @@ open class ChannelInviteLinkViewController: ViewController,
         tableView.dataSource = self
         tableView.separatorStyle = .none
         tableView.showsVerticalScrollIndicator = false
+        tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.tableView
 
         let footer = UIView()
         footer.frame.size.height = .leastNormalMagnitude
@@ -62,9 +63,11 @@ open class ChannelInviteLinkViewController: ViewController,
         
         setupBindings()
         
-        // Fetch the current invite link data
+        // Fetch the current invite link data. `loadInviteLinkData` re-reads the channel
+        // from the DB first, so it always queries with the current invite key even when
+        // the channel snapshot handed in from the member list is stale (e.g. the link
+        // was reset on a previous visit).
         inviteLinkViewModel.loadInviteLinkData()
-        inviteLinkViewModel.refreshChannelFromDB()
     }
     
     private func setupBindings() {
@@ -175,6 +178,7 @@ open class ChannelInviteLinkViewController: ViewController,
             cell.parentAppearance = appearance.switchOptionCellAppearance
             cell.titleLabel.text = appearance.showPreviousMessagesText
             cell.switchControl.isOn = inviteLinkViewModel.showPreviousMessages
+            cell.switchControl.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.showMessagesSwitch
             cell.onSwitchChanged = { [weak self] isOn in
                 self?.inviteLinkViewModel.updateShowPreviousMessages(isOn)
             }
@@ -183,21 +187,26 @@ open class ChannelInviteLinkViewController: ViewController,
         case 2:
             let cell = tableView.dequeueReusableCell(for: indexPath, cellType: ActionCell.self)
             cell.parentAppearance = appearance.actionCellAppearance
+            cell.titleLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.actionTitle
             switch indexPath.row {
             case 0:
                 cell.iconView.image = .chatShare
                 cell.titleLabel.text = appearance.shareText
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.shareButton
             case 1:
                 if !inviteLinkViewModel.isPublicChannel {
                     cell.iconView.image = .refreshIcon
                     cell.titleLabel.text = appearance.resetLinkText
+                    cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.resetButton
                 } else {
                     cell.iconView.image = .channelProfileQR
                     cell.titleLabel.text = appearance.openQRCodeText
+                    cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.qrButton
                 }
             case 2:
                 cell.iconView.image = .channelProfileQR
                 cell.titleLabel.text = appearance.openQRCodeText
+                cell.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.ChannelInviteLink.qrButton
             default:
                 break
             }
