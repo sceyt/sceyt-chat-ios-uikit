@@ -26,7 +26,7 @@ let package = Package(
                 .product(name: "SceytChat", package: "sceyt-chat-ios-sdk"),
                 "SceytChatUIKitObjCSupport",
             ],
-            resources: [.copy("Database/SceytChatModel.xcdatamodeld"), .process("Resources")]
+            resources: [.process("Database/SceytChatModel.xcdatamodeld"), .process("Resources")]
         ),
 
         .target(
