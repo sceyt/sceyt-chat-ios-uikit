@@ -28,6 +28,27 @@ open class ChannelPinnedMessageListViewModel: NSObject {
 
     @Published public var event: Event?
 
+    /// `true` while the screen is picking messages rather than browsing them — the rows
+    /// carry checkboxes, the navigation bar counts the picks and the actions bar is up.
+    ///
+    /// Leaving the mode drops the picks: a selection only means anything while it is being
+    /// made, exactly as in the conversation.
+    @Published public var isEditing: Bool = false {
+        didSet {
+            guard oldValue != isEditing, !isEditing else { return }
+            selectedMessageTids = []
+        }
+    }
+
+    /// The picked pins, by `messageTid`.
+    ///
+    /// A tid rather than a `MessageLayoutModel` — the conversation keys its own selection by
+    /// model, which it can because its models outlive a reload; here a pin's model is rebuilt
+    /// and mutated in place from every database change, and a `Set` whose elements hash on
+    /// their message cannot survive that. The tid is the one id every pin has, pending sends
+    /// included, and it is what `layoutModels` is keyed by anyway.
+    @Published public private(set) var selectedMessageTids = Set<Int64>()
+
     /// The channel's live pins in pin order, **oldest pin first** — the conversation's own
     /// direction: the most recent pin is the last row, the screen opens on it, and a pin
     /// taken while the screen is open arrives under it rather than jumping the list.
@@ -121,6 +142,7 @@ open class ChannelPinnedMessageListViewModel: NSObject {
         // reason `ChannelViewModel.reloadPinnedMessages` does it: the request's predicate is
         // evaluated when the fetch runs, not as time passes.
         items = pinnedMessageObserver.orderedItems.filter { !$0.isExpired }
+        pruneSelection()
         // The message observer follows whatever is pinned now, so it is re-pointed here
         // rather than at every message in the channel.
         try? messageObserver.update(predicate: pinnedMessagesPredicate)
@@ -235,6 +257,62 @@ open class ChannelPinnedMessageListViewModel: NSObject {
             }
         }
         model.contentInsets = contentInsets
+    }
+
+    // MARK: - Selection
+
+    /// The picked pins' models, in the list's own order, so the actions act on them the way
+    /// they read on screen — a forward of three pins arrives in pin order, not tap order.
+    open var selectedLayoutModels: [MessageLayoutModel] {
+        items.compactMap {
+            selectedMessageTids.contains($0.messageTid) ? layoutModels[$0.messageTid] : nil
+        }
+    }
+
+    /// Whether the row at `indexPath` can be picked. The conversation's rule — a deleted
+    /// message is a tombstone with nothing to forward, share or delete again — plus system
+    /// messages, which the conversation never offers a checkbox either.
+    open func canSelect(at indexPath: IndexPath) -> Bool {
+        guard isEditing, let model = layoutModel(at: indexPath) else { return false }
+        return model.message.state != .deleted && !model.isSystemMessage
+    }
+
+    open func isSelected(at indexPath: IndexPath) -> Bool {
+        guard let item = item(at: indexPath) else { return false }
+        return selectedMessageTids.contains(item.messageTid)
+    }
+
+    /// Adds or removes the row's pin, up to `config.messageMultiselectLimit` — the same
+    /// ceiling the conversation's selection has, since the actions behind it are the same.
+    open func didChangeSelection(at indexPath: IndexPath) {
+        guard canSelect(at: indexPath), let item = item(at: indexPath) else { return }
+        if selectedMessageTids.contains(item.messageTid) {
+            selectedMessageTids.remove(item.messageTid)
+        } else if selectedMessageTids.count < SceytChatUIKit.shared.config.messageMultiselectLimit {
+            selectedMessageTids.insert(item.messageTid)
+        }
+    }
+
+    /// Enters the mode on one pin — what the row's "Select" action does.
+    open func select(messageTid: Int64) {
+        // Order matters: entering the mode is what clears an older selection, so the new
+        // one is written after.
+        isEditing = true
+        selectedMessageTids = [messageTid]
+    }
+
+    /// Drops picks whose pin is gone — unpinned from here, from the conversation or from
+    /// another device — and leaves the mode once there is nothing left to pick.
+    open func pruneSelection() {
+        if items.isEmpty {
+            isEditing = false
+            return
+        }
+        guard !selectedMessageTids.isEmpty else { return }
+        let live = Set(items.map { $0.messageTid })
+        let remaining = selectedMessageTids.intersection(live)
+        guard remaining != selectedMessageTids else { return }
+        selectedMessageTids = remaining
     }
 
     /// Whether the row offers Unpin.

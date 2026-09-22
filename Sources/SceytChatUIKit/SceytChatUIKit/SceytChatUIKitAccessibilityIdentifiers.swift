@@ -681,6 +681,12 @@ extension SceytChatUIKit {
 
             /// The placeholder shown once the last pin goes away.
             public static let emptyView = "sceyt_chat_pinned_message_list_empty_view"
+
+            /// The bar button that leaves selection mode, in the "X"'s place.
+            public static let cancelSelectingButton = "sceyt_chat_pinned_message_list_cancel_selecting_button"
+
+            /// The bar of actions shown under the picked messages.
+            public static let selectingView = "sceyt_chat_pinned_message_list_selecting_view"
         }
 
         /// The poll-results screen driven by `PollResultsViewController`.

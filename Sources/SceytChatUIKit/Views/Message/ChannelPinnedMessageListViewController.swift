@@ -5,6 +5,7 @@
 //  Copyright © 2026 Sceyt LLC. All rights reserved.
 //
 
+import SceytChat
 import UIKit
 
 /// The standalone pinned-messages screen: every live pin in one channel, opened from the
@@ -26,9 +27,15 @@ import UIKit
 /// pin back through `onSelect`, so the jump runs on `ChannelViewController` — the only place
 /// that can scroll the message list. See `ChannelRouter.showPinnedMessageList`.
 ///
-/// Actions the screen cannot serve on its own — the composer, selection mode, anything
-/// presented over the conversation — are handed back to `channelViewController`, after the
-/// screen closes, so the user lands where the action actually happens.
+/// Picking several pins at once works here too, rather than sending the user back: "Select"
+/// puts the screen into selection mode — checkboxes on the rows, the count in the navigation
+/// bar, the conversation's own actions bar along the bottom — and delete, share and forward
+/// then run against the picked pins. See `menuActionTitlesReturningToConversation` for what
+/// still goes back.
+///
+/// Actions the screen cannot serve on its own — the composer, anything presented over the
+/// conversation — are handed back to `channelViewController`, after the screen closes, so the
+/// user lands where the action actually happens.
 open class ChannelPinnedMessageListViewController: ViewController,
                                                   UITableViewDelegate,
                                                   UITableViewDataSource,
@@ -63,6 +70,28 @@ open class ChannelPinnedMessageListViewController: ViewController,
         style: .plain,
         target: self,
         action: #selector(closeButtonTapped)
+    )
+
+    /// The bar of actions along the bottom while messages are being picked — delete, share,
+    /// forward. Literally the conversation's own view, so the two screens offer the same
+    /// three actions, in the same order, drawn the same way.
+    open lazy var selectingView = Components.messageInputSelectedMessagesActionsView
+        .init()
+        .withoutAutoresizingMask
+
+    /// Fills the home-indicator strip under `selectingView`, which stops at the safe area so
+    /// its buttons stay clear of it. The conversation gets this for free from the input bar
+    /// the actions bar sits on; this screen has no input bar, so the strip is its own view.
+    open lazy var selectingViewBackgroundView = UIView()
+        .withoutAutoresizingMask
+
+    /// Takes the "X"'s place while messages are being picked: the button then leaves the
+    /// mode rather than the screen, so a selection is never closed out from under the user.
+    open lazy var cancelSelectingButton = UIBarButtonItem(
+        title: L10n.Alert.Button.cancel,
+        style: .done,
+        target: self,
+        action: #selector(cancelSelecting)
     )
 
     /// The channel picker while a forward is being addressed, so the handler can close
@@ -109,12 +138,11 @@ open class ChannelPinnedMessageListViewController: ViewController,
         return contextMenu
     }()
 
-    /// Menu actions that need the conversation itself on screen: they drive its composer,
-    /// switch it into selection mode, or present over it. The screen closes and hands
-    /// those over; everything else — copy, pin, unpin, delete, retract vote — runs right
-    /// here, the way the row's swipe action does.
+    /// Menu actions that need the conversation itself on screen: they drive its composer or
+    /// present over it. The screen closes and hands those over; everything else — copy, pin,
+    /// unpin, delete, retract vote, and picking several messages at once — runs right here,
+    /// the way the row's swipe action does.
     open var menuActionTitlesReturningToConversation: Set<String> = [
-        L10n.Message.Action.Title.select,
         // `ChannelViewController` builds this one from a bare string, and it opens a
         // confirmation alert over the conversation.
         "End Poll"
@@ -152,8 +180,9 @@ open class ChannelPinnedMessageListViewController: ViewController,
         // carries the jump.
         tableView.allowsSelection = false
         // The models carry the conversation's spacing *above* each bubble, so the bottom
-        // of the list is the one edge nothing pads.
-        tableView.contentInset.bottom = Layouts.bottomPadding
+        // of the list is the one edge nothing pads — except by the actions bar, while one
+        // is up.
+        tableView.contentInset.bottom = listBottomInset
         tableView.sectionFooterHeight = 0
         tableView.estimatedSectionHeaderHeight = 0
         // No estimates anywhere: every row's height is already known — its layout model
@@ -164,6 +193,24 @@ open class ChannelPinnedMessageListViewController: ViewController,
         tableView.estimatedSectionFooterHeight = 0
         tableView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PinnedMessageList.tableView
         emptyStateView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.PinnedMessageList.emptyView
+
+        selectingView.isHidden = true
+        selectingViewBackgroundView.isHidden = true
+        selectingView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers
+            .PinnedMessageList.selectingView
+        cancelSelectingButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers
+            .PinnedMessageList.cancelSelectingButton
+        selectingView.onAction = { [weak self] in
+            guard let self else { return }
+            switch $0 {
+            case .delete:
+                showDeleteOptionsForSelectedMessages()
+            case .share:
+                shareSelectedMessages()
+            case .forward:
+                forwardSelectedMessages()
+            }
+        }
 
         setupNavigationBarItems()
         setupGestureRecognizers()
@@ -176,13 +223,44 @@ open class ChannelPinnedMessageListViewController: ViewController,
                 self?.onEvent($0)
             }.store(in: &subscriptions)
 
+        // Both hop to the main queue before reading the view model back: `@Published` fires
+        // from `willSet`, so the property still holds the old value when the sink runs
+        // inline.
+        viewModel.$isEditing
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateEditingState()
+            }.store(in: &subscriptions)
+
+        viewModel.$selectedMessageTids
+            .dropFirst()
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateSelectionState()
+            }.store(in: &subscriptions)
+
         updateEmptyState()
     }
 
     open func setupNavigationBarItems() {
         closeButton.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers
             .PinnedMessageList.closeButton
-        navigationItem.rightBarButtonItem = closeButton
+        updateNavigationBarItems()
+    }
+
+    /// The bar shows what the screen is doing: the pins' title and the "X" while browsing,
+    /// the running count and Cancel while picking.
+    open func updateNavigationBarItems() {
+        if viewModel.isEditing {
+            navigationItem.title = L10n.Channel.Selecting.selected(viewModel.selectedMessageTids.count)
+            navigationItem.rightBarButtonItem = cancelSelectingButton
+        } else {
+            navigationItem.title = appearance.titleText
+            navigationItem.rightBarButtonItem = closeButton
+        }
     }
 
     /// Mirrors the conversation's setup: the tap only runs once the long press has failed,
@@ -205,9 +283,18 @@ open class ChannelPinnedMessageListViewController: ViewController,
 
         view.addSubview(tableView)
         view.addSubview(emptyStateView)
+        view.addSubview(selectingViewBackgroundView)
+        view.addSubview(selectingView)
 
         tableView.pin(to: view, anchors: [.leading, .trailing, .top, .bottom])
         emptyStateView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top, .bottom])
+
+        // Above the safe area, so the three buttons are not under the home indicator; the
+        // strip below it is filled by the background view rather than by stretching the bar.
+        selectingView.pin(to: view, anchors: [.leading, .trailing])
+        selectingView.bottomAnchor.pin(to: view.safeAreaLayoutGuide.bottomAnchor)
+        selectingViewBackgroundView.pin(to: view, anchors: [.leading, .trailing, .bottom])
+        selectingViewBackgroundView.topAnchor.pin(to: selectingView.bottomAnchor)
     }
 
     open override func setupAppearance() {
@@ -220,6 +307,11 @@ open class ChannelPinnedMessageListViewController: ViewController,
 
         closeButton.image = appearance.closeIcon
         closeButton.tintColor = appearance.closeIconTintColor
+
+        let selectedMessagesActionsAppearance = Components.messageInputViewController
+            .appearance.selectedMessagesActionsAppearance
+        selectingView.parentAppearance = selectedMessagesActionsAppearance
+        selectingViewBackgroundView.backgroundColor = selectedMessagesActionsAppearance.backgroundColor
     }
 
     open func onEvent(_ event: ChannelPinnedMessageListViewModel.Event) {
@@ -247,6 +339,7 @@ open class ChannelPinnedMessageListViewController: ViewController,
     open override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
+        updateListBottomInset()
         updateTopPaddingForShortContent()
         // Every pass while the screen is still opening: the one that first gives the table
         // a height, and each later one that changes what "the bottom" is.
@@ -266,6 +359,33 @@ open class ChannelPinnedMessageListViewController: ViewController,
         }
     }
 
+    /// How much room the list keeps under its last bubble: the trailing padding, plus the
+    /// actions bar while one is up, so the newest pin is never behind it.
+    open var listBottomInset: CGFloat {
+        guard viewModel.isEditing else { return Layouts.bottomPadding }
+        return Layouts.bottomPadding + selectingView.bounds.height
+    }
+
+    /// Applied from the layout pass, because the actions bar's own height is only known once
+    /// it has been laid out.
+    ///
+    /// The offset moves with the inset. A bottom inset is room reserved *under* the content
+    /// and changing it does not move the content itself, so a list resting on its last pin
+    /// would simply end up with that pin behind the bar; shifting by the same amount keeps
+    /// the rows where they were on screen, above the bar rather than under it. Content too
+    /// short to scroll is held from the other side, by `updateTopPaddingForShortContent()`,
+    /// and the clamps here leave it alone.
+    open func updateListBottomInset() {
+        let inset = listBottomInset
+        let delta = inset - tableView.contentInset.bottom
+        guard abs(delta) > 0.5 else { return }
+        tableView.contentInset.bottom = inset
+
+        let topOffsetY = -tableView.adjustedContentInset.top
+        let offsetY = tableView.contentOffset.y + delta
+        tableView.contentOffset.y = min(max(offsetY, topOffsetY), max(topOffsetY, bottomContentOffsetY))
+    }
+
     /// Holds the pins against the bottom of the screen when there are too few of them to
     /// fill it, by padding the empty space above them.
     ///
@@ -277,7 +397,7 @@ open class ChannelPinnedMessageListViewController: ViewController,
         let viewport = tableView.bounds.height
             - tableView.safeAreaInsets.top
             - tableView.safeAreaInsets.bottom
-            - Layouts.bottomPadding
+            - listBottomInset
         // `contentSize` does not depend on `contentInset`, so writing one from the other
         // settles in a single pass rather than chasing itself.
         let padding = max(0, viewport - tableView.contentSize.height)
@@ -365,6 +485,154 @@ open class ChannelPinnedMessageListViewController: ViewController,
         } else {
             completion?()
         }
+    }
+
+    // MARK: - Selection
+
+    /// The row's "Select": the screen switches into selection mode with this pin picked,
+    /// rather than closing and switching the conversation into it.
+    open func select(_ model: MessageLayoutModel) {
+        viewModel.select(messageTid: model.message.tid)
+    }
+
+    @objc
+    open func cancelSelecting() {
+        viewModel.isEditing = false
+    }
+
+    /// Entering or leaving the mode: the whole screen changes — the bar, the actions, and
+    /// every row, which gains or loses a checkbox and therefore has to be laid out again.
+    open func updateEditingState() {
+        let isEditing = viewModel.isEditing
+        selectingView.isHidden = !isEditing
+        selectingViewBackgroundView.isHidden = !isEditing
+        // Nothing may open the message menu while picking: the menu is what the picking
+        // replaced, and its actions run against one message.
+        longPressGestureRecognizer.isEnabled = !isEditing
+        updateNavigationBarItems()
+        updateSelectedMessagesActionsState()
+        tableView.reloadData()
+        // The actions bar takes room off the bottom of the list, or gives it back.
+        view.setNeedsLayout()
+    }
+
+    /// A pick added or dropped: the count in the bar, what the actions can do, and the
+    /// checkboxes already on screen — reloading the rows here would fight the tap that
+    /// caused it.
+    open func updateSelectionState() {
+        updateNavigationBarItems()
+        updateSelectedMessagesActionsState()
+        for case let cell as MessageCell in tableView.visibleCells {
+            guard let indexPath = tableView.indexPath(for: cell) else { continue }
+            cell.isChecked = viewModel.isSelected(at: indexPath)
+        }
+    }
+
+    /// Which of the three actions can run. Nothing picked means nothing to act on; override
+    /// to rule out more, e.g. a message kind that cannot be forwarded.
+    open func updateSelectedMessagesActionsState() {
+        let hasSelection = !viewModel.selectedMessageTids.isEmpty
+        selectingView.buttonDelete.isEnabled = hasSelection
+        selectingView.buttonShare.isEnabled = hasSelection
+        selectingView.buttonForward.isEnabled = hasSelection
+    }
+
+    /// The picked pins as the *conversation* models them, which is what every action that
+    /// writes — deleting, forwarding — has to run against.
+    open var selectedConversationLayoutModels: [MessageLayoutModel] {
+        viewModel.selectedLayoutModels.map { conversationLayoutModel(for: $0) }
+    }
+
+    // MARK: - Selection actions
+
+    /// Deleting needs nothing but the store, so the sheet opens over this screen and the
+    /// messages go from here — the list drops them as their rows lapse.
+    open func showDeleteOptionsForSelectedMessages() {
+        let models = selectedConversationLayoutModels
+        guard !models.isEmpty else { return }
+        showBottomSheet(actions: deleteOptionsSheetActions(for: models), withCancel: true)
+    }
+
+    /// The rows of that sheet. The conversation's own two, with its rule for what
+    /// "for everyone" means; override to offer fewer — e.g. to drop "for everyone" when
+    /// someone else's message is among the picks.
+    open func deleteOptionsSheetActions(for models: [MessageLayoutModel]) -> [SheetAction] {
+        [
+            .init(
+                title: L10n.Message.Action.Subtitle.deleteAll,
+                icon: .chatDelete,
+                style: .destructive
+            ) { [weak self] in
+                self?.deleteSelectedMessages(
+                    models,
+                    type: SceytChatUIKit.shared.config.hardDeleteMessageForAll ? .deleteHard : .deleteForEveryone
+                )
+            },
+            .init(
+                title: L10n.Message.Action.Subtitle.deleteMe,
+                icon: .chatDelete,
+                style: .destructive
+            ) { [weak self] in
+                self?.deleteSelectedMessages(models, type: .deleteForMe)
+            }
+        ]
+    }
+
+    /// Deletes through the conversation's view model — the one that owns the sender and the
+    /// pending-delete bookkeeping; this screen has neither.
+    open func deleteSelectedMessages(_ models: [MessageLayoutModel], type: DeleteMessageType) {
+        guard let channelViewController else { return }
+        models.forEach {
+            channelViewController.channelViewModel.deleteMessage(layoutModel: $0, type: type)
+        }
+        viewModel.isEditing = false
+    }
+
+    /// The system share sheet over this screen, with the same items the conversation puts
+    /// in it: each message's body as it formats it, plus every attachment's file.
+    open func shareSelectedMessages() {
+        let models = viewModel.selectedLayoutModels
+        guard !models.isEmpty else { return }
+        viewModel.isEditing = false
+
+        var items = [Any]()
+        for model in models {
+            let message = model.message
+            guard message.user != nil else { continue }
+            let body = message.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !body.isEmpty {
+                items.append(messageShareBodyFormatter.format(message))
+            }
+            items += message.attachments?.compactMap {
+                // A link attachment is the body's own URL, already in `items`.
+                $0.type == "link" ? nil : ($0.fileUrl ?? $0.originUrl)
+            } ?? []
+        }
+        guard !items.isEmpty else { return }
+        // The screen itself is the popover's anchor, not a button on the actions bar —
+        // leaving the mode above has just hidden that bar.
+        share(items, from: view)
+    }
+
+    /// The conversation's formatter, so a message shared from the pins reads exactly as one
+    /// shared from the conversation.
+    open var messageShareBodyFormatter: any MessageFormatting {
+        channelViewController?.appearance.messageShareBodyFormatter
+            ?? SceytChatUIKit.shared.formatters.messageShareBodyFormatter
+    }
+
+    /// Presents the system share sheet from this screen rather than from the conversation
+    /// behind it — a `UIActivityViewController` put up by a covered view controller never
+    /// appears.
+    open func share(_ items: [Any], from sourceView: Any?) {
+        Router(rootViewController: self).share(items, from: sourceView)
+    }
+
+    open func forwardSelectedMessages() {
+        let messages = selectedConversationLayoutModels.map { $0.message }
+        guard !messages.isEmpty else { return }
+        viewModel.isEditing = false
+        forward(messages: messages)
     }
 
     // MARK: - Message cell actions
@@ -472,23 +740,25 @@ open class ChannelPinnedMessageListViewController: ViewController,
     /// stays up behind them instead of closing first. Returns `nil` for an action this
     /// screen does not take over, which is most of them.
     open func localMenuItem(replacing item: MenuItem, for model: MessageLayoutModel) -> MenuItem? {
-        guard item.title == L10n.Message.Action.Title.forward else { return nil }
-        var item = item
-        item.action = { [weak self] _ in
-            self?.forward(model)
+        switch item.title {
+        case L10n.Message.Action.Title.forward:
+            var item = item
+            item.action = { [weak self] _ in
+                self?.forward(model)
+            }
+            return item
+        case L10n.Message.Action.Title.select:
+            var item = item
+            item.action = { [weak self] _ in
+                self?.select(model)
+            }
+            return item
+        default:
+            return nil
         }
-        return item
     }
 
-    /// Forwards one pin, picking the channels in the same screen the conversation uses,
-    /// presented over this one.
-    ///
-    /// Where the user lands afterwards is the conversation's rule, kept: a copy sent into
-    /// this very channel leaves them here, on the pins, with the conversation behind already
-    /// scrolled to it, and a copy sent to a single other channel opens that channel. That
-    /// channel is pushed onto the navigation stack *underneath* this screen, so the list has
-    /// to close before the push — otherwise it happens behind the modal and the user is left
-    /// looking at the pins.
+    /// Forwards the one pin a row's menu was opened on.
     open func forward(_ model: MessageLayoutModel) {
         guard let channelViewController else { return }
         // A half-recorded voice message is the conversation's to discard, over its own
@@ -499,8 +769,29 @@ open class ChannelPinnedMessageListViewController: ViewController,
             }
             return
         }
+        forward(messages: [conversationLayoutModel(for: model).message])
+    }
 
-        let messages = [conversationLayoutModel(for: model).message]
+    /// Forwards pins — one from a row's menu, or everything picked in selection mode —
+    /// picking the channels in the same screen the conversation uses, presented over this
+    /// one.
+    ///
+    /// Where the user lands afterwards is the conversation's rule, kept: a copy sent into
+    /// this very channel leaves them here, on the pins, with the conversation behind already
+    /// scrolled to it, and a copy sent to a single other channel opens that channel. That
+    /// channel is pushed onto the navigation stack *underneath* this screen, so the list has
+    /// to close before the push — otherwise it happens behind the modal and the user is left
+    /// looking at the pins.
+    ///
+    /// A half-recorded voice message is the conversation's to discard, over its own composer,
+    /// so that case still goes back.
+    open func forward(messages: [ChatMessage]) {
+        guard let channelViewController, !messages.isEmpty else { return }
+        guard !channelViewController.customInputViewController.isRecording else {
+            close { channelViewController.forward(messages: messages) }
+            return
+        }
+
         // The picker outlives this call, so it holds nothing of the two screens: the
         // conversation is read back off this screen when the channels come in.
         let forwardViewController = ForwardViewController.build { [weak self] channels in
@@ -559,11 +850,21 @@ open class ChannelPinnedMessageListViewController: ViewController,
     @objc
     open func handleTapGestureRecognizer(_ sender: UITapGestureRecognizer) {
         guard sender.state == .recognized else { return }
+        // While picking, a tap anywhere in the row is the pick — the bubble's own gestures
+        // are off for the duration, exactly as they are in the conversation.
+        if viewModel.isEditing {
+            guard let indexPath = tableView.indexPathForRow(at: sender.location(in: tableView))
+            else { return }
+            viewModel.didChangeSelection(at: indexPath)
+            return
+        }
         messageView(forGesture: sender)?.handleTap(sender: sender)
     }
 
     @objc
     open func handleLongPressGestureRecognizer(_ sender: UILongPressGestureRecognizer) {
+        guard !viewModel.isEditing else { return }
+
         func reset() {
             sender.isEnabled = false
             sender.isEnabled = true
@@ -595,6 +896,9 @@ open class ChannelPinnedMessageListViewController: ViewController,
         shouldReceive touch: UITouch
     ) -> Bool {
         guard gestureRecognizer is UITapGestureRecognizer else { return true }
+        // While picking, the row has no live controls left — the bubble is inert and the
+        // arrow is gone — so every touch is the selection's.
+        if viewModel.isEditing { return true }
         // The bubble's own controls — a reaction pill, a reply preview, a link card — and
         // the row's arrow button track their touches themselves, exactly as they do in the
         // conversation. The screen's tap recognizer must not take those away.
@@ -622,7 +926,14 @@ open class ChannelPinnedMessageListViewController: ViewController,
             ? tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelPinnedMessageIncomingCell.self)
             : tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelPinnedMessageOutgoingCell.self)
         cell.appearance = appearance
+        // Before `data`: the checkbox's constraints are built by the hosted bubble's own
+        // `data` setter, so the mode has to be in place by then.
+        cell.isSelecting = viewModel.isEditing
         cell.data = model
+        cell.isChecked = viewModel.isSelected(at: indexPath)
+        // A row that cannot be picked — a deleted message — is dimmed rather than hidden,
+        // the way the conversation dims it.
+        cell.contentView.alpha = viewModel.isEditing && !viewModel.canSelect(at: indexPath) ? 0.5 : 1
         cell.onNavigate = { [weak self] in
             self?.navigate(to: item)
         }

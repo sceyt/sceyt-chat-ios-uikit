@@ -45,6 +45,32 @@ extension ChannelPinnedMessageListViewController {
 
         open var onNavigate: (() -> Void)?
 
+        /// `true` while the screen is picking messages: the bubble grows a checkbox and
+        /// stops tracking its own touches, and the arrow goes away — the row's one job in
+        /// this mode is being picked, and a jump would leave the screen mid-selection.
+        ///
+        /// Named for the screen's mode rather than after the bubble's own `isEditing`,
+        /// which cannot be borrowed here: `UITableViewCell` already has that name, for the
+        /// swipe-to-edit state the table drives.
+        ///
+        /// The checkbox is the conversation's own, and its constraints are built by the
+        /// hosted cell's `data` setter, so assign this **before** `data` — the base does
+        /// not rebuild the bubble on its own.
+        open var isSelecting: Bool = false {
+            didSet {
+                guard oldValue != isSelecting else { return }
+                messageView.isEditing = isSelecting
+                navigateButton.isHidden = isSelecting
+            }
+        }
+
+        /// Whether this row's checkbox is ticked.
+        open var isChecked: Bool = false {
+            didSet {
+                messageView.checkBoxView.isSelected = isChecked
+            }
+        }
+
         /// A chat cell has no intrinsic height — it is laid out to the height its layout
         /// model measured, which is also the row height the screen reports.
         public private(set) var messageViewHeight: NSLayoutConstraint?
