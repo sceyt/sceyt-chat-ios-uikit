@@ -757,7 +757,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             .showAttachmentAlert(
                 sources: sources,
                 sourceView: sender)
-        { [unowned self] source in
+        { [weak self] source in
+            guard let self else { return }
             switch source {
             case .media:
                 openPhotoPicker()
@@ -787,9 +788,11 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     open func openPhotoPicker() {
         logger.verbose("[ATTACHMENT] openPhotoPicker")
         router.showPhotos(selectedPhotoAssetIdentifiers: selectedPhotoAssetIdentifiers)
-        { [unowned self] assets, picker in
+        { [weak self] assets, picker in
             logger.verbose("[ATTACHMENT] did select assets \(assets.count)")
-            guard !assets.isEmpty else { return true }
+            // `self` stays weak (no strong rebinding) so the background task below
+            // can't read a dangling reference if the chat is closed mid-processing.
+            guard self != nil, !assets.isEmpty else { return true }
             
             let semaphore = DispatchSemaphore(value: 1)
             DispatchQueue.global().async {
@@ -832,7 +835,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
     
     open func openDocumentsPicker() {
-        router.showDocuments { [unowned self] urls in
+        router.showDocuments { [weak self] urls in
+            guard let self else { return }
             urls.forEach {
                 self.selectedMediaView.insert(view: AttachmentModel(fileUrl: $0))
             }
@@ -843,8 +847,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
     
     open func openCameraPicker() {
-        router.showCamera { [unowned self] attachmentView in
-            guard let attachmentView else { return }
+        router.showCamera { [weak self] attachmentView in
+            guard let self, let attachmentView else { return }
             self.selectedMediaView
                 .insert(view: attachmentView)
             DispatchQueue.main.async { [weak self] in
@@ -854,8 +858,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
 
     open func openPollPicker() {
-        router.showCreatePoll { [unowned self] poll in
-            guard let poll else { return }
+        router.showCreatePoll { [weak self] poll in
+            guard let self, let poll else { return }
             // Poll will be sent as a message - handle poll creation
             self.onCreatePoll?(poll)
         }
