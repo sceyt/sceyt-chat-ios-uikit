@@ -21,7 +21,7 @@ extension MessageCell: AppearanceProviding {
         incomingHighlightedBubbleColor: DefaultColors.bubbleIncomingHighlighted,
         outgoingHighlightedBubbleColor: DefaultColors.bubbleOutgoingHighlighted,
         incomingHighlightedOverlayColor: DefaultColors.bubbleIncomingHighlightedSecondary,
-        outgoingHighlightedOverlayColor: DefaultColors.bubbleIncomingHighlightedSecondary,
+        outgoingHighlightedOverlayColor: DefaultColors.bubbleOutgoingHighlightedSecondary,
         incomingHighlightedSearchResultColor: DefaultColors.bubbleIncomingHighlighted,
         outgoingHighlightedSearchResultColor: DefaultColors.bubbleOutgoingHighlighted,
         incomingHighlightedOverlaySearchResultColor: DefaultColors.bubbleIncomingHighlightedSecondary,
