@@ -3839,9 +3839,6 @@ open class ChannelViewController: ViewController,
             }
 
             let completion: (Bool) -> Void = { [weak self] finished in
-                if !animatesNewestInsert {
-                    CATransaction.commit()
-                }
                 var scrollBottom = false
                 defer {
                     if let self = self {
@@ -3916,6 +3913,15 @@ open class ChannelViewController: ViewController,
                 self.collectionView.performUpdates(updates, completion: completion)
             } else {
                 collectionView.performUpdates(updates, completion: completion)
+            }
+            // Closed here, as soon as the batch is applied, not from its completion. The
+            // completion comes back through `DispatchQueue.main.async`, so a transaction left
+            // open until then stays current across other main-queue work — and every
+            // animation any screen starts in that gap runs with actions disabled and snaps.
+            // That is what stopped the pinned-messages list from animating an unpin: the same
+            // save that removes the pin updates the message behind it here.
+            if !animatesNewestInsert {
+                CATransaction.commit()
             }
 
         case .updateDeliveryStatus(let model, let indexPath):

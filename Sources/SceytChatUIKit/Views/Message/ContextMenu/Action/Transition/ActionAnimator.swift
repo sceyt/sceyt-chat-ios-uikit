@@ -85,7 +85,7 @@ private extension ActionAnimator {
     }
     
     func animateDismissal(context: UIViewControllerContextTransitioning) {
-        guard let toViewController = context.viewController(forKey: .to),
+        guard context.viewController(forKey: .to) != nil,
               let fromViewController = context.viewController(forKey: .from) as? ActionController else {
             context.completeTransition(false)
             return
@@ -93,9 +93,14 @@ private extension ActionAnimator {
         
         let duration = transitionDuration(using: context)
         
+        // Into the menu's own view — the snapshot's superview — not the presenter's. The
+        // two only coincide when the presenter fills the window: the conversation does, but
+        // a screen shown as a sheet (the pinned-messages list) sits lower, so its space put
+        // the snapshot's landing frame that far too high, and the bubble popped back down
+        // when the real view reappeared.
         let snapshotFinalFrame = fromViewController.contextView?.superview?.convert(
             fromViewController.contextView?.frame ?? .zero,
-            to: toViewController.view
+            to: fromViewController.view
         ) ?? .zero
         let snapshotDif = (fromViewController.snapshot?.frame.origin.y ?? .zero) - snapshotFinalFrame.origin.y
         

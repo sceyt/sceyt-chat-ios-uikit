@@ -130,6 +130,25 @@ open class ChannelPinnedMessageListViewController: ViewController,
     /// opening anchor is not considered final.
     public private(set) var hasAppeared = false
 
+    /// The pins the table is showing right now, by `messageTid`, in row order — what the
+    /// next reload is diffed against, so an unpin fades its own row out and slides the rest
+    /// together instead of the whole list being swapped at once. The view model's `items`
+    /// have already moved on by the time the event lands, which is why the table keeps its
+    /// own copy.
+    public private(set) var displayedMessageTids: [Int64] = []
+
+    /// A reload is queued for the end of this run-loop turn. One unpin writes both the pin
+    /// row and the message's own pin mark, so the two observers behind the list fire from the
+    /// same save, in no fixed order — played one by one, the leaving row was first rebound
+    /// without its pin mark and then faded out, as two overlapping animations. Coalesced,
+    /// they are one update.
+    public private(set) var isListReloadScheduled = false
+
+    /// A row animation is on screen. A reload that arrives meanwhile — a server ack touching
+    /// a message, a reaction — waits for it rather than retargeting rows mid-flight.
+    public private(set) var isAnimatingListReload = false
+    public private(set) var needsListReloadAfterAnimation = false
+
     public private(set) lazy var contextMenu: ContextMenu = {
         let contextMenu = ContextMenu(parent: self)
         contextMenu.dataSource = self
@@ -317,23 +336,142 @@ open class ChannelPinnedMessageListViewController: ViewController,
     open func onEvent(_ event: ChannelPinnedMessageListViewModel.Event) {
         switch event {
         case .reload:
-            // Read before the reload: whether the list was resting on the newest pin is what
-            // decides if it follows a pin taken while the screen is open. The conversation
-            // follows a new message on the same terms — only from the bottom, so a user who
-            // has scrolled back through the older pins is left where they are.
-            let wasAtBottom = isAtBottom
-            tableView.reloadData()
-            updateEmptyState()
-            // The pins that just arrived — or the one that just left — decide how much of
-            // the screen the content fills, and therefore how far down it has to be pushed.
-            tableView.layoutIfNeeded()
-            updateTopPaddingForShortContent()
-            if needsInitialScrollToBottom {
-                scrollToBottom(animated: false)
-            } else if wasAtBottom {
-                scrollToBottom(animated: true)
+            setNeedsListReload()
+        }
+    }
+
+    /// Queues one reload for the end of this run-loop turn, or for the end of the row
+    /// animation on screen — see `isListReloadScheduled` and `isAnimatingListReload`.
+    open func setNeedsListReload() {
+        if isAnimatingListReload {
+            needsListReloadAfterAnimation = true
+            return
+        }
+        guard !isListReloadScheduled else { return }
+        isListReloadScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            isListReloadScheduled = false
+            if isAnimatingListReload {
+                needsListReloadAfterAnimation = true
+            } else {
+                reloadList()
             }
         }
+    }
+
+    /// Brings the table up to the view model's pins — as row changes when it can, with a
+    /// `reloadData()` otherwise.
+    open func reloadList() {
+        // Read before the reload: whether the list was resting on the newest pin is what
+        // decides if it follows a pin taken while the screen is open. The conversation
+        // follows a new message on the same terms — only from the bottom, so a user who
+        // has scrolled back through the older pins is left where they are.
+        let wasAtBottom = isAtBottom
+        let tids = viewModel.items.map { $0.messageTid }
+        if canAnimateReload(to: tids) {
+            animateReload(to: tids, wasAtBottom: wasAtBottom)
+            return
+        }
+        displayedMessageTids = tids
+        tableView.reloadData()
+        updateEmptyState()
+        // The pins that just arrived — or the one that just left — decide how much of
+        // the screen the content fills, and therefore how far down it has to be pushed.
+        tableView.layoutIfNeeded()
+        updateTopPaddingForShortContent()
+        if needsInitialScrollToBottom {
+            scrollToBottom(animated: false)
+        } else if wasAtBottom {
+            scrollToBottom(animated: true)
+        }
+    }
+
+    /// Whether a reload can be played as row changes rather than a `reloadData()`.
+    ///
+    /// Not while the screen is still opening — that anchor is placed without animation —
+    /// nor off screen, nor into or out of the empty state, which swaps the table for the
+    /// empty view. Tids must be unique for the diff to mean anything.
+    open func canAnimateReload(to tids: [Int64]) -> Bool {
+        guard hasAppeared,
+              !needsInitialScrollToBottom,
+              tableView.window != nil,
+              !displayedMessageTids.isEmpty,
+              !tids.isEmpty,
+              tableView.numberOfRows(inSection: 0) == displayedMessageTids.count,
+              Set(tids).count == tids.count
+        else { return false }
+        return true
+    }
+
+    /// Plays a reload as row changes: an unpinned row fades out and the ones around it close
+    /// the gap, a new pin fades in, and a row whose message changed — a reaction, an edit —
+    /// grows or shrinks in place.
+    ///
+    /// The rows that stay are rebound where they stand rather than reloaded: their models are
+    /// mutated in place by the view model, and a neighbour of the row that left may now head
+    /// its sender's run or carry different spacing, which a crossfading reload would flicker.
+    /// Updating the table this way, rather than with `reloadData()`, also lets a message
+    /// change that lands mid-animation join it instead of cutting it short.
+    open func animateReload(to tids: [Int64], wasAtBottom: Bool) {
+        let difference = tids.difference(from: displayedMessageTids)
+        var deletedRows = [IndexPath]()
+        var insertedRows = [IndexPath]()
+        for change in difference {
+            switch change {
+            case let .remove(offset, _, _):
+                deletedRows.append(IndexPath(row: offset, section: 0))
+            case let .insert(offset, _, _):
+                insertedRows.append(IndexPath(row: offset, section: 0))
+            }
+        }
+        let newRows = Dictionary(uniqueKeysWithValues: tids.enumerated().map { ($1, $0) })
+        let deleted = Set(deletedRows)
+
+        for case let cell as MessageCell in tableView.visibleCells {
+            guard let oldIndexPath = tableView.indexPath(for: cell),
+                  !deleted.contains(oldIndexPath),
+                  displayedMessageTids.indices.contains(oldIndexPath.row),
+                  let newRow = newRows[displayedMessageTids[oldIndexPath.row]]
+            else { continue }
+            configure(cell, at: IndexPath(row: newRow, section: 0))
+        }
+
+        displayedMessageTids = tids
+        isAnimatingListReload = true
+
+        // One animation for everything that moves: the rows, the padding that holds a short
+        // list against the bottom, and the offset once the content has shrunk under it. Run
+        // on separate clocks — the table's own row animation and a second block for the
+        // insets — the two curves disagreed and the rows wobbled. Batch updates made inside
+        // an animation block take that block's timing.
+        UIView.animate(
+            withDuration: Layouts.rowAnimationDuration,
+            delay: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut]
+        ) { [self] in
+            tableView.performBatchUpdates {
+                tableView.deleteRows(at: deletedRows, with: .fade)
+                tableView.insertRows(at: insertedRows, with: .fade)
+            }
+            updateTopPaddingForShortContent()
+            let topOffsetY = -tableView.adjustedContentInset.top
+            let bottomOffsetY = max(topOffsetY, bottomContentOffsetY)
+            let offsetY = wasAtBottom
+                ? bottomOffsetY
+                : min(max(tableView.contentOffset.y, topOffsetY), bottomOffsetY)
+            if abs(tableView.contentOffset.y - offsetY) > 0.5 {
+                tableView.contentOffset.y = offsetY
+            }
+        } completion: { [weak self] _ in
+            guard let self else { return }
+            isAnimatingListReload = false
+            if needsListReloadAfterAnimation {
+                needsListReloadAfterAnimation = false
+                setNeedsListReload()
+            }
+        }
+        updateEmptyState()
     }
 
     open override func viewDidLayoutSubviews() {
@@ -461,6 +599,31 @@ open class ChannelPinnedMessageListViewController: ViewController,
         }
     }
 
+    /// Unpins from the row's menu, but only once the menu is completely gone.
+    ///
+    /// The menu runs its action from its dismissal's completion, which lands while UIKit is
+    /// still tearing the presentation down — the bubble has only just been handed back its
+    /// alpha and the blur is still coming off. Removing the row right then starts its fade
+    /// and the neighbours' slide against a screen that has not settled, which is what made
+    /// the removal look abrupt at times. So the unpin waits for any transition still in
+    /// flight, then for the next run-loop turn, and only then touches the store.
+    open func unpinAfterMenuDismissal(_ model: MessageLayoutModel) {
+        let unpin: () -> Void = { [weak self] in
+            DispatchQueue.main.async {
+                guard let self,
+                      let indexPath = self.indexPath(for: model)
+                else { return }
+                self.unpin(at: indexPath)
+            }
+        }
+        // `animate` refuses — and never calls back — when the transition is already over.
+        if let coordinator = presentedViewController?.transitionCoordinator ?? transitionCoordinator,
+           coordinator.animate(alongsideTransition: nil, completion: { _ in unpin() }) {
+            return
+        }
+        unpin()
+    }
+
     /// The row's arrow: the screen closes and the conversation moves onto that pin.
     open func navigate(to item: PinnedMessage) {
         guard let target = viewModel.jumpTarget(for: item) else { return }
@@ -511,6 +674,7 @@ open class ChannelPinnedMessageListViewController: ViewController,
         longPressGestureRecognizer.isEnabled = !isEditing
         updateNavigationBarItems()
         updateSelectedMessagesActionsState()
+        displayedMessageTids = viewModel.items.map { $0.messageTid }
         tableView.reloadData()
         // The actions bar takes room off the bottom of the list, or gives it back.
         view.setNeedsLayout()
@@ -753,6 +917,12 @@ open class ChannelPinnedMessageListViewController: ViewController,
                 self?.select(model)
             }
             return item
+        case L10n.Message.Action.Title.unpin:
+            var item = item
+            item.action = { [weak self] _ in
+                self?.unpinAfterMenuDismissal(model)
+            }
+            return item
         default:
             return nil
         }
@@ -916,8 +1086,7 @@ open class ChannelPinnedMessageListViewController: ViewController,
     }
 
     open func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        guard let item = viewModel.item(at: indexPath),
-              let model = viewModel.layoutModel(at: indexPath)
+        guard let model = viewModel.layoutModel(at: indexPath)
         else { return UITableViewCell() }
 
         // Which side of the screen the bubble sits on is the cell's class, the same way
@@ -925,6 +1094,17 @@ open class ChannelPinnedMessageListViewController: ViewController,
         let cell: MessageCell = model.message.incoming
             ? tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelPinnedMessageIncomingCell.self)
             : tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelPinnedMessageOutgoingCell.self)
+        configure(cell, at: indexPath)
+        return cell
+    }
+
+    /// Binds a row to the pin at `indexPath` — from `cellForRowAt`, and again for a row that
+    /// stays on screen through an animated reload.
+    open func configure(_ cell: MessageCell, at indexPath: IndexPath) {
+        guard let item = viewModel.item(at: indexPath),
+              let model = viewModel.layoutModel(at: indexPath)
+        else { return }
+
         cell.appearance = appearance
         // Before `data`: the checkbox's constraints are built by the hosted bubble's own
         // `data` setter, so the mode has to be in place by then.
@@ -951,7 +1131,6 @@ open class ChannelPinnedMessageListViewController: ViewController,
         // Same as the conversation: a pinned photo that is not on disk yet is fetched, so
         // the row fills in instead of staying a placeholder.
         channelViewController?.channelViewModel.downloadMessageAttachmentsIfNeeded(layoutModel: model)
-        return cell
     }
 
     // MARK: - UITableViewDelegate
@@ -1080,5 +1259,9 @@ public extension ChannelPinnedMessageListViewController {
         /// How far off the end the list may rest and still follow a pin taken while the
         /// screen is open.
         public static var followBottomThreshold: CGFloat = 40
+
+        /// How long the space around the rows takes to settle after a pin is added or
+        /// removed — matched to the table's own row animation.
+        public static var rowAnimationDuration: TimeInterval = 0.3
     }
 }
