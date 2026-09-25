@@ -35,11 +35,9 @@ extension ChatMessage {
         
         public var originUrl: URL {
             if let filePath {
-                logger.verbose("[Attachment] originUrl filePath \(filePath)")
                 return URL(fileURLWithPath: filePath)
             }
             if let url, let _url = URL(string: url) {
-                logger.verbose("[Attachment] originUrl url \(url)")
                 return _url
             }
             //should not be happen

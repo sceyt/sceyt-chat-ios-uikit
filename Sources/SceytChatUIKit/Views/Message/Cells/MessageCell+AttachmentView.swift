@@ -336,6 +336,11 @@ extension MessageCell {
         }
         
         open func setProgress(_ progress: AttachmentTransfer.AttachmentProgress) {
+            // Every exit re-derives the label: the CGFloat overload below can return early
+            // (same value already drawn — a video subclass even short-circuits before it
+            // reaches super), and a stale tick returns here, and neither used to put back a
+            // label that `update(status:)` had just hidden.
+            defer { updateProgressLabelVisibility() }
             guard !isStaleProgress(progress.progress)
             else { return }
             let total = progress.attachment.uploadedFileSize
@@ -358,6 +363,7 @@ extension MessageCell {
         }
         
         open func setProgress(_ progress: CGFloat) {
+            defer { updateProgressLabelVisibility() }
             guard !isStaleProgress(progress)
             else { return }
             if let message = data.ownerMessage,
@@ -386,6 +392,9 @@ extension MessageCell {
                     // then shrink out.
                     let item = DispatchWorkItem { [weak self] in
                         guard let self, self.progressView.progress >= 1 else { return }
+                        // Cleared first: `shouldShowProgressLabel` reads a pending item as
+                        // "still filling", which would put the label back during the shrink.
+                        self.pendingHideWorkItem = nil
                         self.hideProgressView()
                     }
                     pendingHideWorkItem = item
@@ -404,7 +413,6 @@ extension MessageCell {
                 } else {
                     progressView.progress = progress
                 }
-                progressLabel.isHidden = (progressLabel.text ?? "").isEmpty || progressView.isHidden || progressView.isHiddenProgress
                 pauseButton.isHidden = false
             }
         }
@@ -424,6 +432,28 @@ extension MessageCell {
         /// through `clearTransferOverlay`/a pause, all of which drop the mark back to 0 first.
         open func isStaleProgress(_ progress: CGFloat) -> Bool {
             isTransferOverlayVisible && progress > 0 && progress < highestRenderedProgress
+        }
+
+        /// Whether the "<done> / <total>" label belongs on screen: whenever the ring is drawing
+        /// a transfer that is in flight, including the fill-through to 100% before it shrinks.
+        ///
+        /// Derived from the overlay's state instead of being assigned along individual paths.
+        /// It used to be hidden by every `update(status:)` — each rebind, each status relay —
+        /// and shown again only from the one branch of `setProgress` that draws a *new* value.
+        /// A rebind re-seeds the value already drawn, and the status relay re-seeds a cached
+        /// percent that is a tick behind (dropped as stale), so both left the ring running
+        /// with no byte count until the next tick that happened to be higher.
+        open var shouldShowProgressLabel: Bool {
+            let progress = progressView.progress
+            return !(progressLabel.text ?? "").isEmpty
+                && !progressView.isHidden
+                && !progressView.isHiddenProgress
+                && progress > 0
+                && (progress < 1 || pendingHideWorkItem != nil)
+        }
+
+        open func updateProgressLabelVisibility() {
+            progressLabel.isHidden = !shouldShowProgressLabel
         }
 
         /// Brings the overlay (the disc and its action button) on screen without touching
@@ -464,6 +494,7 @@ extension MessageCell {
                 } else {
                     self.progressView.transform = .identity
                     self.pauseButton.transform = .identity
+                    self.updateProgressLabelVisibility()
                 }
             }
         }
@@ -477,7 +508,7 @@ extension MessageCell {
         open func update(status: ChatMessage.Attachment.TransferStatus) {
             progressView.isHiddenProgress = false
             progressView.rotateZ = true
-            progressLabel.isHidden = true
+            defer { updateProgressLabelVisibility() }
             switch status {
             case .pending:
                 // A queued upload. Offline this is where the attachment sits for the whole
@@ -497,13 +528,11 @@ extension MessageCell {
                 showTransferOverlay()
                 progressView.isHiddenProgress = true
                 highestRenderedProgress = 0
-                progressLabel.isHidden = true
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.uploadIcon, for: .normal)
             case .pauseDownloading, .failedDownloading:
                 showTransferOverlay()
                 progressView.isHiddenProgress = true
                 highestRenderedProgress = 0
-                progressLabel.isHidden = true
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.downloadIcon, for: .normal)
             case .done:
                 if progressView.progress > 0 {

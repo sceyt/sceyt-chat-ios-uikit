@@ -110,6 +110,17 @@ open class CircularProgressView: View {
             
             let animation = CABasicAnimation(keyPath: "transform.rotation.z")
             animation.duration = rotationDuration
+            // Phase-locked to the media clock rather than to the moment of installation.
+            // The spin is re-installed whenever the ring's view is rebuilt (a cell reload,
+            // the attachment stack recreating its views) or its animations are cleared, and
+            // counting from install time made each of those snap the arc back to 12 o'clock
+            // mid-transfer. With the offset, a re-installed spin lands on the angle the
+            // previous one would have reached.
+            if rotationDuration > 0 {
+                animation.timeOffset = CACurrentMediaTime()
+                    .truncatingRemainder(dividingBy: rotationDuration)
+            }
+            animation.fromValue = 0
             animation.toValue = CGFloat.pi * 2
             animation.isCumulative = true
             animation.repeatCount = .infinity
