@@ -54,6 +54,9 @@ open class ReactionsInfoViewController: ViewController,
         .withoutAutoresizingMask
     private var transition: ReactionTransition!
     private var hasSelectedInitialItem = false
+    /// Every reaction was removed before the screen finished appearing; a presentation still
+    /// in flight can't be dismissed, so the close waits for `viewDidAppear`.
+    private var needsDismissOnAppear = false
 
     public required init() {
         super.init(nibName: nil, bundle: nil)
@@ -69,6 +72,14 @@ open class ReactionsInfoViewController: ViewController,
     
     open override func viewDidLoad() {
         super.viewDidLoad()
+    }
+
+    open override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if needsDismissOnAppear {
+            needsDismissOnAppear = false
+            dismissIfNoReactions()
+        }
     }
 
     open override func setup() {
@@ -104,6 +115,11 @@ open class ReactionsInfoViewController: ViewController,
                 guard let self else { return }
                 switch event {
                 case .reloadData(let keys):
+                    guard !keys.isEmpty else {
+                        self.dismissIfNoReactions()
+                        return
+                    }
+                    self.needsDismissOnAppear = false
                     let currentKeys = self.userReactionsViewModel.compactMap { $0.reactionKey }
                     let keysChanged = currentKeys != keys
                     self.updateViewControllers(forKeys: keys)
@@ -118,6 +134,17 @@ open class ReactionsInfoViewController: ViewController,
                     }
                 }
             }.store(in: &subscriptions)
+    }
+
+    /// Nothing is left to show once the last reaction goes away (removed here, or by an
+    /// incoming event), so the screen closes itself instead of sitting on an empty "All 0".
+    open func dismissIfNoReactions() {
+        guard !isBeingPresented, viewIfLoaded?.window != nil else {
+            needsDismissOnAppear = true
+            return
+        }
+        guard !isBeingDismissed, presentingViewController != nil else { return }
+        dismiss(animated: true)
     }
 
     open func updateViewControllers(forKeys keys: [String]) {
