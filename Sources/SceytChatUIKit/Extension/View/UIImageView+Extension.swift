@@ -53,6 +53,11 @@ extension UIImageView {
     @objc
     private func showImageViewer(_ sender: TapWithDataRecognizer) {
         guard let sourceView = sender.view as? UIImageView else { return }
+        guard let presentFromViewController = sender.from ?? viewController,
+              presentFromViewController.presentedViewController == nil,
+              !presentFromViewController.isBeingPresented,
+              !presentFromViewController.isBeingDismissed
+        else { return }
         logThumbnailStateOnPreviewTap(sourceView: sourceView, item: sender.item, viewOnce: sender.viewOnce)
         UIApplication.shared.sendAction(#selector(resignFirstResponder), to: nil, from: nil, for: nil)
 
@@ -108,8 +113,7 @@ extension UIImageView {
                 initialIndex: initialIndex,
                 viewOnce: sender.viewOnce,
                 messageText: sender.messageText)
-        let presentFromViewController = sender.from ?? viewController
-        presentFromViewController?.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
+        presentFromViewController.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
     }
 
     /// Diagnostic for the "image/video download finished but the cell stayed on the blurry
