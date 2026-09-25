@@ -151,10 +151,35 @@ extension ChannelInfoViewController {
         open func syncTransferOverlay(for cell: ChannelInfoViewController.AttachmentCell) {
             guard let layout = cell.data else { return }
             let attachment = layout.attachment
+            let liveStatus = layout.ownerMessage.flatMap {
+                fileProvider.transferStatus(message: $0, attachment: attachment)
+            }
+            let livePercent = layout.ownerMessage.flatMap {
+                fileProvider.currentProgressPercent(message: $0, attachment: attachment)
+            }
+
+            // A paused transfer keeps its task — and with it the last cached percent —
+            // so it can resume. Checked before the percent, or a paused upload
+            // (paused on the chat thread, say) comes back as a spinning ring here.
+            if attachment.isPendingUpload, (liveStatus ?? attachment.status) == .pauseUploading {
+                cell.lastAttachmentTransferProgress = nil
+                cell.update(status: .pauseUploading)
+                return
+            }
+            if liveStatus == .pauseDownloading, fileProvider.filePath(attachment: attachment) == nil {
+                cell.lastAttachmentTransferProgress = nil
+                cell.update(status: .pauseDownloading)
+                return
+            }
 
             // A live transfer always wins — show its real percent.
-            if let message = layout.ownerMessage,
-               let progress = fileProvider.currentProgressPercent(message: message, attachment: attachment) {
+            if let progress = livePercent {
+                // Restores the pause glyph on a reused cell that last showed a
+                // paused/tap-to-transfer icon.
+                let status = liveStatus ?? attachment.status
+                if status == .uploading || status == .downloading {
+                    cell.update(status: status)
+                }
                 cell.setProgress(progress)
                 return
             }
@@ -163,6 +188,14 @@ extension ChannelInfoViewController {
             // resolving its action from a stale `.downloading` and toggles a
             // transfer that no longer exists instead of acting on the real state.
             cell.lastAttachmentTransferProgress = nil
+            // An outgoing file that never finished uploading: the local file is the
+            // upload's *source*, not proof it is done, so it keeps the loader while
+            // queued or in flight.
+            if attachment.isPendingUpload, [.pending, .uploading].contains(liveStatus ?? attachment.status) {
+                cell.update(status: .uploading)
+                cell.setProgress(0.0001)
+                return
+            }
             // The bytes are on disk: nothing to overlay, whatever the status claims.
             // A transfer can end without its completion ever reaching this cell.
             if fileProvider.filePath(attachment: attachment) != nil {
@@ -244,7 +277,9 @@ extension ChannelInfoViewController {
                     // With the bytes already on disk there is nothing to pause, resume,
                     // or cancel: hide the overlay and let `resumeDownload`'s
                     // file-on-disk fast path reconcile the stored status to `.done`.
-                    if fileProvider.filePath(attachment: data.attachment) != nil {
+                    // Not for an unsent upload: its local file is the upload's source.
+                    if !data.attachment.isPendingUpload,
+                       fileProvider.filePath(attachment: data.attachment) != nil {
                         cell.lastAttachmentTransferProgress = nil
                         cell.update(status: .done)
                         self.mediaViewModel.resumeDownload(data)
@@ -253,6 +288,26 @@ extension ChannelInfoViewController {
                     let progressStatus = cell.lastAttachmentTransferProgress?.attachment.status
                     let dataStatus = data.attachment.status
                     let status = progressStatus ?? dataStatus
+                    switch status {
+                    case .uploading:
+                        cell.lastAttachmentTransferProgress = nil
+                        cell.update(status: .pauseUploading)
+                        self.mediaViewModel.pauseUpload(data)
+                        return
+                    case .pending where data.attachment.isPendingUpload:
+                        cell.lastAttachmentTransferProgress = nil
+                        cell.update(status: .pauseUploading)
+                        self.mediaViewModel.pauseUpload(data)
+                        return
+                    case .pauseUploading:
+                        cell.update(status: .uploading)
+                        cell.setProgress(0.0001)
+                        cell.setProgressHandler()
+                        self.mediaViewModel.resumeUpload(data)
+                        return
+                    default:
+                        break
+                    }
                     switch status {
                     case .pauseDownloading, .failedDownloading:
                         logger.debug("[MediaGallery] onPauseAction → resumeDownload")

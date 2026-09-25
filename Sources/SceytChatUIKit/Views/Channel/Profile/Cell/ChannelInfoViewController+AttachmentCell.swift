@@ -37,6 +37,7 @@ extension ChannelInfoViewController {
             trackColor: .clear,
             backgroundColor: .overlayBackground2,
             cancelIcon: .attachmentTransferPause,
+            uploadIcon: .attachmentUpload,
             downloadIcon: .attachmentDownload
         ) {
             didSet { setupProgressAppearance() }
@@ -173,8 +174,15 @@ extension ChannelInfoViewController {
             switch status {
             case .pending:
                 break
-            case .downloading:
+            case .downloading, .uploading:
                 pauseButton.setImage(overlayLoaderAppearance.cancelIcon, for: .normal)
+            case .pauseUploading:
+                // A paused upload keeps its task (and its last cached percent) alive so
+                // it can resume — the ring must stop and offer "tap to upload" instead
+                // of spinning on as if bytes were still going out.
+                setProgress(0.0001)
+                progressView.isHiddenProgress = true
+                pauseButton.setImage(overlayLoaderAppearance.uploadIcon ?? .attachmentUpload, for: .normal)
             case .pauseDownloading, .failedDownloading:
                 setProgress(0.0001)
                 progressView.isHiddenProgress = true

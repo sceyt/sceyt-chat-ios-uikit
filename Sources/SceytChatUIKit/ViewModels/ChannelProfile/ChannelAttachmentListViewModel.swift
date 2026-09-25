@@ -558,6 +558,52 @@ public extension ChannelAttachmentListViewModelProviding {
     func downloadAttachmentIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
         downloadAttachmentIfNeeded(layout, completion: nil)
     }
+
+    /// Pauses an outgoing attachment's upload from the grid — the same
+    /// `stopTransfer` the chat thread's pause button calls, so both screens persist
+    /// and relay the same `.pauseUploading`.
+    func pauseUpload(_ layout: MessageLayoutModel.AttachmentLayout) {
+        let attachment = layout.attachment
+        resolveOwnerMessage(layout) { message in
+            guard let message else { return }
+            fileProvider.stopTransfer(message: message, attachment: attachment)
+        }
+    }
+
+    /// Resumes a paused upload. Mirrors `ChannelViewModel.resumeFileTransfer`: with no
+    /// live task (the upload was paused while still queued, or the task is gone) the
+    /// message is resent, which re-runs its attachment upload.
+    func resumeUpload(_ layout: MessageLayoutModel.AttachmentLayout) {
+        let attachment = layout.attachment
+        resolveOwnerMessage(layout) { message in
+            guard let message else { return }
+            fileProvider.resumeTransfer(message: message, attachment: attachment) { resumed in
+                guard !resumed,
+                      message.deliveryStatus == .pending,
+                      attachment.filePath != nil
+                else { return }
+                let identity = AttachmentTransfer.transferIdentity(of: attachment)
+                message.attachments?
+                    .filter { AttachmentTransfer.transferIdentity(of: $0) == identity }
+                    .forEach { $0.status = .pending }
+                attachment.status = .pending
+                Components.channelMessageSender
+                    .init(channelId: message.channelId)
+                    .resendMessage(message)
+            }
+        }
+    }
+
+    private func resolveOwnerMessage(
+        _ layout: MessageLayoutModel.AttachmentLayout,
+        completion: @escaping (ChatMessage?) -> Void
+    ) {
+        if let message = layout.ownerMessage {
+            completion(message)
+        } else {
+            ChannelMessageProvider.fetchMessage(id: layout.attachment.messageId, completion: completion)
+        }
+    }
 }
 
 extension ChannelAttachmentListViewModel: ChannelAttachmentListViewModelProviding {
