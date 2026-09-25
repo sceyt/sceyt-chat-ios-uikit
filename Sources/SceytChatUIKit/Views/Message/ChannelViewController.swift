@@ -249,6 +249,21 @@ open class ChannelViewController: ViewController,
     /// as a glitch rather than as feedback for something the user just did. A subclass that
     /// overrides `restoreDraftIfNeeded()` wholesale opts out of the suppression.
     private var isRestoringDraft = false
+    /// Armed by a send from the newest edge. Clearing a tall composer shrinks it
+    /// before the new message's insert batch arrives (the DB write is async), and
+    /// re-anchoring the list to the smaller inset right away pulls every message
+    /// down after the composer — only for the insert to push them back up a
+    /// moment later. While armed, a shrinking composer leaves the list's inset
+    /// and offset alone; the next newest-edge insert applies them in the same
+    /// frame as its own animation, so the two resolve into one upward motion.
+    private var defersInputShrinkReanchor = false
+    /// Applies the deferred re-anchor when no insert shows up (failed send, slow
+    /// observer), so the list never keeps the tall composer's inset.
+    private var inputShrinkReanchorFallback: DispatchWorkItem?
+    private static let inputShrinkReanchorFallbackDelay: TimeInterval = 0.5
+    /// For a re-anchor that runs on its own (fallback, non-animated batch, or no
+    /// cell animation to copy).
+    private static let inputShrinkReanchorDuration: TimeInterval = 0.25
     private var contextMenu: ContextMenu!
     private var scrollTimer: Timer?
     private var isAppActive: Bool = true
@@ -905,6 +920,14 @@ open class ChannelViewController: ViewController,
     /// which must cover the `setContentOffset` below — `scrollViewDidScroll` fires
     /// synchronously from it and reads that flag to suppress `addMoreMessage`.
     private func applyInputContentHeight(_ height: CGFloat) {
+        if defersInputShrinkReanchor, height < messageInputViewHeightConstraint.constant {
+            messageInputViewHeightConstraint.constant = height
+            coverView.layoutIfNeeded()
+            return
+        }
+        // Any other height change re-derives the insets from scratch below, which
+        // subsumes a pending deferred shrink.
+        cancelDeferredInputShrinkReanchor()
         // Mirrored: the input bar occupies contentInset.top (the
         // anchored edge), so the offset shifts opposite to the inset
         // growth to keep the visible content riding above the input
@@ -928,6 +951,81 @@ open class ChannelViewController: ViewController,
             ),
             animated: false
         )
+    }
+
+    private func armDeferredInputShrinkReanchor() {
+        cancelDeferredInputShrinkReanchor()
+        defersInputShrinkReanchor = true
+        let fallback = DispatchWorkItem { [weak self] in
+            self?.applyDeferredInputShrinkReanchor()
+        }
+        inputShrinkReanchorFallback = fallback
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.inputShrinkReanchorFallbackDelay, execute: fallback)
+    }
+
+    private func cancelDeferredInputShrinkReanchor() {
+        defersInputShrinkReanchor = false
+        inputShrinkReanchorFallback?.cancel()
+        inputShrinkReanchorFallback = nil
+    }
+
+    /// Brings the list's insets and offset in line with the composer's current
+    /// height with an animation of its own — for the fallback and for newest-edge
+    /// batches that don't animate. A no-op unless a send-time shrink is pending.
+    private func applyDeferredInputShrinkReanchor() {
+        guard defersInputShrinkReanchor else { return }
+        UIView.animate(withDuration: Self.inputShrinkReanchorDuration) { [weak self] in
+            self?.consumeDeferredInputShrinkReanchor()
+        }
+    }
+
+    /// Replays an already-applied re-anchor offset change on the curve UIKit just
+    /// gave the newest insert. The cells move on a critically damped
+    /// `CASpringAnimation`; any other curve for the list's shift — a fixed-duration
+    /// ease, or nesting `performUpdates` in `UIView.animate`, which retimes the
+    /// bounds but not the cells — sums with it into a visible bounce whose size
+    /// depends on the composer-shrink / bubble-height ratio. Copying the cells'
+    /// own animation makes the sum the net move on one spring: monotonic for any
+    /// ratio. Call right after `performUpdates` started the batch.
+    private func animateReanchorAlongNewestInsert(offsetShift: CGFloat) {
+        let cellAnimation = collectionView.visibleCells.lazy
+            .compactMap { $0.layer.animation(forKey: "position") }
+            .first
+        let animation: CABasicAnimation
+        if let copy = cellAnimation?.copy() as? CABasicAnimation {
+            animation = copy
+            animation.delegate = nil
+        } else {
+            animation = CABasicAnimation()
+            animation.duration = Self.inputShrinkReanchorDuration
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        }
+        animation.keyPath = "bounds.origin"
+        animation.isAdditive = true
+        animation.fromValue = NSValue(cgPoint: CGPoint(x: 0, y: offsetShift))
+        animation.toValue = NSValue(cgPoint: .zero)
+        collectionView.layer.add(animation, forKey: "inputShrinkReanchor")
+    }
+
+    /// The deferred re-anchor itself, un-animated; the caller supplies the
+    /// animation context.
+    private func consumeDeferredInputShrinkReanchor() {
+        guard defersInputShrinkReanchor else { return }
+        cancelDeferredInputShrinkReanchor()
+        // Save/restore rather than reset: the composer's own resize may still be
+        // in flight and owns clearing the flag in its completion.
+        let wasUpdatingInputViewHeight = isUpdatingInputViewHeight
+        isUpdatingInputViewHeight = true
+        let previousAnchoringInset = offsetAnchoringInset
+        let previousOffsetY = collectionView.contentOffset.y
+        updateCollectionViewInsets()
+        collectionView.layoutIfNeeded()
+        let contentOffsetY = offsetAfterInsetChange(
+            from: previousOffsetY,
+            previousAnchoringInset: previousAnchoringInset
+        )
+        collectionView.setContentOffset(.init(x: 0, y: contentOffsetY), animated: false)
+        isUpdatingInputViewHeight = wasUpdatingInputViewHeight
     }
 
     private func removePrevUnreadSeparatorView(
@@ -2887,6 +2985,10 @@ open class ChannelViewController: ViewController,
             channelViewModel.selectedMessageForAction?.1 == .reply {
             pinnedScrollMessageId = 0
             isStartedDragging = true
+            // Before the text and media are cleared: that is what shrinks the composer.
+            if wasAtBottom {
+                armDeferredInputShrinkReanchor()
+            }
         }
         channelViewModel.createAndSendUserMessage(message)
         if shouldClearText {
@@ -3740,6 +3842,24 @@ open class ChannelViewController: ViewController,
                     """)
             }
 
+
+            // A send-time composer shrink held the list's inset back for this
+            // insert. An animated insert applies it instantly here and replays
+            // the shift on the insert's own spring after `performUpdates` (see
+            // `animateReanchorAlongNewestInsert`), so the shift down and the
+            // insert's push up are one curve and net out into a single move.
+            // Any other newest-edge batch just animates it on its own.
+            var reanchorOffsetShift: CGFloat = 0
+            if animatesNewestInsert, defersInputShrinkReanchor {
+                let offsetBefore = collectionView.contentOffset.y
+                UIView.performWithoutAnimation {
+                    consumeDeferredInputShrinkReanchor()
+                }
+                reanchorOffsetShift = offsetBefore - collectionView.contentOffset.y
+            } else if isInsertingNewestItems {
+                applyDeferredInputShrinkReanchor()
+            }
+
             if animatesOlderPageFadeIn {
                 let survivorKey = appliedSnapshot.items.first?.first
                 appliedSnapshot = newSnapshot
@@ -3911,6 +4031,9 @@ open class ChannelViewController: ViewController,
                 }
             } else if animatesNewestInsert {
                 self.collectionView.performUpdates(updates, completion: completion)
+                if reanchorOffsetShift != 0 {
+                    animateReanchorAlongNewestInsert(offsetShift: reanchorOffsetShift)
+                }
             } else {
                 collectionView.performUpdates(updates, completion: completion)
             }
