@@ -48,6 +48,13 @@ extension ChannelInfoViewController {
 
         open var previewer: (() -> (any PreviewDataSource)?)?
 
+        /// The attachment the image view's tap-to-preview recognizer was last set up with.
+        /// The recognizer keeps that snapshot until the next bind, so when the layout's
+        /// attachment changes identity (a pending upload gets its server id and url) the
+        /// grid must rebind — the previewer can't match the stale snapshot and would open
+        /// a different item.
+        open var previewAttachment: ChatMessage.Attachment?
+
         override open func setup() {
             super.setup()
             imageView.isUserInteractionEnabled = true

@@ -409,6 +409,15 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         readCache({self.currentCaches.mapItems[objectID]})
     }
     
+    /// The instance currently mapped to `objectID`, including one that `reload(dto:)` has
+    /// parked in `mapDeletedItems` while it re-inserts the changed row. An `itemCreator`
+    /// that updates the previous instance in place must look it up with this:
+    /// `item(for:)` returns nil for the whole of that window, so every update would build
+    /// a fresh instance and the views still holding the old one would never see the change.
+    open func reusableItem(for objectID: NSManagedObjectID) -> Item? {
+        _item(for: objectID)
+    }
+
     private func _item(for objectID: NSManagedObjectID) -> Item? {
         readCache({ self.currentCaches.mapItems[objectID] ?? self.currentCaches.mapDeletedItems[objectID] })
     }

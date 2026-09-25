@@ -202,7 +202,10 @@ open class ChannelAttachmentListViewModel: NSObject {
             relationshipKeyPathsObserver: []
         ) { [weak self] in
             let attachment = $0.convert()
-            if let prevItem = self?.attachmentObserver.item(for: $0.objectID) {
+            // `reusableItem`, not `item(for:)`: a changed row is re-created while its old
+            // instance is parked as deleted, and the grid cell holds that instance — a fresh
+            // one would leave the cell on a pending attachment (id 0, no url) forever.
+            if let prevItem = self?.attachmentObserver.reusableItem(for: $0.objectID) {
                 prevItem.update(attachment: attachment)
                 if let message = $0.message?.convert() {
                     prevItem.updateMessageIfNeeded(ownerMessage: message)

@@ -104,6 +104,27 @@ extension ChannelInfoViewController {
                 if !paths.updates.isEmpty {
                     syncVisibleTransferOverlays()
                 }
+                rebindVisibleCellsWithChangedAttachment()
+            }
+        }
+
+        /// Rebinds, in place, every visible cell whose tap-to-preview item no longer
+        /// identifies the attachment it shows — most commonly a pending upload that got its
+        /// server id: the recognizer still holds the id-0/no-url snapshot, which the
+        /// previewer can't match, so it would open a different item. Transfer-progress
+        /// updates keep the attachment's identity and are left to
+        /// `syncVisibleTransferOverlays()`, so live progress rings aren't rebuilt.
+        open func rebindVisibleCellsWithChangedAttachment() {
+            for cell in visibleCells.compactMap({ $0 as? ChannelInfoViewController.AttachmentCell }) {
+                guard let indexPath = indexPath(for: cell),
+                      let layout = mediaViewModel.attachmentLayout(at: indexPath)
+                else { continue }
+                if layout === cell.data,
+                   let bound = cell.previewAttachment,
+                   bound == layout.attachment {
+                    continue
+                }
+                configure(cell, at: indexPath)
             }
         }
 
@@ -193,6 +214,16 @@ extension ChannelInfoViewController {
                 cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoImageAttachmentCell.self)
             }
 
+            configure(cell, at: indexPath)
+            return cell
+        }
+
+        /// Binds `cell` to the layout at `indexPath`: thumbnail, tap-to-preview item,
+        /// transfer overlay and actions. Shared by `cellForItemAt` and
+        /// `rebindVisibleCellsWithChangedAttachment()`, which re-runs it on a visible cell
+        /// in place — `reloadItems` would flash the thumbnail.
+        open func configure(_ cell: ChannelInfoViewController.AttachmentCell, at indexPath: IndexPath) {
+            let model = mediaViewModel.attachmentLayout(at: indexPath)
             cell.overlayLoaderAppearance = appearance.overlayLoaderAppearance
             cell.data = mediaViewModel.attachmentLayout(at: indexPath, onLoadThumbnail: { [weak cell] layout in
                 guard layout == cell?.data else { return }
@@ -256,7 +287,6 @@ extension ChannelInfoViewController {
                     }
                 }
             }
-            return cell
         }
         
         public func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, referenceSizeForHeaderInSection section: Int) -> CGSize {
