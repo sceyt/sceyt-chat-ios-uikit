@@ -204,14 +204,14 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                     self.updateMentions()
                     self.findLink()
                 case .contentSizeUpdate:
-                    // Recompute from the live content size rather than the event payload:
+                    // Recompute from the live fitting height rather than the event payload:
                     // this delivery is always a hop late (`receive(on:)`), and by the time it
                     // lands the text view may have re-laid out at a different width — feeding
                     // a stale height into `update(height:)` animates the bar to a value it
                     // then has to animate back from. Reading live state also makes the
                     // delivery idempotent, so a height already installed synchronously (a
                     // draft restore) is recognised as unchanged and dropped.
-                    self.update(height: max(0, self.inputTextView.contentSize.height))
+                    self.update(height: max(0, self.inputTextView.fittingHeight))
                 case .pastedImage:
                     guard let images = UIPasteboard.general.images else { return }
                     images.forEach { image in
@@ -224,6 +224,22 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                 }
             }.store(in: &subscriptions)
         
+        // Not `receive(on:)`-bound on purpose: a multi-line paste into the one-line bar
+        // makes UITextView scroll to the caret on its next layout pass, and the deferred
+        // `.contentSizeUpdate` lands after it — the text jumps up, then slides back down
+        // while the bar grows. Resize the bar synchronously here instead. The trailing
+        // buttons are settled first, without animation, so the height is measured at the
+        // final width: a paste into an empty field swaps camera/mic for send, and measuring
+        // before that re-wrap animates the bar to a too-tall height and back.
+        inputTextView
+            .pasteEvent
+            .sink { [weak self] in
+                guard let self else { return }
+                self.updateTrailingInputButtons(false)
+                self.view.layoutIfNeeded()
+                self.update(height: self.inputTextView.fittingHeight)
+            }.store(in: &subscriptions)
+
         inputTextView
             .formatEvent
             .receive(on: DispatchQueue.main)
