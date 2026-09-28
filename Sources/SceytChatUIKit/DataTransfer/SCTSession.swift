@@ -27,11 +27,18 @@ open class SCTSession: NSObject, SCTDataSession {
     }
     
     open func stop(_ operation: SCTUploadOperation) {
+        // `ChatClient.upload` cannot be paused or cancelled, so the bytes keep going out
+        // after a pause. Detach from that request and hand it to the operation that will
+        // resume it: resuming used to start a second upload from 0 while the first one
+        // kept reporting its own (higher) percent, so the ring restarted and then jumped
+        // back to where it was paused.
+        let upload = operation.detachUpload()
         operation.complete()
         pendingOperations.add(SCTUploadOperation(
             uuid: operation.uuid,
             attachment: operation.attachment,
-            taskInfo: operation.taskInfo
+            taskInfo: operation.taskInfo,
+            adopting: upload
         ))
     }
     
@@ -229,23 +236,107 @@ open class SCTSession: NSObject, SCTDataSession {
     }
 }
 
+/// One `ChatClient.upload` request. Outlives the operation that started it, so a paused
+/// upload can be picked up again by the operation that resumes it instead of being
+/// restarted. While nothing is attached (paused) progress is only recorded and the
+/// result is held back, so a pause still keeps the message from being sent.
+final class SCTUploadRequest {
+    private let lock = NSLock()
+    private var handlers: (
+        progress: (Double) -> Void,
+        completion: (URL?, Error?) -> Void
+    )?
+    private var result: (url: URL?, error: Error?)?
+    private var lastProgress: Double = 0
+
+    /// Finished without an uploaded URL.
+    var failed: Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard let result else { return false }
+        return result.error != nil || result.url == nil
+    }
+
+    func attach(
+        progress: @escaping (Double) -> Void,
+        completion: @escaping (URL?, Error?) -> Void
+    ) {
+        lock.lock()
+        let finished = result
+        let last = lastProgress
+        if finished == nil {
+            handlers = (progress, completion)
+        }
+        lock.unlock()
+        if let finished {
+            completion(finished.url, finished.error)
+        } else if last > 0 {
+            progress(last)
+        }
+    }
+
+    func detach() {
+        lock.lock()
+        handlers = nil
+        lock.unlock()
+    }
+
+    func report(progress: Double) {
+        lock.lock()
+        lastProgress = max(lastProgress, progress)
+        let handler = handlers?.progress
+        lock.unlock()
+        handler?(progress)
+    }
+
+    func finish(url: URL?, error: Error?) {
+        lock.lock()
+        result = (url, error)
+        let handler = handlers?.completion
+        handlers = nil
+        lock.unlock()
+        handler?(url, error)
+    }
+}
+
 open class SCTUploadOperation: AsyncOperation {
     let attachment: ChatMessage.Attachment
     let taskInfo: SCTDataSessionTaskInfo
     private(set) var videoProcessInfo: SCVideoProcessInfo?
     public let fileStorage: FileStorage = .init()
+    /// The request this operation drives: started by `startUploading`, or adopted from
+    /// the paused operation it resumes.
+    private var upload: SCTUploadRequest?
 
     init(
         uuid: String = UUID().uuidString,
         attachment: ChatMessage.Attachment,
-        taskInfo: SCTDataSessionTaskInfo
+        taskInfo: SCTDataSessionTaskInfo,
+        adopting upload: SCTUploadRequest? = nil
     ) {
         self.attachment = attachment
         self.taskInfo = taskInfo
+        self.upload = upload
         super.init(uuid)
     }
-    
+
+    /// Stops forwarding the in-flight request to `taskInfo` and returns it, so a
+    /// resuming operation can continue it.
+    func detachUpload() -> SCTUploadRequest? {
+        let upload = upload
+        upload?.detach()
+        self.upload = nil
+        return upload
+    }
+
     override open func main() {
+        // Resuming a paused upload whose request is still alive (or already landed while
+        // paused): continue it rather than sending the file again from the start. A
+        // request that failed while paused is dropped and the upload starts over.
+        if let upload, !upload.failed {
+            attach(upload)
+            return
+        }
+        upload = nil
         guard SceytChatUIKit.shared.config.preventDuplicateAttachmentUpload else {
             self.startPreparing()
             return
@@ -306,14 +397,25 @@ open class SCTUploadOperation: AsyncOperation {
     
     open func startUploading(filePath: String) {
         let fileUrl = URL(fileURLWithPath: filePath)
-        SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { [weak self] pct in
+        let upload = SCTUploadRequest()
+        self.upload = upload
+        attach(upload)
+        SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { pct in
+            upload.report(progress: pct)
+        } completion: { url, error in
+            upload.finish(url: url, error: error)
+        }
+    }
+
+    private func attach(_ upload: SCTUploadRequest) {
+        upload.attach { [weak self] pct in
             self?.taskInfo.updateProgress(pct)
         } completion: { [weak self] url, error in
             guard let self else { return }
-            if let error {
-                self.taskInfo.failure(error: error)
+            if let url, error == nil {
+                self.taskInfo.success(origin: url)
             } else {
-                self.taskInfo.success(origin: url!)
+                self.taskInfo.failure(error: error)
             }
             self.complete()
         }
