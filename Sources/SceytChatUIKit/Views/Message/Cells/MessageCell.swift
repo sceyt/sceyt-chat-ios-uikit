@@ -352,7 +352,10 @@ open class MessageCell: CollectionViewCell,
         unsupportedView.data = data
         reactionTotalView.data = data
         reactionTotalView.isHidden = (data.reactions?.isEmpty ?? true)
-        replyView.data = message.repliedInThread ? nil : data.replyLayout
+        // Forward wins over reply: `layoutConstraints` and `measure` skip the reply branch
+        // for a forwarded message, so a reply view bound here would have no constraints and
+        // no height and be drawn at a stale frame over the forward header and content.
+        replyView.data = (message.repliedInThread || data.isForwarded) ? nil : data.replyLayout
         replyCountView.count = data.replyCount
         deliveryStatus = message.deliveryStatus
         // Cancel any in-flight avatar download from a previous binding before

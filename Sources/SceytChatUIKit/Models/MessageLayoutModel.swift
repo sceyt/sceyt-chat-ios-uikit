@@ -828,6 +828,7 @@ open class MessageLayoutModel {
         
         let prevHasReply = self.message.parent != nil && self.message.repliedInThread == false
         let newHasReply = message.parent != nil && message.repliedInThread == false
+        let prevIsForwarded = isForwarded
 
         if let parent = message.parent {
             let title = appearance.senderNameFormatter.format(parent.user)
@@ -898,6 +899,16 @@ open class MessageLayoutModel {
         // otherwise the cell keeps the old (reply-sized) height while bind()
         // hides replyView, or vice versa.
         if prevHasReply != newHasReply {
+            updateOptions.insert(.reload)
+        }
+        // Same for the forward header, which replaces the reply view when present:
+        // forwarding details (or the forwarder) arriving after the first build flip the
+        // cell between the reply and forward layouts.
+        let newIsForwarded: Bool = {
+            guard message.state != .deleted, let details = message.forwardingDetails else { return false }
+            return details.user?.id != message.user.id
+        }()
+        if prevIsForwarded != newIsForwarded {
             updateOptions.insert(.reload)
         }
         if attachments.isEmpty {
