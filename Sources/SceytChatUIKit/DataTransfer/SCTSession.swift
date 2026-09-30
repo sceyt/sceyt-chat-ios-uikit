@@ -33,7 +33,14 @@ open class SCTSession: NSObject, SCTDataSession {
         // kept reporting its own (higher) percent, so the ring restarted and then jumped
         // back to where it was paused.
         let upload = operation.detachUpload()
-        operation.complete()
+        // A copy still waiting in the queue (paused again right after a resume) has to be
+        // cancelled: `start()` resets `isFinished`, so completing it here would not stop it
+        // from running later and taking the request over behind a paused UI.
+        if operation.isExecuting {
+            operation.complete()
+        } else {
+            operation.cancel()
+        }
         pendingOperations.add(SCTUploadOperation(
             uuid: operation.uuid,
             attachment: operation.attachment,

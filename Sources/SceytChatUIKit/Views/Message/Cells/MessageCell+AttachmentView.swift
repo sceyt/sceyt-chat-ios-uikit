@@ -535,7 +535,13 @@ extension MessageCell {
                 highestRenderedProgress = 0
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.downloadIcon, for: .normal)
             case .done:
-                if progressView.progress > 0 {
+                if progressView.progress >= 1 {
+                    // Already drawn at 100% — `setProgress(1)` short-circuits on an unchanged
+                    // value and would never hide it. Happens when a pause lands after the last
+                    // tick: it re-shows the overlay with the upload icon and cancels the pending
+                    // hide, and the overlay then stayed over the finished file.
+                    hideProgressView()
+                } else if progressView.progress > 0 {
                     setProgress(1)
                 } else {
                     // `hideProgressView` directly, not `setProgress(0)`: that short-circuits

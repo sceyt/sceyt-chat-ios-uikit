@@ -449,7 +449,14 @@ open class AttachmentTransfer: DataProvider {
                 completion?(true)
                 return
             }
-            
+            // The bytes already landed and the task is only finishing (video poster upload,
+            // persisting). Pausing now would persist and relay `.pauseUploading` over the
+            // `.done` that is about to be written — the upload icon over a sent file.
+            guard !task.isTransferFinished else {
+                completion?(false)
+                return
+            }
+
             // Matched by transfer identity, not `id`: every attachment of an incoming
             // message has `id == 0` until the server assigns one, so `$0.id == attachment.id`
             // returned whichever attachment came first — pausing the third video paused
@@ -486,6 +493,12 @@ open class AttachmentTransfer: DataProvider {
                 guard let task = self.taskFor(message: message, attachment: attachment)
                 else {
                     completion?(false)
+                    return
+                }
+                // Already delivered and finishing: nothing to resume, but it is not stalled
+                // either — reporting `false` would make callers resend the message.
+                guard !task.isTransferFinished else {
+                    completion?(true)
                     return
                 }
                 // See `stopTransfer`: `id` is not a usable match for an in-flight transfer.
@@ -853,6 +866,11 @@ open class AttachmentTransfer: DataProvider {
                     $0.updateChecksum(data: attachment.url!, messageTid: message.tid, attachmentTid: attachment.tid)
                 }
             } completion: { _ in
+                // Last word on a successful transfer: a pause that slipped in just before
+                // the success relays `.pauseUploading` after `finishSuccess` relayed `.done`.
+                if error == nil, taskInfo.attachment.status == .done {
+                    AttachmentTransferStatusRelay.default.post(taskInfo.attachment, status: .done)
+                }
                 completion?(storedMessage ?? message, error)
                 switch taskInfo.transferType {
                 case .upload:
