@@ -122,6 +122,12 @@ extension MessageCell {
         /// newer progress value arrives (e.g. the attachment starts re-downloading).
         private var pendingHideWorkItem: DispatchWorkItem?
 
+        /// Identifies the shrink-out currently owning the overlay's transform. A completion
+        /// whose id no longer matches belongs to a shrink that was cancelled or superseded.
+        private var hideAnimationID = 0
+        /// True while `hideProgressView`'s shrink-out is running.
+        private var isHidingProgressView = false
+
         /// The largest value the ring has rendered for the transfer currently on screen.
         /// Reset to 0 whenever the ring leaves the screen or its stroke is taken off
         /// (pause/failure), i.e. whenever there is no longer a drawn value to regress from.
@@ -408,9 +414,14 @@ extension MessageCell {
                     // Seed the ring before it comes back on screen: the stored value is
                     // still the last transfer's, and animating from it plays that one
                     // rewinding over the first frames of this one.
+                    cancelHideAnimation()
                     progressView.setProgressWithoutAnimation(progress)
                     progressView.isHidden = false
                 } else {
+                    // A tick re-showing the ring mid-shrink takes it back at full size.
+                    if isHidingProgressView {
+                        cancelHideAnimation()
+                    }
                     progressView.progress = progress
                 }
                 pauseButton.isHidden = false
@@ -464,23 +475,40 @@ extension MessageCell {
         open func showTransferOverlay() {
             pendingHideWorkItem?.cancel()
             pendingHideWorkItem = nil
-            progressView.transform = .identity
-            pauseButton.transform = .identity
+            cancelHideAnimation()
             progressView.isHidden = false
             pauseButton.isHidden = false
         }
-        
+
+        /// Stops a running shrink-out and puts the overlay back at full size (see
+        /// `resetTransformCancellingAnimations` for why a bare `.identity` is not enough).
+        private func cancelHideAnimation() {
+            hideAnimationID += 1
+            isHidingProgressView = false
+            progressView.resetTransformCancellingAnimations()
+            pauseButton.resetTransformCancellingAnimations()
+        }
+
         open func hideProgressView() {
             progressLabel.isHidden = true
-            guard !progressView.isHidden
+            // One shrink at a time: `.done` can arrive several times for one transfer, and a
+            // second shrink (already at 0.01, so nothing to animate) completed at once and
+            // reset the transform under the first.
+            guard !progressView.isHidden, !isHidingProgressView
             else { return }
+            hideAnimationID += 1
+            let animationID = hideAnimationID
+            isHidingProgressView = true
             willHideProgressView()
             UIView.animate(withDuration: progressView.animationDuration + 0.1) { [weak self] in
                 guard let self else { return }
                 self.progressView.transform = .init(scaleX: 0.01, y: 0.01)
                 self.pauseButton.transform = .init(scaleX: 0.01, y: 0.01)
             } completion: { [weak self] _ in
-                guard let self else { return }
+                // Cancelled by a re-show (`cancelHideAnimation`), which already restored
+                // the overlay; this completion no longer owns it.
+                guard let self, self.hideAnimationID == animationID else { return }
+                self.isHidingProgressView = false
                 // A progress tick may have re-shown the ring mid-shrink (the same
                 // attachment started transferring again); leave it visible then.
                 let progress = self.progressView.progress
@@ -535,7 +563,10 @@ extension MessageCell {
                 highestRenderedProgress = 0
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.downloadIcon, for: .normal)
             case .done:
-                if progressView.progress >= 1 {
+                if pendingHideWorkItem != nil || isHidingProgressView {
+                    // Already on its way out: the fill-through to 100% hides it once.
+                    break
+                } else if progressView.progress >= 1 {
                     // Already drawn at 100% — `setProgress(1)` short-circuits on an unchanged
                     // value and would never hide it. Happens when a pause lands after the last
                     // tick: it re-shows the overlay with the upload icon and cancels the pending
@@ -647,6 +678,8 @@ extension MessageCell {
         open func clearTransferOverlay() {
             pendingHideWorkItem?.cancel()
             pendingHideWorkItem = nil
+            hideAnimationID += 1
+            isHidingProgressView = false
             lastAttachmentTransferProgress = nil
             progressView.transform = .identity
             pauseButton.transform = .identity
