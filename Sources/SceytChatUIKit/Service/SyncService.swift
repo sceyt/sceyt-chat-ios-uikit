@@ -735,13 +735,22 @@ public struct Operations {
         let fetchChannels = FetchAllChannelsOperation(query: provider.defaultQuery)
         fetchChannels.onLoad = onLoad
 
-        let deleteChannels = DeleteChannelsOperation(database: DataProvider.database, channelIds: undeleteChannelIds)
+        // A channel the pages skipped but the server still has is stored again by the verifier;
+        // `onLoad` gives it the same message catch-up as the channels the pages did return.
+        let verifier = ServerMissingChannelsVerifier()
+        verifier.onRecover = onLoad
+        let deleteChannels = DeleteChannelsOperation(
+            database: DataProvider.database,
+            channelIds: undeleteChannelIds,
+            verifier: verifier
+        )
 
         let fetchDone = BlockOperation { [unowned fetchChannels, unowned deleteChannels, unowned createChannel] in
             guard case let .success(channels)? = fetchChannels.result else {
                 deleteChannels.cancel()
                 return
             }
+            deleteChannels.confirmsMissingChannels = !channels.isEmpty
             deleteChannels.addChannel(ids: channels.map { $0.id })
 
             if  case let .success(channels)? = createChannel.result {

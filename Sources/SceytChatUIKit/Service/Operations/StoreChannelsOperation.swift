@@ -117,16 +117,36 @@ public enum ProtectedChannels {
     }
 }
 
+/// Deletes the synced channels the channel-list sync did not return — but only once the server
+/// confirms each one is gone.
+///
+/// The sync pages by offset, so a channel that gets a new message mid-sync moves into a page
+/// already read and every later page skips it. Deleting on absence alone dropped that channel and
+/// all its messages, and with them its search results. Each missing channel is now asked about
+/// by id first (`MissingChannelsVerifier`): one that still exists is stored again, one whose
+/// answer is inconclusive is kept for the next sync, and only the confirmed rest is deleted.
 open class DeleteChannelsOperation: AsyncOperation {
     
     private let database: Database
     public private(set) var channelIds: [ChannelId]
+
+    /// Asks the server about the missing channels before any is deleted. `nil` deletes them all
+    /// unconfirmed.
+    public let verifier: MissingChannelsVerifier?
+
+    /// `false` deletes the missing channels unconfirmed. Set when the sync returned no channels at
+    /// all: an empty first page cannot come from an offset shift, so it means the user really has
+    /// none, and confirming would only cost a request per local channel.
+    public var confirmsMissingChannels = true
+
     public init(
         database: Database,
-        channelIds: [ChannelId] = []
+        channelIds: [ChannelId] = [],
+        verifier: MissingChannelsVerifier? = ServerMissingChannelsVerifier()
     ) {
         self.database = database
         self.channelIds = channelIds
+        self.verifier = verifier
         super.init()
     }
     
@@ -135,47 +155,99 @@ open class DeleteChannelsOperation: AsyncOperation {
     }
     
     open override func main() {
-        database.performWriteTask({
-            let ids = self.channelIds
-            // A protected channel is kept even when the sync returned nothing at all, which is the
-            // case this guards: an empty result would otherwise clear every synced channel.
-            let keep = Set(ids).union(ProtectedChannels.channelIds)
-            let request = NSFetchRequest<NSFetchRequestResult>(entityName: ChannelDTO.entityName)
-            request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
-            if keep.isEmpty {
-                request.predicate = .init(format: "unsynched = NO")
-            } else {
-                request.predicate = .init(format: "unsynched = NO AND (NOT (id IN %@))", Array(keep))
+        // A protected channel is kept even when the sync returned nothing at all, which is the
+        // case this guards: an empty result would otherwise clear every synced channel.
+        let keep = Set(channelIds).union(ProtectedChannels.channelIds)
+        database.performBgTask(resultQueue: .global(), { context in
+            Self.channelIds(matching: Self.missingPredicate(keep: keep), context: context)
+        }, completion: { [weak self] result in
+            guard let self else { return }
+            let missing: [ChannelId]
+            switch result {
+            case let .success(ids):
+                missing = ids
+            case let .failure(error):
+                logger.errorIfNotNil(error, "DeleteChannelsOperation: read missing channels")
+                missing = []
             }
-            
+            guard !missing.isEmpty, !self.isCancelled else {
+                self.complete()
+                return
+            }
+            guard self.confirmsMissingChannels, let verifier = self.verifier else {
+                self.delete(confirmedIds: missing)
+                return
+            }
+            verifier.verify(channelIds: missing) { [weak self] gone in
+                self?.delete(confirmedIds: gone)
+            }
+        })
+    }
+
+    /// Deletes the confirmed channels and the side tables keyed by them.
+    ///
+    /// Overridable because `NSBatchDeleteRequest` merges into `SceytChatUIKit.shared.database`,
+    /// which a test's in-memory store cannot share.
+    open func delete(channelIds ids: [ChannelId], context: NSManagedObjectContext) throws {
+        let request = NSFetchRequest<NSFetchRequestResult>(entityName: ChannelDTO.entityName)
+        request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
+        request.predicate = .init(format: "id IN %@", ids)
+        try context.batchDelete(fetchRequest: request)
+
+        // `NSBatchDeleteRequest` bypasses deletion rules, so the channel-scoped side tables have
+        // to be swept explicitly or their rows outlive the channel forever.
+        for id in ids {
+            DraftMessageDTO.delete(channelId: id, context: context)
+            DraftAttachmentDTO.deleteAll(channelId: id, context: context)
+            // This path never reaches `deleteChannel(id:)`, so the pin rows would
+            // otherwise be stranded on a channel that no longer exists.
+            PinnedMessageDTO.deleteAll(channelId: id, context: context)
+            PinDetailsDTO.deleteAll(channelId: id, context: context)
+        }
+    }
+
+    private func delete(confirmedIds: [ChannelId]) {
+        // The sync is cancelled before an account switch wipes the database; a delete landing
+        // after that would act on the incoming account's rows.
+        guard !confirmedIds.isEmpty, !isCancelled else {
+            complete()
+            return
+        }
+        database.performWriteTask({
+            // Re-checked at delete time: the server check takes a round trip, and a channel can
+            // be protected or turned back into a local placeholder meanwhile.
+            let predicate = NSPredicate(
+                format: "unsynched = NO AND (id IN %@) AND (NOT (id IN %@))",
+                confirmedIds,
+                Array(ProtectedChannels.channelIds)
+            )
+            let doomed = Self.channelIds(matching: predicate, context: $0)
+            guard !doomed.isEmpty else { return }
             do {
-                // Collect the ids before the delete: `NSBatchDeleteRequest` bypasses deletion
-                // rules, so the channel-scoped side tables have to be swept explicitly or their
-                // rows outlive the channel forever. Read as a dictionary so a full channel-list
-                // sync does not materialize every doomed row just to learn its id.
-                let idRequest = NSFetchRequest<NSDictionary>(entityName: ChannelDTO.entityName)
-                idRequest.predicate = request.predicate
-                idRequest.propertiesToFetch = ["id"]
-                idRequest.resultType = .dictionaryResultType
-                let doomed = (ChannelDTO.fetch(request: idRequest, context: $0) as? [[String: Int64]] ?? [])
-                    .compactMap { $0["id"].map { ChannelId($0) } }
-
-                try $0.batchDelete(fetchRequest: request)
-
-                for id in doomed {
-                    DraftMessageDTO.delete(channelId: id, context: $0)
-                    DraftAttachmentDTO.deleteAll(channelId: id, context: $0)
-                    // This path never reaches `deleteChannel(id:)`, so the pin rows would
-                    // otherwise be stranded on a channel that no longer exists.
-                    PinnedMessageDTO.deleteAll(channelId: id, context: $0)
-                    PinDetailsDTO.deleteAll(channelId: id, context: $0)
-                }
+                try self.delete(channelIds: doomed, context: $0)
             } catch {
                 logger.errorIfNotNil(error, "")
             }
         }, completion: { [weak self] error in
-            logger.errorIfNotNil(error, "StoreChannelsOperation completed with ")
+            logger.errorIfNotNil(error, "DeleteChannelsOperation completed with ")
             self?.complete()
         })
+    }
+
+    private static func missingPredicate(keep: Set<ChannelId>) -> NSPredicate {
+        keep.isEmpty
+            ? NSPredicate(format: "unsynched = NO")
+            : NSPredicate(format: "unsynched = NO AND (NOT (id IN %@))", Array(keep))
+    }
+
+    /// Read as a dictionary so a full channel-list sync does not materialize every doomed row
+    /// just to learn its id.
+    private static func channelIds(matching predicate: NSPredicate, context: NSManagedObjectContext) -> [ChannelId] {
+        let request = NSFetchRequest<NSDictionary>(entityName: ChannelDTO.entityName)
+        request.predicate = predicate
+        request.propertiesToFetch = ["id"]
+        request.resultType = .dictionaryResultType
+        return (ChannelDTO.fetch(request: request, context: context) as? [[String: Int64]] ?? [])
+            .compactMap { $0["id"].map { ChannelId($0) } }
     }
 }
