@@ -46,7 +46,8 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         }
     }
 
-    public var minAutoDownloadSize = 3_000_000
+    /// Largest file, in bytes, the list downloads on its own; 0 means no limit.
+    public var minAutoDownloadSize = 0
 
     private let thumbnailCache = {
         $0.countLimit = 20

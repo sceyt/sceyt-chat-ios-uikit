@@ -204,7 +204,7 @@ final class GlobalSearchAllMediaViewModelTests: XCTestCase {
     // MARK: - minAutoDownloadSize default
 
     func testDefaultMinAutoDownloadSize() {
-        XCTAssertEqual(viewModel.minAutoDownloadSize, 3_000_000)
+        XCTAssertEqual(viewModel.minAutoDownloadSize, 0)
     }
 
     // MARK: - sectionNameKeyPath default

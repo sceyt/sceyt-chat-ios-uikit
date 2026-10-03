@@ -37,7 +37,9 @@ open class ChannelAttachmentListViewModel: NSObject {
             }
         }
     }
-    public var minAutoDownloadSize = 10_000_000
+    /// Largest file, in bytes, the list downloads on its own; 0 means no limit. Defaults to no
+    /// limit, so the Channel Info media, file and voice lists download everything like the chat.
+    public var minAutoDownloadSize = 0
 
     /// False until the first server page has reported back. While false, an empty list
     /// means "not loaded yet" rather than "nothing here", and the view keeps its empty
