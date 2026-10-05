@@ -139,9 +139,11 @@ class ProfileViewController: ViewController {
     }
     
     private func logOut() {
-        ConnectionService.shared.removeDeviceToken()
-        SceytChatUIKit.shared.logout { didUnregister in
-            Config.currentUserId = nil
+        DemoCalling.logout { [weak self] error in
+            if let error {
+                self?.showAlert(error: error)
+                return
+            }
             AppCoordinator.shared.showAuthFlow()
         }
     }

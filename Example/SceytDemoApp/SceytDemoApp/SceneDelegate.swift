@@ -36,10 +36,12 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         // Called when the scene has moved from an inactive state to an active state.
         // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
-        if backgroundTaskId != .invalid {
-            UIApplication.shared.endBackgroundTask(backgroundTaskId)
-            backgroundTaskId = .invalid
-        }
+        cancelPendingDisconnect()
+        ConnectionService.shared.reconnectIfNeeded()
+    }
+
+    func scene(_ scene: UIScene, continue userActivity: NSUserActivity) {
+        DemoCalling.handleCallUserActivity(userActivity)
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
@@ -52,14 +54,23 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // Use this method to undo the changes made on entering the background.
     }
 
+    func cancelPendingDisconnect() {
+        guard backgroundTaskId != .invalid else { return }
+        UIApplication.shared.endBackgroundTask(backgroundTaskId)
+        backgroundTaskId = .invalid
+    }
+
     func sceneDidEnterBackground(_ scene: UIScene) {
         // Called as the scene transitions from the foreground to the background.
         // Use this method to save data, release shared resources, and store enough scene-specific state information
         // to restore the scene back to its current state.
-        guard backgroundTaskId == .invalid else { return }
+        guard backgroundTaskId == .invalid,
+              DemoCalling.provider?.isCallActive != true else { return }
         backgroundTaskId = UIApplication.shared
             .beginBackgroundTask(withName: "Close Chat socket") {
-                SceytChatUIKit.shared.disconnect()
+                if DemoCalling.provider?.isCallActive != true {
+                    SceytChatUIKit.shared.disconnect()
+                }
                 UIApplication.shared.endBackgroundTask(self.backgroundTaskId)
                 self.backgroundTaskId = .invalid
             }
@@ -67,4 +78,3 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
 
 }
-
