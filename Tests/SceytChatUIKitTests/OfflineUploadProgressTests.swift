@@ -24,6 +24,7 @@
 @testable import SceytChatUIKit
 import CoreData
 import SceytChat
+import UIKit
 import XCTest
 
 final class OfflineUploadProgressTests: XCTestCase {
@@ -153,7 +154,12 @@ final class OfflineUploadProgressTests: XCTestCase {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let path = directory
             .appendingPathComponent("offline-upload-\(UUID().uuidString)-\(name)").path
-        try Data(repeating: 0x1, count: 2048).write(to: URL(fileURLWithPath: path))
+        // A real JPEG: the reconcile removes an image attachment's file it cannot read.
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 8, height: 8)).image { context in
+            UIColor.systemBlue.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 8, height: 8))
+        }
+        try XCTUnwrap(image.jpegData(compressionQuality: 0.8)).write(to: URL(fileURLWithPath: path))
         temporaryFiles.append(path)
         return path
     }

@@ -108,6 +108,52 @@ open class AttachmentTransfer: DataProvider {
         .pending, .downloading, .pauseDownloading, .failedDownloading
     ]
 
+    /// Image files already found readable, so a cell bind does not reread a header it has read.
+    nonisolated(unsafe) private static let readableImageFiles = NSCache<NSString, NSNumber>()
+
+    /// Paths already removed once this session. A file that is still unreadable after its
+    /// re-download is a real file ImageIO cannot decode, not a leftover, and removing it again
+    /// would download it on every cell bind.
+    nonisolated(unsafe) private static let discardedImageFiles = NSCache<NSString, NSNumber>()
+
+    /// Whether the local file of an image attachment can stand in for its download.
+    ///
+    /// A failed download can leave something other than the image at the destination — S3
+    /// writes its error body there on a 404. Read as "the file is on disk", that marked the
+    /// attachment `.done` with bytes nothing can show, and it was never downloaded again. Such a
+    /// file is removed so the attachment counts as not downloaded.
+    ///
+    /// Only finished, received images are judged: a live transfer still owns its file, and an
+    /// unsent attachment's file is the user's source, which is never deleted.
+    func keepsLocalFile(
+        _ path: String,
+        of attachment: ChatMessage.Attachment,
+        message: ChatMessage
+    ) -> Bool {
+        guard attachment.type == "image",
+              !attachment.isPendingUpload,
+              taskFor(message: message, attachment: attachment) == nil
+        else { return true }
+        if Self.readableImageFiles.object(forKey: path as NSString) != nil {
+            return true
+        }
+        guard SCTSession.isCompleteImageFile(at: path) else {
+            guard Self.discardedImageFiles.object(forKey: path as NSString) == nil else {
+                logger.error("[Attachment] keeping \(path): still not a readable image after a re-download \(attachment.description)")
+                return true
+            }
+            Self.discardedImageFiles.setObject(true, forKey: path as NSString)
+            logger.error("[Attachment] removing \(path): not a readable image, so the download is not done \(attachment.description)")
+            try? FileManager.default.removeItem(atPath: path)
+            if attachment.filePath == path {
+                attachment.filePath = nil
+            }
+            return false
+        }
+        Self.readableImageFiles.setObject(true, forKey: path as NSString)
+        return true
+    }
+
     private static func key(message: ChatMessage, attachment: ChatMessage.Attachment) -> String {
         "\(message.id).\(message.tid).\(transferIdentity(of: attachment))"
     }
@@ -287,7 +333,8 @@ open class AttachmentTransfer: DataProvider {
         var reconciled = [ChatMessage.Attachment]()
         for att in attachments where att.type != "link" {
             let resolvedLocalFilePath = dataSession(for: message)?.getFilePath(attachment: att)
-            if let filePath = resolvedLocalFilePath, !filePath.isEmpty {
+            if let filePath = resolvedLocalFilePath, !filePath.isEmpty,
+               keepsLocalFile(filePath, of: att, message: message) {
                 guard Self.healableDownloadStatuses.contains(att.status),
                       // `.pending` is shared by both directions and this rule reads a local
                       // file as proof the transfer finished — true for a download, false for
