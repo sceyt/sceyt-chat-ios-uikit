@@ -24,6 +24,12 @@ public class SceytChatUIKit {
         ChatClient.shared
     }
     
+    /// The client's user id, cached; see ``LiveUserIdCache``.
+    let liveUserIdCache = LiveUserIdCache { ChatClient.shared.user.id }
+
+    /// Held here: the client's delegate table does not keep it alive.
+    private lazy var liveUserIdCacheInvalidator = LiveUserIdCacheInvalidator(cache: liveUserIdCache)
+
     public var database: Database {
         return _database
     }
@@ -44,6 +50,12 @@ public class SceytChatUIKit {
     
     public static func initialize(apiUrl: String, appId: String, clientId: String = "", chatClientOnly: Bool = false) {
         ChatClient.initialize(apiUrl: apiUrl, appId: appId, clientId: clientId)
+        // Regardless of `chatClientOnly`: `currentUserId` is read either way.
+        shared.chatClient.add(
+            delegate: shared.liveUserIdCacheInvalidator,
+            identifier: String(reflecting: LiveUserIdCacheInvalidator.self)
+        )
+        shared.liveUserIdCache.enable()
         if !chatClientOnly {
             SceytChatUIKit.shared.chatClient.add(delegate: Components.clientConnectionHandler.default, identifier: String(reflecting: ClientConnectionHandler.self))
             shared.channelEventHandler.startEventHandler()
@@ -125,10 +137,21 @@ public class SceytChatUIKit {
     /// reaction and poll-vote ownership test, so it is read several times per
     /// cell bind — asking first put those reads on every frame of a list
     /// scroll, for an answer that almost never depended on them.
+    ///
+    /// For the same reason the live id comes from ``LiveUserIdCache``: asking
+    /// the client copies the whole native user. When the ids disagree it is
+    /// asked anyway, because the cache can lag the client: state changes reach
+    /// delegates asynchronously, so the client can already be connected as the
+    /// incoming user while the cache still names the outgoing one.
     public var currentUserId: UserId? {
-        Self.resolveCurrentUserId(
-            live: SceytChatUIKit.shared.chatClient.user.id,
-            declared: UserDefaults.currentUserId,
+        let declaredUserId = UserDefaults.currentUserId
+        var liveUserId = liveUserIdCache.value
+        if let declaredUserId, !declaredUserId.isEmpty, declaredUserId != liveUserId {
+            liveUserId = liveUserIdCache.refreshed()
+        }
+        return Self.resolveCurrentUserId(
+            live: liveUserId,
+            declared: declaredUserId,
             isConnected: SceytChatUIKit.shared.chatClient.connectionState == .connected
         )
     }
