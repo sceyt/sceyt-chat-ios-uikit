@@ -103,12 +103,18 @@ extension UIImageView {
             if let item = sender.item {
                 let attachment = item.attachment
                 if fileProvider.filePath(attachment: attachment) != nil {
-                    if attachment.status != .done {
+                    // The local file of an unsent attachment is its upload source, not a finished
+                    // download: marking it `.done` took it out of the resend's upload.
+                    if attachment.status != .done, !attachment.isPendingUpload {
                         attachment.status = .done
-                        DataProvider.database.write {
-                            AttachmentDTO.fetch(id: attachment.id, context: $0)?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
-                        } completion: { error in
-                            logger.errorIfNotNil(error, "")
+                        // id 0 is every attachment the server has not acked yet, so a write by
+                        // it would land on an arbitrary one of them.
+                        if attachment.id != 0 {
+                            DataProvider.database.write {
+                                AttachmentDTO.fetch(id: attachment.id, context: $0)?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+                            } completion: { error in
+                                logger.errorIfNotNil(error, "")
+                            }
                         }
                     }
                 } else if attachment.status != .done {

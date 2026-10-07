@@ -361,6 +361,13 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(attachments: [Attachment], dto: MessageDTO) -> MessageDTO {
+        // Rows of this message still waiting for their upload: a local file and no url yet. The
+        // ack gives them a server id and tid 0, and when SceytChat uploaded the file itself a url
+        // they never had, so neither lookup below finds them. Unclaimed, they were orphaned and
+        // the message got a new row with no local file, which the sender then showed blurred.
+        var pendingUploads = Array(dto.attachments ?? []).filter {
+            ($0.url ?? "").isEmpty && !($0.filePath ?? "").isEmpty
+        }
         dto.attachments = .init(
             attachments.compactMap {
                 var attachmentDTO: AttachmentDTO?
@@ -371,8 +378,17 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     if $0.tid != 0 {
                         attachmentDTO = AttachmentDTO.fetch(tid: Int64($0.tid), message: dto, context: self)
                     } else if $0.id != 0 {
-                        attachmentDTO = AttachmentDTO.fetchOrCreate(id: $0.id, context: self)
+                        attachmentDTO = AttachmentDTO.fetch(id: $0.id, context: self)
                     }
+                }
+                if attachmentDTO == nil {
+                    attachmentDTO = AttachmentDTO.claimPendingUpload(for: $0, from: &pendingUploads)
+                }
+                if let attachmentDTO {
+                    pendingUploads.removeAll { $0 == attachmentDTO }
+                }
+                if attachmentDTO == nil, $0.tid == 0, $0.id != 0 {
+                    attachmentDTO = AttachmentDTO.fetchOrCreate(id: $0.id, context: self)
                 }
                 if attachmentDTO == nil, let url = $0.url {
                     attachmentDTO = AttachmentDTO.fetchOrCreate(url: url, message: dto, context: self)
@@ -1498,5 +1514,18 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         } catch {
             logger.errorIfNotNil(error, "Failed to fetch expired auto-delete messages")
         }
+    }
+}
+
+private extension AttachmentDTO {
+    /// The pending-upload row an ack attachment stands for: one of the same type and name, or the
+    /// only one of that type. Anything more ambiguous is left alone.
+    static func claimPendingUpload(for attachment: Attachment, from rows: inout [AttachmentDTO]) -> AttachmentDTO? {
+        let sameType = rows.filter { $0.type == attachment.type }
+        let sameName = sameType.filter { $0.name != nil && $0.name == attachment.name }
+        guard let match = sameName.first ?? (sameType.count == 1 ? sameType.first : nil)
+        else { return nil }
+        rows.removeAll { $0 == match }
+        return match
     }
 }
