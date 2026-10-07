@@ -1002,8 +1002,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Sceyt Chat";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Sceyt Chat needs access to your camera to let you share photos and videos during chats. Please enable camera access to enhance your messaging experience.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Sceyt Chat requires microphone access to record and send voice messages. Please grant permission to use this feature effectively.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera so you can take photos, record videos, and join video calls.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need access to your microphone so you can record and send voice messages, or speak during voice and video calls.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Sceyt Chat needs access to your photo library to let you add photos and videos to your chats. Please enable photo library access to enhance your messaging experience.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Sceyt Chat requires access to your photo library to view and share your existing photos and videos. Please grant permission to use this feature effectively.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -1043,8 +1043,8 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Sceyt Chat";
 				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.developer-tools";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Sceyt Chat needs access to your camera to let you share photos and videos during chats. Please enable camera access to enhance your messaging experience.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Sceyt Chat requires microphone access to record and send voice messages. Please grant permission to use this feature effectively.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "We need access to your camera so you can take photos, record videos, and join video calls.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need access to your microphone so you can record and send voice messages, or speak during voice and video calls.";
 				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "Sceyt Chat needs access to your photo library to let you add photos and videos to your chats. Please enable photo library access to enhance your messaging experience.";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Sceyt Chat requires access to your photo library to view and share your existing photos and videos. Please grant permission to use this feature effectively.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
