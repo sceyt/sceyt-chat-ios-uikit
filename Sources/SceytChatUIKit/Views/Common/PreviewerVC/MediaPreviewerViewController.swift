@@ -105,7 +105,11 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
 
     private var playerLayer: AVPlayerLayer?
     private var player: AVPlayer?
-    private var isPreparingToPlay = false
+    /// The video file the player is built (or being built) from. A rebind for the same file must
+    /// not rebuild the player: every rebuild swaps in a fresh `AVPlayerLayer`, which blanks the
+    /// video and reads as the preview opening a second time. DB updates that don't change the file
+    /// (a status flip, the download saving `filePath`) land right after a first open.
+    private var preparedVideoUrl: URL?
 
     private var videoOutput: AVPlayerItemVideoOutput?
     private var displayLink: CADisplayLink?
@@ -389,7 +393,6 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
         case .saveGalleryAccessDenied:
             showGalleryAccessDeniedAlert()
         case .didUpdateItem:
-            isPreparingToPlay = false
             bindPreviewItem()
         }
     }
@@ -433,11 +436,8 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
             if attachment.type == "video",
                let fileUrl = attachment.fileUrl
             {
-                if isPreparingToPlay {
-                    return
-                } else {
-                    isPreparingToPlay = true
-                }
+                guard fileUrl != preparedVideoUrl else { return }
+                preparedVideoUrl = fileUrl
                 scrollView.isHidden = true
                 playerView.isHidden = false
                 playerControlContainerView.isHidden = false
@@ -448,7 +448,8 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
                 let assetKeys = ["playable", "duration"]
                 asset.loadValuesAsynchronously(forKeys: assetKeys) {
                     DispatchQueue.main.async { [weak self] in
-                        guard let self else { return }
+                        // A later bind moved to another file; its own load configures the player.
+                        guard let self, self.preparedVideoUrl == fileUrl else { return }
                         self.configurePlayer(asset: asset, assetKeys: assetKeys)
                         self.isConfiguredPlayer = true
                         if self.isViewDidAppear {
