@@ -66,11 +66,49 @@ jobs:
             -skip-testing:SceytChatUIKitTests/GlobalSearchMessagesViewModelDBPerformanceTests \
             -clonedSourcePackagesDirPath SourcePackages \
             -resultBundlePath TestResults.xcresult \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log
+
+      # Surface what broke as annotations and a run summary, so a failure can be
+      # read on the run page without downloading logs or artifacts.
+      - name: Report failures
+        if: failure()
+        run: |
+          {
+            echo "## iOS CI failed"
+            echo "$(xcodebuild -version | head -1), simulator ${{ steps.sim.outputs.udid }}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Compile errors
+          grep -E '^/.+:[0-9]+:[0-9]+: error: ' build.log | sort -u | head -50 | while IFS= read -r line; do
+            file=$(echo "$line" | cut -d: -f1 | sed "s|^$GITHUB_WORKSPACE/||")
+            lineno=$(echo "$line" | cut -d: -f2)
+            msg=$(echo "$line" | cut -d: -f5- | sed 's/^ *//')
+            echo "::error file=$file,line=$lineno::$msg"
+            echo "- \`$file:$lineno\` $msg" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          # Failing tests
+          if [ -d TestResults.xcresult ]; then
+            xcrun xcresulttool get test-results summary --path TestResults.xcresult --compact > summary.json || exit 0
+            python3 - <<'EOF'
+          import json, os
+          d = json.load(open("summary.json"))
+          lines = [f"**{d.get('result')}**: {d.get('passedTests')} passed, "
+                   f"{d.get('failedTests')} failed, {d.get('skippedTests')} skipped"]
+          for f in d.get("testFailures", []):
+              name, text = f.get("testIdentifierString"), f.get("failureText", "").replace("\n", " ")
+              print(f"::error title={name}::{text}")
+              lines.append(f"- `{name}`: {text}")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
+              s.write("\n".join(lines) + "\n")
+          EOF
+          fi
 
       - name: Upload test results
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: test-results
-          path: TestResults.xcresult
+          path: |
+            TestResults.xcresult
+            build.log
