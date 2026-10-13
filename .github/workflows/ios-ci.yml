@@ -1,0 +1,76 @@
+name: iOS CI
+
+on:
+  push:
+    # main, dev, and the release branches (v1.6.17-beta.9-call, ...)
+    branches: [main, dev, 'v*']
+  pull_request:
+    branches: [main, dev]
+  # Lets the workflow be started by hand from the Actions tab, on any branch.
+  workflow_dispatch:
+
+# Cancel older runs on the same branch when a new commit is pushed
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Cache Swift packages
+        uses: actions/cache@v4
+        with:
+          path: SourcePackages
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.swift') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # Simulator names change with every Xcode release, so pick whichever
+      # iPhone the runner image has instead of hard-coding one.
+      - name: Pick simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available --json | python3 -c '
+          import json, sys
+          runtimes = json.load(sys.stdin)["devices"]
+          ios = sorted((r for r in runtimes if "iOS" in r), reverse=True)
+          for r in ios:
+              for d in runtimes[r]:
+                  if d["name"].startswith("iPhone"):
+                      print(d["udid"]); sys.exit()
+          sys.exit("no iPhone simulator found")
+          ')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      # Unit tests of the SceytChatUIKit Swift package. The demo-app UI tests
+      # are not run here: the demo project depends on ../sceyt-call-ios-uikit,
+      # which is not part of this repository.
+      # The DB performance tests (500K/1M-message stores) are skipped — they
+      # take most of the suite's time and only make sense on a quiet machine.
+      - name: Build and test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -scheme SceytChatUIKit \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -skip-testing:SceytChatUIKitTests/GlobalSearchMessagesViewModelDBPerformanceTests \
+            -clonedSourcePackagesDirPath SourcePackages \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xcresult

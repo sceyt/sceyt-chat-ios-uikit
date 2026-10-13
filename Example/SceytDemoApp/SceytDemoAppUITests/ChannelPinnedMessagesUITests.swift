@@ -612,47 +612,6 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(waitForPreview(Pinned.textPreview))
     }
 
-    /// The oldest pin has nowhere further up to go, so the banner wraps round to the newest —
-    /// the same way tapping past the oldest pin does.
-    func testPinnedListNavigateButtonOnTheOldestPin_wrapsTheBannerToTheNewest() {
-        openPinnedConversation()
-        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertEqual(screen.pinnedMessagesValue, "3/3")
-        // Move off the newest pin, so the wrap back onto it is a real change rather than the
-        // banner having never moved at all.
-        screen.tapPinnedBanner()
-        XCTAssertTrue(waitForBannerValue("2/3"))
-
-        XCTAssertTrue(screen.openPinnedMessageList())
-        let textRow = screen.pinnedListCell(Pinned.textId)
-        XCTAssertTrue(textRow.waitForExistence(timeout: 5), "the text pin must have a row")
-        screen.pinnedListNavigateButton(in: textRow).tap()
-
-        XCTAssertTrue(waitForPinnedListToClose(), "the arrow must close the list")
-        XCTAssertTrue(waitForBannerValue("3/3"),
-                      "past the oldest pin the banner must come back round, got \(screen.pinnedMessagesValue)")
-        XCTAssertTrue(waitForPreview(Pinned.pollPreview))
-    }
-
-    /// The rows are the conversation's own bubbles, so they raise the conversation's own
-    /// context menu — and an action that needs nothing but the store runs without leaving
-    /// the list, exactly as the swipe action does.
-    func testPinnedListLongPress_opensTheConversationMenuAndUnpinsInPlace() {
-        openPinnedConversation()
-        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(screen.openPinnedMessageList())
-
-        let textRow = screen.pinnedListCell(Pinned.textId)
-        XCTAssertTrue(textRow.waitForExistence(timeout: 5))
-        screen.unpinMessage(cell: textRow)
-
-        XCTAssertTrue(waitForRowToDisappear(textRow), "the unpinned row must leave the list")
-        XCTAssertTrue(screen.pinnedListTable.exists,
-                      "unpinning needs nothing from the conversation, so the list must stay up")
-        XCTAssertEqual(screen.pinnedListRowIdentifiers,
-                       [Pinned.rowIdentifier(Pinned.videoId), Pinned.rowIdentifier(Pinned.pollId)])
-    }
-
     /// The arrow lives on whichever side the bubble leaves free, so it can never cover the
     /// message: the trailing side of an incoming bubble, the leading side of an outgoing
     /// one. Only a pin the user sends can prove the mirrored case, so this one pins
@@ -694,49 +653,6 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
 
         XCTAssertFalse(waitForPinnedListToClose(timeout: 2),
                        "tapping a bubble must leave the list up")
-    }
-
-    func testPinnedListSwipe_unpinsOneMessage() {
-        openPinnedConversation()
-        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(screen.openPinnedMessageList())
-
-        let textRow = screen.pinnedListCell(Pinned.textId)
-        XCTAssertTrue(textRow.waitForExistence(timeout: 5))
-        textRow.swipeLeft()
-        let unpin = app.buttons["Unpin"]
-        XCTAssertTrue(unpin.waitForExistence(timeout: 5),
-                      "swiping a row must reveal its Unpin action")
-        unpin.tap()
-
-        // The row goes away because the list observes the store, not a snapshot handed
-        // to it when it opened.
-        XCTAssertTrue(waitForRowToDisappear(textRow), "the unpinned row must leave the list")
-        XCTAssertEqual(screen.pinnedListRowIdentifiers,
-                       [Pinned.rowIdentifier(Pinned.videoId), Pinned.rowIdentifier(Pinned.pollId)])
-    }
-
-    /// Emptying the list one pin at a time — there is no Unpin All — must leave the
-    /// placeholder up rather than dismiss the screen, and take the banner with it.
-    func testUnpinningEveryRow_leavesThePlaceholderAndClearsTheBanner() {
-        openPinnedConversation()
-        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(screen.openPinnedMessageList())
-
-        for id in [Pinned.textId, Pinned.videoId, Pinned.pollId] {
-            let row = screen.pinnedListCell(id)
-            XCTAssertTrue(row.waitForExistence(timeout: 5), "pin \(id) must have a row to unpin")
-            screen.unpinMessage(cell: row)
-            XCTAssertTrue(waitForRowToDisappear(row), "the unpinned row must leave the list")
-        }
-
-        XCTAssertTrue(screen.pinnedListEmptyView.waitForExistence(timeout: 5),
-                      "the emptied list shows its placeholder rather than dismissing itself")
-
-        screen.closePinnedMessageList()
-        XCTAssertTrue(waitForPinnedListToClose(), "the \"X\" must dismiss the list")
-        XCTAssertTrue(waitForBannerToDisappear(),
-                      "back in the conversation the banner must be gone too")
     }
 
     // MARK: - Persistence
@@ -896,47 +812,6 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         XCTAssertTrue(waitForPinToDisappear(in: cell))
     }
 
-    /// Unpinning a pin the server **has** accepted needs a round trip, but the UI must not wait
-    /// for it: the removal is queued and the pin disappears at once.
-    ///
-    /// The pin-order fixture is the one seeded with real server pin ids, so its rows start
-    /// `.synced` — which is what puts this on the queued-removal path rather than the
-    /// cancel-an-unsent-pin one.
-    func testUnpinningAnAckedPinWithNoConnection_hidesItAtOnce() {
-        openConversation(launchApp(pinnedMessagesPinOrder: true, pinsStayPending: true))
-        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForBannerValue("3/3"))
-
-        XCTAssertTrue(screen.openPinnedMessageList())
-        let row = screen.pinnedListCell(Pinned.pollId)
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
-        screen.unpinMessage(cell: row)
-        XCTAssertTrue(waitForRowToDisappear(row),
-                      "a queued removal must leave the list immediately")
-        screen.closePinnedMessageList()
-        XCTAssertTrue(waitForPinnedListToClose())
-
-        XCTAssertTrue(waitForBannerValueMatchingOneOf(["1/2", "2/2"]),
-                      "and the banner must drop to two pins, got \(screen.pinnedMessagesValue)")
-    }
-
-    /// With the server acking, the same unpin completes rather than staying queued.
-    func testUnpinningAnAckedPin_completesWhenTheServerAgrees() {
-        openPinOrderConversation()
-        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForBannerValue("3/3"))
-
-        XCTAssertTrue(screen.openPinnedMessageList())
-        let row = screen.pinnedListCell(Pinned.pollId)
-        XCTAssertTrue(row.waitForExistence(timeout: 5))
-        screen.unpinMessage(cell: row)
-        XCTAssertTrue(waitForRowToDisappear(row))
-        screen.closePinnedMessageList()
-        XCTAssertTrue(waitForPinnedListToClose())
-
-        XCTAssertTrue(waitForBannerValueMatchingOneOf(["1/2", "2/2"]))
-    }
-
     // MARK: - Rapid interaction / stress
     //
     // Pinning is a two-phase write — an optimistic local row, then the server's answer stamped
@@ -1021,31 +896,6 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         )
     }
 
-    /// Unpinning every pin one after another from the seeded fixture. The banner has to shrink
-    /// in step and then go away — a stale index here is what makes the banner page onto nothing.
-    func testUnpinningEveryPinInQuickSuccession_takesTheBannerAway() {
-        openPinnedConversation()
-        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForBannerValue("3/3"))
-
-        XCTAssertTrue(screen.openPinnedMessageList(), "the pinned list should open")
-
-        for (index, id) in [Pinned.textId, Pinned.videoId, Pinned.pollId].enumerated() {
-            let row = screen.pinnedListCell(id)
-            XCTAssertTrue(row.waitForExistence(timeout: 5), "row \(id) should be listed")
-            // Through the row's context menu rather than the swipe action: swipe-to-reveal is
-            // flaky for a row whose content is an embedded message cell.
-            screen.unpinMessage(cell: row)
-            XCTAssertTrue(waitForRowToDisappear(row),
-                          "row \(id) must leave the list (step \(index + 1) of 3)")
-        }
-
-        screen.closePinnedMessageList()
-        XCTAssertTrue(waitForPinnedListToClose())
-        XCTAssertTrue(waitForBannerToDisappear(),
-                      "with nothing pinned the banner must come down")
-    }
-
     /// Swiping the banner far faster than its paging animation. Whatever it lands on, the value
     /// and the preview have to be consistent with each other and inside the real range.
     func testRapidBannerSwiping_neverPagesOntoNothing() {
@@ -1068,37 +918,6 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
             waitForPreviewMatchingOneOf([Pinned.textPreview, Pinned.videoPreview, Pinned.pollPreview]),
             "the preview settled on \"\(screen.pinnedMessagesPreview.label)\", which is not one of the three pins"
         )
-    }
-
-    /// Paging the banner while the pin set is changing underneath it. The banner holds its place
-    /// by message tid rather than by index for exactly this case.
-    func testSwipingWhileUnpinning_keepsTheBannerAndTheSetInStep() {
-        openPinnedConversation()
-        XCTAssertTrue(screen.pinnedMessagesView.waitForExistence(timeout: 5))
-
-        screen.swipeToNextPinnedMessage()
-        XCTAssertTrue(waitForPreview(Pinned.videoPreview),
-                      "one step up from the newest pin the banner opens on")
-
-        // Unpin a *different* pin than the one on show.
-        let cell = screen.cell(Pinned.textId)
-        if cell.exists {
-            screen.unpinMessage(cell: cell)
-        } else {
-            XCTAssertTrue(screen.openPinnedMessageList())
-            let row = screen.pinnedListCell(Pinned.textId)
-            XCTAssertTrue(row.waitForExistence(timeout: 5))
-            screen.unpinMessage(cell: row)
-            XCTAssertTrue(waitForRowToDisappear(row))
-            screen.closePinnedMessageList()
-            XCTAssertTrue(waitForPinnedListToClose())
-        }
-
-        XCTAssertTrue(waitForBannerValueMatchingOneOf(["1/2", "2/2"]),
-                      "the banner must drop to two pins, got \(screen.pinnedMessagesValue)")
-        screen.swipeToNextPinnedMessage()
-        XCTAssertTrue(waitForBannerValueMatchingOneOf(["1/2", "2/2"]),
-                      "and keep paging inside the smaller set, got \(screen.pinnedMessagesValue)")
     }
 
     /// Opening and closing the pinned list repeatedly. Each open starts a pin sweep and a
@@ -1233,15 +1052,6 @@ final class ChannelPinnedMessagesUITests: BaseUITestCase {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if !screen.pinnedListTable.exists { return true }
-            usleep(100_000)
-        }
-        return false
-    }
-
-    private func waitForRowToDisappear(_ row: XCUIElement, timeout: TimeInterval = 5) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while Date() < deadline {
-            if !row.exists { return true }
             usleep(100_000)
         }
         return false

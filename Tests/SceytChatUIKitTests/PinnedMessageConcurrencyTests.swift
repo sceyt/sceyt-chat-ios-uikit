@@ -166,7 +166,15 @@ final class PinnedMessageConcurrencyTests: XCTestCase {
         return context
     }
 
-    private lazy var readContext: NSManagedObjectContext = freshContext()
+    /// Main-queue, unlike `freshContext()`: the assertions read through it straight from the
+    /// test's main thread, and touching a private-queue context off its queue intermittently
+    /// crashed the run (double free in Core Data's reference queue).
+    private lazy var readContext: NSManagedObjectContext = {
+        let context = NSManagedObjectContext(concurrencyType: .mainQueueConcurrencyType)
+        context.persistentStoreCoordinator = mockDB.container.persistentStoreCoordinator
+        liveContexts.append(context)
+        return context
+    }()
     private lazy var repairContext: NSManagedObjectContext = freshContext()
 
     /// A context that reads **committed** state.
