@@ -55,6 +55,9 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
 
     override func setUpWithError() throws {
         try super.setUpWithError()
+        // The gate is process-wide: a reload still in flight, or a failure cooldown left by an
+        // earlier test on the same attachment key, would silently skip this test's self-heal.
+        ThumbnailReloadGate.reset()
         mock = MockThumbnailDataSession()
         originalDataSession = Components.dataSession
         Components.dataSession = mock
@@ -134,9 +137,13 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
     /// Spins the main run loop until `condition` is true or `timeout` elapses.
     /// Pumping the run loop is required because the layout publishes thumbnails
     /// via `DispatchQueue.main.async`.
+    ///
+    /// The default is generous on purpose: the bind-time self-heal loads on a `.utility`
+    /// queue, which a busy CI runner can starve for well over 2 s. A wait that succeeds
+    /// returns at once, and "must not happen" checks pass their own short timeout.
     @discardableResult
     private func waitUntil(
-        timeout: TimeInterval = 2,
+        timeout: TimeInterval = 10,
         _ condition: () -> Bool
     ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
