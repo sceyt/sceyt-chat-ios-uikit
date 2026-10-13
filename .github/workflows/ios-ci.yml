@@ -95,10 +95,21 @@ jobs:
           d = json.load(open("summary.json"))
           lines = [f"**{d.get('result')}**: {d.get('passedTests')} passed, "
                    f"{d.get('failedTests')} failed, {d.get('skippedTests')} skipped"]
+          log = open("build.log", errors="replace").read().splitlines()
           for f in d.get("testFailures", []):
               name, text = f.get("testIdentifierString"), f.get("failureText", "").replace("\n", " ")
               print(f"::error title={name}::{text}")
               lines.append(f"- `{name}`: {text}")
+              # The failing test's own console output (last 80 lines), so it can be read
+              # without access to the raw job log.
+              cls, _, method = name.rstrip("()").partition("/")
+              start = f"Test Case '-[SceytChatUIKitTests.{cls} {method}]' started"
+              end = f"Test Case '-[SceytChatUIKitTests.{cls} {method}]' failed"
+              s = next((i for i, l in enumerate(log) if l.startswith(start)), None)
+              if s is not None:
+                  e = next((i for i in range(s, len(log)) if log[i].startswith(end)), len(log) - 1)
+                  excerpt = "%0A".join(l.replace("%", "%25") for l in log[s:e + 1][-80:])
+                  print(f"::notice title=log {name}::{excerpt}")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as s:
               s.write("\n".join(lines) + "\n")
           EOF
