@@ -139,3 +139,18 @@ extension UIView {
         return rect.contains(location)
     }
 }
+
+extension UIView {
+    /// Drops in-flight `transform` animations and puts the view back at `.identity`.
+    ///
+    /// UIView animations are additive: a scale-down to 0.01 runs a "100× → 1×" delta on top
+    /// of the 0.01 model value. Assigning `.identity` while it runs applies that delta to
+    /// `.identity` instead, so the view draws up to 100× its size before settling.
+    func resetTransformCancellingAnimations() {
+        for key in layer.animationKeys() ?? []
+        where (layer.animation(forKey: key) as? CAPropertyAnimation)?.keyPath == "transform" {
+            layer.removeAnimation(forKey: key)
+        }
+        transform = .identity
+    }
+}

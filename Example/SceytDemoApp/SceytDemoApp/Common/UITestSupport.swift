@@ -58,6 +58,83 @@ enum UITestSupport {
         launchArgumentValue("--uitest-inject-on-open")
     }
 
+    /// `--uitest-pinned-messages` — seeds a conversation with three already-pinned
+    /// messages (a text, a video attachment and a poll), for the pinned banner tests.
+    static var isPinnedMessages: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pinned-messages")
+    }
+
+    /// `--uitest-pinned-messages-single` — the same fixture with only one pin, for the
+    /// "unpin the last pin and the banner goes away" case.
+    static var isPinnedMessagesSingle: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pinned-messages-single")
+    }
+
+    /// `--uitest-pins-stay-pending` — leaves pin/unpin requests unacked, so a pin behaves the
+    /// way it does with no connection: queued, visible, and unannounced. Without it, UI-test
+    /// mode acks instantly (see `SceytChatUIKit.uiTestPinRequestsCompleteLocally`), because
+    /// otherwise nothing that depends on a server ack could be driven at all.
+    static var pinsStayPending: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pins-stay-pending")
+    }
+
+    /// `--uitest-pinning-disabled` — runs with
+    /// `SceytChatUIKit.shared.config.isMessagePinningEnabled = false`, the feature's master
+    /// switch, while the fixture still seeds its pins straight into the store (seeding goes
+    /// through `pinMessagesForUITests`, which writes below the switch). So the pins exist on
+    /// disk and nothing about them may reach the screen.
+    static var isPinningDisabled: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pinning-disabled")
+    }
+
+    /// `--uitest-pinned-messages-pin-order` — the three-pin fixture with explicit server pin
+    /// ids assigned **against** timeline order, so the banner's order can only be right if it
+    /// is reading `serverPinId` and not `messageCreatedAt`.
+    static var isPinnedMessagesPinOrder: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-pinned-messages-pin-order")
+    }
+
+    /// `--uitest-conversation-edited` — seeds the conversation's outgoing message as
+    /// edited, so its bubble carries the "edited" mark beside the timestamp. The widest
+    /// the info row gets, and what a pin added later has to make room beside.
+    static var isConversationEdited: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-conversation-edited")
+    }
+
+    /// `--uitest-conversation-pending` — appends an outgoing message still in the
+    /// `.pending` delivery state (index 20), for the "a message that has not reached the
+    /// server cannot be pinned" case.
+    static var isConversationPending: Bool {
+        ProcessInfo.processInfo.arguments.contains("--uitest-conversation-pending")
+    }
+
+    /// `--uitest-conversation-tail-count=N` — appends N already-read *incoming*
+    /// messages (ids 30+1…30+N) after the newest one, pushing the inline reply at
+    /// index 18 well away from the bottom of the list. Without it the reply and the
+    /// newest message are adjacent, so "returned to the reply" and "jumped to the
+    /// bottom" are the same screen and no assertion can tell them apart.
+    private static var conversationTailCountOverride: Int? {
+        launchArgumentValue("--uitest-conversation-tail-count")
+    }
+
+    /// `--uitest-messages-fetch-limit=N` — shrinks the message window the conversation
+    /// opens with (`ChannelViewModel.messagesFetchLimit`, 50 by default). With the
+    /// default every seeded message fits in one window, so a reply's quoted parent is
+    /// always cached and the load-then-restart path a jump takes for an old parent —
+    /// where the rapid-tap bugs live — can never be reached from a UI test.
+    private static var messagesFetchLimitOverride: Int? {
+        launchArgumentValue("--uitest-messages-fetch-limit")
+    }
+
+    /// `--uitest-near-load-local=<ms>` — answers the "load messages around X" server
+    /// request locally, from the seeded database, after this many milliseconds
+    /// (`SceytChatUIKit.uiTestNearLoadCompletesLocallyDelayMs`). UI-test mode never
+    /// connects, so without it a jump to a parent outside the window fails with
+    /// "not connected". The delay is what makes rapid taps race the way they do live.
+    private static var nearLoadLocalDelayMs: Int? {
+        launchArgumentValue("--uitest-near-load-local")
+    }
+
     /// `--uitest-conversation-unread-long` — makes the parametrized unread tail
     /// use long multi-line bodies instead of one-liners, so the newest cells are
     /// several lines tall. Exposes initial-scroll positions computed from
@@ -242,6 +319,17 @@ enum UITestSupport {
         guard isActive else { return }
         #if DEBUG
         SceytChatUIKit.shared.startUITestSession()
+        // Before any seeding: the fixtures write pins directly to the store, and the flag is
+        // read by the screens that would show them, not by the writes.
+        if isPinningDisabled {
+            SceytChatUIKit.shared.config.isMessagePinningEnabled = false
+        }
+        if let limit = messagesFetchLimitOverride {
+            ChannelViewModel.messagesFetchLimit = UInt(limit)
+        }
+        if let delayMs = nearLoadLocalDelayMs {
+            SceytChatUIKit.uiTestNearLoadCompletesLocallyDelayMs = delayMs
+        }
         if isReplyAttachment {
             seedReplyAttachmentConversation()
             installFloatingAttachmentDownloadInjector()
@@ -254,7 +342,11 @@ enum UITestSupport {
             if let gapMs = pollDoubleVoteGapMs {
                 installFloatingPollDoubleVoteInjector(gapMs: gapMs)
             }
+        } else if isPinnedMessages || isPinnedMessagesSingle || isPinnedMessagesPinOrder {
+            SceytChatUIKit.uiTestPinRequestsCompleteLocally = !pinsStayPending
+            seedPinnedMessagesConversation()
         } else if isConversation || isConversationUnread || conversationUnreadCountOverride != nil {
+            SceytChatUIKit.uiTestPinRequestsCompleteLocally = !pinsStayPending
             seedConversation()
             if isInjectionEnabled {
                 installFloatingConversationInjector()
@@ -354,6 +446,7 @@ enum UITestSupport {
     static let conversationLastReadText = "This is the last read message"
     static let conversationOutgoingText = "My outgoing reply"
     static let conversationLastText = "This is the newest message"
+    static let conversationPendingText = "Still sending this one"
 
     private static func conversationMessageId(_ index: UInt64) -> UInt64 {
         conversationChannelId * 10_000 + index
@@ -392,14 +485,44 @@ enum UITestSupport {
             .init(id: conversationMessageId(18),
                   body: conversationOutgoingText,
                   incoming: false, senderId: me, senderName: "Me",
-                  parentId: conversationMessageId(1)),
+                  parentId: conversationMessageId(1),
+                  edited: isConversationEdited),
             // Newest message; incoming so the unread separator can render.
             .init(id: conversationMessageId(19),
                   body: conversationLastText,
                   incoming: true, senderId: "bob", senderName: "Bob")
         ])
+        if isConversationPending {
+            // Appended only behind the flag, so the fixture every other test reads keeps
+            // index 19 as its newest message.
+            messages.append(
+                .init(id: conversationMessageId(20),
+                      body: conversationPendingText,
+                      incoming: false, senderId: me, senderName: "Me",
+                      deliveryStatus: .pending)
+            )
+        }
+        if let tailCount = conversationTailCountOverride, tailCount > 0 {
+            // Also appended only behind its flag, for the same reason. Ids start at 30
+            // to stay clear of the pending message's index 20, and `createdAt` is left
+            // implicit — `seedMessagesForUITests` dates array index `i` as
+            // `uiTestMessageSeedBaseDate + i` seconds, so appending here is already
+            // chronologically ascending.
+            for n in 1...tailCount {
+                messages.append(
+                    .init(id: conversationMessageId(UInt64(30 + n)),
+                          body: conversationTailText(n),
+                          incoming: true, senderId: "bob", senderName: "Bob")
+                )
+            }
+        }
         return messages
     }
+
+    /// Body of the `n`-th message in the read tail seeded by
+    /// `--uitest-conversation-tail-count=N`. Mirrored in the UI-test bundle
+    /// (`ChannelScreen.Convo.tailText`).
+    static func conversationTailText(_ n: Int) -> String { "Tail \(n)" }
 
     /// Body of the `n`-th message in the parametrized unread tail seeded by
     /// `--uitest-conversation-unread-count=N`. Mirrored in the UI-test bundle
@@ -458,6 +581,103 @@ enum UITestSupport {
                 lastDisplayedMessageId: isConversationUnread ? conversationMessageId(16) : 0
             )
         }
+    }
+
+    // MARK: - Pinned messages (gated behind --uitest-pinned-messages)
+
+    static let pinnedTextBody = "Do you know what time is it?"
+    static let pinnedPollQuestion = "With title"
+
+    static var pinnedTextMessageId: UInt64 { conversationMessageId(31) }
+    static var pinnedVideoMessageId: UInt64 { conversationMessageId(32) }
+    static var pinnedPollMessageId: UInt64 { conversationMessageId(33) }
+    static var pinnedPollId: String { "uitest-pinned-poll" }
+
+    /// The three previews the banner must render, in timeline order — this is exactly what
+    /// `PinnedMessageBodyFormatter` is expected to produce.
+    static let pinnedTextPreview = pinnedTextBody
+    static let pinnedVideoPreview = "Video"
+    static var pinnedPollPreview: String { "Poll: \(pinnedPollQuestion)" }
+
+    /// A short history plus three pinnable messages: a plain text, a caption-less video
+    /// attachment, and a poll. Pinned oldest-first so the banner's order is deterministic,
+    /// and (multi-pin only) followed by enough filler that the pins sit off the top of the
+    /// list on open, which is what makes a banner tap's jump observable.
+    private static func seedPinnedMessagesConversation() {
+        SceytChatUIKit.shared.seedChannelsForUITests([
+            .init(id: conversationChannelId, subject: conversationSubject)
+        ])
+        var messages = Array(conversationMessages.prefix(5))
+        messages.append(
+            .init(id: pinnedTextMessageId,
+                  body: pinnedTextBody,
+                  incoming: true, senderId: "bob", senderName: "Bob")
+        )
+        messages.append(
+            // No body, so the preview falls through to the attachment type name.
+            .init(id: pinnedVideoMessageId,
+                  body: "",
+                  incoming: true, senderId: "bob", senderName: "Bob",
+                  imageAttachment: .init(
+                      id: 900_101,
+                      url: "https://uitest.sceyt.invalid/uitest-pinned-video/clip.mp4",
+                      name: "clip.mp4",
+                      type: "video"))
+        )
+        messages.append(
+            .init(id: pinnedPollMessageId,
+                  body: pinnedPollQuestion,
+                  incoming: true, senderId: "bob", senderName: "Bob",
+                  poll: .init(
+                      id: pinnedPollId,
+                      question: pinnedPollQuestion,
+                      options: [.init(id: "\(pinnedPollId)-1", text: "Yes"),
+                                .init(id: "\(pinnedPollId)-2", text: "No")],
+                      anonymous: true))
+        )
+        // Filler *after* the pins, so every pin starts scrolled off the top and a tap on
+        // the banner has somewhere to travel to. Multi-pin only: the single-pin fixture is
+        // the one whose tests reach for the pinned bubble's context menu, and that needs
+        // the bubble on screen from the start.
+        if isPinnedMessages || isPinnedMessagesPinOrder {
+            for n in 34...48 {
+                let incoming = !n.isMultiple(of: 2)
+                messages.append(.init(
+                    id: conversationMessageId(UInt64(n)),
+                    body: "Message number \(n)",
+                    incoming: incoming,
+                    senderId: incoming ? "bob" : SceytChatUIKit.uiTestUserId,
+                    senderName: incoming ? "Bob" : "Me"))
+            }
+        }
+
+        SceytChatUIKit.shared.seedMessagesForUITests(
+            channelId: conversationChannelId,
+            messages: messages
+        )
+
+        if isPinnedMessagesPinOrder {
+            // Pin ids ascend poll -> text -> video, which is the reverse-ish of the timeline
+            // order (text 31, video 32, poll 33). Passing them explicitly also marks the rows
+            // `.synced`, the way a server sweep would.
+            SceytChatUIKit.shared.pinMessagesForUITests(
+                channelId: conversationChannelId,
+                messageIds: [pinnedPollMessageId, pinnedTextMessageId, pinnedVideoMessageId],
+                serverPinIds: [100, 200, 300]
+            )
+            return
+        }
+
+        let toPin = isPinnedMessagesSingle
+            ? [pinnedTextMessageId]
+            : [pinnedTextMessageId, pinnedVideoMessageId, pinnedPollMessageId]
+        // No `serverPinIds`: every row keeps `unknownServerPinId`, ties on the leading sort
+        // descriptor and falls through to the timeline tiebreakers — so these fixtures stay in
+        // seeding order, which is what the rest of the pinned tests assert against.
+        SceytChatUIKit.shared.pinMessagesForUITests(
+            channelId: conversationChannelId,
+            messageIds: toPin
+        )
     }
 
     // MARK: - Reply-to-image conversation (gated behind --uitest-reply-attachment)

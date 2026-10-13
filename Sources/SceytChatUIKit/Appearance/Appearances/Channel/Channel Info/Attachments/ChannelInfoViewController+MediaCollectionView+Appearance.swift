@@ -19,6 +19,7 @@ extension ChannelInfoViewController.MediaCollectionView: AppearanceProviding {
             trackColor: .clear,
             backgroundColor: .overlayBackground2,
             cancelIcon: .attachmentTransferPause,
+            uploadIcon: .attachmentUpload,
             downloadIcon: .attachmentDownload
         )
     )

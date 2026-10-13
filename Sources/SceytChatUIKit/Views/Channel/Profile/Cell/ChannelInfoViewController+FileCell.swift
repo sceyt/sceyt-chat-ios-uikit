@@ -189,7 +189,6 @@ extension ChannelInfoViewController {
                 ) { [weak self] progress in
                     guard let self, self.data == data
                     else {
-                        logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(attachment.description)")
                         return
                     }
                     

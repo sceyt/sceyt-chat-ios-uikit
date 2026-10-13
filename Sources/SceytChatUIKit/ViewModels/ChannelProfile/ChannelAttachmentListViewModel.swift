@@ -37,7 +37,9 @@ open class ChannelAttachmentListViewModel: NSObject {
             }
         }
     }
-    public var minAutoDownloadSize = 10_000_000
+    /// Largest file, in bytes, the list downloads on its own; 0 means no limit. Defaults to no
+    /// limit, so the Channel Info media, file and voice lists download everything like the chat.
+    public var minAutoDownloadSize = 0
 
     /// False until the first server page has reported back. While false, an empty list
     /// means "not loaded yet" rather than "nothing here", and the view keeps its empty
@@ -202,7 +204,10 @@ open class ChannelAttachmentListViewModel: NSObject {
             relationshipKeyPathsObserver: []
         ) { [weak self] in
             let attachment = $0.convert()
-            if let prevItem = self?.attachmentObserver.item(for: $0.objectID) {
+            // `reusableItem`, not `item(for:)`: a changed row is re-created while its old
+            // instance is parked as deleted, and the grid cell holds that instance — a fresh
+            // one would leave the cell on a pending attachment (id 0, no url) forever.
+            if let prevItem = self?.attachmentObserver.reusableItem(for: $0.objectID) {
                 prevItem.update(attachment: attachment)
                 if let message = $0.message?.convert() {
                     prevItem.updateMessageIfNeeded(ownerMessage: message)
@@ -554,6 +559,52 @@ public extension ChannelAttachmentListViewModelProviding {
     }
     func downloadAttachmentIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
         downloadAttachmentIfNeeded(layout, completion: nil)
+    }
+
+    /// Pauses an outgoing attachment's upload from the grid — the same
+    /// `stopTransfer` the chat thread's pause button calls, so both screens persist
+    /// and relay the same `.pauseUploading`.
+    func pauseUpload(_ layout: MessageLayoutModel.AttachmentLayout) {
+        let attachment = layout.attachment
+        resolveOwnerMessage(layout) { message in
+            guard let message else { return }
+            fileProvider.stopTransfer(message: message, attachment: attachment)
+        }
+    }
+
+    /// Resumes a paused upload. Mirrors `ChannelViewModel.resumeFileTransfer`: with no
+    /// live task (the upload was paused while still queued, or the task is gone) the
+    /// message is resent, which re-runs its attachment upload.
+    func resumeUpload(_ layout: MessageLayoutModel.AttachmentLayout) {
+        let attachment = layout.attachment
+        resolveOwnerMessage(layout) { message in
+            guard let message else { return }
+            fileProvider.resumeTransfer(message: message, attachment: attachment) { resumed in
+                guard !resumed,
+                      message.deliveryStatus == .pending,
+                      attachment.filePath != nil
+                else { return }
+                let identity = AttachmentTransfer.transferIdentity(of: attachment)
+                message.attachments?
+                    .filter { AttachmentTransfer.transferIdentity(of: $0) == identity }
+                    .forEach { $0.status = .pending }
+                attachment.status = .pending
+                Components.channelMessageSender
+                    .init(channelId: message.channelId)
+                    .resendMessage(message)
+            }
+        }
+    }
+
+    private func resolveOwnerMessage(
+        _ layout: MessageLayoutModel.AttachmentLayout,
+        completion: @escaping (ChatMessage?) -> Void
+    ) {
+        if let message = layout.ownerMessage {
+            completion(message)
+        } else {
+            ChannelMessageProvider.fetchMessage(id: layout.attachment.messageId, completion: completion)
+        }
     }
 }
 

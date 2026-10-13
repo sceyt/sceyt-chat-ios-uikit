@@ -15,6 +15,16 @@ extension MessageInputViewController {
         open private(set) var typingTimer: Timer?
         
         open var formatEvent = PassthroughSubject<FormatEvent, Never>()
+        /// Sent synchronously at the end of `paste(_:)`, before UIKit's deferred
+        /// scroll-to-caret layout pass, so the owner can grow the bar first.
+        open var pasteEvent = PassthroughSubject<Void, Never>()
+
+        /// The height the text needs at the current width. Unlike `contentSize`, this is
+        /// never stale: UITextView defers re-measuring `contentSize` while a width change
+        /// is animating, so right after one it still reports the height at the old width.
+        open var fittingHeight: CGFloat {
+            sizeThatFits(CGSize(width: bounds.width, height: .greatestFiniteMagnitude)).height
+        }
         open var typingEvent = PassthroughSubject<Bool, Never>()
 
         open func _setCGColors() {
@@ -184,6 +194,7 @@ extension MessageInputViewController {
             mAttributedText.safeReplaceCharacters(in: range, with: insertString)
             attributedText = mAttributedText
             selectedRange = .init(location: range.location + insertString.length, length: 0)
+            pasteEvent.send()
         }
         
         open func resetTypingAttributes() {

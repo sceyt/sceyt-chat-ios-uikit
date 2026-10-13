@@ -170,13 +170,28 @@ open class SCTDataSessionTaskInfo: NSObject {
         onAction?(.cancel)
     }
     
+    /// The transport has delivered the file. `AttachmentTransfer` may still be finishing
+    /// (uploading a video's poster frame, persisting), but there is nothing left to pause.
+    public var isTransferFinished: Bool {
+        switch event {
+        case .successURI, .successURL:
+            return true
+        default:
+            return false
+        }
+    }
+
     public func stop() {
+        // A pause racing the success would overwrite the `.done` just set on this same
+        // attachment, leaving a delivered file stuck paused with no task left to resume.
+        guard !isTransferFinished else { return }
         attachment.status = transferType == .upload ? .pauseUploading : .pauseDownloading
         action = .stop
         onAction?(.stop)
     }
-    
+
     public func resume() {
+        guard !isTransferFinished else { return }
         attachment.status = transferType == .upload ? .uploading : .downloading
         action = .resume
         onAction?(.resume)

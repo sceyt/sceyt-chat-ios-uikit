@@ -23,6 +23,18 @@ public enum SceytChatError: Int, Error {
     case requestTimeout = 9902
     
     case queryInProgress = 10008
+
+    /// The code the **SDK** stamps on its own "Query in progress" rejection
+    /// (`+[SCTError queryInProgress]`, domain `com.sceytchat.sdk`).
+    ///
+    /// Deliberately not a case of this enum: `queryInProgress` above is the sentinel *we*
+    /// return from our own `query.loading` guards, and the two carry different codes. Adding
+    /// 9908 as a second case would give the enum two members meaning one thing; changing
+    /// `queryInProgress` to 9908 instead would silently flip the `sceytChatCode ==
+    /// .queryInProgress` branches in `CreatePublicChannelViewModel` /
+    /// `ChannelProfileEditViewModel`, which today never match an SDK-sourced error. Use
+    /// `Error.isQueryInProgress` to test for either.
+    public static let sdkQueryInProgressCode = 9908
     
     case notConnect = 9001
     
@@ -61,7 +73,18 @@ public extension Error {
     var sceytChatCode: SceytChatError? {
         .init(rawValue: (self as NSError).code)
     }
-    
+
+    /// A load rejected only because the query it was handed is already running.
+    ///
+    /// Covers both spellings: the SDK's own rejection (code 9908) and the
+    /// `SceytChatError.queryInProgress` sentinel (10008) our providers return from their
+    /// `query.loading` guards. `sceytChatCode == .queryInProgress` catches only the latter,
+    /// which is why anything deciding whether to *surface* this has to ask here instead.
+    var isQueryInProgress: Bool {
+        let code = (self as NSError).code
+        return code == SceytChatError.queryInProgress.rawValue
+            || code == SceytChatError.sdkQueryInProgressCode
+    }
 }
 
 extension Error {

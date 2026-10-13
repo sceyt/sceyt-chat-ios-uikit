@@ -182,6 +182,9 @@ public extension MenuController {
 
 public struct MenuItem {
     public let title: String
+    /// Stable, unlocalized key for this action, used as the row's accessibility
+    /// identifier so UI tests can address it without matching display text.
+    public let accessibilityKey: String?
     public let attributedTitle: NSAttributedString?
     public let image: UIImage?
     public let imageRenderingMode: UIImage.RenderingMode
@@ -195,9 +198,11 @@ public struct MenuItem {
         destructive: Bool = false,
         imageRenderingMode: UIImage.RenderingMode = .alwaysTemplate,
         dismissOnAction: Bool = true,
+        accessibilityKey: String? = nil,
         action: @escaping (Self) -> Void
     ) {
         self.title = title
+        self.accessibilityKey = accessibilityKey
         self.attributedTitle = nil
         self.image = image
         self.destructive = destructive
@@ -212,9 +217,11 @@ public struct MenuItem {
         destructive: Bool = false,
         imageRenderingMode: UIImage.RenderingMode = .alwaysTemplate,
         dismissOnAction: Bool = true,
+        accessibilityKey: String? = nil,
         action: @escaping (Self) -> Void
     ) {
         self.title = attributedTitle.string
+        self.accessibilityKey = accessibilityKey
         self.attributedTitle = attributedTitle
         self.image = image
         self.destructive = destructive

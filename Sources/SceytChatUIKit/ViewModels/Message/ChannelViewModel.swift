@@ -9,6 +9,7 @@
 import SceytChat
 import UIKit
 import Combine
+import CoreData
 
 open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, UnreadMentionsManagerDelegate {
     public typealias ChangeItem = LazyDatabaseObserver<MessageDTO, ChatMessage>.ChangeItemPaths
@@ -38,6 +39,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     public private(set) var loadRangeProvider: LoadRangeProvider
     public private(set) var messageMarkerProvider: ChannelMessageMarkerProvider
     public private(set) lazy var channelProvider = Components.channelProvider
+        .init(channelId: channel.id)
+    public private(set) lazy var pinnedMessageProvider = Components.channelPinnedMessageProvider
         .init(channelId: channel.id)
     
     public var chatClient: ChatClient {
@@ -87,7 +90,19 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open lazy var linkMetadataProvider = LinkMetadataProvider()
     
-    open lazy var previewer = AttachmentPreviewDataSource(channel: channel)
+    private var _previewer: AttachmentPreviewDataSource?
+
+    open var previewer: AttachmentPreviewDataSource {
+        if let _previewer { return _previewer }
+        let previewer = AttachmentPreviewDataSource(channel: channel)
+        _previewer = previewer
+        return previewer
+    }
+
+    /// The previewer only when it has already been built. Refresh paths use this so a
+    /// channel where no media was ever opened does not pay for a data source, an
+    /// attachment provider and a live DB observer just to be refreshed.
+    open var loadedPreviewer: AttachmentPreviewDataSource? { _previewer }
     
     public let attachmentUploadInfo = MessageAttachmentUploadInfo.default
     open var isUnsubscribedChannel: Bool {
@@ -148,6 +163,21 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     private var lastLoadNearMessageId: MessageId = 0
     private(set) var scrollToMessageIdIfSearching: MessageId = 0
     open private(set) var scrollToRepliedMessageId: MessageId = 0
+
+    /// Identity of the navigation the list is currently trying to reach. Bumped by every
+    /// armed navigation (reply/pin jump, mention, search, jump-to-latest, and anything
+    /// that drops the targets), and captured by each of their async stages, which bail
+    /// when it has moved on. Without it a jump has no identity that survives its own
+    /// round trip: the previous landing's delayed reset wiped the next jump's target, and
+    /// a superseded load still re-anchored the window on the target the user had left.
+    private(set) var navigationGeneration: Int = 0
+    /// The parent a network near-load is currently fetching, or 0. The SDK's message
+    /// query is single-flight, so a second reply jump arriving meanwhile cannot start its
+    /// own load; it waits in `pendingReplyJumpMessageId` and runs when this one returns.
+    private var replyNearLoadInFlight: MessageId = 0
+    /// A reply jump that arrived while `replyNearLoadInFlight` was busy. Only the newest
+    /// is kept: two taps in flight can only mean the user changed their mind.
+    private var pendingReplyJumpMessageId: MessageId = 0
     private(set) var scrollToUnreadMentionMessageId: MessageId = 0
     private(set) var searchDirection: SearchDirection = .none
     private var markMessagesQueue = DispatchQueue(label: "com.sceytchat.uikit.mark_messages")
@@ -237,8 +267,12 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         startDatabaseObserver {}
         if chatClient.connectionState == .connected {
             loadLastMessages()
+            // Already connected, so no `.connected` transition will arrive to trigger this.
+            syncPinnedMessages()
         } else {
             loadLastMessagesAfterConnect = true
+            // Nothing deferred to remember: `chatClient(_:didChange:error:)` sweeps on every
+            // transition to `.connected`.
         }
         newMessageCount = channel.newMessageCount
         event = .updateChannel
@@ -265,6 +299,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         logger.verbose("ChannelViewModel deinit for channel \(channel.id)")
         channelObserver.stopObserver()
         messageObserver.stopObserver()
+        // Only if it was ever started — touching the lazy var here would otherwise build
+        // an FRC just to tear it down.
+        if didStartPinnedMessageObserver {
+            pinnedMessageObserver.stopObserver()
+        }
         NotificationCenter.default.removeObserver(self)
         //        unsubscribeToPeerPresence()
         SceytChatUIKit.shared.chatClient.removeDelegate(identifier: clientDelegateIdentifier)
@@ -298,6 +337,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         channelObserver.onDidChange = { [weak self] in
             self?.onDidChangeChannelEvent(items: $0)
         }
+
+        startPinnedMessageObserver()
         let initialMessageId: MessageId
         if scrollToRepliedMessageId != 0 {
             initialMessageId = scrollToRepliedMessageId
@@ -724,8 +765,14 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     private func resetStateAfterChangeEvent() {
+        // The delay keeps the target armed while the landing's highlight plays out.
+        // It belongs to *this* landing only: a navigation armed inside the second must
+        // not have its fresh target wiped by the previous one's timer — that left the
+        // restart's initial change event with nothing to scroll to.
+        let generation = navigationGeneration
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
                 guard let self else { return }
+                guard self.navigationGeneration == generation else { return }
                 self.scrollToRepliedMessageId = 0
                 self.scrollToUnreadMentionMessageId = 0
                 self.isRestartingMessageObserver = .none
@@ -1316,29 +1363,79 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
     }
     
+    /// Fetches the page around `id` from the server and stores it. Load only: it always
+    /// completes and never re-anchors the observer — that is `findReplayedMessage`'s
+    /// decision, taken once and only if the jump is still the one the user wants.
     open func loadNearMessagesOfRepliedMessage(
         id: MessageId,
         completion: (([Message]?, Error?) -> Void)? = nil
     ) {
-        if chatClient.connectionState == .connected {
-            provider.loadNearMessages(near: id) { [weak self] messages, error in
-                guard let self else { return }
-                if error == nil {
-                    
-                    if messages?.first(where: { $0.id == id }) == nil {
-                        return
-                    }
-                    
-                    self.messageObserver.restartToNear(at: id)
-                }
-                completion?(messages, error)
-            }
-        } else {
-            completion?(nil, SceytChatError.notConnect)
+        #if DEBUG
+        if let delayMs = SceytChatUIKit.uiTestNearLoadCompletesLocallyDelayMs,
+           chatClient.connectionState != .connected {
+            completeNearLoadLocallyForUITests(near: id, afterMs: delayMs, completion: completion)
+            return
         }
-
+        #endif
+        guard chatClient.connectionState == .connected else {
+            completion?(nil, SceytChatError.notConnect)
+            return
+        }
+        provider.loadNearMessages(near: id) { messages, error in
+            completion?(messages, error)
+        }
     }
     
+    #if DEBUG
+    /// See `SceytChatUIKit.uiTestNearLoadCompletesLocallyDelayMs`.
+    private static var uiTestNearLoadInFlight = false
+
+    private func completeNearLoadLocallyForUITests(
+        near id: MessageId,
+        afterMs delayMs: Int,
+        completion: (([Message]?, Error?) -> Void)?
+    ) {
+        guard !Self.uiTestNearLoadInFlight else {
+            completion?(nil, NSError(domain: "com.sceytchat.sdk",
+                                     code: SceytChatError.sdkQueryInProgressCode))
+            return
+        }
+        Self.uiTestNearLoadInFlight = true
+        let channelId = channel.id
+        let limit = Int(provider.queryLimit)
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(delayMs)) { [weak self] in
+            guard let self else { return }
+            self.provider.database.read { context -> [MessageId] in
+                let request = NSFetchRequest<MessageDTO>(entityName: "MessageDTO")
+                request.predicate = NSPredicate(format: "channelId == %lld", channelId)
+                request.sortDescriptors = [NSSortDescriptor(key: "id", ascending: true)]
+                let ids = try context.fetch(request).map { MessageId($0.id) }
+                guard let index = ids.firstIndex(of: id) else { return [] }
+                let lower = max(0, index - limit / 2)
+                let upper = min(ids.count, lower + limit)
+                return Array(ids[lower..<upper])
+            } completion: { [weak self] result in
+                guard let self else { return }
+                let ids = (try? result.get()) ?? []
+                let finish = {
+                    Self.uiTestNearLoadInFlight = false
+                    completion?(ids.map { Message.Builder().id($0).build() }, nil)
+                }
+                guard let start = ids.first, let end = ids.last else {
+                    finish()
+                    return
+                }
+                self.provider.database.performWriteTask {
+                    $0.updateRanges(startMessageId: start, endMessageId: end,
+                                    triggerMessage: id, channelId: channelId)
+                } completion: { _ in
+                    DispatchQueue.main.async(execute: finish)
+                }
+            }
+        }
+    }
+    #endif
+
     open func loadNearMessagesOfUnreadMention(
         id: MessageId,
         completion: ((Error?) -> Void)? = nil
@@ -1371,6 +1468,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         // restart's initial change event redirects the scroll to the unread
         // separator / replied message instead of the last message.
         resetScrollState()
+        // The deferred tail re-align below belongs to this jump-to-latest only; a reply
+        // jump armed while the tail page is loading must not be yanked to the bottom.
+        let generation = navigationGeneration
         if lastDisplayedMessageId != 0 {
             // Layout models capture the separator at creation; drop this one so it
             // is rebuilt without it, like on a fresh open of a fully read channel.
@@ -1411,6 +1511,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 }
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
+                    guard self.navigationGeneration == generation else {
+                        logger.info("[BugFix][RESET] tail re-align skipped — a newer navigation (#\(self.navigationGeneration)) is armed")
+                        return
+                    }
                     self.isRestartingMessageObserver = .reloadToLatestState
                     // messageId 0 → totalCount(default) - fetchLimit: the tail
                     // window, recounted after the page was inserted.
@@ -1442,6 +1546,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         scrollToRepliedMessageId = 0
         scrollToUnreadMentionMessageId = 0
         searchDirection = .none
+        // A deferred jump is the user's intent from before this reset; it dies with it.
+        pendingReplyJumpMessageId = 0
+        bumpNavigationGeneration(reason: "resetScrollState")
     }
     
     private func resetFetchState() {
@@ -1452,7 +1559,43 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     open func updateLastNavigatedIndexPath(indexPath: IndexPath?) {
         lastNavigatedIndexPath = indexPath
     }
-    
+
+    /// Marks every in-flight navigation stage as superseded. Returns the new generation
+    /// for the caller to capture and compare against later.
+    @discardableResult
+    private func bumpNavigationGeneration(reason: String) -> Int {
+        navigationGeneration += 1
+        return navigationGeneration
+    }
+
+    /// Arms a reply/pin jump to `messageId`. The mention target is dropped at the same
+    /// time: `needsToScrollAtIndexPath` prefers it over the replied one, and now that a
+    /// superseded delayed reset no longer wipes it, a stale mention would win the landing.
+    @discardableResult
+    private func armRepliedNavigation(_ messageId: MessageId) -> Int {
+        scrollToUnreadMentionMessageId = 0
+        scrollToRepliedMessageId = messageId
+        return bumpNavigationGeneration(reason: "reply → \(messageId)")
+    }
+
+    /// Starts the reply jump that was parked behind the single-flight near-load, if any.
+    private func drainPendingReplyJumpIfNeeded() {
+        guard pendingReplyJumpMessageId != 0 else { return }
+        let next = pendingReplyJumpMessageId
+        pendingReplyJumpMessageId = 0
+        findReplayedMessage(messageId: next)
+    }
+
+    /// Drops a reply jump that is still loading, so it can never land after the user
+    /// has moved on — the view controller calls this on its paths that scroll the list
+    /// without going through a navigation here (the cached return to a reply, and a
+    /// jump to the tail that needs no restart). Search and mention state is left alone.
+    open func cancelPendingReplyNavigation() {
+        scrollToRepliedMessageId = 0
+        pendingReplyJumpMessageId = 0
+        bumpNavigationGeneration(reason: "cancel")
+    }
+
     //MARK: mark messages
     
     
@@ -1632,6 +1775,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         scrollToRepliedMessageId = 0
         scrollToMessageIdIfSearching = 0
+        pendingReplyJumpMessageId = 0
+        bumpNavigationGeneration(reason: "send")
         if let lastCacheItem = messageObserver.lastItem,
             let lastMessageItem = channel.lastMessage,
             lastCacheItem.id != lastMessageItem.id {
@@ -1729,6 +1874,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         scrollToRepliedMessageId = 0
         scrollToMessageIdIfSearching = 0
+        pendingReplyJumpMessageId = 0
+        bumpNavigationGeneration(reason: "send")
 
         // Ensure observer is up to date
         if let lastCacheItem = messageObserver.lastItem,
@@ -1961,6 +2108,147 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
     }
     
+    // MARK: Pinned messages
+
+    /// The channel's live pins, in pin order (oldest pin first).
+    public private(set) var pinnedMessages: [PinnedMessage] = []
+
+    /// Feeds the pinned banner and the pinned list.
+    ///
+    /// A plain `DatabaseObserver`, not a lazy one: the set is small and fully materialized.
+    /// It needs no `relationshipKeyPathsForRefreshing` — `PinnedMessageDTO` holds no
+    /// relationships, and its preview snapshot is refreshed from the write side by
+    /// `NSManagedObjectContext.syncPin(for:)`. See `PinnedMessageDTO`.
+    public private(set) lazy var pinnedMessageObserver: DatabaseObserver<PinnedMessageDTO, PinnedMessage> = {
+        DatabaseObserver<PinnedMessageDTO, PinnedMessage>(
+            request: PinnedMessageDTO.fetchRequest(channelId: channel.id),
+            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext
+        ) { $0.convert() }
+    }()
+
+    private var didStartPinnedMessageObserver = false
+
+    open func startPinnedMessageObserver() {
+        // Pinning off: no observer, so `pinnedMessages` stays empty and the banner has nothing
+        // to show even for pins an earlier run of the app left on disk.
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
+        didStartPinnedMessageObserver = true
+        pinnedMessageObserver.onDidChange = { [weak self] _ in
+            self?.reloadPinnedMessages()
+        }
+        try? pinnedMessageObserver.startObserver()
+        reloadPinnedMessages()
+    }
+
+    open func reloadPinnedMessages() {
+        // `items` is dictionary-backed and unordered; the banner's paging depends on the
+        // request's pin-id sort, so read the ordered view.
+        let items = pinnedMessageObserver.orderedItems.filter { !$0.isExpired }
+        pinnedMessages = items
+        event = .updatePinnedMessages(items)
+    }
+
+    /// Reconciles this channel's pins against the server, the way `syncChannels` reconciles the
+    /// channel list.
+    ///
+    /// Nothing here feeds the UI directly: the observer above has already started, so the banner
+    /// is showing whatever was on disk the moment the screen opened, and this sweep only writes
+    /// to the database. Pages land progressively and the reconcile drops what the server no
+    /// longer reports; the observer repaints either way.
+    ///
+    /// `open` so a host that manages pin state itself can suppress it.
+    open func syncPinnedMessages() {
+        // `SyncService.syncChannelPins` refuses too — this is the early exit for the two call
+        // sites here (channel open, and every reconnection) so a disabled feature logs nothing.
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
+        SyncService.syncChannelPins(channelId: channel.id)
+    }
+
+    /// Pins a message for this channel.
+    ///
+    /// - Parameter pinnedUntil: when the pin lapses; `nil` is open-ended.
+    ///
+    /// Stores the pin as an intent, then sends it — `ChannelPinnedMessageProvider` owns both
+    /// halves, which is why this call site did not have to move when pinning stopped being
+    /// local-only.
+    ///
+    /// An error here is not a failure to pin: the intent is on disk and the next sync sends it.
+    /// The "X pinned" system message is **not** posted from here — it is posted from the server's
+    /// ack, which for a pin taken offline is minutes later. See
+    /// `ChannelPinnedMessageProvider.confirm`.
+    open func pinMessage(
+        layoutModel: MessageLayoutModel,
+        scope: PinnedMessage.Scope,
+        pinnedUntil: Date? = nil
+    ) {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else {
+            logger.warn("Pin message ignored: config.isMessagePinningEnabled is false")
+            return
+        }
+        pinnedMessageProvider.pin(
+            message: layoutModel.message,
+            scope: scope,
+            pinnedUntil: pinnedUntil
+        ) { error in
+            logger.errorIfNotNil(error, "Pin message")
+        }
+    }
+
+    open func unpinMessage(layoutModel: MessageLayoutModel) {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else {
+            logger.warn("Unpin message ignored: config.isMessagePinningEnabled is false")
+            return
+        }
+        pinnedMessageProvider.unpin(message: layoutModel.message) { error in
+            logger.errorIfNotNil(error, "Unpin message")
+        }
+    }
+
+    /// A message can be pinned when it exists on this channel, is not ephemeral, and has
+    /// reached the server.
+    ///
+    /// The ephemeral half mirrors the guard in `NSManagedObjectContext.pinMessage`, so the
+    /// menu never offers an action the store will refuse. The delivery-status half is a UI
+    /// rule: a pending or failed message has no server id yet, so a pin taken on it would
+    /// be invisible to the other members and would not survive the resend (which allocates
+    /// a new message id). `model.messageDeliveryStatus` is checked alongside
+    /// `message.deliveryStatus` because attachment uploads move the cell's status ahead of
+    /// the stored one — the same pairing `canShare(model:)` uses.
+    ///
+    /// Override to apply your own rule — e.g. to restrict pinning to channel admins:
+    ///
+    /// ```swift
+    /// override func canPin(model: MessageLayoutModel) -> Bool {
+    ///     super.canPin(model: model) && model.channel.userRole == "admin"
+    /// }
+    /// ```
+    open func canPin(model: MessageLayoutModel) -> Bool {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return false }
+        let message = model.message
+        guard message.state != .deleted,
+              !message.transient,
+              !message.viewOnce,
+              message.autoDeleteAt == nil,
+              !Self.unpinnableDeliveryStatuses.contains(message.deliveryStatus),
+              !Self.unpinnableDeliveryStatuses.contains(model.messageDeliveryStatus)
+        else { return false }
+        return true
+    }
+
+    /// Delivery statuses that block pinning: the message is not on the server, so a pin on
+    /// it has nothing to point at for the other members.
+    open class var unpinnableDeliveryStatuses: Set<ChatMessage.DeliveryStatus> {
+        [.pending, .failed]
+    }
+
+    /// An existing pin can always be lifted, whatever `canPin(model:)` says about taking a
+    /// new one — otherwise a pin could be stranded on a message that later stops meeting the
+    /// pinning conditions.
+    open func canUnpin(model: MessageLayoutModel) -> Bool {
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return false }
+        return model.message.isPinned && model.message.state != .deleted
+    }
+
     open func deleteSelectedMessages(type: DeleteMessageType) {
         selectedMessages.forEach {
             deleteMessage(layoutModel: $0, type: type)
@@ -2486,6 +2774,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         channelProvider.fetchDraft(completion: completion)
     }
 
+    /// The draft, read inline. See `ChannelProvider.fetchDraft()`.
+    open func loadDraft() -> DraftMessage? {
+        channelProvider.fetchDraft()
+    }
+
     /// The reply/edit target as the input bar's own state, ready to persist.
     open var draftTarget: DraftMessage.Target? {
         guard let (message, action) = selectedMessageForAction else { return nil }
@@ -2729,6 +3022,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             scrollToMessageIdIfSearching = messageId
             searchDirection = .prev
             isSearchResultsLoading = true
+            bumpNavigationGeneration(reason: "search prev → \(messageId)")
             messageObserver.restartToNear(at: messageId) {[weak self] isDone in
                 guard let self else { return }
                 self.isSearchResultsLoading = false
@@ -2770,6 +3064,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             scrollToMessageIdIfSearching = messageId
             searchDirection = .next
             isSearchResultsLoading = true
+            bumpNavigationGeneration(reason: "search next → \(messageId)")
             messageObserver.restartToNear(at: messageId) {[weak self] isDone in
                 guard let self else { return }
                 self.isSearchResultsLoading = false
@@ -2812,8 +3107,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     
     open func findReplayedMessage(messageId: MessageId) {
         guard messageId != 0 else { return }
-        scrollToRepliedMessageId = messageId
         if let (index, indexPath) = cachePosition(messageId: messageId) {
+            // Arming bumps the generation even here, so an older jump still loading
+            // over the network cannot land after this synchronous scroll.
+            armRepliedNavigation(messageId)
             scroll(to: indexPath, messageId: messageId)
             scrollToRepliedMessageId = 0
             updateLastNavigatedIndexPath(indexPath: indexPath)
@@ -2822,36 +3119,59 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
             return
         }
-        
-        messageObserver
-            .loadRangeProvider
-            .fetchLoadRanges(
-                channelId: channel.id,
-                messageId: messageId)
-        {[weak self] ranges in
+        if replyNearLoadInFlight == messageId, scrollToRepliedMessageId == messageId {
+            // The same target, tapped again while its load is in flight: it will land.
+            return
+        }
+        if replyNearLoadInFlight != 0 {
+            // The SDK's message query is single-flight: a second load now would be
+            // rejected as "query in progress", and a jump that neither loads nor bails
+            // strands the user. Park it — latest wins — and arm its target so the load in
+            // flight knows it has been superseded and lands nothing.
+            armRepliedNavigation(messageId)
+            pendingReplyJumpMessageId = messageId
+            return
+        }
+        let token = armRepliedNavigation(messageId)
+        replyNearLoadInFlight = messageId
+        // The jump is user-initiated (a tap on the quoted bubble), so every way it can
+        // fail has to reach the user — a load error left unreported is a tap that
+        // visibly does nothing.
+        loadNearMessagesOfRepliedMessage(id: messageId) { [weak self] messages, error in
             guard let self else { return }
-            // The jump is user-initiated (a tap on the quoted bubble), so every way it
-            // can fail has to reach the user — a load error left unreported is a tap
-            // that visibly does nothing.
-            self.loadNearMessagesOfRepliedMessage(id: messageId) { [weak self] messages, error in
-                guard let self else { return }
-                if let error {
-                    self.handleRepliedMessageNavigationFailure(messageId: messageId, error: error)
-                    return
-                }
-                guard messages?.first(where: { $0.id == messageId }) != nil else {
-                    // The backend answered, but the parent is not in the window it
-                    // returned — deleted, or no longer visible to this user. There is
-                    // no error object to show; just release the pending navigation so
-                    // the next tap is not blocked by stale state.
-                    logger.error("[ReplyNavigation] parent message \(messageId) not found in the loaded range")
-                    self.clearPendingRepliedMessageNavigation(messageId: messageId)
-                    return
-                }
-                if !ranges.isEmpty {
-                    self.messageObserver.restartToNear(at: messageId)
-                }
+            self.replyNearLoadInFlight = 0
+            // Whatever happened to this jump, the one parked behind it gets its turn.
+            defer { self.drainPendingReplyJumpIfNeeded() }
+            // Superseded while loading: a newer navigation owns the list now.
+            guard token == self.navigationGeneration else { return }
+            if let error {
+                self.handleRepliedMessageNavigationFailure(messageId: messageId, error: error)
+                return
             }
+            guard messages?.first(where: { $0.id == messageId }) != nil else {
+                // The backend answered, but the parent is not in the window it
+                // returned — deleted, or no longer visible to this user. There is
+                // no error object to show; just release the pending navigation so
+                // the next tap is not blocked by stale state.
+                self.clearPendingRepliedMessageNavigation(messageId: messageId)
+                return
+            }
+            // The one re-anchor of this jump. `shouldProceed` is asked again after the
+            // observer's own async range lookup, closing the gap between this check
+            // and the restart itself.
+            self.messageObserver.restartToNear(
+                at: messageId,
+                done: { [weak self] isDone in
+                    guard let self, token == self.navigationGeneration else { return }
+                    if !isDone {
+                        self.clearPendingRepliedMessageNavigation(messageId: messageId)
+                    }
+                },
+                shouldProceed: { [weak self] in
+                    guard let self else { return false }
+                    return token == self.navigationGeneration
+                }
+            )
         }
     }
 
@@ -2860,8 +3180,16 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     /// after a failure both blocks link-preview updates and makes the next unrelated
     /// change event scroll to a message the user never reached.
     open func handleRepliedMessageNavigationFailure(messageId: MessageId, error: Error) {
-        logger.errorIfNotNil(error, "[ReplyNavigation] load near messages of replied message \(messageId)")
         clearPendingRepliedMessageNavigation(messageId: messageId)
+        // A jump the user superseded by tapping again is not a failure to report. Every
+        // message load shares one `MessageListQuery`, so a second tap arriving while the
+        // first load is still in flight is rejected purely for being second — the user did
+        // nothing wrong, and an alert for it is noise on top of a jump that was already
+        // being replaced. Releasing the pending navigation above is the whole remedy.
+        guard !error.isQueryInProgress else {
+            return
+        }
+        logger.errorIfNotNil(error, "[ReplyNavigation] load near messages of replied message \(messageId)")
         event = .showError(error)
     }
 
@@ -2873,7 +3201,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     /// Finds and navigates to an unread mention message, loading it if necessary
     open func findUnreadMentionMessage(messageId: MessageId) {
         guard messageId != 0 else { return }
+        // Same identity rules as a reply jump: this navigation supersedes any other.
+        scrollToRepliedMessageId = 0
+        pendingReplyJumpMessageId = 0
         scrollToUnreadMentionMessageId = messageId
+        let token = bumpNavigationGeneration(reason: "mention → \(messageId)")
         if let (index, indexPath) = cachePosition(messageId: messageId) {
             scroll(to: indexPath, messageId: messageId)
             updateLastNavigatedIndexPath(indexPath: indexPath)
@@ -2891,14 +3223,21 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 channelId: channel.id,
                 messageId: messageId)
         {[weak self] ranges in
-            guard let self else { return }
+            guard let self, token == self.navigationGeneration else { return }
             if !ranges.isEmpty {
-                self.messageObserver.restartToNear(at: messageId) {[weak self] isDone in
-                    guard let self else { return }
-                    if !isDone {
-                        self.loadNearMessagesOfUnreadMention(id: messageId)
+                self.messageObserver.restartToNear(
+                    at: messageId,
+                    done: { [weak self] isDone in
+                        guard let self, token == self.navigationGeneration else { return }
+                        if !isDone {
+                            self.loadNearMessagesOfUnreadMention(id: messageId)
+                        }
+                    },
+                    shouldProceed: { [weak self] in
+                        guard let self else { return false }
+                        return token == self.navigationGeneration
                     }
-                }
+                )
             } else {
                 self.loadNearMessagesOfUnreadMention(id: messageId)
             }
@@ -3213,6 +3552,11 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 loadLastMessages()
                 loadLastMessagesAfterConnect = false
             }
+            // Every (re)connection, not just the first: pin and unpin events that landed while
+            // this device was offline were dropped, and a sweep is the only way to learn about
+            // them. Same reason `syncChannels` runs on connect. The per-channel guard in
+            // `SyncService` collapses this when a sweep is already in flight.
+            syncPinnedMessages()
             // A sync usually follows (re)connection after a DB wipe; resolve a stale local
             // direct placeholder to the real synced channel as soon as it lands in the DB.
             reconcileDirectChannelAfterSyncIfNeeded()
@@ -3495,6 +3839,8 @@ public extension ChannelViewModel {
         case pumpPrevPagination
         case providerFinishedPrevPagination(beforeMessageId: MessageId)
         case showError(Error)
+        /// The channel's live pins changed — membership, order, or a preview snapshot.
+        case updatePinnedMessages([PinnedMessage])
     }
 }
 

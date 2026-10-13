@@ -86,6 +86,23 @@ open class CircularProgressView: View {
             progressLayer.add(animation, forKey: "animateprogress")
         }
     }
+
+    /// Applies a value without the stroke-fill animation.
+    ///
+    /// Assigning `progress` always animates from whatever it held before, which is right
+    /// while the ring is on screen and wrong while it is not: nothing resets the stored
+    /// value when the ring is hidden, so seeding a new transfer plays the previous one
+    /// rewinding from 100% over the first frames after the ring is shown again.
+    open func setProgressWithoutAnimation(_ newValue: CGFloat) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let duration = animationDuration
+        animationDuration = 0
+        progress = newValue
+        animationDuration = duration
+        progressLayer.removeAnimation(forKey: "animateprogress")
+        CATransaction.commit()
+    }
     
     open func createRotateZAnimation() {
         func perform() {
@@ -93,6 +110,17 @@ open class CircularProgressView: View {
             
             let animation = CABasicAnimation(keyPath: "transform.rotation.z")
             animation.duration = rotationDuration
+            // Phase-locked to the media clock rather than to the moment of installation.
+            // The spin is re-installed whenever the ring's view is rebuilt (a cell reload,
+            // the attachment stack recreating its views) or its animations are cleared, and
+            // counting from install time made each of those snap the arc back to 12 o'clock
+            // mid-transfer. With the offset, a re-installed spin lands on the angle the
+            // previous one would have reached.
+            if rotationDuration > 0 {
+                animation.timeOffset = CACurrentMediaTime()
+                    .truncatingRemainder(dividingBy: rotationDuration)
+            }
+            animation.fromValue = 0
             animation.toValue = CGFloat.pi * 2
             animation.isCumulative = true
             animation.repeatCount = .infinity

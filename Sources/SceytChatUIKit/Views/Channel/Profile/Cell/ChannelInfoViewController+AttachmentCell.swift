@@ -30,6 +30,8 @@ extension ChannelInfoViewController {
         /// no newer show/reuse happened while the animation was in flight — a stale
         /// completion from a previous binding must not hide the next binding's ring.
         private var overlayGeneration = 0
+        /// True while `hideProgressView`'s shrink-out is running.
+        private var isHidingProgressView = false
 
         open var overlayLoaderAppearance = CircularProgressView.Appearance(
             reference: CircularProgressView.appearance,
@@ -37,6 +39,7 @@ extension ChannelInfoViewController {
             trackColor: .clear,
             backgroundColor: .overlayBackground2,
             cancelIcon: .attachmentTransferPause,
+            uploadIcon: .attachmentUpload,
             downloadIcon: .attachmentDownload
         ) {
             didSet { setupProgressAppearance() }
@@ -47,6 +50,13 @@ extension ChannelInfoViewController {
         open var data: MessageLayoutModel.AttachmentLayout!
 
         open var previewer: (() -> (any PreviewDataSource)?)?
+
+        /// The attachment the image view's tap-to-preview recognizer was last set up with.
+        /// The recognizer keeps that snapshot until the next bind, so when the layout's
+        /// attachment changes identity (a pending upload gets its server id and url) the
+        /// grid must rebind — the previewer can't match the stale snapshot and would open
+        /// a different item.
+        open var previewAttachment: ChatMessage.Attachment?
 
         override open func setup() {
             super.setup()
@@ -166,8 +176,15 @@ extension ChannelInfoViewController {
             switch status {
             case .pending:
                 break
-            case .downloading:
+            case .downloading, .uploading:
                 pauseButton.setImage(overlayLoaderAppearance.cancelIcon, for: .normal)
+            case .pauseUploading:
+                // A paused upload keeps its task (and its last cached percent) alive so
+                // it can resume — the ring must stop and offer "tap to upload" instead
+                // of spinning on as if bytes were still going out.
+                setProgress(0.0001)
+                progressView.isHiddenProgress = true
+                pauseButton.setImage(overlayLoaderAppearance.uploadIcon ?? .attachmentUpload, for: .normal)
             case .pauseDownloading, .failedDownloading:
                 setProgress(0.0001)
                 progressView.isHiddenProgress = true
@@ -203,15 +220,29 @@ extension ChannelInfoViewController {
         }
 
         open func showProgressView() {
-            overlayGeneration &+= 1
+            cancelHideAnimation()
             progressView.isHidden = false
             pauseButton.isHidden = false
         }
 
+        /// Invalidates any running shrink-out and puts the overlay back at full size. The
+        /// in-flight animation has to be removed, not just overridden — see
+        /// `resetTransformCancellingAnimations`; otherwise a ring shown (or a cell reused)
+        /// mid-shrink draws its background disc oversized and shrinks it back.
+        private func cancelHideAnimation() {
+            overlayGeneration &+= 1
+            isHidingProgressView = false
+            progressView.resetTransformCancellingAnimations()
+            pauseButton.resetTransformCancellingAnimations()
+        }
+
         open func hideProgressView() {
-            guard !progressView.isHidden else { return }
+            // One shrink at a time: a second one has nothing left to animate, so its
+            // completion fired at once and reset the transform under the first.
+            guard !progressView.isHidden, !isHidingProgressView else { return }
             overlayGeneration &+= 1
             let generation = overlayGeneration
+            isHidingProgressView = true
             UIView.animate(withDuration: progressView.animationDuration + 0.1) { [weak self] in
                 self?.progressView.transform = .init(scaleX: 0.01, y: 0.01)
                 self?.pauseButton.transform = .init(scaleX: 0.01, y: 0.01)
@@ -219,12 +250,10 @@ extension ChannelInfoViewController {
                 guard let self else { return }
                 guard generation == self.overlayGeneration else {
                     // The ring was shown again (or the cell rebound) while this hide
-                    // was animating — the hide no longer applies. Undo the shrink and
-                    // leave the current binding's state alone.
-                    self.progressView.transform = .identity
-                    self.pauseButton.transform = .identity
+                    // was animating; `cancelHideAnimation` already restored it.
                     return
                 }
+                self.isHidingProgressView = false
                 self.progressView.isHidden = true
                 self.pauseButton.isHidden = true
                 self.progressView.transform = .identity
@@ -275,8 +304,8 @@ extension ChannelInfoViewController {
             super.prepareForReuse()
             // Invalidate any in-flight hide animation of the previous binding so its
             // completion can't hide the next binding's overlay (or load the wrong
-            // thumbnail).
-            overlayGeneration &+= 1
+            // thumbnail), and drop its shrink so the next binding starts at full size.
+            cancelHideAnimation()
             if let message = data?.ownerMessage, let attachment = data?.attachment {
                 fileProvider.removeProgressObserver(
                     message: message,

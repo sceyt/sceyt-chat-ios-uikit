@@ -9,6 +9,34 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
     public private(set) var loadRangeProvider: LoadRangeProvider
     
     public let channelId: ChannelId
+
+    /// Related-object changes that must reconfigure a message cell.
+    ///
+    /// `RelationshipKeyPathsObserver` resolves exactly **one** hop — it splits on `.` and
+    /// walks the relationship's inverse — so every entry here has to be
+    /// `MessageDTO.<toOneOrToMany>.<field>` with an inverse defined. A deeper path (a
+    /// reply's `parent.attachments.filePath`, say) silently does nothing; those cases need
+    /// an in-view backstop instead.
+    ///
+    /// Named rather than inlined so it can be asserted on in tests: forgetting to list a
+    /// field here fails silently at runtime, with the cell simply never updating.
+    public static let relationshipKeyPaths: [String] = [
+        #keyPath(MessageDTO.attachments.status),
+        #keyPath(MessageDTO.attachments.filePath),
+        #keyPath(MessageDTO.user.avatarUrl),
+        #keyPath(MessageDTO.user.firstName),
+        #keyPath(MessageDTO.user.lastName),
+        #keyPath(MessageDTO.parent.state),
+        #keyPath(MessageDTO.bodyAttributes),
+        #keyPath(MessageDTO.linkMetadatas),
+        // Without these the bubble never repaints on pin/unpin.
+        #keyPath(MessageDTO.pinDetails.isPinned),
+        #keyPath(MessageDTO.pinDetails.pinnedUntil),
+        #keyPath(MessageDTO.poll.votesPerOption),
+        #keyPath(MessageDTO.poll.votes),
+        #keyPath(MessageDTO.poll.ownVotes),
+        #keyPath(MessageDTO.poll.closed)
+    ]
     
     public init(
         channelId: ChannelId,
@@ -33,20 +61,7 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             ],
             sectionNameKeyPath: #keyPath(MessageDTO.daySectionIdentifier),
             fetchPredicate: defaultFetchPredicate,
-            relationshipKeyPathsObserver: [
-                #keyPath(MessageDTO.attachments.status),
-                #keyPath(MessageDTO.attachments.filePath),
-                #keyPath(MessageDTO.user.avatarUrl),
-                #keyPath(MessageDTO.user.firstName),
-                #keyPath(MessageDTO.user.lastName),
-                #keyPath(MessageDTO.parent.state),
-                #keyPath(MessageDTO.bodyAttributes),
-                #keyPath(MessageDTO.linkMetadatas),
-                #keyPath(MessageDTO.poll.votesPerOption),
-                #keyPath(MessageDTO.poll.votes),
-                #keyPath(MessageDTO.poll.ownVotes),
-                #keyPath(MessageDTO.poll.closed)
-            ],
+            relationshipKeyPathsObserver: Self.relationshipKeyPaths,
             itemCreator: itemCreator
         )
     }
@@ -186,12 +201,23 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         loadPrev(done: done)
     }
     
+    /// Re-anchors the window around `messageId`.
+    ///
+    /// `done(true)` means a restart is on its way — started now or queued behind the one
+    /// in flight (see `LazyDatabaseObserver.restartObserver`); `done(false)` means none
+    /// will happen: the observer is stopped, no range covers the message, or
+    /// `shouldProceed` said no. `shouldProceed` is asked right before the restart, after
+    /// the asynchronous range lookup: a caller whose intent may have been superseded in
+    /// the meantime (a newer jump) answers `false` there instead of re-anchoring the list
+    /// onto a target the user has already left behind.
     open func restartToNear(
         at messageId: MessageId,
         done: ((Bool) -> Void)? = nil,
-        completion: (() -> Void)? = nil
+        completion: (() -> Void)? = nil,
+        shouldProceed: (() -> Bool)? = nil
     ) {
-        guard isObserverStarted else {
+        // A restart in flight is not a reason to refuse: the request queues behind it.
+        guard isObserverStarted || isObserverRestarting else {
             done?(false)
             return
         }
@@ -201,6 +227,10 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
                 triggeredMessageId: messageId
             ) { [weak self] range in
                 guard let self, let range else {
+                    done?(false)
+                    return
+                }
+                if let shouldProceed, !shouldProceed() {
                     done?(false)
                     return
                 }

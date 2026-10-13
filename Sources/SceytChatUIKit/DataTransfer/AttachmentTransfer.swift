@@ -33,6 +33,9 @@ open class AttachmentTransfer: DataProvider {
     @Atomic private var progressCache = ProgressCache()
     @Atomic private var taskGroups = [Int64: [SCTDataSessionTaskInfo]]()
     @Atomic private var inFlightVideoThumbOrigins = Set<String>()
+    /// Transfer keys already reported as having no progress observer, so the warning is
+    /// emitted once per transfer instead of once per byte-chunk.
+    @Atomic private var unobservedProgressKeys = Set<String>()
     
     /// Progress reported for an upload the moment its task is created, before any
     /// byte-level callback exists. Small enough to read as "just started" (the UI shows
@@ -40,6 +43,13 @@ open class AttachmentTransfer: DataProvider {
     /// — `onProgress` ignores non-positive values and the attachment views hide the ring
     /// at 0.
     public static var initialUploadProgress: Double = 0.001
+
+    /// Whether the client currently has no connection to the server. An upload failure
+    /// raised in this state says nothing about the file or the server — only that there is
+    /// nothing to send over — so it is treated as "wait", not as "failed".
+    open class var isOffline: Bool {
+        SceytChatUIKit.shared.chatClient.connectionState != .connected
+    }
 
     public private(set) var uploadStopedOperations = [AsyncOperationBlock]()
     public var allTasks: [SCTDataSessionTaskInfo] {
@@ -97,6 +107,52 @@ open class AttachmentTransfer: DataProvider {
     static let healableDownloadStatuses: Set<ChatMessage.Attachment.TransferStatus> = [
         .pending, .downloading, .pauseDownloading, .failedDownloading
     ]
+
+    /// Image files already found readable, so a cell bind does not reread a header it has read.
+    nonisolated(unsafe) private static let readableImageFiles = NSCache<NSString, NSNumber>()
+
+    /// Paths already removed once this session. A file that is still unreadable after its
+    /// re-download is a real file ImageIO cannot decode, not a leftover, and removing it again
+    /// would download it on every cell bind.
+    nonisolated(unsafe) private static let discardedImageFiles = NSCache<NSString, NSNumber>()
+
+    /// Whether the local file of an image attachment can stand in for its download.
+    ///
+    /// A failed download can leave something other than the image at the destination — S3
+    /// writes its error body there on a 404. Read as "the file is on disk", that marked the
+    /// attachment `.done` with bytes nothing can show, and it was never downloaded again. Such a
+    /// file is removed so the attachment counts as not downloaded.
+    ///
+    /// Only finished, received images are judged: a live transfer still owns its file, and an
+    /// unsent attachment's file is the user's source, which is never deleted.
+    func keepsLocalFile(
+        _ path: String,
+        of attachment: ChatMessage.Attachment,
+        message: ChatMessage
+    ) -> Bool {
+        guard attachment.type == "image",
+              !attachment.isPendingUpload,
+              taskFor(message: message, attachment: attachment) == nil
+        else { return true }
+        if Self.readableImageFiles.object(forKey: path as NSString) != nil {
+            return true
+        }
+        guard SCTSession.isCompleteImageFile(at: path) else {
+            guard Self.discardedImageFiles.object(forKey: path as NSString) == nil else {
+                logger.error("[Attachment] keeping \(path): still not a readable image after a re-download \(attachment.description)")
+                return true
+            }
+            Self.discardedImageFiles.setObject(true, forKey: path as NSString)
+            logger.error("[Attachment] removing \(path): not a readable image, so the download is not done \(attachment.description)")
+            try? FileManager.default.removeItem(atPath: path)
+            if attachment.filePath == path {
+                attachment.filePath = nil
+            }
+            return false
+        }
+        Self.readableImageFiles.setObject(true, forKey: path as NSString)
+        return true
+    }
 
     private static func key(message: ChatMessage, attachment: ChatMessage.Attachment) -> String {
         "\(message.id).\(message.tid).\(transferIdentity(of: attachment))"
@@ -277,8 +333,16 @@ open class AttachmentTransfer: DataProvider {
         var reconciled = [ChatMessage.Attachment]()
         for att in attachments where att.type != "link" {
             let resolvedLocalFilePath = dataSession(for: message)?.getFilePath(attachment: att)
-            if let filePath = resolvedLocalFilePath, !filePath.isEmpty {
+            if let filePath = resolvedLocalFilePath, !filePath.isEmpty,
+               keepsLocalFile(filePath, of: att, message: message) {
                 guard Self.healableDownloadStatuses.contains(att.status),
+                      // `.pending` is shared by both directions and this rule reads a local
+                      // file as proof the transfer finished — true for a download, false for
+                      // an upload whose source file is exactly what has not been sent yet.
+                      // Without this an outgoing attachment waiting to upload is marked
+                      // `.done` the first time its cell is displayed, which takes the loader
+                      // off screen and makes an unsent photo look delivered.
+                      !att.isPendingUpload,
                       taskFor(message: message, attachment: att) == nil
                 else { continue }
                 logger.verbose("[Attachment] reconciling stale \(att.status) to .done, file is on disk \(att.description)")
@@ -415,6 +479,12 @@ open class AttachmentTransfer: DataProvider {
                     attachment.status = .pauseDownloading
                 case .uploading:
                     attachment.status = .pauseUploading
+                case .pending where attachment.isPendingUpload:
+                    // A queued upload: no task yet (waiting on the upload queue, or waiting
+                    // for a connection after an offline attempt). The pause still has to
+                    // stick — `SyncService` skips resending a message whose attachments are
+                    // paused, which is what keeps it from going out on the next connect.
+                    attachment.status = .pauseUploading
                 default:
                     completion?(false)
                     return
@@ -426,7 +496,14 @@ open class AttachmentTransfer: DataProvider {
                 completion?(true)
                 return
             }
-            
+            // The bytes already landed and the task is only finishing (video poster upload,
+            // persisting). Pausing now would persist and relay `.pauseUploading` over the
+            // `.done` that is about to be written — the upload icon over a sent file.
+            guard !task.isTransferFinished else {
+                completion?(false)
+                return
+            }
+
             // Matched by transfer identity, not `id`: every attachment of an incoming
             // message has `id == 0` until the server assigns one, so `$0.id == attachment.id`
             // returned whichever attachment came first — pausing the third video paused
@@ -463,6 +540,12 @@ open class AttachmentTransfer: DataProvider {
                 guard let task = self.taskFor(message: message, attachment: attachment)
                 else {
                     completion?(false)
+                    return
+                }
+                // Already delivered and finishing: nothing to resume, but it is not stalled
+                // either — reporting `false` would make callers resend the message.
+                guard !task.isTransferFinished else {
+                    completion?(true)
                     return
                 }
                 // See `stopTransfer`: `id` is not a usable match for an in-flight transfer.
@@ -661,17 +744,16 @@ open class AttachmentTransfer: DataProvider {
                 attachment: taskInfo.attachment,
                 progress: progress
             )
-            logger.verbose("[Attachment] onProgress KEY \(key)")
             if let blocks = self.cache[key], !blocks.isEmpty {
                 blocks.forEach {
                     $0.progress?(attachmentProgress)
                 }
-            } else {
+            } else if self.unobservedProgressKeys.insert(key).inserted {
                 // The transfer is running but nothing is listening on this key. Either
                 // no view is on screen for it, or the emitter and the subscriber
                 // disagree on the attachment's identity — the latter shows up as a ring
                 // frozen at its bind-time floor until the download completes.
-                logger.warn("[Attachment] onProgress has no observers for KEY \(key) — progress \(progress) will not be rendered \(taskInfo.attachment.description)")
+                logger.warn("[Attachment] onProgress has no observers for KEY \(key) — progress will not be rendered \(taskInfo.attachment.description)")
             }
             self.progressCache[key] = progress
         }
@@ -774,7 +856,14 @@ open class AttachmentTransfer: DataProvider {
                                 }
                             case .upload:
                                 if atch.status != .pauseUploading {
-                                    atch.status = .failedUploading
+                                    // Being offline is not a refusal. The upload is a plain
+                                    // REST request, so it fails the instant there is no
+                                    // network — and `.failedUploading` swaps the loader for a
+                                    // retry arrow on a message the app resends by itself on
+                                    // the next connect (`SyncService.resendPendingMessage`).
+                                    // Park it back in the queue instead, so the bubble keeps
+                                    // showing that the file is still on its way out.
+                                    atch.status = Self.isOffline ? .pending : .failedUploading
                                 }
                             }
                             onCompletion(taskInfo: taskInfo, attachment: atch, error: error)
@@ -816,6 +905,7 @@ open class AttachmentTransfer: DataProvider {
             // reads a stale `.downloading` status can't restore a progress ring that
             // nothing would ever hide.
             self.progressCache[key] = nil
+            self.unobservedProgressKeys.remove(key)
             var storedMessage: ChatMessage?
             self.database.write(resultQueue: .global()) {
                 storedMessage = $0.update(chatMessage: message, attachments: attachments)?.convert()
@@ -823,6 +913,11 @@ open class AttachmentTransfer: DataProvider {
                     $0.updateChecksum(data: attachment.url!, messageTid: message.tid, attachmentTid: attachment.tid)
                 }
             } completion: { _ in
+                // Last word on a successful transfer: a pause that slipped in just before
+                // the success relays `.pauseUploading` after `finishSuccess` relayed `.done`.
+                if error == nil, taskInfo.attachment.status == .done {
+                    AttachmentTransferStatusRelay.default.post(taskInfo.attachment, status: .done)
+                }
                 completion?(storedMessage ?? message, error)
                 switch taskInfo.transferType {
                 case .upload:

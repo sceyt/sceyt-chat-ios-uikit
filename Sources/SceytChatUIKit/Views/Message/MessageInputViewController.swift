@@ -203,8 +203,15 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                     self.updateState()
                     self.updateMentions()
                     self.findLink()
-                case let .contentSizeUpdate(old: _, new: new):
-                    self.update(height: max(0, new))
+                case .contentSizeUpdate:
+                    // Recompute from the live fitting height rather than the event payload:
+                    // this delivery is always a hop late (`receive(on:)`), and by the time it
+                    // lands the text view may have re-laid out at a different width — feeding
+                    // a stale height into `update(height:)` animates the bar to a value it
+                    // then has to animate back from. Reading live state also makes the
+                    // delivery idempotent, so a height already installed synchronously (a
+                    // draft restore) is recognised as unchanged and dropped.
+                    self.update(height: max(0, self.inputTextView.fittingHeight))
                 case .pastedImage:
                     guard let images = UIPasteboard.general.images else { return }
                     images.forEach { image in
@@ -217,6 +224,22 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
                 }
             }.store(in: &subscriptions)
         
+        // Not `receive(on:)`-bound on purpose: a multi-line paste into the one-line bar
+        // makes UITextView scroll to the caret on its next layout pass, and the deferred
+        // `.contentSizeUpdate` lands after it — the text jumps up, then slides back down
+        // while the bar grows. Resize the bar synchronously here instead. The trailing
+        // buttons are settled first, without animation, so the height is measured at the
+        // final width: a paste into an empty field swaps camera/mic for send, and measuring
+        // before that re-wrap animates the bar to a too-tall height and back.
+        inputTextView
+            .pasteEvent
+            .sink { [weak self] in
+                guard let self else { return }
+                self.updateTrailingInputButtons(false)
+                self.view.layoutIfNeeded()
+                self.update(height: self.inputTextView.fittingHeight)
+            }.store(in: &subscriptions)
+
         inputTextView
             .formatEvent
             .receive(on: DispatchQueue.main)
@@ -750,7 +773,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
             .showAttachmentAlert(
                 sources: sources,
                 sourceView: sender)
-        { [unowned self] source in
+        { [weak self] source in
+            guard let self else { return }
             switch source {
             case .media:
                 openPhotoPicker()
@@ -780,9 +804,11 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     open func openPhotoPicker() {
         logger.verbose("[ATTACHMENT] openPhotoPicker")
         router.showPhotos(selectedPhotoAssetIdentifiers: selectedPhotoAssetIdentifiers)
-        { [unowned self] assets, picker in
+        { [weak self] assets, picker in
             logger.verbose("[ATTACHMENT] did select assets \(assets.count)")
-            guard !assets.isEmpty else { return true }
+            // `self` stays weak (no strong rebinding) so the background task below
+            // can't read a dangling reference if the chat is closed mid-processing.
+            guard self != nil, !assets.isEmpty else { return true }
             
             let semaphore = DispatchSemaphore(value: 1)
             DispatchQueue.global().async {
@@ -825,7 +851,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
     
     open func openDocumentsPicker() {
-        router.showDocuments { [unowned self] urls in
+        router.showDocuments { [weak self] urls in
+            guard let self else { return }
             urls.forEach {
                 self.selectedMediaView.insert(view: AttachmentModel(fileUrl: $0))
             }
@@ -836,8 +863,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
     
     open func openCameraPicker() {
-        router.showCamera { [unowned self] attachmentView in
-            guard let attachmentView else { return }
+        router.showCamera { [weak self] attachmentView in
+            guard let self, let attachmentView else { return }
             self.selectedMediaView
                 .insert(view: attachmentView)
             DispatchQueue.main.async { [weak self] in
@@ -847,8 +874,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
 
     open func openPollPicker() {
-        router.showCreatePoll { [unowned self] poll in
-            guard let poll else { return }
+        router.showCreatePoll { [weak self] poll in
+            guard let self, let poll else { return }
             // Poll will be sent as a message - handle poll creation
             self.onCreatePoll?(poll)
         }

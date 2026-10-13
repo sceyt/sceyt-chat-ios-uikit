@@ -21,8 +21,6 @@ final class ImageViewerTransitionPresentationAnimator: NSObject {
     let isPresenting: Bool
     let imageContentMode: UIView.ContentMode
     
-    var observation: NSKeyValueObservation?
-    
     init(isPresenting: Bool, imageContentMode: UIView.ContentMode) {
         self.isPresenting = isPresenting
         self.imageContentMode = imageContentMode
@@ -42,7 +40,10 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
     func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
         let key: UITransitionContextViewControllerKey = isPresenting ? .to : .from
         guard let controller = transitionContext.viewController(forKey: key)
-        else { return }
+        else {
+            transitionContext.completeTransition(false)
+            return
+        }
         
         let animationDuration = transitionDuration(using: transitionContext)
         if isPresenting {
@@ -51,7 +52,7 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
                 controller: controller,
                 duration: animationDuration)
             { finished in
-                transitionContext.completeTransition(finished)
+                transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
             }
             
         } else {
@@ -60,7 +61,7 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
                 controller: controller,
                 duration: animationDuration)
             { finished in
-                transitionContext.completeTransition(finished)
+                transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
             }
         }
     }
@@ -85,7 +86,12 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
         guard
             let transitionViewController = controller as? PreviewerTransitionViewControllerConvertible,
             let sourceView = transitionViewController.sourceView
-        else { return }
+        else {
+            transitionView.addSubview(controller.view)
+            controller.view.alpha = 1
+            completed(true)
+            return
+        }
             
         sourceView.alpha = 0.0
         controller.view.alpha = 0.0
@@ -106,13 +112,13 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
             dummyImageView.frame = UIScreen.main.bounds
             dummyImageView.contentMode = self.imageContentMode
             controller.view.alpha = 1.0
-        }) { [weak self] finished in
-            self?.observation = transitionViewController.targetView?.observe(\.image, options: [.new, .initial]) { _, _ in
-                transitionViewController.targetView?.alpha = 1.0
-                dummyImageView.alpha = 0.0
-                dummyImageView.removeFromSuperview()
-                completed(finished)
-            }
+        }) { finished in
+            // Image loading can update the target repeatedly. It must never drive
+            // transition completion (the old .initial KVO callback ran immediately
+            // anyway, then completed the same transition again on later updates).
+            transitionViewController.targetView?.alpha = 1.0
+            dummyImageView.removeFromSuperview()
+            completed(finished)
         }
     }
     
@@ -124,7 +130,11 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
     {
         guard
             let transitionViewController = controller as? PreviewerTransitionViewControllerConvertible
-        else { return }
+        else {
+            controller.view.removeFromSuperview()
+            completed(true)
+            return
+        }
             
         let sourceView = transitionViewController.sourceView
         let targetView = transitionViewController.targetView
@@ -151,6 +161,7 @@ extension ImageViewerTransitionPresentationAnimator: UIViewControllerAnimatedTra
             }
             controller.view.alpha = 0.0
         }) { finished in
+            dummyImageView.removeFromSuperview()
             sourceView?.alpha = 1.0
             controller.view.removeFromSuperview()
             completed(finished)

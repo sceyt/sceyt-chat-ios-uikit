@@ -18,10 +18,28 @@ extension UIImageView {
         var messageText: String?
     }
     
-    private var viewController: UIViewController? {
-        guard let rootViewController = window?.rootViewController
-        else { return nil }
-        return rootViewController.presentedViewController != nil ? rootViewController.presentedViewController : rootViewController
+    // Resolve from the source view, never from the window's currently presented
+    // controller: a second tap must not use the first preview as its presenter.
+    func mediaPreviewPresenter(from explicitPresenter: UIViewController? = nil) -> UIViewController? {
+        var responder: UIResponder? = self
+        while let current = responder, !(current is UIViewController) {
+            responder = current.next
+        }
+        guard let presenter = explicitPresenter ?? (responder as? UIViewController) else { return nil }
+
+        // UIKit may forward presentation from a child to its navigation/tab parent.
+        var controller: UIViewController? = presenter
+        while let current = controller {
+            guard current.presentedViewController == nil,
+                  !current.isBeingPresented,
+                  !current.isBeingDismissed,
+                  !(current is MediaPreviewerNavigationController),
+                  !(current is MediaPreviewerCarouselViewController),
+                  !(current is MediaPreviewerViewController)
+            else { return nil }
+            controller = current.parent
+        }
+        return presenter
     }
     
     func setup(
@@ -53,6 +71,9 @@ extension UIImageView {
     @objc
     private func showImageViewer(_ sender: TapWithDataRecognizer) {
         guard let sourceView = sender.view as? UIImageView else { return }
+        guard sourceView.window != nil,
+              let presentFromViewController = sourceView.mediaPreviewPresenter(from: sender.from)
+        else { return }
         logThumbnailStateOnPreviewTap(sourceView: sourceView, item: sender.item, viewOnce: sender.viewOnce)
         UIApplication.shared.sendAction(#selector(resignFirstResponder), to: nil, from: nil, for: nil)
 
@@ -82,12 +103,18 @@ extension UIImageView {
             if let item = sender.item {
                 let attachment = item.attachment
                 if fileProvider.filePath(attachment: attachment) != nil {
-                    if attachment.status != .done {
+                    // The local file of an unsent attachment is its upload source, not a finished
+                    // download: marking it `.done` took it out of the resend's upload.
+                    if attachment.status != .done, !attachment.isPendingUpload {
                         attachment.status = .done
-                        DataProvider.database.write {
-                            AttachmentDTO.fetch(id: attachment.id, context: $0)?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
-                        } completion: { error in
-                            logger.errorIfNotNil(error, "")
+                        // id 0 is every attachment the server has not acked yet, so a write by
+                        // it would land on an arbitrary one of them.
+                        if attachment.id != 0 {
+                            DataProvider.database.write {
+                                AttachmentDTO.fetch(id: attachment.id, context: $0)?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+                            } completion: { error in
+                                logger.errorIfNotNil(error, "")
+                            }
                         }
                     }
                 } else if attachment.status != .done {
@@ -108,8 +135,7 @@ extension UIImageView {
                 initialIndex: initialIndex,
                 viewOnce: sender.viewOnce,
                 messageText: sender.messageText)
-        let presentFromViewController = sender.from ?? viewController
-        presentFromViewController?.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
+        presentFromViewController.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
     }
 
     /// Diagnostic for the "image/video download finished but the cell stayed on the blurry

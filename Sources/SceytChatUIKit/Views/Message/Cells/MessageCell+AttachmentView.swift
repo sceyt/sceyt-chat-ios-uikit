@@ -121,6 +121,47 @@ extension MessageCell {
         /// animation gets to render the 100% state first. Cancelled whenever a
         /// newer progress value arrives (e.g. the attachment starts re-downloading).
         private var pendingHideWorkItem: DispatchWorkItem?
+
+        /// Identifies the shrink-out currently owning the overlay's transform. A completion
+        /// whose id no longer matches belongs to a shrink that was cancelled or superseded.
+        private var hideAnimationID = 0
+        /// True while `hideProgressView`'s shrink-out is running.
+        private var isHidingProgressView = false
+
+        /// The largest value the ring has rendered for the transfer currently on screen.
+        /// Reset to 0 whenever the ring leaves the screen or its stroke is taken off
+        /// (pause/failure), i.e. whenever there is no longer a drawn value to regress from.
+        open private(set) var highestRenderedProgress: CGFloat = 0
+
+        /// True while the transfer overlay occupies the centre of the thumbnail — including
+        /// the shrink-out it plays on completion. Anything else that draws in that slot (the
+        /// video views' play button) must stay hidden until this goes false.
+        open var isTransferOverlayVisible: Bool {
+            !progressView.isHidden
+        }
+
+        /// True when the bound attachment is an outgoing file that has not been uploaded yet.
+        /// `.pending` on such an attachment means "queued to upload" — waiting behind the
+        /// serialized upload queue, or waiting for a connection after an offline attempt —
+        /// and has to read as an active transfer, not as nothing at all.
+        open var isQueuedUpload: Bool {
+            guard let data else { return false }
+            return data.attachment.isPendingUpload
+        }
+
+        /// Puts the ring at the floor a just-started transfer draws, so a queued upload is
+        /// visible while it waits. The transfer-side twin is
+        /// `AttachmentTransfer.initialUploadProgress`, seeded once a task exists; this covers
+        /// the window before that (and the whole offline wait, where no task survives).
+        /// Routed through the `AttachmentProgress` overload so the byte-count label is seeded
+        /// too, and past `setProgress`'s own staleness guard so it can never rewind a ring
+        /// that is already drawing a real percentage.
+        open func seedQueuedUploadProgress() {
+            guard let data, let message = data.ownerMessage else { return }
+            setProgress(
+                .init(message: message, attachment: data.attachment, progress: 0.0001)
+            )
+        }
         
         override open func setup() {
             super.setup()
@@ -166,6 +207,10 @@ extension MessageCell {
         /// `data`'s `didSet` — i.e. on bind — and a status-only change bumps no
         /// `contentVersion`, so nothing reconfigures this cell and it keeps rendering the
         /// state the transfer was in when it was last bound.
+        /// Last foreign-tick identity reported by `setProgressHandler`, so the warning is
+        /// emitted once per mismatched attachment rather than once per byte-chunk.
+        private var lastReportedForeignTick: String?
+
         open func attachmentTransferStatusDidChange(
             _ attachment: ChatMessage.Attachment,
             status: ChatMessage.Attachment.TransferStatus
@@ -183,6 +228,17 @@ extension MessageCell {
                    let live = fileProvider.currentProgressPercent(message: message, attachment: data.attachment) {
                     setProgress(live)
                 }
+            case .done:
+                // The transfer is over and the bytes are on disk, but this relay is the *only*
+                // thing that hears about it: a transfer-only change bumps no `contentVersion`,
+                // so nothing reconfigures this cell and nothing calls the layout's
+                // `update(attachment:)` — the sole other trigger for a thumbnail reload. Without
+                // this the bubble keeps the thumbHash blur it loaded before the file existed,
+                // and only a scroll away and back clears it.
+                //
+                // The layout guards the reload on `isThumbnailLoadedFromFile`, so an upload
+                // finishing (already sharp from its local source file) costs nothing here.
+                data.reloadThumbnailFromFileIfNeeded()
             default:
                 break
             }
@@ -286,6 +342,13 @@ extension MessageCell {
         }
         
         open func setProgress(_ progress: AttachmentTransfer.AttachmentProgress) {
+            // Every exit re-derives the label: the CGFloat overload below can return early
+            // (same value already drawn — a video subclass even short-circuits before it
+            // reaches super), and a stale tick returns here, and neither used to put back a
+            // label that `update(status:)` had just hidden.
+            defer { updateProgressLabelVisibility() }
+            guard !isStaleProgress(progress.progress)
+            else { return }
             let total = progress.attachment.uploadedFileSize
             if total <= 0 {
                 progressLabel.text = L10n.Upload.preparing
@@ -306,6 +369,9 @@ extension MessageCell {
         }
         
         open func setProgress(_ progress: CGFloat) {
+            defer { updateProgressLabelVisibility() }
+            guard !isStaleProgress(progress)
+            else { return }
             if let message = data.ownerMessage,
                let task = AttachmentTransfer.default.taskFor(message: message, attachment: data.attachment),
                task.transferType == .upload,
@@ -317,10 +383,12 @@ extension MessageCell {
             else { return }
             pendingHideWorkItem?.cancel()
             pendingHideWorkItem = nil
-            progressView.progress = progress
+            highestRenderedProgress = progress <= 0 ? 0 : max(highestRenderedProgress, progress)
             if progress <= 0 {
+                progressView.progress = progress
                 hideProgressView()
             } else if progress >= 1 {
+                progressView.progress = progress
                 if progressView.isHidden || progressView.isHiddenProgress {
                     hideProgressView()
                 } else {
@@ -330,6 +398,9 @@ extension MessageCell {
                     // then shrink out.
                     let item = DispatchWorkItem { [weak self] in
                         guard let self, self.progressView.progress >= 1 else { return }
+                        // Cleared first: `shouldShowProgressLabel` reads a pending item as
+                        // "still filling", which would put the label back during the shrink.
+                        self.pendingHideWorkItem = nil
                         self.hideProgressView()
                     }
                     pendingHideWorkItem = item
@@ -339,35 +410,119 @@ extension MessageCell {
                     )
                 }
             } else {
-                progressView.isHidden = false
-                progressLabel.isHidden = (progressLabel.text ?? "").isEmpty || progressView.isHidden || progressView.isHiddenProgress
+                if progressView.isHidden {
+                    // Seed the ring before it comes back on screen: the stored value is
+                    // still the last transfer's, and animating from it plays that one
+                    // rewinding over the first frames of this one.
+                    cancelHideAnimation()
+                    progressView.setProgressWithoutAnimation(progress)
+                    progressView.isHidden = false
+                } else {
+                    // A tick re-showing the ring mid-shrink takes it back at full size.
+                    if isHidingProgressView {
+                        cancelHideAnimation()
+                    }
+                    progressView.progress = progress
+                }
                 pauseButton.isHidden = false
             }
         }
-        
+
+        /// A tick reporting less than the ring already draws.
+        ///
+        /// Progress reaches this view from more than one place — the transfer's own stream,
+        /// and `attachmentTransferStatusDidChange` reading the transfer's cached percent when
+        /// a status change lands — each with its own latency, and every tick is hopped onto
+        /// the main queue individually. An older value arriving after a newer one used to be
+        /// rendered as an animated stroke, which is the ring running *backwards* for a moment
+        /// near the end of a download and then forward again on the next tick.
+        ///
+        /// Only a *drawn* value can regress, so this holds nothing back while the overlay is
+        /// off screen — a transfer that starts again after one finished still gets its ring
+        /// from its first tick. A genuine restart of a visible overlay comes in as `<= 0`, or
+        /// through `clearTransferOverlay`/a pause, all of which drop the mark back to 0 first.
+        open func isStaleProgress(_ progress: CGFloat) -> Bool {
+            isTransferOverlayVisible && progress > 0 && progress < highestRenderedProgress
+        }
+
+        /// Whether the "<done> / <total>" label belongs on screen: whenever the ring is drawing
+        /// a transfer that is in flight, including the fill-through to 100% before it shrinks.
+        ///
+        /// Derived from the overlay's state instead of being assigned along individual paths.
+        /// It used to be hidden by every `update(status:)` — each rebind, each status relay —
+        /// and shown again only from the one branch of `setProgress` that draws a *new* value.
+        /// A rebind re-seeds the value already drawn, and the status relay re-seeds a cached
+        /// percent that is a tick behind (dropped as stale), so both left the ring running
+        /// with no byte count until the next tick that happened to be higher.
+        open var shouldShowProgressLabel: Bool {
+            let progress = progressView.progress
+            return !(progressLabel.text ?? "").isEmpty
+                && !progressView.isHidden
+                && !progressView.isHiddenProgress
+                && progress > 0
+                && (progress < 1 || pendingHideWorkItem != nil)
+        }
+
+        open func updateProgressLabelVisibility() {
+            progressLabel.isHidden = !shouldShowProgressLabel
+        }
+
+        /// Brings the overlay (the disc and its action button) on screen without touching
+        /// `progress`. The paused/failed states need the container and their resume icon, not
+        /// a new value — they used to ask for it by pushing ~0 through `setProgress`, which
+        /// animated the stroke back down to empty first: on a download paused at 90% that is
+        /// the ring visibly rewinding.
+        open func showTransferOverlay() {
+            pendingHideWorkItem?.cancel()
+            pendingHideWorkItem = nil
+            cancelHideAnimation()
+            progressView.isHidden = false
+            pauseButton.isHidden = false
+        }
+
+        /// Stops a running shrink-out and puts the overlay back at full size (see
+        /// `resetTransformCancellingAnimations` for why a bare `.identity` is not enough).
+        private func cancelHideAnimation() {
+            hideAnimationID += 1
+            isHidingProgressView = false
+            progressView.resetTransformCancellingAnimations()
+            pauseButton.resetTransformCancellingAnimations()
+        }
+
         open func hideProgressView() {
             progressLabel.isHidden = true
-            guard !progressView.isHidden
+            // One shrink at a time: `.done` can arrive several times for one transfer, and a
+            // second shrink (already at 0.01, so nothing to animate) completed at once and
+            // reset the transform under the first.
+            guard !progressView.isHidden, !isHidingProgressView
             else { return }
+            hideAnimationID += 1
+            let animationID = hideAnimationID
+            isHidingProgressView = true
             willHideProgressView()
             UIView.animate(withDuration: progressView.animationDuration + 0.1) { [weak self] in
                 guard let self else { return }
                 self.progressView.transform = .init(scaleX: 0.01, y: 0.01)
                 self.pauseButton.transform = .init(scaleX: 0.01, y: 0.01)
             } completion: { [weak self] _ in
-                guard let self else { return }
+                // Cancelled by a re-show (`cancelHideAnimation`), which already restored
+                // the overlay; this completion no longer owns it.
+                guard let self, self.hideAnimationID == animationID else { return }
+                self.isHidingProgressView = false
                 // A progress tick may have re-shown the ring mid-shrink (the same
                 // attachment started transferring again); leave it visible then.
                 let progress = self.progressView.progress
                 if progress <= 0 || progress >= 1 {
                     self.progressView.isHidden = true
                     self.pauseButton.isHidden = true
+                    self.highestRenderedProgress = 0
                     self.progressView.transform = .identity
                     self.pauseButton.transform = .identity
                     self.didHideProgressView()
                 } else {
                     self.progressView.transform = .identity
                     self.pauseButton.transform = .identity
+                    self.updateProgressLabelVisibility()
                 }
             }
         }
@@ -381,29 +536,50 @@ extension MessageCell {
         open func update(status: ChatMessage.Attachment.TransferStatus) {
             progressView.isHiddenProgress = false
             progressView.rotateZ = true
-            progressLabel.isHidden = true
+            defer { updateProgressLabelVisibility() }
             switch status {
             case .pending:
-                break
+                // A queued upload. Offline this is where the attachment sits for the whole
+                // wait — the upload fails the moment it is attempted and is parked back here
+                // until the next connect resends the message — so the loader has to stay on
+                // screen for it. An incoming `.pending` attachment keeps the old behaviour:
+                // its own download path drives the overlay.
+                guard isQueuedUpload else { break }
+                showTransferOverlay()
+                pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
+                seedQueuedUploadProgress()
             case .uploading:
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
             case .downloading:
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.cancelIcon, for: .normal)
             case .pauseUploading, .failedUploading:
-                setProgress(0.0001)
+                showTransferOverlay()
                 progressView.isHiddenProgress = true
-                progressLabel.isHidden = true
+                highestRenderedProgress = 0
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.uploadIcon, for: .normal)
             case .pauseDownloading, .failedDownloading:
-                setProgress(0.0001)
+                showTransferOverlay()
                 progressView.isHiddenProgress = true
-                progressLabel.isHidden = true
+                highestRenderedProgress = 0
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.downloadIcon, for: .normal)
             case .done:
-                if progressView.progress > 0 {
+                if pendingHideWorkItem != nil || isHidingProgressView {
+                    // Already on its way out: the fill-through to 100% hides it once.
+                    break
+                } else if progressView.progress >= 1 {
+                    // Already drawn at 100% — `setProgress(1)` short-circuits on an unchanged
+                    // value and would never hide it. Happens when a pause lands after the last
+                    // tick: it re-shows the overlay with the upload icon and cancels the pending
+                    // hide, and the overlay then stayed over the finished file.
+                    hideProgressView()
+                } else if progressView.progress > 0 {
                     setProgress(1)
                 } else {
-                    setProgress(0)
+                    // `hideProgressView` directly, not `setProgress(0)`: that short-circuits
+                    // when 0 is already the stored value, and the overlay can be on screen at
+                    // zero — an attachment that was never downloaded shows it for its download
+                    // button, without ever having received a tick.
+                    hideProgressView()
                 }
             }
         }
@@ -502,6 +678,8 @@ extension MessageCell {
         open func clearTransferOverlay() {
             pendingHideWorkItem?.cancel()
             pendingHideWorkItem = nil
+            hideAnimationID += 1
+            isHidingProgressView = false
             lastAttachmentTransferProgress = nil
             progressView.transform = .identity
             pauseButton.transform = .identity
@@ -517,6 +695,7 @@ extension MessageCell {
             CATransaction.commit()
             progressView.isHidden = true
             progressView.isHiddenProgress = false
+            highestRenderedProgress = 0
             progressLabel.isHidden = true
             progressLabel.text = nil
             pauseButton.isHidden = true
@@ -541,6 +720,11 @@ extension MessageCell {
             guard let data,
                   let message = data.ownerMessage,
                   AttachmentTransfer.healableDownloadStatuses.contains(stored),
+                  // `.pending` is in that set for downloads. On an upload the local file is
+                  // the source, not the result, so healing it hides the loader over a file
+                  // that has not been sent — the whole of an offline send would render as
+                  // delivered.
+                  !isQueuedUpload,
                   fileProvider.currentProgressPercent(message: message, attachment: data.attachment) == nil,
                   fileProvider.taskFor(message: message, attachment: data.attachment) == nil,
                   fileProvider.filePath(attachment: data.attachment) != nil
@@ -575,17 +759,18 @@ extension MessageCell {
                 return
             }
             var needsToUpdateStatus = false
+            // Per bind, so a view reused for a different attachment can report its own mismatch.
+            lastReportedForeignTick = nil
             fileProvider
                 .progress(
                     message: message,
                     attachment: data.attachment,
                     objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "messagecell")
                 ) { [weak self, weak data] progress in
+                    // Silent: a tick arriving after this view was rebound or torn down is the
+                    // normal end of every scroll, and it fires per byte-chunk.
                     guard let self, let data, self.data == data
-                    else {
-                        logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(progress.attachment.description)")
-                        return
-                    }
+                    else { return }
                     // A tick for a different attachment is not ours to render: its
                     // percent against this attachment's total would produce a byte
                     // count belonging to neither.
@@ -597,7 +782,14 @@ extension MessageCell {
                     guard AttachmentTransfer.transferIdentity(of: data.attachment)
                             == AttachmentTransfer.transferIdentity(of: progress.attachment)
                     else {
-                        logger.warn("[Attachment] dropping a tick for another attachment — bound \(AttachmentTransfer.transferIdentity(of: data.attachment)) received \(AttachmentTransfer.transferIdentity(of: progress.attachment))")
+                        // Reported once per bound attachment: the mismatch holds for the whole
+                        // transfer, so a per-tick warning says the same thing hundreds of times.
+                        let bound = AttachmentTransfer.transferIdentity(of: data.attachment)
+                        let received = AttachmentTransfer.transferIdentity(of: progress.attachment)
+                        if self.lastReportedForeignTick != received {
+                            self.lastReportedForeignTick = received
+                            logger.warn("[Attachment] dropping a tick for another attachment — bound \(bound) received \(received)")
+                        }
                         return
                     }
 
@@ -607,10 +799,7 @@ extension MessageCell {
                     // after this view has correctly rendered the paused state.
                     guard ![.pauseDownloading, .pauseUploading,
                             .failedDownloading, .failedUploading].contains(data.attachment.status)
-                    else {
-                        logger.verbose("[Attachment] dropping a tick for a paused transfer \(AttachmentTransfer.transferIdentity(of: data.attachment))")
-                        return
-                    }
+                    else { return }
 
                     DispatchQueue.main.async { [weak self] in
                         if needsToUpdateStatus {

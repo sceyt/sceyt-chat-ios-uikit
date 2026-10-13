@@ -135,6 +135,16 @@ public protocol RepliedMessageBodyFormatting: Formatting {
     func format(_ attributes: RepliedMessageBodyFormatterAttributes) -> NSAttributedString
 }
 
+/// A protocol that defines formatting behavior for the one-line preview of a pinned message,
+/// as shown in the pinned messages banner and the pinned messages list.
+public protocol PinnedMessageBodyFormatting: Formatting {
+    /// Formats a pinned message into its preview line.
+    ///
+    /// - Parameter attributes: The `PinnedMessageBodyFormatterAttributes` instance containing the attributes needed for formatting.
+    /// - Returns: An `NSAttributedString` representing the pinned message preview.
+    func format(_ attributes: PinnedMessageBodyFormatterAttributes) -> NSAttributedString
+}
+
 /// A protocol that defines formatting behavior for edited message bodies.
 public protocol EditMessageBodyFormatting: Formatting {
     /// Formats an edited message body into an attributed string.

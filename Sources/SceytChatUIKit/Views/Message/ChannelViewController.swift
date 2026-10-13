@@ -60,6 +60,14 @@ open class ChannelViewController: ViewController,
         .init()
         .withoutAutoresizingMask
     
+    /// The pinned-messages banner under the navigation bar. Hidden when the channel has no
+    /// live pins.
+    open var pinnedMessagesView = Components.channelPinnedMessagesView
+        .init()
+        .withoutAutoresizingMask
+
+    public var pinnedMessagesViewHeightConstraint: NSLayoutConstraint!
+
     open var bottomView = Components.messageInputCoverView
         .init()
         .withoutAutoresizingMask
@@ -141,7 +149,10 @@ open class ChannelViewController: ViewController,
     /// `contentInset.bottom` when the list is mirrored, and into
     /// `contentInset.top` when it is upright. Raise it per instance to make
     /// room for a top overlay bar.
-    public var collectionViewTopSpacing: CGFloat = 5 {
+    /// The value `collectionViewTopSpacing` returns to when no top overlay is showing.
+    public static var defaultCollectionViewTopSpacing: CGFloat = 5
+
+    public var collectionViewTopSpacing: CGFloat = defaultCollectionViewTopSpacing {
         didSet {
             guard oldValue != collectionViewTopSpacing, isViewLoaded else { return }
             updateCollectionViewInsets()
@@ -232,6 +243,27 @@ open class ChannelViewController: ViewController,
     /// Restoring is a one-shot per screen; `viewDidAppear` fires again on every return from a
     /// pushed screen, and by then the bar already holds whatever the user left in it.
     private var hasRestoredDraft = false
+    /// Set only for the duration of the synchronous draft-restore pass, so
+    /// `onContentHeightUpdate` moves the input bar without animating it. The draft read is
+    /// async and resolves *after* the push transition, where a bar growing into place reads
+    /// as a glitch rather than as feedback for something the user just did. A subclass that
+    /// overrides `restoreDraftIfNeeded()` wholesale opts out of the suppression.
+    private var isRestoringDraft = false
+    /// Armed by a send from the newest edge. Clearing a tall composer shrinks it
+    /// before the new message's insert batch arrives (the DB write is async), and
+    /// re-anchoring the list to the smaller inset right away pulls every message
+    /// down after the composer — only for the insert to push them back up a
+    /// moment later. While armed, a shrinking composer leaves the list's inset
+    /// and offset alone; the next newest-edge insert applies them in the same
+    /// frame as its own animation, so the two resolve into one upward motion.
+    private var defersInputShrinkReanchor = false
+    /// Applies the deferred re-anchor when no insert shows up (failed send, slow
+    /// observer), so the list never keeps the tall composer's inset.
+    private var inputShrinkReanchorFallback: DispatchWorkItem?
+    private static let inputShrinkReanchorFallbackDelay: TimeInterval = 0.5
+    /// For a re-anchor that runs on its own (fallback, non-animated batch, or no
+    /// cell animation to copy).
+    private static let inputShrinkReanchorDuration: TimeInterval = 0.25
     private var contextMenu: ContextMenu!
     private var scrollTimer: Timer?
     private var isAppActive: Bool = true
@@ -241,6 +273,40 @@ open class ChannelViewController: ViewController,
     private var lastAnimatedIndexPath: IndexPath? = nil
     private var selectMessageId: MessageId?
     private var pinnedScrollMessageId: MessageId = 0
+
+    /// Set while a jump started from the pinned banner is in flight, so the landing
+    /// flashes the bubble instead of arriving silently. Reusing
+    /// `userSelectOnRepliedMessage` would also arm the return-jump in
+    /// `showRepliedMessage`, which a pinned jump must not do.
+    private var pinnedJumpMessageId: MessageId = 0
+
+    /// Whether the reply recorded in `userSelectOnRepliedMessage` has actually left
+    /// the viewport since it was armed. `showReply` arms the anchor while the reply
+    /// is still on screen — the user just tapped it — and the jump to the parent can
+    /// take a round trip (`findReplayedMessage`'s uncached path hits the network), so
+    /// "the reply is visible, nothing to return to" is only a true statement once the
+    /// reply has been off screen at least once. See
+    /// `releaseRepliedReturnAnchorIfNeeded()`.
+    private var hasRepliedReturnAnchorLeftViewport = false
+
+    /// Message id of an in-flight *return* jump — the one `unreadButtonAction` makes
+    /// back to the reply the user came from. That jump must scroll without flashing
+    /// the bubble: the user is going back to where they already were, and a highlight
+    /// there reads as "look at this new thing".
+    ///
+    /// A flag is needed because the flash is not driven by the jump's caller. Both
+    /// `willDisplay` and the `.scrollAndSelect` / `.reloadDataAndSelect` landings key
+    /// it off `channelViewModel.scrollToRepliedMessageId` alone, which is identical
+    /// for a forward reply jump (flash — the user asked to be shown that message) and
+    /// a return jump (don't). This names the exception. Released by the next armed
+    /// jump and by the user's next drag, so it can never mask a later highlight.
+    private var silentJumpMessageId: MessageId = 0
+
+    /// `messageTid` of a pin the user has just taken on this screen, held until the pin
+    /// shows up in the banner's items. The pin is written as an intent and the observer
+    /// reports it a moment later, so the banner cannot be moved at the moment of the tap —
+    /// the pin it should land on does not exist yet. See `updatePinnedMessages(_:)`.
+    private var pendingPinnedMessageTid: Int64?
     private let impactFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
 
     /// What UIKit has been told exists. Mutated only inside `performUpdates`
@@ -297,6 +363,17 @@ open class ChannelViewController: ViewController,
         super.viewWillLayoutSubviews()
         
     }
+
+    override open func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // The earliest point where the collection view holds its final bounds, which is what
+        // the restore's inset/offset math needs. Measured on an iPhone 17 simulator, this runs
+        // ~30ms after `viewDidLoad` while `viewDidAppear` only fires at ~540ms — the whole push
+        // transition later. Restoring here is what puts a saved reply bar on screen *with* the
+        // channel instead of dropping it in half a second afterwards.
+        restoreDraftIfNeeded()
+    }
+
     
     override open func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
@@ -388,6 +465,12 @@ open class ChannelViewController: ViewController,
 
         unreadMentionCountView.addTarget(self, action: #selector(unreadMentionCountButtonAction(_:)), for: .touchUpInside)
 
+        pinnedMessagesView.parentAppearance = appearance.pinnedMessagesAppearance
+        pinnedMessagesView.onAction = { [weak self] action in
+            self?.handlePinnedMessagesAction(action)
+        }
+        updatePinnedMessages()
+
         joinGlobalChannelButton.addTarget(self, action: #selector(joinButtonAction(_:)), for: .touchUpInside)
         titleView.profileImageView.isUserInteractionEnabled = false
         titleView.tapButton.addTarget(self, action: #selector(showChannelProfileAction), for: .touchUpInside)
@@ -416,6 +499,7 @@ open class ChannelViewController: ViewController,
         super.setupLayout()
         
         view.addSubview(collectionView)
+        view.addSubview(pinnedMessagesView)
         view.addSubview(emptyStateView)
         view.addSubview(coverView)
         view.addSubview(searchControlsView)
@@ -435,6 +519,14 @@ open class ChannelViewController: ViewController,
         coverView.pin(to: view.safeAreaLayoutGuide)
         collectionView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
         collectionView.bottomAnchor.pin(to: coverView.safeAreaLayoutGuide.bottomAnchor)
+
+        // The banner overlays the list rather than displacing it: `collectionView` stays
+        // pinned to the safe-area top and clearance is made with `collectionViewTopSpacing`.
+        // Re-pinning the list to this view instead would break `.newestAtBottom`, where the
+        // list is mirrored and content-space top/bottom are flipped.
+        pinnedMessagesView.pin(to: view.safeAreaLayoutGuide, anchors: [.leading, .trailing, .top])
+        pinnedMessagesViewHeightConstraint = pinnedMessagesView
+            .resize(anchors: [.height(PinnedMessagesView.Layouts.height)]).first!
         emptyStateView.pin(to: view, anchors: [.leading, .trailing])
         emptyStateView.topAnchor.pin(to: view.safeAreaLayoutGuide.topAnchor)
         emptyStateView.bottomAnchor.pin(to: customInputViewController.view.topAnchor)
@@ -518,32 +610,22 @@ open class ChannelViewController: ViewController,
         customInputViewController.onContentHeightUpdate = { [weak self] height, completion in
             guard let self else { return }
             if height != self.messageInputViewHeightConstraint.constant {
+                // A draft restore applies the whole composer state in one synchronous pass
+                // and has to land already in place. `completion` is invoked explicitly here:
+                // `UIView.animate` does run its block inline while animations are disabled,
+                // but *when* it calls the completion is undocumented — and
+                // `removeActionView()` hides the action bar and clears its re-entrancy flag
+                // only from inside that closure.
+                if self.isRestoringDraft {
+                    self.isUpdatingInputViewHeight = true
+                    self.applyInputContentHeight(height)
+                    self.isUpdatingInputViewHeight = false
+                    completion?()
+                    return
+                }
                 self.isUpdatingInputViewHeight = true
                 UIView.animate(withDuration: 0.25) { [weak self] in
-                    guard let self else { return }
-                    // Mirrored: the input bar occupies contentInset.top (the
-                    // anchored edge), so the offset shifts opposite to the inset
-                    // growth to keep the visible content riding above the input
-                    // bar; at the newest edge this lands exactly on the new minimum
-                    // offset. Upright: the inset grows the far edge and the content
-                    // does not move, so only the clamp applies.
-                    let previousAnchoringInset = self.offsetAnchoringInset
-                    let previousOffsetY = self.collectionView.contentOffset.y
-                    self.messageInputViewHeightConstraint.constant = height
-                    self.updateCollectionViewInsets()
-                    self.coverView.layoutIfNeeded()
-                    self.collectionView.layoutIfNeeded()
-                    let contentOffsetY = self.offsetAfterInsetChange(
-                        from: previousOffsetY,
-                        previousAnchoringInset: previousAnchoringInset
-                    )
-                    self.collectionView.setContentOffset(
-                        .init(
-                            x: 0,
-                            y: contentOffsetY
-                        ),
-                        animated: false
-                    )
+                    self?.applyInputContentHeight(height)
                 } completion: { [weak self] _ in
                     self?.isUpdatingInputViewHeight = false
                     completion?()
@@ -808,6 +890,144 @@ open class ChannelViewController: ViewController,
         )
     }
     
+    /// Drives the input bar to the height its restored content needs, now, instead of
+    /// leaving it to the deferred `.contentSizeUpdate` delivery — that subscription is
+    /// `receive(on:)`-bound, so it always lands a main-queue hop late and would animate a
+    /// second time on top of the restore.
+    ///
+    /// Iterated rather than one-shot: `update(height:)` rounds the height it reports *up*,
+    /// so with fractional line heights the first pass can still leave a point on the table
+    /// and the second is what reaches the fixed point. Once there, every later pass — the
+    /// deferred delivery included — recomputes the same number and the equality guard in
+    /// `onContentHeightUpdate` drops it. Bounded so a layout that never settles cannot spin.
+    private func settleInputContentHeight() {
+        var settled = messageInputViewHeightConstraint.constant
+        for _ in 0 ..< 3 {
+            // `contentSize` is only final once the trailing-button constraints that
+            // `apply(draft:)`'s `updateState()` rewrote are laid out — width is its only
+            // geometric input.
+            customInputViewController.view.layoutIfNeeded()
+            customInputViewController.update(height: inputTextView.contentSize.height)
+            let updated = messageInputViewHeightConstraint.constant
+            if updated == settled { return }
+            settled = updated
+        }
+    }
+
+    /// Moves the input bar to `height` and re-anchors the message list so the visible
+    /// content stays put. Shared by the animated and the non-animated (draft restore)
+    /// paths so both run identical offset math. Callers own `isUpdatingInputViewHeight`,
+    /// which must cover the `setContentOffset` below — `scrollViewDidScroll` fires
+    /// synchronously from it and reads that flag to suppress `addMoreMessage`.
+    private func applyInputContentHeight(_ height: CGFloat) {
+        if defersInputShrinkReanchor, height < messageInputViewHeightConstraint.constant {
+            messageInputViewHeightConstraint.constant = height
+            coverView.layoutIfNeeded()
+            return
+        }
+        // Any other height change re-derives the insets from scratch below, which
+        // subsumes a pending deferred shrink.
+        cancelDeferredInputShrinkReanchor()
+        // Mirrored: the input bar occupies contentInset.top (the
+        // anchored edge), so the offset shifts opposite to the inset
+        // growth to keep the visible content riding above the input
+        // bar; at the newest edge this lands exactly on the new minimum
+        // offset. Upright: the inset grows the far edge and the content
+        // does not move, so only the clamp applies.
+        let previousAnchoringInset = offsetAnchoringInset
+        let previousOffsetY = collectionView.contentOffset.y
+        messageInputViewHeightConstraint.constant = height
+        updateCollectionViewInsets()
+        coverView.layoutIfNeeded()
+        collectionView.layoutIfNeeded()
+        let contentOffsetY = offsetAfterInsetChange(
+            from: previousOffsetY,
+            previousAnchoringInset: previousAnchoringInset
+        )
+        collectionView.setContentOffset(
+            .init(
+                x: 0,
+                y: contentOffsetY
+            ),
+            animated: false
+        )
+    }
+
+    private func armDeferredInputShrinkReanchor() {
+        cancelDeferredInputShrinkReanchor()
+        defersInputShrinkReanchor = true
+        let fallback = DispatchWorkItem { [weak self] in
+            self?.applyDeferredInputShrinkReanchor()
+        }
+        inputShrinkReanchorFallback = fallback
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.inputShrinkReanchorFallbackDelay, execute: fallback)
+    }
+
+    private func cancelDeferredInputShrinkReanchor() {
+        defersInputShrinkReanchor = false
+        inputShrinkReanchorFallback?.cancel()
+        inputShrinkReanchorFallback = nil
+    }
+
+    /// Brings the list's insets and offset in line with the composer's current
+    /// height with an animation of its own — for the fallback and for newest-edge
+    /// batches that don't animate. A no-op unless a send-time shrink is pending.
+    private func applyDeferredInputShrinkReanchor() {
+        guard defersInputShrinkReanchor else { return }
+        UIView.animate(withDuration: Self.inputShrinkReanchorDuration) { [weak self] in
+            self?.consumeDeferredInputShrinkReanchor()
+        }
+    }
+
+    /// Replays an already-applied re-anchor offset change on the curve UIKit just
+    /// gave the newest insert. The cells move on a critically damped
+    /// `CASpringAnimation`; any other curve for the list's shift — a fixed-duration
+    /// ease, or nesting `performUpdates` in `UIView.animate`, which retimes the
+    /// bounds but not the cells — sums with it into a visible bounce whose size
+    /// depends on the composer-shrink / bubble-height ratio. Copying the cells'
+    /// own animation makes the sum the net move on one spring: monotonic for any
+    /// ratio. Call right after `performUpdates` started the batch.
+    private func animateReanchorAlongNewestInsert(offsetShift: CGFloat) {
+        let cellAnimation = collectionView.visibleCells.lazy
+            .compactMap { $0.layer.animation(forKey: "position") }
+            .first
+        let animation: CABasicAnimation
+        if let copy = cellAnimation?.copy() as? CABasicAnimation {
+            animation = copy
+            animation.delegate = nil
+        } else {
+            animation = CABasicAnimation()
+            animation.duration = Self.inputShrinkReanchorDuration
+            animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        }
+        animation.keyPath = "bounds.origin"
+        animation.isAdditive = true
+        animation.fromValue = NSValue(cgPoint: CGPoint(x: 0, y: offsetShift))
+        animation.toValue = NSValue(cgPoint: .zero)
+        collectionView.layer.add(animation, forKey: "inputShrinkReanchor")
+    }
+
+    /// The deferred re-anchor itself, un-animated; the caller supplies the
+    /// animation context.
+    private func consumeDeferredInputShrinkReanchor() {
+        guard defersInputShrinkReanchor else { return }
+        cancelDeferredInputShrinkReanchor()
+        // Save/restore rather than reset: the composer's own resize may still be
+        // in flight and owns clearing the flag in its completion.
+        let wasUpdatingInputViewHeight = isUpdatingInputViewHeight
+        isUpdatingInputViewHeight = true
+        let previousAnchoringInset = offsetAnchoringInset
+        let previousOffsetY = collectionView.contentOffset.y
+        updateCollectionViewInsets()
+        collectionView.layoutIfNeeded()
+        let contentOffsetY = offsetAfterInsetChange(
+            from: previousOffsetY,
+            previousAnchoringInset: previousAnchoringInset
+        )
+        collectionView.setContentOffset(.init(x: 0, y: contentOffsetY), animated: false)
+        isUpdatingInputViewHeight = wasUpdatingInputViewHeight
+    }
+
     private func removePrevUnreadSeparatorView(
         escape messageId: UInt64
     ) {
@@ -943,6 +1163,8 @@ open class ChannelViewController: ViewController,
         }
         selectingView.isHidden = !channelViewModel.isEditing
         coverView.isHidden = channelViewModel.isEditing
+        // The banner would sit under the search bar / selection UI otherwise.
+        updatePinnedMessages()
     }
     
     open func showSearchBar() {
@@ -1112,11 +1334,35 @@ open class ChannelViewController: ViewController,
     
     @objc
     open func unreadButtonAction(_ sender: ChannelViewController.ScrollDownView) {
-        // Always jump to the latest message — release any active pin and any
-        // pending replied-message navigation so the .reloadDataAndScrollToBottom
-        // branch (or scrollToBottom() below) can actually land at the bottom.
+        // One step back first: the user arrived at this message by tapping a reply
+        // preview, so the button returns them to the reply they came from rather
+        // than abandoning their place in the history. Consumed here — the next tap
+        // falls through to the jump-to-latest below, so they are never stranded.
+        if let userSelectOnRepliedMessage {
+            // The reply jump's landing anchored the viewport to the *parent*
+            // (.scrollAndSelect / .reloadDataAndSelect). Left set, the next
+            // structural update restores that offset and undoes this scroll.
+            pinnedScrollMessageId = 0
+            pinnedJumpMessageId = 0
+            showRepliedMessage(userSelectOnRepliedMessage)
+            self.userSelectOnRepliedMessage = nil
+            // Deliberately none of the jump-to-latest bookkeeping below: the user
+            // is still up in the history, so the button has to stay available, and
+            // resetToInitialStateIfNeeded() would restart the observer at the
+            // channel tail — throwing away the window the reply lives in.
+            return
+        }
+
+        // Jump to the latest message — release any active pin and any pending
+        // replied-message navigation so the .reloadDataAndScrollToBottom branch
+        // (or scrollToBottom() below) can actually land at the bottom.
         pinnedScrollMessageId = 0
         userSelectOnRepliedMessage = nil
+        // Cancel a reply jump still loading before deciding how to reach the tail.
+        // `resetToInitialStateIfNeeded` does this itself when it restarts, but when the
+        // window is already the tail one it returns false without touching the view
+        // model, and the late landing would then override the scrollToBottom() below.
+        channelViewModel.cancelPendingReplyNavigation()
         if !channelViewModel.resetToInitialStateIfNeeded() {
             scrollToBottom()
         }
@@ -1424,6 +1670,7 @@ open class ChannelViewController: ViewController,
     open func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
         isStartedDragging = true
         pinnedScrollMessageId = 0
+        silentJumpMessageId = 0
         // Drag starting while pinned to the oldest loaded edge (content end in the
         // mirrored order) reopens the prev-fetch gate so a failed server page can
         // be retried once connectivity returns.
@@ -1446,10 +1693,7 @@ open class ChannelViewController: ViewController,
     }
     
     open func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-        if let userSelectOnRepliedMessage,
-           !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
-            self.userSelectOnRepliedMessage = nil
-        }
+        releaseRepliedReturnAnchorIfNeeded()
 
         if lastScrollDirection == .down,
            let indexPath = addMoreMessage(scrollDirection: lastScrollDirection, force: false) {
@@ -1465,6 +1709,7 @@ open class ChannelViewController: ViewController,
     }
 
     public func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
+        releaseRepliedReturnAnchorIfNeeded()
         if let lastAnimatedIndexPath, !isCollectionViewUpdating {
             if !self.isCollectionViewUpdating {
 //                self.channelViewModel.loadNearMessages(arMessageAt: lastAnimatedIndexPath)
@@ -1474,12 +1719,49 @@ open class ChannelViewController: ViewController,
     }
 
     open func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
-        if let userSelectOnRepliedMessage,
-           !collectionView.visibleCells.contains(where: { ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id }) {
-            self.userSelectOnRepliedMessage = nil
-        }
+        releaseRepliedReturnAnchorIfNeeded()
         if !decelerate {
             drainPendingPrevDBFetch()
+        }
+    }
+
+    /// Drops the "back to the reply" target recorded by `showReply` once there is
+    /// nothing left to return to — either the user has scrolled back to the reply
+    /// themselves, or they are resting at the newest message.
+    ///
+    /// It deliberately does *not* release the anchor merely because the reply is off
+    /// screen: after the jump to the parent the reply is always off screen, so that
+    /// condition would discard the return target on the user's first drag — exactly
+    /// when `unreadButtonAction` needs it. The latch is what makes "the reply is
+    /// visible again" mean the user came back rather than never having left.
+    ///
+    /// Releasing at the bottom matters beyond tidiness: a live anchor suppresses the
+    /// newest-insert animation and the auto-scroll to a newly arrived message
+    /// (see `performUpdates`), and the button is hidden down there anyway, so the
+    /// anchor could never be consumed.
+    private func releaseRepliedReturnAnchorIfNeeded() {
+        guard let userSelectOnRepliedMessage else { return }
+        // Against `visibleContentRect`, not bare `visibleCells`: UIKit keeps cells
+        // that sit behind the composer in `visibleCells`, and counting one of those
+        // as "the user can see the reply again" releases the anchor while the reply
+        // is still hidden — the same distinction `syncSeenUnreadMessagesFromVisibleCells`
+        // draws.
+        let visibleRect = collectionView.visibleContentRect
+        let isReplyVisible = visibleRect.height > 0 && collectionView.visibleCells.contains {
+            ($0 as? MessageCell)?.data.message.id == userSelectOnRepliedMessage.id
+            && $0.frame.intersects(visibleRect)
+        }
+        guard hasRepliedReturnAnchorLeftViewport else {
+            // Still on the way out. Nothing may release the anchor yet — a reply
+            // tapped near the newest message arms it while sitting on screen *and*
+            // at the bottom, and the jump to the parent only lands later.
+            if !isReplyVisible {
+                hasRepliedReturnAnchorLeftViewport = true
+            }
+            return
+        }
+        if isReplyVisible || collectionView.isAtBottom() {
+            self.userSelectOnRepliedMessage = nil
         }
     }
 
@@ -1895,6 +2177,16 @@ open class ChannelViewController: ViewController,
         layout.invalidateLayout(with: context)
     }
     
+    /// The pending reply-jump target a cell scrolling into view should flash, or 0.
+    ///
+    /// `scrollToRepliedMessageId` says *where* the list is going, not whether the
+    /// arrival deserves a highlight; a silent return jump is the case where it does
+    /// not. See `silentJumpMessageId`.
+    private var repliedMessageIdToHighlight: MessageId {
+        let messageId = channelViewModel.scrollToRepliedMessageId
+        return messageId == silentJumpMessageId ? 0 : messageId
+    }
+
     open func collectionView(
         _ collectionView: UICollectionView,
         willDisplay cell: UICollectionViewCell,
@@ -1902,7 +2194,7 @@ open class ChannelViewController: ViewController,
     ) {
         if let systemCell = cell as? SystemMessageCell, systemCell.data != nil {
             var repliedMessageId: MessageId {
-                channelViewModel.scrollToRepliedMessageId
+                repliedMessageIdToHighlight
             }
             if repliedMessageId != 0,
                systemCell.data.message.id == repliedMessageId {
@@ -1919,7 +2211,7 @@ open class ChannelViewController: ViewController,
         else { return }
 
         var repliedMessageId: MessageId {
-            channelViewModel.scrollToRepliedMessageId
+            repliedMessageIdToHighlight
         }
         if selectMessageId != 0, cell.data.message.id == selectMessageId {
             cell.highlightMode = .search
@@ -2435,6 +2727,14 @@ open class ChannelViewController: ViewController,
         if model.isSystemMessage {
             let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelSystemMessageCell)
             cell.data = model
+            cell.onAction = { [weak self] action in
+                // A tap while multi-selecting belongs to the selection, not to a jump.
+                guard let self, !self.channelViewModel.isEditing else { return }
+                switch action {
+                case .didTapTargetMessage(let messageId):
+                    self.jumpToPinnedMessage(id: messageId)
+                }
+            }
             return cell
         }
 
@@ -2484,78 +2784,7 @@ open class ChannelViewController: ViewController,
         }
 
         cell.onAction = { [weak self] action in
-            guard let self else { return }
-            
-            self.isStartedDragging = true
-            
-            switch action {
-            case .editMessage:
-                self.edit(layoutModel: model)
-            case .deleteMessage:
-                self.delete(layoutModel: model)
-            case .showThread:
-                self.reply(layoutModel: model, in: true)
-            case .showReply:
-                self.showReply(layoutModel: model)
-            case .tapReaction:
-                self.tapReaction(layoutModel: model)
-            case .addReaction:
-                self.addReaction(layoutModel: model)
-            case .deleteReaction(let key):
-                self.deleteReaction(layoutModel: model, reaction: key)
-            case .updateReactionScore(let key, let score, let add):
-                self.updateReaction(layoutModel: model, reaction: key, score: UInt16(score), add: add)
-            case .selectMentionedUser:
-                break
-            case .selectAttachment(let index):
-                if let attachments = message.attachments,
-                   index < attachments.count,
-                   attachments[index].type == "file" {
-                    self.showAttachment(attachments[index])
-                }
-            case .pauseTransfer(let message, let attachment):
-                self.channelViewModel.stopFileTransfer(message: message, attachment: attachment)
-            case .resumeTransfer(let message, let attachment):
-                self.channelViewModel.resumeFileTransfer(message: message, attachment: attachment)
-            case .openUrl(let url):
-                self.showLink(url)
-            case .playAtUrl(let url):
-                self.router.playFrom(url: url)
-            case .playedAudio(_):
-                self.channelViewModel.markMessages([model.message], as: .played)
-            case .openedViewOnce(_):
-                self.channelViewModel.markMessages([model.message], as: .opened)
-            case .didTapLink(let link):
-                self.showLink(link)
-            case .didLongPressLink(let link):
-                self.router
-                    .showLinkAlert(
-                        link,
-                        actions: [(L10n.Link.openIn, .default), (L10n.Link.copy, .default)])
-                { [weak self] actionTitle in
-                    if actionTitle == L10n.Link.openIn {
-                        self?.showLink(link)
-                    } else if actionTitle == L10n.Link.copy {
-                        UIPasteboard.general.string = link.absoluteString
-                    }
-                }
-            case .didTapAvatar:
-                self.didSelectAvatar(layoutModel: model)
-            case .didTapMentionUser(let userId):
-                self.didSelectMentionUser(userId: userId, layoutModel: model)
-            case .didTapPhoneNumber(let phoneNumber), .didLongPressPhoneNumber(let phoneNumber):
-                self.didSelectPhoneNumber(phoneNumber, layoutModel: model)
-            case .didSwipe:
-                self.reply(layoutModel: model, in: false)
-            case .didTapBottomAction:
-                if model.message.poll != nil {
-                    self.showPollResults(for: model)
-                }
-            case .didTapPollOption(let optionIndex, let pollViewModel):
-                self.didTapPollOption(layoutModel: model, optionIndex: optionIndex, pollViewModel: pollViewModel)
-            case .didTapReadMore:
-                self.expandText(for: model)
-            }
+            self?.handleMessageCellAction(action, layoutModel: model)
         }
         cell.contextMenu = contextMenu
         channelViewModel.downloadMessageAttachmentsIfNeeded(layoutModel: model)
@@ -2756,6 +2985,10 @@ open class ChannelViewController: ViewController,
             channelViewModel.selectedMessageForAction?.1 == .reply {
             pinnedScrollMessageId = 0
             isStartedDragging = true
+            // Before the text and media are cleared: that is what shrinks the composer.
+            if wasAtBottom {
+                armDeferredInputShrinkReanchor()
+            }
         }
         channelViewModel.createAndSendUserMessage(message)
         if shouldClearText {
@@ -2809,6 +3042,33 @@ open class ChannelViewController: ViewController,
         }
     }
     
+    /// - Parameter pinnedUntil: when the pin lapses; `nil` is open-ended, which is what the
+    ///   menu offers today.
+    open func pin(
+        layoutModel: MessageLayoutModel,
+        scope: PinnedMessage.Scope,
+        pinnedUntil: Date? = nil
+    ) {
+        // Both "Pin for all" and "Pin for me" come through here, and either one should
+        // leave the banner showing what the user has just pinned rather than the pin they
+        // happened to have paged to.
+        //
+        // Resolved the way `NSManagedObjectContext.pinMessage` resolves it, so an incoming
+        // message — which carries no tid of its own — is recognized by the id the pin row
+        // is keyed under instead.
+        let message = layoutModel.message
+        pendingPinnedMessageTid = message.tid != 0 ? message.tid : Int64(message.id)
+        channelViewModel.pinMessage(
+            layoutModel: layoutModel,
+            scope: scope,
+            pinnedUntil: pinnedUntil
+        )
+    }
+
+    open func unpin(layoutModel: MessageLayoutModel) {
+        channelViewModel.unpinMessage(layoutModel: layoutModel)
+    }
+
     open func reply(
         layoutModel: MessageLayoutModel,
         in thread: Bool
@@ -3102,14 +3362,123 @@ open class ChannelViewController: ViewController,
         guard let parent = layoutModel.message.parent
         else { return }
         pinnedScrollMessageId = 0
+        pinnedJumpMessageId = 0
+        // A forward jump is exactly the case that should flash.
+        silentJumpMessageId = 0
         userSelectOnRepliedMessage = layoutModel.message
+        // Armed while the reply is still on screen — the user just tapped it.
+        hasRepliedReturnAnchorLeftViewport = false
         channelViewModel.findReplayedMessage(messageId: parent.id)
     }
     
+    // MARK: Pinned messages
+
+    /// Pushes the channel's live pins into the banner and makes room for it.
+    open func updatePinnedMessages(_ items: [PinnedMessage]? = nil) {
+        let pins = items ?? channelViewModel.pinnedMessages
+        // The pin the user took has landed: send the banner back to the state it opens in,
+        // resting on the newest pin, instead of holding it on the one they were paged to.
+        if let tid = pendingPinnedMessageTid,
+           pins.contains(where: { $0.messageTid == tid }) {
+            pendingPinnedMessageTid = nil
+            pinnedMessagesView.resetsSelectionOnNextUpdate = true
+        }
+        pinnedMessagesView.items = pins
+
+        let shouldShow = SceytChatUIKit.shared.config.isMessagePinningEnabled
+            && !pins.isEmpty
+            && !channelViewModel.isEditing
+            && !channelViewModel.isSearching
+        guard pinnedMessagesView.isHidden == shouldShow else { return }
+        pinnedMessagesView.isHidden = !shouldShow
+        // Drives `contentInset` through `updateCollectionViewInsets()`; the list itself is
+        // never re-pinned, see `setupLayout`.
+        collectionViewTopSpacing = shouldShow
+            ? Self.defaultCollectionViewTopSpacing + PinnedMessagesView.Layouts.height
+            : Self.defaultCollectionViewTopSpacing
+    }
+
+    open func handlePinnedMessagesAction(_ action: PinnedMessagesView.Action) {
+        switch action {
+        case .next, .previous:
+            // The banner has already moved itself onto the new pin, so `selectedItem` is
+            // where the swipe landed. Take the list there too — a swipe navigates the pins
+            // exactly like a tap does, just without the tap's extra step forward.
+            guard let item = pinnedMessagesView.selectedItem else { return }
+            jumpToPinnedMessage(item)
+        case .jump:
+            guard let item = pinnedMessagesView.selectedItem else { return }
+            jumpToPinnedMessage(item)
+            // A tap both takes the list to the pin on screen and hands the banner the
+            // next one, so repeated taps walk the whole set — up from the newest pin the
+            // banner opens on. The walk wraps: a tap on the oldest pin jumps to it and
+            // brings the banner back round to the newest, so tapping cycles forever.
+            pinnedMessagesView.selectNext(animated: true)
+        case .showList:
+            showPinnedMessageList()
+        }
+    }
+
+    /// Scrolls the list to a pinned message, reusing the same path a reply tap takes.
+    open func jumpToPinnedMessage(_ item: PinnedMessage) {
+        jumpToPinnedMessage(id: item.messageId)
+    }
+
+    /// Takes the list to a pinned message by id, for the callers that hold no
+    /// `PinnedMessage` — a tap on an "Adam pinned …" system message, which knows only the
+    /// id its `parentMessageId` points at.
+    open func jumpToPinnedMessage(id messageId: MessageId) {
+        guard messageId != 0 else { return }
+        // Clearing the scroll anchor first, exactly as `showReply` does — leaving it set
+        // lands the jump in the wrong place.
+        pinnedScrollMessageId = 0
+        pinnedJumpMessageId = messageId
+        silentJumpMessageId = 0
+        channelViewModel.findReplayedMessage(messageId: messageId)
+    }
+
+    /// Opens the standalone pinned-messages screen. Picking a row there comes back through
+    /// `didSelectPinnedMessage`.
+    open func showPinnedMessageList() {
+        // Unreachable through the banner while pinning is off — it is never shown — but a host
+        // can call this directly, and the screen it opens would be permanently empty.
+        guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
+        // The keyboard would otherwise stay up behind the pushed screen and come back with
+        // it, on top of the jump the selection triggers.
+        inputTextView.resignFirstResponder()
+        router.showPinnedMessageList { [weak self] item in
+            self?.didSelectPinnedMessage(item)
+        }
+    }
+
+    /// Jumps to the pin picked in the pinned-messages list, and hands the banner the pin
+    /// *after* it — the same step a banner tap takes after its own jump, so the next tap
+    /// walks forward instead of re-jumping to the pin the user just landed on.
+    open func didSelectPinnedMessage(_ item: PinnedMessage) {
+        if let index = pinnedMessagesView.items.firstIndex(where: { $0.messageTid == item.messageTid }) {
+            // One step along the banner's walk, which runs up the segment bar toward the
+            // older pins — hence `- 1` against an `items` ordered oldest first. `select`
+            // clamps, so picking the oldest pin leaves the banner on it: there is nothing
+            // beyond it to hand over, as with a channel that has a single pin.
+            pinnedMessagesView.select(index: index - 1, animated: true)
+        }
+        jumpToPinnedMessage(item)
+    }
+
     open func showRepliedMessage(_ message: ChatMessage) {
+        // Scroll there, but silently — see `silentJumpMessageId`. Armed for both
+        // routes below: the cached one never flashes anyway, and the loader route
+        // has three separate places that would.
+        silentJumpMessageId = message.id
         let paths = channelViewModel.indexPaths(for: [message])
         guard let dataPath = paths.values.first,
               let indexPath = uiIndexPath(fromData: dataPath) else {
+            // The reply has paged out of the loaded window, so the return jump has
+            // to go through the loader. Release the anchor first: the landing reads
+            // `userSelectOnRepliedMessage != nil` as "flash this bubble", which would
+            // contradict the no-highlight contract below and hand the user a second
+            // highlight. Nil plus `pinnedJumpMessageId == 0` resolves to `.none`.
+            userSelectOnRepliedMessage = nil
             channelViewModel.findReplayedMessage(messageId: message.id)
             return
         }
@@ -3118,6 +3487,11 @@ open class ChannelViewController: ViewController,
                                             object: (userSelectOnRepliedMessage.id, MessageCell.HighlightMode.none))
         }
         
+        // This branch never goes through the view model, so nothing there would notice
+        // that the forward jump (still loading the parent over the network, if the user
+        // was quick) has been superseded. Cancel it, or it lands on the parent after
+        // the user asked for the reply.
+        channelViewModel.cancelPendingReplyNavigation()
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
             // Deliberately no highlight on this jump: it returns the user from the
@@ -3468,6 +3842,24 @@ open class ChannelViewController: ViewController,
                     """)
             }
 
+
+            // A send-time composer shrink held the list's inset back for this
+            // insert. An animated insert applies it instantly here and replays
+            // the shift on the insert's own spring after `performUpdates` (see
+            // `animateReanchorAlongNewestInsert`), so the shift down and the
+            // insert's push up are one curve and net out into a single move.
+            // Any other newest-edge batch just animates it on its own.
+            var reanchorOffsetShift: CGFloat = 0
+            if animatesNewestInsert, defersInputShrinkReanchor {
+                let offsetBefore = collectionView.contentOffset.y
+                UIView.performWithoutAnimation {
+                    consumeDeferredInputShrinkReanchor()
+                }
+                reanchorOffsetShift = offsetBefore - collectionView.contentOffset.y
+            } else if isInsertingNewestItems {
+                applyDeferredInputShrinkReanchor()
+            }
+
             if animatesOlderPageFadeIn {
                 let survivorKey = appliedSnapshot.items.first?.first
                 appliedSnapshot = newSnapshot
@@ -3567,9 +3959,6 @@ open class ChannelViewController: ViewController,
             }
 
             let completion: (Bool) -> Void = { [weak self] finished in
-                if !animatesNewestInsert {
-                    CATransaction.commit()
-                }
                 var scrollBottom = false
                 defer {
                     if let self = self {
@@ -3642,8 +4031,20 @@ open class ChannelViewController: ViewController,
                 }
             } else if animatesNewestInsert {
                 self.collectionView.performUpdates(updates, completion: completion)
+                if reanchorOffsetShift != 0 {
+                    animateReanchorAlongNewestInsert(offsetShift: reanchorOffsetShift)
+                }
             } else {
                 collectionView.performUpdates(updates, completion: completion)
+            }
+            // Closed here, as soon as the batch is applied, not from its completion. The
+            // completion comes back through `DispatchQueue.main.async`, so a transaction left
+            // open until then stays current across other main-queue work — and every
+            // animation any screen starts in that gap runs with actions disabled and snaps.
+            // That is what stopped the pinned-messages list from animating an unpin: the same
+            // save that removes the pin updates the message behind it here.
+            if !animatesNewestInsert {
+                CATransaction.commit()
             }
 
         case .updateDeliveryStatus(let model, let indexPath):
@@ -3898,6 +4299,11 @@ open class ChannelViewController: ViewController,
             DispatchQueue.main.async { [weak self] in
                 self?.showAlert(error: error)
             }
+        case .updatePinnedMessages(let items):
+            // The observer fires on its own context's queue.
+            DispatchQueue.main.async { [weak self] in
+                self?.updatePinnedMessages(items)
+            }
         case .close:    
             router.popToRoot()
         case .connection(let state):
@@ -3948,8 +4354,17 @@ open class ChannelViewController: ViewController,
             }
             var mode = mentionMode ?? MessageCell.HighlightMode.search
             if channelViewModel.scrollToRepliedMessageId != 0 {
-                if userSelectOnRepliedMessage != nil {
+                // A pinned-banner jump arms no `userSelectOnRepliedMessage` — it must not
+                // set up the return-jump — but it still deserves the same flash, which is
+                // what `willDisplay` already gives a pin that scrolls in from off screen.
+                if silentJumpMessageId == messageId {
+                    // A return jump: scroll, don't flash. Stated here rather than
+                    // inferred from a cleared `userSelectOnRepliedMessage`, so the
+                    // contract does not depend on the caller's ordering.
+                    mode = .none
+                } else if userSelectOnRepliedMessage != nil || pinnedJumpMessageId == messageId {
                     mode = .reply
+                    pinnedJumpMessageId = 0
                 } else {
                     mode = .none
                 }
@@ -4017,8 +4432,17 @@ open class ChannelViewController: ViewController,
             lastAnimatedIndexPath = uiPath
             var mode = MessageCell.HighlightMode.search
             if channelViewModel.scrollToRepliedMessageId != 0 {
-                if userSelectOnRepliedMessage != nil {
+                // A pinned-banner jump arms no `userSelectOnRepliedMessage` — it must not
+                // set up the return-jump — but it still deserves the same flash, which is
+                // what `willDisplay` already gives a pin that scrolls in from off screen.
+                if silentJumpMessageId == messageId {
+                    // A return jump: scroll, don't flash. Stated here rather than
+                    // inferred from a cleared `userSelectOnRepliedMessage`, so the
+                    // contract does not depend on the caller's ordering.
+                    mode = .none
+                } else if userSelectOnRepliedMessage != nil || pinnedJumpMessageId == messageId {
                     mode = .reply
+                    pinnedJumpMessageId = 0
                 } else {
                     mode = .none
                 }
@@ -4027,6 +4451,14 @@ open class ChannelViewController: ViewController,
                 selectMessageId = messageId
             }
             NotificationCenter.default.post(name: .selectMessage, object: (messageId, mode))
+            // The flashing modes have to be released, or a jump landing through this
+            // branch — the uncached path both reply and pinned navigation take — leaves
+            // the bubble highlighted for good. `.scrollAndSelect` already does this.
+            if mode == .reply || mode == .mention {
+                DispatchQueue.main.asyncAfter(deadline: .now() + highlightedDurationForReplyMessage) {
+                    NotificationCenter.default.post(name: .selectMessage, object: (messageId, MessageCell.HighlightMode.none))
+                }
+            }
             if let uiPath {
                 collectionView.scrollToItem(at: uiPath, pos: .centeredVertically, animated: true)
             }
@@ -4123,19 +4555,37 @@ open class ChannelViewController: ViewController,
 
     /// Restores the input bar from the last saved draft, once per screen.
     ///
-    /// Runs from `viewDidAppear` rather than `setupDone`: `addReply`/`addEdit` drive
-    /// `onContentHeightUpdate`, which animates the input height and re-anchors the collection
-    /// view's content offset — at `setupDone` the collection view has no final bounds yet.
+    /// Driven from the first `viewDidLayoutSubviews` (~30ms after `viewDidLoad`) rather than
+    /// from `viewDidAppear` (~540ms, the far side of the push transition) — that timing, not
+    /// the read, is what used to make a restored reply bar drop in late.
+    ///
+    /// Read inline rather than through the async `loadDraft(completion:)`: it is one row plus
+    /// its relationships on the main context, measured at ~0.8ms, so the bar is already correct
+    /// in the frame the channel first draws. The async path costs about the same to execute but
+    /// goes through the *shared* `backgroundReadOnlyContext`, which channel-open work contends
+    /// for, and lands its result a queue hop later — i.e. possibly a frame after the screen is
+    /// already up.
+    ///
+    /// `viewDidAppear` still calls this as a backstop for a screen that appears without a
+    /// layout pass; the one-shot guard makes that a no-op in the normal flow.
     open func restoreDraftIfNeeded() {
         guard !hasRestoredDraft else { return }
         hasRestoredDraft = true
 
-        channelViewModel.loadDraft { [weak self] draft in
-            guard let self, let draft else { return }
-            DispatchQueue.main.async {
-                self.apply(draft: draft)
-            }
+        guard let draft = channelViewModel.loadDraft() else { return }
+
+        // Nothing here may animate: at first layout the screen has not been drawn yet, and by
+        // `viewDidAppear` the push transition has already settled — either way a bar growing
+        // into place reads as a glitch. `isRestoringDraft` takes `onContentHeightUpdate` down
+        // its immediate path, and `performWithoutAnimation` covers the animations the input bar
+        // runs itself, which never reach that callback (`updateMediaButtonAppearance` inside
+        // `addEdit`, unhiding the recorded-voice preview).
+        isRestoringDraft = true
+        UIView.performWithoutAnimation {
+            apply(draft: draft)
+            settleInputContentHeight()
         }
+        isRestoringDraft = false
     }
 
     open func apply(draft: DraftMessage) {
@@ -4234,6 +4684,88 @@ open class ChannelViewController: ViewController,
         )
     }
     
+    /// Everything a message cell can ask its screen to do — opening a link, playing an
+    /// attachment, voting in a poll, replying, reacting. Extracted from `cellForItemAt` so
+    /// the pinned-messages list can hand the actions it cannot serve itself back to the
+    /// conversation. See `ChannelPinnedMessageListViewController`.
+    open func handleMessageCellAction(
+        _ action: MessageCell.Action,
+        layoutModel model: MessageLayoutModel
+    ) {
+        let message = model.message
+
+        isStartedDragging = true
+
+        switch action {
+        case .editMessage:
+            self.edit(layoutModel: model)
+        case .deleteMessage:
+            self.delete(layoutModel: model)
+        case .showThread:
+            self.reply(layoutModel: model, in: true)
+        case .showReply:
+            self.showReply(layoutModel: model)
+        case .tapReaction:
+            self.tapReaction(layoutModel: model)
+        case .addReaction:
+            self.addReaction(layoutModel: model)
+        case .deleteReaction(let key):
+            self.deleteReaction(layoutModel: model, reaction: key)
+        case .updateReactionScore(let key, let score, let add):
+            self.updateReaction(layoutModel: model, reaction: key, score: UInt16(score), add: add)
+        case .selectMentionedUser:
+            break
+        case .selectAttachment(let index):
+            if let attachments = message.attachments,
+               index < attachments.count,
+               attachments[index].type == "file" {
+                self.showAttachment(attachments[index])
+            }
+        case .pauseTransfer(let message, let attachment):
+            self.channelViewModel.stopFileTransfer(message: message, attachment: attachment)
+        case .resumeTransfer(let message, let attachment):
+            self.channelViewModel.resumeFileTransfer(message: message, attachment: attachment)
+        case .openUrl(let url):
+            self.showLink(url)
+        case .playAtUrl(let url):
+            self.router.playFrom(url: url)
+        case .playedAudio(_):
+            self.channelViewModel.markMessages([model.message], as: .played)
+        case .openedViewOnce(_):
+            self.channelViewModel.markMessages([model.message], as: .opened)
+        case .didTapLink(let link):
+            self.showLink(link)
+        case .didLongPressLink(let link):
+            self.router
+                .showLinkAlert(
+                    link,
+                    actions: [(L10n.Link.openIn, .default), (L10n.Link.copy, .default)])
+            { [weak self] actionTitle in
+                if actionTitle == L10n.Link.openIn {
+                    self?.showLink(link)
+                } else if actionTitle == L10n.Link.copy {
+                    UIPasteboard.general.string = link.absoluteString
+                }
+            }
+        case .didTapAvatar:
+            self.didSelectAvatar(layoutModel: model)
+        case .didTapMentionUser(let userId):
+            self.didSelectMentionUser(userId: userId, layoutModel: model)
+        case .didTapPhoneNumber(let phoneNumber), .didLongPressPhoneNumber(let phoneNumber):
+            self.didSelectPhoneNumber(phoneNumber, layoutModel: model)
+        case .didSwipe:
+            self.reply(layoutModel: model, in: false)
+        case .didTapBottomAction:
+            if model.message.poll != nil {
+                self.showPollResults(for: model)
+            }
+        case .didTapPollOption(let optionIndex, let pollViewModel):
+            self.didTapPollOption(layoutModel: model, optionIndex: optionIndex, pollViewModel: pollViewModel)
+        case .didTapReadMore:
+            self.expandText(for: model)
+        }
+    }
+
     // MARK: ContextMenuDataSource
     
     open func canShow(contextMenu: ContextMenu, identifier: Identifier) -> Bool {
@@ -4311,12 +4843,64 @@ open class ChannelViewController: ViewController,
                 ]
             }
         }
+
+        // Outside the `!isPoll` guard: a poll is pinnable like any other message, and
+        // `PinnedMessageBodyFormatter` renders it as "Poll: <question>".
+        if channelViewModel.canUnpin(model: model) {
+            items += [
+                .init(
+                    title: L10n.Message.Action.Title.unpin,
+                    image: .messageActionUnpin,
+                    imageRenderingMode: .alwaysTemplate,
+                    accessibilityKey: "unpin",
+                    action: { [weak self] _ in
+                        self?.unpin(layoutModel: model)
+                    }
+                )
+            ]
+        } else if channelViewModel.canPin(model: model) {
+            items += [
+                .init(
+                    title: L10n.Message.Action.Title.pin,
+                    image: .messageActionPin,
+                    imageRenderingMode: .alwaysTemplate,
+                    // `MenuController` has no nested menus; the Delete item's approach is
+                    // to keep the menu up and swap the item list in place.
+                    dismissOnAction: false,
+                    accessibilityKey: "pin",
+                    action: { [weak self] _ in
+                        contextMenu.actionController?.emojiController.view.isHidden = true
+                        contextMenu.reload(items: [
+                            .init(
+                                title: L10n.Message.Action.Subtitle.pinAll,
+                                image: .messageActionPin,
+                                imageRenderingMode: .alwaysTemplate,
+                                accessibilityKey: "pinAll",
+                                action: { [weak self] _ in
+                                    self?.pin(layoutModel: model, scope: .forAll)
+                                }
+                            ),
+                            .init(
+                                title: L10n.Message.Action.Subtitle.pinMe,
+                                image: .messageActionPin,
+                                imageRenderingMode: .alwaysTemplate,
+                                accessibilityKey: "pinMe",
+                                action: { [weak self] _ in
+                                    self?.pin(layoutModel: model, scope: .forMe)
+                                }
+                            )
+                        ])
+                    }
+                )
+            ]
+        }
         if !channelViewModel.isReadOnlyChannel {
             items += [
                 .init(
                     title: L10n.Message.Action.Title.reply,
                     image: .messageActionReply,
                     imageRenderingMode: .alwaysTemplate,
+                    accessibilityKey: "reply",
                     action: { [weak self] _ in
                         self?.reply(layoutModel: model, in: false)
                     }

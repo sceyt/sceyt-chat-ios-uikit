@@ -25,6 +25,10 @@ open class ClientConnectionHandler: NSObject, ChatClientDelegate {
                 // A sync is what normally replays stored message deletes; without it they would
                 // never reach the server.
                 SyncService.sendPendingMessageDeletes()
+                // Same for messages still waiting to go out — including the ones whose
+                // attachments `AttachmentTransfer` parked in `.pending` because the upload was
+                // attempted while offline. Resending is what restarts those uploads.
+                SyncService.sendPendingMessages()
             }
 
             if !SceytChatUIKit.shared.chatClient.user.id.isEmpty {

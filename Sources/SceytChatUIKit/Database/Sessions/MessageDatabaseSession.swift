@@ -269,6 +269,17 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
             }
         }
+
+        // Every message write funnels through here — server page, incoming event, edit ack,
+        // send ack, forward, notification payload — so this one call keeps a pinned message's
+        // preview snapshot fresh, auto-unpins a soft delete, and promotes tid -> server id.
+        // It cannot be done with a relationship key path: RelationshipKeyPathsObserver
+        // resolves a single hop. See PinnedMessageDTO.
+        syncPin(for: dto)
+        // ...and this applies the pin state the server nests on the message itself. Must run
+        // after `syncPin`, which owns the pin-row -> mirror direction; this is the more
+        // authoritative server -> mirror signal. See `applyPinDetails`.
+        applyPinDetails(message.pin, to: dto)
         return dto
     }
 
@@ -350,6 +361,13 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(attachments: [Attachment], dto: MessageDTO) -> MessageDTO {
+        // Rows of this message still waiting for their upload: a local file and no url yet. The
+        // ack gives them a server id and tid 0, and when SceytChat uploaded the file itself a url
+        // they never had, so neither lookup below finds them. Unclaimed, they were orphaned and
+        // the message got a new row with no local file, which the sender then showed blurred.
+        var pendingUploads = Array(dto.attachments ?? []).filter {
+            ($0.url ?? "").isEmpty && !($0.filePath ?? "").isEmpty
+        }
         dto.attachments = .init(
             attachments.compactMap {
                 var attachmentDTO: AttachmentDTO?
@@ -360,8 +378,17 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     if $0.tid != 0 {
                         attachmentDTO = AttachmentDTO.fetch(tid: Int64($0.tid), message: dto, context: self)
                     } else if $0.id != 0 {
-                        attachmentDTO = AttachmentDTO.fetchOrCreate(id: $0.id, context: self)
+                        attachmentDTO = AttachmentDTO.fetch(id: $0.id, context: self)
                     }
+                }
+                if attachmentDTO == nil {
+                    attachmentDTO = AttachmentDTO.claimPendingUpload(for: $0, from: &pendingUploads)
+                }
+                if let attachmentDTO {
+                    pendingUploads.removeAll { $0 == attachmentDTO }
+                }
+                if attachmentDTO == nil, $0.tid == 0, $0.id != 0 {
+                    attachmentDTO = AttachmentDTO.fetchOrCreate(id: $0.id, context: self)
                 }
                 if attachmentDTO == nil, let url = $0.url {
                     attachmentDTO = AttachmentDTO.fetchOrCreate(url: url, message: dto, context: self)
@@ -966,6 +993,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     }
                 }
             }
+            dropPin(for: dto)
             delete(dto)
         }
     }
@@ -993,6 +1021,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     }
                 }
             }
+            dropPin(for: dto)
             delete(dto)
         }
     }
@@ -1115,6 +1144,12 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 let keptParents = MessageDTO.fetch(request: parentsRequest, context: self)
                 for parent in keptParents {
                     parent.replied = true
+                    // The stub survives the sweep, but its pin row does not — drop its
+                    // pin details or the bubble keeps claiming to be pinned.
+                    if let details = parent.pinDetails {
+                        delete(details)
+                        parent.pinDetails = nil
+                    }
                 }
                 request.predicate = NSCompoundPredicate(type: .and, subpredicates: [
                     predicate,
@@ -1122,6 +1157,9 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 ])
             }
             try batchDelete(fetchRequest: request)
+            // NSBatchDeleteRequest ignores deletion rules and PinnedMessageDTO holds no
+            // relationship anyway, so the pin rows have to be swept by hand.
+            unpinMessages(channelId: channelId, before: date)
             try? deleteAllAttachments(channelId: channelId, before: date)
             if let date,
                let channel = ChannelDTO.fetch(id: channelId, context: self)
@@ -1468,10 +1506,26 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             logger.verbose("Deleting \(expiredMessages.count) expired auto-delete messages")
 
             for message in expiredMessages {
+                // Deleted straight through the context, with nothing to cascade to the
+                // pin table — drop the pin explicitly or it outlives its message.
+                dropPin(for: message)
                 delete(message)
             }
         } catch {
             logger.errorIfNotNil(error, "Failed to fetch expired auto-delete messages")
         }
+    }
+}
+
+private extension AttachmentDTO {
+    /// The pending-upload row an ack attachment stands for: one of the same type and name, or the
+    /// only one of that type. Anything more ambiguous is left alone.
+    static func claimPendingUpload(for attachment: Attachment, from rows: inout [AttachmentDTO]) -> AttachmentDTO? {
+        let sameType = rows.filter { $0.type == attachment.type }
+        let sameName = sameType.filter { $0.name != nil && $0.name == attachment.name }
+        guard let match = sameName.first ?? (sameType.count == 1 ? sameType.first : nil)
+        else { return nil }
+        rows.removeAll { $0 == match }
+        return match
     }
 }

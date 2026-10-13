@@ -112,17 +112,13 @@ extension MessageCell {
                 let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
                 blurEffectView.isHidden = !isViewOnce
                 fireIconContainerView.isHidden = !isViewOnce
-                if isViewOnce {
-                    playButton.isHidden = true
-                } else {
-                    if data.attachment.status == .done || fileProvider.filePath(attachment: data.attachment) != nil {
-                        playButton.isHidden = false
-                    } else {
-                        playButton.isHidden = true
-                    }
-                }
 
+                // Resolve the play button *after* the transfer state, not before: binding a
+                // video whose bytes are already on disk while its ring is still on screen
+                // (a rebind mid-download, or the frames between 100% and the ring shrinking
+                // out) used to draw the play glyph straight through the full circle.
                 applyTransferStatus(data.transferStatus)
+                updatePlayButtonVisibility()
 
                 if let filePath = data.attachment.filePath,
                    filePath.hasPrefix("/local/"),
@@ -162,8 +158,6 @@ extension MessageCell {
             guard progressView.progress != progress
             else { return }
             if progress > 0, progress < 1 {
-                playButton.isHidden = true
-
                 // Hide viewOnce blur and fire icon during upload/download to avoid double blur
                 let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
                 if isViewOnce {
@@ -171,22 +165,26 @@ extension MessageCell {
                 }
             }
             super.setProgress(progress)
+            updatePlayButtonVisibility()
         }
-        
-        open override func willHideProgressView() {
-            super.willHideProgressView()
-            let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
-            guard !isViewOnce else { return }
 
-            UIView.performWithoutAnimation {
-                playButton.transform = .init(scaleX: 0.01, y: 0.01)
-                playButton.isHidden = false
+        /// The play button and the transfer overlay share the centre of the thumbnail and are
+        /// the same size (their dimensions are pinned to each other), so at most one of them
+        /// may ever be on screen. `isTransferOverlayVisible` stays true for the whole
+        /// shrink-out, which is what keeps the completed ring from being drawn under the play
+        /// glyph on the last frames of a download.
+        open func updatePlayButtonVisibility() {
+            guard let data else { return }
+            let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
+            let isPlayable = data.attachment.status == .done
+                || fileProvider.filePath(attachment: data.attachment) != nil
+            let isHidden = isViewOnce || !isPlayable || isTransferOverlayVisible
+            if isHidden {
+                // A view recycled mid-pop would otherwise come back holding the shrunken
+                // transform the reveal animates away from.
+                playButton.transform = .identity
             }
-            UIView.animate(withDuration: progressView.animationDuration + 0.1) {
-                self.playButton.transform = .init(scaleX: 1, y: 1)
-            } completion: { _ in
-                self.playButton.transform = .identity
-            }
+            playButton.isHidden = isHidden
         }
         
         open override func didHideProgressView() {
@@ -194,8 +192,22 @@ extension MessageCell {
 
             // Show viewOnce blur and fire icon again after upload/download completes
             let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
-            playButton.isHidden = isViewOnce
             fireIconContainerView.isHidden = !isViewOnce
+
+            // The reveal runs here rather than in `willHideProgressView`: popping the play
+            // button in as the ring starts shrinking put both in the middle of the thumbnail
+            // for the length of that animation, with the ring still drawn at 100%.
+            let wasHidden = playButton.isHidden
+            updatePlayButtonVisibility()
+            guard wasHidden, !playButton.isHidden else { return }
+            UIView.performWithoutAnimation {
+                playButton.transform = .init(scaleX: 0.01, y: 0.01)
+            }
+            UIView.animate(withDuration: progressView.animationDuration + 0.1) {
+                self.playButton.transform = .init(scaleX: 1, y: 1)
+            } completion: { _ in
+                self.playButton.transform = .identity
+            }
         }
 
         override open func update(status: ChatMessage.Attachment.TransferStatus) {
@@ -209,6 +221,9 @@ extension MessageCell {
                 let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
                 fireIconContainerView.isHidden = !isViewOnce
             }
+            // A paused/failed download puts the overlay back on screen without going through
+            // `setProgress`, so the play button has to be re-resolved from here too.
+            updatePlayButtonVisibility()
         }
 
         open override func layoutSubviews() {

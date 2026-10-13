@@ -35,11 +35,9 @@ extension ChatMessage {
         
         public var originUrl: URL {
             if let filePath {
-                logger.verbose("[Attachment] originUrl filePath \(filePath)")
                 return URL(fileURLWithPath: filePath)
             }
             if let url, let _url = URL(string: url) {
-                logger.verbose("[Attachment] originUrl url \(url)")
                 return _url
             }
             //should not be happen
@@ -58,6 +56,18 @@ extension ChatMessage {
         }
         
         public var assetFilePath: String?
+
+        /// True while this attachment's bytes have never left the device: it has a local
+        /// source file and no remote url yet.
+        ///
+        /// Only an outgoing attachment can be in this state — anything received carries the
+        /// url it was (or will be) downloaded from. It is the discriminator every
+        /// "the file is on disk, so the transfer must be over" rule needs: for a download the
+        /// local file is the *result*, for an upload it is the *source*, so a `.pending`
+        /// upload must not be reconciled to `.done` just because its file exists.
+        public var isPendingUpload: Bool {
+            (url ?? "").isEmpty && !(filePath ?? "").isEmpty
+        }
 
         /// Replaces the metadata JSON and re-runs the eager decode so
         /// `imageDecodedMetadata`/`voiceDecodedMetadata` stay in sync — they are

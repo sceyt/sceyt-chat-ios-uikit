@@ -52,6 +52,7 @@ extension ChannelInfoViewController {
                     previewer: { [weak self] in self?.previewer?() },
                     item: PreviewItem.attachment(data.attachment)
                 )
+                previewAttachment = data.attachment
                 update(status: data.attachment.status)
             }
         }

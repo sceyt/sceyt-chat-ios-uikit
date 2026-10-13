@@ -443,6 +443,12 @@ public enum L10n {
       /// No Messages yet
       public static let title = L10n.tr("Localizable", "channel.noMessages.title", fallback: "No Messages yet")
     }
+    public enum PinnedMessages {
+      /// No pinned messages
+      public static let empty = L10n.tr("Localizable", "channel.pinnedMessages.empty", fallback: "No pinned messages")
+      /// Pinned Messages
+      public static let title = L10n.tr("Localizable", "channel.pinnedMessages.title", fallback: "Pinned Messages")
+    }
     public enum Private {
       /// Members
       public static let sectionTitle = L10n.tr("Localizable", "channel.private.sectionTitle", fallback: "Members")
@@ -637,6 +643,10 @@ public enum L10n {
         public static let deleteAll = L10n.tr("Localizable", "message.action.subtitle.deleteAll", fallback: "Delete For All")
         /// Delete For Me
         public static let deleteMe = L10n.tr("Localizable", "message.action.subtitle.deleteMe", fallback: "Delete For Me")
+        /// Pin For All
+        public static let pinAll = L10n.tr("Localizable", "message.action.subtitle.pinAll", fallback: "Pin For All")
+        /// Pin For Me
+        public static let pinMe = L10n.tr("Localizable", "message.action.subtitle.pinMe", fallback: "Pin For Me")
       }
       public enum Title {
         /// Add
@@ -659,6 +669,8 @@ public enum L10n {
         public static let forward = L10n.tr("Localizable", "message.action.title.forward", fallback: "Forward")
         /// Info
         public static let info = L10n.tr("Localizable", "message.action.title.info", fallback: "Info")
+        /// Pin
+        public static let pin = L10n.tr("Localizable", "message.action.title.pin", fallback: "Pin")
         /// React
         public static let react = L10n.tr("Localizable", "message.action.title.react", fallback: "React")
         /// Remove
@@ -671,6 +683,8 @@ public enum L10n {
         public static let report = L10n.tr("Localizable", "message.action.title.report", fallback: "Report")
         /// Select
         public static let select = L10n.tr("Localizable", "message.action.title.select", fallback: "Select")
+        /// Unpin
+        public static let unpin = L10n.tr("Localizable", "message.action.title.unpin", fallback: "Unpin")
         /// Video Call
         public static let videoCall = L10n.tr("Localizable", "message.action.title.videoCall", fallback: "Video Call")
       }
@@ -724,6 +738,16 @@ public enum L10n {
       public static let bordersToday = L10n.tr("Localizable", "message.list.borders-today", fallback: "Today")
       /// New Messages
       public static let unread = L10n.tr("Localizable", "message.list.unread", fallback: "New Messages")
+    }
+    public enum Pinned {
+      /// Poll: %@
+      public static func poll(_ p1: Any) -> String {
+        return L10n.tr("Localizable", "message.pinned.poll", String(describing: p1), fallback: "Poll: %@")
+      }
+      /// %1$@: %2$@
+      public static func voice(_ p1: Any, _ p2: Any) -> String {
+        return L10n.tr("Localizable", "message.pinned.voice", String(describing: p1), String(describing: p2), fallback: "%1$@: %2$@")
+      }
     }
     public enum Reply {
       /// %d Replies
@@ -933,6 +957,34 @@ public enum L10n {
       /// %@ left the group
       public static func leaveGroup(_ p1: Any) -> String {
         return L10n.tr("Localizable", "system.message.leaveGroup", String(describing: p1), fallback: "%@ left the group")
+      }
+      /// %1$@ pinned: "%2$@"
+      public static func pinnedBody(_ p1: Any, _ p2: Any) -> String {
+        return L10n.tr("Localizable", "system.message.pinnedBody", String(describing: p1), String(describing: p2), fallback: "%1$@ pinned: \"%2$@\"")
+      }
+      /// %@ pinned a file
+      public static func pinnedFile(_ p1: Any) -> String {
+        return L10n.tr("Localizable", "system.message.pinnedFile", String(describing: p1), fallback: "%@ pinned a file")
+      }
+      /// %@ pinned a message
+      public static func pinnedMessage(_ p1: Any) -> String {
+        return L10n.tr("Localizable", "system.message.pinnedMessage", String(describing: p1), fallback: "%@ pinned a message")
+      }
+      /// %@ pinned a photo
+      public static func pinnedPhoto(_ p1: Any) -> String {
+        return L10n.tr("Localizable", "system.message.pinnedPhoto", String(describing: p1), fallback: "%@ pinned a photo")
+      }
+      /// %@ pinned a poll
+      public static func pinnedPoll(_ p1: Any) -> String {
+        return L10n.tr("Localizable", "system.message.pinnedPoll", String(describing: p1), fallback: "%@ pinned a poll")
+      }
+      /// %@ pinned a video
+      public static func pinnedVideo(_ p1: Any) -> String {
+        return L10n.tr("Localizable", "system.message.pinnedVideo", String(describing: p1), fallback: "%@ pinned a video")
+      }
+      /// %@ pinned a voice message
+      public static func pinnedVoice(_ p1: Any) -> String {
+        return L10n.tr("Localizable", "system.message.pinnedVoice", String(describing: p1), fallback: "%@ pinned a voice message")
       }
       /// %@ removed %@
       public static func removeGroupMember(_ p1: Any, _ p2: Any) -> String {

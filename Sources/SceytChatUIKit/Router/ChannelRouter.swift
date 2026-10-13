@@ -89,18 +89,7 @@ open class ChannelRouter: Router<ChannelViewController> {
     open func showReactions(
         message: ChatMessage
     ) -> ReactionsInfoViewController {
-        let reactionPageViewController = Components.reactionsInfoViewController.init()
-        let reactionScores = message.reactionScores?.sorted(by: { $0.key > $1.key && $0.value > $1.value }) ?? []
-        let reactionScoreViewModel = Components.reactionScoreViewModel.init(messageId: message.id, reactionScores: reactionScores)
-        var userReactionViewModels: [UserReactionViewModel] = .init()
-        userReactionViewModels.reserveCapacity(reactionScores.count + 1)
-        userReactionViewModels.append(Components.userReactionViewModel.init(messageId: message.id, reactionKey: nil))
-        reactionScores.forEach { key, _ in
-            userReactionViewModels.append(Components.userReactionViewModel.init(messageId: message.id, reactionKey: key))
-        }
-        reactionPageViewController.reactionScoreViewModel = reactionScoreViewModel
-        reactionPageViewController.userReactionsViewModel = userReactionViewModels
-        reactionPageViewController.modalPresentationStyle = .custom
+        let reactionPageViewController = ReactionsInfoViewController.build(message: message)
         rootViewController.present(reactionPageViewController, animated: true)
         return reactionPageViewController
     }
@@ -181,11 +170,7 @@ open class ChannelRouter: Router<ChannelViewController> {
     }
     
     open func showForward(_ handler: @escaping (([ChatChannel]) -> Void)) {
-        let viewController = Components.forwardViewController.init()
-        viewController.viewModel = Components.channelForwardViewModel.init(handler: handler)
-        let nav = Components.navigationController.init()
-        nav.viewControllers = [viewController]
-        rootViewController.present(nav, animated: true)
+        rootViewController.present(ForwardViewController.build(handler), animated: true)
     }
     
     open func showJoinGroup(inviteLink: String) {
@@ -239,6 +224,28 @@ open class ChannelRouter: Router<ChannelViewController> {
         let nav = Components.navigationController.init()
         nav.viewControllers = [viewController]
         rootViewController.present(nav, animated: true)
+    }
+
+    /// Presents the standalone pinned-messages list.
+    ///
+    /// The screen sits over this conversation and closes itself — through its own "X", or
+    /// through a row's arrow, which hands the pin to `onSelect` so the message list
+    /// underneath jumps to it.
+    @discardableResult
+    open func showPinnedMessageList(
+        onSelect: @escaping (PinnedMessage) -> Void
+    ) -> ChannelPinnedMessageListViewController {
+        let viewController = Components.channelPinnedMessageListViewController.init()
+        viewController.viewModel = Components.channelPinnedMessageListViewModel
+            .init(channel: rootViewController.channelViewModel.channel)
+        viewController.onSelect = onSelect
+        // The list renders the conversation's own message cells, so its rows raise the
+        // conversation's actions; it hands the ones it cannot serve itself back here.
+        viewController.channelViewController = rootViewController
+        let navigationController = Components.navigationController.init()
+        navigationController.viewControllers = [viewController]
+        rootViewController.present(navigationController, animated: true)
+        return viewController
     }
 
     open func showPollResults(pollResults: PollDetails, messageID: MessageId) {

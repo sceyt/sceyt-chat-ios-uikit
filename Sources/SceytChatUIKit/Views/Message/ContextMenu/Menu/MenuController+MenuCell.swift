@@ -59,6 +59,9 @@ extension MenuController {
         open var item: MenuItem? {
             didSet {
                 if let item {
+                    accessibilityIdentifier = item.accessibilityKey.map {
+                        SceytChatUIKit.AccessibilityIdentifiers.Channel.contextMenuItem($0)
+                    }
                     if item.attributedTitle != nil {
                         titleLabel.attributedText = item.attributedTitle
                     } else {

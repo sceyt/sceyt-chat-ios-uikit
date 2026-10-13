@@ -71,13 +71,29 @@ public final class RelationshipKeyPathsObserver<ResultType: NSManagedObject>: NS
         // Runs synchronously on whichever context queue posted the notification
         // (observer is registered with object: nil). The managed objects may only be
         // touched here, on their own queue; only their objectIDs may leave it.
-        guard let updatedObjects = notification.userInfo?[NSUpdatedObjectsKey] as? Set<NSManagedObject>
-        else { return }
-        guard let updatedObjectIDs = updatedObjects.updatedObjectIDs(for: keyPaths),
-                !updatedObjectIDs.isEmpty
-        else { return }
+        let info = notification.userInfo
+        var resolved = Set<NSManagedObjectID>()
+
+        if let updated = info?[NSUpdatedObjectsKey] as? Set<NSManagedObject>,
+           let ids = updated.updatedObjectIDs(for: keyPaths) {
+            resolved.formUnion(ids)
+        }
+
+        // A watched related object appearing changes what the parent renders just as much
+        // as one of its fields changing — pinning a message inserts a `PinDetailsDTO`,
+        // which never shows up under `NSUpdatedObjectsKey`. `changedValues()` is populated
+        // for an insert, so these resolve the same way updates do.
+        //
+        // Deletes are deliberately not walked: resolving a deleted object's inverse faults
+        // it, which throws once Core Data invalidates it during teardown.
+        if let inserted = info?[NSInsertedObjectsKey] as? Set<NSManagedObject>,
+           let ids = inserted.updatedObjectIDs(for: keyPaths) {
+            resolved.formUnion(ids)
+        }
+        guard !resolved.isEmpty else { return }
+        let ids = resolved
         fetchedResultsController.managedObjectContext.perform {
-            self.updatedObjectIDs.formUnion(updatedObjectIDs)
+            self.updatedObjectIDs.formUnion(ids)
         }
     }
     

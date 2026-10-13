@@ -179,13 +179,29 @@ open class ChannelMessageSender: DataProvider {
             logger.info("Resending message with tid \(chatMessage.tid) upload attachments if needed")
         }
         let traceTid = Int64(chatMessage.tid)
+        // A reconnect resends the pending messages from more than one trigger (the connection
+        // handler and the channel sync both do), so the same message was often resent twice at
+        // once: two uploads of one file and two sends of one message. A resend of a tid already
+        // in flight waits for that one instead.
+        let finish: (Error?) -> Void
+        if traceTid == 0 {
+            finish = { completion?($0) }
+        } else {
+            guard let token = Self.beginResend(tid: traceTid, completion: completion) else {
+                logger.info("Resend of tid \(chatMessage.tid) already in flight, waiting for it")
+                return
+            }
+            finish = { error in
+                Self.endResend(tid: traceTid, token: token).forEach { $0?(error) }
+            }
+        }
         uploadAttachmentsIfNeeded(message: chatMessage) { message, error in
             if error == nil, let message {
                 let sendableMessage = message.builder.build()
                 guard let sendableMessage = self.willResend(sendableMessage)
                 else {
                      logger.info("Message with tid \(message.tid) build failed can't resend message")
-                    completion?(nil)
+                    finish(nil)
                     return
                 }
                 
@@ -204,7 +220,7 @@ open class ChannelMessageSender: DataProvider {
                             "reason=noAckMessage badParamDelete=\(error?.sceytChatCode == .badMessageParam) "
                             + "\(MessageSendTrace.describe(error: error))"
                         )
-                        completion?(error)
+                        finish(error)
                         return
                     }
                     if sentMessage.deliveryStatus == .pending || sentMessage.deliveryStatus == .failed {
@@ -216,7 +232,7 @@ open class ChannelMessageSender: DataProvider {
                             "reason=status=\(sentMessage.deliveryStatus) localRowUnchanged=true "
                             + "\(MessageSendTrace.describe(error: error))"
                         )
-                        completion?(error)
+                        finish(error)
                         return
                     }
                      logger.info("Message with tid \(sentMessage.tid), id \(sentMessage.id) will store in db")
@@ -272,7 +288,7 @@ open class ChannelMessageSender: DataProvider {
                     }) { dbError in
                         logger.info("[ResendAck] tid \(resendAckTid) database.write completion, error: \(String(describing: dbError))")
                         flushOnce.fire(nil)
-                        completion?(dbError)
+                        finish(dbError)
                     }
                 }
                 Self.beginSend(tid: Int64(sendableMessage.tid))
@@ -297,7 +313,7 @@ open class ChannelMessageSender: DataProvider {
                     "resend.attachmentUploadFailed", tid: traceTid, channelId: self.channelId,
                     "\(MessageSendTrace.describe(error: error))"
                 )
-                completion?(error)
+                finish(error)
             }
         }
     }
@@ -544,7 +560,12 @@ open class ChannelMessageSender: DataProvider {
         }
     
     open func uploadableAttachments(of message: ChatMessage) -> [ChatMessage.Attachment] {
-        guard let attachments = message.attachments?.filter({ $0.status != .done && $0.type != "link" && $0.filePath != nil }),
+        // `.done` alone does not mean uploaded: an attachment with no url has never been, whatever
+        // its status says. Skipping it sent the message with only a local path, so SceytChat
+        // uploaded the file itself, to a url the app's data session could not download.
+        guard let attachments = message.attachments?.filter({
+            $0.type != "link" && $0.filePath != nil && ($0.status != .done || $0.isPendingUpload)
+        }),
               !attachments.isEmpty
         else { return [] }
         
@@ -723,5 +744,45 @@ public extension ChannelMessageSender {
             return false
         }
         return true
+    }
+
+    /// A resend in flight, with every caller waiting on its outcome.
+    private struct InFlightResend {
+        let token: UUID
+        var waiters: [((Error?) -> Void)?]
+        let startedAt: Date
+    }
+
+    /// A resend older than this is replaced, so one whose completion never arrives can't stop that
+    /// message from being resent for the rest of the session. Long enough to cover the upload.
+    public static var inFlightResendStaleInterval: TimeInterval = 300
+
+    nonisolated(unsafe) private static var inFlightResends = [Int64: InFlightResend]()
+
+    /// Registers `completion` for a resend of `tid`. Returns the token the caller ends the resend
+    /// with, or nil when a resend is already running and will call `completion` when it ends.
+    static func beginResend(tid: Int64, completion: ((Error?) -> Void)?, now: Date = Date()) -> UUID? {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        if var existing = inFlightResends[tid],
+           now.timeIntervalSince(existing.startedAt) <= inFlightResendStaleInterval {
+            existing.waiters.append(completion)
+            inFlightResends[tid] = existing
+            return nil
+        }
+        // A stale resend's callers are carried over, so they still hear how the message ends.
+        let token = UUID()
+        let carried = inFlightResends[tid]?.waiters ?? []
+        inFlightResends[tid] = InFlightResend(token: token, waiters: carried + [completion], startedAt: now)
+        return token
+    }
+
+    /// Ends the resend `token` started and returns the callers to notify. Empty when a newer resend
+    /// has replaced it, or when it was already ended.
+    static func endResend(tid: Int64, token: UUID) -> [((Error?) -> Void)?] {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        guard inFlightResends[tid]?.token == token else { return [] }
+        return inFlightResends.removeValue(forKey: tid)?.waiters ?? []
     }
 }
