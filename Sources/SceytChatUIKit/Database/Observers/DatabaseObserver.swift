@@ -28,13 +28,15 @@ open class DatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetchedResu
     /// Every item, in **unspecified** order — this is backed by a dictionary.
     /// Use `orderedItems` whenever the request's sort descriptors matter.
     public var items: [Item] {
-        Array(cache.values)
+        onContextQueue { Array(cache.values) }
     }
 
     /// Every item in the order the fetch request asked for.
     public var orderedItems: [Item] {
-        guard let objects = controller.fetchedObjects else { return [] }
-        return objects.map { cache[$0.objectID] ?? itemCreator($0) }
+        onContextQueue {
+            guard let objects = controller.fetchedObjects else { return [] }
+            return objects.map { cache[$0.objectID] ?? itemCreator($0) }
+        }
     }
     
     private var relationshipKeyPathsObserver: RelationshipKeyPathsObserver<DTO>?
@@ -63,18 +65,20 @@ open class DatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetchedResu
     }
     
     open var isEmpty: Bool {
-        controller.fetchedObjects?.isEmpty == .some(true)
+        onContextQueue { controller.fetchedObjects?.isEmpty == .some(true) }
     }
     
     open var numberOfSections: Int {
-        controller.sections?.count ?? 0
+        onContextQueue { controller.sections?.count ?? 0 }
     }
     
     open func numberOfItems(in section: Int) -> Int {
-        guard let sections = controller.sections,
-                sections.indices.contains(section)
-        else { return 0 }
-        return sections[section].numberOfObjects
+        onContextQueue {
+            guard let sections = controller.sections,
+                  sections.indices.contains(section)
+            else { return 0 }
+            return sections[section].numberOfObjects
+        }
     }
     
     open var count: Int {
@@ -82,23 +86,25 @@ open class DatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetchedResu
     }
     
     open func item(at indexPath: IndexPath) -> Item? {
-        guard canGetObject(at: indexPath)
-        else { return nil }
-        let object = controller.object(at: indexPath)
-        if let item = cache[object.objectID] {
-            return item
-        } else {
-            let item = itemCreator(object)
-            cache[object.objectID] = item
-            return item
+        onContextQueue {
+            guard canGetObject(at: indexPath)
+            else { return nil }
+            let object = controller.object(at: indexPath)
+            if let item = cache[object.objectID] {
+                return item
+            } else {
+                let item = itemCreator(object)
+                cache[object.objectID] = item
+                return item
+            }
         }
     }
     
     open func refresh(at indexPath: IndexPath) {
-        guard canGetObject(at: indexPath)
-        else { return }
-        let object = controller.object(at: indexPath)
         controller.managedObjectContext.perform {
+            guard self.canGetObject(at: indexPath)
+            else { return }
+            let object = self.controller.object(at: indexPath)
             self.controller.managedObjectContext.refresh(object, mergeChanges: true)
         }
     }
@@ -148,6 +154,19 @@ open class DatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetchedResu
         controller.managedObjectContext.performAndWait {
             perform()
         }
+    }
+    
+    /// The fetched results controller and `cache` are mutated by the delegate callbacks on the
+    /// context's queue. When the context is a private-queue (background) one, reading them from
+    /// the main thread races those writes and corrupts `cache` (crash in `Dictionary.lookup`), so
+    /// every read hops onto the context's queue. For the main-queue `viewContext` read from the
+    /// main thread this runs inline.
+    private func onContextQueue<T>(_ block: () -> T) -> T {
+        var result: T!
+        context.performAndWait {
+            result = block()
+        }
+        return result
     }
     
     private func canGetObject(at indexPath: IndexPath) -> Bool {
