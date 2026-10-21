@@ -182,6 +182,11 @@ extension SceytChatUIKit {
                 public static let date = "sceyt_chat_channel_message_cell_date"
                 /// The small pin beside the timestamp, present only while the message is pinned.
                 public static let pinnedIcon = "sceyt_chat_channel_message_cell_pinned_icon"
+                /// The delivery tick of an outgoing message. Its `accessibilityValue` is the status:
+                /// "pending", "sent", "delivered", "read" or "failed".
+                public static let status = "sceyt_chat_channel_message_cell_status"
+                /// The "edited" label, present only while the message is edited.
+                public static let edited = "sceyt_chat_channel_message_cell_edited"
                 /// The "New messages" separator shown on the last displayed message.
                 public static let unreadSeparator = "sceyt_chat_channel_message_cell_unread_separator"
                 /// The quoted reply preview; tapping it scrolls to the parent message.

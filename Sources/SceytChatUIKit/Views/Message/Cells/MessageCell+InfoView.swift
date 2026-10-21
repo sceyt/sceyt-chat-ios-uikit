@@ -72,6 +72,8 @@ extension MessageCell {
             eyeView.image = appearance.viewCountIcon.withRenderingMode(.alwaysTemplate)
             pinView.image = appearance.pinnedIcon.withRenderingMode(.alwaysTemplate)
             pinView.isAccessibilityElement = true
+            tickView.isAccessibilityElement = true
+            tickView.accessibilityLabel = "Message delivery status"
             stateLabel.font = appearance.messageStateLabelAppearance.font
             stateLabel.textColor = appearance.messageStateLabelAppearance.foregroundColor
             dateLabel.font = appearance.messageDateLabelAppearance.font

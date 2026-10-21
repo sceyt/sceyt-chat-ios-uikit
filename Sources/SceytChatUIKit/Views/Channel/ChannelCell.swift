@@ -703,6 +703,7 @@ extension ChannelListViewController {
             let hasDeliveryTick = ticksView.image != nil
             ticksView.isAccessibilityElement = hasDeliveryTick
             ticksView.accessibilityIdentifier = hasDeliveryTick ? CellAID.ticks : nil
+            ticksView.accessibilityValue = hasDeliveryTick ? data.lastMessage?.deliveryStatus.accessibilityStatus : nil
             updateTicksViewSize()
             // Show the unread badge when there are unread messages (a count to
             // display) or the channel was manually marked as unread (empty dot).

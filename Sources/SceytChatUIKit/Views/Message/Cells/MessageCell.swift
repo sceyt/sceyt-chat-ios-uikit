@@ -326,6 +326,8 @@ open class MessageCell: CollectionViewCell,
         textLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.body
         infoView.dateLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.date
         infoView.pinView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.pinnedIcon
+        infoView.tickView.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.status
+        infoView.stateLabel.accessibilityIdentifier = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell.edited
         do {
             typealias CellAID = SceytChatUIKit.AccessibilityIdentifiers.Channel.Cell
             nameLabel.accessibilityIdentifier = CellAID.senderName
@@ -514,11 +516,13 @@ open class MessageCell: CollectionViewCell,
                   data.message.state != .deleted
             else {
                 infoView.tickView.image = nil
+                infoView.tickView.accessibilityValue = nil
                 return
             }
             let image = infoView.backgroundView.isHidden || data.message.deliveryStatus == .displayed ? deliveryStatusImage(deliveryStatus) :
             deliveryStatusImage(deliveryStatus).withTintColor(appearance.onOverlayColor, renderingMode: .alwaysTemplate)
             infoView.tickView.image = image
+            infoView.tickView.accessibilityValue = deliveryStatus.accessibilityStatus
             infoView.tickView.tintColor = appearance.onOverlayColor
         }
     }

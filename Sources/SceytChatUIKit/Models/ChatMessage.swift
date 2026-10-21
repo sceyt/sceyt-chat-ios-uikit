@@ -673,3 +673,16 @@ public extension ChatMessage {
     }
 }
 
+
+extension ChatMessage.DeliveryStatus {
+    /// Stable, non-localized value for UI tests. Do not change these strings.
+    var accessibilityStatus: String {
+        switch self {
+        case .pending: return "pending"
+        case .sent: return "sent"
+        case .received: return "delivered"
+        case .displayed: return "read"
+        case .failed: return "failed"
+        }
+    }
+}
