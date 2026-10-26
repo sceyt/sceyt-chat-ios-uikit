@@ -22,7 +22,18 @@ open class FileStorage: Storage {
         return nil
     }()
     
-    public lazy var storagePath: String = {
+    // Backed by `static let` (initialized once, thread-safe via swift_once): these
+    // are read from background queues (e.g. concurrent thumbnail loads), and the
+    // former `lazy var` initialization was not thread-safe — racing first reads
+    // double-released the backing String and corrupted the heap.
+    private static let resolvedStoragePath = makeStoragePath()
+    private static let resolvedThumbnailPath = makeThumbnailPath(storagePath: resolvedStoragePath)
+
+    open var storagePath: String { Self.resolvedStoragePath }
+    open var thumbnailPath: String { Self.resolvedThumbnailPath }
+
+    private static func makeStoragePath() -> String {
+        let fileManager = FileManager.default
         let tmp = NSTemporaryDirectory()
         guard let documentDirectory = Self.documentDirectory
         else { return tmp }
@@ -36,9 +47,10 @@ open class FileStorage: Storage {
         } catch {
             return tmp
         }
-    }()
-    
-    public lazy var thumbnailPath: String = {
+    }
+
+    private static func makeThumbnailPath(storagePath: String) -> String {
+        let fileManager = FileManager.default
         let path = URL(fileURLWithPath: storagePath).appendingPathComponent("thumbnails").path
         if fileManager.fileExists(atPath: path) {
             return path
@@ -47,8 +59,8 @@ open class FileStorage: Storage {
             try fileManager.createDirectory(atPath: path, withIntermediateDirectories: false, attributes: nil)
         } catch {}
         return path
-    }()
-    
+    }
+
     open func store(transferId: String, fileName: String?, file path: String) -> String {
         var newPath = filePath(transferId: transferId)
         if let fileName {
