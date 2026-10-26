@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Combine
 
 open class CircularProgressView: View {
 
@@ -27,6 +28,7 @@ open class CircularProgressView: View {
     open var rotationDuration: TimeInterval = 0
     
     private var isSetupDone = false
+    private var appDidBecomeActiveObserver: AnyCancellable?
     
     open var rotateZ = true {
         didSet {
@@ -73,6 +75,19 @@ open class CircularProgressView: View {
         if rotateZ {
             createRotateZAnimation()
         }
+        // A spin taken off while the app is in the background is not re-installed there
+        // (see `rotateZAnimationDidStop`); bring it back once the app is active again.
+        appDidBecomeActiveObserver = NotificationCenter.default
+            .publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                self?.ensureRotateZAnimation()
+            }
+    }
+
+    open override func didMoveToWindow() {
+        super.didMoveToWindow()
+        // Removals while the ring was out of a window are not healed; heal on the way back.
+        ensureRotateZAnimation()
     }
 
     open var progress: CGFloat = 0 {
@@ -125,6 +140,9 @@ open class CircularProgressView: View {
             animation.isCumulative = true
             animation.repeatCount = .infinity
             animation.isRemovedOnCompletion = false
+            // Told when the spin is taken off the layer, whoever does it — see
+            // `rotateZAnimationDidStop`.
+            animation.delegate = RotateZAnimationStopObserver(owner: self)
             layer.add(animation, forKey: "rotationAnimation")
         }
         if Thread.isMainThread {
@@ -134,6 +152,30 @@ open class CircularProgressView: View {
         }
     }
     
+    /// Re-installs a spin that was taken off a ring that should still be spinning.
+    ///
+    /// The spin is an infinite animation, and anything that clears the layer's animations
+    /// ends it for good: UIKit's `prepareForReuse` strips every animation in a reused
+    /// cell's subtree, and owners clear their overlays with `removeAllAnimations()`. Core
+    /// Animation reports every such removal here, whoever made it, so a spinning ring
+    /// heals itself instead of freezing until someone happens to set `rotateZ` again. The
+    /// phase lock in `createRotateZAnimation` keeps the arc where it was. In the
+    /// background the re-install waits for `didBecomeActive`.
+    func rotateZAnimationDidStop() {
+        // Next turn of the run loop: the caller may be stopping the spin on purpose and
+        // about to set `rotateZ = false`.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, UIApplication.shared.applicationState != .background else { return }
+            self.ensureRotateZAnimation()
+        }
+    }
+
+    /// Installs the spin if this ring should be spinning and currently is not.
+    open func ensureRotateZAnimation() {
+        guard isSetupDone, rotateZ, window != nil else { return }
+        createRotateZAnimation()
+    }
+
     open func removeRotateZAnimation() {
         layer.removeAnimation(forKey: "rotationAnimation")
     }
@@ -150,5 +192,19 @@ open class CircularProgressView: View {
             .cgPath
         trackLayer.path = path
         progressLayer.path = path
+    }
+}
+
+/// Forwards the spin's stop to its ring without the animation retaining the ring
+/// (`CAAnimation.delegate` is strong, and the ring's layer retains the animation).
+private final class RotateZAnimationStopObserver: NSObject, CAAnimationDelegate {
+    weak var owner: CircularProgressView?
+
+    init(owner: CircularProgressView) {
+        self.owner = owner
+    }
+
+    func animationDidStop(_ anim: CAAnimation, finished flag: Bool) {
+        owner?.rotateZAnimationDidStop()
     }
 }
