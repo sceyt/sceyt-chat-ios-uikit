@@ -77,8 +77,38 @@ extension ChannelInfoViewController {
         open func onEvent(_ event: ChannelAttachmentListViewModel.Event) {
             switch event {
             case .change(let paths):
-                updateCollectionView(paths: paths)
+                // Updates are left out of the batch: `reloadItems` swaps the row for a freshly
+                // bound cell, so a finished download jumped to its new state — the button gone at
+                // once, the text and the sharp icon snapped in. Re-binding the visible rows in
+                // place lets each animate its own change (see `FileCell.data`).
+                var indexes = paths
+                indexes.updates = []
+                updateCollectionView(paths: indexes)
+                if !paths.updates.isEmpty {
+                    rebindVisibleCells()
+                }
             }
+        }
+
+        /// Re-binds every visible row to its current layout, in place. A row whose attachment
+        /// didn't change re-renders the same state, which is a no-op.
+        open func rebindVisibleCells() {
+            for cell in visibleCells.compactMap({ $0 as? ChannelInfoViewController.FileCell }) {
+                guard let indexPath = indexPath(for: cell) else { continue }
+                configure(cell, at: indexPath)
+            }
+        }
+
+        /// Binds `cell` to the layout at `indexPath`. Shared by `cellForItemAt` and
+        /// `rebindVisibleCells()`. The pause/resume subscription and the auto-download stay in
+        /// `cellForItemAt`: a re-bind would add a second subscription, and ask again for a
+        /// download that is already running.
+        open func configure(_ cell: ChannelInfoViewController.FileCell, at indexPath: IndexPath) {
+            cell.parentAppearance = appearance.cellAppearance
+            cell.data = fileViewModel.attachmentLayout(at: indexPath, onLoadThumbnail: { [weak cell] layout in
+                guard let cell, layout == cell.data else { return }
+                cell.setIcon(layout.thumbnail ?? cell.appearance.iconProvider.provideVisual(for: layout.attachment), animated: true)
+            })
         }
         
         public func numberOfSections(in collectionView: UICollectionView) -> Int {
@@ -91,11 +121,10 @@ extension ChannelInfoViewController {
         
         open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
             let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoFileCell.self)
-            cell.parentAppearance = appearance.cellAppearance
-            cell.data = fileViewModel.attachmentLayout(at: indexPath, onLoadThumbnail: { [weak cell] layout in
-                guard layout == cell?.data else { return }
-                cell?.iconView.image = layout.thumbnail
-            })
+            configure(cell, at: indexPath)
+            if let attachmentLayout = cell.data {
+                fileViewModel.downloadAttachmentIfNeeded(attachmentLayout)
+            }
             cell.event
                 .receive(on: DispatchQueue.main)
                 .sink { [weak self] in
@@ -107,9 +136,6 @@ extension ChannelInfoViewController {
                         self.fileViewModel.resumeDownload(layout)
                     }
                 }.store(in: &cell.subscriptions)
-            if let attachmentLayout = cell.data {
-                fileViewModel.downloadAttachmentIfNeeded(attachmentLayout)
-            }
             return cell
         }
         

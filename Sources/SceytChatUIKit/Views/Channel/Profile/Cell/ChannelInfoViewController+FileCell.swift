@@ -100,16 +100,54 @@ extension ChannelInfoViewController {
             progressView.pin(to: downloadButton)
         }
         
+        /// How long the row's state changes animate: the download button shrinking out while
+        /// the text widens into its place, and the icon and text crossfading to new content.
+        public static var transitionDuration: TimeInterval = 0.3
+
+        /// The transfer identity this row last rendered. A bind of the same attachment is a state
+        /// change of the row on screen (the grid re-binds a visible cell in place when its
+        /// attachment updates) and animates; a bind of a different one is a reuse and doesn't.
+        private var renderedIdentity: String?
+
         open var data: MessageLayoutModel.AttachmentLayout? {
             didSet {
                 guard let data = data
                 else { return }
                 let attachment = data.attachment
-                iconView.image = appearance.iconProvider.provideVisual(for: attachment)
-                titleLabel.text = appearance.fileNameFormatter.format(attachment)
-                detailLabel.text = appearance.subtitleFormatter.format(attachment)
-                
-                updateStatus()
+                let identity = AttachmentTransfer.transferIdentity(of: attachment)
+                let animated = identity == renderedIdentity && window != nil
+                renderedIdentity = identity
+                // The layout's thumbnail once it has one: on an in-place re-bind the row already
+                // shows it, and the provider's generic icon would flash back over it.
+                setIcon(data.thumbnail ?? appearance.iconProvider.provideVisual(for: attachment), animated: animated)
+                setText(appearance.fileNameFormatter.format(attachment), on: titleLabel, animated: animated)
+                setText(appearance.subtitleFormatter.format(attachment), on: detailLabel, animated: animated)
+
+                renderStatus(animated: animated)
+            }
+        }
+
+        /// Shows `image`, crossfading when the row is already showing an image — the blurred
+        /// placeholder giving way to the downloaded file's thumbnail.
+        open func setIcon(_ image: UIImage?, animated: Bool) {
+            guard iconView.image !== image else { return }
+            guard animated, window != nil, iconView.image != nil else {
+                iconView.image = image
+                return
+            }
+            UIView.transition(with: iconView, duration: Self.transitionDuration, options: [.transitionCrossDissolve, .allowUserInteraction]) {
+                self.iconView.image = image
+            }
+        }
+
+        open func setText(_ text: String?, on label: UILabel, animated: Bool) {
+            guard label.text != text else { return }
+            guard animated, window != nil else {
+                label.text = text
+                return
+            }
+            UIView.transition(with: label, duration: Self.transitionDuration, options: [.transitionCrossDissolve, .allowUserInteraction]) {
+                label.text = text
             }
         }
         
@@ -126,6 +164,18 @@ extension ChannelInfoViewController {
                     == AttachmentTransfer.transferIdentity(of: attachment)
             else { return }
             data.attachment.status = status
+            renderStatus(animated: window != nil)
+        }
+
+        /// True while `updateStatus()` renders a state change of the row on screen, so the
+        /// changes it makes animate — including a subclass's own `showDownloadButton(_:)` calls
+        /// from an overridden `updateStatus()`.
+        public private(set) var isAnimatingStatusChange = false
+
+        /// Runs `updateStatus()` — the override point — with `isAnimatingStatusChange` set.
+        private func renderStatus(animated: Bool) {
+            isAnimatingStatusChange = animated
+            defer { isAnimatingStatusChange = false }
             updateStatus()
         }
 
@@ -150,28 +200,38 @@ extension ChannelInfoViewController {
             }
         }
         
-        open func showDownloadButton(_ show: Bool, animated: Bool = false) {
-            if show {
+        /// Shows or hides the download button. Hiding it animated shrinks it out while the
+        /// stack view collapses its slot in the same animation, so the title and subtitle widen
+        /// smoothly into the freed space instead of jumping once the button is gone. `animated`
+        /// defaults to whether a state change is being rendered (`isAnimatingStatusChange`).
+        open func showDownloadButton(_ show: Bool, animated: Bool? = nil) {
+            let animated = animated ?? isAnimatingStatusChange
+            // Ends any shrink in flight: a button left at its shrunk scale would keep its slot
+            // and draw nothing — the "row keeps empty space" leftover.
+            downloadButton.layer.removeAllAnimations()
+            downloadButton.transform = .identity
+            downloadButton.alpha = 1
+            guard !show else {
                 downloadButton.isHidden = false
-            } else {
-                if animated {
-                    UIView.performWithoutAnimation {
-                        layoutIfNeeded()
-                        downloadButton.transform = .identity
-                        downloadButton.isHidden = false
-                    }
-                    UIView.animate(withDuration: progressView.animationDuration + 0.1) { [weak self] in
-                        guard let self else { return }
-                        self.downloadButton.transform = .init(scaleX: 0.01, y: 0.01)
-                    } completion: { [weak self] completed in
-                        guard let self else { return }
-                        if completed {
-                            self.downloadButton.isHidden = true
-                        }
-                    }
-                } else {
-                    downloadButton.isHidden = true
-                }
+                return
+            }
+            guard animated, window != nil, !downloadButton.isHidden else {
+                downloadButton.isHidden = true
+                return
+            }
+            contentHStack.layoutIfNeeded()
+            UIView.animate(
+                withDuration: Self.transitionDuration,
+                delay: 0,
+                options: [.beginFromCurrentState, .allowUserInteraction]
+            ) {
+                self.downloadButton.transform = .init(scaleX: 0.01, y: 0.01)
+                self.downloadButton.alpha = 0
+                self.downloadButton.isHidden = true
+                self.contentHStack.layoutIfNeeded()
+            } completion: { _ in
+                self.downloadButton.transform = .identity
+                self.downloadButton.alpha = 1
             }
         }
         
@@ -221,6 +281,8 @@ extension ChannelInfoViewController {
         
         open override func prepareForReuse() {
             super.prepareForReuse()
+            // The next bind is a new row as far as the user can tell, even for the same file.
+            renderedIdentity = nil
 
             if let message = data?.ownerMessage, let attachment = data?.attachment {
                 fileProvider.removeProgressObserver(
