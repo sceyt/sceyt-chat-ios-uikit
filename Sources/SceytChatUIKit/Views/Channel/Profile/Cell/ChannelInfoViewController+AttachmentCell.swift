@@ -149,13 +149,7 @@ extension ChannelInfoViewController {
             // file-backed, so no reload path restores the right thumbnail. Compare max
             // sides (aspect-safe) with the same tolerance the message cell uses.
             //
-            // The requirement comes from this cell's own bounds rather than
-            // `layout.thumbnailSize`, whose units are not consistent across consumers:
-            // the chat list fills it in points, `MediaCollectionView` in device pixels.
-            let displayScale = traitCollection.displayScale > 0 ? traitCollection.displayScale : UIScreen.main.scale
-            let requiredPxMaxSide = max(bounds.width, bounds.height) * displayScale
-            let imagePxMaxSide = max(image.size.width, image.size.height) * image.scale
-            guard imagePxMaxSide >= requiredPxMaxSide * 0.9 else { return }
+            guard meetsCellResolution(image, for: layout) else { return }
             // Heal the layout first so later rebinds see the sharp, file-backed state.
             // setFileBackedThumbnail re-posts to the relay; on that nested entry the
             // state check below is already satisfied, so the recursion terminates.
@@ -195,9 +189,105 @@ extension ChannelInfoViewController {
                 } else {
                     setProgress(0)
                 }
+                // Not left to the ring's hide: the ring can be gone before the data session
+                // hands the file over, and a hide-time reload then finds no file yet.
+                refreshThumbnailFromFile()
             default:
                 break
             }
+        }
+
+        /// Brings the image up to the downloaded file. Reloads the layout's thumbnail
+        /// when it is still a placeholder; when the layout is already sharp, paints it
+        /// directly — its `onLoadThumbnail` paint may have gone to a slot this cell no
+        /// longer owns.
+        ///
+        /// "Already sharp" means file-backed AND big enough for this cell: a video shows its
+        /// small downloaded "video_thumb" poster (file-backed) before the video itself is
+        /// local, and once it is, a grid-sized frame can replace it.
+        open func refreshThumbnailFromFile() {
+            guard let data, data.type == .image || data.type == .video else { return }
+            if data.isThumbnailLoadedFromFile,
+               let thumbnail = data.thumbnail,
+               // A reload that already ran is final: a source without size metadata and
+               // smaller than the cell never meets the size, and must not reload forever.
+               meetsCellResolution(thumbnail, for: data) || reloadedThumbnailAttachment == data.attachment {
+                if imageView.image !== thumbnail {
+                    imageView.image = thumbnail
+                }
+                return
+            }
+            reloadThumbnailFromFile(for: data.attachment)
+        }
+
+        /// The attachment whose thumbnail `reloadThumbnailFromFile` last applied.
+        private var reloadedThumbnailAttachment: ChatMessage.Attachment?
+
+        /// Delayed retries of a reload whose thumbnail couldn't be made yet.
+        public static let thumbnailReloadRetryCount = 3
+
+        /// Builds the thumbnail from the downloaded file and applies it to the bound layout,
+        /// the same way `MessageCell.AttachmentView.reloadThumbnailFromFile` does for chat
+        /// bubbles: one reload per attachment and size at a time (`ThumbnailReloadGate` —
+        /// every bind, re-sync and ring hide of a done cell asks for one), a few delayed
+        /// retries because a video's frame extraction can fail on a just-downloaded file,
+        /// and `.utility` QoS since it can be a full-size decode and encode.
+        open func reloadThumbnailFromFile(for attachment: ChatMessage.Attachment, retriesLeft: Int = thumbnailReloadRetryCount) {
+            guard let data else { return }
+            let preferred = data.thumbnailSize
+            let gateKey = ThumbnailReloadGate.key(attachment: attachment, size: preferred)
+            let isRetry = retriesLeft < Self.thumbnailReloadRetryCount
+            if !isRetry, !ThumbnailReloadGate.begin(gateKey) { return }
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                guard let path = fileProvider.thumbnailFile(for: attachment, preferred: preferred),
+                      let image = UIImage(contentsOfFile: path)
+                else {
+                    guard retriesLeft > 0 else {
+                        ThumbnailReloadGate.end(gateKey, succeeded: false)
+                        return
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                        guard let self, let layout = self.data, layout.attachment == attachment else {
+                            ThumbnailReloadGate.cancel(gateKey)
+                            return
+                        }
+                        self.reloadThumbnailFromFile(for: attachment, retriesLeft: retriesLeft - 1)
+                    }
+                    return
+                }
+                DispatchQueue.main.async { [weak self] in
+                    ThumbnailReloadGate.end(gateKey, succeeded: true)
+                    guard let self, let layout = self.data, layout.attachment == attachment else { return }
+                    // Never downgrades a bigger file-backed thumbnail, and paints through the
+                    // slot and the relay; paint directly too — the slot may not be ours.
+                    layout.setFileBackedThumbnail(image)
+                    self.reloadedThumbnailAttachment = attachment
+                    if let thumbnail = layout.thumbnail, self.imageView.image !== thumbnail {
+                        self.imageView.image = thumbnail
+                    }
+                }
+            }
+        }
+
+        /// The pixel size (longer side) a thumbnail needs to look sharp in this cell. From the
+        /// cell's own bounds rather than `layout.thumbnailSize`, whose units are not consistent
+        /// across consumers: the chat list fills it in points, `MediaCollectionView` in device
+        /// pixels. Capped at the source's own size — a source smaller than the cell can't
+        /// produce a bigger thumbnail, and one at full source resolution is as sharp as it gets.
+        open func requiredThumbnailPxMaxSide(for layout: MessageLayoutModel.AttachmentLayout) -> CGFloat {
+            let displayScale = traitCollection.displayScale > 0 ? traitCollection.displayScale : UIScreen.main.scale
+            var required = max(bounds.width, bounds.height) * displayScale
+            if let metadata = layout.attachment.imageDecodedMetadata,
+               metadata.width > 0, metadata.height > 0 {
+                required = min(required, CGFloat(max(metadata.width, metadata.height)))
+            }
+            return required
+        }
+
+        /// Whether `image` is big enough for this cell, with the same 10% tolerance the
+        /// message cell uses. Compares longer sides, so it is aspect-safe.
+        open func meetsCellResolution(_ image: UIImage, for layout: MessageLayoutModel.AttachmentLayout) -> Bool {
+            max(image.size.width, image.size.height) * image.scale >= requiredThumbnailPxMaxSide(for: layout) * 0.9
         }
 
         open func setProgress(_ progress: CGFloat) {
@@ -258,7 +348,7 @@ extension ChannelInfoViewController {
                 self.pauseButton.isHidden = true
                 self.progressView.transform = .identity
                 self.pauseButton.transform = .identity
-                self.data.loadThumbnail()
+                self.refreshThumbnailFromFile()
             }
         }
 
