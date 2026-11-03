@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import SceytChat
 import UIKit
 
 typealias Components = SceytChatUIKit.Components
@@ -279,6 +280,12 @@ extension SceytChatUIKit {
         public static var audioSession: AudioSession.Type = AudioSession.self
         public static var avatarBuilder: AvatarBuilder.Type = AvatarBuilder.self
         public static var dataSession: SCTDataSession? = SCTSession.default
+        /// Encryption policy and keys for attachments. The default never encrypts.
+        public static var attachmentKeyProvider: AttachmentKeyProvider = InlineAttachmentKeyProvider()
+        /// The Chat SDK's cryptography behind the default `fileEncryption`; owns the keys.
+        public static var fileEncryptionProvider: FileEncryptionProvider = StreamingAeadFileEncryptionProvider()
+        /// Encrypts uploads and decrypts downloads of encrypted attachments, for transports.
+        public static var fileEncryption: FileEncryption = ChatSDKFileEncryption()
         public static var imageBuilder: ImageBuilder.Type = ImageBuilder.self
         public static var initialsBuilder: InitialsBuilder.Type = InitialsBuilder.self
         public static var logger: SceytChatUIKit.Logger.Type = SceytChatUIKit.Logger.self

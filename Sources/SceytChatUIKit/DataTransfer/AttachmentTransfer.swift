@@ -240,9 +240,20 @@ open class AttachmentTransfer: DataProvider {
                 completion?(message, nil)
                 return
             }
-            
+            let encryption = self.uploadEncryption(message: message, attachments: attachments)
+            self.startUploads(message: message, attachments: attachments, encryption: encryption, completion: completion)
+        }
+    }
+
+    private func startUploads(
+        message: ChatMessage,
+        attachments: [ChatMessage.Attachment],
+        encryption: [ObjectIdentifier: EncryptionSetup],
+        completion: ((ChatMessage?, Error?) -> Void)?
+    ) {
             if let dataSession = self.dataSession(for: message) {
                 var tasks = [SCTDataSessionTaskInfo]()
+                var rejected = [(SCTDataSessionTaskInfo, Error)]()
                 let existTasks = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid]
                 for attachment in attachments {
                     self.repairAttachmentFilePathIfNeeded(attachment, dataSession: dataSession)
@@ -266,6 +277,14 @@ open class AttachmentTransfer: DataProvider {
                     )
                     
                     tasks.append(taskInfo)
+                    if let setup = encryption[ObjectIdentifier(attachment)] {
+                        // Fail closed: an attachment that must be encrypted never reaches a
+                        // session that would upload it as plaintext.
+                        if let error = Self.apply(setup, to: taskInfo, dataSession: dataSession) {
+                            rejected.append((taskInfo, error))
+                            continue
+                        }
+                    }
                     dataSession.upload(
                         attachment: attachment,
                         taskInfo: taskInfo
@@ -300,19 +319,21 @@ open class AttachmentTransfer: DataProvider {
                         }
                     }
                 }
+                for (taskInfo, error) in rejected {
+                    taskInfo.failure(error: error)
+                }
                 // Seed a starting progress now that `handle` has installed the event hooks,
                 // so the ring shows for the whole pre-transfer window: the checksum
                 // round-trip, the image resize / video export, and the wait in the upload
                 // queue (serialized, so batch-sent images sit there a while). Without it an
                 // image reported nothing until the SDK streamed its first byte — only video
-                // seeded itself, from `SCTUploadOperation.startPreparing`.
+                // seeded itself, from `TransportDataSession.prepareUploadFile`.
                 for taskInfo in tasks where taskInfo.attachment.status == .uploading {
                     taskInfo.updateProgress(Self.initialUploadProgress)
                 }
             } else {
                 completion?(message, AttachmentTransferError.externalTransferrerNotImplemented)
             }
-        }
     }
     
     @discardableResult
@@ -411,8 +432,20 @@ open class AttachmentTransfer: DataProvider {
                 return
             }
             logger.verbose("[Attachment] downloadMessageAttachments \(attachments.map { $0.description })")
+            let encryption = self.downloadEncryption(attachments: attachments)
+            self.startDownloads(message: message, attachments: attachments, encryption: encryption, completion: completion)
+        }
+    }
+
+    private func startDownloads(
+        message: ChatMessage,
+        attachments: [ChatMessage.Attachment],
+        encryption: [ObjectIdentifier: EncryptionSetup],
+        completion: ((ChatMessage?, Error?) -> Void)?
+    ) {
             if let dataSession = self.dataSession(for: message) {
                 var tasks = [SCTDataSessionTaskInfo]()
+                var rejected = [(SCTDataSessionTaskInfo, Error)]()
                 let existTasks = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid]
                 for (_, attachment) in attachments.enumerated() {
                     guard let url = attachment.url,
@@ -438,6 +471,14 @@ open class AttachmentTransfer: DataProvider {
                     )
                     
                     tasks.append(taskInfo)
+                    if let setup = encryption[ObjectIdentifier(attachment)] {
+                        // A malformed encryption field or a session that would store the
+                        // ciphertext as the file: fail before fetching anything.
+                        if let error = Self.apply(setup, to: taskInfo, dataSession: dataSession) {
+                            rejected.append((taskInfo, error))
+                            continue
+                        }
+                    }
                     dataSession.download(
                         attachment: attachment,
                         taskInfo: taskInfo
@@ -460,11 +501,13 @@ open class AttachmentTransfer: DataProvider {
                 let groupKey = message.id != 0 ? Int64(message.id) : message.tid
                 self.taskGroups[groupKey] = (self.taskGroups[groupKey] ?? []) + tasks
                 self.handle(tasks: tasks, message: message, attachments: attachments, completion: completion)
+                for (taskInfo, error) in rejected {
+                    taskInfo.failure(error: error)
+                }
             } else {
                 logger.error("[Attachment] downloadMessageAttachments: Components.dataSession is nil — no transport, nothing will download for message \(message.id)")
                 completion?(message, AttachmentTransferError.externalTransferrerNotImplemented)
             }
-        }
     }
     
     open func stopTransfer(
@@ -638,6 +681,10 @@ open class AttachmentTransfer: DataProvider {
                 finish.fire()
                 return
             }
+            if taskInfo.encryption == .required {
+                self.uploadEncryptedVideoThumbnail(fileUrl, taskInfo: taskInfo, attachment: atch, decoded: decoded, dataSession: dataSession, finish: finish)
+                return
+            }
             dataSession.uploadAttachmentThumbnail(for: atch, fileUrl: fileUrl) { result in
                 defer { try? FileManager.default.removeItem(at: fileUrl) }
                 switch result {
@@ -651,6 +698,94 @@ open class AttachmentTransfer: DataProvider {
                 }
                 finish.fire()
             }
+        }
+    }
+
+    /// The poster of an encrypted video, encrypted under its own key: a plaintext poster would
+    /// show the video's content. "video_thumb" and its `enc.renditions` entry are set together,
+    /// or neither is: the video then goes out without a poster.
+    private func uploadEncryptedVideoThumbnail(
+        _ fileUrl: URL,
+        taskInfo: SCTDataSessionTaskInfo,
+        attachment atch: ChatMessage.Attachment,
+        decoded: ChatMessage.Attachment.Metadata<String>?,
+        dataSession: SCTDataSession,
+        finish: OneShotBlock
+    ) {
+        Task {
+            let ciphertext = fileUrl.deletingPathExtension().appendingPathExtension("enc")
+            let info: EncryptedFileInfo
+            do {
+                info = try await Components.fileEncryption.encrypt(file: fileUrl, to: ciphertext)
+            } catch {
+                try? FileManager.default.removeItem(at: fileUrl)
+                logger.errorIfNotNil(error, "[Encryption] video_thumb encryption failed — sending without it")
+                finish.fire()
+                return
+            }
+            try? FileManager.default.removeItem(at: fileUrl)
+            uploadEncryptedVideoThumbnail(ciphertext, info: info, taskInfo: taskInfo, attachment: atch, decoded: decoded, dataSession: dataSession, finish: finish)
+        }
+    }
+
+    private func uploadEncryptedVideoThumbnail(
+        _ ciphertext: URL,
+        info: EncryptedFileInfo,
+        taskInfo: SCTDataSessionTaskInfo,
+        attachment atch: ChatMessage.Attachment,
+        decoded: ChatMessage.Attachment.Metadata<String>?,
+        dataSession: SCTDataSession,
+        finish: OneShotBlock
+    ) {
+        dataSession.uploadAttachmentThumbnail(for: atch, fileUrl: ciphertext) { result in
+            defer { try? FileManager.default.removeItem(at: ciphertext) }
+            switch result {
+            case .success(let origin):
+                finish.fire {
+                    var meta = decoded ?? ChatMessage.Attachment.Metadata<String>(thumbnail: "")
+                    meta.videoThumbnail = origin
+                    atch.updateMetadata(meta.build())
+                    taskInfo.thumbnailRendition = AttachmentEncryption.Rendition(role: AttachmentEncryption.Rendition.thumbnailRole, info: info)
+                    logger.verbose("[Attachment] encrypted video_thumb uploaded, origin \(origin)")
+                }
+            case .failure(let error):
+                logger.errorIfNotNil(error, "[Attachment] video_thumb upload failed — sending without it")
+                finish.fire()
+            }
+        }
+    }
+
+    /// Writes a downloaded poster to the cache: decrypted with its `enc.renditions` entry
+    /// when the video is encrypted, as is otherwise.
+    static func storeVideoThumbnail(_ localUrl: URL, of attachment: ChatMessage.Attachment, at destination: URL) async throws {
+        defer { try? FileManager.default.removeItem(at: localUrl) }
+        guard attachment.isEncrypted else {
+            // Atomic write so a concurrent loadThumbnail never observes a
+            // partially written JPEG (same pattern as SCTSession.thumbnailFile).
+            try Data(contentsOf: localUrl).write(to: destination, options: .atomic)
+            return
+        }
+        guard let encryption = attachment.encryption,
+              let rendition = encryption.thumbnail
+        else { throw AttachmentEncryptionError.invalidEncryptionInfo }
+        // Decrypted next to the cache and moved in whole: a reader never sees a prefix.
+        let decrypted = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(UUID().uuidString)-\(destination.lastPathComponent)")
+        do {
+            try await Components.fileEncryption.decrypt(
+                file: localUrl,
+                to: decrypted,
+                encryptionInfo: encryption.info(of: rendition),
+                plaintextSize: nil
+            )
+            if FileManager.default.fileExists(atPath: destination.path) {
+                _ = try FileManager.default.replaceItemAt(destination, withItemAt: decrypted)
+            } else {
+                try FileManager.default.moveItem(at: decrypted, to: destination)
+            }
+        } catch {
+            try? FileManager.default.removeItem(at: decrypted)
+            throw error
         }
     }
 
@@ -710,19 +845,17 @@ open class AttachmentTransfer: DataProvider {
                     return
                 }
                 let destination = URL(fileURLWithPath: FileStorage.default.videoThumbnailCachePath(origin: origin))
-                do {
-                    let data = try Data(contentsOf: localUrl)
-                    // Atomic write so a concurrent loadThumbnail never observes a
-                    // partially written JPEG (same pattern as SCTSession.thumbnailFile).
-                    try data.write(to: destination, options: .atomic)
-                    try? FileManager.default.removeItem(at: localUrl)
-                } catch {
-                    logger.errorIfNotNil(error, "[Attachment] video_thumb store failed, origin \(origin)")
-                    return
-                }
-                DispatchQueue.main.async {
-                    if let image = UIImage(contentsOfFile: destination.path) {
-                        AttachmentSharpThumbnailRelay.default.post(atch, image: image)
+                Task {
+                    do {
+                        try await Self.storeVideoThumbnail(localUrl, of: atch, at: destination)
+                    } catch {
+                        logger.errorIfNotNil(error, "[Attachment] video_thumb store failed, origin \(origin)")
+                        return
+                    }
+                    DispatchQueue.main.async {
+                        if let image = UIImage(contentsOfFile: destination.path) {
+                            AttachmentSharpThumbnailRelay.default.post(atch, image: image)
+                        }
                     }
                 }
             }
@@ -788,6 +921,7 @@ open class AttachmentTransfer: DataProvider {
                         if attachments.indices.contains(index) {
                             let atch = attachments[index]
                             logger.verbose("[Attachment] Handle updateLocalFileURL found \(String(describing: atch.url))")
+                            let previousMetadata = atch.metadata
                             if let builder = Components.imageBuilder.init(imageUrl: url) {
                                 if let decodedMetadata = atch.imageDecodedMetadata {
                                     atch.metadata =
@@ -817,13 +951,20 @@ open class AttachmentTransfer: DataProvider {
                                     ).build()
                                 }
                             }
+                            // The typed rebuild above only knows the media keys.
+                            atch.metadata = ChatMessage.Attachment.metadata(atch.metadata, preservingEncryptionFrom: previousMetadata)
                             atch.name = url.lastPathComponent
                             atch.filePath = url.path
                             let fileSize = Components.storage.sizeOfItem(at: url)
-                            if fileSize > 0 {
+                            // An encrypted download is only the file once it was decrypted;
+                            // before that this is ciphertext, whose size is `cl`, not `ps`.
+                            let isPlaintext = taskInfo.transferType == .upload
+                                || taskInfo.encryption == .none
+                                || taskInfo.didDecryptDownload
+                            if fileSize > 0, isPlaintext {
                                 atch.uploadedFileSize = fileSize
                             }
-                            if taskInfo.transferType == .download, fileSize > 0 {
+                            if taskInfo.transferType == .download, fileSize > 0, isPlaintext {
                                 atch.transferProgress = 1
                                 atch.status = .done
                             }
@@ -863,7 +1004,7 @@ open class AttachmentTransfer: DataProvider {
                                     // the next connect (`SyncService.resendPendingMessage`).
                                     // Park it back in the queue instead, so the bubble keeps
                                     // showing that the file is still on its way out.
-                                    atch.status = Self.isOffline ? .pending : .failedUploading
+                                    atch.status = Self.isOffline && !(error is AttachmentEncryptionError) ? .pending : .failedUploading
                                 }
                             }
                             onCompletion(taskInfo: taskInfo, attachment: atch, error: error)
@@ -883,10 +1024,50 @@ open class AttachmentTransfer: DataProvider {
             }
             let atch = attachments[index]
             logger.verbose("[Attachment] Handle success found \(String(describing: atch.url))")
+            if let error = Self.encryptionGateError(taskInfo: taskInfo, attachment: atch) {
+                logger.error("[Encryption] rejecting success of \(taskInfo.transferType) \(atch.description): \(error)")
+                switch taskInfo.transferType {
+                case .upload:
+                    // Not delivered: keep it an unsent attachment, and keep its url out of
+                    // the checksum table so nothing dedupes onto the plaintext object.
+                    atch.url = nil
+                case .download:
+                    // Whatever the session stored is ciphertext, not the file.
+                    if let filePath = atch.filePath {
+                        try? FileManager.default.removeItem(atPath: filePath)
+                    }
+                    atch.filePath = nil
+                    atch.transferProgress = 0
+                }
+                taskInfo.failure(error: error)
+                return
+            }
             // For a just-uploaded video, upload its poster frame too before completing,
             // so the merged "video_thumb" metadata is persisted by didEndTask and rides
             // the wire message the sender builds from this attachment.
             attachVideoThumbnailIfNeeded(taskInfo: taskInfo, message: message, attachment: atch) {
+                if taskInfo.transferType == .upload, let info = taskInfo.uploadedEncryption {
+                    // The receiver's keys (the file's, and the poster's when one went out), and
+                    // the original size for display: the stored object is larger.
+                    let encryption = AttachmentEncryption(
+                        info: info,
+                        renditions: taskInfo.thumbnailRendition.map { [$0] } ?? []
+                    )
+                    // Ids and algorithm only: the keys are never logged.
+                    logger.debug("[Encryption] upload enc \(atch.description) alg=\(encryption.algorithm) attachmentId=\(encryption.attachmentId) thumbnailAttachmentId=\(encryption.thumbnail?.attachmentId ?? "-")")
+                    do {
+                        atch.updateMetadata(try ChatMessage.Attachment.metadata(atch.metadata, settingEncryption: encryption))
+                    } catch {
+                        // Sent without its key, the file could never be opened.
+                        logger.error("[Encryption] cannot write the encryption info of \(atch.description): \(error)")
+                        atch.url = nil
+                        taskInfo.failure(error: AttachmentEncryptionError.metadataFailed(error))
+                        return
+                    }
+                    if let size = taskInfo.uploadedPlaintextSize {
+                        atch.uploadedFileSize = UInt(size)
+                    }
+                }
                 atch.url = uri
                 atch.transferProgress = 1
                 atch.status = .done
@@ -1028,6 +1209,83 @@ extension AttachmentTransfer {
     }
 }
 
+// MARK: - Encryption
+
+extension AttachmentTransfer {
+
+    /// What `…Encryption` found for one attachment that must be encrypted.
+    struct EncryptionSetup {
+        /// The received attachment's `enc`; nil for an upload.
+        var download: AttachmentEncryption?
+        /// Why it cannot be transferred, e.g. a malformed encryption field.
+        var error: Error?
+    }
+
+    /// The attachments the key provider says must be encrypted. Their keys are made by the
+    /// transport's `FileEncryption` session, once UIKit hands it the prepared file
+    /// (`FileUploadType.encrypted`).
+    func uploadEncryption(
+        message: ChatMessage,
+        attachments: [ChatMessage.Attachment]
+    ) -> [ObjectIdentifier: EncryptionSetup] {
+        let provider = Components.attachmentKeyProvider
+        var setups = [ObjectIdentifier: EncryptionSetup]()
+        for attachment in attachments where attachment.filePath != nil
+            && provider.requirement(for: attachment, in: message) == .required {
+            setups[ObjectIdentifier(attachment)] = EncryptionSetup()
+        }
+        return setups
+    }
+
+    /// The received attachments that carry `enc`. A malformed one, or one of a version or
+    /// algorithm this build cannot read, fails before anything is fetched.
+    func downloadEncryption(attachments: [ChatMessage.Attachment]) -> [ObjectIdentifier: EncryptionSetup] {
+        var setups = [ObjectIdentifier: EncryptionSetup]()
+        for attachment in attachments where attachment.isEncrypted {
+            guard let encryption = attachment.encryption,
+                  encryption.algorithm == StreamingAeadFileEncryptionProvider.format
+            else {
+                logger.error("[Encryption] unreadable enc of \(attachment.description)")
+                setups[ObjectIdentifier(attachment)] = EncryptionSetup(error: AttachmentEncryptionError.invalidEncryptionInfo)
+                continue
+            }
+            // Ids and algorithm only: the keys are never logged.
+            logger.debug("[Encryption] download enc \(attachment.description) alg=\(encryption.algorithm) attachmentId=\(encryption.attachmentId) thumbnailAttachmentId=\(encryption.thumbnail?.attachmentId ?? "-")")
+            setups[ObjectIdentifier(attachment)] = EncryptionSetup(download: encryption)
+        }
+        return setups
+    }
+
+    /// Marks `taskInfo` as an encrypted transfer. Returns the error to fail it with when it
+    /// cannot run encrypted (fail-closed rule 1, malformed encryption field).
+    static func apply(_ setup: EncryptionSetup, to taskInfo: SCTDataSessionTaskInfo, dataSession: SCTDataSession) -> Error? {
+        taskInfo.encryption = .required
+        taskInfo.downloadEncryption = setup.download
+        guard dataSession.supportsAttachmentEncryption else {
+            return AttachmentEncryptionError.encryptionUnsupportedBySession
+        }
+        return setup.error
+    }
+
+    /// Fail-closed rules 2 and 4: an encrypted upload succeeds only with the encryption its
+    /// transport returned (or a dedupe hit that reused an encrypted object together with its
+    /// key); an encrypted download only with the plaintext its transport verified.
+    static func encryptionGateError(taskInfo: SCTDataSessionTaskInfo, attachment: ChatMessage.Attachment) -> Error? {
+        guard taskInfo.encryption == .required else { return nil }
+        switch taskInfo.transferType {
+        case .upload:
+            guard taskInfo.uploadedEncryption != nil || attachment.encryption != nil else {
+                return AttachmentEncryptionError.encryptionBypassed
+            }
+        case .download:
+            guard taskInfo.didDecryptDownload else {
+                return AttachmentEncryptionError.encryptionBypassed
+            }
+        }
+        return nil
+    }
+}
+
 enum AttachmentTransferError: Error {
     case alreadyTransferring
     case externalTransferrerNotImplemented
@@ -1047,6 +1305,19 @@ private final class OneShotBlock {
         lock.lock()
         let block = self.block
         self.block = nil
+        lock.unlock()
+        block?()
+    }
+
+    /// Runs `work`, then the block, only if the block hasn't fired yet: what `work` records
+    /// is never applied after a timeout already went on without it.
+    func fire(after work: () -> Void) {
+        lock.lock()
+        let block = self.block
+        self.block = nil
+        if block != nil {
+            work()
+        }
         lock.unlock()
         block?()
     }

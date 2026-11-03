@@ -7,7 +7,7 @@ let package = Package(
     name: "SceytChatUIKit",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v13)
+        .iOS(.v15)
     ],
     products: [
         .library(
@@ -15,7 +15,7 @@ let package = Package(
             targets: ["SceytChatUIKit"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/sceyt/sceyt-chat-ios-sdk.git", branch: "v1.5.21-beta.2"),
+        .package(url: "https://github.com/sceyt/sceyt-chat-ios-sdk.git", branch: "v1.5.19-beta.14_encription"),
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.

@@ -86,6 +86,18 @@ open class ChannelMessageChecksumProvider: DataProvider {
         attachment: ChatMessage.Attachment,
         completion: @escaping ((Result<String?, Error>) -> Void))
     {
+        startChecksum(message: message, attachment: attachment, encryption: .none, completion: completion)
+    }
+
+    /// With `encryption == .required` only an earlier *encrypted* upload counts as a hit:
+    /// its url is reused together with its `enc`, so the receiver gets the key that object
+    /// was encrypted with. A plaintext object is never reused for an encrypted send.
+    open func startChecksum(
+        message: ChatMessage,
+        attachment: ChatMessage.Attachment,
+        encryption: EncryptionRequirement,
+        completion: @escaping ((Result<String?, Error>) -> Void))
+    {
         if attachment.type != "link" && attachment.filePath != nil {
             let attachmentId = attachment.id
             let message = message
@@ -109,7 +121,7 @@ open class ChannelMessageChecksumProvider: DataProvider {
                             guard let self else { return }
                             switch result {
                             case .success(let stored):
-                                if let stored {
+                                if let stored, encryption == .none || stored.encryption != nil {
                                     attachment.filePath = stored.filePath
                                     attachment.name = stored.name
                                     attachment.metadata = stored.metadata

@@ -8,6 +8,7 @@
 
 import Combine
 import Foundation
+import SceytChat
 
 public protocol SCTDataSession: NSObject {
     func upload(
@@ -42,6 +43,11 @@ public protocol SCTDataSession: NSObject {
         origin: String,
         completion: @escaping (Result<URL, Error>) -> Void
     )
+
+    /// Whether this session encrypts the uploads and decrypts the downloads of encrypted tasks
+    /// (`TransportDataSession` does, through its transport). When it does not, an attachment
+    /// that requires encryption fails instead of going out as plaintext.
+    var supportsAttachmentEncryption: Bool { get }
 }
 
 public enum SCTDataSessionError: Error {
@@ -51,11 +57,28 @@ public enum SCTDataSessionError: Error {
 }
 
 public extension SCTDataSession {
+    var supportsAttachmentEncryption: Bool { false }
+
     func uploadAttachmentThumbnail(
         for attachment: ChatMessage.Attachment,
         fileUrl: URL,
         completion: @escaping (Result<String, Error>) -> Void
     ) {
+        DefaultThumbnailTransfer.upload(fileUrl: fileUrl, completion: completion)
+    }
+
+    func downloadAttachmentThumbnail(
+        for attachment: ChatMessage.Attachment,
+        origin: String,
+        completion: @escaping (Result<URL, Error>) -> Void
+    ) {
+        DefaultThumbnailTransfer.download(origin: origin, completion: completion)
+    }
+}
+
+/// Video posters through the Chat SDK's upload and a plain download of their URL.
+enum DefaultThumbnailTransfer {
+    static func upload(fileUrl: URL, completion: @escaping (Result<String, Error>) -> Void) {
         SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { _ in
         } completion: { url, error in
             if let url {
@@ -66,11 +89,7 @@ public extension SCTDataSession {
         }
     }
 
-    func downloadAttachmentThumbnail(
-        for attachment: ChatMessage.Attachment,
-        origin: String,
-        completion: @escaping (Result<URL, Error>) -> Void
-    ) {
+    static func download(origin: String, completion: @escaping (Result<URL, Error>) -> Void) {
         guard let url = URL(string: origin),
               let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https"
@@ -115,6 +134,21 @@ open class SCTDataSessionTaskInfo: NSObject {
     
     internal let message: ChatMessage
     internal var attachment: ChatMessage.Attachment
+
+    /// `.required` when this transfer must be encrypted: set before the session sees the
+    /// task, from the key provider (upload) or the attachment's metadata (download).
+    public internal(set) var encryption: EncryptionRequirement = .none
+    /// The received attachment's `enc`, read before the download started.
+    internal var downloadEncryption: AttachmentEncryption?
+    /// The encryption of the uploaded object, from the transport's `FileUploadResult`.
+    internal var uploadedEncryption: EncryptedFileInfo?
+    /// The size of the prepared file an encrypted upload sent: the message shows it, not the
+    /// stored object's.
+    internal var uploadedPlaintextSize: Int64?
+    /// The encrypted video poster sent with this upload, for `enc.renditions`.
+    internal var thumbnailRendition: AttachmentEncryption.Rendition?
+    /// The transport returned the verified plaintext of an encrypted download.
+    internal var didDecryptDownload = false
     
     internal init(
         transferType: TransferType,
@@ -200,7 +234,8 @@ open class SCTDataSessionTaskInfo: NSObject {
     public func startChecksum(_ completion: @escaping ((Bool) -> Void)) {
         checksumProvider.startChecksum(
             message: message,
-            attachment: attachment) { [weak self] in
+            attachment: attachment,
+            encryption: encryption) { [weak self] in
                 guard let self else { return }
                 switch $0 {
                 case .success(let link):
