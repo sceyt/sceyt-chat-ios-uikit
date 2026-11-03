@@ -13,6 +13,7 @@
 @testable import SceytChatUIKit
 import ObjectiveC
 import SceytChat
+import UIKit
 import XCTest
 
 // MARK: - Fakes
@@ -1103,5 +1104,151 @@ final class SCTSessionTransportTests: XCTestCase {
 
             guard case .failure = thumbnailDownload(session, origin: StubServer.url("/error")) else { return XCTFail("\(session)") }
         }
+    }
+
+    // MARK: Coverage: SCTSession lookups and thumbnails
+
+    func testTheDefaultSessionFindsAFileByItsURL() throws {
+        let session = SCTSession(transport: NullTransport())
+        let transferId = "TID-\(UUID().uuidString)"
+        let source = directory.appendingPathComponent("source.bin")
+        try Data([1]).write(to: source)
+        let stored = session.storeFile(atPath: source.path, transferId: transferId, fileName: "c.pdf")
+        defer { session.removeFile(atPath: stored) }
+
+        XCTAssertEqual(session.getFilePath(attachment: makeAttachment(name: "c.pdf", url: "https://cdn.example/\(transferId)/c.pdf")), stored)
+        XCTAssertNil(session.getFilePath(attachment: makeAttachment(filePath: directory.appendingPathComponent("gone").path)))
+    }
+
+    private func png(_ name: String = "image.png") throws -> URL {
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 30), format: format).image { context in
+            UIColor.green.setFill()
+            context.fill(CGRect(x: 0, y: 0, width: 40, height: 30))
+        }
+        let url = directory.appendingPathComponent(name)
+        try XCTUnwrap(image.pngData()).write(to: url)
+        return url
+    }
+
+    private func attachment(type: String, filePath: String) -> ChatMessage.Attachment {
+        .init(id: 0, tid: 1, messageId: 1, userId: "u", url: nil, filePath: filePath, type: type, name: nil, metadata: nil, uploadedFileSize: 0, createdAt: Date())
+    }
+
+    func testThumbnailsOfImagesVideosAndFiles() throws {
+        let originalProcessor = Components.videoProcessor
+        defer { Components.videoProcessor = originalProcessor }
+        Components.videoProcessor = FrameProcessor.self
+        FrameProcessor.frame = UIImage(contentsOfFile: try png("frame.png").path)
+        let session = SCTSession(transport: NullTransport())
+        let size = CGSize(width: 10, height: 10)
+        let image = try png()
+        let video = directory.appendingPathComponent("clip.mp4")
+        try Data([0]).write(to: video)
+        let fileVideo = directory.appendingPathComponent("other.mov")
+        try Data([0]).write(to: fileVideo)
+
+        for item in [attachment(type: "image", filePath: image.path),
+                     attachment(type: "video", filePath: video.path),
+                     attachment(type: "file", filePath: try png("doc.png").path),
+                     attachment(type: "file", filePath: fileVideo.path)] {
+            let made = try XCTUnwrap(session.thumbnailFile(for: item, preferred: size), item.type)
+            XCTAssertTrue(SCTSession.isCompleteImageFile(at: made))
+            XCTAssertEqual(session.thumbnailFile(for: item, preferred: size), made, "the cached one")
+            // A broken cached thumbnail is evicted and made again.
+            try Data("broken".utf8).write(to: URL(fileURLWithPath: made))
+            XCTAssertEqual(session.thumbnailFile(for: item, preferred: size), made)
+            XCTAssertTrue(SCTSession.isCompleteImageFile(at: made))
+            try? FileManager.default.removeItem(atPath: made)
+        }
+        // A file of another kind has no thumbnail.
+        let text = directory.appendingPathComponent("notes.txt")
+        try Data("t".utf8).write(to: text)
+        XCTAssertNil(session.thumbnailFile(for: attachment(type: "file", filePath: text.path), preferred: size))
+        XCTAssertNil(session.thumbnailFile(for: attachment(type: "voice", filePath: text.path), preferred: size))
+        // A file the session cannot find: tried from its own path, nothing is made.
+        XCTAssertNil(session.thumbnailFile(for: attachment(type: "image", filePath: directory.appendingPathComponent("gone.png").path), preferred: size))
+    }
+
+    func testAThumbnailThatCannotBeStoredAtomicallyFallsBack() throws {
+        let blocked = directory.appendingPathComponent("blocked")
+        try Data("a file, not a folder".utf8).write(to: blocked)
+        let storage = BlockedStorage(thumbnailRoot: blocked.appendingPathComponent("thumbs"))
+        let session = SCTSession(transport: NullTransport(), fileStorage: storage)
+
+        XCTAssertNil(session.thumbnailFile(for: attachment(type: "image", filePath: try png().path), preferred: CGSize(width: 10, height: 10)),
+                     "neither the atomic write nor the fallback can store it")
+    }
+
+    // MARK: Coverage: posters and task events
+
+    func testAPosterAnsweredWithAnErrorStatusIsStillHandedBack() throws {
+        StubServer.serve("/404.jpg", status: 404, body: Data("<Error/>".utf8))
+        guard case .success(let local) = thumbnailDownload(MinimalSession(), origin: StubServer.url("/404.jpg")) else { return XCTFail() }
+        XCTAssertEqual(try Data(contentsOf: local), Data("<Error/>".utf8))
+        try? FileManager.default.removeItem(at: local)
+    }
+
+    func testAPosterThatCannotLeaveTheTempLocationFails() throws {
+        let original = DefaultThumbnailTransfer.posterDirectory
+        defer { DefaultThumbnailTransfer.posterDirectory = original }
+        DefaultThumbnailTransfer.posterDirectory = { self.directory.appendingPathComponent("no/such") }
+        StubServer.serve("/p.jpg", body: Data("jpeg".utf8))
+        guard case .failure = thumbnailDownload(MinimalSession(), origin: StubServer.url("/p.jpg")) else { return XCTFail() }
+    }
+
+    func testTaskEventsAfterTheEndOrBeforeTheHooks() throws {
+        let attachment = makeAttachment()
+        let message = ChatMessage(id: 1, channelId: 1, attachments: [attachment], user: ChatUser(id: "u"))
+        let url = try XCTUnwrap(URL(string: "https://cdn.example/x"))
+        weak var released: SCTDataSessionTaskInfo?
+        do {
+            let task = SCTDataSessionTaskInfo(transferType: .upload, message: message, attachment: attachment)
+            released = task
+            // No hooks yet: logged as lost.
+            task.updateProgress(0.5)
+            task.success(origin: url)
+            XCTAssertEqual(attachment.url, url.absoluteString)
+            XCTAssertTrue(task.isTransferFinished, "a success by URL is delivered too")
+            // After the end: logged, and a pause or resume is ignored.
+            task.failure(error: URLError(.timedOut))
+            task.success(origin: "again")
+            task.updateProgress(0.9)
+            let failed = SCTDataSessionTaskInfo(transferType: .download, message: message, attachment: attachment)
+            failed.onEvent = { _ in }
+            failed.failure(error: nil)
+            failed.updateProgress(0.1)
+
+            let delivered = SCTDataSessionTaskInfo(transferType: .download, message: message, attachment: attachment)
+            delivered.success(origin: url)
+            attachment.status = .done
+            delivered.stop()
+            delivered.resume()
+            XCTAssertEqual(attachment.status, .done, "nothing to pause or resume once delivered")
+        }
+        XCTAssertNil(released, "a task is freed once nothing holds it")
+    }
+}
+
+/// A video processor that returns a fixed frame.
+private final class FrameProcessor: VideoProcessor {
+    static var frame: UIImage?
+    override class func copyFrame(url: URL, at time: TimeInterval = 1) -> UIImage? { frame }
+}
+
+/// Storage whose thumbnails go under a path that cannot be a folder.
+private final class BlockedStorage: FileStorage {
+    let thumbnailRoot: URL
+    init(thumbnailRoot: URL) {
+        self.thumbnailRoot = thumbnailRoot
+        super.init()
+    }
+    required init() {
+        thumbnailRoot = URL(fileURLWithPath: NSTemporaryDirectory())
+        super.init()
+    }
+    override func thumbnailPath(filePath: String, imageSize: CGSize) -> String {
+        thumbnailRoot.appendingPathComponent((filePath as NSString).lastPathComponent).path
     }
 }
