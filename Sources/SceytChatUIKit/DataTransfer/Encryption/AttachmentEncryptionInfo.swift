@@ -87,10 +87,17 @@ public struct AttachmentEncryption: Codable, Equatable {
         return ChatSDKFileEncryption.sdkInfo(fileInfo, plaintextSize: plainSize)
     }
 
+    /// Fills its buffer with random bytes. A test seam: `SecRandomCopyBytes` in production.
+    static var randomBytes: (inout [UInt8]) -> OSStatus = { bytes in
+        SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+    }
+
     /// A new random attachment id: 16 bytes, base64url without padding.
     public static func newAttachmentId() -> String {
         var bytes = [UInt8](repeating: 0, count: 16)
-        if SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes) != errSecSuccess {
+        let status = randomBytes(&bytes)
+        if status != errSecSuccess {
+            logger.warn("[Encryption] \(TransferLog.currentTag) SecRandomCopyBytes failed (\(status)), the SDK makes the attachment id")
             return StreamingAeadFileEncryptionProvider.newUniqueId()
         }
         return Data(bytes).base64EncodedString()
@@ -183,11 +190,21 @@ public extension ChatMessage.Attachment {
     }
 
     static func encryption(inMetadata metadata: String?) -> AttachmentEncryption? {
-        guard let enc = metadataObject(metadata)?[AttachmentEncryption.metadataKey],
-              JSONSerialization.isValidJSONObject(enc),
+        guard let enc = metadataObject(metadata)?[AttachmentEncryption.metadataKey] else { return nil }
+        guard JSONSerialization.isValidJSONObject(enc),
               let data = try? JSONSerialization.data(withJSONObject: enc)
-        else { return nil }
-        return try? JSONDecoder().decode(AttachmentEncryption.self, from: data)
+        else {
+            // Never the value: it would carry the key.
+            logger.debug("[Encryption] \(TransferLog.currentTag) enc is not a JSON object (\(Swift.type(of: enc))), unreadable")
+            return nil
+        }
+        do {
+            return try JSONDecoder().decode(AttachmentEncryption.self, from: data)
+        } catch {
+            // The coding path and kind only, never a value.
+            logger.debug("[Encryption] \(TransferLog.currentTag) enc unreadable: \(TransferLog.describe(error))")
+            return nil
+        }
     }
 
     /// `metadata` with its `enc` object set to `encryption`; every other key is kept as is.
@@ -196,13 +213,15 @@ public extension ChatMessage.Attachment {
         var object: [String: Any] = [:]
         if let metadata, !metadata.isEmpty {
             guard let existing = metadataObject(metadata) else {
+                // The caller fails the upload with metadataFailed and reports it.
+                logger.debug("[Encryption] \(TransferLog.currentTag) cannot add enc: the attachment metadata (\(metadata.count) chars) is not a JSON object")
                 throw AttachmentEncryptionError.metadataNotAnObject
             }
             object = existing
         }
         object[AttachmentEncryption.metadataKey] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(encryption))
-        let data = try JSONSerialization.data(withJSONObject: object)
-        guard let string = String(data: data, encoding: .utf8) else {
+        let data = try MetadataJSON.serialize(object)
+        guard let string = MetadataJSON.string(data) else {
             throw AttachmentEncryptionError.metadataNotAnObject
         }
         return string
@@ -214,12 +233,20 @@ public extension ChatMessage.Attachment {
     static func metadata(_ newMetadata: String?, preservingEncryptionFrom oldMetadata: String?) -> String? {
         let field = AttachmentEncryption.metadataKey
         guard let encryption = metadataObject(oldMetadata)?[field] else { return newMetadata }
+        if let newMetadata, !newMetadata.isEmpty, metadataObject(newMetadata) == nil {
+            // Not handled: the rebuilt metadata is replaced by an object holding only `enc`.
+            logger.warn("[Encryption] \(TransferLog.currentTag) carrying enc over: the new metadata is not a JSON object, its other keys are dropped")
+        }
         var object = metadataObject(newMetadata) ?? [:]
         guard object[field] == nil else { return newMetadata }
         object[field] = encryption
-        guard let data = try? JSONSerialization.data(withJSONObject: object),
-              let string = String(data: data, encoding: .utf8)
-        else { return newMetadata }
+        guard let data = try? MetadataJSON.serialize(object),
+              let string = MetadataJSON.string(data)
+        else {
+            // Not handled: the file's key is lost from the metadata.
+            logger.error("[Encryption] \(TransferLog.currentTag) enc could not be carried over to the rebuilt metadata: it is dropped")
+            return newMetadata
+        }
         return string
     }
 
@@ -227,4 +254,11 @@ public extension ChatMessage.Attachment {
         guard let data = metadata?.data(using: .utf8), !data.isEmpty else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
     }
+}
+
+/// How attachment metadata is written back. Test seams: `JSONSerialization` and UTF-8 never
+/// fail on an object parsed from JSON, so only a test can make them.
+enum MetadataJSON {
+    static var serialize: (Any) throws -> Data = { try JSONSerialization.data(withJSONObject: $0) }
+    static var string: (Data) -> String? = { String(data: $0, encoding: .utf8) }
 }

@@ -78,12 +78,19 @@ public extension SCTDataSession {
 
 /// Video posters through the Chat SDK's upload and a plain download of their URL.
 enum DefaultThumbnailTransfer {
+    /// Where a downloaded poster is moved out of the session's temp location. A test seam.
+    static var posterDirectory: () -> URL = { URL(fileURLWithPath: NSTemporaryDirectory()) }
+
     static func upload(fileUrl: URL, completion: @escaping (Result<String, Error>) -> Void) {
+        let tag = TransferLog.currentTag
+        logger.debug("[Transfer] \(tag) poster upload start size=\(TransferLog.sizeText(fileUrl))")
         SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { _ in
         } completion: { url, error in
             if let url {
+                logger.debug("[Transfer] \(tag) poster upload finished ref=\(TransferLog.redact(url))")
                 completion(.success(url.absoluteString))
             } else {
+                logger.debug("[Transfer] \(tag) poster upload failed: \(TransferLog.describe(error ?? SCTDataSessionError.thumbnailUploadFailed))")
                 completion(.failure(error ?? SCTDataSessionError.thumbnailUploadFailed))
             }
         }
@@ -94,22 +101,29 @@ enum DefaultThumbnailTransfer {
               let scheme = url.scheme?.lowercased(),
               scheme == "http" || scheme == "https"
         else {
+            logger.warn("[Transfer] poster download rejected: unsupported origin \(TransferLog.redact(origin))")
             completion(.failure(SCTDataSessionError.unsupportedThumbnailOrigin))
             return
         }
-        URLSession.shared.downloadTask(with: url) { location, _, error in
+        URLSession.shared.downloadTask(with: url) { location, response, error in
             guard let location, error == nil else {
+                logger.warn("[Transfer] poster download \(TransferLog.redact(url)) failed: \(TransferLog.describe(error ?? SCTDataSessionError.thumbnailDownloadFailed))")
                 completion(.failure(error ?? SCTDataSessionError.thumbnailDownloadFailed))
                 return
             }
+            if let status = (response as? HTTPURLResponse)?.statusCode, !(200..<300).contains(status) {
+                // Not handled: the error body is kept as the poster (and fails to decode later).
+                logger.warn("[Transfer] poster download \(TransferLog.redact(url)) answered HTTP \(status); the body is used as the poster")
+            }
             // The task's temp file dies when this callback returns — move it first.
-            let stable = URL(fileURLWithPath: NSTemporaryDirectory())
+            let stable = posterDirectory()
                 .appendingPathComponent("video_thumb_\(UUID().uuidString)")
                 .appendingPathExtension("jpg")
             do {
                 try FileManager.default.moveItem(at: location, to: stable)
                 completion(.success(stable))
             } catch {
+                logger.warn("[Transfer] poster download \(TransferLog.redact(url)) could not be moved out of the temp location: \(TransferLog.describe(error))")
                 completion(.failure(error))
             }
         }.resume()
@@ -149,7 +163,32 @@ open class SCTDataSessionTaskInfo: NSObject {
     internal var thumbnailRendition: AttachmentEncryption.Rendition?
     /// The transport returned the verified plaintext of an encrypted download.
     internal var didDecryptDownload = false
-    
+
+    /// Names this transfer in every log line of every layer (`xfer=`). The data session's own
+    /// operation id when it has one (`TransportDataSession`), assigned before the session sees
+    /// the task.
+    public var operationId: String {
+        stateLock.lock(); defer { stateLock.unlock() }
+        return assignedOperationId ?? fallbackOperationId
+    }
+    /// When the task was made: a transfer's duration is measured from here.
+    internal let startedAt = Date()
+    /// Attempts the data session started for this task.
+    internal var attempts: Int {
+        get { stateLock.lock(); defer { stateLock.unlock() }; return _attempts }
+        set { stateLock.lock(); _attempts = newValue; stateLock.unlock() }
+    }
+    /// The last failure was an interruption (work kept for another attempt), not a refusal.
+    internal var wasInterrupted: Bool {
+        get { stateLock.lock(); defer { stateLock.unlock() }; return _wasInterrupted }
+        set { stateLock.lock(); _wasInterrupted = newValue; stateLock.unlock() }
+    }
+    private let stateLock = NSLock()
+    private var assignedOperationId: String?
+    private let fallbackOperationId: String
+    private var _attempts = 0
+    private var _wasInterrupted = false
+
     internal init(
         transferType: TransferType,
         message: ChatMessage,
@@ -158,16 +197,53 @@ open class SCTDataSessionTaskInfo: NSObject {
         self.transferType = transferType
         self.message = message
         self.attachment = attachment
+        switch transferType {
+        case .upload:
+            fallbackOperationId = attachment.tid != 0 ? "upload-\(attachment.tid)" : "upload-\(UUID().uuidString.prefix(8).lowercased())"
+        case .download:
+            fallbackOperationId = TransportDataSession.shortDownloadOperationId(for: attachment)
+        }
         super.init()
+    }
+
+    var hasAssignedOperationId: Bool {
+        stateLock.lock(); defer { stateLock.unlock() }
+        return assignedOperationId != nil
+    }
+
+    func assign(operationId: String) {
+        stateLock.lock(); assignedOperationId = operationId; stateLock.unlock()
+    }
+
+    /// Who this task's log lines are about.
+    var logContext: TransferLogContext {
+        TransferLogContext(operationId: operationId, message: message)
+    }
+
+    /// `xfer=<operation> msg=<id>/<tid> channel=<id>`.
+    var logTag: String {
+        logContext.tag
+    }
+
+    /// The task has reported its end (a success or a failure).
+    var isTerminal: Bool {
+        switch event {
+        case .failure, .successURI, .successURL:
+            return true
+        default:
+            return false
+        }
     }
     
     public func updateLocalFileLocation(newLocation: URL) {
+        logEventDiagnostics("updateLocalFileURL")
         event = .updateLocalFileURL(newLocation, attachment.filePath)
         onEvent?(.updateLocalFileURL(newLocation, attachment.filePath))
         attachment.filePath = newLocation.path
     }
     
     public func updateLocalFileLocation(newPath: String) {
+        logEventDiagnostics("updateLocalFileURL")
         event = .updateLocalFileURL(URL(fileURLWithPath: newPath), attachment.filePath)
         onEvent?(.updateLocalFileURL(URL(fileURLWithPath: newPath), attachment.filePath))
         attachment.filePath = newPath
@@ -180,25 +256,56 @@ open class SCTDataSessionTaskInfo: NSObject {
     }
     
     public func failure(error: Error?) {
+        logEventDiagnostics("failure(\(TransferLog.describe(error)))")
+        event = .failure(error)
+        onEvent?(.failure(error))
+    }
+
+    /// `AttachmentTransfer` turning a success its gate refused into a failure: expected after
+    /// a terminal event, so not reported as one arriving late.
+    func reject(error: Error) {
         event = .failure(error)
         onEvent?(.failure(error))
     }
     
     public func success(origin uri: String) {
+        logEventDiagnostics("successURI(\(TransferLog.redact(uri)))")
         attachment.url = uri
         event = .successURI(uri)
         onEvent?(.successURI(uri))
     }
     
     public func success(origin url: URL) {
+        logEventDiagnostics("successURL(\(TransferLog.redact(url)))")
         attachment.url = url.absoluteString
         event = .successURL(url)
         onEvent?(.successURL(url))
     }
     
     deinit {}
+
+    /// An event emitted before `AttachmentTransfer` installed `onEvent` (lost), or after a
+    /// terminal one (it replaces it). Neither should happen; both are logged if they do.
+    private func logEventDiagnostics(_ name: @autoclosure () -> String) {
+        let ended: String?
+        switch event {
+        case .failure(let error):
+            ended = "failure(\(TransferLog.describe(error)))"
+        case .successURI, .successURL:
+            ended = "success"
+        default:
+            ended = nil
+        }
+        if let ended {
+            logger.warn("[Transfer] \(logTag) \(transferType) event \(name()) after the task already ended with \(ended) \(attachment.transferLogDescription)")
+        }
+        if onEvent == nil {
+            logger.warn("[Transfer] \(logTag) \(transferType) event \(name()) emitted before the event hooks were installed: it is lost \(attachment.transferLogDescription)")
+        }
+    }
     
     public func cancel() {
+        logger.info("[Transfer] \(logTag) \(transferType) cancel requested (last event \(TransportDataSession.describe(event))) \(attachment.transferLogDescription)")
         attachment.status = .pending
         action = .cancel
         onAction?(.cancel)
@@ -218,38 +325,53 @@ open class SCTDataSessionTaskInfo: NSObject {
     public func stop() {
         // A pause racing the success would overwrite the `.done` just set on this same
         // attachment, leaving a delivered file stuck paused with no task left to resume.
-        guard !isTransferFinished else { return }
+        guard !isTransferFinished else {
+            logger.debug("[Transfer] \(logTag) \(transferType) pause ignored: already delivered")
+            return
+        }
+        logger.info("[Transfer] \(logTag) \(transferType) pause requested")
         attachment.status = transferType == .upload ? .pauseUploading : .pauseDownloading
         action = .stop
         onAction?(.stop)
     }
 
     public func resume() {
-        guard !isTransferFinished else { return }
+        guard !isTransferFinished else {
+            logger.debug("[Transfer] \(logTag) \(transferType) resume ignored: already delivered")
+            return
+        }
+        logger.info("[Transfer] \(logTag) \(transferType) resume requested")
         attachment.status = transferType == .upload ? .uploading : .downloading
         action = .resume
         onAction?(.resume)
     }
     
     public func startChecksum(_ completion: @escaping ((Bool) -> Void)) {
-        checksumProvider.startChecksum(
-            message: message,
-            attachment: attachment,
-            encryption: encryption) { [weak self] in
-                guard let self else { return }
-                switch $0 {
-                case .success(let link):
-                    if let link {
-                        self.success(origin: link)
-                        completion(true)
-                    } else {
+        // The provider tags its own lines from the bound context.
+        TransferLog.with(logContext) {
+            checksumProvider.startChecksum(
+                message: message,
+                attachment: attachment,
+                encryption: encryption) { [weak self] in
+                    guard let self else { return }
+                    switch $0 {
+                    case .success(let link):
+                        if let link {
+                            logger.info("[Transfer] \(self.logTag) upload checksum hit: reusing \(TransferLog.redact(link)) encryption=\(self.encryption) \(self.attachment.transferLogDescription)")
+                            self.success(origin: link)
+                            completion(true)
+                        } else {
+                            logger.debug("[Transfer] \(self.logTag) upload checksum miss")
+                            completion(false)
+                        }
+                    case .failure(let error):
+                        // Reported at the end, once, by `AttachmentTransfer`.
+                        logger.debug("[Transfer] \(self.logTag) upload checksum step failed, the upload fails: \(TransferLog.describe(error))")
+                        self.failure(error: error)
                         completion(false)
                     }
-                case .failure(let error):
-                    self.failure(error: error)
-                    completion(false)
                 }
-            }
+        }
     }
 }
 

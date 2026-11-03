@@ -16,13 +16,21 @@ open class SCTSession: TransportDataSession {
 
     public static let `default` = SCTSession()
 
-    public let fileStorage: FileStorage = .init()
+    public let fileStorage: FileStorage
 
     public init() {
+        fileStorage = .init()
         super.init(transport: DefaultFileTransferTransport())
     }
 
     public override init(transport: FileTransferTransport) {
+        fileStorage = .init()
+        super.init(transport: transport)
+    }
+
+    /// With its own storage. A test seam.
+    init(transport: FileTransferTransport, fileStorage: FileStorage) {
+        self.fileStorage = fileStorage
         super.init(transport: transport)
     }
 
@@ -39,7 +47,11 @@ open class SCTSession: TransportDataSession {
     }
 
     open override func downloadDestination(for attachment: ChatMessage.Attachment) -> URL? {
-        guard let string = attachment.url, let url = URL(string: string) else { return nil }
+        guard let string = attachment.url, let url = URL(string: string) else {
+            // The download fails with invalidRequest, reported once by `AttachmentTransfer`.
+            logger.debug("[Transfer] \(TransferLog.currentTag) no download destination: url missing or unparsable (\(TransferLog.redact(attachment.url))) \(attachment.transferLogDescription)")
+            return nil
+        }
         let transferId = url.deletingLastPathComponent().lastPathComponent
         return URL(fileURLWithPath: fileStorage.createPath(transferId: transferId, fileName: attachment.name))
     }

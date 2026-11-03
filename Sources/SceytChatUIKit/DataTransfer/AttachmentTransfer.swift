@@ -51,6 +51,10 @@ open class AttachmentTransfer: DataProvider {
         SceytChatUIKit.shared.chatClient.connectionState != .connected
     }
 
+    /// How long a video's poster upload may take before the video goes out without it. A test
+    /// seam: 30 s in production.
+    var videoThumbnailTimeout: TimeInterval = 30
+
     public private(set) var uploadStopedOperations = [AsyncOperationBlock]()
     public var allTasks: [SCTDataSessionTaskInfo] {
         taskGroups.values.flatMap({ $0 })
@@ -93,7 +97,7 @@ open class AttachmentTransfer: DataProvider {
         }
         // No tid, url, filePath or id: every such attachment collapses onto one key,
         // so their progress would be delivered to each other's observers.
-        logger.error("[Attachment] transferIdentity has nothing to key on — progress delivery will be wrong for \(attachment.description)")
+        logger.error("[Attachment] transferIdentity has nothing to key on — progress delivery will be wrong for \(attachment.transferLogDescription)")
         return "unknown"
     }
     
@@ -139,11 +143,11 @@ open class AttachmentTransfer: DataProvider {
         }
         guard SCTSession.isCompleteImageFile(at: path) else {
             guard Self.discardedImageFiles.object(forKey: path as NSString) == nil else {
-                logger.error("[Attachment] keeping \(path): still not a readable image after a re-download \(attachment.description)")
+                logger.error("[Attachment] keeping \(path): still not a readable image after a re-download \(attachment.transferLogDescription)")
                 return true
             }
             Self.discardedImageFiles.setObject(true, forKey: path as NSString)
-            logger.error("[Attachment] removing \(path): not a readable image, so the download is not done \(attachment.description)")
+            logger.error("[Attachment] removing \(path): not a readable image, so the download is not done \(attachment.transferLogDescription)")
             try? FileManager.default.removeItem(atPath: path)
             if attachment.filePath == path {
                 attachment.filePath = nil
@@ -190,8 +194,6 @@ open class AttachmentTransfer: DataProvider {
         } else {
             objs.append(obj)
         }
-        // updateValue bypasses the FileProviderCache subscript, whose setter
-        // appends instead of replacing.
         cache.updateValue(objs, forKey: key)
     }
     
@@ -210,7 +212,7 @@ open class AttachmentTransfer: DataProvider {
         // every other subscriber for the same attachment — a channel-info cell being
         // deallocated took the open message cell's live progress ring with it.
         if objectIdKey.isEmpty, existing.count > 1 {
-            logger.warn("[Attachment] removeProgressObserver called with no objectIdKey — dropping all \(existing.count) observers for \(key), including ones this caller does not own")
+            logger.warn("[Attachment] removeProgressObserver called with no objectIdKey — dropping all \(existing.count) observers for \(TransferLog.redact(key)), including ones this caller does not own")
         }
         let remaining = objectIdKey.isEmpty ? [] : existing.filter { $0.idKey != objectIdKey }
         // The cached percent belongs to the transfer, not to any one observer: it is
@@ -220,7 +222,6 @@ open class AttachmentTransfer: DataProvider {
         if remaining.isEmpty {
             cache[key] = nil
         } else {
-            // updateValue, not the subscript: the FileProviderCache setter appends.
             cache.updateValue(remaining, forKey: key)
         }
         if !liveTask {
@@ -240,64 +241,102 @@ open class AttachmentTransfer: DataProvider {
                 completion?(message, nil)
                 return
             }
-            let encryption = self.uploadEncryption(message: message, attachments: attachments)
-            self.startUploads(message: message, attachments: attachments, encryption: encryption, completion: completion)
+            self.startUploads(message: message, attachments: attachments, completion: completion)
+        }
+    }
+
+    /// The operation id `dataSession` will use for `attachment`, assigned to the task before
+    /// the session sees it, so every layer's lines carry the same `xfer=`.
+    static func assignOperationId(to taskInfo: SCTDataSessionTaskInfo, dataSession: SCTDataSession) {
+        guard let session = dataSession as? TransportDataSession else { return }
+        switch taskInfo.transferType {
+        case .upload:
+            taskInfo.assign(operationId: session.uploadOperationId(for: taskInfo.attachment))
+        case .download:
+            taskInfo.assign(operationId: session.downloadOperationId(for: taskInfo.attachment))
         }
     }
 
     private func startUploads(
         message: ChatMessage,
         attachments: [ChatMessage.Attachment],
-        encryption: [ObjectIdentifier: EncryptionSetup],
         completion: ((ChatMessage?, Error?) -> Void)?
     ) {
             if let dataSession = self.dataSession(for: message) {
+                let groupKey = message.id != 0 ? Int64(message.id) : message.tid
                 var tasks = [SCTDataSessionTaskInfo]()
+                var starts = [SCTDataSessionTaskInfo]()
                 var rejected = [(SCTDataSessionTaskInfo, Error)]()
-                let existTasks = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid]
+                let existTasks = self.taskGroups[groupKey]
                 for attachment in attachments {
                     self.repairAttachmentFilePathIfNeeded(attachment, dataSession: dataSession)
                     if let resolvedFilePath = dataSession.getFilePath(attachment: attachment),
                        resolvedFilePath != attachment.filePath {
                         attachment.filePath = resolvedFilePath
                     }
-                    guard attachment.filePath != nil
-                    else { continue }
-                    if existTasks?.contains(where: { $0.attachment.filePath == attachment.filePath }) == true {
+                    // A task that already ended (a cancelled one included) does not count: a
+                    // new upload of its file is a new upload.
+                    if let filePath = attachment.filePath,
+                       let running = existTasks?.first(where: { !$0.isTerminal && $0.attachment.filePath == filePath }) {
                         let key = Self.key(message: message, attachment: attachment)
-                        self.uploadCallbackCache[key] = [.init(callback: completion)]
+                        // Appended: an earlier caller waiting on the same upload keeps its
+                        // completion (`[key] = …` is the Dictionary setter, which replaces).
+                        if let completion {
+                            self._uploadCallbackCache.mutate { $0[key, default: []].append(.init(callback: completion)) }
+                        }
+                        logger.info("[Attachment] \(running.logTag) upload already running for this file, waiting for it \(attachment.transferLogDescription)")
                         continue
                     }
-                    
-                    attachment.status = .uploading
                     let taskInfo = SCTDataSessionTaskInfo(
                         transferType: .upload,
                         message: message,
                         attachment: attachment
                     )
-                    
+                    Self.assignOperationId(to: taskInfo, dataSession: dataSession)
                     tasks.append(taskInfo)
-                    if let setup = encryption[ObjectIdentifier(attachment)] {
+                    let tag = taskInfo.logTag
+                    guard attachment.filePath != nil else {
+                        // Failed, not skipped: without a task nothing would ever change its status.
+                        logger.debug("[Attachment] \(tag) upload has no local file (source deleted?): failing it (missingSourceFile) \(attachment.transferLogDescription)")
+                        rejected.append((taskInfo, TransportDataSessionError.missingSourceFile))
+                        continue
+                    }
+                    attachment.status = .uploading
+                    let setup = TransferLog.with(taskInfo.logContext) {
+                        self.uploadEncryption(message: message, attachments: [attachment])[ObjectIdentifier(attachment)]
+                    }
+                    if let setup {
                         // Fail closed: an attachment that must be encrypted never reaches a
                         // session that would upload it as plaintext.
                         if let error = Self.apply(setup, to: taskInfo, dataSession: dataSession) {
+                            logger.debug("[Encryption] \(tag) upload rejected before start (fail closed): \(TransferLog.describe(error)) session=\(type(of: dataSession))")
                             rejected.append((taskInfo, error))
                             continue
                         }
                     }
-                    dataSession.upload(
-                        attachment: attachment,
-                        taskInfo: taskInfo
-                    )
+                    logger.info("[Attachment] \(tag) upload start type=\(taskInfo.encryption == .required ? "encrypted" : "plain") size=\(TransferLog.size(path: attachment.filePath)) session=\(type(of: dataSession)) \(attachment.transferLogDescription)")
+                    starts.append(taskInfo)
                 }
                 guard !tasks.isEmpty else {
+                    logger.info("[Attachment] upload: no new task for message \(message.id)/\(message.tid) channel=\(message.channelId), every attachment is already uploading")
                     completion?(message, AttachmentTransferError.alreadyTransferring)
                     return
                 }
                 self.database.write {
                     $0.update(chatMessage: message, attachments: attachments)
                 }
-                self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] = tasks
+                // Merged, like `startDownloads`: overwriting dropped the tasks an earlier call
+                // still runs for this message, so the `existTasks` guard no longer saw them and
+                // their pause / resume / progress lookups found nothing. A rejected task never
+                // joins: it ends below, before any session sees it.
+                let rejectedTasks = Set(rejected.map { ObjectIdentifier($0.0) })
+                let started = tasks.filter { !rejectedTasks.contains(ObjectIdentifier($0)) }
+                if !started.isEmpty {
+                    // One locked step: `didEndTask` removes tasks from other threads.
+                    self._taskGroups.mutate { $0[groupKey, default: []].append(contentsOf: started) }
+                }
+                // The hooks go in before any session sees a task: an event it reports at once
+                // (a fast failure) is never lost.
                 self.handle(tasks: tasks, message: message, attachments: attachments) { message, error in
                     self.database.read {
                         var dto: MessageDTO?
@@ -322,16 +361,17 @@ open class AttachmentTransfer: DataProvider {
                 for (taskInfo, error) in rejected {
                     taskInfo.failure(error: error)
                 }
-                // Seed a starting progress now that `handle` has installed the event hooks,
-                // so the ring shows for the whole pre-transfer window: the checksum
-                // round-trip, the image resize / video export, and the wait in the upload
-                // queue (serialized, so batch-sent images sit there a while). Without it an
-                // image reported nothing until the SDK streamed its first byte — only video
-                // seeded itself, from `TransportDataSession.prepareUploadFile`.
-                for taskInfo in tasks where taskInfo.attachment.status == .uploading {
+                // Seed a starting progress, so the ring shows for the whole pre-transfer
+                // window: the checksum round-trip, the image resize / video export, and the
+                // wait in the upload queue (serialized, so batch-sent images sit there a while).
+                for taskInfo in starts where taskInfo.attachment.status == .uploading {
                     taskInfo.updateProgress(Self.initialUploadProgress)
                 }
+                for taskInfo in starts {
+                    dataSession.upload(attachment: taskInfo.attachment, taskInfo: taskInfo)
+                }
             } else {
+                logger.error("[Attachment] upload: no data session, nothing uploads for message \(message.id)/\(message.tid) channel=\(message.channelId)")
                 completion?(message, AttachmentTransferError.externalTransferrerNotImplemented)
             }
     }
@@ -366,7 +406,7 @@ open class AttachmentTransfer: DataProvider {
                       !att.isPendingUpload,
                       taskFor(message: message, attachment: att) == nil
                 else { continue }
-                logger.verbose("[Attachment] reconciling stale \(att.status) to .done, file is on disk \(att.description)")
+                logger.verbose("[Attachment] reconciling stale \(att.status) to .done, file is on disk \(att.transferLogDescription)")
                 att.status = .done
                 att.transferProgress = 1
                 if att.filePath != filePath {
@@ -375,7 +415,7 @@ open class AttachmentTransfer: DataProvider {
                 reconciled.append(att)
 
                 let key = Self.key(message: message, attachment: att)
-                logger.verbose("[Attachment] onCompletion KEY \(key)")
+                logger.verbose("[Attachment] onCompletion KEY \(TransferLog.redact(key))")
                 if let blocks = self.cache[key] {
                     let attachmentCompletion = AttachmentCompletion(
                         message: message,
@@ -431,81 +471,85 @@ open class AttachmentTransfer: DataProvider {
                 completion?(message, nil)
                 return
             }
-            logger.verbose("[Attachment] downloadMessageAttachments \(attachments.map { $0.description })")
-            let encryption = self.downloadEncryption(attachments: attachments)
-            self.startDownloads(message: message, attachments: attachments, encryption: encryption, completion: completion)
+            self.startDownloads(message: message, attachments: attachments, completion: completion)
         }
     }
 
     private func startDownloads(
         message: ChatMessage,
         attachments: [ChatMessage.Attachment],
-        encryption: [ObjectIdentifier: EncryptionSetup],
         completion: ((ChatMessage?, Error?) -> Void)?
     ) {
             if let dataSession = self.dataSession(for: message) {
+                let groupKey = message.id != 0 ? Int64(message.id) : message.tid
                 var tasks = [SCTDataSessionTaskInfo]()
+                var starts = [SCTDataSessionTaskInfo]()
                 var rejected = [(SCTDataSessionTaskInfo, Error)]()
-                let existTasks = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid]
-                for (_, attachment) in attachments.enumerated() {
-                    guard let url = attachment.url,
-                          !url.isEmpty
-                    else {
-                        // Skipped without a task, so nothing will ever complete or fail
-                        // it — it keeps whatever status it has, forever.
-                        logger.error("[Attachment] downloadMessageAttachments: skipping attachment with no url, it will never download \(attachment.description)")
-                        continue
-                    }
-                    if existTasks?.contains(where: { $0.attachment.url == attachment.url }) == true || fileProvider.filePath(attachment: attachment) != nil {
-                        let key = Self.key(message: message, attachment: attachment)
-                        self.downloadCallbackCache[key] = [.init(callback: completion)]
-                        logger.verbose("[Attachment] downloadMessageAttachments: Task already exist \(attachments.map { $0.description })")
-                        continue
-                    }
-                    attachment.status = .downloading
-                    
+                let existTasks = self.taskGroups[groupKey]
+                for attachment in attachments {
                     let taskInfo = SCTDataSessionTaskInfo(
                         transferType: .download,
                         message: message,
                         attachment: attachment
                     )
-                    
+                    Self.assignOperationId(to: taskInfo, dataSession: dataSession)
+                    let tag = taskInfo.logTag
+                    guard let url = attachment.url,
+                          !url.isEmpty
+                    else {
+                        // Skipped without a task, so nothing will ever complete or fail
+                        // it — it keeps whatever status it has, forever.
+                        logger.error("[Attachment] \(tag) download skipped: the attachment has no url, it will never download \(attachment.transferLogDescription)")
+                        continue
+                    }
+                    let running = existTasks?.contains(where: { !$0.isTerminal && $0.attachment.url == attachment.url }) == true
+                    if running || fileProvider.filePath(attachment: attachment) != nil {
+                        let key = Self.key(message: message, attachment: attachment)
+                        if let completion {
+                            self._downloadCallbackCache.mutate { $0[key, default: []].append(.init(callback: completion)) }
+                        }
+                        logger.verbose("[Attachment] \(tag) download: \(running ? "task already exists" : "file already on disk"), waiting for it")
+                        continue
+                    }
+                    attachment.status = .downloading
                     tasks.append(taskInfo)
-                    if let setup = encryption[ObjectIdentifier(attachment)] {
+                    let setup = TransferLog.with(taskInfo.logContext) {
+                        self.downloadEncryption(attachments: [attachment])[ObjectIdentifier(attachment)]
+                    }
+                    if let setup {
                         // A malformed encryption field or a session that would store the
                         // ciphertext as the file: fail before fetching anything.
                         if let error = Self.apply(setup, to: taskInfo, dataSession: dataSession) {
+                            logger.debug("[Encryption] \(tag) download rejected before fetching (fail closed): \(TransferLog.describe(error)) session=\(type(of: dataSession))")
                             rejected.append((taskInfo, error))
                             continue
                         }
                     }
-                    dataSession.download(
-                        attachment: attachment,
-                        taskInfo: taskInfo
-                    )
+                    logger.info("[Attachment] \(tag) download start type=\(taskInfo.encryption == .required ? "encrypted" : "plain") size=\(attachment.uploadedFileSize) url=\(TransferLog.redact(attachment.url)) session=\(type(of: dataSession)) \(attachment.transferLogDescription)")
+                    starts.append(taskInfo)
                 }
                 guard !tasks.isEmpty else {
-                    logger.verbose("[Attachment] downloadMessageAttachments: no new tasks for message \(message.id), every requested attachment is already transferring or on disk")
+                    logger.verbose("[Attachment] download: no new task for message \(message.id)/\(message.tid) channel=\(message.channelId), every requested attachment is already transferring or on disk")
                     completion?(message, AttachmentTransferError.alreadyTransferring)
                     return
                 }
                 self.database.write {
                     $0.update(chatMessage: message, attachments: attachments)
                 }
-                if let infos = self.taskGroups[message.id != 0 ? Int64(message.id) : message.tid] {
-                    logger.verbose("[Attachment] Download error \(infos.map { $0.attachment.url}) \(message.id)")
-                    logger.verbose("[Attachment] Download error new \(tasks.map { $0.attachment.url}) \(tasks.map { $0.message.id})")
-                }
                 // Merge: overwriting dropped any sibling task still running under this
                 // message from the `existTasks` guard consulted on the next rebind.
-                let groupKey = message.id != 0 ? Int64(message.id) : message.tid
-                self.taskGroups[groupKey] = (self.taskGroups[groupKey] ?? []) + tasks
+                self._taskGroups.mutate { $0[groupKey, default: []].append(contentsOf: tasks) }
+                // The hooks go in before any session sees a task: an event it reports at once
+                // (a fast failure) is never lost.
                 self.handle(tasks: tasks, message: message, attachments: attachments, completion: completion)
                 for (taskInfo, error) in rejected {
                     taskInfo.failure(error: error)
                 }
+                for taskInfo in starts {
+                    dataSession.download(attachment: taskInfo.attachment, taskInfo: taskInfo)
+                }
             } else {
-                logger.error("[Attachment] downloadMessageAttachments: Components.dataSession is nil — no transport, nothing will download for message \(message.id)")
+                logger.error("[Attachment] download: no data session, nothing will download for message \(message.id)/\(message.tid) channel=\(message.channelId)")
                 completion?(message, AttachmentTransferError.externalTransferrerNotImplemented)
             }
     }
@@ -570,7 +614,7 @@ open class AttachmentTransfer: DataProvider {
                 completion?(true)
                 return
             }
-            logger.error("[Attachment] stopTransfer: no attachment on the message matches \(identity) — status unchanged, the transfer keeps running")
+            logger.error("[Attachment] stopTransfer: no attachment on the message matches \(TransferLog.redact(identity)) — status unchanged, the transfer keeps running")
             completion?(true)
         }
     }
@@ -610,7 +654,7 @@ open class AttachmentTransfer: DataProvider {
                     completion?(true)
                     return
                 }
-                logger.error("[Attachment] resumeTransfer: no attachment on the message matches \(identity) — status unchanged, the UI will keep showing it paused")
+                logger.error("[Attachment] resumeTransfer: no attachment on the message matches \(TransferLog.redact(identity)) — status unchanged, the UI will keep showing it paused")
                 completion?(true)
                 return
             }
@@ -671,34 +715,66 @@ open class AttachmentTransfer: DataProvider {
             return
         }
         let finish = OneShotBlock(completion)
-        handleTaskQueue.asyncAfter(deadline: .now() + 30) {
-            finish.fire()
+        handleTaskQueue.asyncAfter(deadline: .now() + videoThumbnailTimeout) {
+            if finish.fire() {
+                logger.warn("[Attachment] \(taskInfo.logTag) video_thumb timed out after 30 s, sending without it")
+            }
         }
         handleTaskQueue.async { [weak self] in
             guard let self,
                   let fileUrl = self.makeVideoThumbnailFile(for: atch)
             else {
+                logger.warn("[Attachment] \(taskInfo.logTag) video_thumb: no poster frame could be made, sending without it")
                 finish.fire()
                 return
             }
-            if taskInfo.encryption == .required {
+            // A dedupe hit can reuse an encrypted object even for a plain send: its poster
+            // must then be encrypted too, or the receiver could not show it.
+            if taskInfo.encryption == .required || atch.isEncrypted {
                 self.uploadEncryptedVideoThumbnail(fileUrl, taskInfo: taskInfo, attachment: atch, decoded: decoded, dataSession: dataSession, finish: finish)
                 return
             }
-            dataSession.uploadAttachmentThumbnail(for: atch, fileUrl: fileUrl) { result in
-                defer { try? FileManager.default.removeItem(at: fileUrl) }
-                switch result {
-                case .success(let origin):
-                    var meta = decoded ?? ChatMessage.Attachment.Metadata<String>(thumbnail: "")
-                    meta.videoThumbnail = origin
-                    atch.updateMetadata(meta.build())
-                    logger.verbose("[Attachment] video_thumb uploaded, origin \(origin)")
-                case .failure(let error):
-                    logger.errorIfNotNil(error, "[Attachment] video_thumb upload failed — sending without it")
+            let tag = taskInfo.logTag
+            TransferLog.with(taskInfo.logContext) {
+                dataSession.uploadAttachmentThumbnail(for: atch, fileUrl: fileUrl) { result in
+                    defer { TransferLog.remove(fileUrl, what: "the poster frame", context: "[Attachment] \(tag) video_thumb") }
+                    switch result {
+                    case .success(let origin):
+                        var meta = decoded ?? ChatMessage.Attachment.Metadata<String>(thumbnail: "")
+                        meta.videoThumbnail = origin
+                        Self.updateMetadata(of: atch, rebuiltFrom: meta)
+                        logger.verbose("[Attachment] \(tag) video_thumb uploaded, origin \(TransferLog.redact(origin))")
+                    case .failure(let error):
+                        logger.warn("[Attachment] \(tag) video_thumb upload failed, sending without it: \(TransferLog.describe(error))")
+                    }
+                    finish.fire()
                 }
-                finish.fire()
             }
         }
+    }
+
+    /// Sets `atch`'s metadata to `meta`, keeping the `enc` the typed model does not know: a
+    /// dedupe hit's metadata already carries the reused object's key.
+    static func updateMetadata(of atch: ChatMessage.Attachment, rebuiltFrom meta: ChatMessage.Attachment.Metadata<String>) {
+        atch.updateMetadata(ChatMessage.Attachment.metadata(meta.build(), preservingEncryptionFrom: atch.metadata))
+    }
+
+    /// The `enc` an upload's metadata must carry, or nil when it has none to write: the
+    /// uploaded object's key with the poster's rendition, or, for a dedupe hit (nothing was
+    /// uploaded, the reused object's `enc` is already in the metadata), that `enc` with the
+    /// rendition of a poster uploaded for it.
+    static func uploadEncryption(of taskInfo: SCTDataSessionTaskInfo, attachment atch: ChatMessage.Attachment) -> AttachmentEncryption? {
+        let renditions = taskInfo.thumbnailRendition.map { [$0] } ?? []
+        if let info = taskInfo.uploadedEncryption {
+            return AttachmentEncryption(info: info, renditions: renditions)
+        }
+        guard let rendition = taskInfo.thumbnailRendition, let reused = atch.encryption else { return nil }
+        return AttachmentEncryption(
+            algorithm: reused.algorithm,
+            attachmentId: reused.attachmentId,
+            key: reused.key,
+            renditions: reused.renditions.filter { $0.role != rendition.role } + [rendition]
+        )
     }
 
     /// The poster of an encrypted video, encrypted under its own key: a plaintext poster would
@@ -712,18 +788,22 @@ open class AttachmentTransfer: DataProvider {
         dataSession: SCTDataSession,
         finish: OneShotBlock
     ) {
+        let context = taskInfo.logContext
+        let tag = taskInfo.logTag
         Task {
             let ciphertext = fileUrl.deletingPathExtension().appendingPathExtension("enc")
             let info: EncryptedFileInfo
             do {
-                info = try await Components.fileEncryption.encrypt(file: fileUrl, to: ciphertext)
+                info = try await TransferLog.$current.withValue(context) {
+                    try await Components.fileEncryption.encrypt(file: fileUrl, to: ciphertext)
+                }
             } catch {
-                try? FileManager.default.removeItem(at: fileUrl)
-                logger.errorIfNotNil(error, "[Encryption] video_thumb encryption failed — sending without it")
+                TransferLog.remove(fileUrl, what: "the poster frame", context: "[Encryption] \(tag) video_thumb")
+                logger.warn("[Encryption] \(tag) video_thumb encryption failed, sending without it: \(TransferLog.describe(error))")
                 finish.fire()
                 return
             }
-            try? FileManager.default.removeItem(at: fileUrl)
+            TransferLog.remove(fileUrl, what: "the plaintext poster frame", context: "[Encryption] \(tag) video_thumb")
             uploadEncryptedVideoThumbnail(ciphertext, info: info, taskInfo: taskInfo, attachment: atch, decoded: decoded, dataSession: dataSession, finish: finish)
         }
     }
@@ -737,28 +817,34 @@ open class AttachmentTransfer: DataProvider {
         dataSession: SCTDataSession,
         finish: OneShotBlock
     ) {
+        let tag = taskInfo.logTag
+        TransferLog.with(taskInfo.logContext) {
         dataSession.uploadAttachmentThumbnail(for: atch, fileUrl: ciphertext) { result in
-            defer { try? FileManager.default.removeItem(at: ciphertext) }
+            defer { TransferLog.remove(ciphertext, what: "the encrypted poster", context: "[Encryption] \(tag) video_thumb") }
             switch result {
             case .success(let origin):
-                finish.fire {
+                let applied = finish.fire {
                     var meta = decoded ?? ChatMessage.Attachment.Metadata<String>(thumbnail: "")
                     meta.videoThumbnail = origin
-                    atch.updateMetadata(meta.build())
+                    Self.updateMetadata(of: atch, rebuiltFrom: meta)
                     taskInfo.thumbnailRendition = AttachmentEncryption.Rendition(role: AttachmentEncryption.Rendition.thumbnailRole, info: info)
-                    logger.verbose("[Attachment] encrypted video_thumb uploaded, origin \(origin)")
+                    logger.verbose("[Encryption] \(tag) encrypted video_thumb uploaded, origin \(TransferLog.redact(origin)) attachmentId=\(info.attachmentId)")
+                }
+                if !applied {
+                    logger.warn("[Encryption] \(tag) encrypted video_thumb uploaded after the 30 s timeout: not attached")
                 }
             case .failure(let error):
-                logger.errorIfNotNil(error, "[Attachment] video_thumb upload failed — sending without it")
+                logger.warn("[Encryption] \(tag) video_thumb upload failed, sending without it: \(TransferLog.describe(error))")
                 finish.fire()
             }
+        }
         }
     }
 
     /// Writes a downloaded poster to the cache: decrypted with its `enc.renditions` entry
     /// when the video is encrypted, as is otherwise.
     static func storeVideoThumbnail(_ localUrl: URL, of attachment: ChatMessage.Attachment, at destination: URL) async throws {
-        defer { try? FileManager.default.removeItem(at: localUrl) }
+        defer { TransferLog.remove(localUrl, what: "the downloaded poster", context: "[Attachment] video_thumb") }
         guard attachment.isEncrypted else {
             // Atomic write so a concurrent loadThumbnail never observes a
             // partially written JPEG (same pattern as SCTSession.thumbnailFile).
@@ -767,7 +853,10 @@ open class AttachmentTransfer: DataProvider {
         }
         guard let encryption = attachment.encryption,
               let rendition = encryption.thumbnail
-        else { throw AttachmentEncryptionError.invalidEncryptionInfo }
+        else {
+            logger.debug("[Encryption] video_thumb of \(attachment.transferLogDescription) cannot be decrypted: \(attachment.encryption == nil ? "enc unreadable" : "no thumbnail rendition in enc")")
+            throw AttachmentEncryptionError.invalidEncryptionInfo
+        }
         // Decrypted next to the cache and moved in whole: a reader never sees a prefix.
         let decrypted = destination.deletingLastPathComponent()
             .appendingPathComponent(".\(UUID().uuidString)-\(destination.lastPathComponent)")
@@ -784,7 +873,9 @@ open class AttachmentTransfer: DataProvider {
                 try FileManager.default.moveItem(at: decrypted, to: destination)
             }
         } catch {
-            try? FileManager.default.removeItem(at: decrypted)
+            // The caller reports it (and retries on the next bind).
+            logger.debug("[Encryption] video_thumb of \(attachment.transferLogDescription) decrypt/store failed: \(TransferLog.describe(error))")
+            TransferLog.remove(decrypted, what: "the partial poster", context: "[Encryption] video_thumb", level: .error)
             throw error
         }
     }
@@ -840,7 +931,7 @@ open class AttachmentTransfer: DataProvider {
                 self.inFlightVideoThumbOrigins.remove(origin)
                 guard case .success(let localUrl) = result else {
                     if case .failure(let error) = result {
-                        logger.errorIfNotNil(error, "[Attachment] video_thumb download failed, origin \(origin)")
+                        logger.warn("[Attachment] video_thumb download failed, origin \(TransferLog.redact(origin)): \(TransferLog.describe(error)) \(atch.transferLogDescription)")
                     }
                     return
                 }
@@ -849,7 +940,7 @@ open class AttachmentTransfer: DataProvider {
                     do {
                         try await Self.storeVideoThumbnail(localUrl, of: atch, at: destination)
                     } catch {
-                        logger.errorIfNotNil(error, "[Attachment] video_thumb store failed, origin \(origin)")
+                        logger.warn("[Attachment] video_thumb store failed, origin \(TransferLog.redact(origin)): \(TransferLog.describe(error)) \(atch.transferLogDescription)")
                         return
                     }
                     DispatchQueue.main.async {
@@ -882,11 +973,10 @@ open class AttachmentTransfer: DataProvider {
                     $0.progress?(attachmentProgress)
                 }
             } else if self.unobservedProgressKeys.insert(key).inserted {
-                // The transfer is running but nothing is listening on this key. Either
-                // no view is on screen for it, or the emitter and the subscriber
-                // disagree on the attachment's identity — the latter shows up as a ring
-                // frozen at its bind-time floor until the download completes.
-                logger.warn("[Attachment] onProgress has no observers for KEY \(key) — progress will not be rendered \(taskInfo.attachment.description)")
+                // Normal when no cell for it is on screen. When one is, the emitter and the
+                // subscriber disagree on the attachment's identity: the ring stays frozen at
+                // its bind-time floor until the transfer completes.
+                logger.verbose("[Attachment] \(taskInfo.logTag) progress has no observer for KEY \(TransferLog.redact(key)) (no cell on screen?)")
             }
             self.progressCache[key] = progress
         }
@@ -897,7 +987,6 @@ open class AttachmentTransfer: DataProvider {
             error: Error? = nil
         ) {
             let key = Self.key(message: taskInfo.message, attachment: taskInfo.attachment)
-            logger.verbose("[Attachment] onCompletion KEY \(key)")
             if let blocks = self.cache[key] {
                 let attachmentCompletion = AttachmentCompletion(
                     message: message,
@@ -909,123 +998,60 @@ open class AttachmentTransfer: DataProvider {
                 }
             }
         }
-        
-        for (index, taskInfo) in tasks.enumerated() {
-            taskInfo.onEvent = { [weak self, index] event in
-                    guard let self else { return }
-                    switch event {
-                    case .updateProgress(let progress):
-                        onProgress(progress, taskInfo: taskInfo)
-                    case .updateLocalFileURL(let url, let filePath):
-                        logger.verbose("[Attachment] Handle updateLocalFileURL \(url)")
-                        if attachments.indices.contains(index) {
-                            let atch = attachments[index]
-                            logger.verbose("[Attachment] Handle updateLocalFileURL found \(String(describing: atch.url))")
-                            let previousMetadata = atch.metadata
-                            if let builder = Components.imageBuilder.init(imageUrl: url) {
-                                if let decodedMetadata = atch.imageDecodedMetadata {
-                                    atch.metadata =
-                                    ChatMessage.Attachment.Metadata(
-                                        width: Int(builder.imageSize.width),
-                                        height: Int(builder.imageSize.height),
-                                        thumbnail: decodedMetadata.thumbnail,
-                                        duration: decodedMetadata.duration,
-                                        description: decodedMetadata.description,
-                                        imageUrl: decodedMetadata.imageUrl,
-                                        thumbnailUrl: decodedMetadata.thumbnailUrl,
-                                        hideLinkDetails: decodedMetadata.hideLinkDetails,
-                                        videoThumbnail: decodedMetadata.videoThumbnail
-                                    ).build()
-                                } else if let decodedMetadata = atch.voiceDecodedMetadata {
-                                    atch.metadata =
-                                    ChatMessage.Attachment.Metadata(
-                                        width: Int(builder.imageSize.width),
-                                        height: Int(builder.imageSize.height),
-                                        thumbnail: decodedMetadata.thumbnail,
-                                        duration: decodedMetadata.duration,
-                                        description: decodedMetadata.description,
-                                        imageUrl: decodedMetadata.imageUrl,
-                                        thumbnailUrl: decodedMetadata.thumbnailUrl,
-                                        hideLinkDetails: decodedMetadata.hideLinkDetails,
-                                        videoThumbnail: decodedMetadata.videoThumbnail
-                                    ).build()
-                                }
+
+        // Each task with its own attachment: `tasks` and `attachments` are not parallel (an
+        // attachment already uploading has no task here).
+        for taskInfo in tasks {
+            let atch = taskInfo.attachment
+            taskInfo.onEvent = { [weak self] event in
+                guard let self else { return }
+                // The hot path: no log context to build.
+                if case .updateProgress(let progress) = event {
+                    onProgress(progress, taskInfo: taskInfo)
+                    return
+                }
+                // Every layer this event reaches (`enc` parsing, the poster) tags its lines
+                // with this transfer.
+                TransferLog.with(taskInfo.logContext) {
+                    // Not a `switch`: progress has been handled above.
+                    if case .updateLocalFileURL(let url, let filePath) = event {
+                        self.updateLocalFile(url, previousPath: filePath, attachment: atch, taskInfo: taskInfo, message: message)
+                    } else if case .successURL(let url) = event {
+                        logger.verbose("[Attachment] \(taskInfo.logTag) success \(TransferLog.redact(url))")
+                        finishSuccess(uri: url.absoluteString, taskInfo: taskInfo, atch: atch)
+                    } else if case .successURI(let uri) = event {
+                        logger.verbose("[Attachment] \(taskInfo.logTag) success \(TransferLog.redact(uri))")
+                        finishSuccess(uri: uri, taskInfo: taskInfo, atch: atch)
+                    } else if case .failure(let error) = event {
+                        switch taskInfo.transferType {
+                        case .download:
+                            if atch.status != .pauseDownloading {
+                                atch.status = .failedDownloading
                             }
-                            // The typed rebuild above only knows the media keys.
-                            atch.metadata = ChatMessage.Attachment.metadata(atch.metadata, preservingEncryptionFrom: previousMetadata)
-                            atch.name = url.lastPathComponent
-                            atch.filePath = url.path
-                            let fileSize = Components.storage.sizeOfItem(at: url)
-                            // An encrypted download is only the file once it was decrypted;
-                            // before that this is ciphertext, whose size is `cl`, not `ps`.
-                            let isPlaintext = taskInfo.transferType == .upload
-                                || taskInfo.encryption == .none
-                                || taskInfo.didDecryptDownload
-                            if fileSize > 0, isPlaintext {
-                                atch.uploadedFileSize = fileSize
-                            }
-                            if taskInfo.transferType == .download, fileSize > 0, isPlaintext {
-                                atch.transferProgress = 1
-                                atch.status = .done
-                            }
-                            taskInfo.attachment = atch
-                            self.database.write {
-                                if let filePath {
-                                    logger.verbose("[Attachment] Handle updateLocalFileURL file by filePath \(String(describing: atch.url))")
-                                    $0.updateAttachment(with: filePath, chatMessage: message, attachment: atch)
-                                } else {
-                                    logger.verbose("[Attachment] Handle updateLocalFileURL file by [] \(String(describing: atch.url))")
-                                    $0.update(chatMessage: message, attachments: [atch])
-                                }
+                        case .upload:
+                            if atch.status != .pauseUploading {
+                                atch.status = Self.uploadStatus(
+                                    afterFailure: error,
+                                    userCancelled: taskInfo.action == .cancel,
+                                    interrupted: taskInfo.wasInterrupted
+                                )
                             }
                         }
-                    case .successURL(let url):
-                        logger.verbose("[Attachment] Handle successURL  \(url)")
-                        finishSuccess(uri: url.absoluteString, taskInfo: taskInfo, index: index)
-                    case .successURI(let uri):
-                        logger.verbose("[Attachment] Handle successURI  \(uri)")
-                        finishSuccess(uri: uri, taskInfo: taskInfo, index: index)
-                    case .failure(let error):
-                        logger.errorIfNotNil(error, "[Attachment] transfer")
-                        if attachments.indices.contains(index) {
-                            let atch = attachments[index]
-                            logger.verbose("[Attachment] Handle failure  found \(String(describing: atch.url))")
-                            switch taskInfo.transferType {
-                            case .download:
-                                if atch.status != .pauseDownloading {
-                                    atch.status = .failedDownloading
-                                }
-                            case .upload:
-                                if atch.status != .pauseUploading {
-                                    // Being offline is not a refusal. The upload is a plain
-                                    // REST request, so it fails the instant there is no
-                                    // network — and `.failedUploading` swaps the loader for a
-                                    // retry arrow on a message the app resends by itself on
-                                    // the next connect (`SyncService.resendPendingMessage`).
-                                    // Park it back in the queue instead, so the bubble keeps
-                                    // showing that the file is still on its way out.
-                                    atch.status = Self.isOffline && !(error is AttachmentEncryptionError) ? .pending : .failedUploading
-                                }
-                            }
-                            onCompletion(taskInfo: taskInfo, attachment: atch, error: error)
-                            AttachmentTransferStatusRelay.default.post(atch, status: atch.status)
-                        }
-                        logger.errorIfNotNil(error, "[Attachment] receive failure")
+                        // The one line for this failure, with its whole cause chain: the
+                        // layers below logged it at debug.
+                        Self.logSummary(taskInfo, attachment: atch, error: error)
+                        onCompletion(taskInfo: taskInfo, attachment: atch, error: error)
+                        AttachmentTransferStatusRelay.default.post(atch, status: atch.status)
                         didEndTask(taskInfo: taskInfo, error: error)
                     }
                 }
+            }
         }
         
-        func finishSuccess(uri: String, taskInfo: SCTDataSessionTaskInfo, index: Int) {
-            guard attachments.indices.contains(index) else {
-                logger.verbose("[Attachment] receive success \(uri)")
-                didEndTask(taskInfo: taskInfo, error: nil)
-                return
-            }
-            let atch = attachments[index]
-            logger.verbose("[Attachment] Handle success found \(String(describing: atch.url))")
+        func finishSuccess(uri: String, taskInfo: SCTDataSessionTaskInfo, atch: ChatMessage.Attachment) {
+            let tag = taskInfo.logTag
             if let error = Self.encryptionGateError(taskInfo: taskInfo, attachment: atch) {
-                logger.error("[Encryption] rejecting success of \(taskInfo.transferType) \(atch.description): \(error)")
+                logger.debug("[Encryption] \(tag) rejecting success of \(taskInfo.transferType) (fail closed): \(TransferLog.describe(error)) uploadedEncryption=\(taskInfo.uploadedEncryption != nil) decrypted=\(taskInfo.didDecryptDownload)")
                 switch taskInfo.transferType {
                 case .upload:
                     // Not delivered: keep it an unsent attachment, and keep its url out of
@@ -1034,53 +1060,52 @@ open class AttachmentTransfer: DataProvider {
                 case .download:
                     // Whatever the session stored is ciphertext, not the file.
                     if let filePath = atch.filePath {
-                        try? FileManager.default.removeItem(atPath: filePath)
+                        TransferLog.remove(URL(fileURLWithPath: filePath), what: "the undecrypted download", context: "[Encryption] \(tag) gate", level: .error)
                     }
                     atch.filePath = nil
                     atch.transferProgress = 0
                 }
-                taskInfo.failure(error: error)
+                taskInfo.reject(error: error)
                 return
             }
             // For a just-uploaded video, upload its poster frame too before completing,
             // so the merged "video_thumb" metadata is persisted by didEndTask and rides
             // the wire message the sender builds from this attachment.
             attachVideoThumbnailIfNeeded(taskInfo: taskInfo, message: message, attachment: atch) {
-                if taskInfo.transferType == .upload, let info = taskInfo.uploadedEncryption {
-                    // The receiver's keys (the file's, and the poster's when one went out), and
-                    // the original size for display: the stored object is larger.
-                    let encryption = AttachmentEncryption(
-                        info: info,
-                        renditions: taskInfo.thumbnailRendition.map { [$0] } ?? []
-                    )
-                    // Ids and algorithm only: the keys are never logged.
-                    logger.debug("[Encryption] upload enc \(atch.description) alg=\(encryption.algorithm) attachmentId=\(encryption.attachmentId) thumbnailAttachmentId=\(encryption.thumbnail?.attachmentId ?? "-")")
-                    do {
-                        atch.updateMetadata(try ChatMessage.Attachment.metadata(atch.metadata, settingEncryption: encryption))
-                    } catch {
-                        // Sent without its key, the file could never be opened.
-                        logger.error("[Encryption] cannot write the encryption info of \(atch.description): \(error)")
-                        atch.url = nil
-                        taskInfo.failure(error: AttachmentEncryptionError.metadataFailed(error))
-                        return
+                TransferLog.with(taskInfo.logContext) {
+                    if taskInfo.transferType == .upload, let encryption = Self.uploadEncryption(of: taskInfo, attachment: atch) {
+                        // The receiver's keys (the file's, and the poster's when one went out), and
+                        // the original size for display: the stored object is larger.
+                        // Ids and algorithm only: the keys are never logged.
+                        logger.debug("[Encryption] \(tag) upload enc alg=\(encryption.algorithm) attachmentId=\(encryption.attachmentId) thumbnailAttachmentId=\(encryption.thumbnail?.attachmentId ?? "-")")
+                        do {
+                            atch.updateMetadata(try ChatMessage.Attachment.metadata(atch.metadata, settingEncryption: encryption))
+                        } catch {
+                            // Sent without its key, the file could never be opened.
+                            logger.debug("[Encryption] \(tag) upload cannot write enc into the metadata: \(TransferLog.describe(error))")
+                            atch.url = nil
+                            taskInfo.reject(error: AttachmentEncryptionError.metadataFailed(error))
+                            return
+                        }
+                        if let size = taskInfo.uploadedPlaintextSize {
+                            atch.uploadedFileSize = UInt(size)
+                        }
                     }
-                    if let size = taskInfo.uploadedPlaintextSize {
-                        atch.uploadedFileSize = UInt(size)
-                    }
+                    atch.url = uri
+                    atch.transferProgress = 1
+                    atch.status = .done
+                    onCompletion(taskInfo: taskInfo, attachment: atch)
+                    Self.logSummary(taskInfo, attachment: atch, error: nil, reference: uri)
+                    // `.done` is relayed once, by `didEndTask`, after it is persisted.
+                    didEndTask(taskInfo: taskInfo, error: nil)
                 }
-                atch.url = uri
-                atch.transferProgress = 1
-                atch.status = .done
-                onCompletion(taskInfo: taskInfo, attachment: atch)
-                AttachmentTransferStatusRelay.default.post(atch, status: .done)
-                logger.verbose("[Attachment] receive success \(uri)")
-                didEndTask(taskInfo: taskInfo, error: nil)
             }
         }
 
         func didEndTask(taskInfo: SCTDataSessionTaskInfo, error: Error?) {
             let key = Self.key(message: taskInfo.message, attachment: taskInfo.attachment)
             let groupKey = message.id != 0 ? Int64(message.id) : message.tid
+            let tag = taskInfo.logTag
             // The task is over — no progress/completion event will ever fire for this
             // key again. Drop the cached percent so a later cell rebind that still
             // reads a stale `.downloading` status can't restore a progress ring that
@@ -1093,42 +1118,190 @@ open class AttachmentTransfer: DataProvider {
                 for attachment in attachments where attachment.url != nil {
                     $0.updateChecksum(data: attachment.url!, messageTid: message.tid, attachmentTid: attachment.tid)
                 }
-            } completion: { _ in
-                // Last word on a successful transfer: a pause that slipped in just before
-                // the success relays `.pauseUploading` after `finishSuccess` relayed `.done`.
+            } completion: { dbError in
+                if let dbError {
+                    logger.error("[Attachment] \(tag) \(taskInfo.transferType) end could not be persisted: \(TransferLog.describe(dbError)) \(taskInfo.attachment.transferLogDescription)")
+                }
+                // The one relay of a successful transfer, and its last word: a pause that
+                // slipped in just before the success relayed `.pauseUploading`.
                 if error == nil, taskInfo.attachment.status == .done {
                     AttachmentTransferStatusRelay.default.post(taskInfo.attachment, status: .done)
                 }
                 completion?(storedMessage ?? message, error)
+                // Taken in one locked step: a caller appending meanwhile is either in this
+                // batch or kept for the next end of the key.
+                var callbacks: [_CallBack]?
                 switch taskInfo.transferType {
                 case .upload:
-                    if let callbacks = self.uploadCallbackCache[key] {
-                        for callback in callbacks {
-                            logger.verbose("[Attachment] Handle didEndTask  uploadCallbackCache \(callback)")
-                            callback.callback?(storedMessage ?? message, error)
-                        }
-                        self.uploadCallbackCache[key] = nil
-                    }
+                    self._uploadCallbackCache.mutate { callbacks = $0.removeValue(forKey: key) }
                 case .download:
-                    if let callbacks = self.downloadCallbackCache[key] {
-                        for callback in callbacks {
-
-                            logger.verbose("[Attachment] Handle didEndTask  downloadCallbackCache \(callback)")
-                            callback.callback?(storedMessage ?? message, error)
-                        }
-                        self.downloadCallbackCache[key] = nil
-                    }
+                    self._downloadCallbackCache.mutate { callbacks = $0.removeValue(forKey: key) }
+                }
+                for callback in callbacks ?? [] {
+                    callback.callback?(storedMessage ?? message, error)
                 }
             }
-            if let taskInfos = self.taskGroups[groupKey] {
-                logger.verbose("[Attachment] Handle didEndTask  taskInfos \(taskInfos.map { $0.attachment.url})")
-                // Only this task is over. Clearing the whole group left the message's
-                // other attachments with no entry to guard against, so the next cell
-                // rebind started a second download for bytes already in flight.
-                let survivors = taskInfos.filter { $0 !== taskInfo }
-                self.taskGroups[groupKey] = survivors.isEmpty ? nil : survivors
+            // Only this task is over. Clearing the whole group left the message's other
+            // attachments with no entry to guard against, so the next cell rebind started a
+            // second download for bytes already in flight. One locked step: a start merging
+            // its tasks into the group meanwhile is not overwritten.
+            var survivors: Int?
+            self._taskGroups.mutate { groups in
+                guard let taskInfos = groups[groupKey] else { return }
+                let remaining = taskInfos.filter { $0 !== taskInfo }
+                groups[groupKey] = remaining.isEmpty ? nil : remaining
+                survivors = remaining.count
             }
-            
+            if let survivors {
+                logger.verbose("[Attachment] \(tag) task removed, \(survivors) other task(s) of the message still running")
+            }
+        }
+    }
+
+    /// The status of an upload that failed with `error`. Being offline is not a refusal: the
+    /// upload fails the instant there is no network, and `.failedUploading` would swap the
+    /// loader for a retry arrow on a message the app resends by itself on the next connect
+    /// (`SyncService.resendPendingMessage`), so it is parked back in the queue. A refusal by
+    /// encryption, or a file that is gone, fails.
+    ///
+    /// A cancel by the user (`SCTDataSessionTaskInfo.cancel`, or a cancellation the session did
+    /// not report as an interruption) is `.pauseUploading`: the one upload status
+    /// `SyncService.resendPendingMessage` skips, so a reconnect never sends what the user
+    /// abandoned; a tap on it resends, as on `.failedUploading`. A cancellation reported as an
+    /// interruption is parked like an offline failure: it is resent.
+    static func uploadStatus(
+        afterFailure error: Error?,
+        userCancelled: Bool = false,
+        interrupted: Bool = false
+    ) -> ChatMessage.Attachment.TransferStatus {
+        if userCancelled || (TransferLog.isCancellation(error) && !interrupted) {
+            return .pauseUploading
+        }
+        if TransferLog.isCancellation(error) {
+            return .pending
+        }
+        if error is AttachmentEncryptionError {
+            return .failedUploading
+        }
+        if case .missingSourceFile? = error as? TransportDataSessionError {
+            return .failedUploading
+        }
+        return isOffline ? .pending : .failedUploading
+    }
+
+    /// The one line a transfer ends with: info for a success, warn for an interruption, a
+    /// pause or a cancel, error for a failure, which it reports with its whole cause chain.
+    static func logSummary(_ taskInfo: SCTDataSessionTaskInfo, attachment atch: ChatMessage.Attachment, error: Error?, reference: String? = nil) {
+        let duration = Int((Date().timeIntervalSince(taskInfo.startedAt) * 1000).rounded())
+        var size = Int64(atch.uploadedFileSize)
+        if size <= 0, let filePath = atch.filePath, error == nil {
+            size = TransferLog.size(URL(fileURLWithPath: filePath)) ?? 0
+        }
+        let result: String
+        let level: SceytChatUIKit.Logger.LogLevel
+        if error == nil {
+            result = "success"
+            level = .info
+        } else if TransferLog.isCancellation(error) {
+            result = "cancelled"
+            level = .warning
+        } else if atch.status == .pauseUploading || atch.status == .pauseDownloading {
+            result = "paused"
+            level = .warning
+        } else if taskInfo.wasInterrupted || atch.status == .pending {
+            result = "interrupted"
+            level = .warning
+        } else {
+            result = "failure"
+            level = .error
+        }
+        var line = "[Attachment] \(taskInfo.logTag) transfer finished"
+        line += " dir=\(taskInfo.transferType == .upload ? "upload" : "download")"
+        line += " type=\(taskInfo.encryption == .required ? "encrypted" : "plain")"
+        line += " size=\(size > 0 ? "\(size)" : "-")"
+        line += " attempts=\(taskInfo.attempts)"
+        line += " duration=\(duration)ms"
+        line += " result=\(result)"
+        line += " error=\(error.map { TransferLog.describe($0) } ?? "-")"
+        line += " status=\(atch.status)"
+        if let reference {
+            line += " ref=\(TransferLog.redact(reference))"
+        }
+        line += " tid=\(atch.tid) id=\(atch.id) kind=\(atch.type)"
+        switch level {
+        case .error:
+            logger.error(line)
+        case .warning:
+            logger.warn(line)
+        default:
+            logger.info(line)
+        }
+    }
+
+    /// The file of `attachment` is now at `url` (prepared for its upload, or downloaded):
+    /// the metadata follows the file, and the attachment is persisted.
+    private func updateLocalFile(
+        _ url: URL,
+        previousPath filePath: String?,
+        attachment atch: ChatMessage.Attachment,
+        taskInfo: SCTDataSessionTaskInfo,
+        message: ChatMessage
+    ) {
+        let previousMetadata = atch.metadata
+        if let builder = Components.imageBuilder.init(imageUrl: url) {
+            if let decodedMetadata = atch.imageDecodedMetadata {
+                atch.metadata =
+                ChatMessage.Attachment.Metadata(
+                    width: Int(builder.imageSize.width),
+                    height: Int(builder.imageSize.height),
+                    thumbnail: decodedMetadata.thumbnail,
+                    duration: decodedMetadata.duration,
+                    description: decodedMetadata.description,
+                    imageUrl: decodedMetadata.imageUrl,
+                    thumbnailUrl: decodedMetadata.thumbnailUrl,
+                    hideLinkDetails: decodedMetadata.hideLinkDetails,
+                    videoThumbnail: decodedMetadata.videoThumbnail
+                ).build()
+            } else if let decodedMetadata = atch.voiceDecodedMetadata {
+                atch.metadata =
+                ChatMessage.Attachment.Metadata(
+                    width: Int(builder.imageSize.width),
+                    height: Int(builder.imageSize.height),
+                    thumbnail: decodedMetadata.thumbnail,
+                    duration: decodedMetadata.duration,
+                    description: decodedMetadata.description,
+                    imageUrl: decodedMetadata.imageUrl,
+                    thumbnailUrl: decodedMetadata.thumbnailUrl,
+                    hideLinkDetails: decodedMetadata.hideLinkDetails,
+                    videoThumbnail: decodedMetadata.videoThumbnail
+                ).build()
+            }
+        }
+        // The typed rebuild above only knows the media keys.
+        atch.metadata = ChatMessage.Attachment.metadata(atch.metadata, preservingEncryptionFrom: previousMetadata)
+        atch.name = url.lastPathComponent
+        atch.filePath = url.path
+        let fileSize = Components.storage.sizeOfItem(at: url)
+        // An encrypted download is only the file once it was decrypted;
+        // before that this is ciphertext, whose size is `cl`, not `ps`.
+        let isPlaintext = taskInfo.transferType == .upload
+            || taskInfo.encryption == .none
+            || taskInfo.didDecryptDownload
+        if fileSize > 0, isPlaintext {
+            atch.uploadedFileSize = fileSize
+        }
+        if taskInfo.transferType == .download, fileSize > 0, isPlaintext {
+            atch.transferProgress = 1
+            atch.status = .done
+        }
+        taskInfo.attachment = atch
+        logger.verbose("[Attachment] \(taskInfo.logTag) local file now \(url.lastPathComponent) (\(fileSize) B), persisted by \(filePath != nil ? "its previous path" : "the attachment")")
+        self.database.write {
+            if let filePath {
+                $0.updateAttachment(with: filePath, chatMessage: message, attachment: atch)
+            } else {
+                $0.update(chatMessage: message, attachments: [atch])
+            }
         }
     }
     
@@ -1234,6 +1407,7 @@ extension AttachmentTransfer {
             && provider.requirement(for: attachment, in: message) == .required {
             setups[ObjectIdentifier(attachment)] = EncryptionSetup()
         }
+        logger.debug("[Encryption] \(TransferLog.currentTag) upload of message tid=\(message.tid): \(setups.count) of \(attachments.count) attachment(s) must be encrypted (provider \(type(of: provider)))")
         return setups
     }
 
@@ -1245,12 +1419,13 @@ extension AttachmentTransfer {
             guard let encryption = attachment.encryption,
                   encryption.algorithm == StreamingAeadFileEncryptionProvider.format
             else {
-                logger.error("[Encryption] unreadable enc of \(attachment.description)")
+                // The task fails with it and reports it.
+                logger.debug("[Encryption] \(TransferLog.currentTag) download rejected: \(attachment.encryption == nil ? "malformed enc or unsupported version" : "unsupported algorithm \(attachment.encryption?.algorithm ?? "-")") \(attachment.transferLogDescription)")
                 setups[ObjectIdentifier(attachment)] = EncryptionSetup(error: AttachmentEncryptionError.invalidEncryptionInfo)
                 continue
             }
             // Ids and algorithm only: the keys are never logged.
-            logger.debug("[Encryption] download enc \(attachment.description) alg=\(encryption.algorithm) attachmentId=\(encryption.attachmentId) thumbnailAttachmentId=\(encryption.thumbnail?.attachmentId ?? "-")")
+            logger.debug("[Encryption] \(TransferLog.currentTag) download enc \(attachment.transferLogDescription) alg=\(encryption.algorithm) attachmentId=\(encryption.attachmentId) thumbnailAttachmentId=\(encryption.thumbnail?.attachmentId ?? "-")")
             setups[ObjectIdentifier(attachment)] = EncryptionSetup(download: encryption)
         }
         return setups
@@ -1301,17 +1476,21 @@ private final class OneShotBlock {
         self.block = block
     }
 
-    func fire() {
+    /// Returns whether this call ran the block.
+    @discardableResult
+    func fire() -> Bool {
         lock.lock()
         let block = self.block
         self.block = nil
         lock.unlock()
         block?()
+        return block != nil
     }
 
     /// Runs `work`, then the block, only if the block hasn't fired yet: what `work` records
     /// is never applied after a timeout already went on without it.
-    func fire(after work: () -> Void) {
+    @discardableResult
+    func fire(after work: () -> Void) -> Bool {
         lock.lock()
         let block = self.block
         self.block = nil
@@ -1320,6 +1499,7 @@ private final class OneShotBlock {
         }
         lock.unlock()
         block?()
+        return block != nil
     }
 }
 
@@ -1327,48 +1507,16 @@ private final class OneShotBlock {
 private struct _Obj {
     var progress: AttachmentTransfer.ProgressBlock?
     var completion: AttachmentTransfer.CompletionBlock?
-    var idKey: String = ""
+    var idKey: String
 }
 
 private struct _CallBack {
-    var callback: ((ChatMessage?, Error?) -> Void)? = nil
+    var callback: ((ChatMessage?, Error?) -> Void)?
 }
 
 private typealias FileProviderCache = [String: [_Obj]]
 private typealias ProgressCache = [String: Double]
 private typealias CallbackCache = [String: [_CallBack]]
-
-private extension FileProviderCache {
-    
-    subscript(key: String) -> [_Obj] {
-        get {
-            self[key] ?? []
-        }
-        set {
-            if self[key] == nil {
-                self[key] = []
-            }
-            self[key] = self[key]?.filter { $0.progress != nil }
-            self[key]?.append(contentsOf: newValue)
-        }
-    }
-}
-
-private extension CallbackCache {
-    
-    subscript(key: String) -> [_CallBack] {
-        get {
-            self[key] ?? []
-        }
-        set {
-            if self[key] == nil {
-                self[key] = []
-            }
-            self[key] = self[key]?.filter { $0.callback != nil }
-            self[key]?.append(contentsOf: newValue)
-        }
-    }
-}
 
 public extension AttachmentTransfer {
 

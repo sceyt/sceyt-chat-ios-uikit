@@ -57,7 +57,8 @@ public final class AttachmentTransferStatusRelay {
             }
             return
         }
-        logger.verbose("[Attachment] status relay post \(status) for \(AttachmentTransfer.transferIdentity(of: attachment))")
+        // A UI fan-out, not a transfer step: its own tag.
+        logger.verbose("[StatusRelay] post \(status) for \(TransferLog.redact(AttachmentTransfer.transferIdentity(of: attachment)))")
         // allObjects snapshots the live observers, so a handler that triggers a nested post
         // re-enters safely. Note that reading a weak table retains+autoreleases the members —
         // observers may outlive their last strong reference until the enclosing pool drains.

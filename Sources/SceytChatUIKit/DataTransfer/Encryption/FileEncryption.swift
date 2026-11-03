@@ -113,8 +113,10 @@ public extension FileEncryptionSession {
     /// send files (a background `URLSession`).
     func write(_ range: Range<Int64>, to url: URL) throws {
         let fileManager = FileManager.default
-        try? fileManager.removeItem(at: url)
+        let tag = TransferLog.currentTag
+        TransferLog.remove(url, what: "the old ciphertext file", context: "[Encryption] \(tag) write")
         guard fileManager.createFile(atPath: url.path, contents: nil) else {
+            logger.debug("[Encryption] \(tag) write \(range.lowerBound)..<\(range.upperBound) of \(ciphertextSize) B: cannot create \(url.lastPathComponent)")
             throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: url.path])
         }
         do {
@@ -129,7 +131,8 @@ public extension FileEncryptionSession {
                 offset = end
             }
         } catch {
-            try? fileManager.removeItem(at: url)
+            logger.debug("[Encryption] \(tag) write \(range.lowerBound)..<\(range.upperBound) of \(ciphertextSize) B to \(url.lastPathComponent) failed: \(TransferLog.describe(error))")
+            TransferLog.remove(url, what: "the partial ciphertext", context: "[Encryption] \(tag) write", level: .error)
             throw error
         }
     }
@@ -150,7 +153,17 @@ public extension FileEncryption {
             session.close()
             discard(checkpoint)
         }
-        try await FileEncryptionChunk.offMain { try session.materialize(to: destination) }
+        // Sizes and the bound id only: never the key.
+        let tag = TransferLog.currentTag
+        logger.debug("[Encryption] \(tag) encrypt \(file.lastPathComponent) start plaintext=\(session.plaintextSize) B ciphertext=\(session.ciphertextSize) B attachmentId=\(session.encryptionInfo.attachmentId)")
+        do {
+            try await FileEncryptionChunk.offMain { try session.materialize(to: destination) }
+        } catch {
+            // The caller reports the failure.
+            logger.debug("[Encryption] \(tag) encrypt \(file.lastPathComponent) failed attachmentId=\(session.encryptionInfo.attachmentId): \(TransferLog.describe(error))")
+            throw error
+        }
+        logger.debug("[Encryption] \(tag) encrypt \(file.lastPathComponent) finished, wrote \(TransferLog.sizeText(destination)) attachmentId=\(session.encryptionInfo.attachmentId)")
         return session.encryptionInfo
     }
 }
@@ -158,11 +171,13 @@ public extension FileEncryption {
 enum FileEncryptionChunk {
     static let length: Int64 = 1 << 20
 
-    /// Runs blocking crypto or file work off the caller's thread.
+    /// Runs blocking crypto or file work off the caller's thread, with the caller's transfer
+    /// log context bound there too.
     static func offMain<T>(_ work: @escaping () throws -> T) async throws -> T {
-        try await withCheckedThrowingContinuation { continuation in
+        let context = TransferLog.current
+        return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(with: Result { try work() })
+                continuation.resume(with: Result { try TransferLog.with(context) { try work() } })
             }
         }
     }
@@ -187,59 +202,133 @@ final class ChatSDKFileEncryption: FileEncryption {
                     uniqueId: AttachmentEncryption.newAttachmentId()
                 )
                 let session = ChatSDKEncryptionSession(upload: upload, transferId: transferId)
-                logger.verbose("[Encryption] session \(transferId): \(session.plaintextSize) B -> \(session.ciphertextSize) B")
+                logger.debug("[Encryption] \(TransferLog.currentTag) session \(transferId) prepared: \(session.plaintextSize) B -> \(session.ciphertextSize) B attachmentId=\(session.encryptionInfo.attachmentId)")
+                if session.plaintextSize == 0 {
+                    logger.warn("[Encryption] \(TransferLog.currentTag) session \(transferId) encrypts an empty file")
+                }
                 return session
             } catch {
                 AttachmentEncryptionFiles.discard(transferId: transferId)
-                logger.errorIfNotNil(error, "[Encryption] prepare failed")
+                // The caller reports the failure.
+                logger.debug("[Encryption] \(TransferLog.currentTag) session \(transferId) prepare failed for \(file.lastPathComponent) (\(TransferLog.size(path: file.path))): \(TransferLog.describe(error))")
                 throw error
             }
         }
     }
 
     func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
-        let saved = try SavedSession(checkpoint)
+        let saved: SavedSession
+        do {
+            saved = try SavedSession(checkpoint)
+        } catch {
+            // Never the checkpoint itself: it carries the key.
+            logger.debug("[Encryption] \(TransferLog.currentTag) restore rejected: unreadable checkpoint (attachmentId=\(checkpoint.encryptionInfo.attachmentId)): \(TransferLog.describe(error))")
+            throw error
+        }
         return try await FileEncryptionChunk.offMain {
             // The snapshot the session read; the file itself if it is gone, which the SDK then
             // checks against what the session recorded.
             let snapshot = AttachmentEncryptionFiles.snapshot(transferId: saved.transferId)
-            let source = FileManager.default.fileExists(atPath: snapshot.path) ? snapshot : file
-            let upload = try Components.fileEncryptionProvider.restoreUpload(
-                fileURL: source,
-                checkpoint: SceytChat.FileEncryptionCheckpoint(
-                    encryptionInfo: Self.sdkInfo(checkpoint.encryptionInfo, plaintextSize: UInt64(checkpoint.plaintextSize)),
-                    data: saved.sdkData
+            let hasSnapshot = FileManager.default.fileExists(atPath: snapshot.path)
+            let source = hasSnapshot ? snapshot : file
+            if !hasSnapshot {
+                logger.warn("[Encryption] \(TransferLog.currentTag) restore \(saved.transferId): snapshot gone, restoring from \(file.lastPathComponent)")
+            }
+            let upload: PreparedUpload
+            do {
+                upload = try Components.fileEncryptionProvider.restoreUpload(
+                    fileURL: source,
+                    checkpoint: SceytChat.FileEncryptionCheckpoint(
+                        encryptionInfo: Self.sdkInfo(checkpoint.encryptionInfo, plaintextSize: UInt64(checkpoint.plaintextSize)),
+                        data: saved.sdkData
+                    )
                 )
-            )
-            logger.verbose("[Encryption] restored session \(saved.transferId)")
+            } catch {
+                logger.debug("[Encryption] \(TransferLog.currentTag) restore \(saved.transferId) failed (source changed or checkpoint corrupt): \(TransferLog.describe(error))")
+                throw error
+            }
+            logger.info("[Encryption] \(TransferLog.currentTag) session \(saved.transferId) restored plaintext=\(checkpoint.plaintextSize) B")
             return ChatSDKEncryptionSession(upload: upload, transferId: saved.transferId)
         }
     }
 
     func discard(_ checkpoint: EncryptedFileCheckpoint) {
-        guard let saved = try? SavedSession(checkpoint) else { return }
+        guard let saved = try? SavedSession(checkpoint) else {
+            logger.warn("[Encryption] \(TransferLog.currentTag) discard ignored: unreadable checkpoint (attachmentId=\(checkpoint.encryptionInfo.attachmentId))")
+            return
+        }
         AttachmentEncryptionFiles.discard(transferId: saved.transferId)
+        logger.debug("[Encryption] \(TransferLog.currentTag) session \(saved.transferId) discarded")
     }
 
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
+        // The bound id and sizes only: never the key.
+        let label = "\(TransferLog.currentTag) attachmentId=\(encryptionInfo.attachmentId)"
+        logger.info("[Encryption] \(label) decrypt start ciphertext=\(TransferLog.sizeText(file)) trustedPlaintext=\(plaintextSize.map { "\($0) B" } ?? "derived")")
         try await FileEncryptionChunk.offMain {
             do {
                 try Self.decrypt(file, to: destination) { ciphertextSize in
-                    let size: UInt64
-                    if let plaintextSize {
-                        size = UInt64(plaintextSize)
-                    } else if let derived = AttachmentEncryption.plaintextSize(ciphertextSize: ciphertextSize) {
-                        size = derived
-                    } else {
-                        throw AttachmentEncryptionError.invalidCiphertextSize(ciphertextSize)
-                    }
+                    let size = try Self.plaintextSize(trusted: plaintextSize, ciphertextSize: ciphertextSize, label: label)
                     return Self.sdkInfo(encryptionInfo, plaintextSize: size)
                 }
             } catch {
-                try? FileManager.default.removeItem(at: destination)
+                // The caller reports the failure, with this kind (`TransferLog.describe`).
+                logger.debug("[Encryption] \(label) decrypt failed, verification kind: \(Self.failureKind(error)) (\(TransferLog.describe(error)))")
+                TransferLog.remove(destination, what: "the partial plaintext", context: "[Encryption] \(label) decrypt", level: .error)
                 throw AttachmentEncryptionError.decryptionFailed(error)
             }
         }
+        logger.debug("[Encryption] \(label) decrypt finished plaintext=\(TransferLog.sizeText(destination))")
+    }
+
+    /// The plaintext size to decrypt a stored object of `ciphertextSize` bytes with: the
+    /// trusted size the message carries, so the object must hold exactly that many bytes, or
+    /// the size derived from the object when there is none.
+    ///
+    /// A message whose sender could not tell the plaintext size carries the stored object's
+    /// size instead. No file encrypts to its own size, so that value is never a real trusted
+    /// size: the derived one is used, as without one.
+    static func plaintextSize(trusted: Int64?, ciphertextSize: UInt64, label: String) throws -> UInt64 {
+        let derived = AttachmentEncryption.plaintextSize(ciphertextSize: ciphertextSize)
+        if let trusted, trusted >= 0 {
+            let size = UInt64(trusted)
+            if size == ciphertextSize, let derived {
+                logger.debug("[Encryption] \(label) decrypt: the trusted size is the stored object's (\(ciphertextSize) B), using the derived \(derived) B")
+                return derived
+            }
+            if let derived, derived != size {
+                logger.warn("[Encryption] \(label) decrypt size mismatch: trusted plaintext \(size) B, the stored \(ciphertextSize) B object holds \(derived) B")
+            } else if derived == nil {
+                logger.warn("[Encryption] \(label) decrypt size mismatch: no file encrypts to \(ciphertextSize) B (trusted plaintext \(size) B)")
+            }
+            return size
+        }
+        guard let derived else {
+            logger.debug("[Encryption] \(label) decrypt rejected: no file encrypts to \(ciphertextSize) B (truncated or not this format)")
+            throw AttachmentEncryptionError.invalidCiphertextSize(ciphertextSize)
+        }
+        return derived
+    }
+
+    /// The reason a decryption failed, for logs.
+    static func failureKind(_ error: Error) -> String {
+        if case .invalidCiphertextSize = error as? AttachmentEncryptionError {
+            return "invalid ciphertext size"
+        }
+        let ns = error as NSError
+        if ns.domain == FileEncryptionErrorDomain {
+            if ns.code == FileEncryptionError.authentication.rawValue {
+                return "authentication failed (tampered, truncated or wrong key/id)"
+            }
+            return "rejected by the SDK (code \(ns.code))"
+        }
+        if ns.domain == NSCocoaErrorDomain, ns.code == CocoaError.fileReadCorruptFile.rawValue {
+            return "short read (truncated ciphertext)"
+        }
+        if TransferLog.isOutOfSpace(ns) {
+            return "disk full"
+        }
+        return "I/O"
     }
 
     static func sdkInfo(_ info: EncryptedFileInfo, plaintextSize: UInt64) -> FileEncryptionInfo {
@@ -263,6 +352,7 @@ final class ChatSDKFileEncryption: FileEncryption {
         defer { reader.close() }
 
         guard FileManager.default.createFile(atPath: destination.path, contents: nil) else {
+            logger.debug("[Encryption] \(TransferLog.currentTag) decrypt cannot create \(destination.lastPathComponent) (folder missing or disk full)")
             throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: destination.path])
         }
         let output = try FileHandle(forWritingTo: destination)
@@ -365,6 +455,7 @@ final class FileCiphertextSource: NSObject, CiphertextRangeSource {
         try handle.seek(toOffset: offset)
         let data = try handle.read(upToCount: Int(length)) ?? Data()
         guard data.count == length else {
+            logger.debug("[Encryption] \(TransferLog.currentTag) ciphertext short read at \(offset): \(data.count) of \(length) B (object \(ciphertextSize) B)")
             throw CocoaError(.fileReadCorruptFile)
         }
         return data
@@ -400,20 +491,28 @@ public enum AttachmentEncryptionFiles {
     static let staleSnapshotAge: TimeInterval = 7 * 24 * 60 * 60
 
     /// Removes the snapshots older than `staleSnapshotAge`, once per process.
-    static let purgeStaleSnapshots: Void = {
+    static let purgeStaleSnapshots: Void = purgeStaleSnapshots(in: transfersDirectory)
+
+    /// Removes the snapshot folders in `directory` older than `staleSnapshotAge`.
+    static func purgeStaleSnapshots(in directory: URL) {
         let fileManager = FileManager.default
         let cutoff = Date().addingTimeInterval(-staleSnapshotAge)
         let directories = (try? fileManager.contentsOfDirectory(
-            at: transfersDirectory,
+            at: directory,
             includingPropertiesForKeys: [.contentModificationDateKey]
         )) ?? []
+        var purged = 0
         for directory in directories {
             let modified = (try? directory.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            if let modified, modified < cutoff {
-                try? fileManager.removeItem(at: directory)
+            if let modified, modified < cutoff,
+               TransferLog.remove(directory, what: "a stale snapshot", context: "[Encryption] snapshot purge") {
+                purged += 1
             }
         }
-    }()
+        if purged > 0 {
+            logger.info("[Encryption] snapshot purge removed \(purged) of \(directories.count) snapshot(s)")
+        }
+    }
 
     /// An immutable, transfer-owned copy of `file`. `copyItem` clones on APFS, so it costs
     /// no disk until one side changes; never a hard link, which shares the inode and so
@@ -428,20 +527,22 @@ public enum AttachmentEncryptionFiles {
                 withIntermediateDirectories: true,
                 attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
             )
-            try? fileManager.removeItem(at: snapshot)
+            TransferLog.remove(snapshot, what: "the old snapshot", context: "[Encryption] \(TransferLog.currentTag) snapshot \(transferId)")
             try fileManager.copyItem(at: file, to: snapshot)
             try fileManager.setAttributes(
                 [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication, .posixPermissions: 0o400],
                 ofItemAtPath: snapshot.path
             )
         } catch {
+            logger.debug("[Encryption] \(TransferLog.currentTag) snapshot \(transferId) of \(file.lastPathComponent) failed (source exists: \(fileManager.fileExists(atPath: file.path))): \(TransferLog.describe(error))")
             throw AttachmentEncryptionError.snapshotFailed(error)
         }
+        logger.debug("[Encryption] \(TransferLog.currentTag) snapshot \(transferId) created (\(TransferLog.sizeText(snapshot)))")
         return snapshot
     }
 
     /// Removes the snapshot. Call once the transfer is over (sent, or abandoned for good).
     public static func discard(transferId: String) {
-        try? FileManager.default.removeItem(at: directory(transferId: transferId))
+        TransferLog.remove(directory(transferId: transferId), what: "the snapshot", context: "[Encryption] \(TransferLog.currentTag) snapshot \(transferId)")
     }
 }

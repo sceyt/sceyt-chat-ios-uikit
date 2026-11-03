@@ -1,0 +1,1107 @@
+//
+//  DefaultFileTransferTransportTests.swift
+//  SceytChatUIKitTests
+//
+//  `DefaultFileTransferTransport`, the Chat SDK's own transfers: plain and encrypted uploads
+//  (the SDK client's two upload calls are replaced in-process, nothing reaches a server),
+//  downloads served by a URL protocol stub, publishing and decryption into the destination,
+//  and the one-invocation rules of pause, resume, cancel and task cancellation. Also the
+//  `SCTSession` and `SCTDataSession` parts the transport split introduced: the default
+//  session's storage and the video-poster transfers.
+//
+
+@testable import SceytChatUIKit
+import ObjectiveC
+import SceytChat
+import XCTest
+
+// MARK: - Fakes
+
+/// Replaces `ChatClient.upload(fileUrl:…)` and `ChatClient.uploadEncrypted(_:…)` with handlers the
+/// test drives, and `UploadOperation.cancel` with a counter.
+private enum FakeClient {
+    typealias Progress = (Double) -> Void
+    typealias PlainCompletion = (URL?, SceytError?) -> Void
+    typealias EncryptedCompletion = (URL?, FileEncryptionInfo?, SceytError?) -> Void
+
+    struct PlainCall {
+        let file: URL
+        let progress: Progress
+        let completion: PlainCompletion
+    }
+
+    struct EncryptedCall {
+        let upload: PreparedUpload
+        let progress: Progress
+        let completion: EncryptedCompletion
+    }
+
+    private static let lock = NSLock()
+    private static var _plain = [PlainCall]()
+    private static var _encrypted = [EncryptedCall]()
+    private static var _cancels = 0
+    private static var originals = [(Method, IMP)]()
+    /// Called on every plain upload, e.g. to answer at once.
+    static var onPlain: (PlainCall) -> Void = { _ in }
+    static var onEncrypted: (EncryptedCall) -> Void = { _ in }
+
+    static var plain: [PlainCall] { lock.lock(); defer { lock.unlock() }; return _plain }
+    static var encrypted: [EncryptedCall] { lock.lock(); defer { lock.unlock() }; return _encrypted }
+    static var cancels: Int { lock.lock(); defer { lock.unlock() }; return _cancels }
+    /// The operation `uploadEncrypted` returns; kept alive here.
+    static let operation: UploadOperation = class_createInstance(UploadOperation.self, 0) as! UploadOperation
+
+    static func install() {
+        lock.lock()
+        _plain = []
+        _encrypted = []
+        _cancels = 0
+        lock.unlock()
+        onPlain = { _ in }
+        onEncrypted = { _ in }
+
+        let plain: @convention(block) (AnyObject, NSURL, @escaping Progress, @escaping PlainCompletion) -> Void = { _, file, progress, completion in
+            let call = PlainCall(file: file as URL, progress: progress, completion: completion)
+            lock.lock(); _plain.append(call); lock.unlock()
+            onPlain(call)
+        }
+        let encrypted: @convention(block) (AnyObject, PreparedUpload, @escaping Progress, @escaping EncryptedCompletion) -> UploadOperation = { _, upload, progress, completion in
+            let call = EncryptedCall(upload: upload, progress: progress, completion: completion)
+            lock.lock(); _encrypted.append(call); lock.unlock()
+            onEncrypted(call)
+            return operation
+        }
+        let cancel: @convention(block) (AnyObject) -> Void = { _ in
+            lock.lock(); _cancels += 1; lock.unlock()
+        }
+        replace(ChatClient.self, "uploadFile:progressHandler:completion:", with: plain)
+        replace(ChatClient.self, "uploadEncrypted:progressHandler:completion:", with: encrypted)
+        replace(UploadOperation.self, "cancel", with: cancel)
+    }
+
+    static func uninstall() {
+        for (method, imp) in originals {
+            method_setImplementation(method, imp)
+        }
+        originals = []
+    }
+
+    private static func replace(_ cls: AnyClass, _ selector: String, with block: Any) {
+        guard let method = class_getInstanceMethod(cls, NSSelectorFromString(selector)) else {
+            return XCTFail("\(cls) has no \(selector)")
+        }
+        originals.append((method, method_setImplementation(method, imp_implementationWithBlock(block))))
+    }
+}
+
+/// Serves `https://transport.stub/<path>`: the registered body with its status, nothing at all
+/// for `/hold`, and a transport error for `/error`.
+private final class StubServer: URLProtocol {
+    private static let lock = NSLock()
+    private static var bodies = [String: (Int, Data)]()
+    static var delay: TimeInterval = 0
+
+    static func serve(_ path: String, status: Int = 200, body: Data) {
+        lock.lock(); bodies[path] = (status, body); lock.unlock()
+    }
+
+    static func reset() {
+        lock.lock(); bodies = [:]; lock.unlock()
+        delay = 0
+    }
+
+    static func url(_ path: String) -> String { "https://transport.stub\(path)" }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host == "transport.stub"
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        guard let url = request.url else { return }
+        switch url.path {
+        case "/hold":
+            return
+        case "/error":
+            client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet))
+            return
+        default:
+            break
+        }
+        Self.lock.lock()
+        let (status, body) = Self.bodies[url.path] ?? (404, Data())
+        Self.lock.unlock()
+        let respond = { [weak self] in
+            guard let self,
+                  let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Length": "\(body.count)"])
+            else { return }
+            self.client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            self.client?.urlProtocol(self, didLoad: body)
+            self.client?.urlProtocolDidFinishLoading(self)
+        }
+        if Self.delay > 0 {
+            DispatchQueue.global().asyncAfter(deadline: .now() + Self.delay, execute: respond)
+        } else {
+            respond()
+        }
+    }
+
+    override func stopLoading() {}
+}
+
+/// A `FileEncryption` whose sessions the SDK client did not make.
+private final class ForeignEncryption: FileEncryption {
+    var prepareError: Error?
+    private(set) var discarded = [EncryptedFileCheckpoint]()
+    private(set) var session: ForeignSession?
+
+    func prepare(file: URL) async throws -> FileEncryptionSession {
+        if let prepareError { throw prepareError }
+        let session = ForeignSession()
+        self.session = session
+        return session
+    }
+
+    func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
+        throw AttachmentEncryptionError.invalidCheckpoint
+    }
+
+    func discard(_ checkpoint: EncryptedFileCheckpoint) { discarded.append(checkpoint) }
+
+    func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
+        try FileManager.default.copyItem(at: file, to: destination)
+    }
+}
+
+/// The SDK's own encryption, whose `prepare` can be held until the test lets it finish, and
+/// which counts discards.
+private final class GatedEncryption: FileEncryption {
+    private let inner = ChatSDKFileEncryption()
+    private let lock = NSLock()
+    private var holding: Bool
+    private var gate: CheckedContinuation<Void, Never>?
+    private var _entered = false
+    private var _discarded = 0
+    private var _session: ChatSDKEncryptionSession?
+
+    init(holding: Bool = false) {
+        self.holding = holding
+    }
+
+    var prepareEntered: Bool { lock.lock(); defer { lock.unlock() }; return _entered }
+    var discarded: Int { lock.lock(); defer { lock.unlock() }; return _discarded }
+    var session: ChatSDKEncryptionSession? { lock.lock(); defer { lock.unlock() }; return _session }
+
+    func letPrepareFinish() {
+        lock.lock()
+        holding = false
+        let gate = gate
+        self.gate = nil
+        lock.unlock()
+        gate?.resume()
+    }
+
+    func prepare(file: URL) async throws -> FileEncryptionSession {
+        let session = try await inner.prepare(file: file)
+        lock.lock(); _session = session as? ChatSDKEncryptionSession; lock.unlock()
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            lock.lock()
+            _entered = true
+            if holding {
+                gate = continuation
+                lock.unlock()
+            } else {
+                lock.unlock()
+                continuation.resume()
+            }
+        }
+        return session
+    }
+
+    func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
+        try await inner.restore(file: file, checkpoint: checkpoint)
+    }
+
+    func discard(_ checkpoint: EncryptedFileCheckpoint) {
+        lock.lock(); _discarded += 1; lock.unlock()
+        inner.discard(checkpoint)
+    }
+
+    func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
+        try await inner.decrypt(file: file, to: destination, encryptionInfo: encryptionInfo, plaintextSize: plaintextSize)
+    }
+}
+
+private final class ForeignSession: FileEncryptionSession {
+    let sourceId = "foreign"
+    let plaintextSize: Int64 = 1
+    let ciphertextSize: Int64 = 1
+    let encryptionInfo = EncryptedFileInfo(algorithm: "foreign", attachmentId: "f", key: "k")
+    private(set) var closed = false
+    func read(offset: Int64, length: Int) throws -> Data { Data(count: length) }
+    func checkpoint() -> EncryptedFileCheckpoint { EncryptedFileCheckpoint(encryptionInfo: encryptionInfo, plaintextSize: 1, data: "foreign") }
+    func close() { closed = true }
+}
+
+/// Collects progress from any thread.
+private final class ProgressLog {
+    private let lock = NSLock()
+    private var _values = [Double]()
+    var values: [Double] { lock.lock(); defer { lock.unlock() }; return _values }
+    func record(_ value: Double) { lock.lock(); _values.append(value); lock.unlock() }
+}
+
+/// The outcome of a call made in a `Task`.
+private final class Outcome<T> {
+    private let lock = NSLock()
+    private var _value: T?
+    var value: T? { lock.lock(); defer { lock.unlock() }; return _value }
+    func set(_ value: T) { lock.lock(); _value = value; lock.unlock() }
+}
+
+private func waitUntil(timeout: TimeInterval = 5, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
+    let deadline = Date().addingTimeInterval(timeout)
+    while Date() < deadline {
+        if condition() { return }
+        RunLoop.main.run(until: Date().addingTimeInterval(0.005))
+    }
+    XCTAssertTrue(condition(), "timed out", file: file, line: line)
+}
+
+private func settle(_ seconds: TimeInterval = 0.15) {
+    RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+}
+
+// MARK: - DefaultFileTransferTransport
+
+final class DefaultFileTransferTransportTests: XCTestCase {
+
+    private var transport: DefaultFileTransferTransport!
+    private var directory: URL!
+    private var originalProvider: FileEncryptionProvider!
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        originalProvider = Components.fileEncryptionProvider
+        FakeClient.install()
+        URLProtocol.registerClass(StubServer.self)
+        StubServer.reset()
+        transport = DefaultFileTransferTransport(encryption: ChatSDKFileEncryption())
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("default-transport-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        FakeClient.uninstall()
+        URLProtocol.unregisterClass(StubServer.self)
+        StubServer.reset()
+        Components.fileEncryptionProvider = originalProvider
+        try? FileManager.default.removeItem(at: directory)
+        transport = nil
+        try super.tearDownWithError()
+    }
+
+    // MARK: Fixtures
+
+    private func file(size: Int = 100) throws -> URL {
+        let url = directory.appendingPathComponent("plain-\(UUID().uuidString).bin")
+        try Data((0..<size).map { UInt8(truncatingIfNeeded: $0 &* 11) }).write(to: url)
+        return url
+    }
+
+    private func uploadRequest(_ type: FileUploadType = .plain, operationId: String = "upload-1", file: URL? = nil) throws -> FileUploadRequest {
+        FileUploadRequest(operationId: operationId, sourceFile: try file ?? self.file(), fileName: "a.bin", mimeType: nil, type: type)
+    }
+
+    /// Starts `upload` in a task; returns its outcome, its progress and the task.
+    @discardableResult
+    private func startUpload(_ request: FileUploadRequest, on transport: DefaultFileTransferTransport? = nil) -> (Outcome<FileTransferResult<FileUploadResult>>, ProgressLog, Task<Void, Never>) {
+        let outcome = Outcome<FileTransferResult<FileUploadResult>>()
+        let progress = ProgressLog()
+        let transport = transport ?? self.transport!
+        let task = Task {
+            outcome.set(await transport.upload(request) { progress.record($0) })
+        }
+        return (outcome, progress, task)
+    }
+
+    @discardableResult
+    private func startDownload(_ request: FileDownloadRequest) -> (Outcome<FileTransferResult<URL>>, ProgressLog, Task<Void, Never>) {
+        let outcome = Outcome<FileTransferResult<URL>>()
+        let progress = ProgressLog()
+        let task = Task { [transport] in
+            outcome.set(await transport!.download(request) { progress.record($0) })
+        }
+        return (outcome, progress, task)
+    }
+
+    private func destination(_ name: String = "file.bin") -> URL {
+        directory.appendingPathComponent("downloads/nested/\(name)")
+    }
+
+    private func reference(_ result: FileTransferResult<FileUploadResult>?) -> String? {
+        if case .success(let uploaded) = result { return uploaded.remoteReference }
+        return nil
+    }
+
+    private func error<T>(_ result: FileTransferResult<T>?) -> Error? {
+        if case .failure(let error) = result { return error }
+        return nil
+    }
+
+    private func interruption<T>(_ result: FileTransferResult<T>?) -> Error? {
+        if case .interrupted(let error) = result { return error }
+        return nil
+    }
+
+    // MARK: - Plain upload
+
+    func testPlainUploadForwardsProgressAndReturnsTheURL() throws {
+        let request = try uploadRequest()
+        FakeClient.onPlain = { call in
+            call.progress(0.3)
+            call.progress(1)
+            call.completion(URL(string: "https://cdn.example/a.bin"), nil)
+        }
+
+        let (outcome, progress, _) = startUpload(request)
+        waitUntil { outcome.value != nil }
+
+        XCTAssertEqual(FakeClient.plain.first?.file, request.sourceFile)
+        XCTAssertEqual(reference(outcome.value), "https://cdn.example/a.bin")
+        if case .success(let uploaded) = outcome.value { XCTAssertNil(uploaded.encryptionInfo) }
+        XCTAssertEqual(progress.values, [0.3, 1])
+    }
+
+    func testPlainUploadFailures() throws {
+        let sdkError = SceytError(domain: "sceyt", code: 7, userInfo: nil)
+        for (url, error) in [(nil, sdkError), (URL(string: "https://cdn.example/x"), sdkError), (nil, nil)] as [(URL?, SceytError?)] {
+            FakeClient.onPlain = { $0.completion(url, error) }
+            let (outcome, _, _) = startUpload(try uploadRequest())
+            waitUntil { outcome.value != nil }
+            let failure = self.error(outcome.value)
+            if let error {
+                XCTAssertEqual((failure as NSError?)?.code, error.code)
+            } else {
+                guard case .invalidRequest = failure as? FileTransferError else { return XCTFail("\(String(describing: failure))") }
+            }
+        }
+    }
+
+    func testAPausedUploadHoldsItsResultAndProgressUntilResumed() throws {
+        let (outcome, progress, _) = startUpload(try uploadRequest())
+        waitUntil { FakeClient.plain.count == 1 }
+        let call = try XCTUnwrap(FakeClient.plain.first)
+        call.progress(0.2)
+
+        XCTAssertTrue(transport.pause(operationId: "upload-1"))
+        call.progress(0.5)
+        call.completion(URL(string: "https://cdn.example/a"), nil)
+        settle()
+        XCTAssertNil(outcome.value, "a paused upload is not delivered")
+        XCTAssertEqual(progress.values, [0.2], "no progress while paused")
+
+        XCTAssertTrue(transport.resume(operationId: "upload-1"))
+        waitUntil { outcome.value != nil }
+        XCTAssertEqual(reference(outcome.value), "https://cdn.example/a")
+        XCTAssertFalse(transport.pause(operationId: "upload-1"), "the invocation is over")
+        XCTAssertFalse(transport.resume(operationId: "upload-1"))
+    }
+
+    func testAResumeWithNothingHeldKeepsTheUploadRunning() throws {
+        let (outcome, progress, _) = startUpload(try uploadRequest())
+        waitUntil { FakeClient.plain.count == 1 }
+        let call = try XCTUnwrap(FakeClient.plain.first)
+
+        XCTAssertTrue(transport.pause(operationId: "upload-1"))
+        XCTAssertTrue(transport.resume(operationId: "upload-1"))
+        call.progress(0.6)
+        call.completion(URL(string: "https://cdn.example/b"), nil)
+
+        waitUntil { outcome.value != nil }
+        XCTAssertEqual(progress.values, [0.6])
+        XCTAssertEqual(reference(outcome.value), "https://cdn.example/b")
+    }
+
+    func testASecondResultWhilePausedEndsTheUpload() throws {
+        let (outcome, _, _) = startUpload(try uploadRequest())
+        waitUntil { FakeClient.plain.count == 1 }
+        let call = try XCTUnwrap(FakeClient.plain.first)
+
+        XCTAssertTrue(transport.pause(operationId: "upload-1"))
+        call.completion(URL(string: "https://cdn.example/first"), nil)
+        call.completion(nil, nil)
+
+        waitUntil { outcome.value != nil }
+        XCTAssertNotNil(error(outcome.value), "only one result can be held")
+    }
+
+    func testCancelEndsAPlainUploadAtOnceAndIgnoresItsLateResult() throws {
+        let (outcome, progress, _) = startUpload(try uploadRequest())
+        waitUntil { FakeClient.plain.count == 1 }
+
+        transport.cancel(operationId: "upload-1")
+        transport.cancel(operationId: "upload-1")
+        transport.cancel(operationId: "unknown")
+        waitUntil { outcome.value != nil }
+
+        guard case .cancelled = error(outcome.value) as? FileTransferError else {
+            return XCTFail("expected cancelled, got \(String(describing: outcome.value))")
+        }
+        FakeClient.plain.first?.progress(0.9)
+        FakeClient.plain.first?.completion(URL(string: "https://cdn.example/late"), nil)
+        XCTAssertTrue(progress.values.isEmpty)
+    }
+
+    func testTaskCancellationInterruptsAnUpload() throws {
+        let (outcome, _, task) = startUpload(try uploadRequest())
+        waitUntil { FakeClient.plain.count == 1 }
+
+        task.cancel()
+        waitUntil { outcome.value != nil }
+
+        XCTAssertTrue(interruption(outcome.value) is CancellationError)
+    }
+
+    func testAnUploadOfAnAlreadyCancelledTaskEndsAtOnce() throws {
+        let request = try uploadRequest()
+        let outcome = Outcome<FileTransferResult<FileUploadResult>>()
+        Task { [transport] in
+            withUnsafeCurrentTask { $0?.cancel() }
+            outcome.set(await transport!.upload(request) { _ in })
+        }
+
+        waitUntil { outcome.value != nil }
+        XCTAssertTrue(interruption(outcome.value) is CancellationError)
+    }
+
+    func testAnInvocationThatEndedCannotBePausedOrResumed() throws {
+        let request = try uploadRequest()
+        let outcome = Outcome<FileTransferResult<FileUploadResult>>()
+        var controls = [Bool]()
+        FakeClient.onPlain = { [transport] _ in
+            // Still registered, but already over: the task was cancelled before it began.
+            controls = [transport!.pause(operationId: "upload-1"), transport!.resume(operationId: "upload-1")]
+        }
+        Task { [transport] in
+            withUnsafeCurrentTask { $0?.cancel() }
+            outcome.set(await transport!.upload(request) { _ in })
+        }
+
+        waitUntil { outcome.value != nil }
+        XCTAssertEqual(controls, [false, false])
+    }
+
+    func testControlsOfAnUnknownOperation() {
+        XCTAssertFalse(transport.pause(operationId: "nothing"))
+        XCTAssertFalse(transport.resume(operationId: "nothing"))
+        transport.cancel(operationId: "nothing")
+    }
+
+    /// A second invocation of an operation still running is rejected: the two would share
+    /// one record, and a cancel could reach only one of them.
+    func testARepeatedOperationIdIsRejectedWhileTheFirstRuns() throws {
+        let (first, _, _) = startUpload(try uploadRequest())
+        waitUntil { FakeClient.plain.count == 1 }
+        let (second, _, _) = startUpload(try uploadRequest())
+        waitUntil { second.value != nil }
+
+        guard case .duplicateOperation = error(second.value) as? FileTransferError else {
+            return XCTFail("expected duplicateOperation, got \(String(describing: second.value))")
+        }
+        XCTAssertEqual(FakeClient.plain.count, 1, "nothing was sent for the duplicate")
+
+        transport.cancel(operationId: "upload-1")
+        waitUntil { first.value != nil }
+        guard case .cancelled = error(first.value) as? FileTransferError else {
+            return XCTFail("the cancel reaches the running invocation")
+        }
+
+        // Once it ended, the operation can run again.
+        let (third, _, _) = startUpload(try uploadRequest())
+        waitUntil { FakeClient.plain.count == 2 }
+        FakeClient.plain[1].completion(URL(string: "https://cdn.example/3"), nil)
+        waitUntil { third.value != nil }
+        XCTAssertEqual(reference(third.value), "https://cdn.example/3")
+    }
+
+    // MARK: - Encrypted upload
+
+    func testEncryptedUploadSendsTheSDKSessionAndReturnsItsEncryption() throws {
+        let source = try file(size: 3000)
+        var ciphertext: Data?
+        FakeClient.onEncrypted = { call in
+            ciphertext = try? call.upload.readCiphertextRange(offset: 0, length: UInt(call.upload.ciphertextSize))
+            call.progress(0.5)
+            call.completion(URL(string: "https://cdn.example/enc"), nil, nil)
+        }
+
+        let (outcome, progress, _) = startUpload(try uploadRequest(.encrypted, file: source))
+        waitUntil { outcome.value != nil }
+
+        guard case .success(let uploaded) = outcome.value, let info = uploaded.encryptionInfo else {
+            return XCTFail("expected an encrypted success, got \(String(describing: outcome.value))")
+        }
+        XCTAssertEqual(uploaded.remoteReference, "https://cdn.example/enc")
+        XCTAssertEqual(progress.values, [0.5])
+        XCTAssertNotNil(ciphertext, "the session is open while the SDK sends it")
+
+        // What was sent decrypts with what was returned.
+        let object = directory.appendingPathComponent("object")
+        try XCTUnwrap(ciphertext).write(to: object)
+        let output = directory.appendingPathComponent("output")
+        let done = Outcome<Error?>()
+        Task {
+            do {
+                try await ChatSDKFileEncryption().decrypt(file: object, to: output, encryptionInfo: info, plaintextSize: nil)
+                done.set(nil)
+            } catch { done.set(error) }
+        }
+        waitUntil { done.value != nil }
+        XCTAssertEqual(try Data(contentsOf: output), try Data(contentsOf: source))
+
+        // The session is released after the completion.
+        XCTAssertThrowsError(try FakeClient.encrypted.first?.upload.readCiphertextRange(offset: 0, length: 1))
+    }
+
+    func testEncryptedUploadFailures() throws {
+        let sdkError = SceytError(domain: "sceyt", code: 9, userInfo: nil)
+        for (url, error) in [(nil, sdkError), (nil, nil)] as [(URL?, SceytError?)] {
+            FakeClient.onEncrypted = { $0.completion(url, nil, error) }
+            let (outcome, _, _) = startUpload(try uploadRequest(.encrypted))
+            waitUntil { outcome.value != nil }
+            let failure = self.error(outcome.value)
+            if let error {
+                XCTAssertEqual((failure as NSError?)?.code, error.code)
+            } else {
+                guard case .invalidRequest = failure as? FileTransferError else { return XCTFail("\(String(describing: failure))") }
+            }
+        }
+    }
+
+    func testCancelStopsTheSDKOperationOfAnEncryptedUpload() throws {
+        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted))
+        waitUntil { FakeClient.encrypted.count == 1 }
+
+        transport.cancel(operationId: "upload-1")
+        waitUntil { outcome.value != nil }
+
+        guard case .cancelled = error(outcome.value) as? FileTransferError else { return XCTFail("\(String(describing: outcome.value))") }
+        XCTAssertEqual(FakeClient.cancels, 1)
+    }
+
+    /// Ended before the session was prepared: the SDK is never asked to send it, and the
+    /// session (its snapshot) is released.
+    func testAnEncryptedUploadCancelledBeforeTheSDKStartsSendsNothing() throws {
+        let gated = GatedEncryption()
+        let transport = DefaultFileTransferTransport(encryption: gated)
+        let request = try uploadRequest(.encrypted)
+        let outcome = Outcome<FileTransferResult<FileUploadResult>>()
+        Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            outcome.set(await transport.upload(request) { _ in })
+        }
+
+        waitUntil { outcome.value != nil }
+        XCTAssertTrue(interruption(outcome.value) is CancellationError)
+        waitUntil { gated.discarded == 1 }
+        settle()
+        XCTAssertTrue(FakeClient.encrypted.isEmpty, "never sent")
+        XCTAssertEqual(FakeClient.cancels, 0, "nothing to stop")
+        XCTAssertEqual(gated.discarded, 1)
+        try assertReleased(gated)
+    }
+
+    /// Finding #8: a cancel while the session is being prepared. Nothing is sent once
+    /// preparation ends, and the snapshot is discarded.
+    func testACancelDuringPrepareStartsNoSDKUploadAndDiscardsTheSnapshot() throws {
+        let gated = GatedEncryption(holding: true)
+        let transport = DefaultFileTransferTransport(encryption: gated)
+        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
+        waitUntil { gated.prepareEntered }
+
+        transport.cancel(operationId: "upload-1")
+        waitUntil { outcome.value != nil }
+        guard case .cancelled = error(outcome.value) as? FileTransferError else { return XCTFail("\(String(describing: outcome.value))") }
+
+        gated.letPrepareFinish()
+        waitUntil { gated.discarded == 1 }
+        settle()
+        XCTAssertTrue(FakeClient.encrypted.isEmpty, "uploadEncrypted never starts for an invocation that already ended")
+        XCTAssertEqual(gated.discarded, 1, "released exactly once")
+        try assertReleased(gated)
+    }
+
+    func testACancelMidUploadReleasesTheSessionOnce() throws {
+        let gated = GatedEncryption()
+        let transport = DefaultFileTransferTransport(encryption: gated)
+        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
+        waitUntil { FakeClient.encrypted.count == 1 }
+        XCTAssertEqual(gated.discarded, 0, "open while the SDK sends it")
+
+        transport.cancel(operationId: "upload-1")
+        waitUntil { outcome.value != nil }
+
+        XCTAssertEqual(FakeClient.cancels, 1)
+        XCTAssertEqual(gated.discarded, 1, "released on cancel: the SDK may never call back")
+        try assertReleased(gated)
+        // A late completion does not release it again.
+        FakeClient.encrypted.first?.completion(URL(string: "https://cdn.example/late"), nil, nil)
+        settle()
+        XCTAssertEqual(gated.discarded, 1)
+    }
+
+    func testAnInterruptionMidUploadReleasesTheSession() throws {
+        let gated = GatedEncryption()
+        let transport = DefaultFileTransferTransport(encryption: gated)
+        let (outcome, _, task) = startUpload(try uploadRequest(.encrypted), on: transport)
+        waitUntil { FakeClient.encrypted.count == 1 }
+
+        task.cancel()
+        waitUntil { outcome.value != nil }
+
+        XCTAssertTrue(interruption(outcome.value) is CancellationError)
+        XCTAssertEqual(FakeClient.cancels, 1)
+        XCTAssertEqual(gated.discarded, 1)
+        try assertReleased(gated)
+    }
+
+    /// A pause is not an ending: the session stays open (the SDK keeps sending), and the held
+    /// result is delivered on resume. It is released by the completion, once.
+    func testAPausedEncryptedUploadKeepsItsSessionAndResumes() throws {
+        let gated = GatedEncryption()
+        let transport = DefaultFileTransferTransport(encryption: gated)
+        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
+        waitUntil { FakeClient.encrypted.count == 1 }
+
+        XCTAssertTrue(transport.pause(operationId: "upload-1"))
+        settle()
+        XCTAssertEqual(gated.discarded, 0, "a pause releases nothing")
+        XCTAssertNoThrow(try FakeClient.encrypted.first?.upload.readCiphertextRange(offset: 0, length: 1))
+
+        FakeClient.encrypted.first?.completion(URL(string: "https://cdn.example/paused"), nil, nil)
+        settle()
+        XCTAssertNil(outcome.value, "held while paused")
+        XCTAssertEqual(gated.discarded, 1, "the SDK is done with it")
+        XCTAssertTrue(transport.resume(operationId: "upload-1"))
+        waitUntil { outcome.value != nil }
+        XCTAssertEqual(reference(outcome.value), "https://cdn.example/paused")
+        XCTAssertEqual(gated.discarded, 1)
+    }
+
+    private func assertReleased(_ gated: GatedEncryption, file: StaticString = #filePath, line: UInt = #line) throws {
+        let session = try XCTUnwrap(gated.session, file: file, line: line)
+        XCTAssertThrowsError(try session.read(offset: 0, length: 1), "closed", file: file, line: line)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: AttachmentEncryptionFiles.snapshot(transferId: session.transferId).path),
+                       "the snapshot is discarded", file: file, line: line)
+    }
+
+    func testAPrepareFailureFailsTheEncryptedUpload() throws {
+        let foreign = ForeignEncryption()
+        foreign.prepareError = AttachmentEncryptionError.snapshotFailed(CocoaError(.fileNoSuchFile))
+        let transport = DefaultFileTransferTransport(encryption: foreign)
+
+        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
+        waitUntil { outcome.value != nil }
+
+        guard case .snapshotFailed = error(outcome.value) as? AttachmentEncryptionError else { return XCTFail("\(String(describing: outcome.value))") }
+        XCTAssertTrue(FakeClient.encrypted.isEmpty)
+    }
+
+    func testASessionTheSDKDidNotMakeIsNeverSent() throws {
+        let foreign = ForeignEncryption()
+        let transport = DefaultFileTransferTransport(encryption: foreign)
+
+        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
+        waitUntil { outcome.value != nil }
+
+        guard case .encryptionUnsupportedBySession = error(outcome.value) as? AttachmentEncryptionError else {
+            return XCTFail("\(String(describing: outcome.value))")
+        }
+        XCTAssertTrue(FakeClient.encrypted.isEmpty, "uploadEncrypted raises for a foreign session")
+        XCTAssertEqual(foreign.session?.closed, true)
+        XCTAssertEqual(foreign.discarded.count, 1)
+    }
+
+    func testASessionOfAnotherProviderIsNeverSent() throws {
+        Components.fileEncryptionProvider = OtherProvider()
+        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted))
+        waitUntil { outcome.value != nil }
+
+        guard case .encryptionUnsupportedBySession = error(outcome.value) as? AttachmentEncryptionError else {
+            return XCTFail("\(String(describing: outcome.value))")
+        }
+        XCTAssertTrue(FakeClient.encrypted.isEmpty)
+    }
+
+    func testDefaultEncryptionIsTheComponent() {
+        XCTAssertTrue(DefaultFileTransferTransport().encryption === Components.fileEncryption)
+    }
+
+    // MARK: - Download
+
+    func testADownloadOfAnUnusableReferenceFailsAtOnce() async {
+        let result = await transport.download(FileDownloadRequest(operationId: "d", url: "", destinationFile: destination())) { _ in }
+        guard case .invalidRequest = error(result) as? FileTransferError else { return XCTFail("\(result)") }
+    }
+
+    func testPlainDownloadIsPublishedAtTheDestination() throws {
+        let body = Data((0..<50_000).map { UInt8(truncatingIfNeeded: $0) })
+        StubServer.serve("/plain", body: body)
+        let request = FileDownloadRequest(operationId: "download-1", url: StubServer.url("/plain"), destinationFile: destination())
+
+        let (outcome, progress, _) = startDownload(request)
+        waitUntil { outcome.value != nil }
+
+        guard case .success(let url) = outcome.value else { return XCTFail("\(String(describing: outcome.value))") }
+        XCTAssertEqual(url, request.destinationFile)
+        XCTAssertEqual(try Data(contentsOf: url), body)
+        XCTAssertTrue(progress.values.allSatisfy { (0...1).contains($0) })
+    }
+
+    func testADownloadReplacesAnOlderFile() throws {
+        StubServer.serve("/new", body: Data("new".utf8))
+        let destination = destination()
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: destination)
+
+        let (outcome, _, _) = startDownload(FileDownloadRequest(operationId: "d", url: StubServer.url("/new"), destinationFile: destination))
+        waitUntil { outcome.value != nil }
+
+        XCTAssertEqual(try Data(contentsOf: destination), Data("new".utf8))
+    }
+
+    func testDownloadErrorsAreFailures() throws {
+        StubServer.serve("/missing", status: 404, body: Data("<Error/>".utf8))
+        for path in ["/missing", "/error"] {
+            let destination = destination("\(path.dropFirst()).bin")
+            let (outcome, _, _) = startDownload(FileDownloadRequest(operationId: path, url: StubServer.url(path), destinationFile: destination))
+            waitUntil { outcome.value != nil }
+            XCTAssertNotNil(error(outcome.value), path)
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path), path)
+        }
+    }
+
+    func testEncryptedDownloadIsDecryptedBeforeItIsPublished() async throws {
+        let plaintext = try file(size: 70_000)
+        let object = directory.appendingPathComponent("object")
+        let info = try await ChatSDKFileEncryption().encrypt(file: plaintext, to: object)
+        StubServer.serve("/enc", body: try Data(contentsOf: object))
+        let destination = destination("enc.bin")
+
+        let result = await transport.download(
+            FileDownloadRequest(operationId: "d", url: StubServer.url("/enc"), destinationFile: destination, encryptionInfo: info, plaintextSize: 70_000)
+        ) { _ in }
+
+        guard case .success = result else { return XCTFail("\(result)") }
+        XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: plaintext))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: destination.deletingLastPathComponent().path), ["enc.bin"], "no temporary file is left")
+    }
+
+    func testAnEncryptedDownloadThatDoesNotVerifyPublishesNothing() async throws {
+        let object = directory.appendingPathComponent("object")
+        let info = try await ChatSDKFileEncryption().encrypt(file: try file(size: 1000), to: object)
+        var bytes = try Data(contentsOf: object)
+        bytes[500] ^= 0x01
+        StubServer.serve("/tampered", body: bytes)
+        let destination = destination("tampered.bin")
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("previous".utf8).write(to: destination)
+
+        let result = await transport.download(
+            FileDownloadRequest(operationId: "d", url: StubServer.url("/tampered"), destinationFile: destination, encryptionInfo: info)
+        ) { _ in }
+
+        guard case .decryptionFailed = error(result) as? AttachmentEncryptionError else { return XCTFail("\(result)") }
+        XCTAssertEqual(try Data(contentsOf: destination), Data("previous".utf8), "an unverified object never replaces a file")
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: destination.deletingLastPathComponent().path), ["tampered.bin"])
+    }
+
+    func testPublishOfAnEncryptedObjectReplacesAnOlderFile() async throws {
+        let plaintext = try file(size: 500)
+        let staging = directory.appendingPathComponent("staging")
+        let info = try await ChatSDKFileEncryption().encrypt(file: plaintext, to: staging)
+        let destination = destination()
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("old".utf8).write(to: destination)
+
+        try await DefaultFileTransferTransport.publish(
+            staging,
+            to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: destination, encryptionInfo: info),
+            encryption: ChatSDKFileEncryption()
+        )
+
+        XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: plaintext))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path), "the ciphertext is removed")
+    }
+
+    func testPublishFailsWhenTheDestinationFolderCannotBeMade() async throws {
+        let blocker = directory.appendingPathComponent("blocker")
+        try Data().write(to: blocker)
+        let staging = try file()
+        do {
+            try await DefaultFileTransferTransport.publish(
+                staging,
+                to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: blocker.appendingPathComponent("x/file")),
+                encryption: ChatSDKFileEncryption()
+            )
+            XCTFail("a file is in the way")
+        } catch {}
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path), "the downloaded file is not left behind")
+    }
+
+    func testCancelEndsADownloadAtOnce() throws {
+        let (outcome, _, _) = startDownload(FileDownloadRequest(operationId: "download-1", url: StubServer.url("/hold"), destinationFile: destination()))
+        settle()
+
+        transport.cancel(operationId: "download-1")
+        waitUntil { outcome.value != nil }
+
+        guard case .cancelled = error(outcome.value) as? FileTransferError else { return XCTFail("\(String(describing: outcome.value))") }
+    }
+
+    func testTaskCancellationInterruptsADownload() throws {
+        let (outcome, _, task) = startDownload(FileDownloadRequest(operationId: "download-1", url: StubServer.url("/hold"), destinationFile: destination()))
+        settle()
+
+        task.cancel()
+        waitUntil { outcome.value != nil }
+
+        XCTAssertTrue(interruption(outcome.value) is CancellationError)
+    }
+
+    func testADownloadPausesAndResumesInPlace() throws {
+        StubServer.serve("/slow", body: Data("slow".utf8))
+        StubServer.delay = 0.3
+        let destination = destination()
+        let (outcome, _, _) = startDownload(FileDownloadRequest(operationId: "download-1", url: StubServer.url("/slow"), destinationFile: destination))
+        settle(0.05)
+
+        XCTAssertTrue(transport.pause(operationId: "download-1"))
+        XCTAssertTrue(transport.resume(operationId: "download-1"))
+        waitUntil { outcome.value != nil }
+
+        guard case .success = outcome.value else { return XCTFail("\(String(describing: outcome.value))") }
+        XCTAssertEqual(try Data(contentsOf: destination), Data("slow".utf8))
+    }
+}
+
+/// Another provider than the SDK's: its sessions cannot go through `uploadEncrypted`.
+private final class OtherProvider: NSObject, FileEncryptionProvider {
+    let real = StreamingAeadFileEncryptionProvider()
+
+    func prepareUpload(fileURL: URL, uniqueId: String) throws -> PreparedUpload {
+        try real.prepareUpload(fileURL: fileURL, uniqueId: uniqueId)
+    }
+
+    func restoreUpload(fileURL: URL, checkpoint: FileEncryptionCheckpoint) throws -> PreparedUpload {
+        try real.restoreUpload(fileURL: fileURL, checkpoint: checkpoint)
+    }
+
+    func openDownload(source: CiphertextRangeSource, encryptionInfo: FileEncryptionInfo) throws -> PlaintextReader {
+        try real.openDownload(source: source, encryptionInfo: encryptionInfo)
+    }
+}
+
+// MARK: - Coverage: the download's own failure paths
+
+extension DefaultFileTransferTransportTests {
+
+    func testARepeatedDownloadOperationIdIsRejectedWhileTheFirstRuns() throws {
+        let request = FileDownloadRequest(operationId: "same", url: StubServer.url("/hold"), destinationFile: destination())
+        let (first, _, _) = startDownload(request)
+        settle()
+        let (second, _, _) = startDownload(request)
+        waitUntil { second.value != nil }
+
+        guard case .duplicateOperation = error(second.value) as? FileTransferError else { return XCTFail("\(String(describing: second.value))") }
+        transport.cancel(operationId: "same")
+        waitUntil { first.value != nil }
+    }
+
+    func testADownloadThatCannotLeaveTheSessionsTempLocationFails() throws {
+        let original = DefaultFileTransferTransport.downloadStagingDirectory
+        defer { DefaultFileTransferTransport.downloadStagingDirectory = original }
+        DefaultFileTransferTransport.downloadStagingDirectory = { self.directory.appendingPathComponent("no/such/folder") }
+        StubServer.serve("/moved", body: Data("x".utf8))
+
+        let (outcome, _, _) = startDownload(FileDownloadRequest(operationId: "d", url: StubServer.url("/moved"), destinationFile: destination()))
+        waitUntil { outcome.value != nil }
+
+        XCTAssertNotNil(error(outcome.value))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: destination().path))
+    }
+
+    func testADownloadWithoutAURLSessionTaskStillCompletes() throws {
+        transport.startDownload = { _, _, completion in
+            let file = self.directory.appendingPathComponent("task-file-\(UUID().uuidString)")
+            try? Data("body".utf8).write(to: file)
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.05) { completion(.success(file)) }
+            return nil
+        }
+
+        let (outcome, _, _) = startDownload(FileDownloadRequest(operationId: "d", url: StubServer.url("/none"), destinationFile: destination()))
+        waitUntil { outcome.value != nil }
+
+        XCTAssertEqual(try Data(contentsOf: destination()), Data("body".utf8))
+        XCTAssertFalse(transport.pause(operationId: "d"), "nothing to pause once over")
+    }
+
+    func testAPlainPublishThatCannotMoveTheFileFails() async throws {
+        let missing = directory.appendingPathComponent("never-downloaded")
+        do {
+            try await DefaultFileTransferTransport.publish(missing, to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: destination()), encryption: ChatSDKFileEncryption())
+            XCTFail("nothing to publish")
+        } catch {
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination().path))
+        }
+    }
+}
+
+// MARK: - SCTSession and SCTDataSession
+
+final class SCTSessionTransportTests: XCTestCase {
+
+    /// A data session that keeps every default of `SCTDataSession`.
+    private final class MinimalSession: NSObject, SCTDataSession {
+        func upload(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo) {}
+        func download(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo) {}
+        func getFilePath(attachment: ChatMessage.Attachment) -> String? { nil }
+        func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? { nil }
+    }
+
+    private final class NullTransport: FileTransferTransport {
+        func upload(_ request: FileUploadRequest, progress: @escaping (Double) -> Void) async -> FileTransferResult<FileUploadResult> {
+            .failure(FileTransferError.invalidRequest)
+        }
+        func download(_ request: FileDownloadRequest, progress: @escaping (Double) -> Void) async -> FileTransferResult<URL> {
+            .failure(FileTransferError.invalidRequest)
+        }
+        func cancel(operationId: String) {}
+    }
+
+    private var directory: URL!
+
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        FakeClient.install()
+        URLProtocol.registerClass(StubServer.self)
+        StubServer.reset()
+        directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sct-session-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        FakeClient.uninstall()
+        URLProtocol.unregisterClass(StubServer.self)
+        StubServer.reset()
+        try? FileManager.default.removeItem(at: directory)
+        try super.tearDownWithError()
+    }
+
+    private func makeAttachment(name: String? = "a.pdf", url: String? = nil, filePath: String? = nil) -> ChatMessage.Attachment {
+        .init(id: 0, tid: 1, messageId: 1, userId: "u", url: url, filePath: filePath, type: "file", name: name, metadata: nil, uploadedFileSize: 0, createdAt: Date())
+    }
+
+    private func thumbnailUpload(_ session: SCTDataSession) -> Result<String, Error>? {
+        let outcome = Outcome<Result<String, Error>>()
+        session.uploadAttachmentThumbnail(for: makeAttachment(), fileUrl: directory.appendingPathComponent("poster.jpg")) { outcome.set($0) }
+        waitUntil { outcome.value != nil }
+        return outcome.value
+    }
+
+    private func thumbnailDownload(_ session: SCTDataSession, origin: String) -> Result<URL, Error>? {
+        let outcome = Outcome<Result<URL, Error>>()
+        session.downloadAttachmentThumbnail(for: makeAttachment(), origin: origin) { outcome.set($0) }
+        waitUntil { outcome.value != nil }
+        return outcome.value
+    }
+
+    // MARK: SCTSession
+
+    func testTheDefaultSessionUsesTheSDKTransport() {
+        XCTAssertTrue(SCTSession().transport is DefaultFileTransferTransport)
+        let transport = NullTransport()
+        XCTAssertTrue(SCTSession(transport: transport).transport === transport)
+        XCTAssertTrue(SCTSession.default.supportsAttachmentEncryption)
+    }
+
+    func testTheDefaultSessionStoresInItsFileStorage() throws {
+        let session = SCTSession(transport: NullTransport())
+        let source = directory.appendingPathComponent("source.bin")
+        try Data([1, 2, 3]).write(to: source)
+        let transferId = UUID().uuidString
+
+        let stored = session.storeFile(atPath: source.path, transferId: transferId, fileName: "stored.bin")
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: stored)), Data([1, 2, 3]))
+        XCTAssertTrue(stored.contains(transferId))
+        session.updateThumbnailPath(transferId: transferId, filePath: stored)
+        XCTAssertEqual(session.getFilePath(attachment: makeAttachment(filePath: stored)), stored)
+
+        session.removeFile(atPath: stored)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stored))
+    }
+
+    func testTheDefaultSessionDownloadsIntoItsFileStorage() throws {
+        let session = SCTSession(transport: NullTransport())
+        XCTAssertNil(session.downloadDestination(for: makeAttachment(url: nil)))
+        let destination = try XCTUnwrap(session.downloadDestination(for: makeAttachment(name: "b.pdf", url: "https://cdn.example/TID-9/b.pdf")))
+        XCTAssertTrue(destination.path.contains("TID-9"))
+        XCTAssertEqual(destination.lastPathComponent, "b.pdf")
+    }
+
+    func testTheDefaultSessionHasNoThumbnailWithoutAFile() {
+        XCTAssertNil(SCTSession(transport: NullTransport()).thumbnailFile(for: makeAttachment(), preferred: CGSize(width: 20, height: 20)))
+    }
+
+    // MARK: SCTDataSession defaults
+
+    func testADataSessionDoesNotEncryptUnlessItSaysSo() {
+        XCTAssertFalse(MinimalSession().supportsAttachmentEncryption)
+    }
+
+    func testATransportThatCannotPauseSaysSo() {
+        let transport = NullTransport()
+        XCTAssertFalse(transport.pause(operationId: "any"), "UIKit then stops the attempt and starts another")
+        XCTAssertFalse(transport.resume(operationId: "any"))
+    }
+
+    func testPosterUploadThroughTheSDK() {
+        for session: SCTDataSession in [MinimalSession(), SCTSession(transport: NullTransport())] {
+            FakeClient.onPlain = {
+                $0.progress(0.5)
+                $0.completion(URL(string: "https://cdn.example/poster.jpg"), nil)
+            }
+            guard case .success(let origin) = thumbnailUpload(session) else { return XCTFail("\(session)") }
+            XCTAssertEqual(origin, "https://cdn.example/poster.jpg")
+
+            let sdkError = SceytError(domain: "sceyt", code: 3, userInfo: nil)
+            FakeClient.onPlain = { $0.completion(nil, sdkError) }
+            guard case .failure(let error) = thumbnailUpload(session) else { return XCTFail("\(session)") }
+            XCTAssertEqual((error as NSError).code, 3)
+
+            FakeClient.onPlain = { $0.completion(nil, nil) }
+            guard case .failure(SCTDataSessionError.thumbnailUploadFailed) = thumbnailUpload(session) else { return XCTFail("\(session)") }
+        }
+    }
+
+    func testPosterDownloadOnlyFollowsHTTP() throws {
+        StubServer.serve("/poster.jpg", body: Data("jpeg".utf8))
+        for session: SCTDataSession in [MinimalSession(), SCTSession(transport: NullTransport())] {
+            for origin in ["", "b9d80ec3-e1e9-442f-db3a-df545cad86bb", "file:///etc/hosts", "ftp://cdn.example/a.jpg"] {
+                guard case .failure(SCTDataSessionError.unsupportedThumbnailOrigin) = thumbnailDownload(session, origin: origin) else {
+                    return XCTFail("\(origin) must not be fetched")
+                }
+            }
+            guard case .success(let local) = thumbnailDownload(session, origin: StubServer.url("/poster.jpg")) else { return XCTFail("\(session)") }
+            XCTAssertEqual(try Data(contentsOf: local), Data("jpeg".utf8))
+            XCTAssertEqual(local.pathExtension, "jpg")
+            try? FileManager.default.removeItem(at: local)
+
+            guard case .failure = thumbnailDownload(session, origin: StubServer.url("/error")) else { return XCTFail("\(session)") }
+        }
+    }
+}
