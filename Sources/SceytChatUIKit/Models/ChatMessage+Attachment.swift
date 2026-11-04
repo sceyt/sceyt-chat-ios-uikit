@@ -18,18 +18,74 @@ extension ChatMessage {
         public let tid: Int64
         public let messageId: MessageId
         public let userId: UserId
-        public var url: String?
-        public var filePath: String?
         public let type: String
-        public var name: String?
-        public var metadata: String?
-        public var uploadedFileSize: UInt
         public let createdAt: Date
-        public var status: TransferStatus
-        public var transferProgress: Double
-        
-        public private(set) var imageDecodedMetadata: Metadata<String>?
-        public private(set) var voiceDecodedMetadata: Metadata<[Int]>?
+
+        /// What a transfer changes. One attachment object is shared by the transfer layer
+        /// (writing on its queues) and the UI (reading on main), so every field goes through
+        /// `lock`: a read never sees half a write (TSan reported `status` racing this way).
+        private struct MutableState {
+            var url: String?
+            var filePath: String?
+            var name: String?
+            var metadata: String?
+            var uploadedFileSize: UInt
+            var status: TransferStatus
+            var transferProgress: Double
+            var imageDecodedMetadata: Metadata<String>?
+            var voiceDecodedMetadata: Metadata<[Int]>?
+            var assetFilePath: String?
+        }
+
+        private let lock = NSLock()
+        private var state: MutableState
+
+        private func read<T>(_ value: (MutableState) -> T) -> T {
+            lock.lock(); defer { lock.unlock() }
+            return value(state)
+        }
+
+        private func write(_ change: (inout MutableState) -> Void) {
+            lock.lock(); defer { lock.unlock() }
+            change(&state)
+        }
+
+        public var url: String? {
+            get { read { $0.url } }
+            set { write { $0.url = newValue } }
+        }
+        public var filePath: String? {
+            get { read { $0.filePath } }
+            set { write { $0.filePath = newValue } }
+        }
+        public var name: String? {
+            get { read { $0.name } }
+            set { write { $0.name = newValue } }
+        }
+        public var metadata: String? {
+            get { read { $0.metadata } }
+            set { write { $0.metadata = newValue } }
+        }
+        public var uploadedFileSize: UInt {
+            get { read { $0.uploadedFileSize } }
+            set { write { $0.uploadedFileSize = newValue } }
+        }
+        public var status: TransferStatus {
+            get { read { $0.status } }
+            set { write { $0.status = newValue } }
+        }
+        public var transferProgress: Double {
+            get { read { $0.transferProgress } }
+            set { write { $0.transferProgress = newValue } }
+        }
+        public private(set) var imageDecodedMetadata: Metadata<String>? {
+            get { read { $0.imageDecodedMetadata } }
+            set { write { $0.imageDecodedMetadata = newValue } }
+        }
+        public private(set) var voiceDecodedMetadata: Metadata<[Int]>? {
+            get { read { $0.voiceDecodedMetadata } }
+            set { write { $0.voiceDecodedMetadata = newValue } }
+        }
         
         @Lazy public var user: ChatUser?
         
@@ -55,7 +111,10 @@ extension ChatMessage {
             return nil
         }
         
-        public var assetFilePath: String?
+        public var assetFilePath: String? {
+            get { read { $0.assetFilePath } }
+            set { write { $0.assetFilePath = newValue } }
+        }
 
         /// True while this attachment's bytes have never left the device: it has a local
         /// source file and no remote url yet.
@@ -73,12 +132,19 @@ extension ChatMessage {
         /// `imageDecodedMetadata`/`voiceDecodedMetadata` stay in sync — they are
         /// otherwise only decoded in `init`.
         public func updateMetadata(_ metadata: String?) {
-            self.metadata = metadata
-            guard let metadata else { return }
-            if type != "voice" {
-                imageDecodedMetadata = try? Metadata<String>.decode(metadata)
-            } else {
-                voiceDecodedMetadata = try? Metadata<[Int]>.decode(metadata)
+            // Decoded outside the lock, then stored with the JSON in one step: a reader never
+            // sees new JSON next to the old decoded values.
+            let isVoice = type == "voice"
+            let image = metadata.flatMap { isVoice ? nil : try? Metadata<String>.decode($0) }
+            let voice = metadata.flatMap { isVoice ? try? Metadata<[Int]>.decode($0) : nil }
+            write {
+                $0.metadata = metadata
+                guard metadata != nil else { return }
+                if isVoice {
+                    $0.voiceDecodedMetadata = voice
+                } else {
+                    $0.imageDecodedMetadata = image
+                }
             }
         }
         
@@ -101,23 +167,21 @@ extension ChatMessage {
             self.tid = tid
             self.messageId = messageId
             self.userId = userId
-            self.url = url
-            self.filePath = filePath
             self.type = type
-            self.name = name
-            self.metadata = metadata
-            self.uploadedFileSize = uploadedFileSize
             self.createdAt = createdAt
-            self.status = status
-            self.transferProgress = transferProgress
-            // Decode metadata eagerly so the properties are immutable by the time any
-            // thread reads them — lazy var on a class is not thread-safe.
-            if let metadata, type != "voice" {
-                imageDecodedMetadata = try? Metadata<String>.decode(metadata)
-            }
-            if let metadata, type == "voice" {
-                voiceDecodedMetadata = try? Metadata<[Int]>.decode(metadata)
-            }
+            // Metadata is decoded eagerly, so no thread ever decodes it lazily.
+            state = MutableState(
+                url: url,
+                filePath: filePath,
+                name: name,
+                metadata: metadata,
+                uploadedFileSize: uploadedFileSize,
+                status: status,
+                transferProgress: transferProgress,
+                imageDecodedMetadata: metadata.flatMap { type != "voice" ? try? Metadata<String>.decode($0) : nil },
+                voiceDecodedMetadata: metadata.flatMap { type == "voice" ? try? Metadata<[Int]>.decode($0) : nil },
+                assetFilePath: nil
+            )
             $user = {
                 try? DataProvider.database.read {
                      UserDTO.fetch(id: userId, context: $0)?.convert()
@@ -159,7 +223,7 @@ extension ChatMessage {
             )
         }
         
-        public enum TransferStatus: Int16 {
+        public enum TransferStatus: Int16, Sendable {
             case pending
             case uploading
             case downloading
@@ -376,3 +440,6 @@ public extension ChatMessage.Attachment {
         tid != 0 ? tid : Int64(messageId)
     }
 }
+
+/// Every field a transfer changes is behind the attachment's lock; the rest are constants.
+extension ChatMessage.Attachment: @unchecked Sendable {}

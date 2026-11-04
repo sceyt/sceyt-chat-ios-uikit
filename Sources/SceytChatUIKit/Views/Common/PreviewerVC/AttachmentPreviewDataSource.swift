@@ -65,6 +65,10 @@ open class SingleItemPreviewDataSource: PreviewDataSource {
 }
 
 open class AttachmentPreviewDataSource: PreviewDataSource {
+    /// Transfers and local files of the attachments shown here: the app's shared transfer
+    /// unless the owner sets its own.
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
     
     private var ascending: Bool
     public let provider: ChannelAttachmentProvider
@@ -244,7 +248,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
               attachment.status != .done,
               attachment.status != .failedDownloading,
               attachment.status != .failedUploading,
-              fileProvider.filePath(attachment: attachment) == nil
+              self.attachmentTransfer.filePath(attachment: attachment) == nil
         else { return }
         downloadQueue.async {
             guard let chatMessage = try? DataProvider.database.read ({
@@ -253,7 +257,7 @@ open class AttachmentPreviewDataSource: PreviewDataSource {
             }).get()
             else { return }
             
-            fileProvider
+            self.attachmentTransfer
                 .downloadMessageAttachments(
                     message: chatMessage,
                     attachments: [attachment]

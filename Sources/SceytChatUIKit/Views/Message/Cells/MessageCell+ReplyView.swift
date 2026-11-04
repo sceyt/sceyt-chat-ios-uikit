@@ -12,6 +12,10 @@ import SceytChat
 extension MessageCell {
 
     open class ReplyView: Control, MessageCellMeasurable, AttachmentSharpThumbnailObserver {
+        /// Transfers and local files of the attachments shown here: the app's shared transfer
+        /// unless the owner sets its own.
+        public var attachmentTransfer: AttachmentTransfer = fileProvider
+
 
         open lazy var nameLabel = UILabel()
             .withoutAutoresizingMask
@@ -283,7 +287,7 @@ extension MessageCell {
 
             // Observe an in-flight transfer (e.g. the replied-to message is also on
             // screen and downloading the same attachment under the same key).
-            fileProvider
+            self.attachmentTransfer
                 .progress(
                     message: message,
                     attachment: chatAttachment,
@@ -292,7 +296,7 @@ extension MessageCell {
 
                 } completion: { [weak data] done in
                     if done.error == nil {
-                        fileProvider.removeProgressObserver(
+                        self.attachmentTransfer.removeProgressObserver(
                             message: done.message,
                             attachment: done.attachment,
                             objectIdKey: observerKey
@@ -309,7 +313,7 @@ extension MessageCell {
             // (a no-op if already in flight or done). The completion also fires on the
             // already-downloaded fast path, refreshing a stale placeholder from disk.
             DispatchQueue.global().async {
-                fileProvider.downloadMessageAttachmentsIfNeeded(
+                self.attachmentTransfer.downloadMessageAttachmentsIfNeeded(
                     message: message,
                     attachments: [chatAttachment]
                 ) { [weak data] resolvedMessage, error in

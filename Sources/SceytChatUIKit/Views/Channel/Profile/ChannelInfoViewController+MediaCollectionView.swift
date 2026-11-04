@@ -15,6 +15,9 @@ extension ChannelInfoViewController {
                                     UICollectionViewDelegate,
                                     UICollectionViewDataSource,
                                     UICollectionViewDelegateFlowLayout {
+        /// Transfers and local files of the attachments shown here: its view model's.
+        public var attachmentTransfer: AttachmentTransfer { mediaViewModel.attachmentTransfer }
+
         
         public var settings = Layout.Settings(sectionInset: .init(top: 0, left: 1, bottom: 0, right: 1),
                                               interitemSpacing: 2,
@@ -152,10 +155,10 @@ extension ChannelInfoViewController {
             guard let layout = cell.data else { return }
             let attachment = layout.attachment
             let liveStatus = layout.ownerMessage.flatMap {
-                fileProvider.transferStatus(message: $0, attachment: attachment)
+                self.attachmentTransfer.transferStatus(message: $0, attachment: attachment)
             }
             let livePercent = layout.ownerMessage.flatMap {
-                fileProvider.currentProgressPercent(message: $0, attachment: attachment)
+                self.attachmentTransfer.currentProgressPercent(message: $0, attachment: attachment)
             }
 
             // A paused transfer keeps its task — and with it the last cached percent —
@@ -166,7 +169,7 @@ extension ChannelInfoViewController {
                 cell.update(status: .pauseUploading)
                 return
             }
-            if liveStatus == .pauseDownloading, fileProvider.filePath(attachment: attachment) == nil {
+            if liveStatus == .pauseDownloading, self.attachmentTransfer.filePath(attachment: attachment) == nil {
                 cell.lastAttachmentTransferProgress = nil
                 cell.update(status: .pauseDownloading)
                 return
@@ -198,7 +201,7 @@ extension ChannelInfoViewController {
             }
             // The bytes are on disk: nothing to overlay, whatever the status claims.
             // A transfer can end without its completion ever reaching this cell.
-            if fileProvider.filePath(attachment: attachment) != nil {
+            if self.attachmentTransfer.filePath(attachment: attachment) != nil {
                 cell.update(status: .done)
                 return
             }
@@ -256,6 +259,7 @@ extension ChannelInfoViewController {
         /// `rebindVisibleCellsWithChangedAttachment()`, which re-runs it on a visible cell
         /// in place — `reloadItems` would flash the thumbnail.
         open func configure(_ cell: ChannelInfoViewController.AttachmentCell, at indexPath: IndexPath) {
+            cell.attachmentTransfer = mediaViewModel.attachmentTransfer
             let model = mediaViewModel.attachmentLayout(at: indexPath)
             cell.overlayLoaderAppearance = appearance.overlayLoaderAppearance
             cell.data = mediaViewModel.attachmentLayout(at: indexPath, onLoadThumbnail: { [weak cell] layout in
@@ -279,7 +283,7 @@ extension ChannelInfoViewController {
                     // file-on-disk fast path reconcile the stored status to `.done`.
                     // Not for an unsent upload: its local file is the upload's source.
                     if !data.attachment.isPendingUpload,
-                       fileProvider.filePath(attachment: data.attachment) != nil {
+                       self.attachmentTransfer.filePath(attachment: data.attachment) != nil {
                         cell.lastAttachmentTransferProgress = nil
                         cell.update(status: .done)
                         self.mediaViewModel.resumeDownload(data)
@@ -322,7 +326,7 @@ extension ChannelInfoViewController {
                     // has to re-fetch, not no-op.
                     case .pending, .done:
                         if let message = data.ownerMessage,
-                           fileProvider.currentProgressPercent(message: message, attachment: data.attachment) != nil {
+                           self.attachmentTransfer.currentProgressPercent(message: message, attachment: data.attachment) != nil {
                             cell.update(status: .pauseDownloading)
                             self.mediaViewModel.pauseDownload(data)
                         } else {

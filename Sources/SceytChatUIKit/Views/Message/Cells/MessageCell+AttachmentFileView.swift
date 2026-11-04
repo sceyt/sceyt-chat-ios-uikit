@@ -225,7 +225,7 @@ extension MessageCell {
             // outlive its transfer, and a video whose bytes are on disk is playable whatever
             // the row still says.
             let isDownloaded = data.transferStatus == .done
-                || fileProvider.filePath(attachment: data.attachment) != nil
+                || self.attachmentTransfer.filePath(attachment: data.attachment) != nil
             let isPlayable = isDownloaded && imageView.image != nil && isVideoFile
             playButton.isHidden = !isPlayable || isTransferOverlayVisible
         }

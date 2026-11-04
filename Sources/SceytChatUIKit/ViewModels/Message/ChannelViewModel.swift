@@ -12,6 +12,10 @@ import Combine
 import CoreData
 
 open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, UnreadMentionsManagerDelegate {
+    /// Sends and fetches this object's attachments. The app's shared transfer unless replaced
+    /// (a test, or a screen with its own transfer).
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
     public typealias ChangeItem = LazyDatabaseObserver<MessageDTO, ChatMessage>.ChangeItemPaths
     //MARK: Events
     @Published public var event: Event?
@@ -2790,18 +2794,18 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open func stopFileTransfer(message: ChatMessage, attachment: ChatMessage.Attachment) {
-        fileProvider.stopTransfer(message: message, attachment: attachment)
+        self.attachmentTransfer.stopTransfer(message: message, attachment: attachment)
     }
     
     open func resumeFileTransfer(message: ChatMessage, attachment: ChatMessage.Attachment) {
-        fileProvider.resumeTransfer(message: message, attachment: attachment) {[weak self] status in
+        self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {[weak self] status in
             if let self, !status {
                 if message.deliveryStatus == .pending, attachment.filePath != nil {
                     attachment.status = .pending
                     self.messageSender.resendMessage(message)
                 } else if attachment.url != nil {
                     attachment.status = .pending
-                    fileProvider.downloadMessageAttachmentsIfNeeded(
+                    self.attachmentTransfer.downloadMessageAttachmentsIfNeeded(
                         message: message,
                         attachments: [attachment]
                     ) { [weak self] resolvedMessage, error in
@@ -2837,7 +2841,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 attachmentsToDownload = layoutModel.message.attachments?.filter { $0.type != "link" }
             }
 
-            fileProvider
+            self.attachmentTransfer
                 .downloadMessageAttachmentsIfNeeded(
                     message: layoutModel.message,
                     attachments: attachmentsToDownload

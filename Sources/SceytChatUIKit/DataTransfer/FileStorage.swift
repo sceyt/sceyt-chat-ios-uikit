@@ -10,12 +10,13 @@ import Foundation
 import SceytChat
 import CryptoKit
 
-open class FileStorage: Storage {
-    public static let `default` = FileStorage()
+/// Safe to share: it holds no state of its own, only paths derived from constants.
+open class FileStorage: Storage, @unchecked Sendable {
+    nonisolated(unsafe) public static let `default` = FileStorage()
     
     var fileManager: FileManager { FileManager.default }
     
-    public static var documentDirectory: URL? = {
+    nonisolated(unsafe) public static var documentDirectory: URL? = {
         if let path = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first {
             return URL(fileURLWithPath: path)
         }
@@ -45,6 +46,8 @@ open class FileStorage: Storage {
             try fileManager.createDirectory(atPath: cachePath, withIntermediateDirectories: false, attributes: nil)
             return cachePath
         } catch {
+            // Files kept in the temporary directory can be purged by the system.
+            logger.error("[Transfer] storage folder app_files could not be created, using the temporary directory: \(TransferLog.describe(error))")
             return tmp
         }
     }
@@ -57,7 +60,10 @@ open class FileStorage: Storage {
         }
         do {
             try fileManager.createDirectory(atPath: path, withIntermediateDirectories: false, attributes: nil)
-        } catch {}
+        } catch {
+            // Every thumbnail write below it fails until a later call creates it.
+            logger.error("[Transfer] thumbnail folder could not be created: \(TransferLog.describe(error))")
+        }
         return path
     }
 
@@ -68,7 +74,7 @@ open class FileStorage: Storage {
                 try fileManager.createDirectory(at: URL(fileURLWithPath: newPath), withIntermediateDirectories: true, attributes: nil)
                 newPath = (newPath as NSString).appendingPathComponent(fileName)
             } catch {
-                logger.errorIfNotNil(error, "store")
+                Self.logFailure("store: folder for \(fileName)", error)
             }
         }
         do {
@@ -80,10 +86,12 @@ open class FileStorage: Storage {
                 try fileManager.copyItem(atPath: path, toPath: newPath)
             }
         } catch {
-            logger.errorIfNotNil(error, "")
             if (error as NSError).code == NSFileWriteFileExistsError {
+                logger.debug("[Transfer] \(TransferLog.currentTag) store: \(newPath.lastPathComponentOfPath) already stored, kept")
                 return newPath
             }
+            // The source path comes back: callers check for it (`TransportDataSession.adopt`).
+            Self.logFailure("store: move of \(path.lastPathComponentOfPath)", error)
             return path
         }
         return newPath
@@ -110,7 +118,7 @@ open class FileStorage: Storage {
                     try fileManager.removeItem(atPath: path)
                 }
             } catch {
-                logger.errorIfNotNil(error, "store")
+                Self.logFailure("createPath: \(fileName)", error)
             }
         }
         return path
@@ -129,7 +137,7 @@ open class FileStorage: Storage {
         do {
             try fileManager.createDirectory(at: tmUrl.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)
         } catch {
-            logger.errorIfNotNil(error, "thumbnailPath")
+            Self.logFailure("thumbnail folder \(folder)", error)
         }
         return tmUrl.path
     }
@@ -142,7 +150,14 @@ open class FileStorage: Storage {
                 tmPath = String(tmPath.dropFirst(1))
             }
         }
-        try? fileManager.contentsOfDirectory(atPath: thumbnailPath)
+        let sizes: [String]
+        do {
+            sizes = try fileManager.contentsOfDirectory(atPath: thumbnailPath)
+        } catch {
+            Self.logFailure("updateThumbnailPath: listing thumbnails", error)
+            return
+        }
+        sizes
             .forEach { path in
                 var isDir: ObjCBool = false
                 let subDir = URL(fileURLWithPath: thumbnailPath).appendingPathComponent(path)
@@ -157,11 +172,11 @@ open class FileStorage: Storage {
                         .appendingPathComponent(transferId)
                         .appendingPathComponent(tmPath)
                     do {
-                        try? fileManager.createDirectory(at: newTmpUrl.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)
+                        try fileManager.createDirectory(at: newTmpUrl.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: nil)
                         try fileManager.copyItem(at: tmpUrl, to: newTmpUrl)
                         try fileManager.removeItem(at: tmpUrl)
                     } catch {
-                        logger.errorIfNotNil(error, "")
+                        Self.logFailure("updateThumbnailPath: moving the \(path) thumbnail", error)
                     }
                 }
             }
@@ -173,7 +188,12 @@ open class FileStorage: Storage {
     open func videoThumbnailCachePath(origin: String) -> String {
         let dir = URL(fileURLWithPath: storagePath).appendingPathComponent("video_thumbs")
         if !fileManager.fileExists(atPath: dir.path) {
-            try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+            do {
+                try fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
+            } catch {
+                // The poster's store then fails and is logged by its caller with this reason.
+                Self.logFailure("video_thumbs folder", error)
+            }
         }
         let digest = SHA256.hash(data: Data(origin.utf8))
         let name = digest.map { String(format: "%02x", $0) }.joined()
@@ -181,7 +201,23 @@ open class FileStorage: Storage {
     }
 
     open func remove(path: String) {
-        try? fileManager.removeItem(atPath: path)
+        do {
+            try fileManager.removeItem(atPath: path)
+        } catch where TransferLog.isNotFound(error) {
+            // Already gone: nothing to remove.
+        } catch {
+            Self.logFailure("remove \(path.lastPathComponentOfPath)", error, level: .debug)
+        }
+    }
+
+    /// One line per storage failure, with the transfer it belongs to.
+    static func logFailure(_ action: String, _ error: Error, level: SceytChatUIKit.Logger.LogLevel = .error) {
+        let line = "[Transfer] \(TransferLog.currentTag) storage \(action) failed: \(TransferLog.describe(error))"
+        if level == .debug {
+            logger.debug(line)
+        } else {
+            logger.error(line)
+        }
     }
     
     open func filePath(transferId: String) -> String {
@@ -190,5 +226,21 @@ open class FileStorage: Storage {
     
     open func isFilePath(_ path: String) -> Bool {
         fileManager.fileExists(atPath: path)
+    }
+}
+
+private extension String {
+    var lastPathComponentOfPath: String { (self as NSString).lastPathComponent }
+}
+
+// MARK: - AttachmentFileStore
+
+extension FileStorage: AttachmentFileStore {
+    public func store(fileAt path: String, transferId: String, fileName: String?) -> String {
+        store(transferId: transferId, fileName: fileName, file: path)
+    }
+
+    public func remove(fileAt path: String) {
+        remove(path: path)
     }
 }

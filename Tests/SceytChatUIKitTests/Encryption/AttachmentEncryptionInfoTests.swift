@@ -84,6 +84,35 @@ final class AttachmentEncryptionInfoTests: XCTestCase {
         }
     }
 
+    func testAKeyThatIsNot32BytesOfBase64URLIsRejectedBeforeAnythingIsFetched() {
+        for bad in ["", "short", String(key.dropLast()), key + "AA", key.replacingOccurrences(of: "_", with: "/"), key + "="] {
+            var object = validObject
+            object["key"] = bad
+            XCTAssertThrowsError(try decode(object), "key \(bad)")
+        }
+    }
+
+    func testAnAttachmentIdThatIsNotBase64URLIsRejected() {
+        for bad in ["", "has space", "a+b/c==", "a.b"] {
+            var object = validObject
+            object["attachmentId"] = bad
+            XCTAssertThrowsError(try decode(object), "attachmentId \(bad)")
+        }
+    }
+
+    func testARenditionWithABadKeyRejectsTheWholeEnc() {
+        var object = validObject
+        object["renditions"] = [["role": "thumbnail", "attachmentId": attachmentId, "key": "nope"]]
+        XCTAssertThrowsError(try decode(object))
+    }
+
+    func testBase64URLDecodedCount() {
+        XCTAssertEqual(AttachmentEncryption.base64URLDecodedCount(key), 32)
+        XCTAssertEqual(AttachmentEncryption.base64URLDecodedCount(attachmentId), 16)
+        XCTAssertNil(AttachmentEncryption.base64URLDecodedCount("A"), "one character can't encode a byte")
+        XCTAssertTrue(AttachmentEncryption.isBase64URLAlphabet("a-_Z9"))
+    }
+
     func testAnUnknownVersionIsRejected() {
         for version in [0, 2, -1] {
             var object = validObject
@@ -130,8 +159,8 @@ final class AttachmentEncryptionInfoTests: XCTestCase {
     }
 
     func testEncodingRoundTripsRenditions() throws {
-        let thumbnail = AttachmentEncryption.Rendition(role: AttachmentEncryption.Rendition.thumbnailRole, attachmentId: "p", key: "pk")
-        let other = AttachmentEncryption.Rendition(role: "preview", attachmentId: "q", key: "qk")
+        let thumbnail = AttachmentEncryption.Rendition(role: AttachmentEncryption.Rendition.thumbnailRole, attachmentId: "p", key: "YGzDgK1imJtelRMNIoRMDMFn3l2SITyRHaqTrSwGYx4")
+        let other = AttachmentEncryption.Rendition(role: "preview", attachmentId: "q", key: "fc3Ym1caWRIAWJRXZAj3kM088pUm0Etu7i2i70hQsDk")
         let enc = AttachmentEncryption(algorithm: algorithm, attachmentId: attachmentId, key: key, renditions: [other, thumbnail])
         let data = try JSONEncoder().encode(enc)
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
@@ -249,6 +278,15 @@ final class AttachmentEncryptionInfoTests: XCTestCase {
         XCTAssertNotNil(makeAttachment(metadata: try metadata(enc: validObject)).encryption)
     }
 
+    /// E7: metadata that is not JSON but names `enc` (a truncated write, a bad merge) fails
+    /// closed: encrypted and unreadable, never saved as plaintext.
+    func testUnparsableMetadataNamingEncIsEncryptedAndUnreadable() {
+        let truncated = makeAttachment(metadata: #"{"enc":{"alg":"x","key":"#)
+        XCTAssertTrue(truncated.isEncrypted)
+        XCTAssertNil(truncated.encryption)
+        XCTAssertFalse(makeAttachment(metadata: #"{"tmb":"x""#).isEncrypted, "no enc named: still plain")
+    }
+
     func testSettingEncryptionKeepsTheOtherKeysAndReplacesAnOldEnc() throws {
         let enc = AttachmentEncryption(algorithm: algorithm, attachmentId: attachmentId, key: key)
         let old = try metadata(enc: ["v": 1, "alg": "old", "attachmentId": "old", "key": "old"], extra: ["szw": 3, "tmb": "t"])
@@ -332,31 +370,23 @@ final class AttachmentEncryptionInfoTests: XCTestCase {
 extension AttachmentEncryptionInfoTests {
 
     func testANewAttachmentIdStillComesWhenTheRandomSourceFails() {
-        let original = AttachmentEncryption.randomBytes
-        defer { AttachmentEncryption.randomBytes = original }
-        AttachmentEncryption.randomBytes = { _ in errSecAllocate }
-
-        let id = AttachmentEncryption.newAttachmentId()
+        let id = AttachmentEncryption.newAttachmentId(randomBytes: { _ in errSecAllocate })
 
         XCTAssertFalse(id.isEmpty, "the SDK makes one")
     }
 
     func testEncThatCannotBeWrittenAsUTF8Throws() {
-        let original = MetadataJSON.string
-        defer { MetadataJSON.string = original }
-        MetadataJSON.string = { _ in nil }
+        let noText = MetadataJSON(serialize: MetadataJSON.live.serialize, string: { _ in nil })
 
-        XCTAssertThrowsError(try ChatMessage.Attachment.metadata(nil, settingEncryption: AttachmentEncryption(algorithm: "a", attachmentId: "b", key: "c"))) {
+        XCTAssertThrowsError(try ChatMessage.Attachment.metadata(nil, settingEncryption: AttachmentEncryption(algorithm: "a", attachmentId: "b", key: "c"), json: noText)) {
             guard case .metadataNotAnObject = $0 as? AttachmentEncryptionError else { return XCTFail("\($0)") }
         }
     }
 
     func testEncThatCannotBeCarriedOverLeavesTheNewMetadata() throws {
         let old = try ChatMessage.Attachment.metadata(nil, settingEncryption: AttachmentEncryption(algorithm: "a", attachmentId: "b", key: "c"))
-        let original = MetadataJSON.serialize
-        defer { MetadataJSON.serialize = original }
-        MetadataJSON.serialize = { _ in throw CocoaError(.coderInvalidValue) }
+        let failing = MetadataJSON(serialize: { _ in throw CocoaError(.coderInvalidValue) }, string: MetadataJSON.live.string)
 
-        XCTAssertEqual(ChatMessage.Attachment.metadata(#"{"tmb":"x"}"#, preservingEncryptionFrom: old), #"{"tmb":"x"}"#)
+        XCTAssertEqual(ChatMessage.Attachment.metadata(#"{"tmb":"x"}"#, preservingEncryptionFrom: old, json: failing), #"{"tmb":"x"}"#)
     }
 }

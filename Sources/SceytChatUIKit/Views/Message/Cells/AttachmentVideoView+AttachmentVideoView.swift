@@ -177,7 +177,7 @@ extension MessageCell {
             guard let data else { return }
             let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
             let isPlayable = data.attachment.status == .done
-                || fileProvider.filePath(attachment: data.attachment) != nil
+                || self.attachmentTransfer.filePath(attachment: data.attachment) != nil
             let isHidden = isViewOnce || !isPlayable || isTransferOverlayVisible
             if isHidden {
                 // A view recycled mid-pop would otherwise come back holding the shrunken

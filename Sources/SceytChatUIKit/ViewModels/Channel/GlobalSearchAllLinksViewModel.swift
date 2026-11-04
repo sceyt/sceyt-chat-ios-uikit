@@ -15,6 +15,10 @@ import UIKit
 /// - `allLinksObserver`: always-on, no text/user filter, paginated – drives the table view.
 /// - `searchObserver`: restarted on each `search(query:filterUser:)` call – drives filtered results.
 open class GlobalSearchAllLinksViewModel: NSObject {
+    /// Sends and fetches this object's attachments. The app's shared transfer unless replaced
+    /// (a test, or a screen with its own transfer).
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
 
     public let attachmentTypes: [String]
     public let sectionNameKeyPath: String?
@@ -400,7 +404,7 @@ open class GlobalSearchAllLinksViewModel: NSObject {
             }
             getMessage(layout) { message in
                 if let message {
-                    fileProvider.downloadMessageAttachments(
+                    self.attachmentTransfer.downloadMessageAttachments(
                         message: message,
                         attachments: [attachment]
                     ) { message, error in
@@ -421,9 +425,9 @@ open class GlobalSearchAllLinksViewModel: NSObject {
         guard attachment.type != "link" else { return }
         getMessage(layout) { message in
             if let message {
-                fileProvider.resumeTransfer(message: message, attachment: attachment) {
+                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {
                     if !$0 {
-                        fileProvider.downloadMessageAttachments(message: message, attachments: [attachment])
+                        self.attachmentTransfer.downloadMessageAttachments(message: message, attachments: [attachment])
                     }
                 }
             }
@@ -434,7 +438,7 @@ open class GlobalSearchAllLinksViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { _ in
+                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment) { _ in
                     DataProvider.database.write {
                         let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
                         dto?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue

@@ -8,19 +8,31 @@
 
 import Foundation
 
+/// Safe to share: every access to the value takes its lock.
 @propertyWrapper
-public final class Atomic<T> {
+public final class Atomic<T>: @unchecked Sendable {
     private let lock = NSRecursiveLock()
     private var value: T
 
+    /// A read takes the lock once; a write — including an in-place one such as
+    /// `dict[key] = value`, `set.insert(x)` or `array.append(x)` through the wrapper —
+    /// holds the lock for the whole read-modify-write via `_modify`, so concurrent
+    /// in-place writes can't overwrite each other.
     public var wrappedValue: T {
         get {
-            var currentValue: T!
-            mutate { currentValue = $0 }
-            return currentValue
+            lock.lock()
+            defer { lock.unlock() }
+            return value
         }
         set {
-            mutate { $0 = newValue }
+            lock.lock()
+            defer { lock.unlock() }
+            value = newValue
+        }
+        _modify {
+            lock.lock()
+            defer { lock.unlock() }
+            yield &value
         }
     }
 

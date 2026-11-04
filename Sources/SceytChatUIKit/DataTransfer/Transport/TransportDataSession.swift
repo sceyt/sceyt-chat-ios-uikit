@@ -34,20 +34,26 @@ public enum TransportDataSessionError: Error {
 ///
 /// A prepared file is staged per operation and reused by the next attempt of the same upload,
 /// so a retry or a relaunch sends the bytes a transport may already have stored in part.
-open class TransportDataSession: NSObject, SCTDataSession {
+/// Safe to share between threads: its transfers live in `board`, changed one locked step at a
+/// time; its configuration (`environment`, `stagingDirectory`, the hooks) is set before the
+/// first transfer and only read after.
+open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
 
     public let transport: FileTransferTransport
 
-    private let lock = NSLock()
-    private var uploads = [ObjectIdentifier: UploadJob]()
-    private var waiting = [UploadJob]()
-    /// The upload holding the queue's only slot.
-    private var active: UploadJob?
-    private var downloads = [ObjectIdentifier: DownloadJob]()
+    /// The jobs, the upload queue and its slots, and each job's state: changed only through
+    /// `board.withState`, one locked step at a time.
+    let board = JobBoard()
 
-    /// Whether this process is an app extension, which resizes images with less memory. A
-    /// test seam: `Bundle.main.isAppExtension` in production.
-    static var isAppExtension: () -> Bool = { Bundle.main.isAppExtension }
+    /// Whether this process is an app extension, which resizes images with less memory.
+    open var isAppExtension: Bool { Bundle.main.isAppExtension }
+
+    /// How video posters go up and come down.
+    var thumbnailTransfer = DefaultThumbnailTransfer()
+
+    /// The dependencies preparation uses (video export, image resize, storage). Set it before
+    /// the first upload.
+    public var environment = TransferEnvironment.components
 
     /// Test hooks, run as an upload attempt is about to take its slot and as a download
     /// attempt is about to start: what happens to the transfer meanwhile is what they test.
@@ -57,17 +63,23 @@ open class TransportDataSession: NSObject, SCTDataSession {
     public init(transport: FileTransferTransport) {
         self.transport = transport
         super.init()
-        let directory = stagingDirectory
+        let staging = self.staging
         DispatchQueue.global(qos: .utility).async {
-            Self.purgeStaleStaging(in: directory)
+            staging.purgeStale()
         }
     }
 
     open var supportsAttachmentEncryption: Bool { true }
 
+    /// How many uploads run at once; the rest wait in order. One by default: a message is
+    /// sent when its upload lands, so parallel uploads can send messages out of the order
+    /// they were written in (a small photo overtaking an earlier video). Raise it where
+    /// that order does not matter, or is restored elsewhere.
+    open var maxConcurrentUploads: Int { 1 }
+
     /// Whether an upload first asks the checksum table for an object already stored.
     open var checksumsBeforeUpload: Bool {
-        SceytChatUIKit.shared.config.preventDuplicateAttachmentUpload
+        environment.preventsDuplicateUploads()
     }
 
     // MARK: Identity
@@ -99,17 +111,24 @@ open class TransportDataSession: NSObject, SCTDataSession {
 
     // MARK: Storage
 
-    /// Moves (or copies) `path` into storage and returns where it is now.
+    /// Where this session keeps the files it transfers. Replace it to store them elsewhere,
+    /// rather than overriding the methods below. Set it before the first transfer.
+    public var fileStore: AttachmentFileStore = FileStorage.default
+
+    /// Moves (or copies) `path` into storage and returns where it is now: `fileStore`'s.
+    /// Kept for subclasses written before `fileStore`; new code sets `fileStore` instead.
     open func storeFile(atPath path: String, transferId: String, fileName: String?) -> String {
-        FileStorage.default.store(transferId: transferId, fileName: fileName, file: path)
+        fileStore.store(fileAt: path, transferId: transferId, fileName: fileName)
     }
 
+    /// Removes a file from storage: `fileStore`'s. Kept like `storeFile`.
     open func removeFile(atPath path: String) {
-        FileStorage.default.remove(path: path)
+        fileStore.remove(fileAt: path)
     }
 
+    /// Moves the thumbnails of a stored file along with it: `fileStore`'s. Kept like `storeFile`.
     open func updateThumbnailPath(transferId: String, filePath: String) {
-        FileStorage.default.updateThumbnailPath(transferId: transferId, filePath: filePath)
+        fileStore.updateThumbnailPath(transferId: transferId, filePath: filePath)
     }
 
     /// Where a download's plaintext goes, the place `getFilePath` finds it afterwards.
@@ -124,9 +143,13 @@ open class TransportDataSession: NSObject, SCTDataSession {
 
     /// Prepared files waiting for their upload to land, one folder per operation.
     open var stagingDirectory: URL {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        return caches.appendingPathComponent("upload-staging", isDirectory: true)
+        TransferDirectories.cachesOrTemporary().appendingPathComponent("upload-staging", isDirectory: true)
+    }
+
+    /// The staged files of uploads, under `stagingDirectory` (read each time: a subclass
+    /// may override it).
+    var staging: UploadStaging {
+        UploadStaging(directory: stagingDirectory)
     }
 
     // MARK: SCTDataSession
@@ -145,7 +168,7 @@ open class TransportDataSession: NSObject, SCTDataSession {
         fileUrl: URL,
         completion: @escaping (Result<String, Error>) -> Void
     ) {
-        DefaultThumbnailTransfer.upload(fileUrl: fileUrl, completion: completion)
+        thumbnailTransfer.upload(fileUrl: fileUrl, completion: completion)
     }
 
     open func downloadAttachmentThumbnail(
@@ -153,7 +176,7 @@ open class TransportDataSession: NSObject, SCTDataSession {
         origin: String,
         completion: @escaping (Result<URL, Error>) -> Void
     ) {
-        DefaultThumbnailTransfer.download(origin: origin, completion: completion)
+        thumbnailTransfer.download(origin: origin, completion: completion)
     }
 
     open func upload(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo) {
@@ -166,15 +189,19 @@ open class TransportDataSession: NSObject, SCTDataSession {
             operationId: taskInfo.operationId
         )
         let tag = taskInfo.logTag
-        lock.lock()
         // A second start of an upload still running joins it: two jobs of one operation would
         // share its staging folder and the transport's record, and a cancel of one would end
         // the other's transfer.
-        if let running = uploads.values.first(where: { $0.operationId == job.operationId && !$0.isFinished }) {
+        let joinedRunning: (job: UploadJob, state: UploadJob.State, attempt: Int)? = board.withState { jobs in
+            guard let running = jobs.uploads.values.first(where: { $0.operationId == job.operationId && !$0.isFinished }) else {
+                jobs.uploads[ObjectIdentifier(taskInfo)] = job
+                return nil
+            }
             running.joined.append(taskInfo)
-            let state = running.state
-            let attempt = running.attempt
-            lock.unlock()
+            return (running, running.state, running.attempt)
+        }
+        if let joinedRunning {
+            let (running, state, attempt) = joinedRunning
             taskInfo.attempts = attempt
             logger.info("[Transfer] \(tag) upload started again while attempt \(attempt) is \(state): joins it, no second transfer \(attachment.transferLogDescription)")
             taskInfo.onAction = actions(of: running)
@@ -183,8 +210,6 @@ open class TransportDataSession: NSObject, SCTDataSession {
             }
             return
         }
-        uploads[ObjectIdentifier(taskInfo)] = job
-        lock.unlock()
         if attachment.tid == 0 {
             logger.warn("[Transfer] \(tag) upload has no tid: a retry or relaunch cannot find what this attempt saves \(attachment.transferLogDescription)")
         }
@@ -193,7 +218,7 @@ open class TransportDataSession: NSObject, SCTDataSession {
         enqueue(job)
     }
 
-    private func actions(of job: UploadJob) -> (SCTDataSessionTaskInfo.Action) -> Void {
+    func actions(of job: UploadJob) -> (SCTDataSessionTaskInfo.Action) -> Void {
         { [weak self, weak job] action in
             guard let self, let job else { return }
             switch action {
@@ -207,7 +232,7 @@ open class TransportDataSession: NSObject, SCTDataSession {
         }
     }
 
-    private func actions(of job: DownloadJob) -> (SCTDataSessionTaskInfo.Action) -> Void {
+    func actions(of job: DownloadJob) -> (SCTDataSessionTaskInfo.Action) -> Void {
         { [weak self, weak job] action in
             guard let self, let job else { return }
             switch action {
@@ -249,14 +274,18 @@ open class TransportDataSession: NSObject, SCTDataSession {
             // Fails closed later: the transport stores ciphertext and the gate rejects it.
             logger.warn("[Encryption] \(tag) download must be decrypted but has no enc; the request goes out without it \(attachment.transferLogDescription)")
         }
-        lock.lock()
         // A second start of a download still running joins it: two invocations of one
         // operation would write the same destination, and only one could be controlled.
-        if let running = downloads.values.first(where: { $0.request.operationId == request.operationId && !$0.isFinished }) {
+        let joinedRunning: (job: DownloadJob, state: DownloadJob.State, attempt: Int)? = board.withState { jobs in
+            guard let running = jobs.downloads.values.first(where: { $0.request.operationId == request.operationId && !$0.isFinished }) else {
+                jobs.downloads[ObjectIdentifier(taskInfo)] = job
+                return nil
+            }
             running.joined.append(taskInfo)
-            let state = running.state
-            let attempt = running.attempt
-            lock.unlock()
+            return (running, running.state, running.attempt)
+        }
+        if let joinedRunning {
+            let (running, state, attempt) = joinedRunning
             taskInfo.attempts = attempt
             logger.info("[Transfer] \(tag) download started again while attempt \(attempt) is \(state): joins it, no second transfer \(attachment.transferLogDescription)")
             taskInfo.onAction = actions(of: running)
@@ -265,8 +294,6 @@ open class TransportDataSession: NSObject, SCTDataSession {
             }
             return
         }
-        downloads[ObjectIdentifier(taskInfo)] = job
-        lock.unlock()
         logger.debug("[Transfer] \(tag) download queued encrypted=\(request.encryptionInfo != nil) trustedSize=\(request.plaintextSize.map { "\($0) B" } ?? "-") url=\(TransferLog.redact(url)) destinationExists=\(FileManager.default.fileExists(atPath: destination.path)) \(attachment.transferLogDescription)")
         taskInfo.onAction = actions(of: job)
         start(job)
@@ -276,9 +303,7 @@ open class TransportDataSession: NSObject, SCTDataSession {
     /// relaunch nothing runs, but a remote multipart upload may still be open).
     open func cancel(attachments: [ChatMessage.Attachment]) {
         for attachment in attachments where attachment.tid != 0 {
-            lock.lock()
-            let job = uploads.values.first { $0.attachment.tid == attachment.tid }
-            lock.unlock()
+            let job = board.withState { jobs in jobs.uploads.values.first { $0.attachment.tid == attachment.tid } }
             if let job {
                 logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) abandoned by cancel(attachments:) \(attachment.transferLogDescription)")
                 cancel(job)
@@ -286,7 +311,7 @@ open class TransportDataSession: NSObject, SCTDataSession {
                 let operationId = uploadOperationId(for: attachment)
                 logger.info("[Transfer] xfer=\(operationId) upload has no live job: abandoning what the transport saved \(attachment.transferLogDescription)")
                 transport.cancel(operationId: operationId)
-                discardStaged(operationId: operationId)
+                staging.discard(operationId: operationId)
             }
         }
     }
@@ -294,20 +319,14 @@ open class TransportDataSession: NSObject, SCTDataSession {
     /// Stops every transfer without abandoning any (the network went away): each task fails
     /// with `error`, and the transport keeps what a later attempt can continue.
     open func interruptTransfers(error: Error) {
-        lock.lock()
-        let uploadJobs = Array(uploads.values)
-        let downloadJobs = Array(downloads.values)
-        for job in uploadJobs {
-            job.state = .finished
+        let (uploadJobs, downloadJobs) = board.withState { jobs -> ([UploadJob], [DownloadJob]) in
+            let uploadJobs = Array(jobs.uploads.values)
+            let downloadJobs = Array(jobs.downloads.values)
+            uploadJobs.forEach { $0.state = .finished }
+            downloadJobs.forEach { $0.state = .finished }
+            jobs = JobBoard.Jobs()
+            return (uploadJobs, downloadJobs)
         }
-        for job in downloadJobs {
-            job.state = .finished
-        }
-        uploads = [:]
-        downloads = [:]
-        waiting = []
-        active = nil
-        lock.unlock()
         logger.warn("[Transfer] interrupting \(uploadJobs.count) upload(s) and \(downloadJobs.count) download(s): \(TransferLog.describe(error))")
         for job in uploadJobs {
             logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) -> finished (interrupted)")
@@ -316,376 +335,9 @@ open class TransportDataSession: NSObject, SCTDataSession {
         }
         for job in downloadJobs {
             logger.debug("[Transfer] \(job.taskInfo.logTag) download attempt=\(attempt(of: job)) -> finished (interrupted)")
-            job.task?.cancel()
+            job.cancelTask()
             report(tasks(of: job), .failure(error), interrupted: true)
         }
-    }
-
-    // MARK: Upload queue
-
-    private func enqueue(_ job: UploadJob) {
-        lock.lock()
-        guard active == nil else {
-            waiting.append(job)
-            let depth = waiting.count
-            let holder = active?.operationId ?? "-"
-            lock.unlock()
-            logger.debug("[Transfer] \(job.taskInfo.logTag) upload waiting for the upload slot (position \(depth), held by \(holder))")
-            return
-        }
-        active = job
-        lock.unlock()
-        begin(job)
-    }
-
-    /// Gives up the slot `job` holds and starts the next upload.
-    private func releaseSlot(of job: UploadJob) {
-        lock.lock()
-        guard active === job else {
-            lock.unlock()
-            return
-        }
-        active = nil
-        let next = waiting.isEmpty ? nil : waiting.removeFirst()
-        active = next
-        lock.unlock()
-        logger.debug("[Transfer] \(job.taskInfo.logTag) upload released the upload slot, next=\(next?.operationId ?? "-")")
-        if let next {
-            begin(next)
-        }
-    }
-
-    /// `job` holds the slot: continue its paused invocation, or start a new attempt.
-    private func begin(_ job: UploadJob) {
-        willBeginUpload?(job.taskInfo)
-        lock.lock()
-        guard case .waiting(let alive) = job.state else {
-            let state = job.state
-            lock.unlock()
-            logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) got the slot while \(state), not starting")
-            releaseSlot(of: job)
-            return
-        }
-        if alive {
-            job.state = .uploading
-            lock.unlock()
-            if transport.resume(operationId: job.operationId) {
-                logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) waiting -> uploading (resumed the live invocation)")
-                return
-            }
-            logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) transport could not resume the paused invocation, starting a new attempt")
-            lock.lock()
-            guard case .uploading = job.state else {
-                let state = job.state
-                lock.unlock()
-                logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) became \(state) during the failed resume, no new attempt")
-                return
-            }
-        }
-        job.attempt += 1
-        let attempt = job.attempt
-        job.state = .preparing
-        let previous = job.task
-        let tasks = [job.taskInfo] + job.joined
-        lock.unlock()
-        tasks.forEach { $0.attempts = attempt }
-        logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt) waiting -> preparing \(job.attachment.transferLogDescription)")
-        previous?.cancel()
-        let context = job.taskInfo.logContext
-        job.task = Task { [weak self] in
-            // Every layer below (transport, encryption) tags its lines with this transfer.
-            await TransferLog.$current.withValue(context) {
-                await self?.run(job, attempt: attempt)
-            }
-        }
-    }
-
-    private func isCurrent(_ job: UploadJob, attempt: Int) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        guard job.attempt == attempt else { return false }
-        switch job.state {
-        case .preparing, .uploading:
-            return true
-        default:
-            return false
-        }
-    }
-
-    private func run(_ job: UploadJob, attempt: Int) async {
-        let taskInfo = job.taskInfo
-        let tag = taskInfo.logTag
-        if checksumsBeforeUpload {
-            let stored = await withCheckedContinuation { continuation in
-                taskInfo.startChecksum { continuation.resume(returning: $0) }
-            }
-            // A stored copy was reported by the checksum itself, and so was its failure.
-            if stored || isTerminal(taskInfo) {
-                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) -> finished (\(stored ? "checksum hit, nothing uploaded" : "checksum step failed the task"))")
-                finish(job, attempt: attempt)
-                // A task that joined this one ends the same way.
-                if let event = taskInfo.event {
-                    report(joined(of: job), event)
-                }
-                return
-            }
-            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) checksum miss, uploading")
-        }
-        guard isCurrent(job, attempt: attempt) else {
-            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) dropped after the checksum: stale or no longer preparing")
-            return
-        }
-
-        let prepared: PreparedUploadFile
-        do {
-            prepared = try await prepareUploadFile(job)
-        } catch {
-            guard isCurrent(job, attempt: attempt) else {
-                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparation ended (\(TransferLog.describe(error))) after a pause/cancel/new attempt, dropped")
-                return
-            }
-            // Reported at the end, once, by `AttachmentTransfer`.
-            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (failure): preparation failed \(TransferLog.describe(error))")
-            finish(job, attempt: attempt)
-            report(tasks(of: job), .failure(error))
-            return
-        }
-        let preparedSize = TransferLog.size(prepared.file)
-        if !FileManager.default.fileExists(atPath: prepared.file.path) {
-            // Not handled: the transport is asked to send a file that is gone.
-            logger.warn("[Transfer] \(tag) upload attempt=\(attempt) prepared file \(prepared.file.lastPathComponent) does not exist (source deleted?) \(job.attachment.transferLogDescription)")
-        } else if preparedSize == 0 {
-            // Sent as is. The checksum step never dedupes an empty file.
-            logger.warn("[Transfer] \(tag) upload attempt=\(attempt) prepared file is 0 bytes \(job.attachment.transferLogDescription)")
-        }
-        guard startUploading(job, attempt: attempt) else {
-            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) paused, cancelled or superseded during preparation, not uploading")
-            return
-        }
-
-        let type: FileUploadType = taskInfo.encryption == .required ? .encrypted : .plain
-        let fileName = job.attachment.name?.isEmpty == false ? job.attachment.name! : prepared.file.lastPathComponent
-        let request = FileUploadRequest(
-            operationId: job.operationId,
-            sourceFile: prepared.file,
-            fileName: fileName,
-            mimeType: Self.mimeType(of: prepared, fileName: fileName),
-            context: AttachmentTransferContext(message: taskInfo.message, attachment: job.attachment),
-            type: type
-        )
-        logger.info("[Transfer] \(tag) upload attempt=\(attempt) preparing -> uploading type=\(type) staged=\(prepared.isStaged) size=\(preparedSize.map { "\($0) B" } ?? "unknown") mime=\(request.mimeType ?? "-") \(job.attachment.transferLogDescription)")
-        let result = await transport.upload(request) { [weak self, weak job] progress in
-            guard let self, let job, self.isUploading(job, attempt: attempt) else { return }
-            if let quarter = job.progressMilestone(progress) {
-                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) progress \(quarter)%")
-            }
-            self.tasks(of: job).forEach { $0.updateProgress(progress) }
-        }
-        handle(result, of: job, attempt: attempt, prepared: prepared, type: type)
-    }
-
-    /// A prepared file's type follows its own extension (a resized image is a JPEG whatever
-    /// its source was); a file sent in place is typed by the name it is sent under, its own
-    /// extension when that name has none.
-    static func mimeType(of prepared: PreparedUploadFile, fileName: String) -> String? {
-        let named = (fileName as NSString).pathExtension
-        let ext = prepared.isStaged || named.isEmpty ? prepared.file.pathExtension : named
-        return UTType(filenameExtension: ext)?.preferredMIMEType
-    }
-
-    /// Preparation is over and nothing paused or cancelled the attempt meanwhile.
-    private func startUploading(_ job: UploadJob, attempt: Int) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        guard job.attempt == attempt, case .preparing = job.state else { return false }
-        job.state = .uploading
-        return true
-    }
-
-    private func isUploading(_ job: UploadJob, attempt: Int) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        guard job.attempt == attempt, case .uploading = job.state else { return false }
-        return true
-    }
-
-    private func handle(
-        _ result: FileTransferResult<FileUploadResult>,
-        of job: UploadJob,
-        attempt: Int,
-        prepared: PreparedUploadFile,
-        type: FileUploadType
-    ) {
-        let outcome = Self.describe(result)
-        let tag = job.taskInfo.logTag
-        lock.lock()
-        guard job.attempt == attempt else {
-            let current = job.attempt
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) upload stale attempt=\(attempt) ended (\(outcome)) while attempt \(current) is current, dropped")
-            return
-        }
-        switch (result, job.state) {
-        case (_, .finished):
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) ended (\(outcome)) after it was finished (cancelled/interrupted), dropped")
-            return
-        case (.success, _):
-            // Landed, even while paused: the file is stored.
-            break
-        case (_, .paused):
-            // The paused invocation ended without the file: a resume starts a new attempt.
-            job.state = .paused(alive: false)
-            lock.unlock()
-            logger.info("[Transfer] \(tag) upload attempt=\(attempt) paused -> paused(alive: false): the paused invocation ended (\(outcome))")
-            return
-        case (_, .waiting):
-            job.state = .waiting(alive: false)
-            lock.unlock()
-            logger.info("[Transfer] \(tag) upload attempt=\(attempt) waiting -> waiting(alive: false): the paused invocation ended (\(outcome))")
-            return
-        default:
-            break
-        }
-        lock.unlock()
-        finish(job, attempt: attempt)
-
-        // Failures are reported at the end, once, by `AttachmentTransfer`: debug here.
-        let tasks = tasks(of: job)
-        switch result {
-        case .success(let uploaded):
-            if type == .encrypted, uploaded.encryptionInfo == nil {
-                // Encrypted bytes without their key could never be opened.
-                logger.debug("[Encryption] \(tag) upload attempt=\(attempt) -> finished (failure): transport reported success without encryptionInfo, rejected (encryptionBypassed)")
-                report(tasks, .failure(AttachmentEncryptionError.encryptionBypassed))
-                return
-            }
-            if type == .plain, uploaded.encryptionInfo != nil {
-                logger.warn("[Encryption] \(tag) upload attempt=\(attempt) plain upload came back with encryptionInfo; it is kept \(job.attachment.transferLogDescription)")
-            }
-            // Checked before anything replaces the task's event: an event after the terminal
-            // one would hide that the task ended, and the success would be reported over it.
-            let live = tasks.filter { !$0.isTerminal }
-            guard !live.isEmpty else {
-                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) landed after the task already ended (\(Self.describe(job.taskInfo.event))): result dropped")
-                discardStaged(operationId: job.operationId)
-                return
-            }
-            if prepared.isStaged {
-                adopt(prepared.file, job: job, tasks: live)
-            }
-            discardStaged(operationId: job.operationId)
-            var plaintextSize: Int64?
-            if type == .encrypted {
-                plaintextSize = Self.fileSize(prepared.file) ?? Self.fileSize(job.attachment.filePath.map { URL(fileURLWithPath: $0) })
-                if plaintextSize == nil {
-                    logger.warn("[Transfer] \(tag) upload attempt=\(attempt) plaintext size unknown after the upload: the message carries the stored size")
-                }
-            }
-            for taskInfo in live {
-                taskInfo.uploadedEncryption = uploaded.encryptionInfo
-                if type == .encrypted {
-                    taskInfo.uploadedPlaintextSize = plaintextSize
-                }
-            }
-            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (success) ref=\(TransferLog.redact(uploaded.remoteReference)) encrypted=\(uploaded.encryptionInfo != nil)")
-            report(live, .successURI(uploaded.remoteReference))
-        case .failure(let error):
-            // The staged file stays: the next attempt sends it again.
-            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (failure): \(TransferLog.describe(error))")
-            report(tasks, .failure(error))
-        case .interrupted(let error):
-            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (interrupted, work kept for a retry): \(TransferLog.describe(error))")
-            report(tasks, .failure(error), interrupted: true)
-        }
-    }
-
-    /// The attempt is over: the job leaves the queue and the session.
-    private func finish(_ job: UploadJob, attempt: Int) {
-        lock.lock()
-        guard job.attempt == attempt else {
-            let current = job.attempt
-            lock.unlock()
-            logger.debug("[Transfer] \(job.taskInfo.logTag) upload finish of stale attempt=\(attempt) ignored (current \(current))")
-            return
-        }
-        let previous = job.state
-        job.state = .finished
-        uploads[ObjectIdentifier(job.taskInfo)] = nil
-        lock.unlock()
-        logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt) \(previous) -> finished")
-        releaseSlot(of: job)
-    }
-
-    private func pause(_ job: UploadJob) {
-        lock.lock()
-        switch job.state {
-        case .waiting(let alive):
-            waiting.removeAll { $0 === job }
-            job.state = .paused(alive: alive)
-            lock.unlock()
-            logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) waiting -> paused(alive: \(alive))")
-        case .preparing:
-            job.state = .paused(alive: false)
-            lock.unlock()
-            logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) preparing -> paused(alive: false), preparation stopped")
-            job.stopWork()
-            releaseSlot(of: job)
-        case .uploading:
-            lock.unlock()
-            let alive = transport.pause(operationId: job.operationId)
-            lock.lock()
-            guard case .uploading = job.state else {
-                let state = job.state
-                lock.unlock()
-                logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) pause raced to \(state), ignored")
-                return
-            }
-            job.state = .paused(alive: alive)
-            lock.unlock()
-            logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) uploading -> paused(alive: \(alive))\(alive ? "" : ", invocation stopped")")
-            if !alive {
-                job.stopWork()
-            }
-            releaseSlot(of: job)
-        case .paused, .finished:
-            let state = job.state
-            lock.unlock()
-            logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) pause ignored while \(state)")
-        }
-    }
-
-    private func resume(_ job: UploadJob) {
-        lock.lock()
-        guard case .paused(let alive) = job.state else {
-            let state = job.state
-            lock.unlock()
-            logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) resume ignored while \(state)")
-            return
-        }
-        job.state = .waiting(alive: alive)
-        lock.unlock()
-        logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) paused -> waiting(alive: \(alive)) (resumed)")
-        enqueue(job)
-    }
-
-    private func cancel(_ job: UploadJob) {
-        lock.lock()
-        if case .finished = job.state {
-            lock.unlock()
-            logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) cancel ignored: already finished")
-            return
-        }
-        let previous = job.state
-        job.state = .finished
-        waiting.removeAll { $0 === job }
-        uploads[ObjectIdentifier(job.taskInfo)] = nil
-        lock.unlock()
-        logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) \(previous) -> finished (cancelled)")
-        transport.cancel(operationId: job.operationId)
-        job.stopWork()
-        discardStaged(operationId: job.operationId)
-        releaseSlot(of: job)
-        // A terminal event, like a cancelled download's: the task leaves `AttachmentTransfer`,
-        // so a later upload of the same file is a new one.
-        report(tasks(of: job), .failure(URLError(.cancelled)))
     }
 
     // MARK: Preparation
@@ -699,79 +351,22 @@ open class TransportDataSession: NSObject, SCTDataSession {
         operationId: String,
         videoProcessInfo: SCVideoProcessInfo
     ) async throws -> PreparedUploadFile {
-        guard var filePath = attachment.filePath else {
-            logger.debug("[Transfer] \(taskInfo.logTag) upload has no local file to prepare (missingSourceFile)")
-            throw TransportDataSessionError.missingSourceFile
-        }
-        if !FileManager.default.fileExists(atPath: filePath) {
-            // Not handled here: preparation goes on and fails (or sends nothing) later.
-            logger.warn("[Transfer] \(taskInfo.logTag) upload source file \((filePath as NSString).lastPathComponent) is missing \(attachment.transferLogDescription)")
-        }
-        if attachment.type == "image" || attachment.type == "video",
-           let staged = stagedFile(operationId: operationId) {
-            // An export or resize would make different bytes than the ones already sent.
-            logger.info("[Transfer] \(taskInfo.logTag) upload staging reused: sends the file an earlier attempt prepared (\(TransferLog.sizeText(staged)))")
-            return PreparedUploadFile(file: staged, isStaged: true)
-        }
-        taskInfo.updateProgress(0.01)
-        switch attachment.type {
-        case "video":
-            switch await Components.videoProcessor.export(from: filePath, processInfo: videoProcessInfo) {
-            case .success(let exported):
-                try Task.checkCancellation()
-                return PreparedUploadFile(file: try stage(exported, operationId: operationId, fileName: exported.lastPathComponent, tag: taskInfo.logTag), isStaged: true)
-            case .failure(let error):
-                logger.warn("[Transfer] \(taskInfo.logTag) upload video export failed (\(TransferLog.describe(error))), uploading the original")
-            }
-        case "image":
-            let config = SceytChatUIKit.shared.config.imageAttachmentResizeConfig
-            var jpeg: Data?
-            if Self.isAppExtension() {
-                jpeg = Components.imageBuilder.lowMemory_resizeImage(fileUrl: URL(fileURLWithPath: filePath), maxPixelSize: config.dimensionThreshold)?
-                    .jpegData(compressionQuality: config.compressionQuality)
-            } else if let builder = Components.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)),
-                      !builder.imageSize.isNan {
-                jpeg = try? builder.resize(max: config.dimensionThreshold).jpegData(compressionQuality: config.compressionQuality)
-            }
-            try Task.checkCancellation()
-            if let jpeg,
-               let resized = Components.storage.storeInTemporaryDirectory(data: jpeg, filename: attachment.name ?? UUID().uuidString) {
-                return PreparedUploadFile(file: try stage(resized, operationId: operationId, fileName: resized.lastPathComponent, tag: taskInfo.logTag), isStaged: true)
-            }
-            logger.warn("[Transfer] \(taskInfo.logTag) upload image resize \(jpeg == nil ? "failed" : "could not be stored"), uploading the original")
-        case "file":
-            var isDirectory: ObjCBool = false
-            FileManager.default.fileExists(atPath: filePath, isDirectory: &isDirectory)
-            if isDirectory.boolValue {
-                let zip = try await Components.storage.makeUploadingUrl(directoryUrl: URL(fileURLWithPath: filePath))
-                try Task.checkCancellation()
-                logger.debug("[Transfer] \(taskInfo.logTag) upload folder zipped (\(TransferLog.sizeText(zip)))")
-                taskInfo.updateLocalFileLocation(newLocation: zip)
-                filePath = zip.path
-            } else {
-                // Sent in place, as `SCTSession` always did: moving it into storage took the
-                // attachment's own file away from where it was, and each retry moved it again
-                // into a new folder, leaving the previous one empty.
-                logger.debug("[Transfer] \(taskInfo.logTag) upload file sent in place (\(TransferLog.size(path: filePath)))")
-            }
-        default:
-            break
-        }
-        return PreparedUploadFile(file: URL(fileURLWithPath: filePath), isStaged: false)
+        try await UploadPreparer(staging: staging, environment: environment, isAppExtension: isAppExtension)
+            .prepare(attachment, taskInfo: taskInfo, operationId: operationId, videoProcessInfo: videoProcessInfo)
     }
 
-    private func prepareUploadFile(_ job: UploadJob) async throws -> PreparedUploadFile {
+    func prepareUploadFile(_ job: UploadJob, videoProcessInfo: SCVideoProcessInfo) async throws -> PreparedUploadFile {
         try await prepareUploadFile(
             for: job.attachment,
             taskInfo: job.taskInfo,
             operationId: job.operationId,
-            videoProcessInfo: job.videoProcessInfo
+            videoProcessInfo: videoProcessInfo
         )
     }
 
     /// The upload landed: the staged file becomes the attachment's, and an image's original
     /// goes (the resized copy is what was sent).
-    private func adopt(_ staged: URL, job: UploadJob, tasks: [SCTDataSessionTaskInfo]) {
+    func adopt(_ staged: URL, job: UploadJob, tasks: [SCTDataSessionTaskInfo]) {
         let tag = job.taskInfo.logTag
         guard FileManager.default.fileExists(atPath: staged.path) else {
             logger.warn("[Transfer] \(tag) upload landed but its staged file is gone: the attachment keeps its original file")
@@ -780,66 +375,19 @@ open class TransportDataSession: NSObject, SCTDataSession {
         let original = job.attachment.filePath
         let transferId = UUID().uuidString
         let path = storeFile(atPath: staged.path, transferId: transferId, fileName: staged.lastPathComponent)
-        logger.debug("[Transfer] \(tag) upload staged file adopted as the attachment's file\(FileManager.default.fileExists(atPath: path) ? "" : " (missing after the move)")")
+        // `storeFile` cannot throw (it is open, and apps override it): a store that failed
+        // hands back the staged path, or a path with no file. The staging folder is deleted
+        // next, so adopting either would leave the attachment with no file, and an image's
+        // original would be deleted too.
+        guard path != staged.path, FileManager.default.fileExists(atPath: path) else {
+            logger.error("[Transfer] \(tag) upload landed but its staged file could not be stored (got \(path == staged.path ? "the staged path back" : "a path with no file")): the attachment keeps its original file \(job.attachment.transferLogDescription)")
+            return
+        }
+        logger.debug("[Transfer] \(tag) upload staged file adopted as the attachment's file")
         tasks.forEach { $0.updateLocalFileLocation(newPath: path) }
         updateThumbnailPath(transferId: transferId, filePath: path)
-        if job.attachment.type == "image", let original, original != path, original != staged.path {
+        if job.attachment.kind == .image, let original, original != path, original != staged.path {
             removeFile(atPath: original)
-        }
-    }
-
-    private func stagingFolder(operationId: String) -> URL {
-        let name = operationId.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? operationId
-        return stagingDirectory.appendingPathComponent(name, isDirectory: true)
-    }
-
-    private func stagedFile(operationId: String) -> URL? {
-        let folder = stagingFolder(operationId: operationId)
-        let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.fileSizeKey], options: .skipsHiddenFiles)) ?? []
-        return files.first { (Self.fileSize($0) ?? 0) > 0 }
-    }
-
-    private func stage(_ file: URL, operationId: String, fileName: String, tag: String) throws -> URL {
-        let fileManager = FileManager.default
-        let folder = stagingFolder(operationId: operationId)
-        TransferLog.remove(folder, what: "the old staging folder", context: "[Transfer] \(tag) upload")
-        let staged = folder.appendingPathComponent(fileName.isEmpty ? "file" : fileName)
-        do {
-            try fileManager.createDirectory(at: folder, withIntermediateDirectories: true)
-            try fileManager.moveItem(at: file, to: staged)
-        } catch {
-            logger.debug("[Transfer] \(tag) upload staging failed: \(TransferLog.describe(error))")
-            throw error
-        }
-        logger.debug("[Transfer] \(tag) upload staging created (\(TransferLog.sizeText(staged)))")
-        return staged
-    }
-
-    private func discardStaged(operationId: String) {
-        let folder = stagingFolder(operationId: operationId)
-        guard FileManager.default.fileExists(atPath: folder.path) else { return }
-        if TransferLog.remove(folder, what: "the staging folder", context: "[Transfer] xfer=\(operationId) upload") {
-            logger.debug("[Transfer] xfer=\(operationId) upload staging cleaned up")
-        }
-    }
-
-    /// How long a staged file nobody uploaded or abandoned is kept.
-    static let staleStagingAge: TimeInterval = 7 * 24 * 60 * 60
-
-    private static func purgeStaleStaging(in directory: URL) {
-        let fileManager = FileManager.default
-        let cutoff = Date().addingTimeInterval(-staleStagingAge)
-        let folders = (try? fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-        var purged = 0
-        for folder in folders {
-            let modified = (try? folder.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            if let modified, modified < cutoff,
-               TransferLog.remove(folder, what: "a stale staging folder", context: "[Transfer] staging purge") {
-                purged += 1
-            }
-        }
-        if purged > 0 {
-            logger.info("[Transfer] staging purge removed \(purged) of \(folders.count) folder(s) older than \(Int(staleStagingAge / 86_400)) days")
         }
     }
 
@@ -848,216 +396,27 @@ open class TransportDataSession: NSObject, SCTDataSession {
         return Int64(size)
     }
 
-    // MARK: Downloads
-
-    private func start(_ job: DownloadJob) {
-        let tag = job.taskInfo.logTag
-        willStartDownload?(job.taskInfo)
-        lock.lock()
-        if case .finished = job.state {
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) not started: already finished")
-            return
-        }
-        job.attempt += 1
-        let attempt = job.attempt
-        let previousState = job.state
-        job.state = .running
-        let previous = job.task
-        let tasks = [job.taskInfo] + job.joined
-        lock.unlock()
-        tasks.forEach { $0.attempts = attempt }
-        logger.info("[Transfer] \(tag) download attempt=\(attempt) \(attempt == 1 ? "queued" : "\(previousState)") -> running encrypted=\(job.request.encryptionInfo != nil) url=\(TransferLog.redact(job.request.url))")
-        previous?.cancel()
-        let encrypted = job.request.encryptionInfo != nil
-        let context = job.taskInfo.logContext
-        job.task = Task { [weak self] in
-            guard let self else { return }
-            // Every layer below (transport, encryption) tags its lines with this transfer.
-            let result = await TransferLog.$current.withValue(context) {
-                await self.transport.download(job.request) { [weak self, weak job] progress in
-                    guard let self, let job, self.isRunning(job, attempt: attempt) else { return }
-                    if let quarter = job.progressMilestone(progress) {
-                        logger.debug("[Transfer] \(tag) download attempt=\(attempt) progress \(quarter)%")
-                    }
-                    // Not done when the last byte arrives: it still has to be verified and
-                    // decrypted, so the bar stops short of full until then.
-                    self.tasks(of: job).forEach { $0.updateProgress(encrypted ? min(progress, 0.99) : progress) }
-                }
-            }
-            self.handle(result, of: job, attempt: attempt)
-        }
-    }
-
-    private func isRunning(_ job: DownloadJob, attempt: Int) -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        guard job.attempt == attempt, case .running = job.state else { return false }
-        return true
-    }
-
-    private func handle(_ result: FileTransferResult<URL>, of job: DownloadJob, attempt: Int) {
-        let tag = job.taskInfo.logTag
-        let outcome = Self.describe(result)
-        lock.lock()
-        guard job.attempt == attempt else {
-            let current = job.attempt
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) download stale attempt=\(attempt) ended (\(outcome)) while attempt \(current) is current, dropped")
-            return
-        }
-        switch job.state {
-        case .finished, .paused(alive: false):
-            // Cancelled, or stopped by a pause: a resume starts again.
-            let state = job.state
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt) ended (\(outcome)) while \(state), dropped")
-            return
-        default:
-            // A task left suspended long enough can be timed out by the system; that is a
-            // failed download.
-            job.state = .finished
-            downloads[ObjectIdentifier(job.taskInfo)] = nil
-        }
-        let tasks = [job.taskInfo] + job.joined
-        lock.unlock()
-        // Failures are reported at the end, once, by `AttachmentTransfer`: debug here.
-        switch result {
-        case .success(let file):
-            // Checked before anything replaces the task's event: `updateLocalFileLocation`
-            // would hide that the task ended, and the success would be reported over it.
-            let live = tasks.filter { !$0.isTerminal }
-            guard !live.isEmpty else {
-                logger.debug("[Transfer] \(tag) download attempt=\(attempt) succeeded after the task already ended (\(Self.describe(job.taskInfo.event))): result dropped")
-                return
-            }
-            if !FileManager.default.fileExists(atPath: file.path) {
-                logger.warn("[Transfer] \(tag) download attempt=\(attempt) transport reported success but \(file.lastPathComponent) does not exist")
-            }
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt) running -> finished (success) size=\(TransferLog.sizeText(file)) decrypted=\(job.request.encryptionInfo != nil)")
-            for taskInfo in live {
-                if job.request.encryptionInfo != nil {
-                    taskInfo.didDecryptDownload = true
-                }
-                taskInfo.updateLocalFileLocation(newPath: file.path)
-            }
-            report(live, .successURI(job.request.url))
-        case .failure(let error):
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt) running -> finished (failure): \(TransferLog.describe(error))")
-            report(tasks, .failure(error))
-        case .interrupted(let error):
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt) running -> finished (interrupted): \(TransferLog.describe(error))")
-            report(tasks, .failure(error), interrupted: true)
-        }
-    }
-
-    private func pause(_ job: DownloadJob) {
-        let tag = job.taskInfo.logTag
-        lock.lock()
-        guard case .running = job.state else {
-            let state = job.state
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) pause ignored while \(state)")
-            return
-        }
-        lock.unlock()
-        let alive = transport.pause(operationId: job.request.operationId)
-        lock.lock()
-        guard case .running = job.state else {
-            let state = job.state
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) pause raced to \(state), ignored")
-            return
-        }
-        job.state = .paused(alive: alive)
-        lock.unlock()
-        logger.info("[Transfer] \(tag) download attempt=\(attempt(of: job)) running -> paused(alive: \(alive))\(alive ? "" : ", task cancelled")")
-        if !alive {
-            job.task?.cancel()
-        }
-    }
-
-    private func resume(_ job: DownloadJob) {
-        let tag = job.taskInfo.logTag
-        lock.lock()
-        guard case .paused(let alive) = job.state else {
-            let state = job.state
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) resume ignored while \(state)")
-            return
-        }
-        if alive {
-            job.state = .running
-        }
-        lock.unlock()
-        if alive, transport.resume(operationId: job.request.operationId) {
-            logger.info("[Transfer] \(tag) download attempt=\(attempt(of: job)) paused -> running (resumed the live invocation)")
-            return
-        }
-        lock.lock()
-        if case .finished = job.state {
-            // Cancelled while the transport was asked to resume: it stays cancelled.
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) cancelled during the resume, not restarted")
-            return
-        }
-        job.state = .paused(alive: false)
-        lock.unlock()
-        logger.info("[Transfer] \(tag) download attempt=\(attempt(of: job)) \(alive ? "transport could not resume the invocation" : "no live invocation"), starting a new attempt")
-        start(job)
-    }
-
-    private func cancel(_ job: DownloadJob) {
-        let tag = job.taskInfo.logTag
-        lock.lock()
-        if case .finished = job.state {
-            lock.unlock()
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) cancel ignored: already finished")
-            return
-        }
-        let previous = job.state
-        job.state = .finished
-        downloads[ObjectIdentifier(job.taskInfo)] = nil
-        lock.unlock()
-        logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) \(previous) -> finished (cancelled)")
-        transport.cancel(operationId: job.request.operationId)
-        job.task?.cancel()
-        report(tasks(of: job), .failure(URLError(.cancelled)))
-    }
-
     // MARK: Reporting
 
     /// The job's attempt, read under the lock, for a log line written outside it.
-    private func attempt(of job: UploadJob) -> Int {
-        lock.lock(); defer { lock.unlock() }
-        return job.attempt
-    }
-
-    private func attempt(of job: DownloadJob) -> Int {
-        lock.lock(); defer { lock.unlock() }
-        return job.attempt
+    func attempt(of job: some TransferJob) -> Int {
+        board.withState { _ in job.attempt }
     }
 
     /// The job's own task and every task that joined it.
-    private func tasks(of job: UploadJob) -> [SCTDataSessionTaskInfo] {
-        lock.lock(); defer { lock.unlock() }
-        return [job.taskInfo] + job.joined
+    func tasks(of job: some TransferJob) -> [SCTDataSessionTaskInfo] {
+        board.withState { _ in [job.taskInfo] + job.joined }
     }
 
-    private func tasks(of job: DownloadJob) -> [SCTDataSessionTaskInfo] {
-        lock.lock(); defer { lock.unlock() }
-        return [job.taskInfo] + job.joined
+    func joined(of job: UploadJob) -> [SCTDataSessionTaskInfo] {
+        board.withState { _ in job.joined }
     }
 
-    private func joined(of job: UploadJob) -> [SCTDataSessionTaskInfo] {
-        lock.lock(); defer { lock.unlock() }
-        return job.joined
-    }
-
-    private func isTerminal(_ taskInfo: SCTDataSessionTaskInfo) -> Bool {
+    func isTerminal(_ taskInfo: SCTDataSessionTaskInfo) -> Bool {
         taskInfo.isTerminal
     }
 
-    private func report(_ tasks: [SCTDataSessionTaskInfo], _ event: SCTDataSessionTaskInfo.Event, interrupted: Bool = false) {
+    func report(_ tasks: [SCTDataSessionTaskInfo], _ event: SCTDataSessionTaskInfo.Event, interrupted: Bool = false) {
         for taskInfo in tasks {
             if interrupted, !taskInfo.isTerminal {
                 taskInfo.wasInterrupted = true
@@ -1069,19 +428,9 @@ open class TransportDataSession: NSObject, SCTDataSession {
     /// Reports the end of a transfer once: a task already ended elsewhere (failed on network
     /// loss) is left alone.
     func report(_ taskInfo: SCTDataSessionTaskInfo, _ event: SCTDataSessionTaskInfo.Event) {
-        guard !isTerminal(taskInfo) else {
+        guard taskInfo.endIfLive(with: event) else {
             logger.debug("[Transfer] \(taskInfo.logTag) \(taskInfo.transferType) report of \(Self.describe(event)) dropped: the task already ended with \(Self.describe(taskInfo.event))")
             return
-        }
-        switch event {
-        case .failure(let error):
-            taskInfo.failure(error: error)
-        case .successURI(let uri):
-            taskInfo.success(origin: uri)
-        case .successURL(let url):
-            taskInfo.success(origin: url)
-        case .updateProgress, .updateLocalFileURL:
-            break
         }
     }
 }
@@ -1089,7 +438,7 @@ open class TransportDataSession: NSObject, SCTDataSession {
 // MARK: - Diagnostics
 
 extension TransportDataSession {
-    static func describe<T>(_ result: FileTransferResult<T>) -> String {
+    static func describe<T: Sendable>(_ result: FileTransferResult<T>) -> String {
         switch result {
         case .success:
             return "success"
@@ -1116,106 +465,5 @@ extension TransportDataSession {
         case .successURL(let url):
             return "successURL(\(TransferLog.redact(url)))"
         }
-    }
-}
-
-/// Logs progress at 25 / 50 / 75 / 100 % only, never per chunk.
-private final class ProgressMilestones {
-    private let lock = NSLock()
-    private var logged = 0
-
-    /// The milestone `progress` just crossed, once per attempt's climb.
-    func crossed(_ progress: Double) -> Int? {
-        let quarter = min(4, max(0, Int(progress * 4)))
-        lock.lock(); defer { lock.unlock() }
-        if quarter < logged {
-            // A new attempt starts from the beginning again.
-            logged = quarter
-            return nil
-        }
-        guard quarter > logged else { return nil }
-        logged = quarter
-        return quarter * 25
-    }
-}
-
-// MARK: - Jobs
-
-private final class UploadJob {
-    enum State {
-        /// In the queue; `alive` when a paused invocation is there to resume.
-        case waiting(alive: Bool)
-        case preparing
-        case uploading
-        case paused(alive: Bool)
-        case finished
-    }
-
-    let attachment: ChatMessage.Attachment
-    let taskInfo: SCTDataSessionTaskInfo
-    let operationId: String
-    let videoProcessInfo = SCVideoProcessInfo()
-    /// Guarded by the session's lock, like `attempt`.
-    var state = State.waiting(alive: false)
-    /// Tasks that started the same operation while this job ran: they get its events.
-    /// Guarded by the session's lock.
-    var joined = [SCTDataSessionTaskInfo]()
-
-    var isFinished: Bool {
-        if case .finished = state { return true }
-        return false
-    }
-    /// Bumped by every new attempt, so a callback of an earlier one is ignored.
-    var attempt = 0
-    var task: Task<Void, Never>?
-    private let milestones = ProgressMilestones()
-
-    func progressMilestone(_ progress: Double) -> Int? {
-        milestones.crossed(progress)
-    }
-
-    init(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo, operationId: String) {
-        self.attachment = attachment
-        self.taskInfo = taskInfo
-        self.operationId = operationId
-    }
-
-    /// Stops preparation and the current invocation. To the transport this is an interruption,
-    /// not an abandonment.
-    func stopWork() {
-        videoProcessInfo.cancel()
-        task?.cancel()
-    }
-}
-
-private final class DownloadJob {
-    enum State {
-        case running
-        case paused(alive: Bool)
-        case finished
-    }
-
-    let request: FileDownloadRequest
-    let taskInfo: SCTDataSessionTaskInfo
-    var state = State.running
-    /// Tasks that started the same operation while this job ran: they get its events.
-    /// Guarded by the session's lock.
-    var joined = [SCTDataSessionTaskInfo]()
-
-    var isFinished: Bool {
-        if case .finished = state { return true }
-        return false
-    }
-    var attempt = 0
-    var task: Task<Void, Never>?
-    private let milestones = ProgressMilestones()
-
-    func progressMilestone(_ progress: Double) -> Int? {
-        milestones.crossed(progress)
-    }
-
-    init(request: FileDownloadRequest, taskInfo: SCTDataSessionTaskInfo) {
-        self.request = request
-        self.taskInfo = taskInfo
     }
 }

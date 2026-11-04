@@ -199,17 +199,28 @@ public extension VideoProcessor {
     }
 }
 
-open class SCVideoProcessInfo: NSObject {
-    var isCancelled = false
+/// One export's cancellation and progress. Cancelling is final: start each export
+/// (each upload attempt) with a new instance.
+/// Safe to share: `isCancelled` is behind its lock and `progress` is a thread-safe `Progress`.
+open class SCVideoProcessInfo: NSObject, @unchecked Sendable {
+    private let lock = NSLock()
+    private var _isCancelled = false
     let progress = Progress()
+
+    /// Written by `cancel()` on the caller's thread, read by the export queues.
+    var isCancelled: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return _isCancelled
+    }
 
     override public init() {
         super.init()
-        logger.debug("[SCVideoProcessInfo] init \(self)")
     }
-    
+
     open func cancel() {
-        isCancelled = true
+        lock.lock()
+        _isCancelled = true
+        lock.unlock()
         logger.debug("[SCVideoProcessInfo] cancel \(self)")
     }
 }

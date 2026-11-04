@@ -104,6 +104,7 @@ extension ChannelInfoViewController {
         /// `cellForItemAt`: a re-bind would add a second subscription, and ask again for a
         /// download that is already running.
         open func configure(_ cell: ChannelInfoViewController.FileCell, at indexPath: IndexPath) {
+            cell.attachmentTransfer = fileViewModel.attachmentTransfer
             cell.parentAppearance = appearance.cellAppearance
             cell.data = fileViewModel.attachmentLayout(at: indexPath, onLoadThumbnail: { [weak cell] layout in
                 guard let cell, layout == cell.data else { return }

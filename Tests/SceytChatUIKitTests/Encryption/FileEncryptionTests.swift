@@ -42,7 +42,7 @@ private final class BrokenSession: FileEncryptionSession {
     let sourceId = "broken"
     let plaintextSize: Int64 = 10
     let ciphertextSize: Int64
-    let encryptionInfo = EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "c")
+    let encryptionInfo = EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")
     let failingOffset: Int64
     private(set) var reads = [Range<Int64>]()
     private(set) var closed = false
@@ -90,11 +90,9 @@ final class FileEncryptionTests: XCTestCase {
 
     private var encryption: ChatSDKFileEncryption!
     private var directory: URL!
-    private var originalProvider: FileEncryptionProvider!
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        originalProvider = Components.fileEncryptionProvider
         encryption = ChatSDKFileEncryption()
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("file-encryption-\(UUID().uuidString)", isDirectory: true)
@@ -102,7 +100,6 @@ final class FileEncryptionTests: XCTestCase {
     }
 
     override func tearDownWithError() throws {
-        Components.fileEncryptionProvider = originalProvider
         try? FileManager.default.removeItem(at: directory)
         encryption = nil
         try super.tearDownWithError()
@@ -215,7 +212,7 @@ final class FileEncryptionTests: XCTestCase {
     func testPrepareRethrowsTheProvidersErrorAndRemovesItsSnapshot() async throws {
         let provider = FailingProvider()
         provider.prepareError = NSError(domain: FileEncryptionErrorDomain, code: FileEncryptionError.invalidArgument.rawValue)
-        Components.fileEncryptionProvider = provider
+        encryption = ChatSDKFileEncryption(provider: { provider })
         let before = Set((try? FileManager.default.contentsOfDirectory(atPath: AttachmentEncryptionFiles.transfersDirectory.path)) ?? [])
 
         do {
@@ -247,7 +244,7 @@ final class FileEncryptionTests: XCTestCase {
     }
 
     func testRestoreRejectsACheckpointOfAnotherVersionOrWithoutData() async throws {
-        let info = EncryptedFileInfo(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "a", key: "k")
+        let info = EncryptedFileInfo(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "a", key: "7b64ReeCOhm0NOUU1jMyLzNHwQVjgtI9p8MEvF5k6C4")
         let saved = String(decoding: try JSONEncoder().encode(ChatSDKFileEncryption.SavedSession(transferId: "t", sdkData: "d")), as: UTF8.self)
         let otherVersion = saved.replacingOccurrences(of: #""v":1"#, with: #""v":2"#)
         XCTAssertNotEqual(otherVersion, saved)
@@ -297,7 +294,7 @@ final class FileEncryptionTests: XCTestCase {
 
     func testSavedSessionRoundTrips() throws {
         let saved = ChatSDKFileEncryption.SavedSession(transferId: "T-1", sdkData: "{\"a\":1}")
-        let info = EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "c")
+        let info = EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")
         let decoded = try ChatSDKFileEncryption.SavedSession(EncryptedFileCheckpoint(encryptionInfo: info, plaintextSize: 1, data: saved.encoded))
         XCTAssertEqual(decoded.v, ChatSDKFileEncryption.SavedSession.version)
         XCTAssertEqual(decoded.transferId, "T-1")
@@ -424,11 +421,11 @@ final class FileEncryptionTests: XCTestCase {
 
     func testDecryptOfAnObjectNoFileEncryptsToFailsBeforeOpeningIt() async throws {
         let provider = FailingProvider()
-        Components.fileEncryptionProvider = provider
+        encryption = ChatSDKFileEncryption(provider: { provider })
         let object = directory.appendingPathComponent("short")
         try Data(repeating: 0, count: 10).write(to: object)
 
-        let error = await decryptionError(object, info: EncryptedFileInfo(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "a", key: "k"))
+        let error = await decryptionError(object, info: EncryptedFileInfo(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "a", key: "7b64ReeCOhm0NOUU1jMyLzNHwQVjgtI9p8MEvF5k6C4"))
 
         guard case .decryptionFailed(let reason) = error as? AttachmentEncryptionError,
               case .invalidCiphertextSize(10) = reason as? AttachmentEncryptionError
@@ -516,7 +513,7 @@ final class FileEncryptionTests: XCTestCase {
         let object = try await encrypted(size: 1000)
         let provider = FailingProvider()
         provider.openError = NSError(domain: FileEncryptionErrorDomain, code: FileEncryptionError.invalidEncryption.rawValue)
-        Components.fileEncryptionProvider = provider
+        encryption = ChatSDKFileEncryption(provider: { provider })
 
         let reason = reason(await decryptionError(object.object, info: object.info))
 
@@ -525,7 +522,7 @@ final class FileEncryptionTests: XCTestCase {
     }
 
     func testDecryptOfAMissingObjectFails() async {
-        let info = EncryptedFileInfo(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "a", key: "k")
+        let info = EncryptedFileInfo(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "a", key: "7b64ReeCOhm0NOUU1jMyLzNHwQVjgtI9p8MEvF5k6C4")
         let reason = reason(await decryptionError(directory.appendingPathComponent("missing"), info: info))
         XCTAssertEqual(reason?.domain, NSCocoaErrorDomain)
     }
@@ -691,20 +688,27 @@ extension FileEncryptionTests {
     }
 
     func testARemoveFailureIsLoggedUnlessTheFileIsAlreadyGone() {
-        let original = TransferLog.removeItem
-        defer { TransferLog.removeItem = original }
         let url = directory.appendingPathComponent("x")
         let gone: [Error] = [
             NSError(domain: NSPOSIXErrorDomain, code: Int(ENOENT)),
             NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError, userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(ENOENT))]),
         ]
         for error in gone {
-            TransferLog.removeItem = { _ in throw error }
-            XCTAssertTrue(TransferLog.remove(url, what: "f", context: "t"), "\(error)")
+            XCTAssertTrue(TransferLog.remove(url, what: "f", context: "t", removeItem: { _ in throw error }), "\(error)")
         }
         let denied = NSError(domain: NSCocoaErrorDomain, code: NSFileWriteNoPermissionError, userInfo: [NSUnderlyingErrorKey: NSError(domain: NSPOSIXErrorDomain, code: Int(EPERM))])
-        TransferLog.removeItem = { _ in throw denied }
-        XCTAssertFalse(TransferLog.remove(url, what: "f", context: "t"))
-        XCTAssertFalse(TransferLog.remove(url, what: "f", context: "t", level: .error))
+        XCTAssertFalse(TransferLog.remove(url, what: "f", context: "t", removeItem: { _ in throw denied }))
+        XCTAssertFalse(TransferLog.remove(url, what: "f", context: "t", level: .error, removeItem: { _ in throw denied }))
+    }
+}
+
+extension FileEncryptionTests {
+
+    func testWithoutACachesFolderTransfersUseTheTemporaryOne() {
+        XCTAssertEqual(TransferDirectories.cachesOrTemporary(caches: { nil }).standardizedFileURL.path, URL(fileURLWithPath: NSTemporaryDirectory()).standardizedFileURL.path)
+    }
+
+    func testASessionThatCannotBeEncodedIsAnEmptyCheckpoint() {
+        XCTAssertEqual(ChatSDKFileEncryption.SavedSession(transferId: "t", sdkData: "d").encoded(using: { _ in throw CocoaError(.coderInvalidValue) }), "")
     }
 }

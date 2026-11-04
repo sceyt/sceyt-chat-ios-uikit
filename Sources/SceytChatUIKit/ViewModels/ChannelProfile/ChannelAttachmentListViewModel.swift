@@ -12,6 +12,10 @@ import SceytChat
 import UIKit
 
 open class ChannelAttachmentListViewModel: NSObject {
+    /// Sends and fetches this object's attachments. The app's shared transfer unless replaced
+    /// (a test, or a screen with its own transfer).
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
     public let sectionNameKeyPath: String?
     public let channel: ChatChannel
     public let attachmentTypes: [String]
@@ -343,7 +347,7 @@ open class ChannelAttachmentListViewModel: NSObject {
                   // A stored `.done` is not proof the bytes are still there (cache
                   // eviction, restored backup), and a stored `.pending` is not proof
                   // they are missing. The file itself is the authority.
-                  fileProvider.filePath(attachment: attachment) == nil
+                  self.attachmentTransfer.filePath(attachment: attachment) == nil
             else {
                 DispatchQueue.main.async {
                     completion?(layout)
@@ -353,7 +357,7 @@ open class ChannelAttachmentListViewModel: NSObject {
 
             self.getMessage(layout) { message in
                 if let message {
-                    fileProvider
+                    self.attachmentTransfer
                         .downloadMessageAttachments(
                             message: message,
                             attachments: [attachment]
@@ -382,11 +386,11 @@ open class ChannelAttachmentListViewModel: NSObject {
     /// videos there is nothing to fetch.
     open func downloadVideoThumbnailIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
-        guard fileProvider.needsVideoThumbnailDownload(attachment: attachment)
+        guard self.attachmentTransfer.needsVideoThumbnailDownload(attachment: attachment)
         else { return }
         getMessage(layout) { message in
             guard let message else { return }
-            fileProvider.downloadVideoThumbnailsIfNeeded(
+            self.attachmentTransfer.downloadVideoThumbnailsIfNeeded(
                 message: message,
                 attachments: [attachment]
             )
@@ -397,7 +401,7 @@ open class ChannelAttachmentListViewModel: NSObject {
         let attachment = layout.attachment
         guard attachment.type != "link"
         else { return }
-        if fileProvider.filePath(attachment: attachment) != nil {
+        if self.attachmentTransfer.filePath(attachment: attachment) != nil {
             let done = ChatMessage.Attachment.TransferStatus.done.rawValue
             DataProvider.database.write {
                 // Skip the same-value write: Core Data would still mark the object
@@ -415,9 +419,9 @@ open class ChannelAttachmentListViewModel: NSObject {
         }
         getMessage(layout) { message in
             if let message {
-                fileProvider.resumeTransfer(message: message, attachment: attachment) {
+                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {
                     if !$0 {
-                        fileProvider
+                        self.attachmentTransfer
                             .downloadMessageAttachments(
                                 message: message,
                                 attachments: [attachment]
@@ -433,7 +437,7 @@ open class ChannelAttachmentListViewModel: NSObject {
 
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment) { stopped in
                     // stopTransfer persists the paused status itself whenever it had
                     // something to stop. False means there was no live task and the
                     // status is not a transfer state — e.g. the download already
@@ -480,6 +484,8 @@ public extension ChannelAttachmentListViewModel {
 // MARK: - Protocol
 
 public protocol ChannelAttachmentListViewModelProviding: AnyObject {
+    /// Pauses and resumes this list's transfers.
+    var attachmentTransfer: AttachmentTransfer { get }
     var numberOfSections: Int { get }
     func numberOfAttachments(in section: Int) -> Int
     var thumbnailSize: CGSize { get set }
@@ -517,6 +523,8 @@ public protocol ChannelAttachmentListViewModelProviding: AnyObject {
 }
 
 public extension ChannelAttachmentListViewModelProviding {
+    var attachmentTransfer: AttachmentTransfer { fileProvider }
+
     /// The cell binding asks this the moment a cell is dequeued, to decide whether to
     /// put the progress ring up *before* the transfer produces its first byte. Keeping
     /// it as the one predicate both the view and `downloadAttachmentIfNeeded` consult
@@ -568,7 +576,7 @@ public extension ChannelAttachmentListViewModelProviding {
         let attachment = layout.attachment
         resolveOwnerMessage(layout) { message in
             guard let message else { return }
-            fileProvider.stopTransfer(message: message, attachment: attachment)
+            self.attachmentTransfer.stopTransfer(message: message, attachment: attachment)
         }
     }
 
@@ -579,7 +587,7 @@ public extension ChannelAttachmentListViewModelProviding {
         let attachment = layout.attachment
         resolveOwnerMessage(layout) { message in
             guard let message else { return }
-            fileProvider.resumeTransfer(message: message, attachment: attachment) { resumed in
+            self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) { resumed in
                 guard !resumed,
                       message.deliveryStatus == .pending,
                       attachment.filePath != nil

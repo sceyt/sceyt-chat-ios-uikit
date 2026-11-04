@@ -1686,6 +1686,10 @@ public extension MessageLayoutModel {
 extension MessageLayoutModel {
     
     open class AttachmentLayout {
+        /// Transfers and local files of the attachments shown here: the app's shared transfer
+        /// unless the owner sets its own.
+        public var attachmentTransfer: AttachmentTransfer = fileProvider
+
         // `attachment` is read on a background thread (loadThumbnail) and written on the
         // main thread (update/init). The lock makes the read+retain atomic with the
         // concurrent write+release, preventing use-after-free crashes.
@@ -1876,7 +1880,7 @@ extension MessageLayoutModel {
                 resultThumbnail = appearance.attachmentIconProvider.provideVisual(for: attachment)
                 resultWaveform = attachment.voiceDecodedMetadata?.thumbnail.map { Float($0) }
             case .image, .video:
-                if let path = fileProvider.thumbnailFile(for: attachment, preferred: thumbnailSize) {
+                if let path = self.attachmentTransfer.thumbnailFile(for: attachment, preferred: thumbnailSize) {
                     logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)
@@ -1891,7 +1895,7 @@ extension MessageLayoutModel {
                     }
                 }
                 if resultThumbnail == nil, attachmentType == .video,
-                   let path = fileProvider.cachedVideoThumbnailPath(attachment: attachment) {
+                   let path = self.attachmentTransfer.cachedVideoThumbnailPath(attachment: attachment) {
                     // Downloaded "video_thumb" poster: sharp preview available before
                     // the video itself is local. File-backed semantics so the
                     // no-downgrade guards keep it over the thumbHash blur.
@@ -1920,7 +1924,7 @@ extension MessageLayoutModel {
                     }
                 }
             case .file:
-                if let path = fileProvider.thumbnailFile(for: attachment, preferred: thumbnailSize) {
+                if let path = self.attachmentTransfer.thumbnailFile(for: attachment, preferred: thumbnailSize) {
                     logger.verbose("[Attachment]  thumbnail load from filePath \(attachment.description)")
                     do {
                         let data = try Data(contentsOf: URL(fileURLWithPath: path), options: .alwaysMapped)

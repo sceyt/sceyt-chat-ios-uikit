@@ -25,6 +25,10 @@ public protocol ChannelMessageSenderDelegate: AnyObject {
 }
 
 open class ChannelMessageSender: DataProvider {
+    /// Sends and fetches this object's attachments. The app's shared transfer unless replaced
+    /// (a test, or a screen with its own transfer).
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
     
     public let channelId: ChannelId
     public let channelOperator: ChannelOperator
@@ -550,7 +554,7 @@ open class ChannelMessageSender: DataProvider {
                 completion(message, nil)
                 return
             }
-            fileProvider
+            self.attachmentTransfer
                 .uploadMessageAttachments(
                     message: message,
                     attachments: attachments

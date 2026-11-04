@@ -35,7 +35,8 @@ public enum AttachmentEncryptionError: Error {
 
 /// Cryptography for transports, UIKit's own: a transport never needs the Chat SDK's types. It
 /// makes no requests and stores no transfer state; the transport saves the checkpoints.
-public protocol FileEncryption: AnyObject {
+/// Used from the transport's tasks and the transfer's queues: it must be safe to share.
+public protocol FileEncryption: AnyObject, Sendable {
     /// A new session, under a new key, for `file`. Nothing is encrypted ahead: the bytes are
     /// made when they are read.
     func prepare(file: URL) async throws -> FileEncryptionSession
@@ -77,7 +78,7 @@ public protocol FileEncryptionSession: AnyObject {
 }
 
 /// One encrypted file: its algorithm, the id its encryption is bound to and its key.
-public struct EncryptedFileInfo: Codable, Equatable {
+public struct EncryptedFileInfo: Codable, Equatable, Sendable {
     public let algorithm: String
     public let attachmentId: String
     /// The 32-byte key, base64url without padding.
@@ -175,20 +176,52 @@ enum FileEncryptionChunk {
     /// log context bound there too.
     static func offMain<T>(_ work: @escaping () throws -> T) async throws -> T {
         let context = TransferLog.current
-        return try await withCheckedThrowingContinuation { continuation in
+        // The result goes through a lock rather than the continuation's payload: the order is
+        // the same, and the Thread Sanitizer sees it every time (it can miss a resume made on
+        // a dispatch thread, and report what `work` built as racing with its reader).
+        let box = ResultBox<T>()
+        // Handed to the worker thread: the caller waits and does not run it.
+        let work = Handoff(work)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
-                continuation.resume(with: Result { try TransferLog.with(context) { try work() } })
+                box.set(Result { try TransferLog.with(context) { try work.value() } })
+                continuation.resume()
             }
         }
+        return try box.take().get()
+    }
+}
+
+/// One result handed from one thread to another under a lock.
+private final class ResultBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Result<T, Error>?
+
+    func set(_ result: Result<T, Error>) {
+        lock.lock(); self.result = result; lock.unlock()
+    }
+
+    func take() -> Result<T, Error> {
+        lock.lock(); defer { lock.unlock() }
+        guard let result else {
+            preconditionFailure("offMain resumed before its work set a result")
+        }
+        return result
     }
 }
 
 // MARK: - Chat SDK adapter
 
-/// `FileEncryption` by the Chat SDK's `Components.fileEncryptionProvider`. Each session encrypts
-/// a transfer-owned snapshot of the file, so a later change to the prepared file cannot change
-/// the bytes under it mid-upload.
-final class ChatSDKFileEncryption: FileEncryption {
+/// `FileEncryption` by a Chat SDK `FileEncryptionProvider` (the app's by default). Each
+/// session encrypts a transfer-owned snapshot of the file, so a later change to the prepared
+/// file cannot change the bytes under it mid-upload.
+/// Safe to share: it holds only the provider lookup, a constant.
+final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
+    private let provider: () -> FileEncryptionProvider
+
+    init(provider: @escaping () -> FileEncryptionProvider = { Components.fileEncryptionProvider }) {
+        self.provider = provider
+    }
 
     func prepare(file: URL) async throws -> FileEncryptionSession {
         try await FileEncryptionChunk.offMain {
@@ -197,11 +230,12 @@ final class ChatSDKFileEncryption: FileEncryption {
             do {
                 let snapshot = try AttachmentEncryptionFiles.makeSnapshot(of: file, transferId: transferId)
                 // A new key per session, made by the SDK.
-                let upload = try Components.fileEncryptionProvider.prepareUpload(
+                let provider = self.provider()
+                let upload = try provider.prepareUpload(
                     fileURL: snapshot,
                     uniqueId: AttachmentEncryption.newAttachmentId()
                 )
-                let session = ChatSDKEncryptionSession(upload: upload, transferId: transferId)
+                let session = ChatSDKEncryptionSession(upload: upload, transferId: transferId, isSDKStreaming: provider is StreamingAeadFileEncryptionProvider)
                 logger.debug("[Encryption] \(TransferLog.currentTag) session \(transferId) prepared: \(session.plaintextSize) B -> \(session.ciphertextSize) B attachmentId=\(session.encryptionInfo.attachmentId)")
                 if session.plaintextSize == 0 {
                     logger.warn("[Encryption] \(TransferLog.currentTag) session \(transferId) encrypts an empty file")
@@ -210,7 +244,7 @@ final class ChatSDKFileEncryption: FileEncryption {
             } catch {
                 AttachmentEncryptionFiles.discard(transferId: transferId)
                 // The caller reports the failure.
-                logger.debug("[Encryption] \(TransferLog.currentTag) session \(transferId) prepare failed for \(file.lastPathComponent) (\(TransferLog.size(path: file.path))): \(TransferLog.describe(error))")
+                logger.debug("[Encryption] \(TransferLog.currentTag) session \(transferId) prepare failed (\(TransferLog.size(path: file.path))): \(TransferLog.describe(error))")
                 throw error
             }
         }
@@ -232,11 +266,12 @@ final class ChatSDKFileEncryption: FileEncryption {
             let hasSnapshot = FileManager.default.fileExists(atPath: snapshot.path)
             let source = hasSnapshot ? snapshot : file
             if !hasSnapshot {
-                logger.warn("[Encryption] \(TransferLog.currentTag) restore \(saved.transferId): snapshot gone, restoring from \(file.lastPathComponent)")
+                logger.warn("[Encryption] \(TransferLog.currentTag) restore \(saved.transferId): snapshot gone, restoring from the file itself")
             }
             let upload: PreparedUpload
+            let provider = self.provider()
             do {
-                upload = try Components.fileEncryptionProvider.restoreUpload(
+                upload = try provider.restoreUpload(
                     fileURL: source,
                     checkpoint: SceytChat.FileEncryptionCheckpoint(
                         encryptionInfo: Self.sdkInfo(checkpoint.encryptionInfo, plaintextSize: UInt64(checkpoint.plaintextSize)),
@@ -248,7 +283,7 @@ final class ChatSDKFileEncryption: FileEncryption {
                 throw error
             }
             logger.info("[Encryption] \(TransferLog.currentTag) session \(saved.transferId) restored plaintext=\(checkpoint.plaintextSize) B")
-            return ChatSDKEncryptionSession(upload: upload, transferId: saved.transferId)
+            return ChatSDKEncryptionSession(upload: upload, transferId: saved.transferId, isSDKStreaming: provider is StreamingAeadFileEncryptionProvider)
         }
     }
 
@@ -267,7 +302,7 @@ final class ChatSDKFileEncryption: FileEncryption {
         logger.info("[Encryption] \(label) decrypt start ciphertext=\(TransferLog.sizeText(file)) trustedPlaintext=\(plaintextSize.map { "\($0) B" } ?? "derived")")
         try await FileEncryptionChunk.offMain {
             do {
-                try Self.decrypt(file, to: destination) { ciphertextSize in
+                try Self.decrypt(file, to: destination, provider: self.provider()) { ciphertextSize in
                     let size = try Self.plaintextSize(trusted: plaintextSize, ciphertextSize: ciphertextSize, label: label)
                     return Self.sdkInfo(encryptionInfo, plaintextSize: size)
                 }
@@ -338,12 +373,12 @@ final class ChatSDKFileEncryption: FileEncryption {
     /// Decrypts `file` into a new file at `destination`, with the info `info` makes for the
     /// file's size. Every record is verified before its plaintext is written; on a throw
     /// `destination` holds a prefix and must be removed.
-    static func decrypt(_ file: URL, to destination: URL, info: (UInt64) throws -> FileEncryptionInfo) throws {
+    static func decrypt(_ file: URL, to destination: URL, provider: FileEncryptionProvider, info: (UInt64) throws -> FileEncryptionInfo) throws {
         let source = try FileCiphertextSource(url: file)
         let reader: PlaintextReader
         do {
             let info = try info(source.ciphertextSize)
-            reader = try Components.fileEncryptionProvider.openDownload(source: source, encryptionInfo: info)
+            reader = try provider.openDownload(source: source, encryptionInfo: info)
         } catch {
             // On failure the source stays ours to close.
             source.close()
@@ -389,9 +424,12 @@ final class ChatSDKFileEncryption: FileEncryption {
             self = decoded
         }
 
-        var encoded: String {
-            // Plain strings and a number: encoding cannot fail.
-            String(data: (try? JSONEncoder().encode(self)) ?? Data(), encoding: .utf8) ?? ""
+        var encoded: String { encoded() }
+
+        /// The session as JSON text, empty when it can't be encoded (plain strings and a
+        /// number: `JSONEncoder` does not fail on them; tests pass a failing encoder).
+        func encoded(using encode: (SavedSession) throws -> Data = { try JSONEncoder().encode($0) }) -> String {
+            (try? encode(self)).flatMap(MetadataJSON.live.string) ?? ""
         }
     }
 }
@@ -403,10 +441,14 @@ final class ChatSDKEncryptionSession: FileEncryptionSession {
     let encryptionInfo: EncryptedFileInfo
     let plaintextSize: Int64
     let ciphertextSize: Int64
+    /// Prepared by the SDK's own streaming provider: the only kind `ChatClient.uploadEncrypted`
+    /// can send.
+    let isSDKStreaming: Bool
 
-    init(upload: PreparedUpload, transferId: String) {
+    init(upload: PreparedUpload, transferId: String, isSDKStreaming: Bool) {
         self.upload = upload
         self.transferId = transferId
+        self.isSDKStreaming = isSDKStreaming
         encryptionInfo = EncryptedFileInfo(upload.encryptionInfo)
         plaintextSize = Int64(upload.plaintextSize)
         ciphertextSize = Int64(upload.ciphertextSize)
@@ -472,10 +514,8 @@ final class FileCiphertextSource: NSObject, CiphertextRangeSource {
 public enum AttachmentEncryptionFiles {
 
     /// `Caches/encrypted-transfers`: transfer-owned copies, never the user's assets.
-    public static var transfersDirectory: URL = {
-        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? URL(fileURLWithPath: NSTemporaryDirectory())
-        return caches.appendingPathComponent("encrypted-transfers", isDirectory: true)
+    nonisolated(unsafe) public static var transfersDirectory: URL = {
+        TransferDirectories.cachesOrTemporary().appendingPathComponent("encrypted-transfers", isDirectory: true)
     }()
 
     public static func directory(transferId: String) -> URL {

@@ -35,6 +35,12 @@ final class MockDatabase: Database {
             if let error { fatalError("MockDatabase: store load failed: \(error)") }
         }
         container.viewContext.automaticallyMergesChangesFromParent = true
+        // Created here, not lazily: Swift `lazy` is not thread-safe, and transfer
+        // callbacks reach the first write from several threads at once.
+        let context = container.newBackgroundContext()
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        context.automaticallyMergesChangesFromParent = true
+        backgroundPerformContext = context
     }
 
     // MARK: - Database protocol
@@ -46,12 +52,7 @@ final class MockDatabase: Database {
     /// `NSErrorMergePolicy`), so a sequence like "persist the downloaded file, then persist the
     /// completion" could commit in either order or not at all — a race the production code does
     /// not have.
-    lazy var backgroundPerformContext: NSManagedObjectContext = {
-        let context = container.newBackgroundContext()
-        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        context.automaticallyMergesChangesFromParent = true
-        return context
-    }()
+    let backgroundPerformContext: NSManagedObjectContext
 
     var backgroundReadOnlyContext: NSManagedObjectContext { container.newBackgroundContext() }
 

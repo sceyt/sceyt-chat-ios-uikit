@@ -238,7 +238,7 @@ private final class ForeignSession: FileEncryptionSession {
     let sourceId = "foreign"
     let plaintextSize: Int64 = 1
     let ciphertextSize: Int64 = 1
-    let encryptionInfo = EncryptedFileInfo(algorithm: "foreign", attachmentId: "f", key: "k")
+    let encryptionInfo = EncryptedFileInfo(algorithm: "foreign", attachmentId: "f", key: "7b64ReeCOhm0NOUU1jMyLzNHwQVjgtI9p8MEvF5k6C4")
     private(set) var closed = false
     func read(offset: Int64, length: Int) throws -> Data { Data(count: length) }
     func checkpoint() -> EncryptedFileCheckpoint { EncryptedFileCheckpoint(encryptionInfo: encryptionInfo, plaintextSize: 1, data: "foreign") }
@@ -280,11 +280,9 @@ final class DefaultFileTransferTransportTests: XCTestCase {
 
     private var transport: DefaultFileTransferTransport!
     private var directory: URL!
-    private var originalProvider: FileEncryptionProvider!
 
     override func setUpWithError() throws {
         try super.setUpWithError()
-        originalProvider = Components.fileEncryptionProvider
         FakeClient.install()
         URLProtocol.registerClass(StubServer.self)
         StubServer.reset()
@@ -298,7 +296,6 @@ final class DefaultFileTransferTransportTests: XCTestCase {
         FakeClient.uninstall()
         URLProtocol.unregisterClass(StubServer.self)
         StubServer.reset()
-        Components.fileEncryptionProvider = originalProvider
         try? FileManager.default.removeItem(at: directory)
         transport = nil
         try super.tearDownWithError()
@@ -727,8 +724,8 @@ final class DefaultFileTransferTransportTests: XCTestCase {
     }
 
     func testASessionOfAnotherProviderIsNeverSent() throws {
-        Components.fileEncryptionProvider = OtherProvider()
-        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted))
+        let transport = DefaultFileTransferTransport(encryption: ChatSDKFileEncryption(provider: { OtherProvider() }))
+        let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
         waitUntil { outcome.value != nil }
 
         guard case .encryptionUnsupportedBySession = error(outcome.value) as? AttachmentEncryptionError else {
@@ -923,9 +920,7 @@ extension DefaultFileTransferTransportTests {
     }
 
     func testADownloadThatCannotLeaveTheSessionsTempLocationFails() throws {
-        let original = DefaultFileTransferTransport.downloadStagingDirectory
-        defer { DefaultFileTransferTransport.downloadStagingDirectory = original }
-        DefaultFileTransferTransport.downloadStagingDirectory = { self.directory.appendingPathComponent("no/such/folder") }
+        transport.downloadStagingDirectory = { self.directory.appendingPathComponent("no/such/folder") }
         StubServer.serve("/moved", body: Data("x".utf8))
 
         let (outcome, _, _) = startDownload(FileDownloadRequest(operationId: "d", url: StubServer.url("/moved"), destinationFile: destination()))
@@ -1010,6 +1005,13 @@ final class SCTSessionTransportTests: XCTestCase {
     private func thumbnailUpload(_ session: SCTDataSession) -> Result<String, Error>? {
         let outcome = Outcome<Result<String, Error>>()
         session.uploadAttachmentThumbnail(for: makeAttachment(), fileUrl: directory.appendingPathComponent("poster.jpg")) { outcome.set($0) }
+        waitUntil { outcome.value != nil }
+        return outcome.value
+    }
+
+    private func posterDownload(_ transfer: DefaultThumbnailTransfer, origin: String) -> Result<URL, Error>? {
+        let outcome = Outcome<Result<URL, Error>>()
+        transfer.download(origin: origin) { outcome.set($0) }
         waitUntil { outcome.value != nil }
         return outcome.value
     }
@@ -1137,11 +1139,9 @@ final class SCTSessionTransportTests: XCTestCase {
     }
 
     func testThumbnailsOfImagesVideosAndFiles() throws {
-        let originalProcessor = Components.videoProcessor
-        defer { Components.videoProcessor = originalProcessor }
-        Components.videoProcessor = FrameProcessor.self
         FrameProcessor.frame = UIImage(contentsOfFile: try png("frame.png").path)
         let session = SCTSession(transport: NullTransport())
+        session.environment.videoProcessor = { FrameProcessor.self }
         let size = CGSize(width: 10, height: 10)
         let image = try png()
         let video = directory.appendingPathComponent("clip.mp4")
@@ -1174,7 +1174,8 @@ final class SCTSessionTransportTests: XCTestCase {
     func testAThumbnailThatCannotBeStoredAtomicallyFallsBack() throws {
         let blocked = directory.appendingPathComponent("blocked")
         try Data("a file, not a folder".utf8).write(to: blocked)
-        let storage = BlockedStorage(thumbnailRoot: blocked.appendingPathComponent("thumbs"))
+        BlockedStorage.thumbnailRoot = blocked.appendingPathComponent("thumbs")
+        let storage = BlockedStorage()
         let session = SCTSession(transport: NullTransport(), fileStorage: storage)
 
         XCTAssertNil(session.thumbnailFile(for: attachment(type: "image", filePath: try png().path), preferred: CGSize(width: 10, height: 10)),
@@ -1183,19 +1184,28 @@ final class SCTSessionTransportTests: XCTestCase {
 
     // MARK: Coverage: posters and task events
 
-    func testAPosterAnsweredWithAnErrorStatusIsStillHandedBack() throws {
+    func testAPosterAnsweredWithAnErrorStatusFails() throws {
         StubServer.serve("/404.jpg", status: 404, body: Data("<Error/>".utf8))
-        guard case .success(let local) = thumbnailDownload(MinimalSession(), origin: StubServer.url("/404.jpg")) else { return XCTFail() }
-        XCTAssertEqual(try Data(contentsOf: local), Data("<Error/>".utf8))
-        try? FileManager.default.removeItem(at: local)
+        guard case .failure(SCTDataSessionError.thumbnailDownloadFailed) = thumbnailDownload(MinimalSession(), origin: StubServer.url("/404.jpg")) else {
+            return XCTFail("an error body cached as the poster would never be fetched again")
+        }
     }
 
     func testAPosterThatCannotLeaveTheTempLocationFails() throws {
-        let original = DefaultThumbnailTransfer.posterDirectory
-        defer { DefaultThumbnailTransfer.posterDirectory = original }
-        DefaultThumbnailTransfer.posterDirectory = { self.directory.appendingPathComponent("no/such") }
+        var transfer = DefaultThumbnailTransfer()
+        transfer.posterDirectory = { self.directory.appendingPathComponent("no/such") }
         StubServer.serve("/p.jpg", body: Data("jpeg".utf8))
-        guard case .failure = thumbnailDownload(MinimalSession(), origin: StubServer.url("/p.jpg")) else { return XCTFail() }
+        guard case .failure = posterDownload(transfer, origin: StubServer.url("/p.jpg")) else { return XCTFail() }
+    }
+
+    func testAPosterDownloadWithNeitherAFileNorAnErrorFails() {
+        var transfer = DefaultThumbnailTransfer()
+        transfer.startDownload = { _, completion in completion(nil, nil, nil) }
+        guard case .failure(SCTDataSessionError.thumbnailDownloadFailed) = posterDownload(transfer, origin: "https://cdn.example/p.jpg") else { return XCTFail() }
+    }
+
+    func testNoThumbnailForAnAttachmentThatIsNotOnDisk() {
+        XCTAssertNil(SCTSession(transport: NullTransport()).thumbnailFile(for: makeAttachment(url: "https://cdn.example/TID-\(UUID().uuidString)/a.pdf"), preferred: CGSize(width: 10, height: 10)))
     }
 
     func testTaskEventsAfterTheEndOrBeforeTheHooks() throws {
@@ -1239,16 +1249,8 @@ private final class FrameProcessor: VideoProcessor {
 
 /// Storage whose thumbnails go under a path that cannot be a folder.
 private final class BlockedStorage: FileStorage {
-    let thumbnailRoot: URL
-    init(thumbnailRoot: URL) {
-        self.thumbnailRoot = thumbnailRoot
-        super.init()
-    }
-    required init() {
-        thumbnailRoot = URL(fileURLWithPath: NSTemporaryDirectory())
-        super.init()
-    }
+    static var thumbnailRoot = URL(fileURLWithPath: NSTemporaryDirectory())
     override func thumbnailPath(filePath: String, imageSize: CGSize) -> String {
-        thumbnailRoot.appendingPathComponent((filePath as NSString).lastPathComponent).path
+        Self.thumbnailRoot.appendingPathComponent((filePath as NSString).lastPathComponent).path
     }
 }

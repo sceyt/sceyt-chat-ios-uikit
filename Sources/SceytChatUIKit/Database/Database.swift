@@ -186,6 +186,12 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         }
         viewContext.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         viewContext.automaticallyMergesChangesFromParent = true
+        // Swift `lazy` initialization is not thread-safe: two threads touching a context
+        // for the first time can each run its initializer (or read it half-written).
+        // Create them here, on the initializing thread, so every later access is a plain read.
+        _ = backgroundPerformContext
+        _ = backgroundReadOnlyContext
+        _ = backgroundReadOnlyObservableContext
         addObservers()
     }
     
@@ -286,19 +292,23 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                             completion: ((Error?) -> Void)? = nil) {
         backgroundPerformContext.perform {[weak self] in
             guard let self = self else { return }
+            let context = self.backgroundPerformContext
             do {
-                defer { resultQueue.async { completion?(nil) } }
-                try perform(self.backgroundPerformContext)
-                for object in self.backgroundPerformContext.updatedObjects {
+                try perform(context)
+                for object in context.updatedObjects {
                     if object.changedValues().isEmpty {
-                        self.backgroundPerformContext.refresh(object, mergeChanges: false)
+                        context.refresh(object, mergeChanges: false)
                     }
                 }
-                if self.backgroundPerformContext.hasChanges {
-                    self.logUncommittedChanges(context: self.backgroundPerformContext)
-                    try self.backgroundPerformContext.save()
+                if context.hasChanges {
+                    self.logUncommittedChanges(context: context)
+                    try context.save()
                 }
+                resultQueue.async { completion?(nil) }
             } catch {
+                // The context is shared by every write: without a rollback the failed
+                // changes would ride along with (and be saved by) the next write.
+                context.rollback()
                 resultQueue.async { completion?(error) }
             }
         }
@@ -314,7 +324,6 @@ public final class PersistentContainer: NSPersistentContainer, Database {
         context.perform {[weak self] in
             guard let self = self else { return }
             do {
-                defer { resultQueue.async { completion?(nil) } }
                 try perform(context)
                 for object in context.updatedObjects {
                     if object.changedValues().isEmpty {
@@ -324,6 +333,7 @@ public final class PersistentContainer: NSPersistentContainer, Database {
                 if context.hasChanges {
                     try context.save()
                 }
+                resultQueue.async { completion?(nil) }
             } catch {
                 context.rollback()
                 resultQueue.async { completion?(error) }

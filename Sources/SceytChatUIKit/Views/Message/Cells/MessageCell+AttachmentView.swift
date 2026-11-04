@@ -94,6 +94,10 @@ enum ThumbnailReloadGate {
 
 extension MessageCell {
     open class AttachmentView: View, AttachmentSharpThumbnailObserver, AttachmentTransferStatusObserver {
+        /// Transfers and local files of the attachments shown here: the app's shared transfer
+        /// unless the owner sets its own.
+        public var attachmentTransfer: AttachmentTransfer = fileProvider
+
         public lazy var appearance = Components.messageCell.appearance {
             didSet {
                 setupAppearance()
@@ -225,7 +229,7 @@ extension MessageCell {
             switch rendered {
             case .pending, .downloading, .uploading:
                 if let message = data.ownerMessage,
-                   let live = fileProvider.currentProgressPercent(message: message, attachment: data.attachment) {
+                   let live = self.attachmentTransfer.currentProgressPercent(message: message, attachment: data.attachment) {
                     setProgress(live)
                 }
             case .done:
@@ -619,8 +623,8 @@ extension MessageCell {
             // `.utility`, not `.userInteractive`: this can be a full-size decode + resize +
             // JPEG encode. At userInteractive it competes with the render loop for CPU on
             // exactly the frames the user is scrolling, which is what it was doing.
-            DispatchQueue.global(qos: .utility).async { [weak self] in
-                guard let path = fileProvider.thumbnailFile(for: attachment, preferred: preferred),
+            DispatchQueue.global(qos: .utility).async { [weak self, transfer = attachmentTransfer] in
+                guard let path = transfer.thumbnailFile(for: attachment, preferred: preferred),
                       let image = UIImage(contentsOfFile: path)
                 else {
                     // Video frame extraction (copyFrame) can transiently fail on a just-downloaded
@@ -725,9 +729,9 @@ extension MessageCell {
                   // that has not been sent — the whole of an offline send would render as
                   // delivered.
                   !isQueuedUpload,
-                  fileProvider.currentProgressPercent(message: message, attachment: data.attachment) == nil,
-                  fileProvider.taskFor(message: message, attachment: data.attachment) == nil,
-                  fileProvider.filePath(attachment: data.attachment) != nil
+                  self.attachmentTransfer.currentProgressPercent(message: message, attachment: data.attachment) == nil,
+                  self.attachmentTransfer.taskFor(message: message, attachment: data.attachment) == nil,
+                  self.attachmentTransfer.filePath(attachment: data.attachment) != nil
             else { return stored }
             return .done
         }
@@ -761,7 +765,7 @@ extension MessageCell {
             var needsToUpdateStatus = false
             // Per bind, so a view reused for a different attachment can report its own mismatch.
             lastReportedForeignTick = nil
-            fileProvider
+            self.attachmentTransfer
                 .progress(
                     message: message,
                     attachment: data.attachment,
@@ -809,7 +813,7 @@ extension MessageCell {
                         self?.setProgress(progress)
                         self?.lastAttachmentTransferProgress = progress
                     }
-                } completion: {[weak self, weak data] done in
+                } completion: {[weak self, weak data, transfer = attachmentTransfer] done in
                     guard let data, self?.data == data
                     else {
                         logger.verbose("[Attachment] completion self is nil \(done.attachment.description)")
@@ -817,7 +821,7 @@ extension MessageCell {
                     }
                     logger.debug("[Attachment] completion \(done.attachment.status)")
                     if done.error == nil {
-                        fileProvider.removeProgressObserver(
+                        transfer.removeProgressObserver(
                             message: done.message,
                             attachment: done.attachment,
                             objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "messagecell") } ?? ""

@@ -33,7 +33,7 @@ open class InlineAttachmentKeyProvider: AttachmentKeyProvider {
     }
 
     open func requirement(for attachment: ChatMessage.Attachment, in message: ChatMessage) -> EncryptionRequirement {
-        guard attachment.type != "link" else { return .none }
+        guard attachment.kind != .link else { return .none }
         let decided = self.requirement(attachment, message)
         logger.debug("[Encryption] \(TransferLog.currentTag) requirement \(decided) for \(attachment.transferLogDescription) message tid=\(message.tid)")
         return decided

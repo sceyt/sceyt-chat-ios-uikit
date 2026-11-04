@@ -123,9 +123,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
     private var transport: FakeTransport!
     private var session: TestSession!
     private var directory: URL!
-    private var originalDataSession: SCTDataSession?
     private var originalDatabase: Database!
-    private var originalKeyProvider: AttachmentKeyProvider!
 
     private let messageId: MessageId = 901
     private var encryption: FileEncryption { Components.fileEncryption }
@@ -134,21 +132,18 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         try super.setUpWithError()
         originalDatabase = DataProvider.database
         DataProvider.database = MockDatabase()
-        originalDataSession = Components.dataSession
-        originalKeyProvider = Components.attachmentKeyProvider
         directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("enc-gate-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         transport = FakeTransport()
         session = TestSession(transport: transport, root: directory)
-        Components.dataSession = session
-        Components.attachmentKeyProvider = InlineAttachmentKeyProvider { _, _ in .required }
         transfer = AttachmentTransfer()
+        let session = session!
+        transfer.environment.dataSession = { session }
+        transfer.environment.keyProvider = { InlineAttachmentKeyProvider { _, _ in .required } }
     }
 
     override func tearDownWithError() throws {
-        Components.dataSession = originalDataSession
-        Components.attachmentKeyProvider = originalKeyProvider
         DataProvider.database = originalDatabase
         try? FileManager.default.removeItem(at: directory)
         transfer = nil
@@ -308,7 +303,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
     // MARK: - RC1: legacy path untouched
 
     func testPlaintextPolicySendsAPlainRequest() throws {
-        Components.attachmentKeyProvider = InlineAttachmentKeyProvider()
+        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let attachment = makeAttachment(filePath: try file(size: 100).path)
 
         XCTAssertNil(upload(attachment))
@@ -420,7 +415,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
     // MARK: - Control
 
     func testAPauseInPlaceResumesTheSameInvocation() throws {
-        Components.attachmentKeyProvider = InlineAttachmentKeyProvider()
+        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let gate = Gate()
         transport.onUpload = { _ in await gate.wait() }
         let attachment = makeAttachment(filePath: try file(size: 100).path)
@@ -441,7 +436,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
     }
 
     func testAPauseTheTransportCannotHoldStartsANewAttemptOnResume() throws {
-        Components.attachmentKeyProvider = InlineAttachmentKeyProvider()
+        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         transport.pausesInPlace = false
         let gate = Gate()
         transport.onUpload = { _ in
@@ -533,7 +528,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         let destination = directory.appendingPathComponent("thumb.jpg")
         let download = directory.appendingPathComponent("download-1")
         try FileManager.default.copyItem(at: posterCipher, to: download)
-        try await AttachmentTransfer.storeVideoThumbnail(download, of: attachment, at: destination)
+        try await AttachmentTransfer.storeVideoThumbnail(download, of: attachment, at: destination, encryption: encryption)
         XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: poster))
 
         // Signed for the video, not the poster: the poster's key must be used.
@@ -543,7 +538,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         let download2 = directory.appendingPathComponent("download-2")
         try FileManager.default.copyItem(at: posterCipher, to: download2)
         do {
-            try await AttachmentTransfer.storeVideoThumbnail(download2, of: tampered, at: other)
+            try await AttachmentTransfer.storeVideoThumbnail(download2, of: tampered, at: other, encryption: encryption)
             XCTFail("a poster under the wrong key must not be stored")
         } catch {}
         XCTAssertFalse(FileManager.default.fileExists(atPath: other.path))
@@ -553,7 +548,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         let download3 = directory.appendingPathComponent("download-3")
         try FileManager.default.copyItem(at: posterCipher, to: download3)
         do {
-            try await AttachmentTransfer.storeVideoThumbnail(download3, of: noRendition, at: other)
+            try await AttachmentTransfer.storeVideoThumbnail(download3, of: noRendition, at: other, encryption: encryption)
             XCTFail("an encrypted poster without its key must not be stored")
         } catch {}
         XCTAssertFalse(FileManager.default.fileExists(atPath: other.path))

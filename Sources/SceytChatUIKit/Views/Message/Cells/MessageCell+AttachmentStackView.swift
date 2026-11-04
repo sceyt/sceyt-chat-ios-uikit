@@ -11,6 +11,10 @@ import UIKit
 
 extension MessageCell {
     open class AttachmentStackView: View {
+        /// Transfers and local files of the attachments shown here: the app's shared transfer
+        /// unless the owner sets its own.
+        public var attachmentTransfer: AttachmentTransfer = fileProvider
+
         
         public lazy var appearance = Components.messageCell.appearance {
             didSet {
@@ -189,15 +193,15 @@ extension MessageCell {
             av.setProgressHandler()
             switch av.renderedTransferStatus(for: layout.transferStatus) {
             case .pending, .uploading, .downloading:
-                if let progress = fileProvider.currentProgressPercent(message: data.message, attachment: layout.attachment) {
+                if let progress = self.attachmentTransfer.currentProgressPercent(message: data.message, attachment: layout.attachment) {
                     av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
-                } else if fileProvider.filePath(attachment: layout.attachment) == nil {
+                } else if self.attachmentTransfer.filePath(attachment: layout.attachment) == nil {
                     // Through the AttachmentProgress overload so the "0 B / 12.4 MB"
                     // label is seeded too. The CGFloat overload only moves the ring,
                     // which left the byte count blank until the next tick — and blank
                     // forever when the transfer had already delivered its last one.
                     av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: 0.0001))
-                } else if fileProvider.taskFor(message: data.message, attachment: layout.attachment) != nil {
+                } else if self.attachmentTransfer.taskFor(message: data.message, attachment: layout.attachment) != nil {
                     // An upload always has a local file, so the `filePath == nil` fallback
                     // above only ever fires for downloads. Bind a live upload to the same
                     // floor, otherwise a cell that binds before the first progress event —

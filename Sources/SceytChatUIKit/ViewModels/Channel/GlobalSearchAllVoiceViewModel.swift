@@ -14,6 +14,10 @@ import UIKit
 /// Loads all voice attachments across every channel for the
 /// global-search Voice tab initial state (no query active).
 open class GlobalSearchAllVoiceViewModel: NSObject {
+    /// Sends and fetches this object's attachments. The app's shared transfer unless replaced
+    /// (a test, or a screen with its own transfer).
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
 
     public let attachmentTypes: [String]
     public let sectionNameKeyPath: String?
@@ -279,7 +283,7 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
             }
             getMessage(layout) { message in
                 if let message {
-                    fileProvider.downloadMessageAttachments(
+                    self.attachmentTransfer.downloadMessageAttachments(
                         message: message,
                         attachments: [attachment]
                     ) { message, error in
@@ -298,7 +302,7 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
     open func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
         guard attachment.type != "link" else { return }
-        if fileProvider.filePath(attachment: attachment) != nil {
+        if self.attachmentTransfer.filePath(attachment: attachment) != nil {
             DataProvider.database.write {
                 let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
                 dto?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
@@ -309,9 +313,9 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         }
         getMessage(layout) { message in
             if let message {
-                fileProvider.resumeTransfer(message: message, attachment: attachment) {
+                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {
                     if !$0 {
-                        fileProvider.downloadMessageAttachments(message: message, attachments: [attachment])
+                        self.attachmentTransfer.downloadMessageAttachments(message: message, attachments: [attachment])
                     }
                 }
             }
@@ -322,7 +326,7 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment) { stopped in
                     // stopTransfer persists the paused status itself whenever it had
                     // something to stop; false means nothing was running (e.g. the
                     // download already finished) and the stored status must stay.

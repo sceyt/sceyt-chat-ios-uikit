@@ -11,6 +11,10 @@ import UIKit
 
 extension ChannelInfoViewController {
     open class AttachmentCell: CollectionViewCell, AttachmentSharpThumbnailObserver, AttachmentTransferStatusObserver {
+        /// Transfers and local files of the attachments shown here: the app's shared transfer
+        /// unless the owner sets its own.
+        public var attachmentTransfer: AttachmentTransfer = fileProvider
+
 
         open lazy var imageView = UIImageView()
             .withoutAutoresizingMask
@@ -119,7 +123,7 @@ extension ChannelInfoViewController {
             switch status {
             case .pending, .downloading, .uploading:
                 let live = data.ownerMessage.flatMap {
-                    fileProvider.currentProgressPercent(message: $0, attachment: data.attachment)
+                    self.attachmentTransfer.currentProgressPercent(message: $0, attachment: data.attachment)
                 }
                 setProgress(live ?? 0.0001)
             default:
@@ -238,8 +242,8 @@ extension ChannelInfoViewController {
             let gateKey = ThumbnailReloadGate.key(attachment: attachment, size: preferred)
             let isRetry = retriesLeft < Self.thumbnailReloadRetryCount
             if !isRetry, !ThumbnailReloadGate.begin(gateKey) { return }
-            DispatchQueue.global(qos: .utility).async { [weak self] in
-                guard let path = fileProvider.thumbnailFile(for: attachment, preferred: preferred),
+            DispatchQueue.global(qos: .utility).async { [weak self, transfer = attachmentTransfer] in
+                guard let path = transfer.thumbnailFile(for: attachment, preferred: preferred),
                       let image = UIImage(contentsOfFile: path)
                 else {
                     guard retriesLeft > 0 else {
@@ -356,7 +360,7 @@ extension ChannelInfoViewController {
             guard let data = data,
                   let message = data.ownerMessage
             else { return }
-            fileProvider
+            self.attachmentTransfer
                 .progress(
                     message: message,
                     attachment: data.attachment,
@@ -367,10 +371,10 @@ extension ChannelInfoViewController {
                         self?.setProgress(progress.progress)
                         self?.lastAttachmentTransferProgress = progress
                     }
-                } completion: { [weak self] done in
+                } completion: { [weak self, transfer = attachmentTransfer] done in
                     guard self?.data?.attachment.id == data.attachment.id else { return }
                     if done.error == nil {
-                        fileProvider.removeProgressObserver(
+                        transfer.removeProgressObserver(
                             message: done.message,
                             attachment: done.attachment,
                             objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "infoattachment") } ?? ""
@@ -397,7 +401,7 @@ extension ChannelInfoViewController {
             // thumbnail), and drop its shrink so the next binding starts at full size.
             cancelHideAnimation()
             if let message = data?.ownerMessage, let attachment = data?.attachment {
-                fileProvider.removeProgressObserver(
+                self.attachmentTransfer.removeProgressObserver(
                     message: message,
                     attachment: attachment,
                     objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infoattachment")
@@ -412,7 +416,7 @@ extension ChannelInfoViewController {
 
         deinit {
             if let message = data?.ownerMessage, let attachment = data?.attachment {
-                fileProvider.removeProgressObserver(
+                self.attachmentTransfer.removeProgressObserver(
                     message: message,
                     attachment: attachment,
                     objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infoattachment")

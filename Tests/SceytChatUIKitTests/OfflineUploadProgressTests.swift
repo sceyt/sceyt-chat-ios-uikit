@@ -32,14 +32,22 @@ final class OfflineUploadProgressTests: XCTestCase {
     /// Lets a test decide what `AttachmentTransfer` believes about the connection — the real
     /// predicate reads `chatClient.connectionState`, which no unit test can drive.
     private final class TestableTransfer: AttachmentTransfer {
-        nonisolated(unsafe) static var offline = false
-        override class var isOffline: Bool { offline }
+        private let offlineState = Locked(false)
+        var offline: Bool {
+            get { offlineState.wrapped }
+            set { offlineState.wrapped = newValue }
+        }
+
+        required init() {
+            super.init()
+            let offlineState = offlineState
+            connectivity = { offlineState.wrapped }
+        }
     }
 
     private var transfer: TestableTransfer!
     private var session: MockTransferDataSession!
     private var mockDB: MockDatabase!
-    private var originalDataSession: SCTDataSession?
     private var originalDatabase: Database!
     private var temporaryFiles = [String]()
 
@@ -55,12 +63,12 @@ final class OfflineUploadProgressTests: XCTestCase {
         originalDatabase = DataProvider.database
         mockDB = MockDatabase()
         DataProvider.database = mockDB
-        originalDataSession = Components.dataSession
         session = MockTransferDataSession()
-        Components.dataSession = session
-        TestableTransfer.offline = false
         // A fresh instance, not `.default`: the caches are process-wide.
         transfer = TestableTransfer()
+        let session = session!
+        transfer.environment.dataSession = { session }
+        transfer.offline = false
     }
 
     override func tearDownWithError() throws {
@@ -68,8 +76,6 @@ final class OfflineUploadProgressTests: XCTestCase {
             try? FileManager.default.removeItem(atPath: path)
         }
         temporaryFiles.removeAll()
-        TestableTransfer.offline = false
-        Components.dataSession = originalDataSession
         DataProvider.database = originalDatabase
         transfer = nil
         session = nil
@@ -248,7 +254,7 @@ final class OfflineUploadProgressTests: XCTestCase {
         let message = makeMessage([attachment])
 
         let started = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertEqual(attachment.status, .pending,
                        "the bytes are on disk because they have not been sent yet")
@@ -261,7 +267,7 @@ final class OfflineUploadProgressTests: XCTestCase {
     /// dead end and swaps the loader for a retry arrow — on a message
     /// `SyncService.resendPendingMessage` will send by itself on the next connect.
     func testOfflineUploadFailureKeepsTheAttachmentQueued() throws {
-        TestableTransfer.offline = true
+        transfer.offline = true
         let filePath = try makeFileOnDisk()
         let attachment = makeOutgoingAttachment(filePath: filePath)
         let message = makeMessage([attachment])
@@ -326,7 +332,7 @@ final class OfflineUploadProgressTests: XCTestCase {
     /// With a connection, a failed upload is a real failure and must keep its retry affordance —
     /// nothing else would ever retry it.
     func testOnlineUploadFailureStillFails() throws {
-        TestableTransfer.offline = false
+        transfer.offline = false
         let filePath = try makeFileOnDisk()
         let attachment = makeOutgoingAttachment(filePath: filePath)
         let message = makeMessage([attachment])

@@ -23,6 +23,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Upload/download code stays small enough to read: files ≤600 lines, functions
+      # ≤60, nesting ≤5. Runs first: it takes a second and needs no build.
+      - name: Transfer code size
+        run: python3 -I scripts/check_code_size.py Sources/SceytChatUIKit/DataTransfer
+
+      # Every transfer failure leaves a tagged log line: no untagged or empty messages, no
+      # empty catch, no silent `try?` on a file change.
+      - name: Transfer logs
+        run: python3 -I scripts/check_transfer_logs.py Sources/SceytChatUIKit/DataTransfer
+
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
@@ -51,6 +61,10 @@ jobs:
           sys.exit("no iPhone simulator found")
           ')
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      # What Swift 6 will make errors: the transfer layer stays free of data-race warnings.
+      - name: Transfer strict concurrency
+        run: scripts/check_strict_concurrency.sh "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}"
 
       # Unit tests of the SceytChatUIKit Swift package. The demo-app UI tests
       # are not run here: the demo project depends on ../sceyt-call-ios-uikit,

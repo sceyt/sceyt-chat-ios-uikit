@@ -22,6 +22,10 @@ extension ChannelViewController {
     /// The two relay conformances are what sharpen a media pin's blurred placeholder when
     /// its file lands — see `attachmentSharpThumbnailDidLoad(_:image:)`.
     open class PinnedMessagesView: View, AttachmentSharpThumbnailObserver, AttachmentTransferStatusObserver {
+        /// Transfers and local files of the attachments shown here: the app's shared transfer
+        /// unless the owner sets its own.
+        public var attachmentTransfer: AttachmentTransfer = fileProvider
+
 
         public enum Action {
             /// About to advance to the next pinned message. Sent while the banner is still
@@ -708,13 +712,13 @@ extension ChannelViewController {
             guard let attachment = item.previewMessage.attachments?.first else { return nil }
             switch MessageLayoutModel.AttachmentLayout.AttachmentType(rawValue: attachment.type) {
             case .image, .video:
-                if let path = fileProvider.thumbnailFile(
+                if let path = self.attachmentTransfer.thumbnailFile(
                     for: attachment,
                     preferred: MessageLayoutModel.defaults.imageAttachmentSize
                 ), let image = UIImage(contentsOfFile: path) {
                     return image
                 }
-                if let path = fileProvider.cachedVideoThumbnailPath(attachment: attachment),
+                if let path = self.attachmentTransfer.cachedVideoThumbnailPath(attachment: attachment),
                    let image = UIImage(contentsOfFile: path) {
                     return image
                 }
@@ -737,8 +741,8 @@ extension ChannelViewController {
         /// what lets the pin sharpen once the download lands.
         open func isThumbnailFinal(for item: PinnedMessage) -> Bool {
             guard let attachment = item.previewMessage.attachments?.first else { return true }
-            return fileProvider.filePath(attachment: attachment) != nil
-                || fileProvider.cachedVideoThumbnailPath(attachment: attachment) != nil
+            return self.attachmentTransfer.filePath(attachment: attachment) != nil
+                || self.attachmentTransfer.cachedVideoThumbnailPath(attachment: attachment) != nil
         }
 
         // MARK: - Healing a blurred pin

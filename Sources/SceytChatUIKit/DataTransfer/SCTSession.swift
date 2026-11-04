@@ -12,7 +12,7 @@ import UIKit
 
 /// The default data session: `TransportDataSession` over the Chat SDK's own transfers
 /// (`DefaultFileTransferTransport`), storing files in `FileStorage`.
-open class SCTSession: TransportDataSession {
+open class SCTSession: TransportDataSession, @unchecked Sendable {
 
     public static let `default` = SCTSession()
 
@@ -21,29 +21,20 @@ open class SCTSession: TransportDataSession {
     public init() {
         fileStorage = .init()
         super.init(transport: DefaultFileTransferTransport())
+        fileStore = fileStorage
     }
 
     public override init(transport: FileTransferTransport) {
         fileStorage = .init()
         super.init(transport: transport)
+        fileStore = fileStorage
     }
 
     /// With its own storage. A test seam.
     init(transport: FileTransferTransport, fileStorage: FileStorage) {
         self.fileStorage = fileStorage
         super.init(transport: transport)
-    }
-
-    open override func storeFile(atPath path: String, transferId: String, fileName: String?) -> String {
-        fileStorage.store(transferId: transferId, fileName: fileName, file: path)
-    }
-
-    open override func removeFile(atPath path: String) {
-        fileStorage.remove(path: path)
-    }
-
-    open override func updateThumbnailPath(transferId: String, filePath: String) {
-        fileStorage.updateThumbnailPath(transferId: transferId, filePath: filePath)
+        fileStore = fileStorage
     }
 
     open override func downloadDestination(for attachment: ChatMessage.Attachment) -> URL? {
@@ -84,26 +75,26 @@ open class SCTSession: TransportDataSession {
     }
 
     open override func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
-        let scale = UIScreen.main.traitCollection.displayScale
+        let scale = DisplayScale.shared.value
         let newSize = CGSize(width: size.width * scale, height: size.height * scale)
         
         func makeThumbnail(file path: String, thumbnailPath: String) -> String? {
             var image: UIImage?
-            if attachment.type == "image" {
+            if attachment.kind == .image {
                 image = UIImage(contentsOfFile: path)
-            } else if attachment.type == "video" {
-                image = Components.videoProcessor.copyFrame(url: URL(fileURLWithPath: path))
-            } else if attachment.type == "file" {
+            } else if attachment.kind == .video {
+                image = environment.videoProcessor().copyFrame(url: URL(fileURLWithPath: path))
+            } else if attachment.kind == .file {
                 let fileURL = URL(fileURLWithPath: path)
                 if fileURL.isImage {
                     image = UIImage(contentsOfFile: path)
                 } else if fileURL.isVideo {
-                    image = Components.videoProcessor.copyFrame(url: fileURL)
+                    image = environment.videoProcessor().copyFrame(url: fileURL)
                 }
             }
             if let image,
-               let ib = try? Components.imageBuilder.init(image: image).resize(max: newSize.maxSide),
-               let data = ib.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality)
+               let ib = try? environment.imageBuilder().init(image: image).resize(max: newSize.maxSide),
+               let data = ib.jpegData(compressionQuality: environment.imageResizeConfig().compressionQuality)
             {
                 // Atomic write: stage to a temp file then atomically replace the destination so a
                 // concurrent reader (loadThumbnail / reloadThumbnailFromFile) never observes a
@@ -114,10 +105,10 @@ open class SCTSession: TransportDataSession {
                 do {
                     try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try data.write(to: destination, options: .atomic)
-                    logger.debug("[thumbnail] 3 stored (atomic) \(thumbnailPath)")
+                    logger.debug("[Attachment] \(TransferLog.currentTag) thumbnail stored \((thumbnailPath as NSString).lastPathComponent)")
                     return thumbnailPath
                 } catch {
-                    logger.errorIfNotNil(error, "[thumbnail] atomic store failed, falling back \(thumbnailPath)")
+                    logger.warn("[Attachment] \(TransferLog.currentTag) thumbnail atomic store failed, writing it directly: \(TransferLog.describe(error))")
                     return Storage.storeData(data, filePath: thumbnailPath)?.path
                 }
             }
@@ -134,11 +125,11 @@ open class SCTSession: TransportDataSession {
                 // so fully decoding it here just to throw the pixels away doubled the cost of
                 // every cached-thumbnail lookup — on the hot path of every file-cell bind.
                 if Self.isCompleteImageFile(at: thumbnailPath) {
-                    logger.debug("[thumbnail] found file \(attachment.type)")
+                    logger.verbose("[Attachment] \(TransferLog.currentTag) thumbnail cached \(attachment.transferLogDescription)")
                     return thumbnailPath
                 }
-                logger.debug("[thumbnail] cached thumbnail unreadable, evicting \(thumbnailPath)")
-                try? FileManager.default.removeItem(atPath: thumbnailPath)
+                logger.debug("[Attachment] \(TransferLog.currentTag) cached thumbnail unreadable, regenerating \(attachment.transferLogDescription)")
+                TransferLog.remove(URL(fileURLWithPath: thumbnailPath), what: "the unreadable thumbnail", context: "[Attachment] \(TransferLog.currentTag) thumbnail")
             }
             return makeThumbnail(file: path, thumbnailPath: thumbnailPath)
         } else if let path = attachment.filePath {
@@ -146,5 +137,31 @@ open class SCTSession: TransportDataSession {
             return makeThumbnail(file: path, thumbnailPath: thumbnailPath)
         }
         return nil
+    }
+}
+
+/// The screen's scale for work off the main thread: `UIScreen` may only be read on main, so it
+/// is read there and cached. Until it is read, the largest scale (thumbnails at most a little
+/// larger than needed, never blurry).
+final class DisplayScale: @unchecked Sendable {
+    static let shared = DisplayScale()
+
+    private let lock = NSLock()
+    private var _value: CGFloat = 3
+
+    var value: CGFloat {
+        lock.lock(); defer { lock.unlock() }
+        return _value
+    }
+
+    private init() {
+        if Thread.isMainThread {
+            _value = MainActor.assumeIsolated { UIScreen.main.scale }
+        } else {
+            DispatchQueue.main.async { [self] in
+                let scale = UIScreen.main.scale
+                lock.lock(); _value = scale; lock.unlock()
+            }
+        }
     }
 }

@@ -95,6 +95,7 @@ extension ChannelInfoViewController {
         
         open func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
             let cell = collectionView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoVoiceCell.self)
+            cell.attachmentTransfer = voiceViewModel.attachmentTransfer
             cell.parentAppearance = appearance.cellAppearance
             cell.data = voiceViewModel.attachmentLayout(at: indexPath)
             cell.event

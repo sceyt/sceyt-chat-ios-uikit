@@ -73,7 +73,6 @@ final class AttachmentTransferProgressTests: XCTestCase {
 
     private var transfer: AttachmentTransfer!
     private var session: MockTransferDataSession!
-    private var originalDataSession: SCTDataSession?
     private var originalDatabase: Database!
 
     private let messageId: MessageId = 900
@@ -83,16 +82,15 @@ final class AttachmentTransferProgressTests: XCTestCase {
         try super.setUpWithError()
         originalDatabase = DataProvider.database
         DataProvider.database = MockDatabase()
-        originalDataSession = Components.dataSession
         session = MockTransferDataSession()
-        Components.dataSession = session
         // A fresh instance, not `.default`: the caches are process-wide and would
         // otherwise leak between tests.
         transfer = AttachmentTransfer()
+        let session = session!
+        transfer.environment.dataSession = { session }
     }
 
     override func tearDownWithError() throws {
-        Components.dataSession = originalDataSession
         DataProvider.database = originalDatabase
         transfer = nil
         session = nil
@@ -349,7 +347,7 @@ final class AttachmentTransferProgressTests: XCTestCase {
 
         // What `cellForItemAt` does on every rebind.
         transfer.downloadMessageAttachments(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertEqual(session.startedDownloadCount, 1,
                        "an attachment already in flight must not be downloaded twice")
@@ -408,7 +406,7 @@ final class AttachmentTransferProgressTests: XCTestCase {
         let message = makeMessage([attachment])
 
         let started = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertTrue(started.isEmpty, "a paused download must not restart on rebind")
         XCTAssertEqual(attachment.status, .pauseDownloading)
@@ -421,7 +419,7 @@ final class AttachmentTransferProgressTests: XCTestCase {
         let message = makeMessage([attachment])
 
         let started = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertTrue(started.isEmpty, "a failed download must not restart on rebind")
         XCTAssertEqual(session.startedDownloadCount, 0)
@@ -433,7 +431,7 @@ final class AttachmentTransferProgressTests: XCTestCase {
         let message = makeMessage([link])
 
         let started = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [link])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertTrue(started.isEmpty, "link attachments are not transferred")
         XCTAssertEqual(session.startedDownloadCount, 0)
@@ -500,6 +498,72 @@ final class AttachmentTransferProgressTests: XCTestCase {
         XCTAssertTrue(waitUntil { second.status == .pauseDownloading },
                       "the requested attachment must be paused")
         XCTAssertEqual(first.status, .downloading, "its sibling must be left alone")
+    }
+
+    /// The pause persists only the paused attachment: a write carrying its sibling would put
+    /// back whatever this copy of the sibling held, over its own transfer's newer state.
+    func testPausingOneAttachmentPersistsOnlyThatAttachment() throws {
+        let store = RecordingTransferStore()
+        transfer.store = store
+        let first = makeAttachment(url: "AAAA-1111", status: .downloading)
+        let second = makeAttachment(url: "BBBB-2222", status: .downloading)
+        let message = makeMessage([first, second])
+        _ = try startDownload(message: message, attachments: [first, second])
+        store.reset()
+
+        transfer.stopTransfer(message: message, attachment: second)
+
+        XCTAssertTrue(waitUntil { !store.saves.isEmpty })
+        XCTAssertEqual(store.saves.map { $0.map(\.url) }, [["BBBB-2222"]])
+    }
+
+    /// The end of one transfer persists only its attachment, not the message's others.
+    func testEndingOneTransferPersistsOnlyItsAttachment() throws {
+        let store = RecordingTransferStore()
+        transfer.store = store
+        let first = makeAttachment(url: "AAAA-1111", status: .downloading)
+        let second = makeAttachment(url: "BBBB-2222", status: .downloading)
+        let message = makeMessage([first, second])
+        _ = try startDownload(message: message, attachments: [first, second])
+        XCTAssertTrue(waitUntil { self.session.task(forUrl: "BBBB-2222") != nil })
+
+        try XCTUnwrap(session.task(forUrl: "BBBB-2222")).failure(error: URLError(.badServerResponse))
+
+        XCTAssertTrue(waitUntil { !store.ends.isEmpty })
+        XCTAssertEqual(store.ends.map { $0.map(\.url) }, [["BBBB-2222"]])
+    }
+
+    /// Every transfer that ends reaches the metrics observer once, with its category.
+    func testAnEndedTransferReportsItsMetrics() throws {
+        let observer = RecordingMetricsObserver()
+        transfer.metricsObserver = observer
+        let attachment = makeAttachment(url: "CCCC-3333", status: .downloading)
+        let message = makeMessage([attachment])
+        let task = try startDownload(message: message, attachments: [attachment])
+
+        task.failure(error: URLError(.notConnectedToInternet))
+
+        XCTAssertTrue(waitUntil { observer.metrics.count == 1 })
+        let metrics = try XCTUnwrap(observer.metrics.first)
+        XCTAssertEqual(metrics.direction, .download)
+        XCTAssertEqual(metrics.category, .connectivity)
+        XCTAssertEqual(metrics.operationId, task.operationId)
+    }
+
+    /// A transfer is timed with the injected clock, not the wall clock.
+    func testATransferIsTimedWithTheInjectedClock() throws {
+        let clock = Locked(Date(timeIntervalSince1970: 1_000))
+        transfer.now = { clock.wrapped }
+        let observer = RecordingMetricsObserver()
+        transfer.metricsObserver = observer
+        let attachment = makeAttachment(url: "DDDD-4444", status: .downloading)
+        let task = try startDownload(message: makeMessage([attachment]), attachments: [attachment])
+
+        clock.wrapped = Date(timeIntervalSince1970: 1_002.5)
+        task.failure(error: URLError(.badServerResponse))
+
+        XCTAssertTrue(waitUntil { observer.metrics.count == 1 })
+        XCTAssertEqual(observer.metrics.first?.durationMs, 2_500)
     }
 
     /// And the same for resuming.
@@ -649,5 +713,46 @@ final class AttachmentTransferProgressTests: XCTestCase {
             XCTAssertNotNil(weakObserver)
         }
         XCTAssertNil(weakObserver, "the relay must not retain observers")
+    }
+}
+
+
+/// A `TransferStore` that records what each save names, and saves nothing.
+final class RecordingTransferStore: TransferStore {
+    private let lock = NSLock()
+    private var _saves = [[ChatMessage.Attachment]]()
+    private var _ends = [[ChatMessage.Attachment]]()
+
+    var saves: [[ChatMessage.Attachment]] { lock.lock(); defer { lock.unlock() }; return _saves }
+    var ends: [[ChatMessage.Attachment]] { lock.lock(); defer { lock.unlock() }; return _ends }
+
+    func reset() {
+        lock.lock(); _saves = []; _ends = []; lock.unlock()
+    }
+
+    func save(_ attachments: [ChatMessage.Attachment], of message: ChatMessage, completion: ((Error?) -> Void)?) {
+        lock.lock(); _saves.append(attachments); lock.unlock()
+        completion?(nil)
+    }
+
+    func saveEnd(of attachments: [ChatMessage.Attachment], of message: ChatMessage, completion: @escaping (ChatMessage?, Error?) -> Void) {
+        lock.lock(); _ends.append(attachments); lock.unlock()
+        completion(message, nil)
+    }
+
+    func saveLocalFile(of attachment: ChatMessage.Attachment, previousPath: String?, of message: ChatMessage) {}
+
+    func messageExists(_ message: ChatMessage, completion: @escaping (Bool) -> Void) {
+        completion(true)
+    }
+}
+
+final class RecordingMetricsObserver: TransferMetricsObserver {
+    private let lock = NSLock()
+    private var _metrics = [TransferMetrics]()
+    var metrics: [TransferMetrics] { lock.lock(); defer { lock.unlock() }; return _metrics }
+
+    func transferDidEnd(_ metrics: TransferMetrics) {
+        lock.lock(); _metrics.append(metrics); lock.unlock()
     }
 }

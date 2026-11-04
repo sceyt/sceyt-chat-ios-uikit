@@ -31,7 +31,6 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
     private var transfer: AttachmentTransfer!
     private var session: MockTransferDataSession!
     private var mockDB: MockDatabase!
-    private var originalDataSession: SCTDataSession?
     private var originalDatabase: Database!
     private var temporaryFiles = [String]()
 
@@ -47,12 +46,12 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
         originalDatabase = DataProvider.database
         mockDB = MockDatabase()
         DataProvider.database = mockDB
-        originalDataSession = Components.dataSession
         session = MockTransferDataSession()
-        Components.dataSession = session
         // A fresh instance, not `.default`: the caches are process-wide and would otherwise
         // leak between tests.
         transfer = AttachmentTransfer()
+        let session = session!
+        transfer.environment.dataSession = { session }
     }
 
     override func tearDownWithError() throws {
@@ -60,7 +59,6 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
             try? FileManager.default.removeItem(atPath: path)
         }
         temporaryFiles.removeAll()
-        Components.dataSession = originalDataSession
         DataProvider.database = originalDatabase
         transfer = nil
         session = nil
@@ -303,7 +301,7 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
         let message = makeMessage([attachment])
 
         transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertEqual(attachment.status, .failedUploading,
                        "a failed upload's local file is the source, not proof of delivery")
@@ -318,7 +316,7 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
         let message = makeMessage([attachment])
 
         transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertEqual(attachment.status, .pauseUploading)
     }
@@ -335,7 +333,7 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
         session.setLocalPath(filePath, forUrl: attachmentUrl)
 
         transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertEqual(attachment.status, .downloading,
                        "a transfer with a live task decides its own terminal status")
@@ -348,7 +346,7 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
         let message = makeMessage([attachment])
 
         let started = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertTrue(started.isEmpty)
         XCTAssertEqual(attachment.status, .pauseDownloading)
@@ -360,7 +358,7 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
         let message = makeMessage([attachment])
 
         let started = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertTrue(started.isEmpty)
         XCTAssertEqual(attachment.status, .failedDownloading)
@@ -400,7 +398,7 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
         let message = makeMessage([link])
 
         let started = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [link])
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertTrue(started.isEmpty)
         XCTAssertEqual(link.status, .pending)
@@ -523,7 +521,7 @@ final class AttachmentTransferStaleStatusTests: XCTestCase {
 
         let storedPath = try makeFileOnDisk(named: "stored.mp4")
         task.updateLocalFileLocation(newPath: storedPath)
-        _ = waitUntil(timeout: 0.3) { false }
+        transfer.waitForPendingWork()
 
         XCTAssertEqual(attachment.status, .uploading,
                        "an upload is finished by its server ack, not by its file moving")

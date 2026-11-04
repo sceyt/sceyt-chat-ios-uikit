@@ -16,6 +16,10 @@ import UIKit
 /// - `allAttachmentsObserver`: always-on, no search filter, paginated – drives the collection view.
 /// - `searchObserver`: restarted on each `search(query:filterUser:)` call with text/user predicates – drives the search table view.
 open class GlobalSearchAllMediaViewModel: NSObject {
+    /// Sends and fetches this object's attachments. The app's shared transfer unless replaced
+    /// (a test, or a screen with its own transfer).
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
 
     public let attachmentTypes: [String]
     public let sectionNameKeyPath: String?
@@ -504,14 +508,14 @@ open class GlobalSearchAllMediaViewModel: NSObject {
                   // A stored `.done` is not proof the bytes are still there (cache
                   // eviction, restored backup), and a stored `.pending` is not proof
                   // they are missing. The file itself is the authority.
-                  fileProvider.filePath(attachment: attachment) == nil
+                  self.attachmentTransfer.filePath(attachment: attachment) == nil
             else {
                 DispatchQueue.main.async { completion?(layout) }
                 return
             }
             getMessage(layout) { message in
                 if let message {
-                    fileProvider.downloadMessageAttachments(
+                    self.attachmentTransfer.downloadMessageAttachments(
                         message: message,
                         attachments: [attachment]
                     ) { message, error in
@@ -532,11 +536,11 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     /// it must happen even when the video won't be (or hasn't been) downloaded.
     open func downloadVideoThumbnailIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
-        guard fileProvider.needsVideoThumbnailDownload(attachment: attachment)
+        guard self.attachmentTransfer.needsVideoThumbnailDownload(attachment: attachment)
         else { return }
         getMessage(layout) { message in
             guard let message else { return }
-            fileProvider.downloadVideoThumbnailsIfNeeded(
+            self.attachmentTransfer.downloadVideoThumbnailsIfNeeded(
                 message: message,
                 attachments: [attachment]
             )
@@ -546,7 +550,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
     open func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
         guard attachment.type != "link" else { return }
-        if fileProvider.filePath(attachment: attachment) != nil {
+        if self.attachmentTransfer.filePath(attachment: attachment) != nil {
             DataProvider.database.write {
                 let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
                 dto?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
@@ -557,9 +561,9 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         }
         getMessage(layout) { message in
             if let message {
-                fileProvider.resumeTransfer(message: message, attachment: attachment) {
+                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {
                     if !$0 {
-                        fileProvider.downloadMessageAttachments(message: message, attachments: [attachment])
+                        self.attachmentTransfer.downloadMessageAttachments(message: message, attachments: [attachment])
                     }
                 }
             }
@@ -570,7 +574,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment) { stopped in
                     // stopTransfer persists the paused status itself whenever it had
                     // something to stop; false means nothing was running (e.g. the
                     // download already finished) and the stored status must stay.

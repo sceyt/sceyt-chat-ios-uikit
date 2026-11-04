@@ -16,6 +16,8 @@ extension UIImageView {
         var item: PreviewItem?
         var viewOnce: Bool = false
         var messageText: String?
+        /// Whose files the preview checks and downloads.
+        var attachmentTransfer: AttachmentTransfer = fileProvider
     }
     
     // Resolve from the source view, never from the window's currently presented
@@ -47,7 +49,8 @@ extension UIImageView {
         item: PreviewItem?,
         from: UIViewController? = nil,
         viewOnce: Bool = false,
-        messageText: String? = nil) {
+        messageText: String? = nil,
+        attachmentTransfer: AttachmentTransfer = fileProvider) {
         var _tapRecognizer: TapWithDataRecognizer? = gestureRecognizers?.first(where: { $0 is TapWithDataRecognizer }) as? TapWithDataRecognizer
 
         isUserInteractionEnabled = true
@@ -65,6 +68,7 @@ extension UIImageView {
         _tapRecognizer!.from = from
         _tapRecognizer!.viewOnce = viewOnce
         _tapRecognizer!.messageText = messageText
+        _tapRecognizer!.attachmentTransfer = attachmentTransfer
         addGestureRecognizer(_tapRecognizer!)
     }
     
@@ -74,7 +78,7 @@ extension UIImageView {
         guard sourceView.window != nil,
               let presentFromViewController = sourceView.mediaPreviewPresenter(from: sender.from)
         else { return }
-        logThumbnailStateOnPreviewTap(sourceView: sourceView, item: sender.item, viewOnce: sender.viewOnce)
+        logThumbnailStateOnPreviewTap(sourceView: sourceView, item: sender.item, viewOnce: sender.viewOnce, transfer: sender.attachmentTransfer)
         UIApplication.shared.sendAction(#selector(resignFirstResponder), to: nil, from: nil, for: nil)
 
         // For view-once messages, create a single-item previewer with just the pressed item
@@ -84,7 +88,7 @@ extension UIImageView {
         if sender.viewOnce, let item = sender.item {
             let attachment = item.attachment
 
-            if attachment.status == .done || fileProvider.filePath(attachment: attachment) != nil {
+            if attachment.status == .done || sender.attachmentTransfer.filePath(attachment: attachment) != nil {
                 // file is fully on disk (covers stuck .downloading case too)
                 finalPreviewer = SingleItemPreviewDataSource(item: item)
                 initialIndex = 0
@@ -94,7 +98,7 @@ extension UIImageView {
                     MessageDTO.fetch(id: attachment.messageId, context: $0)?.convert()
                 }.get()
                 guard let message else { return }
-                fileProvider.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment]) { [weak self] _, _ in
+                sender.attachmentTransfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment]) { [weak self] _, _ in
                     // re-trigger tap after download completes
                 }
                 return
@@ -102,7 +106,7 @@ extension UIImageView {
         } else {
             if let item = sender.item {
                 let attachment = item.attachment
-                if fileProvider.filePath(attachment: attachment) != nil {
+                if sender.attachmentTransfer.filePath(attachment: attachment) != nil {
                     // The local file of an unsent attachment is its upload source, not a finished
                     // download: marking it `.done` took it out of the resend's upload.
                     if attachment.status != .done, !attachment.isPendingUpload {
@@ -157,7 +161,7 @@ extension UIImageView {
     /// id back through the `[Attachment]` logs to see which path (duplicate layout instance / missed
     /// completion callback / missed reconfigure) skipped this cell. No-op unless warnings are
     /// enabled, and skipped for view-once (its blur is intentional, not this bug).
-    private func logThumbnailStateOnPreviewTap(sourceView: UIImageView, item: PreviewItem?, viewOnce: Bool) {
+    private func logThumbnailStateOnPreviewTap(sourceView: UIImageView, item: PreviewItem?, viewOnce: Bool, transfer: AttachmentTransfer) {
         guard !viewOnce, let attachment = item?.attachment else { return }
         let type = AttachmentType(rawValue: attachment.type)
         guard type == .image || type == .video else { return }
@@ -171,8 +175,8 @@ extension UIImageView {
             ? MessageLayoutModel.defaults.imageAttachmentSize
             : (layout?.thumbnailSize ?? MessageLayoutModel.defaults.imageAttachmentSize)
 
-        let fullFileOnDisk = fileProvider.filePath(attachment: attachment) != nil
-        let sharpThumbOnDisk = fileProvider.thumbnailFile(for: attachment, preferred: preferred) != nil
+        let fullFileOnDisk = transfer.filePath(attachment: attachment) != nil
+        let sharpThumbOnDisk = transfer.thumbnailFile(for: attachment, preferred: preferred) != nil
         let mediaReady = attachment.status == .done || fullFileOnDisk
         let loadedFromFile = layout?.isThumbnailLoadedFromFile
 

@@ -60,7 +60,6 @@ final class AttachmentTransferTaskLeakTests: XCTestCase {
 
     private var transfer: AttachmentTransfer!
     private var session: MockLeakDataSession!
-    private var originalDataSession: SCTDataSession?
     private var originalDatabase: Database!
 
     private let messageId: MessageId = 4242
@@ -69,16 +68,15 @@ final class AttachmentTransferTaskLeakTests: XCTestCase {
         try super.setUpWithError()
         originalDatabase = DataProvider.database
         DataProvider.database = MockDatabase()
-        originalDataSession = Components.dataSession
         session = MockLeakDataSession()
-        Components.dataSession = session
         // A fresh instance, not `.default`: its caches are process-wide and would keep
         // state alive across tests.
         transfer = AttachmentTransfer()
+        let session = session!
+        transfer.environment.dataSession = { session }
     }
 
     override func tearDownWithError() throws {
-        Components.dataSession = originalDataSession
         DataProvider.database = originalDatabase
         transfer = nil
         session = nil
