@@ -2793,12 +2793,12 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
     }
     
-    open func stopFileTransfer(message: ChatMessage, attachment: ChatMessage.Attachment) {
-        self.attachmentTransfer.stopTransfer(message: message, attachment: attachment)
+    open func stopFileTransfer(message: ChatMessage, attachment: ChatMessage.Attachment, reason: String = "chat: message cell button") {
+        self.attachmentTransfer.stopTransfer(message: message, attachment: attachment, reason: reason)
     }
     
     open func resumeFileTransfer(message: ChatMessage, attachment: ChatMessage.Attachment) {
-        self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {[weak self] status in
+        self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment, reason: "chat: message cell button") {[weak self] status in
             if let self, !status {
                 if message.deliveryStatus == .pending, attachment.filePath != nil {
                     attachment.status = .pending

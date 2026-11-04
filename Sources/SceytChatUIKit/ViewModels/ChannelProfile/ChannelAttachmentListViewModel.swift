@@ -419,7 +419,7 @@ open class ChannelAttachmentListViewModel: NSObject {
         }
         getMessage(layout) { message in
             if let message {
-                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {
+                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment, reason: "channel info: download button") {
                     if !$0 {
                         self.attachmentTransfer
                             .downloadMessageAttachments(
@@ -437,7 +437,7 @@ open class ChannelAttachmentListViewModel: NSObject {
 
         getMessage(layout) { message in
             if let message {
-                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment) { stopped in
+                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment, reason: "channel info: download button") { stopped in
                     // stopTransfer persists the paused status itself whenever it had
                     // something to stop. False means there was no live task and the
                     // status is not a transfer state — e.g. the download already
@@ -576,7 +576,7 @@ public extension ChannelAttachmentListViewModelProviding {
         let attachment = layout.attachment
         resolveOwnerMessage(layout) { message in
             guard let message else { return }
-            self.attachmentTransfer.stopTransfer(message: message, attachment: attachment)
+            self.attachmentTransfer.stopTransfer(message: message, attachment: attachment, reason: "channel info: upload button")
         }
     }
 
@@ -587,7 +587,7 @@ public extension ChannelAttachmentListViewModelProviding {
         let attachment = layout.attachment
         resolveOwnerMessage(layout) { message in
             guard let message else { return }
-            self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) { resumed in
+            self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment, reason: "channel info: upload button") { resumed in
                 guard !resumed,
                       message.deliveryStatus == .pending,
                       attachment.filePath != nil

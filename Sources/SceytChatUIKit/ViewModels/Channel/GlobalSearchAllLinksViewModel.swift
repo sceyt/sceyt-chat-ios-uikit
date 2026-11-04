@@ -425,7 +425,7 @@ open class GlobalSearchAllLinksViewModel: NSObject {
         guard attachment.type != "link" else { return }
         getMessage(layout) { message in
             if let message {
-                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {
+                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment, reason: "global search: links button") {
                     if !$0 {
                         self.attachmentTransfer.downloadMessageAttachments(message: message, attachments: [attachment])
                     }
@@ -438,7 +438,7 @@ open class GlobalSearchAllLinksViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment) { _ in
+                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment, reason: "global search: links button") { _ in
                     DataProvider.database.write {
                         let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
                         dto?.status = ChatMessage.Attachment.TransferStatus.pauseDownloading.rawValue

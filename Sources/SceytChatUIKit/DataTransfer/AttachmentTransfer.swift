@@ -84,6 +84,15 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
     open func dataSession(for message: ChatMessage? = nil, forAttachment: ChatMessage.Attachment? = nil) -> SCTDataSession? {
         environment.dataSession()
     }
+
+    /// The server accepted `message` (`ChannelMessageSender`'s send and resend acks): the
+    /// data session can let go of what it kept to report its uploads again.
+    open func messageWasSent(_ message: ChatMessage) {
+        guard message.attachments?.contains(where: { $0.tid != 0 && $0.type != "link" }) == true,
+              let session = dataSession(for: message) as? TransportDataSession
+        else { return }
+        session.messageSent(message)
+    }
     
     /// Identifies an attachment *for the duration of one transfer*.
     ///
@@ -266,12 +275,20 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
     }
 
     
+    /// - Parameters:
+    ///   - reason: who asked (a screen's button), for the log: a pause nobody remembers asking
+    ///     for is otherwise indistinguishable from one the app made. `file`/`line` name the call.
     open func stopTransfer(
         message: ChatMessage,
         attachment: ChatMessage.Attachment,
+        reason: String = "unspecified",
+        file: String = #fileID,
+        line: UInt = #line,
         completion: ((Bool) -> Void)? = nil) {
         onQueue {
-            guard let task = self.taskFor(message: message, attachment: attachment)
+            let task = self.taskFor(message: message, attachment: attachment)
+            logger.info("[Attachment] \(task?.logTag ?? "-") pause requested by \(reason) (\(file):\(line)) status=\(attachment.status) liveTask=\(task != nil) \(attachment.transferLogDescription)")
+            guard let task
             else {
                 switch attachment.status {
                 case .downloading:
@@ -307,9 +324,14 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
     open func resumeTransfer(
         message: ChatMessage,
         attachment: ChatMessage.Attachment,
+        reason: String = "unspecified",
+        file: String = #fileID,
+        line: UInt = #line,
         completion: ((Bool) -> Void)? = nil) {
         onQueue {
-            guard let task = self.taskFor(message: message, attachment: attachment)
+            let task = self.taskFor(message: message, attachment: attachment)
+            logger.info("[Attachment] \(task?.logTag ?? "-") resume requested by \(reason) (\(file):\(line)) status=\(attachment.status) liveTask=\(task != nil) \(attachment.transferLogDescription)")
+            guard let task
             else {
                 completion?(false)
                 return

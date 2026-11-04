@@ -92,6 +92,8 @@ open class ChannelMessageSender: DataProvider {
                 return
             }
             logger.info("message with tid \(sentMessage.tid) id: \(sentMessage.id) sent successfully")
+            // Its uploads will not be asked for again: the transport can forget them.
+            self.attachmentTransfer.messageWasSent(ChatMessage(message: message, channelId: self.channelId))
             let sendAckTid = sentMessage.tid
             var suppressedDelete: PendingMessageDelete?
             // `database.write` can report completion twice (see `OneShotCompletion`), and this one
@@ -240,6 +242,8 @@ open class ChannelMessageSender: DataProvider {
                         return
                     }
                      logger.info("Message with tid \(sentMessage.tid), id \(sentMessage.id) will store in db")
+                    // Its uploads will not be asked for again: the transport can forget them.
+                    self.attachmentTransfer.messageWasSent(chatMessage)
                     let resendAckTid = sentMessage.tid
                     var suppressedDelete: PendingMessageDelete?
                     // `database.write` can report completion twice (see `OneShotCompletion`), and

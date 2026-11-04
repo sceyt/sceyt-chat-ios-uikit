@@ -149,11 +149,16 @@ public protocol FileTransferTransport: AnyObject {
     func pause(operationId: String) -> Bool
     func resume(operationId: String) -> Bool
     func cancel(operationId: String)
+    /// The message carrying the upload `operationId` was sent: nothing will ask for that
+    /// upload's result again, so what was kept to report it again (after a lost result, a
+    /// relaunch) can go. Never called for a running upload; must tolerate an unknown id.
+    func uploadDelivered(operationId: String)
 }
 
 public extension FileTransferTransport {
     func pause(operationId: String) -> Bool { false }
     func resume(operationId: String) -> Bool { false }
+    func uploadDelivered(operationId: String) {}
 }
 
 public enum FileTransferError: Error {

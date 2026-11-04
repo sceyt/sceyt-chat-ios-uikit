@@ -90,6 +90,15 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
         attachment.tid != 0 ? "upload-\(attachment.tid)" : "upload-\(UUID().uuidString)"
     }
 
+    /// The server accepted `message`: its uploads' results are final, and what the transport
+    /// kept to report them again goes. Only attachments with a `tid` have an operation that
+    /// can be found again.
+    open func messageSent(_ message: ChatMessage) {
+        for attachment in message.attachments ?? [] where attachment.tid != 0 && attachment.type != "link" {
+            transport.uploadDelivered(operationId: uploadOperationId(for: attachment))
+        }
+    }
+
     /// Names a download: short and stable (`download-tid…`, `download-id…`, or
     /// `download-url<hash>`), never the url itself, which can be long and signed.
     open func downloadOperationId(for attachment: ChatMessage.Attachment) -> String {

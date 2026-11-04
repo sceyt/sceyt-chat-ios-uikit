@@ -311,7 +311,7 @@ open class GlobalSearchAllFilesViewModel: NSObject {
         }
         getMessage(layout) { message in
             if let message {
-                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment) {
+                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment, reason: "global search: files button") {
                     if !$0 {
                         self.attachmentTransfer.downloadMessageAttachments(message: message, attachments: [attachment])
                     }
@@ -324,7 +324,7 @@ open class GlobalSearchAllFilesViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment) { stopped in
+                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment, reason: "global search: files button") { stopped in
                     // stopTransfer persists the paused status itself whenever it had
                     // something to stop; false means nothing was running (e.g. the
                     // download already finished) and the stored status must stay.

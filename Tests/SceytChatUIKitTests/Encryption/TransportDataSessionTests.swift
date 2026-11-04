@@ -65,6 +65,13 @@ private final class ScriptedTransport: FileTransferTransport {
         lock.lock(); _cancelled.append(operationId); lock.unlock()
         onCancel(operationId)
     }
+
+    private var _delivered = [String]()
+    var delivered: [String] { lock.lock(); defer { lock.unlock() }; return _delivered }
+
+    func uploadDelivered(operationId: String) {
+        lock.lock(); _delivered.append(operationId); lock.unlock()
+    }
 }
 
 /// The router under test, storing everything under one temporary directory.
@@ -356,6 +363,19 @@ final class TransportDataSessionTests: XCTestCase {
     }
 
     // MARK: - Identity and storage
+
+    /// A sent message's uploads are final: the transport is told to forget each one it can
+    /// find again (only an attachment with a `tid` has a stable operation).
+    func testASentMessageTellsTheTransportItsUploadsAreDelivered() {
+        let sent = makeAttachment(tid: 41)
+        let unnamed = makeAttachment(tid: 0)
+        let link = makeAttachment(tid: 43, type: "link")
+        let message = ChatMessage(id: 1, channelId: 1, attachments: [sent, unnamed, link], user: ChatUser(id: "u"))
+
+        session.messageSent(message)
+
+        XCTAssertEqual(transport.delivered, ["upload-41"])
+    }
 
     func testOperationIds() {
         XCTAssertEqual(session.uploadOperationId(for: makeAttachment(tid: 42)), "upload-42")
