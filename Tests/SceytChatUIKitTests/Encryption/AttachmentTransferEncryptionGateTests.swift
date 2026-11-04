@@ -14,7 +14,7 @@ import XCTest
 
 /// A transport whose behaviour each test sets. Records every call.
 private final class FakeTransport: FileTransferTransport {
-    var onUpload: (FileUploadRequest) async -> FileTransferResult<FileUploadResult> = { _ in .success(FileUploadResult(remoteReference: "REMOTE")) }
+    var onUpload: (FileUploadRequest) async -> FileTransferResult<FileUploadResult> = { _ in .success(FileUploadResult(url: "REMOTE")) }
     var onDownload: (FileDownloadRequest) async -> FileTransferResult<URL> = { _ in .failure(URLError(.badURL)) }
     var pausesInPlace = true
 
@@ -216,9 +216,9 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
     private func encryptedUpload(_ request: FileUploadRequest, into ciphertext: URL) async -> FileTransferResult<FileUploadResult> {
         do {
             let session = try await encryption.prepareEncryption(file: request.sourceFile)
-            defer { session.close(); encryption.discard(session.checkpoint()) }
+            defer { session.close() }
             try session.materialize(to: ciphertext)
-            return .success(FileUploadResult(remoteReference: "REMOTE-UUID", encryptionInfo: session.encryptionInfo))
+            return .success(FileUploadResult(url: "REMOTE-UUID", encryptionInfo: session.encryptionInfo))
         } catch {
             return .failure(error)
         }
@@ -288,7 +288,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
 
     func testEncryptedSuccessWithoutEncryptionInfoIsRejected() throws {
         let attachment = makeAttachment(filePath: try file(size: 100).path)
-        transport.onUpload = { _ in .success(FileUploadResult(remoteReference: "PLAINTEXT-UUID")) }
+        transport.onUpload = { _ in .success(FileUploadResult(url: "PLAINTEXT-UUID")) }
 
         let error = upload(attachment)
 
@@ -428,7 +428,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         XCTAssertEqual(transport.paused, ["upload-1"])
         task.resume()
         XCTAssertTrue(waitUntil { self.transport.resumed == ["upload-1"] })
-        gate.open(.success(FileUploadResult(remoteReference: "REMOTE")))
+        gate.open(.success(FileUploadResult(url: "REMOTE")))
 
         XCTAssertTrue(waitUntil { finished })
         XCTAssertEqual(transport.uploads.count, 1, "the paused invocation continued; no second upload")
@@ -455,7 +455,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         task.stop()
         RunLoop.main.run(until: Date().addingTimeInterval(0.2))
         XCTAssertFalse(finished, "an interruption by a pause is not a failure")
-        transport.onUpload = { _ in .success(FileUploadResult(remoteReference: "SECOND")) }
+        transport.onUpload = { _ in .success(FileUploadResult(url: "SECOND")) }
         task.resume()
 
         XCTAssertTrue(waitUntil { finished })
@@ -560,7 +560,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
     /// across the 64 KiB records, and a range read again gives the same bytes.
     func testRangesAreExactRepeatableSlicesOfTheObject() async throws {
         let session = try await encryption.prepareEncryption(file: try file(size: 300_000))
-        defer { session.close(); encryption.discard(session.checkpoint()) }
+        defer { session.close() }
         let whole = directory.appendingPathComponent("whole")
         try session.materialize(to: whole)
         let expected = try Data(contentsOf: whole)
@@ -591,7 +591,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         let saved = try JSONDecoder().decode(EncryptedFileCheckpoint.self, from: JSONEncoder().encode(checkpoint))
 
         let restored = try await encryption.restoreEncryption(file: source, checkpoint: saved)
-        defer { restored.close(); encryption.discard(saved) }
+        defer { restored.close() }
         XCTAssertEqual(restored.encryptionInfo, firstInfo, "the same key and attachment id")
         XCTAssertEqual(restored.sourceId, firstSourceId)
         XCTAssertEqual(saved.plaintextSize, 200_000)
@@ -603,7 +603,6 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         let first = try await encryption.prepareEncryption(file: source)
         let checkpoint = first.checkpoint()
         first.close()
-        encryption.discard(checkpoint)
         try Data(repeating: 7, count: 1000).write(to: source)
 
         do {
@@ -621,6 +620,5 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         let fresh = try await encryption.prepareEncryption(file: source)
         XCTAssertNotEqual(fresh.encryptionInfo.key, checkpoint.encryptionInfo.key)
         fresh.close()
-        encryption.discard(fresh.checkpoint())
     }
 }

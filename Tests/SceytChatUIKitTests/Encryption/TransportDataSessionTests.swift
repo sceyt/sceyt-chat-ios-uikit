@@ -19,7 +19,7 @@ import XCTest
 /// A transport each test scripts. Records every call.
 private final class ScriptedTransport: FileTransferTransport {
     var onUpload: (FileUploadRequest, @escaping (Double) -> Void) async -> FileTransferResult<FileUploadResult> = { _, _ in
-        .success(FileUploadResult(remoteReference: "REMOTE"))
+        .success(FileUploadResult(url: "REMOTE"))
     }
     var onDownload: (FileDownloadRequest, @escaping (Double) -> Void) async -> FileTransferResult<URL> = { request, _ in
         .success(request.destinationFile)
@@ -450,7 +450,7 @@ final class TransportDataSessionTests: XCTestCase {
         transport.onUpload = { request, progress in
             progress(0.25)
             progress(0.75)
-            return .success(FileUploadResult(remoteReference: "REF"))
+            return .success(FileUploadResult(url: "REF"))
         }
 
         session.upload(attachment: attachment, taskInfo: taskInfo)
@@ -482,7 +482,7 @@ final class TransportDataSessionTests: XCTestCase {
         transport.onUpload = { request, _ in
             sizeSeenByTransport = taskInfo.transferSize
             sentFileSize = (try? FileManager.default.attributesOfItem(atPath: request.sourceFile.path)[.size] as? NSNumber)?.int64Value
-            return .success(FileUploadResult(remoteReference: "IMG"))
+            return .success(FileUploadResult(url: "IMG"))
         }
 
         session.upload(attachment: attachment, taskInfo: taskInfo)
@@ -521,7 +521,7 @@ final class TransportDataSessionTests: XCTestCase {
         let info = EncryptedFileInfo(algorithm: "alg", attachmentId: "id", key: "WwzMzbKnXbC2RhfF-HQr0GVLIBnFB54GJt-GBr4RERo")
         transport.onUpload = { request, _ in
             XCTAssertEqual(request.type, .encrypted)
-            return .success(FileUploadResult(remoteReference: "ENC", encryptionInfo: info))
+            return .success(FileUploadResult(url: "ENC", encryptionInfo: info))
         }
 
         let (taskInfo, recorder, _) = try upload(encryption: .required)
@@ -560,7 +560,7 @@ final class TransportDataSessionTests: XCTestCase {
     func testUploadsRunOneAtATime() throws {
         let first = Hold<FileTransferResult<FileUploadResult>>()
         transport.onUpload = { request, _ in
-            request.operationId == "upload-1" ? await first.wait() : .success(FileUploadResult(remoteReference: "SECOND"))
+            request.operationId == "upload-1" ? await first.wait() : .success(FileUploadResult(url: "SECOND"))
         }
         let (_, a, _) = try upload(tid: 1)
         let (_, b, _) = try upload(tid: 2)
@@ -569,7 +569,7 @@ final class TransportDataSessionTests: XCTestCase {
         settle()
         XCTAssertEqual(transport.uploads.map(\.operationId), ["upload-1"], "the second waits for the slot")
 
-        first.open(.success(FileUploadResult(remoteReference: "FIRST")))
+        first.open(.success(FileUploadResult(url: "FIRST")))
         waitUntil { a.isOver && b.isOver }
         XCTAssertEqual(transport.uploads.map(\.operationId), ["upload-1", "upload-2"])
         XCTAssertEqual(b.successes, ["SECOND"])
@@ -579,7 +579,7 @@ final class TransportDataSessionTests: XCTestCase {
         var report: ((Double) -> Void)?
         transport.onUpload = { _, progress in
             report = progress
-            return .success(FileUploadResult(remoteReference: "R"))
+            return .success(FileUploadResult(url: "R"))
         }
         let (_, recorder, _) = try upload()
         waitUntil { recorder.isOver }
@@ -636,7 +636,7 @@ final class TransportDataSessionTests: XCTestCase {
         // Attempt 2 of the same operation: the same bytes, no new resize.
         transport.onUpload = { request, _ in
             XCTAssertEqual(try? Data(contentsOf: request.sourceFile), stagedBytes)
-            return .success(FileUploadResult(remoteReference: "IMG"))
+            return .success(FileUploadResult(url: "IMG"))
         }
         let second = makeAttachment(type: "image", name: "photo.jpg", filePath: original.path)
         let (secondTask, secondRecorder) = makeTask(second)
@@ -705,7 +705,7 @@ final class TransportDataSessionTests: XCTestCase {
         transport.onUpload = { request, _ in
             sentSize = TransportDataSession.fileSize(request.sourceFile)
             try? FileManager.default.removeItem(at: request.sourceFile)
-            return .success(FileUploadResult(remoteReference: "ENC", encryptionInfo: info))
+            return .success(FileUploadResult(url: "ENC", encryptionInfo: info))
         }
         let attachment = makeAttachment(type: "image", name: "photo.jpg", filePath: original.path)
         let (taskInfo, recorder) = makeTask(attachment, encryption: .required)
@@ -723,7 +723,7 @@ final class TransportDataSessionTests: XCTestCase {
 
     func testEncryptedSizeIsTheTransportsWhenItReportsOne() throws {
         transport.onUpload = { _, _ in
-            .success(FileUploadResult(remoteReference: "E", encryptionInfo: EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw"), plaintextSize: 42))
+            .success(FileUploadResult(url: "E", encryptionInfo: EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw"), plaintextSize: 42))
         }
         let (taskInfo, recorder, _) = try upload(tid: 21, encryption: .required)
         waitUntil { recorder.isOver }
@@ -891,7 +891,7 @@ final class TransportDataSessionTests: XCTestCase {
         waitUntil { hold.isWaiting }
 
         taskInfo.failure(error: Failure(name: "elsewhere"))
-        hold.open(.success(FileUploadResult(remoteReference: "LATE")))
+        hold.open(.success(FileUploadResult(url: "LATE")))
         settle()
 
         XCTAssertEqual(recorder.failures.compactMap { $0 as? Failure }, [Failure(name: "elsewhere")])
@@ -905,7 +905,7 @@ final class TransportDataSessionTests: XCTestCase {
     func testAPauseWhileQueuedKeepsTheUploadOutOfTheQueueUntilResumed() throws {
         let first = Hold<FileTransferResult<FileUploadResult>>()
         transport.onUpload = { request, _ in
-            request.operationId == "upload-1" ? await first.wait() : .success(FileUploadResult(remoteReference: "SECOND"))
+            request.operationId == "upload-1" ? await first.wait() : .success(FileUploadResult(url: "SECOND"))
         }
         let (_, a, _) = try upload(tid: 1)
         let (queued, b, _) = try upload(tid: 2)
@@ -913,7 +913,7 @@ final class TransportDataSessionTests: XCTestCase {
 
         queued.stop()
         XCTAssertTrue(transport.paused.isEmpty, "nothing is running to pause")
-        first.open(.success(FileUploadResult(remoteReference: "FIRST")))
+        first.open(.success(FileUploadResult(url: "FIRST")))
         waitUntil { a.isOver }
         settle()
         XCTAssertEqual(uploads(of: "upload-2"), 0)
@@ -966,7 +966,7 @@ final class TransportDataSessionTests: XCTestCase {
         settle()
         XCTAssertEqual(transport.uploads.map(\.operationId), ["upload-1", "upload-2"], "two slots, the third waits")
 
-        release.open(.success(FileUploadResult(remoteReference: "R1")))
+        release.open(.success(FileUploadResult(url: "R1")))
         waitUntil { first.isOver }
         waitUntil { self.transport.uploads.count == 3 }
         XCTAssertEqual(transport.uploads.last?.operationId, "upload-3", "the freed slot goes to the next in line")
@@ -1047,7 +1047,7 @@ final class TransportDataSessionTests: XCTestCase {
         var attempts = 0
         transport.onUpload = { _, _ in
             attempts += 1
-            return attempts == 1 ? await first.wait() : .success(FileUploadResult(remoteReference: "SECOND"))
+            return attempts == 1 ? await first.wait() : .success(FileUploadResult(url: "SECOND"))
         }
         transport.onResume = { _ in false }
         let (taskInfo, recorder, _) = try upload()
@@ -1064,7 +1064,7 @@ final class TransportDataSessionTests: XCTestCase {
         XCTAssertTrue(first.wasCancelled, "the old invocation is stopped")
 
         // The first invocation ends late: it belongs to an earlier attempt.
-        first.open(.success(FileUploadResult(remoteReference: "FIRST")))
+        first.open(.success(FileUploadResult(url: "FIRST")))
         settle()
         XCTAssertEqual(recorder.successes, ["SECOND"])
     }
@@ -1116,7 +1116,7 @@ final class TransportDataSessionTests: XCTestCase {
         var attempts = 0
         transport.onUpload = { _, _ in
             attempts += 1
-            return attempts == 1 ? await first.wait() : .success(FileUploadResult(remoteReference: "SECOND"))
+            return attempts == 1 ? await first.wait() : .success(FileUploadResult(url: "SECOND"))
         }
         let (taskInfo, recorder, _) = try upload()
         waitUntil { first.isWaiting }
@@ -1140,7 +1140,7 @@ final class TransportDataSessionTests: XCTestCase {
         waitUntil { first.isWaiting }
 
         taskInfo.stop()
-        first.open(.success(FileUploadResult(remoteReference: "LANDED")))
+        first.open(.success(FileUploadResult(url: "LANDED")))
         waitUntil { recorder.isOver }
 
         XCTAssertEqual(recorder.successes, ["LANDED"])
@@ -1153,7 +1153,7 @@ final class TransportDataSessionTests: XCTestCase {
         transport.onUpload = { request, _ in
             if request.operationId == "upload-2" { return await b.wait() }
             attemptsOfA += 1
-            return attemptsOfA == 1 ? await a1.wait() : .success(FileUploadResult(remoteReference: "A2"))
+            return attemptsOfA == 1 ? await a1.wait() : .success(FileUploadResult(url: "A2"))
         }
         let (taskA, recorderA, _) = try upload(tid: 1)
         let (_, recorderB, _) = try upload(tid: 2)
@@ -1166,7 +1166,7 @@ final class TransportDataSessionTests: XCTestCase {
         settle()
         XCTAssertFalse(recorderA.isOver)
 
-        b.open(.success(FileUploadResult(remoteReference: "B")))
+        b.open(.success(FileUploadResult(url: "B")))
         waitUntil { recorderA.isOver && recorderB.isOver }
         XCTAssertTrue(transport.resumed.isEmpty, "the paused invocation was gone by its turn")
         XCTAssertEqual(uploads(of: "upload-1"), 2)
@@ -1195,13 +1195,13 @@ final class TransportDataSessionTests: XCTestCase {
         waitUntil { holds[1].isWaiting }
         reports[0](0.6)
         reports[1](0.2)
-        holds[0].open(.success(FileUploadResult(remoteReference: "STALE")))
+        holds[0].open(.success(FileUploadResult(url: "STALE")))
         settle()
         XCTAssertEqual(recorder.progress.last, 0.2)
         XCTAssertFalse(recorder.progress.contains(0.6))
         XCTAssertTrue(recorder.successes.isEmpty, "the stale attempt's result is dropped")
 
-        holds[1].open(.success(FileUploadResult(remoteReference: "CURRENT")))
+        holds[1].open(.success(FileUploadResult(url: "CURRENT")))
         waitUntil { recorder.isOver }
         XCTAssertEqual(recorder.successes, ["CURRENT"])
     }
@@ -1221,7 +1221,7 @@ final class TransportDataSessionTests: XCTestCase {
 
         XCTAssertEqual(transport.paused, ["upload-1"])
         XCTAssertEqual(transport.resumed, ["upload-1"])
-        first.open(.success(FileUploadResult(remoteReference: "R")))
+        first.open(.success(FileUploadResult(url: "R")))
         waitUntil { recorder.isOver }
         XCTAssertEqual(uploads(of: "upload-1"), 1)
     }
@@ -1231,7 +1231,7 @@ final class TransportDataSessionTests: XCTestCase {
     func testCancellingARunningUploadStopsItAndDropsItsResult() throws {
         let first = Hold<FileTransferResult<FileUploadResult>>()
         transport.onUpload = { request, _ in
-            request.operationId == "upload-1" ? await first.wait() : .success(FileUploadResult(remoteReference: "NEXT"))
+            request.operationId == "upload-1" ? await first.wait() : .success(FileUploadResult(url: "NEXT"))
         }
         let (taskInfo, recorder, _) = try upload(tid: 1)
         let (_, next, _) = try upload(tid: 2)
@@ -1243,7 +1243,7 @@ final class TransportDataSessionTests: XCTestCase {
         XCTAssertTrue(first.wasCancelled)
         XCTAssertEqual(transport.cancelled, ["upload-1"], "repeats reach the transport once")
 
-        first.open(.success(FileUploadResult(remoteReference: "LATE")))
+        first.open(.success(FileUploadResult(url: "LATE")))
         settle()
         XCTAssertEqual(recorder.failures.count, 1, "a cancelled upload ends, once")
         XCTAssertEqual((recorder.failures.first as? URLError)?.code, .cancelled, "like a cancelled download")
@@ -1264,7 +1264,7 @@ final class TransportDataSessionTests: XCTestCase {
         waitUntil { first.isWaiting }
 
         queued.cancel()
-        first.open(.success(FileUploadResult(remoteReference: "A")))
+        first.open(.success(FileUploadResult(url: "A")))
         waitUntil { a.isOver }
         settle()
 
@@ -1343,8 +1343,8 @@ final class TransportDataSessionTests: XCTestCase {
         XCTAssertTrue(downloadHold.wasCancelled)
 
         // Late results are dropped, and the slot is free at once.
-        upload1.open(.success(FileUploadResult(remoteReference: "LATE")))
-        transport.onUpload = { _, _ in .success(FileUploadResult(remoteReference: "AFTER")) }
+        upload1.open(.success(FileUploadResult(url: "LATE")))
+        transport.onUpload = { _, _ in .success(FileUploadResult(url: "AFTER")) }
         let (_, after, _) = try upload(tid: 3)
         waitUntil { after.isOver }
         XCTAssertEqual(after.successes, ["AFTER"])
@@ -1602,7 +1602,7 @@ final class TransportDataSessionTests: XCTestCase {
 
         let (second, b) = makeTask(attachment)
         session.upload(attachment: attachment, taskInfo: second)
-        hold.open(.success(FileUploadResult(remoteReference: "ONE")))
+        hold.open(.success(FileUploadResult(url: "ONE")))
         waitUntil { a.isOver && b.isOver }
 
         XCTAssertEqual(uploads(of: "upload-5"), 1, "one transfer, one staging folder, one transport record")
@@ -1664,7 +1664,7 @@ extension TransportDataSessionTests {
         let (second, b) = makeTask(attachment)
         session.upload(attachment: attachment, taskInfo: second)
         waitUntil { self.transport.resumed.count == 1 }
-        hold.open(.success(FileUploadResult(remoteReference: "JOINED")))
+        hold.open(.success(FileUploadResult(url: "JOINED")))
         waitUntil { a.isOver && b.isOver }
 
         XCTAssertEqual(uploads(of: "upload-7"), 1)
@@ -1762,7 +1762,7 @@ extension TransportDataSessionTests {
 
     func testAPlainUploadThatComesBackWithEncryptionKeepsIt() throws {
         let info = EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")
-        transport.onUpload = { _, _ in .success(FileUploadResult(remoteReference: "R", encryptionInfo: info)) }
+        transport.onUpload = { _, _ in .success(FileUploadResult(url: "R", encryptionInfo: info)) }
         let (taskInfo, recorder, _) = try upload(tid: 10)
         waitUntil { recorder.isOver }
         XCTAssertEqual(taskInfo.uploadedEncryption, info)
@@ -1773,7 +1773,7 @@ extension TransportDataSessionTests {
         session.preparation = { _, _ in PreparedUploadFile(file: prepared, isStaged: false) }
         transport.onUpload = { request, _ in
             try? FileManager.default.removeItem(at: request.sourceFile)
-            return .success(FileUploadResult(remoteReference: "E", encryptionInfo: EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")))
+            return .success(FileUploadResult(url: "E", encryptionInfo: EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")))
         }
         let attachment = makeAttachment(tid: 11, filePath: directory.appendingPathComponent("gone").path)
         let (taskInfo, recorder) = makeTask(attachment, encryption: .required)
@@ -1920,7 +1920,7 @@ extension TransportDataSessionTests {
         let signed = "https://cdn.example.com/\(UUID().uuidString)/report.pdf?Signature=SIG-SECRET&Key-Pair-Id=PAIR"
 
         transport.onUpload = { _, _ in
-            .success(FileUploadResult(remoteReference: signed, encryptionInfo: EncryptedFileInfo(algorithm: "alg", attachmentId: "id", key: key)))
+            .success(FileUploadResult(url: signed, encryptionInfo: EncryptedFileInfo(algorithm: "alg", attachmentId: "id", key: key)))
         }
         let (_, uploaded, _) = try upload(tid: 11, encryption: .required)
         waitUntil { uploaded.isOver }
@@ -1932,7 +1932,7 @@ extension TransportDataSessionTests {
         waitUntil { failed.isOver }
 
         // Success without its encryption: rejected.
-        transport.onUpload = { _, _ in .success(FileUploadResult(remoteReference: signed)) }
+        transport.onUpload = { _, _ in .success(FileUploadResult(url: signed)) }
         let (_, bypassed, _) = try upload(tid: 13, encryption: .required)
         waitUntil { bypassed.isOver }
 

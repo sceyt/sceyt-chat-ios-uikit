@@ -76,7 +76,7 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
             live.report(progress: pct)
         } completion: { url, error in
             if let url, error == nil {
-                live.finish(.success(FileUploadResult(remoteReference: url.absoluteString)))
+                live.finish(.success(FileUploadResult(url: url.absoluteString)))
                 return
             }
             if error == nil {
@@ -95,18 +95,14 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
             live.finish(.failure(error))
             return
         }
-        let checkpoint = session.checkpoint()
         let context = TransferLog.current
         // Not restorable: a retry sends again under a new key, so nothing is kept. Released
         // once, by whichever ending comes first: the SDK's completion, or a cancel or
         // interruption of the invocation (after which the SDK may never call back).
         let releaseOnce = OnceFlag()
-        let release = { [encryption] in
+        let release = {
             guard releaseOnce.claim() else { return }
-            TransferLog.with(context) {
-                session.close()
-                encryption.discard(checkpoint)
-            }
+            TransferLog.with(context) { session.close() }
         }
         // Ended (cancelled or interrupted) while the session was being prepared: nothing is
         // sent. `setStopper` runs the release at once when the invocation is already over.
@@ -132,7 +128,7 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
             release()
             if let url, error == nil {
                 logger.debug("[Encryption] \(tag) upload encrypt finished, stored ciphertext=\(session.ciphertextSize) B attachmentId=\(info.attachmentId)")
-                live.finish(.success(FileUploadResult(remoteReference: url.absoluteString, encryptionInfo: info, plaintextSize: session.plaintextSize)))
+                live.finish(.success(FileUploadResult(url: url.absoluteString, encryptionInfo: info, plaintextSize: session.plaintextSize)))
             } else {
                 if error == nil {
                     logger.warn("[Transfer] \(tag) transport upload: SDK returned neither a url nor an error")

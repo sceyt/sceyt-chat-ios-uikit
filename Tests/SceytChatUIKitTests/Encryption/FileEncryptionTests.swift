@@ -2,7 +2,7 @@
 //  FileEncryptionTests.swift
 //  SceytChatUIKitTests
 //
-//  `ChatSDKFileEncryption`, the default `FileEncryption`: snapshots, checkpoints and their
+//  `ChatSDKFileEncryption`, the default `FileEncryption`: sessions, checkpoints and their
 //  restore, decryption of tampered, truncated, mis-keyed or mis-sized objects (nothing is ever
 //  left at the destination), range reads at the object's edges and the `write` / `encrypt`
 //  helpers every transport relies on.
@@ -68,18 +68,15 @@ private final class BrokenSession: FileEncryptionSession {
 /// A `FileEncryption` handing out a `BrokenSession`, or failing to.
 private final class BrokenEncryption: FileEncryption {
     var session: BrokenSession?
-    private(set) var discarded = [EncryptedFileCheckpoint]()
 
     func prepareEncryption(file: URL) async throws -> FileEncryptionSession {
-        guard let session else { throw AttachmentEncryptionError.snapshotFailed(CocoaError(.fileNoSuchFile)) }
+        guard let session else { throw CocoaError(.fileNoSuchFile) }
         return session
     }
 
     func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
         throw AttachmentEncryptionError.invalidCheckpoint
     }
-
-    func discard(_ checkpoint: EncryptedFileCheckpoint) { discarded.append(checkpoint) }
 
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {}
 }
@@ -121,10 +118,6 @@ final class FileEncryptionTests: XCTestCase {
         return (object, info, try Data(contentsOf: plaintext))
     }
 
-    private func transferId(of session: FileEncryptionSession) throws -> String {
-        try XCTUnwrap(session as? ChatSDKEncryptionSession).transferId
-    }
-
     /// Decrypts and returns the error, asserting nothing is left at `destination`.
     private func decryptionError(
         _ object: URL,
@@ -155,31 +148,36 @@ final class FileEncryptionTests: XCTestCase {
 
     // MARK: - Prepare
 
-    func testPrepareEncryptsAReadOnlySnapshotThatDiscardRemoves() async throws {
+    func testPrepareEncryptsTheFileItselfWithNoCopy() async throws {
+        let legacy = LegacyEncryptionSnapshots.directory
         let source = try file(size: 70_000)
         let session = try await encryption.prepareEncryption(file: source)
-        let transferId = try transferId(of: session)
-        let snapshot = AttachmentEncryptionFiles.snapshot(transferId: transferId)
 
         XCTAssertEqual(session.plaintextSize, 70_000)
         XCTAssertEqual(UInt64(session.ciphertextSize), AttachmentEncryption.ciphertextSize(plaintextSize: 70_000))
         XCTAssertEqual(session.encryptionInfo.algorithm, StreamingAeadFileEncryptionProvider.format)
         XCTAssertEqual(session.encryptionInfo.attachmentId.count, 22)
         XCTAssertFalse(session.sourceId.isEmpty)
-        XCTAssertEqual(try Data(contentsOf: snapshot), try Data(contentsOf: source))
-        let permissions = try FileManager.default.attributesOfItem(atPath: snapshot.path)[.posixPermissions] as? Int
-        XCTAssertEqual(permissions, 0o400, "the snapshot is never written again")
-        XCTAssertTrue(snapshot.path.hasPrefix(AttachmentEncryptionFiles.transfersDirectory.path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "no copy of the file is made")
 
         let checkpoint = session.checkpoint()
         XCTAssertEqual(checkpoint.encryptionInfo, session.encryptionInfo)
         XCTAssertEqual(checkpoint.plaintextSize, 70_000)
         XCTAssertFalse(checkpoint.data.contains(checkpoint.encryptionInfo.key), "the opaque data has no key")
         session.close()
-        XCTAssertTrue(FileManager.default.fileExists(atPath: snapshot.path), "closing keeps what a restore needs")
+    }
 
-        encryption.discard(checkpoint)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: AttachmentEncryptionFiles.directory(transferId: transferId).path))
+    func testTheLegacySnapshotFolderIsRemoved() throws {
+        let legacy = directory.appendingPathComponent("encrypted-transfers", isDirectory: true)
+        let old = legacy.appendingPathComponent("T-1", isDirectory: true)
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try Data("plain".utf8).write(to: old.appendingPathComponent("snapshot"))
+
+        LegacyEncryptionSnapshots.remove(legacy)
+
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path))
+        // Nothing there: nothing done.
+        LegacyEncryptionSnapshots.remove(legacy)
     }
 
     func testEverySessionHasItsOwnKeyAndId() async throws {
@@ -187,10 +185,7 @@ final class FileEncryptionTests: XCTestCase {
         let first = try await encryption.prepareEncryption(file: source)
         let second = try await encryption.prepareEncryption(file: source)
         defer {
-            for session in [first, second] {
-                session.close()
-                encryption.discard(session.checkpoint())
-            }
+            for session in [first, second] { session.close() }
         }
         XCTAssertNotEqual(first.encryptionInfo.key, second.encryptionInfo.key)
         XCTAssertNotEqual(first.encryptionInfo.attachmentId, second.encryptionInfo.attachmentId)
@@ -198,22 +193,17 @@ final class FileEncryptionTests: XCTestCase {
         XCTAssertNotEqual(try first.read(offset: 0, length: 180), try second.read(offset: 0, length: 180))
     }
 
-    func testPrepareOfAMissingFileFailsWithSnapshotFailed() async {
+    func testPrepareOfAMissingFileFails() async {
         do {
             _ = try await encryption.prepareEncryption(file: directory.appendingPathComponent("missing"))
             XCTFail("nothing to encrypt")
-        } catch {
-            guard case .snapshotFailed = error as? AttachmentEncryptionError else {
-                return XCTFail("expected snapshotFailed, got \(error)")
-            }
-        }
+        } catch {}
     }
 
-    func testPrepareRethrowsTheProvidersErrorAndRemovesItsSnapshot() async throws {
+    func testPrepareRethrowsTheProvidersError() async throws {
         let provider = FailingProvider()
         provider.prepareError = NSError(domain: FileEncryptionErrorDomain, code: FileEncryptionError.invalidArgument.rawValue)
         encryption = ChatSDKFileEncryption(provider: { provider })
-        let before = Set((try? FileManager.default.contentsOfDirectory(atPath: AttachmentEncryptionFiles.transfersDirectory.path)) ?? [])
 
         do {
             _ = try await encryption.prepareEncryption(file: try file(size: 100))
@@ -221,23 +211,19 @@ final class FileEncryptionTests: XCTestCase {
         } catch {
             XCTAssertEqual((error as NSError).code, FileEncryptionError.invalidArgument.rawValue)
         }
-        let after = Set((try? FileManager.default.contentsOfDirectory(atPath: AttachmentEncryptionFiles.transfersDirectory.path)) ?? [])
-        XCTAssertTrue(after.isSubset(of: before), "the snapshot of the failed session is removed")
     }
 
     // MARK: - Restore
 
-    func testRestoreFallsBackToTheFileWhenTheSnapshotIsGone() async throws {
+    func testRestoreOfTheUnchangedFileGivesTheSameBytes() async throws {
         let source = try file(size: 5000)
         let first = try await encryption.prepareEncryption(file: source)
         let bytes = try first.read(offset: 0, length: Int(first.ciphertextSize))
         let checkpoint = first.checkpoint()
         first.close()
-        // The snapshot is a clone of the unchanged file: the SDK checks size and mtime.
-        try FileManager.default.removeItem(at: AttachmentEncryptionFiles.snapshot(transferId: try transferId(of: first)))
 
         let restored = try await encryption.restoreEncryption(file: source, checkpoint: checkpoint)
-        defer { restored.close(); encryption.discard(checkpoint) }
+        defer { restored.close() }
 
         XCTAssertEqual(restored.encryptionInfo, checkpoint.encryptionInfo)
         XCTAssertEqual(try restored.read(offset: 0, length: Int(restored.ciphertextSize)), bytes)
@@ -264,7 +250,6 @@ final class FileEncryptionTests: XCTestCase {
         let session = try await encryption.prepareEncryption(file: try file(size: 1000))
         let checkpoint = session.checkpoint()
         session.close()
-        defer { encryption.discard(checkpoint) }
         let saved = try ChatSDKFileEncryption.SavedSession(checkpoint)
         let corrupt = EncryptedFileCheckpoint(
             encryptionInfo: checkpoint.encryptionInfo,
@@ -280,18 +265,6 @@ final class FileEncryptionTests: XCTestCase {
         }
     }
 
-    func testDiscardOfAnUnreadableCheckpointDoesNothing() async throws {
-        let session = try await encryption.prepareEncryption(file: try file(size: 10))
-        let transferId = try transferId(of: session)
-        let checkpoint = session.checkpoint()
-        session.close()
-        defer { encryption.discard(checkpoint) }
-
-        encryption.discard(EncryptedFileCheckpoint(encryptionInfo: checkpoint.encryptionInfo, plaintextSize: 10, data: "garbage"))
-
-        XCTAssertTrue(FileManager.default.fileExists(atPath: AttachmentEncryptionFiles.snapshot(transferId: transferId).path))
-    }
-
     func testSavedSessionRoundTrips() throws {
         let saved = ChatSDKFileEncryption.SavedSession(transferId: "T-1", sdkData: "{\"a\":1}")
         let info = EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")
@@ -305,7 +278,7 @@ final class FileEncryptionTests: XCTestCase {
 
     func testRangeReadsAtTheEdgesOfTheObject() async throws {
         let session = try await encryption.prepareEncryption(file: try file(size: 2 * 65_536))
-        defer { session.close(); encryption.discard(session.checkpoint()) }
+        defer { session.close() }
         let size = session.ciphertextSize
         let whole = try session.read(offset: 0, length: Int(size))
         XCTAssertEqual(Int64(whole.count), size)
@@ -319,8 +292,6 @@ final class FileEncryptionTests: XCTestCase {
 
     func testAClosedSessionCannotBeRead() async throws {
         let session = try await encryption.prepareEncryption(file: try file(size: 100))
-        let checkpoint = session.checkpoint()
-        defer { encryption.discard(checkpoint) }
         session.close()
         session.close()
 
@@ -331,7 +302,7 @@ final class FileEncryptionTests: XCTestCase {
 
     func testWriteOfARangeIntoAMissingFolderThrows() async throws {
         let session = try await encryption.prepareEncryption(file: try file(size: 100))
-        defer { session.close(); encryption.discard(session.checkpoint()) }
+        defer { session.close() }
         let url = directory.appendingPathComponent("missing/part")
 
         XCTAssertThrowsError(try session.write(0..<10, to: url)) { error in
@@ -363,7 +334,7 @@ final class FileEncryptionTests: XCTestCase {
 
     // MARK: - encrypt
 
-    func testEncryptClosesAndDiscardsTheSessionWhenWritingFails() async {
+    func testEncryptClosesTheSessionWhenWritingFails() async {
         let broken = BrokenEncryption()
         let session = BrokenSession(ciphertextSize: 100, failingOffset: 0)
         broken.session = session
@@ -373,7 +344,6 @@ final class FileEncryptionTests: XCTestCase {
             XCTFail("the session cannot be read")
         } catch {}
         XCTAssertTrue(session.closed)
-        XCTAssertEqual(broken.discarded, [session.checkpoint()])
         XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("out").path))
     }
 
@@ -383,16 +353,8 @@ final class FileEncryptionTests: XCTestCase {
             _ = try await broken.encrypt(file: directory, to: directory.appendingPathComponent("out"))
             XCTFail("nothing was prepared")
         } catch {
-            guard case .snapshotFailed = error as? AttachmentEncryptionError else { return XCTFail("\(error)") }
+            XCTAssertEqual(error as? CocoaError, CocoaError(.fileNoSuchFile))
         }
-        XCTAssertTrue(broken.discarded.isEmpty)
-    }
-
-    func testEncryptLeavesNoSnapshotBehind() async throws {
-        let before = Set((try? FileManager.default.contentsOfDirectory(atPath: AttachmentEncryptionFiles.transfersDirectory.path)) ?? [])
-        _ = try await encrypted(size: 1000)
-        let after = Set((try? FileManager.default.contentsOfDirectory(atPath: AttachmentEncryptionFiles.transfersDirectory.path)) ?? [])
-        XCTAssertTrue(after.isSubset(of: before))
     }
 
     func testOffMainRunsOnAnotherThreadAndRethrows() async {
@@ -585,7 +547,7 @@ private final class LogCapture {
 
 extension FileEncryptionTests {
 
-    /// Encrypts, decrypts (fine, mis-sized, tampered, truncated), restores and discards with
+    /// Encrypts, decrypts (fine, mis-sized, tampered, truncated), and restores with
     /// logging at its most verbose: no key or checkpoint ever reaches a log line.
     func testNoKeyOrCheckpointIsEverLogged() async throws {
         let capture = LogCapture()
@@ -610,9 +572,7 @@ extension FileEncryptionTests {
         _ = try? await encryption.restoreEncryption(file: source, checkpoint: corrupt)
         let unreadable = EncryptedFileCheckpoint(encryptionInfo: checkpoint.encryptionInfo, plaintextSize: 1, data: "not json \(checkpoint.encryptionInfo.key)")
         _ = try? await encryption.restoreEncryption(file: source, checkpoint: unreadable)
-        encryption.discard(unreadable)
         session.close()
-        encryption.discard(checkpoint)
 
         // `enc` that cannot be read, and metadata `enc` cannot be added to.
         let enc = AttachmentEncryption(info: object.info)
@@ -644,7 +604,7 @@ extension FileEncryptionTests {
     }
 }
 
-// MARK: - Coverage: sizes, failure kinds, the snapshot purge, TransferLog
+// MARK: - Coverage: sizes, failure kinds, TransferLog
 
 extension FileEncryptionTests {
 
@@ -657,28 +617,6 @@ extension FileEncryptionTests {
         XCTAssertEqual(ChatSDKFileEncryption.failureKind(CocoaError(.fileReadCorruptFile)), "short read (truncated ciphertext)")
         XCTAssertEqual(ChatSDKFileEncryption.failureKind(NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))), "disk full")
         XCTAssertEqual(ChatSDKFileEncryption.failureKind(CocoaError(.fileWriteOutOfSpace)), "disk full")
-    }
-
-    func testThePurgeRemovesOnlyStaleSnapshots() throws {
-        let root = directory.appendingPathComponent("transfers", isDirectory: true)
-        let stale = root.appendingPathComponent("stale", isDirectory: true)
-        let fresh = root.appendingPathComponent("fresh", isDirectory: true)
-        for folder in [stale, fresh] {
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        }
-        try FileManager.default.setAttributes(
-            [.modificationDate: Date().addingTimeInterval(-AttachmentEncryptionFiles.staleSnapshotAge - 60)],
-            ofItemAtPath: stale.path
-        )
-
-        AttachmentEncryptionFiles.purgeStaleSnapshots(in: root)
-
-        XCTAssertFalse(FileManager.default.fileExists(atPath: stale.path))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: fresh.path))
-        // Nothing to purge: nothing removed, nothing logged.
-        AttachmentEncryptionFiles.purgeStaleSnapshots(in: root)
-        AttachmentEncryptionFiles.purgeStaleSnapshots(in: directory.appendingPathComponent("missing"))
-        XCTAssertTrue(FileManager.default.fileExists(atPath: fresh.path))
     }
 
     func testDescribeNamesEveryDecodingError() {

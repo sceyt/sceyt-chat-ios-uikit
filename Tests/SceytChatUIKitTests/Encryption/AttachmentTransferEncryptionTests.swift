@@ -38,12 +38,12 @@ private final class EncryptingTransport: FileTransferTransport {
     func upload(_ request: FileUploadRequest, progress: @escaping (Double) -> Void) async -> FileTransferResult<FileUploadResult> {
         lock.lock(); _uploads.append(request); lock.unlock()
         if let onUpload { return await onUpload(request) }
-        guard request.type == .encrypted else { return .success(FileUploadResult(remoteReference: "PLAIN")) }
+        guard request.type == .encrypted else { return .success(FileUploadResult(url: "PLAIN")) }
         do {
             let object = directory.appendingPathComponent("object-\(UUID().uuidString)")
             let info = try await ChatSDKFileEncryption().encrypt(file: request.sourceFile, to: object)
             lock.lock(); objects["ENC"] = object; lock.unlock()
-            return .success(FileUploadResult(remoteReference: "ENC", encryptionInfo: info))
+            return .success(FileUploadResult(url: "ENC", encryptionInfo: info))
         } catch {
             return .failure(error)
         }
@@ -157,9 +157,8 @@ private final class PosterTransfer: AttachmentTransfer {
 
 /// A `FileEncryption` that cannot prepare anything.
 private final class UnpreparedEncryption: FileEncryption {
-    func prepareEncryption(file: URL) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.snapshotFailed(CocoaError(.fileNoSuchFile)) }
+    func prepareEncryption(file: URL) async throws -> FileEncryptionSession { throw CocoaError(.fileNoSuchFile) }
     func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.invalidCheckpoint }
-    func discard(_ checkpoint: EncryptedFileCheckpoint) {}
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
         throw AttachmentEncryptionError.decryptionFailed(CocoaError(.fileReadCorruptFile))
     }
@@ -476,7 +475,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         XCTAssertEqual(waiting.status, .pending, "offline is not a refusal")
 
         transfer.environment.keyProvider = { InlineAttachmentKeyProvider { _, _ in .required } }
-        transport.onUpload = { _ in .success(FileUploadResult(remoteReference: "PLAIN")) }
+        transport.onUpload = { _ in .success(FileUploadResult(url: "PLAIN")) }
         let refused = makeAttachment(tid: 2, filePath: try file().path)
         XCTAssertNotNil(upload(refused))
         XCTAssertEqual(refused.status, .failedUploading, "an encryption refusal fails even offline")
@@ -762,7 +761,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
                 return .interrupted(CancellationError())
             }
-            return .success(FileUploadResult(remoteReference: "SECOND"))
+            return .success(FileUploadResult(url: "SECOND"))
         }
         let attachment = makeAttachment(tid: 62, filePath: try file().path)
         let message = makeMessage([attachment])
@@ -876,7 +875,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
                 try? await Task.sleep(nanoseconds: 10_000_000_000)
                 return .interrupted(CancellationError())
             }
-            return .success(FileUploadResult(remoteReference: "RESUMED"))
+            return .success(FileUploadResult(url: "RESUMED"))
         }
         let attachment = makeAttachment(tid: 67, filePath: try file().path)
         let message = makeMessage([attachment])
@@ -924,7 +923,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
             while !release.contains(request.operationId) {
                 try? await Task.sleep(nanoseconds: 5_000_000)
             }
-            return .success(FileUploadResult(remoteReference: "REF-\(request.operationId)"))
+            return .success(FileUploadResult(url: "REF-\(request.operationId)"))
         }
         let a = makeAttachment(tid: 80, filePath: try file().path)
         let b = makeAttachment(tid: 81, filePath: try file().path)

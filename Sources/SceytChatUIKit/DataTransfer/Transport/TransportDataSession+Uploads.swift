@@ -354,8 +354,8 @@ extension TransportDataSession {
                 taskInfo.uploadedPlaintextSize = plaintextSize
             }
         }
-        logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (success) ref=\(TransferLog.redact(uploaded.remoteReference)) encrypted=\(uploaded.encryptionInfo != nil)")
-        report(live, .successURI(uploaded.remoteReference))
+        logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (success) ref=\(TransferLog.redact(uploaded.url)) encrypted=\(uploaded.encryptionInfo != nil)")
+        report(live, .successURI(uploaded.url))
     }
 
     /// The size an encrypted upload's message carries: the transport's count of the bytes it

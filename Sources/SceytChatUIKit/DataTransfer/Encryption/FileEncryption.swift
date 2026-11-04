@@ -21,7 +21,6 @@ public enum AttachmentEncryptionError: Error {
     case invalidEncryptionInfo
     /// No file encrypts to a stored object of this size: truncated or not this format.
     case invalidCiphertextSize(UInt64)
-    case snapshotFailed(Error)
     /// The attachment's metadata isn't a JSON object, so `enc` cannot be added to it.
     case metadataNotAnObject
     /// `enc` could not be written into the attachment's metadata, so the receiver would get
@@ -45,10 +44,6 @@ public protocol FileEncryption: AnyObject, Sendable {
     /// ranges an earlier attempt sent stay valid next to the ones this one sends. Throws when
     /// the source changed; start a new session (and a new remote upload) then.
     func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession
-
-    /// Removes what only the session saved in `checkpoint` needed. Call when its upload is
-    /// over: stored, or abandoned for good. Restoring it fails afterwards.
-    func discard(_ checkpoint: EncryptedFileCheckpoint)
 
     /// Verifies and decrypts the stored object `file` into a new file at `destination`. On a
     /// throw nothing is left at `destination`. `plaintextSize` nil: derived from the object's.
@@ -149,11 +144,7 @@ public extension FileEncryption {
     /// poster. Returns what to send in `enc`.
     func encrypt(file: URL, to destination: URL) async throws -> EncryptedFileInfo {
         let session = try await prepareEncryption(file: file)
-        let checkpoint = session.checkpoint()
-        defer {
-            session.close()
-            discard(checkpoint)
-        }
+        defer { session.close() }
         // Sizes and the bound id only: never the key.
         let tag = TransferLog.currentTag
         logger.debug("[Encryption] \(tag) encrypt \(file.lastPathComponent) start plaintext=\(session.plaintextSize) B ciphertext=\(session.ciphertextSize) B attachmentId=\(session.encryptionInfo.attachmentId)")
@@ -213,8 +204,9 @@ private final class ResultBox<T>: @unchecked Sendable {
 // MARK: - Chat SDK adapter
 
 /// `FileEncryption` by a Chat SDK `FileEncryptionProvider` (the app's by default). Each
-/// session encrypts a transfer-owned snapshot of the file, so a later change to the prepared
-/// file cannot change the bytes under it mid-upload.
+/// session reads the file itself, as the architecture doc (§5) has it: the SDK records the
+/// source, and a restore against a changed file throws, so the transport starts a new session
+/// and a new remote upload.
 /// Safe to share: it holds only the provider lookup, a constant.
 final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
     private let provider: () -> FileEncryptionProvider
@@ -225,14 +217,13 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
 
     func prepareEncryption(file: URL) async throws -> FileEncryptionSession {
         try await FileEncryptionChunk.offMain {
-            AttachmentEncryptionFiles.purgeStaleSnapshots
+            LegacyEncryptionSnapshots.removeOnce
             let transferId = UUID().uuidString
             do {
-                let snapshot = try AttachmentEncryptionFiles.makeSnapshot(of: file, transferId: transferId)
                 // A new key per session, made by the SDK.
                 let provider = self.provider()
                 let upload = try provider.prepareUpload(
-                    fileURL: snapshot,
+                    fileURL: file,
                     uniqueId: AttachmentEncryption.newAttachmentId()
                 )
                 let session = ChatSDKEncryptionSession(upload: upload, transferId: transferId, isSDKStreaming: provider is StreamingAeadFileEncryptionProvider)
@@ -242,7 +233,6 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
                 }
                 return session
             } catch {
-                AttachmentEncryptionFiles.discard(transferId: transferId)
                 // The caller reports the failure.
                 logger.debug("[Encryption] \(TransferLog.currentTag) session \(transferId) prepare failed (\(TransferLog.size(path: file.path))): \(TransferLog.describe(error))")
                 throw error
@@ -260,19 +250,12 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
             throw error
         }
         return try await FileEncryptionChunk.offMain {
-            // The snapshot the session read; the file itself if it is gone, which the SDK then
-            // checks against what the session recorded.
-            let snapshot = AttachmentEncryptionFiles.snapshot(transferId: saved.transferId)
-            let hasSnapshot = FileManager.default.fileExists(atPath: snapshot.path)
-            let source = hasSnapshot ? snapshot : file
-            if !hasSnapshot {
-                logger.warn("[Encryption] \(TransferLog.currentTag) restore \(saved.transferId): snapshot gone, restoring from the file itself")
-            }
+            // The SDK checks the file against what the session recorded.
             let upload: PreparedUpload
             let provider = self.provider()
             do {
                 upload = try provider.restoreUpload(
-                    fileURL: source,
+                    fileURL: file,
                     checkpoint: SceytChat.FileEncryptionCheckpoint(
                         encryptionInfo: Self.sdkInfo(checkpoint.encryptionInfo, plaintextSize: UInt64(checkpoint.plaintextSize)),
                         data: saved.sdkData
@@ -285,15 +268,6 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
             logger.info("[Encryption] \(TransferLog.currentTag) session \(saved.transferId) restored plaintext=\(checkpoint.plaintextSize) B")
             return ChatSDKEncryptionSession(upload: upload, transferId: saved.transferId, isSDKStreaming: provider is StreamingAeadFileEncryptionProvider)
         }
-    }
-
-    func discard(_ checkpoint: EncryptedFileCheckpoint) {
-        guard let saved = try? SavedSession(checkpoint) else {
-            logger.warn("[Encryption] \(TransferLog.currentTag) discard ignored: unreadable checkpoint (attachmentId=\(checkpoint.encryptionInfo.attachmentId))")
-            return
-        }
-        AttachmentEncryptionFiles.discard(transferId: saved.transferId)
-        logger.debug("[Encryption] \(TransferLog.currentTag) session \(saved.transferId) discarded")
     }
 
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
@@ -403,7 +377,8 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
         }
     }
 
-    /// `EncryptedFileCheckpoint.data`: the SDK's own checkpoint data and the snapshot it reads.
+    /// `EncryptedFileCheckpoint.data`: the SDK's own checkpoint data and the session's id (for
+    /// logs; checkpoints of builds that kept a snapshot under it still decode).
     struct SavedSession: Codable {
         static let version = 1
 
@@ -510,79 +485,20 @@ final class FileCiphertextSource: NSObject, CiphertextRangeSource {
     }
 }
 
-/// Snapshots of encrypted uploads.
-public enum AttachmentEncryptionFiles {
-
-    /// `Caches/encrypted-transfers`: transfer-owned copies, never the user's assets.
-    nonisolated(unsafe) public static var transfersDirectory: URL = {
+/// Builds before the architecture-doc alignment encrypted from a copy ("snapshot") of the
+/// file under `Caches/encrypted-transfers`. Nothing reads them any more: the folder is removed
+/// once per process. Drop this once no installed build can have left one.
+enum LegacyEncryptionSnapshots {
+    nonisolated(unsafe) static var directory: URL = {
         TransferDirectories.cachesOrTemporary().appendingPathComponent("encrypted-transfers", isDirectory: true)
     }()
 
-    public static func directory(transferId: String) -> URL {
-        transfersDirectory.appendingPathComponent(transferId, isDirectory: true)
-    }
+    static let removeOnce: Void = remove(directory)
 
-    static func snapshot(transferId: String) -> URL {
-        directory(transferId: transferId).appendingPathComponent("snapshot")
-    }
-
-    /// How long a snapshot nobody finished or abandoned is kept: one whose transport kept
-    /// it for a retry that never came.
-    static let staleSnapshotAge: TimeInterval = 7 * 24 * 60 * 60
-
-    /// Removes the snapshots older than `staleSnapshotAge`, once per process.
-    static let purgeStaleSnapshots: Void = purgeStaleSnapshots(in: transfersDirectory)
-
-    /// Removes the snapshot folders in `directory` older than `staleSnapshotAge`.
-    static func purgeStaleSnapshots(in directory: URL) {
-        let fileManager = FileManager.default
-        let cutoff = Date().addingTimeInterval(-staleSnapshotAge)
-        let directories = (try? fileManager.contentsOfDirectory(
-            at: directory,
-            includingPropertiesForKeys: [.contentModificationDateKey]
-        )) ?? []
-        var purged = 0
-        for directory in directories {
-            let modified = (try? directory.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
-            if let modified, modified < cutoff,
-               TransferLog.remove(directory, what: "a stale snapshot", context: "[Encryption] snapshot purge") {
-                purged += 1
-            }
+    static func remove(_ directory: URL) {
+        guard FileManager.default.fileExists(atPath: directory.path) else { return }
+        if TransferLog.remove(directory, what: "the legacy snapshot folder", context: "[Encryption] legacy snapshots") {
+            logger.info("[Encryption] legacy snapshot folder removed")
         }
-        if purged > 0 {
-            logger.info("[Encryption] snapshot purge removed \(purged) of \(directories.count) snapshot(s)")
-        }
-    }
-
-    /// An immutable, transfer-owned copy of `file`. `copyItem` clones on APFS, so it costs
-    /// no disk until one side changes; never a hard link, which shares the inode and so
-    /// would follow an in-place rewrite of the original.
-    static func makeSnapshot(of file: URL, transferId: String) throws -> URL {
-        let fileManager = FileManager.default
-        let directory = directory(transferId: transferId)
-        let snapshot = snapshot(transferId: transferId)
-        do {
-            try fileManager.createDirectory(
-                at: directory,
-                withIntermediateDirectories: true,
-                attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication]
-            )
-            TransferLog.remove(snapshot, what: "the old snapshot", context: "[Encryption] \(TransferLog.currentTag) snapshot \(transferId)")
-            try fileManager.copyItem(at: file, to: snapshot)
-            try fileManager.setAttributes(
-                [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication, .posixPermissions: 0o400],
-                ofItemAtPath: snapshot.path
-            )
-        } catch {
-            logger.debug("[Encryption] \(TransferLog.currentTag) snapshot \(transferId) of \(file.lastPathComponent) failed (source exists: \(fileManager.fileExists(atPath: file.path))): \(TransferLog.describe(error))")
-            throw AttachmentEncryptionError.snapshotFailed(error)
-        }
-        logger.debug("[Encryption] \(TransferLog.currentTag) snapshot \(transferId) created (\(TransferLog.sizeText(snapshot)))")
-        return snapshot
-    }
-
-    /// Removes the snapshot. Call once the transfer is over (sent, or abandoned for good).
-    public static func discard(transferId: String) {
-        TransferLog.remove(directory(transferId: transferId), what: "the snapshot", context: "[Encryption] \(TransferLog.currentTag) snapshot \(transferId)")
     }
 }

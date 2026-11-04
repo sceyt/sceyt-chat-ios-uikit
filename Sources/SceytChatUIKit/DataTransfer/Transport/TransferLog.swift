@@ -105,8 +105,6 @@ enum TransferLog {
         switch error {
         case let error as AttachmentEncryptionError:
             switch error {
-            case .snapshotFailed(let underlying):
-                return "AttachmentEncryptionError.snapshotFailed(\(describe(underlying)))"
             case .metadataFailed(let underlying):
                 return "AttachmentEncryptionError.metadataFailed(\(describe(underlying)))"
             case .decryptionFailed(let underlying):

@@ -154,7 +154,6 @@ private final class StubServer: URLProtocol {
 /// A `FileEncryption` whose sessions the SDK client did not make.
 private final class ForeignEncryption: FileEncryption {
     var prepareError: Error?
-    private(set) var discarded = [EncryptedFileCheckpoint]()
     private(set) var session: ForeignSession?
 
     func prepareEncryption(file: URL) async throws -> FileEncryptionSession {
@@ -168,22 +167,18 @@ private final class ForeignEncryption: FileEncryption {
         throw AttachmentEncryptionError.invalidCheckpoint
     }
 
-    func discard(_ checkpoint: EncryptedFileCheckpoint) { discarded.append(checkpoint) }
-
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
         try FileManager.default.copyItem(at: file, to: destination)
     }
 }
 
-/// The SDK's own encryption, whose `prepareEncryption` can be held until the test lets it finish, and
-/// which counts discards.
+/// The SDK's own encryption, whose `prepareEncryption` can be held until the test lets it finish.
 private final class GatedEncryption: FileEncryption {
     private let inner = ChatSDKFileEncryption()
     private let lock = NSLock()
     private var holding: Bool
     private var gate: CheckedContinuation<Void, Never>?
     private var _entered = false
-    private var _discarded = 0
     private var _session: ChatSDKEncryptionSession?
 
     init(holding: Bool = false) {
@@ -191,7 +186,11 @@ private final class GatedEncryption: FileEncryption {
     }
 
     var prepareEntered: Bool { lock.lock(); defer { lock.unlock() }; return _entered }
-    var discarded: Int { lock.lock(); defer { lock.unlock() }; return _discarded }
+    /// 1 once the session it made is closed (a closed SDK session refuses reads), else 0.
+    var released: Int {
+        guard let session else { return 0 }
+        return (try? session.read(offset: 0, length: 1)) == nil ? 1 : 0
+    }
     var session: ChatSDKEncryptionSession? { lock.lock(); defer { lock.unlock() }; return _session }
 
     func letPrepareFinish() {
@@ -222,11 +221,6 @@ private final class GatedEncryption: FileEncryption {
 
     func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
         try await inner.restoreEncryption(file: file, checkpoint: checkpoint)
-    }
-
-    func discard(_ checkpoint: EncryptedFileCheckpoint) {
-        lock.lock(); _discarded += 1; lock.unlock()
-        inner.discard(checkpoint)
     }
 
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
@@ -340,7 +334,7 @@ final class DefaultFileTransferTransportTests: XCTestCase {
     }
 
     private func reference(_ result: FileTransferResult<FileUploadResult>?) -> String? {
-        if case .success(let uploaded) = result { return uploaded.remoteReference }
+        if case .success(let uploaded) = result { return uploaded.url }
         return nil
     }
 
@@ -542,7 +536,7 @@ final class DefaultFileTransferTransportTests: XCTestCase {
         guard case .success(let uploaded) = outcome.value, let info = uploaded.encryptionInfo else {
             return XCTFail("expected an encrypted success, got \(String(describing: outcome.value))")
         }
-        XCTAssertEqual(uploaded.remoteReference, "https://cdn.example/enc")
+        XCTAssertEqual(uploaded.url, "https://cdn.example/enc")
         XCTAssertEqual(progress.values, [0.5])
         XCTAssertNotNil(ciphertext, "the session is open while the SDK sends it")
 
@@ -591,7 +585,7 @@ final class DefaultFileTransferTransportTests: XCTestCase {
     }
 
     /// Ended before the session was prepared: the SDK is never asked to send it, and the
-    /// session (its snapshot) is released.
+    /// session is released.
     func testAnEncryptedUploadCancelledBeforeTheSDKStartsSendsNothing() throws {
         let gated = GatedEncryption()
         let transport = DefaultFileTransferTransport(encryption: gated)
@@ -604,17 +598,17 @@ final class DefaultFileTransferTransportTests: XCTestCase {
 
         waitUntil { outcome.value != nil }
         XCTAssertTrue(interruption(outcome.value) is CancellationError)
-        waitUntil { gated.discarded == 1 }
+        waitUntil { gated.released == 1 }
         settle()
         XCTAssertTrue(FakeClient.encrypted.isEmpty, "never sent")
         XCTAssertEqual(FakeClient.cancels, 0, "nothing to stop")
-        XCTAssertEqual(gated.discarded, 1)
+        XCTAssertEqual(gated.released, 1)
         try assertReleased(gated)
     }
 
     /// Finding #8: a cancel while the session is being prepared. Nothing is sent once
-    /// preparation ends, and the snapshot is discarded.
-    func testACancelDuringPrepareStartsNoSDKUploadAndDiscardsTheSnapshot() throws {
+    /// preparation ends, and the session is released.
+    func testACancelDuringPrepareStartsNoSDKUploadAndReleasesTheSession() throws {
         let gated = GatedEncryption(holding: true)
         let transport = DefaultFileTransferTransport(encryption: gated)
         let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
@@ -625,10 +619,10 @@ final class DefaultFileTransferTransportTests: XCTestCase {
         guard case .cancelled = error(outcome.value) as? FileTransferError else { return XCTFail("\(String(describing: outcome.value))") }
 
         gated.letPrepareFinish()
-        waitUntil { gated.discarded == 1 }
+        waitUntil { gated.released == 1 }
         settle()
         XCTAssertTrue(FakeClient.encrypted.isEmpty, "uploadEncrypted never starts for an invocation that already ended")
-        XCTAssertEqual(gated.discarded, 1, "released exactly once")
+        XCTAssertEqual(gated.released, 1, "released exactly once")
         try assertReleased(gated)
     }
 
@@ -637,18 +631,18 @@ final class DefaultFileTransferTransportTests: XCTestCase {
         let transport = DefaultFileTransferTransport(encryption: gated)
         let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
         waitUntil { FakeClient.encrypted.count == 1 }
-        XCTAssertEqual(gated.discarded, 0, "open while the SDK sends it")
+        XCTAssertEqual(gated.released, 0, "open while the SDK sends it")
 
         transport.cancel(operationId: "upload-1")
         waitUntil { outcome.value != nil }
 
         XCTAssertEqual(FakeClient.cancels, 1)
-        XCTAssertEqual(gated.discarded, 1, "released on cancel: the SDK may never call back")
+        XCTAssertEqual(gated.released, 1, "released on cancel: the SDK may never call back")
         try assertReleased(gated)
         // A late completion does not release it again.
         FakeClient.encrypted.first?.completion(URL(string: "https://cdn.example/late"), nil, nil)
         settle()
-        XCTAssertEqual(gated.discarded, 1)
+        XCTAssertEqual(gated.released, 1)
     }
 
     func testAnInterruptionMidUploadReleasesTheSession() throws {
@@ -662,7 +656,7 @@ final class DefaultFileTransferTransportTests: XCTestCase {
 
         XCTAssertTrue(interruption(outcome.value) is CancellationError)
         XCTAssertEqual(FakeClient.cancels, 1)
-        XCTAssertEqual(gated.discarded, 1)
+        XCTAssertEqual(gated.released, 1)
         try assertReleased(gated)
     }
 
@@ -676,35 +670,33 @@ final class DefaultFileTransferTransportTests: XCTestCase {
 
         XCTAssertTrue(transport.pause(operationId: "upload-1"))
         settle()
-        XCTAssertEqual(gated.discarded, 0, "a pause releases nothing")
+        XCTAssertEqual(gated.released, 0, "a pause releases nothing")
         XCTAssertNoThrow(try FakeClient.encrypted.first?.upload.readCiphertextRange(offset: 0, length: 1))
 
         FakeClient.encrypted.first?.completion(URL(string: "https://cdn.example/paused"), nil, nil)
         settle()
         XCTAssertNil(outcome.value, "held while paused")
-        XCTAssertEqual(gated.discarded, 1, "the SDK is done with it")
+        XCTAssertEqual(gated.released, 1, "the SDK is done with it")
         XCTAssertTrue(transport.resume(operationId: "upload-1"))
         waitUntil { outcome.value != nil }
         XCTAssertEqual(reference(outcome.value), "https://cdn.example/paused")
-        XCTAssertEqual(gated.discarded, 1)
+        XCTAssertEqual(gated.released, 1)
     }
 
     private func assertReleased(_ gated: GatedEncryption, file: StaticString = #filePath, line: UInt = #line) throws {
         let session = try XCTUnwrap(gated.session, file: file, line: line)
         XCTAssertThrowsError(try session.read(offset: 0, length: 1), "closed", file: file, line: line)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: AttachmentEncryptionFiles.snapshot(transferId: session.transferId).path),
-                       "the snapshot is discarded", file: file, line: line)
     }
 
     func testAPrepareFailureFailsTheEncryptedUpload() throws {
         let foreign = ForeignEncryption()
-        foreign.prepareError = AttachmentEncryptionError.snapshotFailed(CocoaError(.fileNoSuchFile))
+        foreign.prepareError = CocoaError(.fileNoSuchFile)
         let transport = DefaultFileTransferTransport(encryption: foreign)
 
         let (outcome, _, _) = startUpload(try uploadRequest(.encrypted), on: transport)
         waitUntil { outcome.value != nil }
 
-        guard case .snapshotFailed = error(outcome.value) as? AttachmentEncryptionError else { return XCTFail("\(String(describing: outcome.value))") }
+        XCTAssertEqual(error(outcome.value) as? CocoaError, CocoaError(.fileNoSuchFile))
         XCTAssertTrue(FakeClient.encrypted.isEmpty)
     }
 
@@ -720,7 +712,6 @@ final class DefaultFileTransferTransportTests: XCTestCase {
         }
         XCTAssertTrue(FakeClient.encrypted.isEmpty, "uploadEncrypted raises for a foreign session")
         XCTAssertEqual(foreign.session?.closed, true)
-        XCTAssertEqual(foreign.discarded.count, 1)
     }
 
     func testASessionOfAnotherProviderIsNeverSent() throws {

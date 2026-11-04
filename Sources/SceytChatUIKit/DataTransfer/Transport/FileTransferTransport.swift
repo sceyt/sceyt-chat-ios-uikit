@@ -64,15 +64,15 @@ public struct FileUploadRequest: Sendable {
 public struct FileUploadResult: Sendable {
     /// A URL, or whatever remote reference this transport's downloads understand. The message
     /// carries it as the attachment's url.
-    public let remoteReference: String
+    public let url: String
     /// The encryption of the uploaded bytes: set exactly when the request was `.encrypted`.
     public let encryptionInfo: EncryptedFileInfo?
     /// The size of the plaintext that was encrypted, when the transport knows it (its
     /// encryption session does). Nil: the router uses the size it measured before the upload.
     public let plaintextSize: Int64?
 
-    public init(remoteReference: String, encryptionInfo: EncryptedFileInfo? = nil, plaintextSize: Int64? = nil) {
-        self.remoteReference = remoteReference
+    public init(url: String, encryptionInfo: EncryptedFileInfo? = nil, plaintextSize: Int64? = nil) {
+        self.url = url
         self.encryptionInfo = encryptionInfo
         self.plaintextSize = plaintextSize
     }
