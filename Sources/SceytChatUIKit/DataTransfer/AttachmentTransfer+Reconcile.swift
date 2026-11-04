@@ -21,6 +21,23 @@ extension AttachmentTransfer {
         .pending, .downloading, .pauseDownloading, .failedDownloading
     ]
 
+    /// Statuses only an upload has.
+    static let uploadStatuses: Set<ChatMessage.Attachment.TransferStatus> = [
+        .uploading, .pauseUploading, .failedUploading
+    ]
+
+    /// An outgoing attachment whose bytes have not been uploaded: there is nothing to download,
+    /// and a download attempt would fail it as `.failedDownloading` (a download button on a
+    /// file that was never sent). No url, and either it is the sender's (`tid`), it is in an
+    /// upload status, or its source file is set. Its source file may not exist yet (a picked
+    /// video is still being copied), so `isPendingUpload` alone does not cover it.
+    static func isAwaitingUpload(_ attachment: ChatMessage.Attachment) -> Bool {
+        guard (attachment.url ?? "").isEmpty else { return false }
+        return attachment.tid != 0
+            || uploadStatuses.contains(attachment.status)
+            || attachment.isPendingUpload
+    }
+
     /// Image files already found readable, so a cell bind does not reread a header it has read.
     nonisolated(unsafe) private static let readableImageFiles = NSCache<NSString, NSNumber>()
 
@@ -80,6 +97,18 @@ extension AttachmentTransfer {
 
         var reconciled = [ChatMessage.Attachment]()
         for att in attachments where att.kind != .link {
+            if Self.isAwaitingUpload(att),
+               [.downloading, .pauseDownloading, .failedDownloading].contains(att.status),
+               taskFor(message: message, attachment: att) == nil {
+                // A download status on a file that was never sent (an earlier bind tried to
+                // download it): it is an upload waiting to go, not a download button.
+                logger.warn("[Attachment] outgoing attachment had download status \(att.status), reset to .pending \(att.transferLogDescription)")
+                att.status = .pending
+                att.transferProgress = 0
+                reconciled.append(att)
+                AttachmentTransferStatusRelay.default.post(att, status: .pending)
+                continue
+            }
             let resolvedLocalFilePath = dataSession(for: message)?.getFilePath(attachment: att)
             if let filePath = resolvedLocalFilePath, !filePath.isEmpty,
                keepsLocalFile(filePath, of: att, message: message) {
@@ -118,6 +147,10 @@ extension AttachmentTransfer {
 
         let needsToDownloadAttachments = attachments.filter {
             $0.kind != .link &&
+            // An unsent attachment's missing file is not a download to start: its upload
+            // owns it (a picked video is still being copied when the cell first binds).
+            !Self.isAwaitingUpload($0) &&
+            !Self.uploadStatuses.contains($0.status) &&
             $0.status != .pauseDownloading &&
             $0.status != .failedDownloading &&
             $0.status != .done &&

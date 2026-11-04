@@ -141,6 +141,11 @@ extension TransportDataSession {
         }
         let request = uploadRequest(for: job, prepared: prepared)
         logger.info("[Transfer] \(tag) upload attempt=\(attempt) preparing -> uploading type=\(request.type) staged=\(prepared.isStaged) size=\(preparedSize.map { "\($0) B" } ?? "unknown") mime=\(request.mimeType ?? "-") \(job.attachment.transferLogDescription)")
+        // The transport's progress is of the prepared file, not of the original: a compressed
+        // video can be a small part of it, and its size is what the message carries.
+        if let preparedSize, preparedSize > 0 {
+            tasks(of: job).forEach { $0.reportTransferSize(preparedSize) }
+        }
         let result = await transport.upload(request) { [weak self, weak job] progress in
             guard let self, let job, self.isUploading(job, attempt: attempt) else { return }
             if let quarter = job.progressMilestone(progress) {

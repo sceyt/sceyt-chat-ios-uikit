@@ -164,4 +164,20 @@ final class VideoAttachmentProgressLabelTests: XCTestCase {
 
         XCTAssertTrue(view.progressLabel.isHidden, describe(view))
     }
+
+    /// The byte count is of the file the transfer moves when it is known (an upload's
+    /// compressed copy), not of the attachment's original size.
+    func testTheByteCountUsesTheTransfersSize() throws {
+        let (_, view) = try makeBoundVideoView(makeModel())
+
+        view.setProgress(.init(
+            message: view.data.ownerMessage!,
+            attachment: view.data.attachment,
+            progress: 0.25,
+            totalBytes: 2_000_000
+        ))
+
+        let format = view.appearance.attachmentFileSizeFormatter
+        XCTAssertEqual(view.progressLabel.text, "\(format.format(500_000)) / \(format.format(2_000_000))", describe(view))
+    }
 }

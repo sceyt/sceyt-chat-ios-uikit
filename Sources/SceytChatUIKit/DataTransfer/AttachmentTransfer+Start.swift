@@ -181,6 +181,12 @@ extension AttachmentTransfer {
         completion: ((ChatMessage?, Error?) -> Void)?,
         into plan: inout TransferPlan
     ) {
+        if Self.isAwaitingUpload(attachment) {
+            // Never sent: there is nothing to download, and failing it would put a download
+            // button on it. Its status belongs to its upload and is left alone.
+            logger.warn("[Attachment] download skipped: the attachment is an outgoing one that has not been uploaded \(attachment.transferLogDescription)")
+            return
+        }
         let taskInfo = makeTask(.download, message: message, attachment: attachment, dataSession: dataSession)
         let tag = taskInfo.logTag
         guard let url = attachment.url, !url.isEmpty else {

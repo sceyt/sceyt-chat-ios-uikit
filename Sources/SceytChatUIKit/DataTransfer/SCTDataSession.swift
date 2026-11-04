@@ -206,6 +206,12 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
     /// The size of the prepared file an encrypted upload sent: the message shows it, not the
     /// stored object's.
     @Atomic internal var uploadedPlaintextSize: Int64?
+    /// The size of the file this transfer actually moves, once the data session knows it: an
+    /// upload's prepared file (a compressed video can be a small part of its original). Progress
+    /// fractions are of these bytes. Nil until reported (`reportTransferSize`).
+    @Atomic public private(set) var transferSize: Int64?
+    /// Told each reported transfer size (`TransferRun` saves it on the attachment).
+    @Atomic internal var onTransferSize: ((Int64) -> Void)?
     /// The encrypted video poster sent with this upload, for `enc.renditions`.
     @Atomic internal var thumbnailRendition: AttachmentEncryption.Rendition?
     /// The transport returned the verified plaintext of an encrypted download.
@@ -340,6 +346,15 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
 
     public func updateLocalFileLocation(newPath: String) {
         updateLocalFileLocation(newLocation: URL(fileURLWithPath: newPath))
+    }
+
+    /// Reports the size of the file the transfer moves, before its first progress: the
+    /// progress shown in bytes is of it, not of the attachment's original. Ignored once the
+    /// task has ended.
+    public func reportTransferSize(_ size: Int64) {
+        guard size > 0, !isTerminal else { return }
+        transferSize = size
+        onTransferSize?(size)
     }
 
     public func updateProgress(_ progress: Double) {

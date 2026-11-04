@@ -194,7 +194,9 @@ extension MessageCell {
             switch av.renderedTransferStatus(for: layout.transferStatus) {
             case .pending, .uploading, .downloading:
                 if let progress = self.attachmentTransfer.currentProgressPercent(message: data.message, attachment: layout.attachment) {
-                    av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
+                    // The live task's size: the stored attachment may not have it yet.
+                    let total = self.attachmentTransfer.taskFor(message: data.message, attachment: layout.attachment)?.transferSize
+                    av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress, totalBytes: total.map { UInt64($0) }))
                 } else if self.attachmentTransfer.filePath(attachment: layout.attachment) == nil {
                     // Through the AttachmentProgress overload so the "0 B / 12.4 MB"
                     // label is seeded too. The CGFloat overload only moves the ring,

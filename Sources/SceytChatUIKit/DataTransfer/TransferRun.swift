@@ -34,7 +34,26 @@ final class TransferRun {
             taskInfo.onEvent = { event in
                 self.handle(event, of: taskInfo)
             }
+            taskInfo.onTransferSize = { [weak taskInfo] size in
+                guard let taskInfo else { return }
+                self.recordTransferSize(size, of: taskInfo)
+            }
         }
+    }
+
+    /// An upload's prepared file is what the message carries and what its progress counts: a
+    /// compressed video's is a small part of the original's size, which the attachment held
+    /// until now. Saved, so a cell bound later (after a relaunch too) shows it.
+    private func recordTransferSize(_ size: Int64, of taskInfo: SCTDataSessionTaskInfo) {
+        guard let transfer, taskInfo.transferType == .upload else { return }
+        let atch = taskInfo.attachment
+        let size = UInt(size)
+        guard atch.uploadedFileSize != size else { return }
+        TransferLog.with(taskInfo.logContext) {
+            logger.debug("[Attachment] \(taskInfo.logTag) upload size \(atch.uploadedFileSize) B -> \(size) B (the prepared file)")
+        }
+        atch.uploadedFileSize = size
+        transfer.store.save([atch], of: message)
     }
 
     private func handle(_ event: SCTDataSessionTaskInfo.Event, of taskInfo: SCTDataSessionTaskInfo) {
@@ -83,7 +102,8 @@ final class TransferRun {
         let attachmentProgress = AttachmentTransfer.AttachmentProgress(
             message: taskInfo.message,
             attachment: taskInfo.attachment,
-            progress: progress
+            progress: progress,
+            totalBytes: taskInfo.transferSize.map { UInt64($0) }
         )
         observers.forEach { $0(attachmentProgress) }
     }

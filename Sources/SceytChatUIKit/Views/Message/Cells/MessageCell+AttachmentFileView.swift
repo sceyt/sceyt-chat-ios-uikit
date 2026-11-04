@@ -289,9 +289,10 @@ extension MessageCell {
             if progress.progress <= 0.01 || progress.progress >= 1 {
                 message = data.fileSize(using: appearance.attachmentFileSizeFormatter)
             } else {
-                let total = progress.attachment.uploadedFileSize
-                let downloaded = UInt(progress.progress * Double(total))
-                message = "\(appearance.attachmentFileSizeFormatter.format(UInt64(downloaded))) • \(appearance.attachmentFileSizeFormatter.format(UInt64(total)))"
+                // Of the file the transfer moves (an upload's compressed copy), not the original.
+                let total = progress.totalBytes ?? 0
+                let done = progress.completedBytes ?? 0
+                message = "\(appearance.attachmentFileSizeFormatter.format(done)) • \(appearance.attachmentFileSizeFormatter.format(total))"
             }
             sizeLabel.text = message
         }

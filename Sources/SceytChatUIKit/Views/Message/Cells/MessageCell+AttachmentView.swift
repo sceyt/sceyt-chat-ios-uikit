@@ -353,12 +353,11 @@ extension MessageCell {
             defer { updateProgressLabelVisibility() }
             guard !isStaleProgress(progress.progress)
             else { return }
-            let total = progress.attachment.uploadedFileSize
-            if total <= 0 {
-                progressLabel.text = L10n.Upload.preparing
+            // Of the file the transfer moves (an upload's compressed copy), not the original.
+            if let total = progress.totalBytes, let done = progress.completedBytes {
+                progressLabel.text = "\(appearance.attachmentFileSizeFormatter.format(done)) / \(appearance.attachmentFileSizeFormatter.format(total))"
             } else {
-                let downloaded = UInt(progress.progress * Double(total))
-                progressLabel.text = "\(appearance.attachmentFileSizeFormatter.format(UInt64(downloaded))) / \(appearance.attachmentFileSizeFormatter.format(UInt64(total)))"
+                progressLabel.text = L10n.Upload.preparing
             }
             setProgress(progress.progress)
         }

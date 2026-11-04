@@ -358,4 +358,134 @@ final class OfflineUploadProgressTests: XCTestCase {
         XCTAssertTrue(view.progressView.isHiddenProgress,
                       "a paused upload shows its resume glyph, not a moving ring: \(overlayDescription(view))")
     }
+
+    // MARK: - The size of the file the upload sends
+
+    /// A compressed video is a small part of its original: the progress counts the bytes of the
+    /// prepared file the data session reports, and the attachment keeps that size (saved, so a
+    /// cell bound after a relaunch shows it) instead of the original's.
+    func testThePreparedFileSizeIsSavedAndCountsTheProgress() throws {
+        let store = RecordingTransferStore()
+        transfer.store = store
+        let attachment = makeOutgoingAttachment(filePath: try makeFileOnDisk(), type: "video")
+        attachment.uploadedFileSize = 151_685_023
+        let message = makeMessage([attachment])
+        var received = [AttachmentTransfer.AttachmentProgress]()
+        transfer.progress(message: message, attachment: attachment, objectIdKey: "cell") { received.append($0) }
+
+        transfer.uploadMessageAttachments(message: message, attachments: [attachment])
+        XCTAssertTrue(waitUntil { self.session.task(forUrl: "") != nil },
+                      "the transport was never asked to upload")
+        let task = try XCTUnwrap(session.task(forUrl: ""))
+        store.reset()
+
+        task.reportTransferSize(7_829_727)
+        task.updateProgress(0.25)
+
+        XCTAssertEqual(task.transferSize, 7_829_727)
+        XCTAssertEqual(attachment.uploadedFileSize, 7_829_727, "the message carries the sent file's size")
+        XCTAssertTrue(waitUntil { store.saves.contains { $0.contains { $0.uploadedFileSize == 7_829_727 } } },
+                      "the new size is saved while the upload runs")
+        let last = try XCTUnwrap(received.last)
+        XCTAssertEqual(last.totalBytes, 7_829_727)
+        XCTAssertEqual(last.completedBytes, 1_957_431, "25% of the sent file, not of the 151 MB original")
+    }
+
+    func testTheSameSizeAgainIsNotSavedAgain() throws {
+        let store = RecordingTransferStore()
+        transfer.store = store
+        let attachment = makeOutgoingAttachment(filePath: try makeFileOnDisk())
+        let message = makeMessage([attachment])
+        transfer.uploadMessageAttachments(message: message, attachments: [attachment])
+        XCTAssertTrue(waitUntil { self.session.task(forUrl: "") != nil })
+        let task = try XCTUnwrap(session.task(forUrl: ""))
+        store.reset()
+
+        task.reportTransferSize(Int64(attachment.uploadedFileSize))
+
+        transfer.waitForPendingWork()
+        XCTAssertTrue(store.saves.isEmpty, "nothing changed: \(store.saves)")
+    }
+
+    func testASizeReportedAfterTheEndIsIgnored() throws {
+        let attachment = makeOutgoingAttachment(filePath: try makeFileOnDisk())
+        let message = makeMessage([attachment])
+        transfer.uploadMessageAttachments(message: message, attachments: [attachment])
+        XCTAssertTrue(waitUntil { self.session.task(forUrl: "") != nil })
+        let task = try XCTUnwrap(session.task(forUrl: ""))
+        task.failure(error: URLError(.badServerResponse))
+
+        task.reportTransferSize(99)
+
+        XCTAssertNil(task.transferSize)
+        XCTAssertEqual(attachment.uploadedFileSize, 2048)
+    }
+
+    /// Without a reported size, the bytes fall back to the attachment's.
+    func testProgressWithoutAReportedSizeCountsTheAttachmentsSize() {
+        let attachment = makeOutgoingAttachment(filePath: "/nowhere")
+        let progress = AttachmentTransfer.AttachmentProgress(message: makeMessage([attachment]), attachment: attachment, progress: 0.5)
+        XCTAssertEqual(progress.totalBytes, 2048)
+        XCTAssertEqual(progress.completedBytes, 1024)
+
+        attachment.uploadedFileSize = 0
+        let unknown = AttachmentTransfer.AttachmentProgress(message: makeMessage([attachment]), attachment: attachment, progress: 0.5)
+        XCTAssertNil(unknown.totalBytes)
+        XCTAssertNil(unknown.completedBytes)
+    }
+
+    // MARK: - An unsent attachment is never downloaded
+
+    /// A picked video's file can be missing when its cell first binds (it is still being
+    /// copied). That is not a download to start: it failed with no url and showed a download
+    /// button on a file that was never sent, until the upload replaced it with "Preparing".
+    func testAnUnsentVideoWhoseFileIsNotThereYetIsNotDownloaded() {
+        let attachment = makeOutgoingAttachment(filePath: "/not-copied-yet/\(UUID().uuidString).mp4", type: "video")
+        let message = makeMessage([attachment])
+
+        let started = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
+        transfer.waitForPendingWork()
+
+        XCTAssertTrue(started.isEmpty)
+        XCTAssertEqual(session.startedDownloadCount, 0)
+        XCTAssertEqual(attachment.status, .pending, "an upload waiting to go, never a download status")
+    }
+
+    func testAnUploadingAttachmentWithoutAFileIsNotDownloaded() {
+        let attachment = makeOutgoingAttachment(filePath: "/gone/\(UUID().uuidString).mp4", status: .uploading, type: "video")
+        let message = makeMessage([attachment])
+
+        _ = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
+        transfer.waitForPendingWork()
+
+        XCTAssertEqual(session.startedDownloadCount, 0)
+        XCTAssertEqual(attachment.status, .uploading)
+    }
+
+    /// An explicit download of an unsent attachment leaves its upload's status alone.
+    func testAnExplicitDownloadOfAnUnsentAttachmentChangesNothing() {
+        let attachment = makeOutgoingAttachment(filePath: "/not-copied-yet/\(UUID().uuidString).mp4", type: "video")
+        let message = makeMessage([attachment])
+
+        transfer.downloadMessageAttachments(message: message, attachments: [attachment])
+        transfer.waitForPendingWork()
+
+        XCTAssertEqual(session.startedDownloadCount, 0)
+        XCTAssertEqual(attachment.status, .pending)
+    }
+
+    /// One already stored with a download status (by an earlier bind) is put back as a pending
+    /// upload, so its cell shows the upload loader instead of a download button.
+    func testAnUnsentAttachmentWithADownloadStatusIsResetToPending() {
+        for stored in [ChatMessage.Attachment.TransferStatus.failedDownloading, .pauseDownloading, .downloading] {
+            let attachment = makeOutgoingAttachment(filePath: "/not-copied-yet/\(UUID().uuidString).mp4", status: stored, type: "video")
+            let message = makeMessage([attachment])
+
+            _ = transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
+            transfer.waitForPendingWork()
+
+            XCTAssertEqual(attachment.status, .pending, "from \(stored)")
+            XCTAssertEqual(session.startedDownloadCount, 0, "from \(stored)")
+        }
+    }
 }

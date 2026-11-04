@@ -452,6 +452,26 @@ final class TransportDataSessionTests: XCTestCase {
         XCTAssertNil(taskInfo.uploadedPlaintextSize)
     }
 
+    /// The progress the transport reports is of the file it sends: its size reaches the task
+    /// before the first byte goes, for a staged (resized) file too.
+    func testTheSentFilesSizeIsReportedBeforeTheTransportStarts() throws {
+        let attachment = makeAttachment(type: "image", name: "photo.jpg", filePath: try image().path)
+        let (taskInfo, recorder) = makeTask(attachment)
+        var sizeSeenByTransport: Int64?
+        var sentFileSize: Int64?
+        transport.onUpload = { request, _ in
+            sizeSeenByTransport = taskInfo.transferSize
+            sentFileSize = (try? FileManager.default.attributesOfItem(atPath: request.sourceFile.path)[.size] as? NSNumber)?.int64Value
+            return .success(FileUploadResult(remoteReference: "IMG"))
+        }
+
+        session.upload(attachment: attachment, taskInfo: taskInfo)
+        waitUntil { recorder.isOver }
+
+        XCTAssertNotNil(sentFileSize)
+        XCTAssertEqual(sizeSeenByTransport, sentFileSize)
+    }
+
     /// Every attempt of a non-media file sends the attachment's own file: nothing is moved,
     /// and no folder is left behind per retry (finding #10).
     func testRetriesOfANonMediaFileSendItInPlaceAndLeaveNoFolders() throws {
