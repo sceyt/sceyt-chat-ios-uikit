@@ -421,9 +421,9 @@ final class OfflineUploadProgressTests: XCTestCase {
         XCTAssertEqual(attachment.uploadedFileSize, 2048)
     }
 
-    /// Without a reported size, the bytes fall back to the attachment's.
-    func testProgressWithoutAReportedSizeCountsTheAttachmentsSize() {
-        let attachment = makeOutgoingAttachment(filePath: "/nowhere")
+    /// A download without a reported size counts the attachment's.
+    func testADownloadsProgressWithoutAReportedSizeCountsTheAttachmentsSize() {
+        let attachment = makeIncomingAttachment()
         let progress = AttachmentTransfer.AttachmentProgress(message: makeMessage([attachment]), attachment: attachment, progress: 0.5)
         XCTAssertEqual(progress.totalBytes, 2048)
         XCTAssertEqual(progress.completedBytes, 1024)
@@ -432,6 +432,20 @@ final class OfflineUploadProgressTests: XCTestCase {
         let unknown = AttachmentTransfer.AttachmentProgress(message: makeMessage([attachment]), attachment: attachment, progress: 0.5)
         XCTAssertNil(unknown.totalBytes)
         XCTAssertNil(unknown.completedBytes)
+    }
+
+    /// An upload whose transport has not started sending (preparing, queued, just relaunched)
+    /// has a placeholder progress, not bytes: no byte count is made of it ("54 KB / 54 MB"
+    /// from a 0.001 placeholder before anything was sent).
+    func testAnUploadsPlaceholderProgressHasNoBytes() {
+        let attachment = makeOutgoingAttachment(filePath: "/nowhere", type: "video")
+        attachment.uploadedFileSize = 54_000_000
+        let placeholder = AttachmentTransfer.AttachmentProgress(message: makeMessage([attachment]), attachment: attachment, progress: AttachmentTransfer.initialUploadProgress)
+        XCTAssertNil(placeholder.totalBytes)
+        XCTAssertNil(placeholder.completedBytes)
+
+        let sending = AttachmentTransfer.AttachmentProgress(message: makeMessage([attachment]), attachment: attachment, progress: 0.02, totalBytes: 54_000_000)
+        XCTAssertEqual(sending.completedBytes, 1_080_000, "once the transport reported the file, its bytes")
     }
 
     // MARK: - An unsent attachment is never downloaded

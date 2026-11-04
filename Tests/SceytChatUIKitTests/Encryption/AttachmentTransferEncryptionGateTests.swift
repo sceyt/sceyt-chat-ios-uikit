@@ -215,7 +215,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
     /// What a transport does with an encrypted request: a session of the facade, all of it read.
     private func encryptedUpload(_ request: FileUploadRequest, into ciphertext: URL) async -> FileTransferResult<FileUploadResult> {
         do {
-            let session = try await encryption.prepare(file: request.sourceFile)
+            let session = try await encryption.prepareEncryption(file: request.sourceFile)
             defer { session.close(); encryption.discard(session.checkpoint()) }
             try session.materialize(to: ciphertext)
             return .success(FileUploadResult(remoteReference: "REMOTE-UUID", encryptionInfo: session.encryptionInfo))
@@ -559,7 +559,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
     /// A transport uploads by range: ranges are exact slices of the whole object, cut anywhere
     /// across the 64 KiB records, and a range read again gives the same bytes.
     func testRangesAreExactRepeatableSlicesOfTheObject() async throws {
-        let session = try await encryption.prepare(file: try file(size: 300_000))
+        let session = try await encryption.prepareEncryption(file: try file(size: 300_000))
         defer { session.close(); encryption.discard(session.checkpoint()) }
         let whole = directory.appendingPathComponent("whole")
         try session.materialize(to: whole)
@@ -581,7 +581,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
 
     func testRestoredSessionMakesTheSameBytesUnderTheSameKey() async throws {
         let source = try file(size: 200_000)
-        let first = try await encryption.prepare(file: source)
+        let first = try await encryption.prepareEncryption(file: source)
         let firstBytes = try first.read(offset: 0, length: Int(first.ciphertextSize))
         let checkpoint = first.checkpoint()
         let firstInfo = first.encryptionInfo
@@ -590,7 +590,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         // A transport serializes the checkpoint as a whole.
         let saved = try JSONDecoder().decode(EncryptedFileCheckpoint.self, from: JSONEncoder().encode(checkpoint))
 
-        let restored = try await encryption.restore(file: source, checkpoint: saved)
+        let restored = try await encryption.restoreEncryption(file: source, checkpoint: saved)
         defer { restored.close(); encryption.discard(saved) }
         XCTAssertEqual(restored.encryptionInfo, firstInfo, "the same key and attachment id")
         XCTAssertEqual(restored.sourceId, firstSourceId)
@@ -600,25 +600,25 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
 
     func testRestoreRejectsAChangedSourceAndAnUnreadableCheckpoint() async throws {
         let source = try file(size: 1000)
-        let first = try await encryption.prepare(file: source)
+        let first = try await encryption.prepareEncryption(file: source)
         let checkpoint = first.checkpoint()
         first.close()
         encryption.discard(checkpoint)
         try Data(repeating: 7, count: 1000).write(to: source)
 
         do {
-            _ = try await encryption.restore(file: source, checkpoint: checkpoint)
+            _ = try await encryption.restoreEncryption(file: source, checkpoint: checkpoint)
             XCTFail("a changed source must not continue the old session")
         } catch {}
         let unreadable = EncryptedFileCheckpoint(encryptionInfo: checkpoint.encryptionInfo, plaintextSize: 1000, data: "not a checkpoint")
         do {
-            _ = try await encryption.restore(file: source, checkpoint: unreadable)
+            _ = try await encryption.restoreEncryption(file: source, checkpoint: unreadable)
             XCTFail("an unreadable checkpoint must be refused")
         } catch {
             guard case .invalidCheckpoint = error as? AttachmentEncryptionError else { return XCTFail("\(error)") }
         }
         // The transport starts over under a new key.
-        let fresh = try await encryption.prepare(file: source)
+        let fresh = try await encryption.prepareEncryption(file: source)
         XCTAssertNotEqual(fresh.encryptionInfo.key, checkpoint.encryptionInfo.key)
         fresh.close()
         encryption.discard(fresh.checkpoint())

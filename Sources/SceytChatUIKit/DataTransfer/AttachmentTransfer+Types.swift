@@ -15,6 +15,10 @@ extension AttachmentTransfer {
         /// The bytes `progress` is a fraction of: the file the transfer moves when the data
         /// session reported it (an upload's prepared file, which a compressed video makes much
         /// smaller), else the attachment's `uploadedFileSize`. Nil when neither is known.
+        ///
+        /// An upload that has not reported its size has not started sending (it is preparing,
+        /// queued, or just relaunched): its `progress` is a placeholder that keeps the ring
+        /// visible, not bytes, so it has no `totalBytes` and the cell says "Preparing".
         public let totalBytes: UInt64?
 
         /// The bytes moved so far, of `totalBytes`.
@@ -29,7 +33,8 @@ extension AttachmentTransfer {
             self.message = message
             self.attachment = attachment
             self.progress = progress
-            let fallback = UInt64(attachment.uploadedFileSize)
+            // An unsent attachment's own size says nothing about how much was sent.
+            let fallback = AttachmentTransfer.isAwaitingUpload(attachment) ? 0 : UInt64(attachment.uploadedFileSize)
             self.totalBytes = totalBytes.flatMap { $0 > 0 ? $0 : nil } ?? (fallback > 0 ? fallback : nil)
         }
     }

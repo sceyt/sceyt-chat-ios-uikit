@@ -89,7 +89,7 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
     private func uploadEncrypted(_ request: FileUploadRequest, live: LiveTransfer<FileUploadResult>, tag: String) async {
         let session: FileEncryptionSession
         do {
-            session = try await encryption.prepare(file: request.sourceFile)
+            session = try await encryption.prepareEncryption(file: request.sourceFile)
         } catch {
             logger.debug("[Encryption] \(tag) upload prepare failed: \(TransferLog.describe(error))")
             live.finish(.failure(error))

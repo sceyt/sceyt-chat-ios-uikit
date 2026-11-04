@@ -70,12 +70,12 @@ private final class BrokenEncryption: FileEncryption {
     var session: BrokenSession?
     private(set) var discarded = [EncryptedFileCheckpoint]()
 
-    func prepare(file: URL) async throws -> FileEncryptionSession {
+    func prepareEncryption(file: URL) async throws -> FileEncryptionSession {
         guard let session else { throw AttachmentEncryptionError.snapshotFailed(CocoaError(.fileNoSuchFile)) }
         return session
     }
 
-    func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
+    func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
         throw AttachmentEncryptionError.invalidCheckpoint
     }
 
@@ -157,7 +157,7 @@ final class FileEncryptionTests: XCTestCase {
 
     func testPrepareEncryptsAReadOnlySnapshotThatDiscardRemoves() async throws {
         let source = try file(size: 70_000)
-        let session = try await encryption.prepare(file: source)
+        let session = try await encryption.prepareEncryption(file: source)
         let transferId = try transferId(of: session)
         let snapshot = AttachmentEncryptionFiles.snapshot(transferId: transferId)
 
@@ -184,8 +184,8 @@ final class FileEncryptionTests: XCTestCase {
 
     func testEverySessionHasItsOwnKeyAndId() async throws {
         let source = try file(size: 100)
-        let first = try await encryption.prepare(file: source)
-        let second = try await encryption.prepare(file: source)
+        let first = try await encryption.prepareEncryption(file: source)
+        let second = try await encryption.prepareEncryption(file: source)
         defer {
             for session in [first, second] {
                 session.close()
@@ -200,7 +200,7 @@ final class FileEncryptionTests: XCTestCase {
 
     func testPrepareOfAMissingFileFailsWithSnapshotFailed() async {
         do {
-            _ = try await encryption.prepare(file: directory.appendingPathComponent("missing"))
+            _ = try await encryption.prepareEncryption(file: directory.appendingPathComponent("missing"))
             XCTFail("nothing to encrypt")
         } catch {
             guard case .snapshotFailed = error as? AttachmentEncryptionError else {
@@ -216,7 +216,7 @@ final class FileEncryptionTests: XCTestCase {
         let before = Set((try? FileManager.default.contentsOfDirectory(atPath: AttachmentEncryptionFiles.transfersDirectory.path)) ?? [])
 
         do {
-            _ = try await encryption.prepare(file: try file(size: 100))
+            _ = try await encryption.prepareEncryption(file: try file(size: 100))
             XCTFail("the provider failed")
         } catch {
             XCTAssertEqual((error as NSError).code, FileEncryptionError.invalidArgument.rawValue)
@@ -229,14 +229,14 @@ final class FileEncryptionTests: XCTestCase {
 
     func testRestoreFallsBackToTheFileWhenTheSnapshotIsGone() async throws {
         let source = try file(size: 5000)
-        let first = try await encryption.prepare(file: source)
+        let first = try await encryption.prepareEncryption(file: source)
         let bytes = try first.read(offset: 0, length: Int(first.ciphertextSize))
         let checkpoint = first.checkpoint()
         first.close()
         // The snapshot is a clone of the unchanged file: the SDK checks size and mtime.
         try FileManager.default.removeItem(at: AttachmentEncryptionFiles.snapshot(transferId: try transferId(of: first)))
 
-        let restored = try await encryption.restore(file: source, checkpoint: checkpoint)
+        let restored = try await encryption.restoreEncryption(file: source, checkpoint: checkpoint)
         defer { restored.close(); encryption.discard(checkpoint) }
 
         XCTAssertEqual(restored.encryptionInfo, checkpoint.encryptionInfo)
@@ -250,7 +250,7 @@ final class FileEncryptionTests: XCTestCase {
         XCTAssertNotEqual(otherVersion, saved)
         for data in [otherVersion, "", "{}", #"{"v":1}"#] {
             do {
-                _ = try await encryption.restore(file: try file(size: 10), checkpoint: EncryptedFileCheckpoint(encryptionInfo: info, plaintextSize: 10, data: data))
+                _ = try await encryption.restoreEncryption(file: try file(size: 10), checkpoint: EncryptedFileCheckpoint(encryptionInfo: info, plaintextSize: 10, data: data))
                 XCTFail("\(data) must be refused")
             } catch {
                 guard case .invalidCheckpoint = error as? AttachmentEncryptionError else {
@@ -261,7 +261,7 @@ final class FileEncryptionTests: XCTestCase {
     }
 
     func testRestoreOfACheckpointWhoseSDKDataIsCorruptFails() async throws {
-        let session = try await encryption.prepare(file: try file(size: 1000))
+        let session = try await encryption.prepareEncryption(file: try file(size: 1000))
         let checkpoint = session.checkpoint()
         session.close()
         defer { encryption.discard(checkpoint) }
@@ -273,7 +273,7 @@ final class FileEncryptionTests: XCTestCase {
         )
 
         do {
-            _ = try await encryption.restore(file: try file(size: 1000), checkpoint: corrupt)
+            _ = try await encryption.restoreEncryption(file: try file(size: 1000), checkpoint: corrupt)
             XCTFail("the SDK's state is unreadable")
         } catch {
             XCTAssertEqual((error as NSError).domain, FileEncryptionErrorDomain)
@@ -281,7 +281,7 @@ final class FileEncryptionTests: XCTestCase {
     }
 
     func testDiscardOfAnUnreadableCheckpointDoesNothing() async throws {
-        let session = try await encryption.prepare(file: try file(size: 10))
+        let session = try await encryption.prepareEncryption(file: try file(size: 10))
         let transferId = try transferId(of: session)
         let checkpoint = session.checkpoint()
         session.close()
@@ -304,7 +304,7 @@ final class FileEncryptionTests: XCTestCase {
     // MARK: - Sessions
 
     func testRangeReadsAtTheEdgesOfTheObject() async throws {
-        let session = try await encryption.prepare(file: try file(size: 2 * 65_536))
+        let session = try await encryption.prepareEncryption(file: try file(size: 2 * 65_536))
         defer { session.close(); encryption.discard(session.checkpoint()) }
         let size = session.ciphertextSize
         let whole = try session.read(offset: 0, length: Int(size))
@@ -318,7 +318,7 @@ final class FileEncryptionTests: XCTestCase {
     }
 
     func testAClosedSessionCannotBeRead() async throws {
-        let session = try await encryption.prepare(file: try file(size: 100))
+        let session = try await encryption.prepareEncryption(file: try file(size: 100))
         let checkpoint = session.checkpoint()
         defer { encryption.discard(checkpoint) }
         session.close()
@@ -330,7 +330,7 @@ final class FileEncryptionTests: XCTestCase {
     }
 
     func testWriteOfARangeIntoAMissingFolderThrows() async throws {
-        let session = try await encryption.prepare(file: try file(size: 100))
+        let session = try await encryption.prepareEncryption(file: try file(size: 100))
         defer { session.close(); encryption.discard(session.checkpoint()) }
         let url = directory.appendingPathComponent("missing/part")
 
@@ -603,13 +603,13 @@ extension FileEncryptionTests {
         _ = await decryptionError(object.object, info: object.info)
 
         let source = try file(size: 5_000)
-        let session = try await encryption.prepare(file: source)
+        let session = try await encryption.prepareEncryption(file: source)
         let checkpoint = session.checkpoint()
-        _ = try await encryption.restore(file: source, checkpoint: checkpoint)
+        _ = try await encryption.restoreEncryption(file: source, checkpoint: checkpoint)
         let corrupt = EncryptedFileCheckpoint(encryptionInfo: checkpoint.encryptionInfo, plaintextSize: checkpoint.plaintextSize, data: "{\"v\":1,\"transferId\":\"x\",\"sdkData\":\"\(checkpoint.encryptionInfo.key)\"}")
-        _ = try? await encryption.restore(file: source, checkpoint: corrupt)
+        _ = try? await encryption.restoreEncryption(file: source, checkpoint: corrupt)
         let unreadable = EncryptedFileCheckpoint(encryptionInfo: checkpoint.encryptionInfo, plaintextSize: 1, data: "not json \(checkpoint.encryptionInfo.key)")
-        _ = try? await encryption.restore(file: source, checkpoint: unreadable)
+        _ = try? await encryption.restoreEncryption(file: source, checkpoint: unreadable)
         encryption.discard(unreadable)
         session.close()
         encryption.discard(checkpoint)

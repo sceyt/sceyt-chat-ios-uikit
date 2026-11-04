@@ -466,7 +466,7 @@ final class TransportDataSessionTests: XCTestCase {
         XCTAssertTrue(recorder.locations.isEmpty, "the attachment keeps its own file")
         XCTAssertTrue(FileManager.default.fileExists(atPath: source.path))
         XCTAssertTrue((request.context as? AttachmentTransferContext)?.attachment === attachment)
-        XCTAssertEqual(recorder.progress, [0.01, 0.25, 0.75])
+        XCTAssertEqual(recorder.progress, [AttachmentTransfer.initialUploadProgress, 0.25, 0.75])
         XCTAssertEqual(recorder.successes, ["REF"])
         XCTAssertNil(taskInfo.uploadedEncryption)
         XCTAssertNil(taskInfo.uploadedPlaintextSize)
@@ -741,7 +741,7 @@ final class TransportDataSessionTests: XCTestCase {
         let sent = try XCTUnwrap(transport.uploads.first?.sourceFile)
         XCTAssertEqual(sent.lastPathComponent, "exported.mp4")
         XCTAssertTrue(sent.path.contains("/staging/"))
-        XCTAssertEqual(recorder.progress.first, 0.01)
+        XCTAssertEqual(recorder.progress.first, AttachmentTransfer.initialUploadProgress, "a placeholder no larger than the task's first")
         XCTAssertNotEqual(attachment.filePath, exported.path)
         XCTAssertTrue(session.removed.isEmpty, "only an image's original is removed")
     }

@@ -37,7 +37,10 @@ struct UploadPreparer {
             logger.info("[Transfer] \(taskInfo.logTag) upload staging reused: sends the file an earlier attempt prepared (\(TransferLog.sizeText(staged)))")
             return PreparedUploadFile(file: staged, isStaged: true)
         }
-        taskInfo.updateProgress(0.01)
+        // A placeholder that keeps the ring up during the export, as small as the task's first
+        // one: a larger one (it was 0.01) is drawn as the ring's floor, and the real progress
+        // below it was dropped as stale, holding "Preparing" until 1% of the file had gone.
+        taskInfo.updateProgress(AttachmentTransfer.initialUploadProgress)
         switch attachment.kind {
         case .video:
             switch await environment.videoProcessor().export(from: filePath, processInfo: videoProcessInfo) {

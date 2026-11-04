@@ -157,14 +157,14 @@ private final class ForeignEncryption: FileEncryption {
     private(set) var discarded = [EncryptedFileCheckpoint]()
     private(set) var session: ForeignSession?
 
-    func prepare(file: URL) async throws -> FileEncryptionSession {
+    func prepareEncryption(file: URL) async throws -> FileEncryptionSession {
         if let prepareError { throw prepareError }
         let session = ForeignSession()
         self.session = session
         return session
     }
 
-    func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
+    func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
         throw AttachmentEncryptionError.invalidCheckpoint
     }
 
@@ -175,7 +175,7 @@ private final class ForeignEncryption: FileEncryption {
     }
 }
 
-/// The SDK's own encryption, whose `prepare` can be held until the test lets it finish, and
+/// The SDK's own encryption, whose `prepareEncryption` can be held until the test lets it finish, and
 /// which counts discards.
 private final class GatedEncryption: FileEncryption {
     private let inner = ChatSDKFileEncryption()
@@ -203,8 +203,8 @@ private final class GatedEncryption: FileEncryption {
         gate?.resume()
     }
 
-    func prepare(file: URL) async throws -> FileEncryptionSession {
-        let session = try await inner.prepare(file: file)
+    func prepareEncryption(file: URL) async throws -> FileEncryptionSession {
+        let session = try await inner.prepareEncryption(file: file)
         lock.lock(); _session = session as? ChatSDKEncryptionSession; lock.unlock()
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             lock.lock()
@@ -220,8 +220,8 @@ private final class GatedEncryption: FileEncryption {
         return session
     }
 
-    func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
-        try await inner.restore(file: file, checkpoint: checkpoint)
+    func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
+        try await inner.restoreEncryption(file: file, checkpoint: checkpoint)
     }
 
     func discard(_ checkpoint: EncryptedFileCheckpoint) {

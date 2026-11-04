@@ -157,8 +157,8 @@ private final class PosterTransfer: AttachmentTransfer {
 
 /// A `FileEncryption` that cannot prepare anything.
 private final class UnpreparedEncryption: FileEncryption {
-    func prepare(file: URL) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.snapshotFailed(CocoaError(.fileNoSuchFile)) }
-    func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.invalidCheckpoint }
+    func prepareEncryption(file: URL) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.snapshotFailed(CocoaError(.fileNoSuchFile)) }
+    func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.invalidCheckpoint }
     func discard(_ checkpoint: EncryptedFileCheckpoint) {}
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
         throw AttachmentEncryptionError.decryptionFailed(CocoaError(.fileReadCorruptFile))

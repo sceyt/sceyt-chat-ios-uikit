@@ -375,11 +375,13 @@ extension MessageCell {
             defer { updateProgressLabelVisibility() }
             guard !isStaleProgress(progress)
             else { return }
+            // Until the transport sends the file (it reports the file's size first), an upload's
+            // progress is a placeholder: "Preparing", never a byte count made from it.
             if let message = data.ownerMessage,
                let task = AttachmentTransfer.default.taskFor(message: message, attachment: data.attachment),
                task.transferType == .upload,
                [.pending, .uploading].contains(data.transferStatus),
-                progress <= 0.01 {
+               task.transferSize == nil {
                 progressLabel.text = L10n.Upload.preparing
             }
             guard progressView.progress != progress

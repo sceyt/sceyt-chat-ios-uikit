@@ -288,11 +288,12 @@ extension MessageCell {
             let message: String
             if progress.progress <= 0.01 || progress.progress >= 1 {
                 message = data.fileSize(using: appearance.attachmentFileSizeFormatter)
-            } else {
+            } else if let total = progress.totalBytes, let done = progress.completedBytes {
                 // Of the file the transfer moves (an upload's compressed copy), not the original.
-                let total = progress.totalBytes ?? 0
-                let done = progress.completedBytes ?? 0
                 message = "\(appearance.attachmentFileSizeFormatter.format(done)) • \(appearance.attachmentFileSizeFormatter.format(total))"
+            } else {
+                // An upload not sending yet: its progress is a placeholder, not bytes.
+                message = L10n.Upload.preparing
             }
             sizeLabel.text = message
         }

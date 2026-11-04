@@ -180,4 +180,28 @@ final class VideoAttachmentProgressLabelTests: XCTestCase {
         let format = view.appearance.attachmentFileSizeFormatter
         XCTAssertEqual(view.progressLabel.text, "\(format.format(500_000)) / \(format.format(2_000_000))", describe(view))
     }
+
+    /// An unsent video whose upload has not started sending (just relaunched, preparing):
+    /// "Preparing", not a byte count made of the placeholder that keeps the ring up. Bytes
+    /// appear once the transport reports the file it sends.
+    func testAnUploadNotSendingYetSaysPreparingThenShowsBytes() throws {
+        let outgoing = ChatMessage.Attachment(
+            id: 0, tid: 77, messageId: 0, userId: "user", url: nil,
+            filePath: "/staged/clip.mp4", type: "video", name: "clip.mp4", metadata: nil,
+            uploadedFileSize: 54_000_000, createdAt: Date(), status: .uploading, transferProgress: 0
+        )
+        let message = ChatMessage(id: 0, channelId: channelId, attachments: [outgoing], user: ChatUser(id: "u1"))
+        let (_, view) = try makeBoundVideoView(MessageLayoutModel(
+            channel: ChatChannel(id: channelId, type: "group", uri: "video-label"),
+            message: message,
+            appearance: MessageCell.appearance
+        ))
+
+        view.setProgress(.init(message: message, attachment: view.data.attachment, progress: 0.001))
+        XCTAssertEqual(view.progressLabel.text, L10n.Upload.preparing, describe(view))
+
+        view.setProgress(.init(message: message, attachment: view.data.attachment, progress: 0.02, totalBytes: 54_000_000))
+        let format = view.appearance.attachmentFileSizeFormatter
+        XCTAssertEqual(view.progressLabel.text, "\(format.format(1_080_000)) / \(format.format(54_000_000))", describe(view))
+    }
 }

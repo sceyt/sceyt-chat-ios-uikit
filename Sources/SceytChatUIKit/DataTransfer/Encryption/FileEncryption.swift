@@ -39,12 +39,12 @@ public enum AttachmentEncryptionError: Error {
 public protocol FileEncryption: AnyObject, Sendable {
     /// A new session, under a new key, for `file`. Nothing is encrypted ahead: the bytes are
     /// made when they are read.
-    func prepare(file: URL) async throws -> FileEncryptionSession
+    func prepareEncryption(file: URL) async throws -> FileEncryptionSession
 
     /// The session saved in `checkpoint`: the same key, attachment id and parameters, so the
     /// ranges an earlier attempt sent stay valid next to the ones this one sends. Throws when
     /// the source changed; start a new session (and a new remote upload) then.
-    func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession
+    func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession
 
     /// Removes what only the session saved in `checkpoint` needed. Call when its upload is
     /// over: stored, or abandoned for good. Restoring it fails afterwards.
@@ -69,7 +69,7 @@ public protocol FileEncryptionSession: AnyObject {
     /// a range read again gives the same bytes. Blocks: call off the main thread.
     func read(offset: Int64, length: Int) throws -> Data
 
-    /// What `restore` needs. Save it after a `read` and before sending that range. It carries
+    /// What `restoreEncryption` needs. Save it after a `read` and before sending that range. It carries
     /// the key: store it as privately as the message itself and never log it.
     func checkpoint() -> EncryptedFileCheckpoint
 
@@ -148,7 +148,7 @@ public extension FileEncryption {
     /// Encrypts all of `file` into a new file at `destination` under a new key, e.g. a video
     /// poster. Returns what to send in `enc`.
     func encrypt(file: URL, to destination: URL) async throws -> EncryptedFileInfo {
-        let session = try await prepare(file: file)
+        let session = try await prepareEncryption(file: file)
         let checkpoint = session.checkpoint()
         defer {
             session.close()
@@ -223,7 +223,7 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
         self.provider = provider
     }
 
-    func prepare(file: URL) async throws -> FileEncryptionSession {
+    func prepareEncryption(file: URL) async throws -> FileEncryptionSession {
         try await FileEncryptionChunk.offMain {
             AttachmentEncryptionFiles.purgeStaleSnapshots
             let transferId = UUID().uuidString
@@ -250,7 +250,7 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
         }
     }
 
-    func restore(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
+    func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession {
         let saved: SavedSession
         do {
             saved = try SavedSession(checkpoint)
