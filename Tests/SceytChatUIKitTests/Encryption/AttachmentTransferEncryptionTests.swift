@@ -159,7 +159,7 @@ private final class PosterTransfer: AttachmentTransfer {
 private final class UnpreparedEncryption: FileEncryption {
     func prepareEncryption(file: URL) async throws -> FileEncryptionSession { throw CocoaError(.fileNoSuchFile) }
     func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.invalidCheckpoint }
-    func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
+    func prepareDecryption(encryptedFile: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64) async throws -> FileDecryptionSession {
         throw AttachmentEncryptionError.decryptionFailed(CocoaError(.fileReadCorruptFile))
     }
 }
@@ -308,13 +308,13 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         return try Data(contentsOf: output)
     }
 
-    /// Serves `object` through the default publishing step.
+    /// Serves `object` as stored: UIKit decrypts it.
     private func serve(_ object: URL) {
         transport.onDownload = { request in
             let staging = self.directory.appendingPathComponent("staging-\(UUID().uuidString)")
             do {
                 try FileManager.default.copyItem(at: object, to: staging)
-                try await DefaultFileTransferTransport.publish(staging, to: request, encryption: self.encryption)
+                try DefaultFileTransferTransport.publish(staging, to: request)
                 return .success(request.destinationFile)
             } catch {
                 return .failure(error)

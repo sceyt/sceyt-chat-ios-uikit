@@ -45,9 +45,27 @@ public protocol FileEncryption: AnyObject, Sendable {
     /// the source changed; start a new session (and a new remote upload) then.
     func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession
 
-    /// Verifies and decrypts the stored object `file` into a new file at `destination`. On a
-    /// throw nothing is left at `destination`. `plaintextSize` nil: derived from the object's.
+    /// Opens the completed local ciphertext `encryptedFile` for verified plaintext reads. No
+    /// networking. `plaintextSize` is the original size; the object must hold exactly that.
+    func prepareDecryption(encryptedFile: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64) async throws -> FileDecryptionSession
+
+    /// Verifies and decrypts all of the stored object `file` into a new file at `destination`.
+    /// A requirement (with a default built on `prepareDecryption`), so an implementation that
+    /// has its own is called through `any FileEncryption`.
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws
+}
+
+/// Verified plaintext of a completed encrypted file. Owns its open file until `close`.
+public protocol FileDecryptionSession: AnyObject {
+    /// The ciphertext file it reads, as it was when opened.
+    var sourceId: String { get }
+    var plaintextSize: Int64 { get }
+
+    /// Exactly `length` authenticated plaintext bytes from `offset`, or a throw. Blocks: call off
+    /// the main thread.
+    func read(offset: Int64, length: Int) throws -> Data
+
+    func close()
 }
 
 /// The encrypted bytes of one file.
@@ -140,6 +158,41 @@ public extension FileEncryptionSession {
 }
 
 public extension FileEncryption {
+    /// Verifies and decrypts all of the stored object `file` into a new file at `destination`
+    /// (a video poster, a test). `plaintextSize` nil, or the object's own size: derived from the
+    /// object's. On a throw (`AttachmentEncryptionError.decryptionFailed` or
+    /// `.invalidCiphertextSize`) nothing is left at `destination`.
+    func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
+        // The bound id and sizes only: never the key.
+        let label = "\(TransferLog.currentTag) attachmentId=\(encryptionInfo.attachmentId)"
+        logger.info("[Encryption] \(label) decrypt start ciphertext=\(TransferLog.sizeText(file)) trustedPlaintext=\(plaintextSize.map { "\($0) B" } ?? "derived")")
+        let ciphertextSize: UInt64
+        do {
+            ciphertextSize = try FileCiphertextSource.size(of: file)
+        } catch {
+            logger.debug("[Encryption] \(label) decrypt cannot read the object: \(TransferLog.describe(error))")
+            throw AttachmentEncryptionError.decryptionFailed(error)
+        }
+        let session: FileDecryptionSession
+        do {
+            let size = try ChatSDKFileEncryption.plaintextSize(trusted: plaintextSize, ciphertextSize: ciphertextSize, label: label)
+            session = try await prepareDecryption(encryptedFile: file, encryptionInfo: encryptionInfo, plaintextSize: Int64(size))
+        } catch {
+            logger.debug("[Encryption] \(label) decrypt failed to open, verification kind: \(ChatSDKFileEncryption.failureKind(error)) (\(TransferLog.describe(error)))")
+            throw AttachmentEncryptionError.wrappingDecryption(error)
+        }
+        defer { session.close() }
+        do {
+            try await FileEncryptionChunk.offMain { try session.write(to: destination) }
+        } catch {
+            // The caller reports the failure, with this kind (`TransferLog.describe`).
+            logger.debug("[Encryption] \(label) decrypt failed, verification kind: \(ChatSDKFileEncryption.failureKind(error)) (\(TransferLog.describe(error)))")
+            TransferLog.remove(destination, what: "the partial plaintext", context: "[Encryption] \(label) decrypt", level: .error)
+            throw AttachmentEncryptionError.wrappingDecryption(error)
+        }
+        logger.debug("[Encryption] \(label) decrypt finished plaintext=\(TransferLog.sizeText(destination))")
+    }
+
     /// Encrypts all of `file` into a new file at `destination` under a new key, e.g. a video
     /// poster. Returns what to send in `enc`.
     func encrypt(file: URL, to destination: URL) async throws -> EncryptedFileInfo {
@@ -157,6 +210,32 @@ public extension FileEncryption {
         }
         logger.debug("[Encryption] \(tag) encrypt \(file.lastPathComponent) finished, wrote \(TransferLog.sizeText(destination)) attachmentId=\(session.encryptionInfo.attachmentId)")
         return session.encryptionInfo
+    }
+}
+
+public extension FileDecryptionSession {
+    /// Writes all of the plaintext to a new file at `destination`. On a throw `destination`
+    /// holds a prefix: remove it.
+    func write(to destination: URL) throws {
+        guard FileManager.default.createFile(atPath: destination.path, contents: nil) else {
+            logger.debug("[Encryption] \(TransferLog.currentTag) decrypt cannot create \(destination.lastPathComponent) (folder missing or disk full)")
+            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: destination.path])
+        }
+        // The same loop a download decrypts with, without its checkpoints.
+        try EncryptedFileDownloader.writePlaintext(
+            from: self, to: destination, start: 0, total: plaintextSize,
+            checkpointLength: .max, cancelled: CancelFlag(), checkpoint: { _ in }, progress: { _ in }
+        )
+    }
+}
+
+extension AttachmentEncryptionError {
+    /// `error` as a decryption failure (its reason inside), unless it is one already or a
+    /// cancellation.
+    static func wrappingDecryption(_ error: Error) -> Error {
+        if error is CancellationError { return error }
+        if case .decryptionFailed = error as? AttachmentEncryptionError { return error }
+        return AttachmentEncryptionError.decryptionFailed(error)
     }
 }
 
@@ -270,24 +349,22 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
         }
     }
 
-    func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
-        // The bound id and sizes only: never the key.
-        let label = "\(TransferLog.currentTag) attachmentId=\(encryptionInfo.attachmentId)"
-        logger.info("[Encryption] \(label) decrypt start ciphertext=\(TransferLog.sizeText(file)) trustedPlaintext=\(plaintextSize.map { "\($0) B" } ?? "derived")")
-        try await FileEncryptionChunk.offMain {
+    func prepareDecryption(encryptedFile: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64) async throws -> FileDecryptionSession {
+        guard plaintextSize >= 0 else { throw AttachmentEncryptionError.invalidEncryptionInfo }
+        return try await FileEncryptionChunk.offMain {
+            let source = try FileCiphertextSource(url: encryptedFile)
             do {
-                try Self.decrypt(file, to: destination, provider: self.provider()) { ciphertextSize in
-                    let size = try Self.plaintextSize(trusted: plaintextSize, ciphertextSize: ciphertextSize, label: label)
-                    return Self.sdkInfo(encryptionInfo, plaintextSize: size)
-                }
+                let reader = try self.provider().openDownload(
+                    source: source,
+                    encryptionInfo: Self.sdkInfo(encryptionInfo, plaintextSize: UInt64(plaintextSize))
+                )
+                return ChatSDKDecryptionSession(reader: reader, source: source)
             } catch {
-                // The caller reports the failure, with this kind (`TransferLog.describe`).
-                logger.debug("[Encryption] \(label) decrypt failed, verification kind: \(Self.failureKind(error)) (\(TransferLog.describe(error)))")
-                TransferLog.remove(destination, what: "the partial plaintext", context: "[Encryption] \(label) decrypt", level: .error)
-                throw AttachmentEncryptionError.decryptionFailed(error)
+                // On failure the source stays ours to close.
+                source.close()
+                throw error
             }
         }
-        logger.debug("[Encryption] \(label) decrypt finished plaintext=\(TransferLog.sizeText(destination))")
     }
 
     /// The plaintext size to decrypt a stored object of `ciphertextSize` bytes with: the
@@ -342,39 +419,6 @@ final class ChatSDKFileEncryption: FileEncryption, @unchecked Sendable {
 
     static func sdkInfo(_ info: EncryptedFileInfo, plaintextSize: UInt64) -> FileEncryptionInfo {
         FileEncryptionInfo(format: info.algorithm, data: FileEncryptionData(uniqueId: info.attachmentId, key: info.key, plainSize: plaintextSize))
-    }
-
-    /// Decrypts `file` into a new file at `destination`, with the info `info` makes for the
-    /// file's size. Every record is verified before its plaintext is written; on a throw
-    /// `destination` holds a prefix and must be removed.
-    static func decrypt(_ file: URL, to destination: URL, provider: FileEncryptionProvider, info: (UInt64) throws -> FileEncryptionInfo) throws {
-        let source = try FileCiphertextSource(url: file)
-        let reader: PlaintextReader
-        do {
-            let info = try info(source.ciphertextSize)
-            reader = try provider.openDownload(source: source, encryptionInfo: info)
-        } catch {
-            // On failure the source stays ours to close.
-            source.close()
-            throw error
-        }
-        defer { reader.close() }
-
-        guard FileManager.default.createFile(atPath: destination.path, contents: nil) else {
-            logger.debug("[Encryption] \(TransferLog.currentTag) decrypt cannot create \(destination.lastPathComponent) (folder missing or disk full)")
-            throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: destination.path])
-        }
-        let output = try FileHandle(forWritingTo: destination)
-        defer { try? output.close() }
-        let size = reader.plaintextSize
-        var offset: UInt64 = 0
-        while offset < size {
-            let length = min(UInt64(FileEncryptionChunk.length), size - offset)
-            try autoreleasepool {
-                try output.write(contentsOf: reader.read(offset: offset, length: UInt(length)))
-            }
-            offset += length
-        }
     }
 
     /// `EncryptedFileCheckpoint.data`: the SDK's own checkpoint data and the session's id (for
@@ -453,6 +497,39 @@ final class ChatSDKEncryptionSession: FileEncryptionSession {
     }
 }
 
+/// Verified plaintext of a downloaded object, read by the Chat SDK.
+final class ChatSDKDecryptionSession: FileDecryptionSession {
+    private let reader: PlaintextReader
+    let sourceId: String
+    let plaintextSize: Int64
+
+    init(reader: PlaintextReader, source: FileCiphertextSource) {
+        self.reader = reader
+        sourceId = source.sourceId
+        plaintextSize = Int64(reader.plaintextSize)
+    }
+
+    private let lock = NSLock()
+    private var closed = false
+
+    deinit {
+        close()
+    }
+
+    func read(offset: Int64, length: Int) throws -> Data {
+        try reader.read(offset: UInt64(offset), length: UInt(length))
+    }
+
+    /// Closes the reader (and its ciphertext source) once, however often it is called.
+    func close() {
+        lock.lock()
+        guard !closed else { lock.unlock(); return }
+        closed = true
+        lock.unlock()
+        reader.close()
+    }
+}
+
 /// Reads a downloaded encrypted file for `FileEncryptionProvider.openDownload`.
 final class FileCiphertextSource: NSObject, CiphertextRangeSource {
 
@@ -461,9 +538,21 @@ final class FileCiphertextSource: NSObject, CiphertextRangeSource {
     // The SDK may read from several threads; a seek and its read must stay together.
     private let lock = NSLock()
 
+    /// The file as opened: path, size and modification time.
+    let sourceId: String
+
+    static func size(of url: URL) throws -> UInt64 {
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return (attributes[.size] as? NSNumber)?.uint64Value ?? 0
+    }
+
     init(url: URL) throws {
         handle = try FileHandle(forReadingFrom: url)
         ciphertextSize = try handle.seekToEnd()
+        // Read from the file system each time: `URL.resourceValues` caches per URL instance,
+        // and a changed file must not keep its old identity.
+        let modified = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+        sourceId = "\(url.path):\(ciphertextSize):\(modified?.timeIntervalSince1970 ?? 0)"
     }
 
     func readCiphertextRange(offset: UInt64, length: UInt) throws -> Data {
@@ -489,7 +578,7 @@ final class FileCiphertextSource: NSObject, CiphertextRangeSource {
 /// file under `Caches/encrypted-transfers`. Nothing reads them any more: the folder is removed
 /// once per process. Drop this once no installed build can have left one.
 enum LegacyEncryptionSnapshots {
-    nonisolated(unsafe) static var directory: URL = {
+    static let directory: URL = {
         TransferDirectories.cachesOrTemporary().appendingPathComponent("encrypted-transfers", isDirectory: true)
     }()
 

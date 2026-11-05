@@ -78,34 +78,37 @@ public struct FileUploadResult: Sendable {
     }
 }
 
-/// One download. With `encryptionInfo` the transport decrypts and verifies the object before
-/// it publishes `destinationFile`.
+/// One download of the remote bytes, as stored (architecture doc §4). The transport never
+/// decrypts: for an encrypted attachment UIKit hands it a staging `destinationFile` and then
+/// verifies and decrypts what it wrote (`EncryptedFileDownloader`).
 public struct FileDownloadRequest: Sendable {
     public let operationId: String
     /// The attachment's url: the remote reference its upload returned.
     public let url: String
-    /// Where the final plaintext goes. Nothing is written there until the file is complete.
+    /// Where the transport writes the downloaded bytes. Nothing may be there until all of them
+    /// arrived: write elsewhere first, then move it here.
     public let destinationFile: URL
-    public let encryptionInfo: EncryptedFileInfo?
-    /// The original size, when the attachment carries it. Nil: derived from the stored object's
-    /// size, which `enc` makes possible for its format.
-    public let plaintextSize: Int64?
     public let context: FileTransferContext?
+    /// HTTP headers to send with the request. Credentials: never forward them to another origin.
+    public let headers: [String: String]
 
     public init(
         operationId: String,
         url: String,
         destinationFile: URL,
-        encryptionInfo: EncryptedFileInfo? = nil,
-        plaintextSize: Int64? = nil,
-        context: FileTransferContext? = nil
+        context: FileTransferContext? = nil,
+        headers: [String: String] = [:]
     ) {
         self.operationId = operationId
         self.url = url
         self.destinationFile = destinationFile
-        self.encryptionInfo = encryptionInfo
-        self.plaintextSize = plaintextSize
         self.context = context
+        self.headers = headers
+    }
+
+    /// The same download, to another file.
+    public func with(destinationFile: URL) -> FileDownloadRequest {
+        FileDownloadRequest(operationId: operationId, url: url, destinationFile: destinationFile, context: context, headers: headers)
     }
 }
 
@@ -123,8 +126,9 @@ public enum FileTransferResult<Success: Sendable>: Sendable {
 /// `DefaultFileTransferTransport`, uses the Chat SDK's own transfers; an application can supply
 /// its own (its backend, multipart protocol, saved sessions).
 ///
-/// - `upload` returns once the object is stored, `download` once `destinationFile` holds the
-///   complete, verified plaintext.
+/// - `upload` returns once the object is stored, `download` once `destinationFile` holds all of
+///   the remote bytes as stored. An encrypted attachment's are ciphertext: UIKit verifies and
+///   decrypts them before it reports the attachment downloaded.
 /// - Task cancellation stops reads, writes and network work. It does not mean the user
 ///   abandoned the file (it is also UIKit's pause fallback): keep what a retry can continue.
 /// - `pause` returning true means the same invocation stays alive for `resume`; false lets

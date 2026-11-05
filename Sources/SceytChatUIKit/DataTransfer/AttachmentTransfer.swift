@@ -22,7 +22,12 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
     public typealias CompletionBlock = (AttachmentCompletion) -> Void
     
     private let tasksQueue = DispatchQueue(label: "com.sceytchat.uikit.attachmentTransfer")
-    nonisolated(unsafe) public static var `default` = Components.attachmentTransfer.init()
+    // Lock-backed: set by the app at start-up, read from the transfer queues.
+    private static let defaultStorage = Atomic(wrappedValue: Components.attachmentTransfer.init())
+    public static var `default`: AttachmentTransfer {
+        get { defaultStorage.wrappedValue }
+        set { defaultStorage.wrappedValue = newValue }
+    }
     
     /// Where transfers persist what they change.
     open var store: TransferStore = DatabaseTransferStore()
@@ -61,7 +66,11 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
     /// `Upload.preparing` under 0.01) but > 0, which is what makes the ring visible at all
     /// — `onProgress` ignores non-positive values and the attachment views hide the ring
     /// at 0.
-    nonisolated(unsafe) public static var initialUploadProgress: Double = 0.001
+    public static var initialUploadProgress: Double {
+        get { initialUploadProgressStorage.wrappedValue }
+        set { initialUploadProgressStorage.wrappedValue = newValue }
+    }
+    private static let initialUploadProgressStorage = Atomic(wrappedValue: 0.001)
 
     /// Whether the client currently has no connection to the server. An upload failure
     /// raised in this state says nothing about the file or the server — only that there is

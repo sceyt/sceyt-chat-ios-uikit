@@ -93,13 +93,15 @@ extension UIImageView {
                 finalPreviewer = SingleItemPreviewDataSource(item: item)
                 initialIndex = 0
             } else {
-                // genuinely still downloading — retry to unstick and wait
-                let message = try? DataProvider.database.read {
-                    MessageDTO.fetch(id: attachment.messageId, context: $0)?.convert()
-                }.get()
-                guard let message else { return }
-                sender.attachmentTransfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment]) { [weak self] _, _ in
-                    // re-trigger tap after download completes
+                // genuinely still downloading — retry to unstick and wait. Off the main
+                // thread: the read and the transfer queue's check-then-start both wait.
+                let transfer = sender.attachmentTransfer
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let message = try? DataProvider.database.read {
+                        MessageDTO.fetch(id: attachment.messageId, context: $0)?.convert()
+                    }.get()
+                    guard let message else { return }
+                    transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
                 }
                 return
             }

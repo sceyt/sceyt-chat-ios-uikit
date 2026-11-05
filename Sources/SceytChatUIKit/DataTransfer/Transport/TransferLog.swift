@@ -271,17 +271,11 @@ extension ChatMessage.Attachment {
 /// The folders transfers keep their files in.
 enum TransferDirectories {
 
-    /// How old a decryption file must be before it counts as left behind: one this young may
-    /// belong to a publish still running.
+    /// How old a decryption file must be before it counts as left behind.
     static let staleDecryptionAge: TimeInterval = 10 * 60
 
-    /// A new hidden file next to `destination` for its plaintext while it is decrypted.
-    static func decryptionFile(for destination: URL) -> URL {
-        destination.deletingLastPathComponent()
-            .appendingPathComponent(".\(UUID().uuidString)-\(destination.lastPathComponent)")
-    }
-
-    /// Removes decryption files of `destination` a crash left behind: nothing else would.
+    /// Removes the hidden `.<uuid>-<name>` decryption files of `destination` that builds before
+    /// `EncryptedFileDownloader` left after a crash: nothing else would.
     static func removeStaleDecryptionFiles(for destination: URL, now: Date = Date(), tag: String) {
         let folder = destination.deletingLastPathComponent()
         let suffix = "-\(destination.lastPathComponent)"

@@ -100,14 +100,21 @@ private enum FakeClient {
 private final class StubServer: URLProtocol {
     private static let lock = NSLock()
     private static var bodies = [String: (Int, Data)]()
+    private static var _headers = [String: [String: String]]()
     static var delay: TimeInterval = 0
+
+    /// The headers of the last request for each path.
+    static func headers(_ path: String) -> [String: String]? {
+        lock.lock(); defer { lock.unlock() }
+        return _headers[path]
+    }
 
     static func serve(_ path: String, status: Int = 200, body: Data) {
         lock.lock(); bodies[path] = (status, body); lock.unlock()
     }
 
     static func reset() {
-        lock.lock(); bodies = [:]; lock.unlock()
+        lock.lock(); bodies = [:]; _headers = [:]; lock.unlock()
         delay = 0
     }
 
@@ -121,6 +128,7 @@ private final class StubServer: URLProtocol {
 
     override func startLoading() {
         guard let url = request.url else { return }
+        Self.lock.lock(); Self._headers[url.path] = request.allHTTPHeaderFields ?? [:]; Self.lock.unlock()
         switch url.path {
         case "/hold":
             return
@@ -167,8 +175,8 @@ private final class ForeignEncryption: FileEncryption {
         throw AttachmentEncryptionError.invalidCheckpoint
     }
 
-    func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
-        try FileManager.default.copyItem(at: file, to: destination)
+    func prepareDecryption(encryptedFile: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64) async throws -> FileDecryptionSession {
+        throw AttachmentEncryptionError.invalidEncryptionInfo
     }
 }
 
@@ -223,8 +231,8 @@ private final class GatedEncryption: FileEncryption {
         try await inner.restoreEncryption(file: file, checkpoint: checkpoint)
     }
 
-    func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {
-        try await inner.decrypt(file: file, to: destination, encryptionInfo: encryptionInfo, plaintextSize: plaintextSize)
+    func prepareDecryption(encryptedFile: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64) async throws -> FileDecryptionSession {
+        try await inner.prepareDecryption(encryptedFile: encryptedFile, encryptionInfo: encryptionInfo, plaintextSize: plaintextSize)
     }
 }
 
@@ -762,79 +770,71 @@ final class DefaultFileTransferTransportTests: XCTestCase {
         XCTAssertEqual(try Data(contentsOf: destination), Data("new".utf8))
     }
 
-    func testDownloadErrorsAreFailures() throws {
+    /// A refused request fails; a lost connection interrupts (what arrived can be continued).
+    /// Neither leaves a file at the destination.
+    func testARefusalFailsAndALostConnectionInterrupts() throws {
         StubServer.serve("/missing", status: 404, body: Data("<Error/>".utf8))
-        for path in ["/missing", "/error"] {
-            let destination = destination("\(path.dropFirst()).bin")
-            let (outcome, _, _) = startDownload(FileDownloadRequest(operationId: path, url: StubServer.url(path), destinationFile: destination))
-            waitUntil { outcome.value != nil }
-            XCTAssertNotNil(error(outcome.value), path)
-            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path), path)
-        }
+        let missing = destination("missing.bin")
+        let (refused, _, _) = startDownload(FileDownloadRequest(operationId: "/missing", url: StubServer.url("/missing"), destinationFile: missing))
+        waitUntil { refused.value != nil }
+        XCTAssertNotNil(error(refused.value))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: missing.path))
+
+        let lost = destination("error.bin")
+        let (interrupted, _, _) = startDownload(FileDownloadRequest(operationId: "/error", url: StubServer.url("/error"), destinationFile: lost))
+        waitUntil { interrupted.value != nil }
+        XCTAssertNotNil(interruption(interrupted.value), "not connected: an interruption")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: lost.path))
     }
 
-    func testEncryptedDownloadIsDecryptedBeforeItIsPublished() async throws {
-        let plaintext = try file(size: 70_000)
+    /// The transport moves bytes only (doc §4): an encrypted object is written as stored, for
+    /// UIKit to verify and decrypt.
+    func testAnEncryptedObjectIsDownloadedAsStored() async throws {
         let object = directory.appendingPathComponent("object")
-        let info = try await ChatSDKFileEncryption().encrypt(file: plaintext, to: object)
+        _ = try await ChatSDKFileEncryption().encrypt(file: try file(size: 70_000), to: object)
         StubServer.serve("/enc", body: try Data(contentsOf: object))
-        let destination = destination("enc.bin")
+        let destination = destination("enc.bin.sceyt.enc.part")
 
         let result = await transport.download(
-            FileDownloadRequest(operationId: "d", url: StubServer.url("/enc"), destinationFile: destination, encryptionInfo: info, plaintextSize: 70_000)
+            FileDownloadRequest(operationId: "d", url: StubServer.url("/enc"), destinationFile: destination)
         ) { _ in }
 
         guard case .success = result else { return XCTFail("\(result)") }
-        XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: plaintext))
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: destination.deletingLastPathComponent().path), ["enc.bin"], "no temporary file is left")
+        XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: object))
     }
 
-    func testAnEncryptedDownloadThatDoesNotVerifyPublishesNothing() async throws {
-        let object = directory.appendingPathComponent("object")
-        let info = try await ChatSDKFileEncryption().encrypt(file: try file(size: 1000), to: object)
-        var bytes = try Data(contentsOf: object)
-        bytes[500] ^= 0x01
-        StubServer.serve("/tampered", body: bytes)
-        let destination = destination("tampered.bin")
-        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try Data("previous".utf8).write(to: destination)
-
+    func testTheRequestHeadersAreSent() async throws {
+        StubServer.serve("/headers", body: Data("x".utf8))
         let result = await transport.download(
-            FileDownloadRequest(operationId: "d", url: StubServer.url("/tampered"), destinationFile: destination, encryptionInfo: info)
+            FileDownloadRequest(operationId: "d", url: StubServer.url("/headers"), destinationFile: destination(), headers: ["X-Chat-Token": "t", "X-Message-Id": "42"])
         ) { _ in }
 
-        guard case .decryptionFailed = error(result) as? AttachmentEncryptionError else { return XCTFail("\(result)") }
-        XCTAssertEqual(try Data(contentsOf: destination), Data("previous".utf8), "an unverified object never replaces a file")
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: destination.deletingLastPathComponent().path), ["tampered.bin"])
+        guard case .success = result else { return XCTFail("\(result)") }
+        XCTAssertEqual(StubServer.headers("/headers")?["X-Chat-Token"], "t")
+        XCTAssertEqual(StubServer.headers("/headers")?["X-Message-Id"], "42")
     }
 
-    func testPublishOfAnEncryptedObjectReplacesAnOlderFile() async throws {
-        let plaintext = try file(size: 500)
-        let staging = directory.appendingPathComponent("staging")
-        let info = try await ChatSDKFileEncryption().encrypt(file: plaintext, to: staging)
+    func testPublishReplacesAnOlderFile() throws {
+        let staging = try file(size: 500)
+        let bytes = try Data(contentsOf: staging)
         let destination = destination()
         try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data("old".utf8).write(to: destination)
 
-        try await DefaultFileTransferTransport.publish(
-            staging,
-            to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: destination, encryptionInfo: info),
-            encryption: ChatSDKFileEncryption()
-        )
+        try DefaultFileTransferTransport.publish(staging, to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: destination))
 
-        XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: plaintext))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path), "the ciphertext is removed")
+        XCTAssertEqual(try Data(contentsOf: destination), bytes)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: staging.path))
     }
 
-    func testPublishFailsWhenTheDestinationFolderCannotBeMade() async throws {
+    func testPublishFailsWhenTheDestinationFolderCannotBeMade() throws {
         let blocker = directory.appendingPathComponent("blocker")
         try Data().write(to: blocker)
         let staging = try file()
         do {
-            try await DefaultFileTransferTransport.publish(
+            try DefaultFileTransferTransport.publish(
                 staging,
-                to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: blocker.appendingPathComponent("x/file")),
-                encryption: ChatSDKFileEncryption()
+                to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: blocker.appendingPathComponent("x/file"))
             )
             XCTFail("a file is in the way")
         } catch {}
@@ -936,10 +936,10 @@ extension DefaultFileTransferTransportTests {
         XCTAssertFalse(transport.pause(operationId: "d"), "nothing to pause once over")
     }
 
-    func testAPlainPublishThatCannotMoveTheFileFails() async throws {
+    func testAPlainPublishThatCannotMoveTheFileFails() throws {
         let missing = directory.appendingPathComponent("never-downloaded")
         do {
-            try await DefaultFileTransferTransport.publish(missing, to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: destination()), encryption: ChatSDKFileEncryption())
+            try DefaultFileTransferTransport.publish(missing, to: FileDownloadRequest(operationId: "d", url: "u", destinationFile: destination()))
             XCTFail("nothing to publish")
         } catch {
             XCTAssertFalse(FileManager.default.fileExists(atPath: destination().path))
@@ -1243,5 +1243,151 @@ private final class BlockedStorage: FileStorage {
     static var thumbnailRoot = URL(fileURLWithPath: NSTemporaryDirectory())
     override func thumbnailPath(filePath: String, imageSize: CGSize) -> String {
         Self.thumbnailRoot.appendingPathComponent((filePath as NSString).lastPathComponent).path
+    }
+}
+
+// MARK: - Resume data (an interrupted download continues instead of starting over)
+
+final class DownloadResumeTests: XCTestCase {
+    private var directory: URL!
+
+    private var savedResumeDirectory: URL!
+
+    override func setUpWithError() throws {
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent("resume-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        savedResumeDirectory = DefaultFileTransferTransport.resumeDirectory
+        DefaultFileTransferTransport.resumeDirectory = directory.appendingPathComponent("resume-data", isDirectory: true)
+        try FileManager.default.createDirectory(at: DefaultFileTransferTransport.resumeDirectory, withIntermediateDirectories: true)
+    }
+
+    override func tearDownWithError() throws {
+        DefaultFileTransferTransport.resumeDirectory = savedResumeDirectory
+        try? FileManager.default.removeItem(at: directory)
+    }
+
+    func testStaleResumeDataIsPurgedAndRecentKept() throws {
+        let stale = DefaultFileTransferTransport.resumeDataFile(operationId: "old")
+        let recent = DefaultFileTransferTransport.resumeDataFile(operationId: "new")
+        try Data("a".utf8).write(to: stale)
+        try Data("b".utf8).write(to: recent)
+        try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-DefaultFileTransferTransport.staleResumeAge - 60)], ofItemAtPath: stale.path)
+        DefaultFileTransferTransport.purgeStaleResumeData()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: stale.path))
+        XCTAssertTrue(FileManager.default.fileExists(atPath: recent.path))
+    }
+
+    func testResumeDataIsKeptOutOfTheAttachmentFolder() {
+        let file = DefaultFileTransferTransport.resumeDataFile(operationId: "download-tid1")
+        XCTAssertEqual(file.deletingLastPathComponent(), DefaultFileTransferTransport.resumeDirectory)
+        XCTAssertFalse(file.lastPathComponent.contains("download-tid1"), "named by a hash, not the id")
+    }
+
+    func testSavedResumeDataIsTakenOnce() {
+        let resume = DownloadResume(file: directory.appendingPathComponent("a.resume"), tag: "t")
+        XCTAssertNil(resume.take())
+        resume.save(Data("r".utf8))
+        XCTAssertEqual(resume.take(), Data("r".utf8))
+        XCTAssertNil(resume.take(), "used once")
+        resume.save(nil)
+        resume.save(Data())
+        XCTAssertNil(resume.take(), "nothing to keep")
+    }
+
+    func testAnAbandonedDownloadKeepsNoResumeData() {
+        let file = directory.appendingPathComponent("a.resume")
+        let resume = DownloadResume(file: file, tag: "t")
+        resume.save(Data("r".utf8))
+        resume.abandon()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path))
+        resume.save(Data("late".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "a stop that lands after the cancel keeps nothing")
+    }
+
+    /// The next attempt continues from the saved resume data, and it is used up.
+    func testTheNextAttemptContinuesFromTheSavedResumeData() async throws {
+        let transport = DefaultFileTransferTransport(encryption: ChatSDKFileEncryption())
+        let destination = directory.appendingPathComponent("files/a.bin")
+        let resumeFile = DefaultFileTransferTransport.resumeDataFile(operationId: "d")
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("resume-data".utf8).write(to: resumeFile)
+        let body = directory.appendingPathComponent("body")
+        try Data("whole file".utf8).write(to: body)
+        let used = Locked<Data?>(nil)
+        transport.startResumedDownload = { data, _, completion in
+            used.wrapped = data
+            completion(.success(body))
+            return nil
+        }
+        transport.startDownload = { _, _, _ in
+            XCTFail("not started over")
+            return nil
+        }
+        let result = await transport.download(FileDownloadRequest(operationId: "d", url: "https://files.example/a.bin", destinationFile: destination)) { _ in }
+        guard case .success = result else { return XCTFail("\(result)") }
+        XCTAssertEqual(used.wrapped, Data("resume-data".utf8))
+        XCTAssertEqual(try Data(contentsOf: destination), Data("whole file".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: resumeFile.path))
+    }
+
+    /// A network failure leaves its resume data for the next attempt.
+    func testANetworkFailureKeepsItsResumeData() async throws {
+        let transport = DefaultFileTransferTransport(encryption: ChatSDKFileEncryption())
+        let destination = directory.appendingPathComponent("files/a.bin")
+        transport.startDownload = { _, _, completion in
+            completion(.failure(NSError(domain: NSURLErrorDomain, code: NSURLErrorNetworkConnectionLost, userInfo: [NSURLSessionDownloadTaskResumeData: Data("partial".utf8)])))
+            return nil
+        }
+        let result = await transport.download(FileDownloadRequest(operationId: "d", url: "https://files.example/a.bin", destinationFile: destination)) { _ in }
+        guard case .interrupted = result else { return XCTFail("a lost network is an interruption, got \(result)") }
+        XCTAssertEqual(try Data(contentsOf: DefaultFileTransferTransport.resumeDataFile(operationId: "d")), Data("partial".utf8))
+    }
+
+    /// Resume data the server no longer accepts (expired url, changed object): fetched again
+    /// from the start, with the request as it is now.
+    func testRefusedResumeDataFallsBackToAFreshDownload() async throws {
+        let transport = DefaultFileTransferTransport(encryption: ChatSDKFileEncryption())
+        let destination = directory.appendingPathComponent("files/a.bin")
+        try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("stale".utf8).write(to: DefaultFileTransferTransport.resumeDataFile(operationId: "d"))
+        let body = directory.appendingPathComponent("body")
+        try Data("fresh".utf8).write(to: body)
+        transport.startResumedDownload = { _, _, completion in
+            completion(.failure(URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "HTTP 403"])))
+            return nil
+        }
+        let fresh = Locked<[URLRequest]>([])
+        transport.startDownload = { request, _, completion in
+            fresh.wrapped.append(request)
+            completion(.success(body))
+            return nil
+        }
+        let result = await transport.download(FileDownloadRequest(operationId: "d", url: "https://files.example/a.bin", destinationFile: destination, headers: ["X-Token": "new"])) { _ in }
+        guard case .success = result else { return XCTFail("\(result)") }
+        XCTAssertEqual(fresh.wrapped.first?.value(forHTTPHeaderField: "X-Token"), "new", "the current request, not the saved one")
+        XCTAssertEqual(try Data(contentsOf: destination), Data("fresh".utf8))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: DefaultFileTransferTransport.resumeDataFile(operationId: "d").path))
+    }
+
+    /// A completed download keeps no resume data, even one a stop saved just before.
+    func testACompletedDownloadLeavesNoResumeData() async throws {
+        let transport = DefaultFileTransferTransport(encryption: ChatSDKFileEncryption())
+        let destination = directory.appendingPathComponent("files/a.bin")
+        let body = directory.appendingPathComponent("body")
+        try Data("whole".utf8).write(to: body)
+        transport.startDownload = { _, _, completion in
+            completion(.success(body))
+            return nil
+        }
+        _ = await transport.download(FileDownloadRequest(operationId: "d", url: "https://files.example/a.bin", destinationFile: destination)) { _ in }
+        XCTAssertFalse(FileManager.default.fileExists(atPath: DefaultFileTransferTransport.resumeDataFile(operationId: "d").path))
+    }
+
+    func testOnlyAConnectionLossCountsAsNetworkLoss() {
+        XCTAssertTrue(DefaultFileTransferTransport.isNetworkLoss(URLError(.networkConnectionLost)))
+        XCTAssertTrue(DefaultFileTransferTransport.isNetworkLoss(URLError(.timedOut)))
+        XCTAssertFalse(DefaultFileTransferTransport.isNetworkLoss(URLError(.badServerResponse)))
+        XCTAssertFalse(DefaultFileTransferTransport.isNetworkLoss(URLError(.cancelled)))
+        XCTAssertFalse(DefaultFileTransferTransport.isNetworkLoss(CocoaError(.fileWriteOutOfSpace)))
     }
 }

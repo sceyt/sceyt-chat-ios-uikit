@@ -243,4 +243,8 @@ extension FileStorage: AttachmentFileStore {
     public func remove(fileAt path: String) {
         remove(path: path)
     }
+
+    public func downloadDestination(transferId: String, fileName: String?) -> URL {
+        URL(fileURLWithPath: createPath(transferId: transferId, fileName: fileName))
+    }
 }

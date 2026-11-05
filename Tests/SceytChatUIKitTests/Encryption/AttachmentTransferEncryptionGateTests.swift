@@ -338,13 +338,13 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         return try XCTUnwrap(made).get()
     }
 
-    /// The transport's part: hands the stored object to the default publishing step.
+    /// The transport's part: writes the stored object, as stored, where it is asked to.
     private func serve(_ ciphertext: URL) {
         transport.onDownload = { request in
             let staging = self.directory.appendingPathComponent("staging-\(UUID().uuidString)")
             do {
                 try FileManager.default.copyItem(at: ciphertext, to: staging)
-                try await DefaultFileTransferTransport.publish(staging, to: request, encryption: self.encryption)
+                try DefaultFileTransferTransport.publish(staging, to: request)
                 return .success(request.destinationFile)
             } catch {
                 return .failure(error)
@@ -359,7 +359,7 @@ final class AttachmentTransferEncryptionGateTests: XCTestCase {
         XCTAssertNil(download(remote.attachment))
 
         let request = try XCTUnwrap(transport.downloads.first)
-        XCTAssertEqual(request.encryptionInfo, remote.attachment.encryption?.fileInfo)
+        XCTAssertTrue(request.destinationFile.path.hasSuffix(".sceyt.enc.part"), "the transport writes ciphertext to staging; UIKit decrypts it")
         XCTAssertEqual(request.url, remote.attachment.url)
         XCTAssertEqual(remote.attachment.status, .done)
         XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: try XCTUnwrap(remote.attachment.filePath))), remote.plaintext)

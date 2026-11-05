@@ -1,18 +1,41 @@
 //
-//  TransportDataSession+Downloads.swift
+//  DownloadCoordinator.swift
 //  SceytChatUIKit
 //
-//  The download state machine: each attempt, its result (decrypted when encrypted), and
-//  pause / resume / cancel. Every state change is one `board` step.
+//  The download state machine: each attempt, its result (an encrypted attachment's decrypted
+//  by `EncryptedFileDownloader`), and pause / resume / cancel. Every state change is one
+//  `board` step.
 //
 
 import Foundation
 
-extension TransportDataSession {
+/// Runs the session's downloads: each attempt, its result, and pause / resume / cancel. The
+/// session owns it and stays the one customization point (its transport, hooks and reporting).
+final class DownloadCoordinator: Sendable {
+    unowned let session: TransportDataSession
+
+    init(session: TransportDataSession) {
+        self.session = session
+    }
+
+    private var board: JobBoard { session.board }
+    private var transport: FileTransferTransport { session.transport }
+    private var encryptedDownloader: EncryptedFileDownloader { session.encryptedDownloader }
+    private var environment: TransferEnvironment { session.environment }
+    private var willStartDownload: ((SCTDataSessionTaskInfo) -> Void)? { session.willStartDownload }
+
+    private func attempt(of job: DownloadJob) -> Int { session.attempt(of: job) }
+    private func tasks(of job: DownloadJob) -> [SCTDataSessionTaskInfo] { session.tasks(of: job) }
+    private func report(_ tasks: [SCTDataSessionTaskInfo], _ event: SCTDataSessionTaskInfo.Event, interrupted: Bool = false) {
+        session.report(tasks, event, interrupted: interrupted)
+    }
+    private static func describe<T: Sendable>(_ result: FileTransferResult<T>) -> String { TransportDataSession.describe(result) }
+    private static func describe(_ event: SCTDataSessionTaskInfo.Event?) -> String { TransportDataSession.describe(event) }
+
     func start(_ job: DownloadJob) {
         let tag = job.taskInfo.logTag
         willStartDownload?(job.taskInfo)
-        let encrypted = job.request.encryptionInfo != nil
+        let encrypted = job.encryption != nil
         let context = job.taskInfo.logContext
         enum Start { case finished, started(attempt: Int, from: DownloadJob.State, previous: Task<Void, Never>?) }
         let start: Start = board.withState { _ in
@@ -24,19 +47,31 @@ extension TransportDataSession {
             ([job.taskInfo] + job.joined).forEach { $0.attempts = attempt }
             // Installed in the same step, so a pause or cancel that follows finds it (a cancel
             // that found no task let the download, and its decryption, run to the end).
-            let previous = job.replaceTask(Task { [weak self] in
-                guard let self else { return }
+            // Holds the session (weakly, strongly while it works): the coordinator reaches it
+            // `unowned`, which is safe only while something keeps the session alive.
+            let previous = job.replaceTask(Task { [weak session = self.session] in
+                guard let session, let self = session.downloads else { return }
                 // Every layer below (transport, encryption) tags its lines with this transfer.
-                let result = await TransferLog.$current.withValue(context) {
-                    await self.transport.download(job.request) { [weak self, weak job] progress in
-                        guard let self, let job, self.isRunning(job, attempt: attempt) else { return }
-                        if let quarter = job.progressMilestone(progress) {
-                            logger.debug("[Transfer] \(tag) download attempt=\(attempt) progress \(quarter)%")
-                        }
-                        // Not done when the last byte arrives: it still has to be verified and
-                        // decrypted, so the bar stops short of full until then.
-                        self.tasks(of: job).forEach { $0.updateProgress(encrypted ? min(progress, 0.99) : progress) }
+                let report: (Double) -> Void = { [weak session] progress in
+                    guard let self = session?.downloads, self.isRunning(job, attempt: attempt) else { return }
+                    if let quarter = job.progressMilestone(progress) {
+                        logger.debug("[Transfer] \(tag) download attempt=\(attempt) progress \(quarter)%")
                     }
+                    // An encrypted download reaches 1 only once it is decrypted and published.
+                    self.tasks(of: job).forEach { $0.updateProgress(progress) }
+                }
+                let result = await TransferLog.$current.withValue(context) {
+                    if let encryption = job.encryption {
+                        return await self.encryptedDownloader.download(
+                            job.request,
+                            encryption: encryption,
+                            fileEncryption: self.environment.fileEncryption(),
+                            progress: report
+                        ) { request, progress in
+                            await self.transport.download(request, progress: progress)
+                        }
+                    }
+                    return await self.transport.download(job.request, progress: report)
                 }
                 self.handle(result, of: job, attempt: attempt)
             })
@@ -99,9 +134,9 @@ extension TransportDataSession {
             if !FileManager.default.fileExists(atPath: file.path) {
                 logger.warn("[Transfer] \(tag) download attempt=\(attempt) transport reported success but its file does not exist")
             }
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt) running -> finished (success) size=\(TransferLog.sizeText(file)) decrypted=\(job.request.encryptionInfo != nil)")
+            logger.debug("[Transfer] \(tag) download attempt=\(attempt) running -> finished (success) size=\(TransferLog.sizeText(file)) decrypted=\(job.encryption != nil)")
             for taskInfo in live {
-                if job.request.encryptionInfo != nil {
+                if job.encryption != nil {
                     taskInfo.didDecryptDownload = true
                 }
                 taskInfo.updateLocalFileLocation(newPath: file.path)
@@ -192,7 +227,17 @@ extension TransportDataSession {
         }
         logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) \(previous) -> finished (cancelled)")
         transport.cancel(operationId: job.request.operationId)
+        let task = job.currentTask
         job.cancelTask()
+        if job.encryption != nil {
+            // Its temporary files go once nothing writes them any more.
+            let downloader = encryptedDownloader
+            let operationId = job.request.operationId
+            Task {
+                await task?.value
+                downloader.discard(operationId)
+            }
+        }
         report(tasks(of: job), .failure(URLError(.cancelled)))
     }
 }

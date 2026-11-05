@@ -78,7 +78,9 @@ private final class BrokenEncryption: FileEncryption {
         throw AttachmentEncryptionError.invalidCheckpoint
     }
 
-    func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws {}
+    func prepareDecryption(encryptedFile: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64) async throws -> FileDecryptionSession {
+        throw AttachmentEncryptionError.invalidEncryptionInfo
+    }
 }
 
 // MARK: - Tests

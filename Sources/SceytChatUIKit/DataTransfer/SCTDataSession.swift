@@ -449,6 +449,14 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
     }
     
     public func startChecksum(_ completion: @escaping ((Bool) -> Void)) {
+        startChecksum(reserve: { true }, completion)
+    }
+
+    /// `reserve` is asked first, when the answer comes: false when the waiting upload already
+    /// moved on (timed out, paused, cancelled), and the answer then changes nothing. True claims
+    /// the wait, so nothing else can end it while the answer is acted on; `completion` then
+    /// hands the waiter its value, after the task was ended by it.
+    func startChecksum(reserve: @escaping () -> Bool, _ completion: @escaping ((Bool) -> Void)) {
         // The provider tags its own lines from the bound context.
         TransferLog.with(logContext) {
             checksumProvider.startChecksum(
@@ -456,11 +464,21 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
                 attachment: attachment,
                 encryption: encryption) { [weak self] in
                     guard let self else { return }
+                    guard reserve() else {
+                        logger.debug("[Transfer] \(self.logTag) upload checksum answered after its wait ended (timed out, paused or cancelled): ignored")
+                        return
+                    }
                     switch $0 {
                     case .success(let link):
                         if let link {
+                            // Only while the task is live: a cancel that already ended it stays
+                            // a cancel, and the attachment keeps no url it was never sent with.
+                            guard self.endIfLive(with: .successURI(link)) else {
+                                logger.debug("[Transfer] \(self.logTag) upload checksum hit after the task ended (\(TransportDataSession.describe(self.event))): ignored")
+                                completion(false)
+                                return
+                            }
                             logger.info("[Transfer] \(self.logTag) upload checksum hit: reusing \(TransferLog.redact(link)) encryption=\(self.encryption) \(self.attachment.transferLogDescription)")
-                            self.success(origin: link)
                             completion(true)
                         } else {
                             logger.debug("[Transfer] \(self.logTag) upload checksum miss")
@@ -469,7 +487,7 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
                     case .failure(let error):
                         // Reported at the end, once, by `AttachmentTransfer`.
                         logger.debug("[Transfer] \(self.logTag) upload checksum step failed, the upload fails: \(TransferLog.describe(error))")
-                        self.failure(error: error)
+                        self.endIfLive(with: .failure(error))
                         completion(false)
                     }
                 }

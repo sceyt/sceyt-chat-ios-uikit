@@ -21,10 +21,41 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
     private let lock = NSLock()
     private var uploads = [String: LiveTransfer<FileUploadResult>]()
     private var downloads = [String: LiveTransfer<URL>]()
+    /// The resume data keeper of each running download, so a cancel can drop what it saved.
+    private var resumes = [String: DownloadResume]()
+
+    /// Where interrupted downloads keep their resume data: Caches, not next to the attachments
+    /// (it holds the request, headers included). A test seam.
+    nonisolated(unsafe) static var resumeDirectory: URL = TransferDirectories.cachesOrTemporary()
+        .appendingPathComponent("download-resume", isDirectory: true)
+
+    /// How long resume data nobody continued is kept.
+    static let staleResumeAge: TimeInterval = 7 * 24 * 60 * 60
+
+    /// Where an interrupted download of `operationId` keeps its resume data.
+    public static func resumeDataFile(operationId: String) -> URL {
+        resumeDirectory.appendingPathComponent(EncryptedFileDownloader.hash([operationId]) + ".resume")
+    }
+
+    /// Removes resume data not touched for `staleResumeAge`: its download was never continued
+    /// (the message was deleted, or the attachment abandoned before a relaunch).
+    static func purgeStaleResumeData(now: Date = Date()) {
+        let files = (try? FileManager.default.contentsOfDirectory(at: resumeDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        for file in files where file.pathExtension == "resume" {
+            let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? now
+            guard now.timeIntervalSince(modified) > staleResumeAge else { continue }
+            TransferLog.remove(file, what: "stale resume data", context: "[Transfer] resume purge")
+        }
+    }
 
     /// Starts a download request. A test seam: `Session.download` in production.
-    var startDownload: (URL, @escaping (Progress) -> Void, @escaping (Result<URL, Error>) -> Void) -> Cancellable? = { url, progress, completion in
-        Session.download(url: url, progressHandler: progress, completion: completion)
+    var startDownload: (URLRequest, @escaping (Progress) -> Void, @escaping (Result<URL, Error>) -> Void) -> Cancellable? = { request, progress, completion in
+        Session.download(request: request, progressHandler: progress, completion: completion)
+    }
+
+    /// Continues a download from the resume data an interrupted one saved. A test seam.
+    var startResumedDownload: (Data, @escaping (Progress) -> Void, @escaping (Result<URL, Error>) -> Void) -> Cancellable? = { data, progress, completion in
+        Session.download(resumeData: data, progressHandler: progress, completion: completion)
     }
 
     /// Where a finished download is moved out of the session's temp location.
@@ -35,6 +66,7 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
 
     public init(encryption: FileEncryption = SceytChatUIKit.Components.fileEncryption) {
         self.encryption = encryption
+        DispatchQueue.global(qos: .utility).async { Self.purgeStaleResumeData() }
     }
 
     // MARK: Upload
@@ -159,16 +191,52 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
             return .failure(FileTransferError.duplicateOperation)
         }
         defer { unregister(live, operationId: request.operationId, in: \.downloads) }
-        logger.debug("[Transfer] \(tag) transport download start url=\(TransferLog.redact(url)) encrypted=\(request.encryptionInfo != nil)")
+        var urlRequest = URLRequest(url: url)
+        for (name, value) in request.headers {
+            urlRequest.setValue(value, forHTTPHeaderField: name)
+        }
+        // Kept registered after this invocation: a stop's resume data lands after it returned,
+        // and a later cancel must still be able to drop it.
+        let resume = register(DownloadResume(file: Self.resumeDataFile(operationId: request.operationId), tag: tag), operationId: request.operationId)
+        let saved = resume.take()
+        logger.debug("[Transfer] \(tag) transport download start url=\(TransferLog.redact(url)) headers=\(request.headers.count) resumed=\(saved != nil)")
         let result = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 live.begin(continuation)
-                let task = self.startDownload(url, { fraction in
+                let progress: (Progress) -> Void = { fraction in
                     live.report(progress: fraction.fractionCompleted)
-                }) { result in
+                }
+                // Refers to itself (a refused resume starts again with it), so it lets go of
+                // itself as it runs: no request outstanding, no cycle left.
+                var completion: ((Result<URL, Error>) -> Void)?
+                var resumed = saved != nil
+                completion = { result in
+                    let current = completion
+                    completion = nil
+                    if case .failure(let error) = result {
+                        if resumed, let current, !Self.isNetworkLoss(error), !Self.isCancellation(error), !live.hasEnded {
+                            // The saved request no longer works (expired url, refreshed headers,
+                            // a changed object): fetched again from the start, as asked now.
+                            // Not after a stop or a cancel: that is no refusal.
+                            resumed = false
+                            completion = current
+                            logger.debug("[Transfer] \(tag) transport download resume refused (\(TransferLog.describe(error))): starting over")
+                            let task = self.startDownload(urlRequest, progress, current)
+                            Self.bindControls(of: task, to: live, resume: resume, tag: tag)
+                            return
+                        }
+                        // A network failure leaves what arrived, to continue from next time.
+                        resume.save((error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data)
+                    } else {
+                        resume.finished()
+                        self.forgetResume(resume, operationId: request.operationId)
+                    }
                     self.downloadFinished(result, request: request, live: live, tag: tag)
                 }
-                Self.bindControls(of: task, to: live, tag: tag)
+                let start = completion!
+                let task = saved.map { self.startResumedDownload($0, progress, start) }
+                    ?? self.startDownload(urlRequest, progress, start)
+                Self.bindControls(of: task, to: live, resume: resume, tag: tag)
             }
         } onCancel: {
             logger.debug("[Transfer] \(tag) transport download task cancelled: interrupting the invocation")
@@ -178,13 +246,14 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
         return result
     }
 
-    /// The fetch is over. The task's temp file dies when this returns, so it is moved first;
-    /// verification and decryption then run off the session's queue.
+    /// The fetch is over. The task's temp file dies when this returns, so it is moved first.
     private func downloadFinished(_ result: Result<URL, Error>, request: FileDownloadRequest, live: LiveTransfer<URL>, tag: String) {
         let file: URL
         switch result {
         case .failure(let error):
-            live.finish(.failure(error))
+            // A lost network leaves what arrived (resume data): an interruption, not a failure,
+            // so nothing kept for the next attempt is discarded.
+            live.finish(Self.isNetworkLoss(error) ? .interrupted(error) : .failure(error))
             return
         case .success(let fetched):
             file = fetched
@@ -198,26 +267,29 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
             return
         }
         logger.debug("[Transfer] \(tag) transport download bytes received (\(TransferLog.sizeText(staging))), publishing")
-        let encryption = self.encryption
-        Task {
-            do {
-                try await Self.publish(staging, to: request, encryption: encryption)
-                live.finish(.success(request.destinationFile))
-            } catch {
-                // `publish` logged why.
-                live.finish(.failure(error))
-            }
+        do {
+            try Self.publish(staging, to: request)
+            live.finish(.success(request.destinationFile))
+        } catch {
+            // `publish` logged why.
+            live.finish(.failure(error))
         }
     }
 
-    /// `suspend()` rather than `cancel(byProducingResumeData:)`: it keeps the bytes already
-    /// received and leaves the task alive for `resume`.
-    private static func bindControls(of task: Cancellable?, to live: LiveTransfer<URL>, tag: String) {
+    /// A pause is `suspend()`: it keeps the bytes already received and leaves the task alive
+    /// for `resume`. A stop keeps them as resume data, for the next attempt (a cancel drops it).
+    private static func bindControls(of task: Cancellable?, to live: LiveTransfer<URL>, resume: DownloadResume, tag: String) {
         guard let task = task as? URLSessionTask else {
             logger.warn("[Transfer] \(tag) transport download has no URLSessionTask: it cannot be stopped, paused or resumed")
             return
         }
-        live.setControls(stop: { [weak task] in task?.cancel() },
+        live.setControls(stop: { [weak task] in
+                            if let download = task as? URLSessionDownloadTask {
+                                download.cancel { resume.save($0) }
+                            } else {
+                                task?.cancel()
+                            }
+                         },
                          pause: { [weak task] in task?.suspend() },
                          resume: { [weak task] in task?.resume() })
     }
@@ -234,51 +306,27 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
         }
     }
 
-    /// Moves a downloaded object to the request's destination: decrypted and verified first
-    /// when it is encrypted, so nothing unverified ever appears there.
-    static func publish(_ staging: URL, to request: FileDownloadRequest, encryption: FileEncryption) async throws {
-        let context = TransferLogContext(request)
-        try await TransferLog.$current.withValue(context) {
-            try await publish(staging, to: request, encryption: encryption, tag: context.tag)
-        }
-    }
-
-    private static func publish(_ staging: URL, to request: FileDownloadRequest, encryption: FileEncryption, tag: String) async throws {
-        let fileManager = FileManager.default
+    /// Moves the downloaded bytes to the request's destination, as they were stored: an
+    /// encrypted attachment's are decrypted by UIKit afterwards.
+    static func publish(_ staging: URL, to request: FileDownloadRequest) throws {
+        let tag = TransferLogContext(request).tag
         let destination = request.destinationFile
         // Failures are debug: the caller reports the outcome once, at the end.
         do {
-            try fileManager.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try replace(destination, with: staging)
         } catch {
-            logger.debug("[Transfer] \(tag) download cannot create the destination folder: \(TransferLog.describe(error))")
+            logger.debug("[Transfer] \(tag) download cannot move the file to its destination: \(TransferLog.describe(error))")
             TransferLog.remove(staging, what: "the downloaded file", context: "[Transfer] \(tag) download")
-            throw error
-        }
-        guard let info = request.encryptionInfo else {
-            do {
-                try replace(destination, with: staging)
-            } catch {
-                logger.debug("[Transfer] \(tag) download cannot move the file to its destination: \(TransferLog.describe(error))")
-                TransferLog.remove(staging, what: "the downloaded file", context: "[Transfer] \(tag) download")
-                throw error
-            }
-            return
-        }
-        defer { TransferLog.remove(staging, what: "the downloaded ciphertext", context: "[Transfer] \(tag) download") }
-        TransferDirectories.removeStaleDecryptionFiles(for: destination, tag: tag)
-        let decrypted = TransferDirectories.decryptionFile(for: destination)
-        do {
-            try await encryption.decrypt(file: staging, to: decrypted, encryptionInfo: info, plaintextSize: request.plaintextSize)
-            try replace(destination, with: decrypted)
-        } catch {
-            logger.debug("[Encryption] \(tag) download decrypt/publish failed, nothing published: \(TransferLog.describe(error))")
-            TransferLog.remove(decrypted, what: "the partial plaintext", context: "[Encryption] \(tag) download", level: .error)
             throw error
         }
     }
 
+    /// Moves `file` to `destination`, replacing what is there. The one move every transfer
+    /// publishes through.
     static func replace(_ destination: URL, with file: URL) throws {
         let fileManager = FileManager.default
+        guard file.standardizedFileURL != destination.standardizedFileURL else { return }
         if fileManager.fileExists(atPath: destination.path) {
             logger.debug("[Transfer] \(TransferLog.currentTag) destination \(destination.lastPathComponent) already exists, replacing it")
             _ = try fileManager.replaceItemAt(destination, withItemAt: file)
@@ -311,12 +359,46 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
         return resumed
     }
 
+    /// The resume keeper of `operationId`: the one an earlier invocation left (its resume data
+    /// may still be landing), or `new`.
+    private func register(_ new: DownloadResume, operationId: String) -> DownloadResume {
+        lock.lock(); defer { lock.unlock() }
+        if let kept = resumes[operationId], kept.file == new.file { return kept }
+        resumes[operationId] = new
+        return new
+    }
+
+    private func forgetResume(_ resume: DownloadResume, operationId: String) {
+        lock.lock(); defer { lock.unlock() }
+        if resumes[operationId] === resume { resumes[operationId] = nil }
+    }
+
+    static func isCancellation(_ error: Error) -> Bool {
+        let ns = error as NSError
+        return error is CancellationError || (ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled)
+    }
+
+    /// The connection went away: what arrived can be continued.
+    static func isNetworkLoss(_ error: Error) -> Bool {
+        let ns = error as NSError
+        guard ns.domain == NSURLErrorDomain else { return false }
+        return [
+            NSURLErrorNetworkConnectionLost, NSURLErrorNotConnectedToInternet, NSURLErrorTimedOut,
+            NSURLErrorCannotConnectToHost, NSURLErrorDNSLookupFailed, NSURLErrorCannotFindHost,
+            NSURLErrorInternationalRoamingOff, NSURLErrorDataNotAllowed, NSURLErrorCallIsActive,
+        ].contains(ns.code)
+    }
+
     open func cancel(operationId: String) {
         lock.lock()
         let upload = uploads[operationId]
         let download = downloads[operationId]
+        let resume = resumes[operationId]
         lock.unlock()
         logger.debug("[Transfer] xfer=\(TransferLog.operation(operationId)) transport cancel live upload=\(upload != nil) download=\(download != nil)")
+        // Abandoned: no resume data is kept for it, now or by its stop.
+        resume?.abandon()
+        if let resume { forgetResume(resume, operationId: operationId) }
         upload?.end(.failure(FileTransferError.cancelled))
         download?.end(.failure(FileTransferError.cancelled))
     }
@@ -499,5 +581,51 @@ private final class LiveTransfer<Success: Sendable>: LiveControl, @unchecked Sen
             resume?()
         }
         return true
+    }
+}
+
+/// The resume data of one download: saved when it is interrupted, taken by the next attempt,
+/// dropped when the download is abandoned. Never a partial file at the destination.
+final class DownloadResume: @unchecked Sendable {
+    let file: URL
+    private let tag: String
+    private let lock = NSLock()
+    private var abandoned = false
+
+    init(file: URL, tag: String) {
+        self.file = file
+        self.tag = tag
+    }
+
+    /// The saved resume data, removed so it is used once.
+    func take() -> Data? {
+        lock.lock(); defer { lock.unlock() }
+        guard let data = try? Data(contentsOf: file) else { return nil }
+        try? FileManager.default.removeItem(at: file)
+        return data
+    }
+
+    func save(_ data: Data?) {
+        guard let data, !data.isEmpty else { return }
+        lock.lock(); defer { lock.unlock() }
+        guard !abandoned else { return }
+        do {
+            try FileManager.default.createDirectory(at: file.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.protectionKey: FileProtectionType.completeUntilFirstUserAuthentication])
+            try data.write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+            logger.debug("[Transfer] \(tag) transport download interrupted: \(data.count) B of resume data kept")
+        } catch {
+            logger.debug("[Transfer] \(tag) transport download resume data not kept: \(TransferLog.describe(error))")
+        }
+    }
+
+    func abandon() {
+        lock.lock(); defer { lock.unlock() }
+        abandoned = true
+        TransferLog.remove(file, what: "the resume data", context: "[Transfer] \(tag) transport download")
+    }
+
+    /// The download completed: no resume data is kept, nor saved later.
+    func finished() {
+        abandon()
     }
 }

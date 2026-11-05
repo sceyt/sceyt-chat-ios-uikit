@@ -19,10 +19,30 @@ open class Session: NSObject {
                                 progressHandler: ((Progress) -> Void)? = nil,
                                 completion: ((_ result: Result<URL, Error>) -> Void)? = nil)
     -> Cancellable? {
+        download(request: URLRequest(url: url), progressHandler: progressHandler, completion: completion)
+    }
 
-        let request = URLRequest(url: url)
+    /// Continues a download from the resume data an interrupted one left.
+    public class func download(resumeData: Data,
+                                progressHandler: ((Progress) -> Void)? = nil,
+                                completion: ((_ result: Result<URL, Error>) -> Void)? = nil)
+    -> Cancellable? {
+        URLSession.shared.downloadTask(withResumeData: resumeData) { responseUrl, response, error in
+            if let error = error ?? Self.statusError(response) {
+                completion?(.failure(error))
+            } else if let responseUrl = responseUrl {
+                completion?(.success(responseUrl))
+            }
+        }.start().handleProgress { progress in
+            progressHandler?(progress)
+        }
+    }
 
-        return URLSession.shared.downloadTask(with: request) { responseUrl, response, error in
+    public class func download(request: URLRequest,
+                                progressHandler: ((Progress) -> Void)? = nil,
+                                completion: ((_ result: Result<URL, Error>) -> Void)? = nil)
+    -> Cancellable? {
+        URLSession.shared.downloadTask(with: request) { responseUrl, response, error in
             if let error = error ?? Self.statusError(response) {
                 completion?(.failure(error))
             } else if let responseUrl = responseUrl {

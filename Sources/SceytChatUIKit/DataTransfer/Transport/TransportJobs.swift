@@ -151,6 +151,8 @@ final class DownloadJob: TransferJob, @unchecked Sendable {
     }
 
     let request: FileDownloadRequest
+    /// Set for an encrypted attachment: UIKit decrypts what the transport fetched.
+    let encryption: FileDownloadEncryption?
     let taskInfo: SCTDataSessionTaskInfo
     var state = State.running
     /// Tasks that started the same operation while this job ran: they get its events.
@@ -179,8 +181,77 @@ final class DownloadJob: TransferJob, @unchecked Sendable {
         work.current.task?.cancel()
     }
 
-    init(request: FileDownloadRequest, taskInfo: SCTDataSessionTaskInfo) {
+    /// The current attempt's task, to wait for it to stop.
+    var currentTask: Task<Void, Never>? {
+        work.current.task
+    }
+
+    init(request: FileDownloadRequest, encryption: FileDownloadEncryption? = nil, taskInfo: SCTDataSessionTaskInfo) {
         self.request = request
+        self.encryption = encryption
         self.taskInfo = taskInfo
+    }
+}
+
+/// One answer for one waiter, whichever comes first: the answer is kept until the waiter
+/// arrives, and every later answer is dropped.
+final class OnceAnswer<T: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<T, Never>?
+    private var value: T?
+    private var given = false
+
+    func wait(_ continuation: CheckedContinuation<T, Never>) {
+        lock.lock()
+        if let value {
+            lock.unlock()
+            continuation.resume(returning: value)
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    private var reserved = false
+
+    var isGiven: Bool {
+        lock.lock(); defer { lock.unlock() }
+        return given
+    }
+
+    /// Claims the answer before its value is known: every `give` after it is dropped, and only
+    /// `fulfill` delivers. False when an answer was given (or claimed) already.
+    func reserve() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !given else { return false }
+        given = true
+        reserved = true
+        return true
+    }
+
+    /// Delivers the value of a `reserve`d answer.
+    func fulfill(_ answer: T) {
+        lock.lock()
+        guard reserved else { lock.unlock(); return }
+        reserved = false
+        let continuation = self.continuation
+        self.continuation = nil
+        if continuation == nil { value = answer }
+        lock.unlock()
+        continuation?.resume(returning: answer)
+    }
+
+    /// False when an answer was given already.
+    @discardableResult
+    func give(_ answer: T) -> Bool {
+        lock.lock()
+        guard !given else { lock.unlock(); return false }
+        given = true
+        let continuation = self.continuation
+        self.continuation = nil
+        if continuation == nil { value = answer }
+        lock.unlock()
+        continuation?.resume(returning: answer)
+        return true
     }
 }

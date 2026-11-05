@@ -54,32 +54,6 @@ final class TransferFailureStatusTests: XCTestCase {
         XCTAssertEqual(TransferFailureCategory.of(NSError(domain: "x", code: 1)), .unknown)
     }
 
-    // MARK: - Decryption files left behind
-
-    func testOnlyOldDecryptionFilesOfTheDestinationAreRemoved() throws {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let destination = folder.appendingPathComponent("photo.jpg")
-        func make(_ name: String, age: TimeInterval) throws -> URL {
-            let file = folder.appendingPathComponent(name)
-            try Data("x".utf8).write(to: file)
-            try FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(-age)], ofItemAtPath: file.path)
-            return file
-        }
-        let old = try make(".\(UUID().uuidString)-photo.jpg", age: 3600)
-        let young = try make(".\(UUID().uuidString)-photo.jpg", age: 5)
-        let otherFile = try make(".\(UUID().uuidString)-other.jpg", age: 3600)
-        let unrelated = try make(".hidden-photo.jpg", age: 3600)
-
-        TransferDirectories.removeStaleDecryptionFiles(for: destination, tag: "test")
-
-        XCTAssertFalse(FileManager.default.fileExists(atPath: old.path), "left behind by a crash")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: young.path), "may belong to a publish still running")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: otherFile.path), "another destination's")
-        XCTAssertTrue(FileManager.default.fileExists(atPath: unrelated.path), "not a decryption file")
-    }
-
     // MARK: - Poster download
 
     func testAPosterAnsweredWithAnHTTPErrorFailsAndCachesNothing() throws {

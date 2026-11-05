@@ -1,5 +1,5 @@
 //
-//  TransportDataSession+Uploads.swift
+//  UploadCoordinator.swift
 //  SceytChatUIKit
 //
 //  The upload state machine: the slot queue, each attempt (checksum, preparation, the
@@ -9,7 +9,43 @@
 import Foundation
 import UniformTypeIdentifiers
 
-extension TransportDataSession {
+/// Runs the session's uploads: the slot queue, each attempt, its result, and pause / resume /
+/// cancel. The session owns it and stays the one customization point (preparation, storage,
+/// transport, hooks and reporting).
+final class UploadCoordinator: Sendable {
+    unowned let session: TransportDataSession
+
+    init(session: TransportDataSession) {
+        self.session = session
+    }
+
+    private var board: JobBoard { session.board }
+    private var transport: FileTransferTransport { session.transport }
+    private var staging: UploadStaging { session.staging }
+    private var maxConcurrentUploads: Int { session.maxConcurrentUploads }
+    private var checksumsBeforeUpload: Bool { session.checksumsBeforeUpload }
+    private var checksumTimeout: TimeInterval { session.checksumTimeout }
+    private var willBeginUpload: ((SCTDataSessionTaskInfo) -> Void)? { session.willBeginUpload }
+
+    private func attempt(of job: UploadJob) -> Int { session.attempt(of: job) }
+    private func tasks(of job: UploadJob) -> [SCTDataSessionTaskInfo] { session.tasks(of: job) }
+    private func joined(of job: UploadJob) -> [SCTDataSessionTaskInfo] { session.joined(of: job) }
+    private func isTerminal(_ taskInfo: SCTDataSessionTaskInfo) -> Bool { session.isTerminal(taskInfo) }
+    private func report(_ tasks: [SCTDataSessionTaskInfo], _ event: SCTDataSessionTaskInfo.Event, interrupted: Bool = false) {
+        session.report(tasks, event, interrupted: interrupted)
+    }
+    private func report(_ taskInfo: SCTDataSessionTaskInfo, _ event: SCTDataSessionTaskInfo.Event) {
+        session.report(taskInfo, event)
+    }
+    private func prepareUploadFile(_ job: UploadJob, videoProcessInfo: SCVideoProcessInfo) async throws -> PreparedUploadFile {
+        try await session.prepareUploadFile(job, videoProcessInfo: videoProcessInfo)
+    }
+    private func adopt(_ staged: URL, job: UploadJob, tasks: [SCTDataSessionTaskInfo]) {
+        session.adopt(staged, job: job, tasks: tasks)
+    }
+    private static func fileSize(_ url: URL?) -> Int64? { TransportDataSession.fileSize(url) }
+    private static func describe<T: Sendable>(_ result: FileTransferResult<T>) -> String { TransportDataSession.describe(result) }
+    private static func describe(_ event: SCTDataSessionTaskInfo.Event?) -> String { TransportDataSession.describe(event) }
     func enqueue(_ job: UploadJob) {
         let slots = max(1, maxConcurrentUploads)
         let queued: (depth: Int, holders: String)? = board.withState { jobs in
@@ -92,10 +128,13 @@ extension TransportDataSession {
             let attempt = job.attempt
             job.state = .preparing
             ([job.taskInfo] + job.joined).forEach { $0.attempts = attempt }
-            let previous = job.replaceWork(videoProcessInfo: videoProcessInfo, task: Task { [weak self] in
+            // Holds the session (weakly, strongly while it works): the coordinator reaches it
+            // `unowned`, which is safe only while something keeps the session alive.
+            let previous = job.replaceWork(videoProcessInfo: videoProcessInfo, task: Task { [weak session = self.session] in
+                guard let session else { return }
                 // Every layer below (transport, encryption) tags its lines with this transfer.
                 await TransferLog.$current.withValue(context) {
-                    await self?.run(job, attempt: attempt, videoProcessInfo: videoProcessInfo)
+                    await session.uploads.run(job, attempt: attempt, videoProcessInfo: videoProcessInfo)
                 }
             })
             return (attempt, previous)
@@ -161,9 +200,29 @@ extension TransportDataSession {
     private func endedByChecksum(_ job: UploadJob, attempt: Int) async -> Bool {
         let taskInfo = job.taskInfo
         let tag = taskInfo.logTag
-        let stored = await withCheckedContinuation { continuation in
-            taskInfo.startChecksum { continuation.resume(returning: $0) }
+        // Resumed once: by the provider, by a cancel of the attempt, or after
+        // `checksumTimeout` (a provider that never answers would hold the upload slot for good).
+        let answer = OnceAnswer<Bool>()
+        let timeout = checksumTimeout
+        let watchdog = Task {
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            if answer.give(false) {
+                logger.warn("[Transfer] \(tag) upload attempt=\(attempt) checksum gave no answer in \(timeout) s: uploading")
+            }
         }
+        let stored = await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                answer.wait(continuation)
+                // Not started for an attempt already cancelled. The provider's answer counts
+                // only while this wait is open: it claims it (`reserve`) before it ends the task,
+                // so a timeout, a pause or a cancel and a late answer never both act.
+                guard !answer.isGiven else { return }
+                taskInfo.startChecksum(reserve: { answer.reserve() }) { answer.fulfill($0) }
+            }
+        } onCancel: {
+            answer.give(false)
+        }
+        watchdog.cancel()
         guard stored || isTerminal(taskInfo) else {
             logger.debug("[Transfer] \(tag) upload attempt=\(attempt) checksum miss, uploading")
             return false
