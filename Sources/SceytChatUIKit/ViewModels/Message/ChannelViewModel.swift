@@ -2123,12 +2123,26 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     /// It needs no `relationshipKeyPathsForRefreshing` — `PinnedMessageDTO` holds no
     /// relationships, and its preview snapshot is refreshed from the write side by
     /// `NSManagedObjectContext.syncPin(for:)`. See `PinnedMessageDTO`.
-    public private(set) lazy var pinnedMessageObserver: DatabaseObserver<PinnedMessageDTO, PinnedMessage> = {
+    public private(set) lazy var pinnedMessageObserver: DatabaseObserver<PinnedMessageDTO, PinnedMessage> =
+        ChannelViewModel.makePinnedMessageObserver(channelId: channel.id, database: SceytChatUIKit.shared.database)
+
+    /// On `viewContext`, not `backgroundReadOnlyObservableContext`: `startPinnedMessageObserver()`
+    /// runs on main while the chat opens, and `DatabaseObserver.startObserver()` fetches
+    /// synchronously. On the shared observable context that blocked main behind the message
+    /// observer, whose layout work (`TextSizeMeasure`) can itself wait on main — a deadlock and
+    /// 0x8BADF00D watchdog kill (WAAFI 8.3.24). On `viewContext` the fetch runs on main without
+    /// waiting on another queue, the initial load stays synchronous, and `onDidChange` arrives
+    /// on main. The set is a handful of rows, as `ChannelPinnedMessageListViewModel` (also on
+    /// `viewContext`) already relies on. See `PinnedMessageObserverDeadlockTests`.
+    static func makePinnedMessageObserver(
+        channelId: ChannelId,
+        database: Database
+    ) -> DatabaseObserver<PinnedMessageDTO, PinnedMessage> {
         DatabaseObserver<PinnedMessageDTO, PinnedMessage>(
-            request: PinnedMessageDTO.fetchRequest(channelId: channel.id),
-            context: SceytChatUIKit.shared.database.backgroundReadOnlyObservableContext
+            request: PinnedMessageDTO.fetchRequest(channelId: channelId),
+            context: database.viewContext
         ) { $0.convert() }
-    }()
+    }
 
     private var didStartPinnedMessageObserver = false
 
@@ -2136,6 +2150,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         // Pinning off: no observer, so `pinnedMessages` stays empty and the banner has nothing
         // to show even for pins an earlier run of the app left on disk.
         guard SceytChatUIKit.shared.config.isMessagePinningEnabled else { return }
+        // The observer lives on `viewContext`; its synchronous fetch must run on main.
+        assert(Thread.isMainThread, "startPinnedMessageObserver() must be called on the main thread")
         didStartPinnedMessageObserver = true
         pinnedMessageObserver.onDidChange = { [weak self] _ in
             self?.reloadPinnedMessages()

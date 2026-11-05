@@ -69,14 +69,10 @@ open class ChannelPinnedMessageListViewModel: NSObject {
     open var messageCellAppearance: MessageCellAppearance = MessageCell.appearance
 
     /// Bound to `viewContext`, the main-queue context, because the table reads `items`
-    /// synchronously from `cellForRowAt`. `ChannelViewModel`'s banner observer watches the
-    /// same request on the background observable context; both are read-only.
-    public private(set) lazy var pinnedMessageObserver: DatabaseObserver<PinnedMessageDTO, PinnedMessage> = {
-        DatabaseObserver<PinnedMessageDTO, PinnedMessage>(
-            request: PinnedMessageDTO.fetchRequest(channelId: channel.id),
-            context: SceytChatUIKit.shared.database.viewContext
-        ) { $0.convert() }
-    }()
+    /// synchronously from `cellForRowAt`. Built by the same factory as `ChannelViewModel`'s
+    /// banner observer, so the banner and this list always watch the same pins.
+    public private(set) lazy var pinnedMessageObserver: DatabaseObserver<PinnedMessageDTO, PinnedMessage> =
+        ChannelViewModel.makePinnedMessageObserver(channelId: channel.id, database: SceytChatUIKit.shared.database)
 
     /// Watches the pinned messages themselves, not just the pin rows: a reaction added
     /// from this screen, an edit, a poll vote, a delete — the conversation shows all of

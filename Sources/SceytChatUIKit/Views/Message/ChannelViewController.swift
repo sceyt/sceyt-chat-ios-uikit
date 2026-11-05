@@ -4300,7 +4300,9 @@ open class ChannelViewController: ViewController,
                 self?.showAlert(error: error)
             }
         case .updatePinnedMessages(let items):
-            // The observer fires on its own context's queue.
+            // The pin observer is on `viewContext`, so this already arrives on main. The hop is
+            // kept on purpose: the first update is emitted from `ChannelViewModel.init`, and
+            // deferring it keeps the banner update after the screen has finished setting up.
             DispatchQueue.main.async { [weak self] in
                 self?.updatePinnedMessages(items)
             }

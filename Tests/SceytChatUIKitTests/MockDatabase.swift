@@ -13,7 +13,14 @@ final class MockDatabase: Database {
 
     let container: NSPersistentContainer
 
-    init() {
+    /// Non-nil when built with `sharesObservableContext: true`.
+    private let sharedObservableContext: NSManagedObjectContext?
+
+    /// - Parameter sharesObservableContext: `true` hands out one `backgroundReadOnlyObservableContext`
+    ///   for every caller, as `PersistentContainer` does in production (a `lazy var`). The default
+    ///   (`false`) keeps the historical behaviour of a fresh context per access, which existing
+    ///   suites rely on.
+    init(sharesObservableContext: Bool = false) {
         let bundle: Bundle
         #if SWIFT_PACKAGE
         bundle = Bundle.module
@@ -41,6 +48,15 @@ final class MockDatabase: Database {
         context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
         context.automaticallyMergesChangesFromParent = true
         backgroundPerformContext = context
+        if sharesObservableContext {
+            let observable = container.newBackgroundContext()
+            observable.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+            observable.automaticallyMergesChangesFromParent = true
+            observable.retainsRegisteredObjects = true
+            sharedObservableContext = observable
+        } else {
+            sharedObservableContext = nil
+        }
     }
 
     // MARK: - Database protocol
@@ -56,7 +72,9 @@ final class MockDatabase: Database {
 
     var backgroundReadOnlyContext: NSManagedObjectContext { container.newBackgroundContext() }
 
-    var backgroundReadOnlyObservableContext: NSManagedObjectContext { container.newBackgroundContext() }
+    var backgroundReadOnlyObservableContext: NSManagedObjectContext {
+        sharedObservableContext ?? container.newBackgroundContext()
+    }
 
     func read<Fetch>(resultQueue: DispatchQueue,
                      _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,
