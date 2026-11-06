@@ -330,6 +330,30 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
         }
     }
     
+    /// Cancels every upload still going, each exactly as the user's own cancel of it
+    /// (`SCTDataSessionTaskInfo.cancel()`): its remote upload is abandoned, and its message
+    /// stays in the chat, failed, with its retry button, never resent on reconnect. For "stop"
+    /// outside the chat, e.g. the system's background-upload activity being stopped. An upload
+    /// whose bytes already landed (only finishing) is left to finish; a paused one, which runs
+    /// nothing, is left paused.
+    /// - Parameter completion: the number of uploads cancelled, on the transfer queue.
+    open func cancelAllUploads(
+        reason: String,
+        file: String = #fileID,
+        line: UInt = #line,
+        completion: ((Int) -> Void)? = nil
+    ) {
+        onQueue {
+            let running = self.allTasks.filter { $0.transferType == .upload && !$0.isTerminal && !$0.isTransferFinished && $0.action != .stop }
+            logger.info("[Attachment] cancelling all \(running.count) running upload(s), requested by \(reason) (\(file):\(line))")
+            for task in running {
+                logger.info("[Attachment] \(task.logTag) upload cancelled by \(reason)")
+                task.cancel()
+            }
+            completion?(running.count)
+        }
+    }
+
     open func resumeTransfer(
         message: ChatMessage,
         attachment: ChatMessage.Attachment,

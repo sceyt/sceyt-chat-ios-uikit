@@ -828,6 +828,32 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         }
     }
 
+    /// "Stop" from outside the chat (the background-upload activity) cancels each running
+    /// upload as the user's own cancel would: kept in the chat, never resent on reconnect.
+    func testCancelAllUploadsCancelsEachAsTheUserWould() throws {
+        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
+        transfer.offline = false
+        holdUploads()
+        let attachment = makeAttachment(tid: 71, filePath: try file().path)
+        let message = makeMessage([attachment])
+        let done = Locked(false)
+        transfer.uploadMessageAttachments(message: message, attachments: [attachment]) { _, _ in done.wrapped = true }
+        XCTAssertTrue(waitUntil { self.transfer.taskFor(message: message, attachment: attachment) != nil && !self.transport.uploads.isEmpty })
+
+        let cancelled = Locked<Int?>(nil)
+        transfer.cancelAllUploads(reason: "test") { cancelled.wrapped = $0 }
+
+        XCTAssertTrue(waitUntil { done.wrapped })
+        XCTAssertEqual(cancelled.wrapped, 1)
+        XCTAssertTrue(notResent.contains(attachment.status), "\(attachment.status) would be resent on reconnect")
+        XCTAssertNil(attachment.url)
+
+        let none = Locked<Int?>(nil)
+        transfer.cancelAllUploads(reason: "test again") { none.wrapped = $0 }
+        XCTAssertTrue(waitUntil { none.wrapped != nil })
+        XCTAssertEqual(none.wrapped, 0, "nothing left running")
+    }
+
     /// A cancel the session reports without the task's own `cancel()` (an abandoned upload,
     /// `TransportDataSession.cancel(attachments:)`) is the user's too.
     func testAnAbandonedUploadIsNotResentOnReconnect() throws {
