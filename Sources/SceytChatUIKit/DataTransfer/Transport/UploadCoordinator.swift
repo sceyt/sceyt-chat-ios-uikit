@@ -19,6 +19,24 @@ final class UploadCoordinator: Sendable {
         self.session = session
     }
 
+    /// Serializes the queue reports: each reads the queue under it, so the session gets them
+    /// in the order of the states they show. Holds the last one reported, to skip repeats.
+    private let queueReports = QueueReports()
+
+    private final class QueueReports: @unchecked Sendable {
+        let lock = NSLock()
+        var last: (running: Int, waiting: Int)?
+    }
+
+    /// Tells the session how many uploads hold a slot and how many wait, when that changed.
+    private func reportQueue() {
+        queueReports.lock.lock(); defer { queueReports.lock.unlock() }
+        let counts: (running: Int, waiting: Int) = board.withState { jobs in (jobs.active.count, jobs.waiting.count) }
+        if let last = queueReports.last, last == counts { return }
+        queueReports.last = counts
+        session.uploadQueueDidChange(running: counts.running, waiting: counts.waiting)
+    }
+
     private var board: JobBoard { session.board }
     private var transport: FileTransferTransport { session.transport }
     private var staging: UploadStaging { session.staging }
@@ -56,6 +74,7 @@ final class UploadCoordinator: Sendable {
             jobs.waiting.append(job)
             return (jobs.waiting.count, jobs.active.map(\.operationId).joined(separator: ","))
         }
+        reportQueue()
         if let queued {
             logger.debug("[Transfer] \(job.taskInfo.logTag) upload waiting for an upload slot (position \(queued.depth), \(slots) held by \(queued.holders))")
             return
@@ -75,6 +94,7 @@ final class UploadCoordinator: Sendable {
             return (true, next)
         }
         guard released.held else { return }
+        reportQueue()
         logger.debug("[Transfer] \(job.taskInfo.logTag) upload released its upload slot, next=\(released.next?.operationId ?? "-")")
         if let next = released.next {
             begin(next)
@@ -470,6 +490,7 @@ final class UploadCoordinator: Sendable {
         switch step {
         case .dequeued(let alive):
             logger.info("[Transfer] \(tag) upload attempt=\(attempt(of: job)) waiting -> paused(alive: \(alive))")
+            reportQueue()
         case .stopPreparing:
             logger.info("[Transfer] \(tag) upload attempt=\(attempt(of: job)) preparing -> paused(alive: false), preparation stopped")
             job.stopWork()
@@ -530,6 +551,8 @@ final class UploadCoordinator: Sendable {
         job.stopWork()
         staging.discard(operationId: job.operationId)
         releaseSlot(of: job)
+        // A queued upload held no slot: its leaving the queue is reported here.
+        reportQueue()
         // A terminal event, like a cancelled download's: the task leaves `AttachmentTransfer`,
         // so a later upload of the same file is a new one.
         report(tasks(of: job), .failure(URLError(.cancelled)))

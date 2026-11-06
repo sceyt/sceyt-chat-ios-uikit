@@ -108,6 +108,13 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
     /// that order does not matter, or is restored elsewhere.
     open var maxConcurrentUploads: Int { 1 }
 
+    /// The upload queue changed: an upload was queued, took a slot, or left it (finished,
+    /// paused, cancelled). `running` uploads hold a slot (preparing or sending), `waiting`
+    /// ones wait for one. Called once per change, in the order of the changes, on the thread
+    /// that made it and outside the session's lock. Reports are serialized, so an override
+    /// must return quickly and must not start, pause, resume or cancel an upload from here.
+    open func uploadQueueDidChange(running: Int, waiting: Int) {}
+
     /// Whether an upload first asks the checksum table for an object already stored.
     open var checksumsBeforeUpload: Bool {
         environment.preventsDuplicateUploads()

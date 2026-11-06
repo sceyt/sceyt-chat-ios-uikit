@@ -98,6 +98,9 @@ private final class RouterSession: TransportDataSession {
     /// The export state each preparation was given, in order.
     var videoProcessInfos: [SCVideoProcessInfo] { lock.lock(); defer { lock.unlock() }; return _videoProcessInfos }
     var removed: [String] { lock.lock(); defer { lock.unlock() }; return _removed }
+    private var _queue = [String]()
+    /// Every queue report, as "running/waiting".
+    var queue: [String] { lock.lock(); defer { lock.unlock() }; return _queue }
     var thumbnailPaths: [String] { lock.lock(); defer { lock.unlock() }; return _thumbnailPaths }
     var stored: [String] { lock.lock(); defer { lock.unlock() }; return _stored }
 
@@ -112,6 +115,10 @@ private final class RouterSession: TransportDataSession {
 
     override var checksumsBeforeUpload: Bool { checksums }
     override var maxConcurrentUploads: Int { slots }
+
+    override func uploadQueueDidChange(running: Int, waiting: Int) {
+        lock.lock(); _queue.append("\(running)/\(waiting)"); lock.unlock()
+    }
     override var isAppExtension: Bool { appExtension }
     override var stagingDirectory: URL { root.appendingPathComponent("staging", isDirectory: true) }
 
@@ -980,6 +987,39 @@ final class TransportDataSessionTests: XCTestCase {
         waitUntil { first.isOver }
         waitUntil { self.transport.uploads.count == 3 }
         XCTAssertEqual(transport.uploads.last?.operationId, "upload-3", "the freed slot goes to the next in line")
+    }
+
+    func testTheQueueIsReportedAsUploadsWaitTakeTheSlotAndLeave() throws {
+        let first = Hold<FileTransferResult<FileUploadResult>>()
+        transport.onUpload = { request, _ in
+            request.operationId == "upload-1" ? await first.wait() : .success(FileUploadResult(url: request.operationId))
+        }
+        let (_, a, _) = try upload(tid: 1)
+        _ = try upload(tid: 2)
+        let (_, c, _) = try upload(tid: 3)
+        waitUntil { first.isWaiting }
+        settle()
+        XCTAssertEqual(session.queue, ["1/0", "1/1", "1/2"], "one sending, two waiting")
+
+        first.open(.success(FileUploadResult(url: "A")))
+        waitUntil { a.isOver && c.isOver }
+        settle()
+        XCTAssertEqual(session.queue, ["1/0", "1/1", "1/2", "1/1", "1/0", "0/0"], "each freed slot goes to the next, then the queue empties")
+    }
+
+    func testCancellingOrPausingAQueuedUploadIsReported() throws {
+        let first = Hold<FileTransferResult<FileUploadResult>>()
+        transport.onUpload = { _, _ in await first.wait() }
+        _ = try upload(tid: 1)
+        let (paused, _, _) = try upload(tid: 2)
+        let (cancelled, _, _) = try upload(tid: 3)
+        waitUntil { first.isWaiting }
+
+        paused.stop()
+        settle()
+        cancelled.cancel()
+        settle()
+        XCTAssertEqual(session.queue, ["1/0", "1/1", "1/2", "1/1", "1/0"])
     }
 
     func testAZeroSlotCountStillRunsOneUpload() throws {
