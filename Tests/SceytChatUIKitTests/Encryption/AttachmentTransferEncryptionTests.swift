@@ -21,6 +21,16 @@ import XCTest
 /// Answers uploads by encrypting the request with the real SDK, or as the test says.
 private final class EncryptingTransport: FileTransferTransport {
     var onUpload: ((FileUploadRequest) async -> FileTransferResult<FileUploadResult>)?
+    /// The prepare hook's answer; nil prepares nothing (the key is made while uploading).
+    var onPrepare: ((FileUploadRequest) async -> FileTransferResult<FileUploadPreparation>)?
+    private var _prepares = [FileUploadRequest]()
+    var prepares: [FileUploadRequest] { lock.lock(); defer { lock.unlock() }; return _prepares }
+
+    func prepareUpload(_ request: FileUploadRequest) async -> FileTransferResult<FileUploadPreparation> {
+        lock.lock(); _prepares.append(request); lock.unlock()
+        return await onPrepare?(request) ?? .success(FileUploadPreparation(encryptionInfo: nil))
+    }
+
     var onDownload: (FileDownloadRequest) async -> FileTransferResult<URL> = { _ in .failure(URLError(.badURL)) }
     private let lock = NSLock()
     private var _uploads = [FileUploadRequest]()
@@ -157,6 +167,7 @@ private final class PosterTransfer: AttachmentTransfer {
 
 /// A `FileEncryption` that cannot prepare anything.
 private final class UnpreparedEncryption: FileEncryption {
+    func newEncryptionInfo() async throws -> EncryptedFileInfo { throw CocoaError(.fileNoSuchFile) }
     func prepareEncryption(file: URL) async throws -> FileEncryptionSession { throw CocoaError(.fileNoSuchFile) }
     func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.invalidCheckpoint }
     func prepareDecryption(encryptedFile: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64) async throws -> FileDecryptionSession {
@@ -1052,6 +1063,82 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         AttachmentTransfer.updateMetadata(of: attachment, rebuiltFrom: meta)
         XCTAssertEqual(attachment.encryption, enc)
         XCTAssertEqual(attachment.imageDecodedMetadata?.videoThumbnail, "V")
+    }
+
+    // MARK: - Prepare hook
+
+    private func newInfo() throws -> EncryptedFileInfo {
+        let sdk = try StreamingAeadFileEncryptionProvider.prepare(uniqueId: StreamingAeadFileEncryptionProvider.newUniqueId())
+        return EncryptedFileInfo(algorithm: sdk.format, attachmentId: sdk.data.uniqueId, key: sdk.data.key)
+    }
+
+    /// The key the transport prepares is in the attachment's `enc` before the upload sends a
+    /// byte, and the upload is asked to encrypt under exactly it.
+    func testAPreparedKeyIsSavedInEncBeforeTheUploadUsesIt() throws {
+        let info = try newInfo()
+        let attachment = makeAttachment(filePath: try file().path, metadata: #"{"tmb":"x"}"#)
+        transport.onPrepare = { _ in .success(FileUploadPreparation(encryptionInfo: info)) }
+        let encAtUpload = Locked<AttachmentEncryption?>(nil)
+        transport.onUpload = { request in
+            encAtUpload.wrapped = (request.context as? AttachmentTransferContext)?.attachment.encryption
+            XCTAssertEqual(request.encryptionInfo, info)
+            return .success(FileUploadResult(url: "ENC", encryptionInfo: request.encryptionInfo))
+        }
+
+        XCTAssertNil(upload(attachment))
+
+        XCTAssertEqual(transport.prepares.count, 1)
+        XCTAssertNil(transport.prepares.first?.encryptionInfo, "nothing saved before the first attempt")
+        XCTAssertEqual(encAtUpload.wrapped?.attachmentId, info.attachmentId, "saved before the upload started")
+        XCTAssertEqual(encAtUpload.wrapped?.key, info.key)
+        XCTAssertEqual(attachment.encryption?.key, info.key)
+        XCTAssertEqual(attachment.url, "ENC")
+        XCTAssertTrue(attachment.metadata?.contains("\"tmb\"") == true, "other metadata keys are kept")
+    }
+
+    /// A retry (or a relaunch) prepares with the `enc` an earlier attempt saved.
+    func testARetryPreparesWithTheSavedEnc() throws {
+        let info = try newInfo()
+        let attachment = makeAttachment(
+            filePath: try file().path,
+            metadata: try ChatMessage.Attachment.metadata(nil, settingEncryption: AttachmentEncryption(info: info))
+        )
+        transport.onPrepare = { request in .success(FileUploadPreparation(encryptionInfo: request.encryptionInfo)) }
+        transport.onUpload = { request in .success(FileUploadResult(url: "ENC", encryptionInfo: request.encryptionInfo)) }
+
+        XCTAssertNil(upload(attachment))
+
+        XCTAssertEqual(transport.prepares.first?.encryptionInfo, info)
+        XCTAssertEqual(transport.uploads.first?.encryptionInfo, info)
+        XCTAssertEqual(attachment.encryption?.key, info.key)
+    }
+
+    func testAnUploadUnderAnotherKeyThanThePreparedOneIsRejected() throws {
+        let prepared = try newInfo()
+        let other = try newInfo()
+        let attachment = makeAttachment(filePath: try file().path)
+        transport.onPrepare = { _ in .success(FileUploadPreparation(encryptionInfo: prepared)) }
+        transport.onUpload = { _ in .success(FileUploadResult(url: "ENC", encryptionInfo: other)) }
+
+        let error = upload(attachment)
+
+        guard case .encryptionBypassed = error as? AttachmentEncryptionError else {
+            return XCTFail("expected encryptionBypassed, got \(String(describing: error))")
+        }
+        XCTAssertNil(attachment.url, "an object the message's key can't open is not sent")
+    }
+
+    func testAFailedPrepareFailsTheUploadBeforeAnyByte() throws {
+        let attachment = makeAttachment(filePath: try file().path)
+        transport.onPrepare = { _ in .failure(AttachmentEncryptionError.invalidEncryptionInfo) }
+
+        let error = upload(attachment)
+
+        guard case .invalidEncryptionInfo = error as? AttachmentEncryptionError else {
+            return XCTFail("expected the prepare error, got \(String(describing: error))")
+        }
+        XCTAssertTrue(transport.uploads.isEmpty)
+        XCTAssertNil(attachment.encryption)
     }
 
     func testTheEncAnUploadWrites() throws {

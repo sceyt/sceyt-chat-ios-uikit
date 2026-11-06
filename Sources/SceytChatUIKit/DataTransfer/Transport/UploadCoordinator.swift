@@ -194,11 +194,13 @@ final class UploadCoordinator: Sendable {
             // Sent as is. The checksum step never dedupes an empty file.
             logger.warn("[Transfer] \(tag) upload attempt=\(attempt) prepared file is 0 bytes \(job.attachment.transferLogDescription)")
         }
+        guard let request = await prepareTransport(job, attempt: attempt, request: uploadRequest(for: job, prepared: prepared)) else {
+            return
+        }
         guard startUploading(job, attempt: attempt) else {
             logger.debug("[Transfer] \(tag) upload attempt=\(attempt) paused, cancelled or superseded during preparation, not uploading")
             return
         }
-        let request = uploadRequest(for: job, prepared: prepared)
         logger.info("[Transfer] \(tag) upload attempt=\(attempt) preparing -> uploading type=\(request.type) staged=\(prepared.isStaged) size=\(preparedSize.map { "\($0) B" } ?? "unknown") mime=\(request.mimeType ?? "-") \(job.attachment.transferLogDescription)")
         // The transport's progress is of the prepared file, not of the original: a compressed
         // video can be a small part of it, and its size is what the message carries.
@@ -212,7 +214,68 @@ final class UploadCoordinator: Sendable {
             }
             self.tasks(of: job).forEach { $0.updateProgress(progress) }
         }
-        handle(result, of: job, attempt: attempt, prepared: prepared, preparedSize: preparedSize, type: request.type)
+        handle(result, of: job, attempt: attempt, prepared: prepared, preparedSize: preparedSize, request: request)
+    }
+
+    /// The transport's prepare step (architecture doc, "prepare hook"): it settles the key of an
+    /// encrypted upload, which is saved in the attachment's `enc` and the database before any
+    /// byte is sent. Returns the request to upload with that key, or nil when the attempt ended
+    /// (failed, interrupted, or dropped as stale).
+    private func prepareTransport(_ job: UploadJob, attempt: Int, request: FileUploadRequest) async -> FileUploadRequest? {
+        let tag = job.taskInfo.logTag
+        // An earlier attempt's key, saved before it sent anything: prepared again with it.
+        let saved = request.type == .encrypted ? job.attachment.encryption.map {
+            EncryptedFileInfo(algorithm: $0.algorithm, attachmentId: $0.attachmentId, key: $0.key)
+        } : nil
+        let result = await transport.prepareUpload(request.with(encryptionInfo: saved))
+        guard isCurrent(job, attempt: attempt) else {
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) transport prepare ended (\(Self.describe(result))) after a pause/cancel/new attempt, dropped")
+            return nil
+        }
+        let info: EncryptedFileInfo?
+        switch result {
+        case .success(let preparation):
+            info = preparation.encryptionInfo
+        case .failure(let error):
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (failure): transport prepare failed \(TransferLog.describe(error))")
+            finish(job, attempt: attempt)
+            report(tasks(of: job), .failure(error))
+            return nil
+        case .interrupted(let error):
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (interrupted): transport prepare \(TransferLog.describe(error))")
+            finish(job, attempt: attempt)
+            report(tasks(of: job), .failure(error), interrupted: true)
+            return nil
+        }
+        guard let info else {
+            // A transport that makes its key while it uploads (or a plain upload).
+            return request
+        }
+        guard request.type == .encrypted else {
+            logger.warn("[Encryption] \(tag) upload attempt=\(attempt) transport prepared a key for a plain upload; it is ignored")
+            return request
+        }
+        if let saved, saved != info {
+            // Allowed (a transport may start over under a new key), but never silently.
+            logger.warn("[Encryption] \(tag) upload attempt=\(attempt) transport prepared a new key attachmentId=\(info.attachmentId) in place of the saved attachmentId=\(saved.attachmentId)")
+        }
+        do {
+            // Saved before the upload starts: the key travels only in the message, and a
+            // retry or a relaunch finds it on the attachment.
+            try await job.taskInfo.persistPreparedEncryption(info)
+        } catch {
+            guard isCurrent(job, attempt: attempt) else { return nil }
+            logger.debug("[Encryption] \(tag) upload attempt=\(attempt) preparing -> finished (failure): the prepared enc was not saved \(TransferLog.describe(error))")
+            finish(job, attempt: attempt)
+            report(tasks(of: job), .failure(error))
+            return nil
+        }
+        guard isCurrent(job, attempt: attempt) else { return nil }
+        // Joined tasks send the same object: they carry the same key.
+        joined(of: job).forEach { joinedTask in
+            Task { try? await joinedTask.persistPreparedEncryption(info) }
+        }
+        return request.with(encryptionInfo: info)
     }
 
     /// Runs the checksum step. True when it ended the attempt: a stored copy was found, or
@@ -330,7 +393,7 @@ final class UploadCoordinator: Sendable {
         attempt: Int,
         prepared: PreparedUploadFile,
         preparedSize: Int64?,
-        type: FileUploadType
+        request: FileUploadRequest
     ) {
         guard ends(job, attempt: attempt, with: result) else { return }
         finish(job, attempt: attempt)
@@ -339,7 +402,7 @@ final class UploadCoordinator: Sendable {
         let tasks = tasks(of: job)
         switch result {
         case .success(let uploaded):
-            landed(uploaded, job: job, attempt: attempt, tasks: tasks, prepared: prepared, preparedSize: preparedSize, type: type)
+            landed(uploaded, job: job, attempt: attempt, tasks: tasks, prepared: prepared, preparedSize: preparedSize, request: request)
         case .failure(let error):
             // The staged file stays: the next attempt sends it again.
             logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (failure): \(TransferLog.describe(error))")
@@ -402,9 +465,17 @@ final class UploadCoordinator: Sendable {
         tasks: [SCTDataSessionTaskInfo],
         prepared: PreparedUploadFile,
         preparedSize: Int64?,
-        type: FileUploadType
+        request: FileUploadRequest
     ) {
         let tag = job.taskInfo.logTag
+        let type = request.type
+        if let prepared = request.encryptionInfo, uploaded.encryptionInfo != prepared {
+            // The message carries the prepared key (already in `enc`): an object encrypted
+            // under another, or not at all, could never be opened with it.
+            logger.debug("[Encryption] \(tag) upload attempt=\(attempt) -> finished (failure): transport returned \(uploaded.encryptionInfo.map { "attachmentId=\($0.attachmentId)" } ?? "no encryption"), not the prepared attachmentId=\(prepared.attachmentId), rejected (encryptionBypassed)")
+            report(tasks, .failure(AttachmentEncryptionError.encryptionBypassed))
+            return
+        }
         if type == .encrypted, uploaded.encryptionInfo == nil {
             // Encrypted bytes without their key could never be opened.
             logger.debug("[Encryption] \(tag) upload attempt=\(attempt) -> finished (failure): transport reported success without encryptionInfo, rejected (encryptionBypassed)")

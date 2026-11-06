@@ -652,3 +652,79 @@ extension FileEncryptionTests {
         XCTAssertEqual(ChatSDKFileEncryption.SavedSession(transferId: "t", sdkData: "d").encoded(using: { _ in throw CocoaError(.coderInvalidValue) }), "")
     }
 }
+
+// MARK: - Streams (the prepare-hook flow)
+
+final class FileEncryptingStreamTests: XCTestCase {
+    private let encryption = ChatSDKFileEncryption()
+
+    private func newInfo() throws -> EncryptedFileInfo {
+        let sdk = try StreamingAeadFileEncryptionProvider.prepare(uniqueId: StreamingAeadFileEncryptionProvider.newUniqueId())
+        return EncryptedFileInfo(algorithm: sdk.format, attachmentId: sdk.data.uniqueId, key: sdk.data.key)
+    }
+
+    private func decrypt(_ ciphertext: Data, info: EncryptedFileInfo) throws -> Data {
+        try StreamingAeadFileEncryptionProvider.decrypt(ciphertext, info: ChatSDKFileEncryption.sdkInfo(info, plaintextSize: FileEncryptionData.unknownPlainSize))
+    }
+
+    func testCiphertextSizeMatchesTheStream() throws {
+        let info = try newInfo()
+        for size in [0, 1, 65_480, 65_481, 65_480 + 65_520, 65_480 + 65_520 + 1, 300_007] {
+            let plaintext = Data((0..<size).map { UInt8(truncatingIfNeeded: $0) })
+            let stream = try encryption.newEncryptingStream(info: info, plaintextSize: Int64(size))
+            var ciphertext = try stream.write(plaintext)
+            ciphertext.append(try stream.close())
+            XCTAssertEqual(UInt64(ciphertext.count), AttachmentEncryption.ciphertextSize(plaintextSize: UInt64(size)), "size \(size)")
+            XCTAssertEqual(try decrypt(ciphertext, info: info), plaintext)
+        }
+    }
+
+    func testARestoredStreamRemakesTheSameBytes() throws {
+        let info = try newInfo()
+        let plaintext = Data((0..<300_000).map { UInt8(truncatingIfNeeded: $0 &* 31) })
+        let stream = try encryption.newEncryptingStream(info: info, plaintextSize: Int64(plaintext.count))
+        let start = stream.checkpoint
+        var whole = try stream.write(plaintext.prefix(150_000))
+        let middle = stream.checkpoint
+        let middleAt = stream.ciphertextPosition
+        whole.append(try stream.write(plaintext.dropFirst(150_000)))
+        whole.append(try stream.close())
+
+        for (checkpoint, at) in [(start, Int64(0)), (middle, middleAt)] {
+            let restored = try encryption.restoreEncryptingStream(info: info, plaintextSize: Int64(plaintext.count), checkpoint: checkpoint)
+            XCTAssertEqual(restored.ciphertextPosition, at)
+            var rest = try restored.write(plaintext.dropFirst(Int(restored.position)))
+            rest.append(try restored.close())
+            XCTAssertEqual(rest, whole.dropFirst(Int(at)), "from \(at)")
+        }
+        XCTAssertFalse(middle.contains(info.key), "a checkpoint has no key")
+    }
+
+    /// A poster is encrypted with the stream: one stored object any download decrypts.
+    func testEncryptStreamWritesAnObjectItsKeyOpens() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("enc-stream-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let plaintext = Data((0..<(2 * 1024 * 1024 + 123)).map { UInt8(truncatingIfNeeded: $0 &* 7) })
+        let file = directory.appendingPathComponent("poster.jpg")
+        try plaintext.write(to: file)
+        let object = directory.appendingPathComponent("poster.enc")
+
+        let info = try await encryption.encryptStream(file: file, to: object)
+
+        let ciphertext = try Data(contentsOf: object)
+        XCTAssertEqual(UInt64(ciphertext.count), AttachmentEncryption.ciphertextSize(plaintextSize: UInt64(plaintext.count)))
+        XCTAssertEqual(try decrypt(ciphertext, info: info), plaintext)
+        do {
+            _ = try await encryption.encryptStream(file: directory.appendingPathComponent("gone.jpg"), to: object)
+            XCTFail("a missing file can't be encrypted")
+        } catch {}
+        XCTAssertFalse(FileManager.default.fileExists(atPath: object.path), "nothing left behind on a failure")
+    }
+
+    func testNewEncryptionInfoIsAKeyTheSDKTakes() async throws {
+        let info = try await encryption.newEncryptionInfo()
+        XCTAssertEqual(info.algorithm, StreamingAeadFileEncryptionProvider.format)
+        XCTAssertNoThrow(try StreamingAeadFileEncryptionProvider.prepare(uniqueId: info.attachmentId, key: info.key))
+    }
+}

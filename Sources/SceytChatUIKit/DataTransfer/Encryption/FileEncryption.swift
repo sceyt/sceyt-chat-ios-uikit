@@ -53,6 +53,90 @@ public protocol FileEncryption: AnyObject, Sendable {
     /// A requirement (with a default built on `prepareDecryption`), so an implementation that
     /// has its own is called through `any FileEncryption`.
     func decrypt(file: URL, to destination: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64?) async throws
+
+    // MARK: Streams (the prepare-hook flow)
+
+    /// A new key bound to a new attachment id, for a file not encrypted yet. Nothing is read:
+    /// the transport's `prepareUpload` makes it, UIKit saves it in the attachment's `enc`
+    /// before any byte is sent, and `newEncryptingStream` encrypts with it.
+    func newEncryptionInfo() async throws -> EncryptedFileInfo
+
+    /// Encrypts exactly `plaintextSize` bytes, given in pieces, under `info`. Each new stream
+    /// picks a new salt: two streams of the same plaintext give different bytes.
+    func newEncryptingStream(info: EncryptedFileInfo, plaintextSize: Int64) throws -> FileEncryptingStream
+
+    /// The stream saved in `checkpoint` (`FileEncryptingStream.checkpoint`): the same salt and
+    /// nonces, so re-fed plaintext gives the same bytes again. It continues at the checkpoint's
+    /// `ciphertextPosition`; feed it the plaintext from its `position`, byte-identical to the
+    /// first time (different bytes would reuse nonces).
+    func restoreEncryptingStream(info: EncryptedFileInfo, plaintextSize: Int64, checkpoint: String) throws -> FileEncryptingStream
+}
+
+/// Encrypts a stream given in pieces (the Chat SDK's `EncryptingStream`): all the bytes
+/// `write` and `close` return, joined, are one stored object. Not safe to share: one caller at
+/// a time. Its calls block: use it off the main thread.
+public protocol FileEncryptingStream: AnyObject {
+    /// Plaintext bytes written so far. On a restored stream: where to re-feed from.
+    var position: Int64 { get }
+    /// Ciphertext bytes returned so far, the restored-from stream's included.
+    var ciphertextPosition: Int64 { get }
+    /// The state at `ciphertextPosition`, for `restoreEncryptingStream`. Has no key: store it
+    /// with the transfer, the key stays in the attachment's `enc`. Take it before `close`: a
+    /// closed stream's does not restore.
+    var checkpoint: String { get }
+
+    /// The ciphertext `plaintext` completes (possibly none: the last segment is held back
+    /// until more data comes or `close`).
+    func write(_ plaintext: Data) throws -> Data
+    /// The rest, sealed as the last segment. Without it the object does not decrypt.
+    func close() throws -> Data
+}
+
+public extension FileEncryption {
+    func newEncryptionInfo() async throws -> EncryptedFileInfo {
+        try await FileEncryptionChunk.offMain {
+            let info = try StreamingAeadFileEncryptionProvider.prepare(uniqueId: AttachmentEncryption.newAttachmentId())
+            // The bound id only: never the key.
+            logger.debug("[Encryption] \(TransferLog.currentTag) new key prepared attachmentId=\(info.data.uniqueId)")
+            return EncryptedFileInfo(info)
+        }
+    }
+
+    func newEncryptingStream(info: EncryptedFileInfo, plaintextSize: Int64) throws -> FileEncryptingStream {
+        guard plaintextSize >= 0 else { throw AttachmentEncryptionError.invalidEncryptionInfo }
+        let sdkInfo = ChatSDKFileEncryption.sdkInfo(info, plaintextSize: UInt64(plaintextSize))
+        return ChatSDKEncryptingStream(try StreamingAeadFileEncryptionProvider.newEncryptingStream(info: sdkInfo))
+    }
+
+    func restoreEncryptingStream(info: EncryptedFileInfo, plaintextSize: Int64, checkpoint: String) throws -> FileEncryptingStream {
+        guard plaintextSize >= 0 else { throw AttachmentEncryptionError.invalidEncryptionInfo }
+        let sdkInfo = ChatSDKFileEncryption.sdkInfo(info, plaintextSize: UInt64(plaintextSize))
+        let stream = try StreamingAeadFileEncryptionProvider.restoreEncryptingStream(
+            checkpoint: SceytChat.FileEncryptionCheckpoint(encryptionInfo: sdkInfo, data: checkpoint)
+        )
+        return ChatSDKEncryptingStream(stream)
+    }
+}
+
+/// The Chat SDK's `EncryptingStream`.
+final class ChatSDKEncryptingStream: FileEncryptingStream {
+    private let stream: EncryptingStream
+
+    init(_ stream: EncryptingStream) {
+        self.stream = stream
+    }
+
+    var position: Int64 { Int64(stream.position) }
+    var ciphertextPosition: Int64 { Int64(stream.ciphertextPosition) }
+    var checkpoint: String { stream.checkpoint.data }
+
+    func write(_ plaintext: Data) throws -> Data {
+        try stream.write(plaintext)
+    }
+
+    func close() throws -> Data {
+        try stream.close()
+    }
 }
 
 /// Verified plaintext of a completed encrypted file. Owns its open file until `close`.
@@ -210,6 +294,48 @@ public extension FileEncryption {
         }
         logger.debug("[Encryption] \(tag) encrypt \(file.lastPathComponent) finished, wrote \(TransferLog.sizeText(destination)) attachmentId=\(session.encryptionInfo.attachmentId)")
         return session.encryptionInfo
+    }
+}
+
+public extension FileEncryption {
+    /// Encrypts all of `file` into a new file at `destination` with the Chat SDK's encrypting
+    /// stream, under a new key (`newEncryptionInfo`), e.g. a video poster. The same format as
+    /// every upload, so it decrypts like one. Returns what to send in `enc`. On a throw nothing
+    /// is left at `destination`.
+    func encryptStream(file: URL, to destination: URL) async throws -> EncryptedFileInfo {
+        let info = try await newEncryptionInfo()
+        let tag = TransferLog.currentTag
+        try await FileEncryptionChunk.offMain {
+            TransferLog.remove(destination, what: "the old ciphertext file", context: "[Encryption] \(tag) encryptStream")
+            let size = try FileCiphertextSource.size(of: file)
+            let stream = try self.newEncryptingStream(info: info, plaintextSize: Int64(size))
+            guard FileManager.default.createFile(atPath: destination.path, contents: nil) else {
+                throw CocoaError(.fileWriteUnknown, userInfo: [NSFilePathErrorKey: destination.path])
+            }
+            do {
+                let input = try FileHandle(forReadingFrom: file)
+                defer { try? input.close() }
+                let output = try FileHandle(forWritingTo: destination)
+                defer { try? output.close() }
+                var read: UInt64 = 0
+                while read < size {
+                    try autoreleasepool {
+                        let chunk = try input.read(upToCount: Int(min(UInt64(FileEncryptionChunk.length), size - read))) ?? Data()
+                        guard !chunk.isEmpty else { throw CocoaError(.fileReadCorruptFile) }
+                        read += UInt64(chunk.count)
+                        try output.write(contentsOf: stream.write(chunk))
+                    }
+                }
+                try output.write(contentsOf: stream.close())
+            } catch {
+                logger.debug("[Encryption] \(tag) encryptStream \(file.lastPathComponent) failed attachmentId=\(info.attachmentId): \(TransferLog.describe(error))")
+                TransferLog.remove(destination, what: "the partial ciphertext", context: "[Encryption] \(tag) encryptStream", level: .error)
+                throw error
+            }
+            // Sizes and the bound id only: never the key.
+            logger.debug("[Encryption] \(tag) encryptStream \(file.lastPathComponent) \(size) B -> \(TransferLog.sizeText(destination)) attachmentId=\(info.attachmentId)")
+        }
+        return info
     }
 }
 

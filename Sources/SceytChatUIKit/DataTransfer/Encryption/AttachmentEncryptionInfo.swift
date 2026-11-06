@@ -128,8 +128,9 @@ public struct AttachmentEncryption: Codable, Equatable {
     private static let headerSize: UInt64 = 40
     private static let commitmentSize: UInt64 = 32
 
-    /// The stored size of a file of `plaintextSize` bytes.
-    static func ciphertextSize(plaintextSize: UInt64) -> UInt64 {
+    /// The stored size of a file of `plaintextSize` bytes: what an encrypting stream of that
+    /// many bytes returns in all, so a transport can plan its parts before encrypting.
+    public static func ciphertextSize(plaintextSize: UInt64) -> UInt64 {
         let firstPlaintext = segmentSize - tagSize - headerSize
         let plaintext = segmentSize - tagSize
         var segments: UInt64 = 1

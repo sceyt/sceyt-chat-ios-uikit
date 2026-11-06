@@ -149,7 +149,7 @@ final class VideoPosterTransfer: @unchecked Sendable {
         let info: EncryptedFileInfo
         do {
             info = try await TransferLog.$current.withValue(context) {
-                try await host.environment.fileEncryption().encrypt(file: frame, to: ciphertext)
+                try await host.environment.fileEncryption().encryptStream(file: frame, to: ciphertext)
             }
         } catch {
             TransferLog.remove(frame, what: "the poster frame", context: "[Encryption] \(tag) video_thumb")

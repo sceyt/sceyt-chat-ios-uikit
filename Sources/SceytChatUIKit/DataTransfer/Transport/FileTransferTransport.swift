@@ -43,6 +43,11 @@ public struct FileUploadRequest: Sendable {
     public let mimeType: String?
     public let context: FileTransferContext?
     public let type: FileUploadType
+    /// `.encrypted` only. In `prepareUpload`: the attachment's saved `enc` (an earlier attempt
+    /// prepared it), nil before the first. In `upload`: what `prepareUpload` returned and UIKit
+    /// saved in the attachment's metadata; the transport encrypts under exactly this key, or,
+    /// when nil (a transport without a prepare step), under a key of its own.
+    public let encryptionInfo: EncryptedFileInfo?
 
     public init(
         operationId: String,
@@ -50,7 +55,8 @@ public struct FileUploadRequest: Sendable {
         fileName: String,
         mimeType: String?,
         context: FileTransferContext? = nil,
-        type: FileUploadType = .plain
+        type: FileUploadType = .plain,
+        encryptionInfo: EncryptedFileInfo? = nil
     ) {
         self.operationId = operationId
         self.sourceFile = sourceFile
@@ -58,6 +64,27 @@ public struct FileUploadRequest: Sendable {
         self.mimeType = mimeType
         self.context = context
         self.type = type
+        self.encryptionInfo = encryptionInfo
+    }
+
+    /// The same upload under `encryptionInfo`.
+    public func with(encryptionInfo: EncryptedFileInfo?) -> FileUploadRequest {
+        FileUploadRequest(
+            operationId: operationId, sourceFile: sourceFile, fileName: fileName, mimeType: mimeType,
+            context: context, type: type, encryptionInfo: encryptionInfo
+        )
+    }
+}
+
+/// What `prepareUpload` settled before any byte is sent.
+public struct FileUploadPreparation: Sendable {
+    /// The encryption the upload will use. UIKit saves it in the attachment's `enc` (and the
+    /// database) before it calls `upload`, so a retry or a relaunch prepares with it again.
+    /// Nil: the transport makes its key during `upload` and returns it then.
+    public let encryptionInfo: EncryptedFileInfo?
+
+    public init(encryptionInfo: EncryptedFileInfo?) {
+        self.encryptionInfo = encryptionInfo
     }
 }
 
@@ -139,7 +166,13 @@ public enum FileTransferResult<Success: Sendable>: Sendable {
 ///   not block, must tolerate repeats and any order with the task's cancellation, and must end
 ///   a running invocation. Remote cleanup (an abort) is the transport's.
 /// - Progress is a fraction, 0...1. A callback of an earlier attempt must not reach a later one.
+/// - `prepareUpload` runs before every `upload` attempt, once the file is prepared. For an
+///   encrypted upload it returns the key, which UIKit saves in the attachment's `enc` before
+///   the upload starts; given the saved one (`request.encryptionInfo`) it must return it
+///   unchanged. The default prepares nothing.
 public protocol FileTransferTransport: AnyObject {
+    func prepareUpload(_ request: FileUploadRequest) async -> FileTransferResult<FileUploadPreparation>
+
     func upload(
         _ request: FileUploadRequest,
         progress: @escaping (Double) -> Void
@@ -160,6 +193,10 @@ public protocol FileTransferTransport: AnyObject {
 }
 
 public extension FileTransferTransport {
+    func prepareUpload(_ request: FileUploadRequest) async -> FileTransferResult<FileUploadPreparation> {
+        .success(FileUploadPreparation(encryptionInfo: nil))
+    }
+
     func pause(operationId: String) -> Bool { false }
     func resume(operationId: String) -> Bool { false }
     func uploadDelivered(operationId: String) {}

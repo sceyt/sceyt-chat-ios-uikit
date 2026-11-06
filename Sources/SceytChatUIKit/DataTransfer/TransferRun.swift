@@ -38,6 +38,52 @@ final class TransferRun {
                 guard let taskInfo else { return }
                 self.recordTransferSize(size, of: taskInfo)
             }
+            taskInfo.onEncryptionPrepared = { [weak taskInfo] info, done in
+                guard let taskInfo else {
+                    done(CancellationError())
+                    return
+                }
+                self.savePreparedEncryption(info, of: taskInfo, done: done)
+            }
+        }
+    }
+
+    /// Writes the key `prepareUpload` settled into the attachment's `enc` and saves the row,
+    /// before the upload sends a byte (architecture doc: the key is on the attachment first, so
+    /// a retry or a relaunch prepares with it again). An `enc` already there for the same key
+    /// keeps its renditions.
+    private func savePreparedEncryption(_ info: EncryptedFileInfo, of taskInfo: SCTDataSessionTaskInfo, done: @escaping (Error?) -> Void) {
+        guard let transfer else {
+            done(CancellationError())
+            return
+        }
+        let atch = taskInfo.attachment
+        TransferLog.with(taskInfo.logContext) {
+            let existing = atch.encryption
+            let renditions = existing?.attachmentId == info.attachmentId && existing?.key == info.key ? existing?.renditions ?? [] : []
+            let encryption = AttachmentEncryption(info: info, renditions: renditions)
+            if existing == encryption {
+                logger.debug("[Encryption] \(taskInfo.logTag) upload prepared with the saved enc attachmentId=\(info.attachmentId)")
+                done(nil)
+                return
+            }
+            do {
+                atch.updateMetadata(try ChatMessage.Attachment.metadata(atch.metadata, settingEncryption: encryption))
+            } catch {
+                logger.debug("[Encryption] \(taskInfo.logTag) upload cannot write the prepared enc into the metadata: \(TransferLog.describe(error))")
+                done(AttachmentEncryptionError.metadataFailed(error))
+                return
+            }
+            // Ids and algorithm only: the key is never logged.
+            logger.debug("[Encryption] \(taskInfo.logTag) upload prepared enc alg=\(info.algorithm) attachmentId=\(info.attachmentId) replaced=\(existing?.attachmentId ?? "-"), saving before the upload")
+            transfer.store.save([atch], of: message) { error in
+                if let error {
+                    logger.debug("[Encryption] \(taskInfo.logTag) upload prepared enc could not be saved: \(TransferLog.describe(error))")
+                    done(AttachmentEncryptionError.metadataFailed(error))
+                } else {
+                    done(nil)
+                }
+            }
         }
     }
 

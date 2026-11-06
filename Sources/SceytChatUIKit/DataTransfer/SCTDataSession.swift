@@ -212,6 +212,9 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
     @Atomic public private(set) var transferSize: Int64?
     /// Told each reported transfer size (`TransferRun` saves it on the attachment).
     @Atomic internal var onTransferSize: ((Int64) -> Void)?
+    /// Saves the encryption a transport's `prepareUpload` settled in the attachment's `enc` and
+    /// the database, then calls back (with the error when it could not). Set by `TransferRun`.
+    @Atomic internal var onEncryptionPrepared: ((EncryptedFileInfo, @escaping (Error?) -> Void) -> Void)?
     /// The encrypted video poster sent with this upload, for `enc.renditions`.
     @Atomic internal var thumbnailRendition: AttachmentEncryption.Rendition?
     /// The transport returned the verified plaintext of an encrypted download.
@@ -351,6 +354,19 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
     /// Reports the size of the file the transfer moves, before its first progress: the
     /// progress shown in bytes is of it, not of the attachment's original. Ignored once the
     /// task has ended.
+    /// Saves `info` in the attachment's `enc` and in the database, before the upload sends a
+    /// byte. Throws when it could not be saved: the upload must not start then.
+    func persistPreparedEncryption(_ info: EncryptedFileInfo) async throws {
+        guard let save = onEncryptionPrepared else {
+            // Nothing would save the key: the receiver could never open the file.
+            throw AttachmentEncryptionError.metadataFailed(CocoaError(.featureUnsupported))
+        }
+        let error: Error? = await withCheckedContinuation { continuation in
+            save(info) { continuation.resume(returning: $0) }
+        }
+        if let error { throw error }
+    }
+
     public func reportTransferSize(_ size: Int64) {
         guard size > 0, !isTerminal else { return }
         transferSize = size
