@@ -38,50 +38,67 @@ final class TransferRun {
                 guard let taskInfo else { return }
                 self.recordTransferSize(size, of: taskInfo)
             }
-            taskInfo.onEncryptionPrepared = { [weak taskInfo] info, done in
+            taskInfo.onUploadPrepared = { [weak taskInfo] entries, done in
                 guard let taskInfo else {
                     done(CancellationError())
                     return
                 }
-                self.savePreparedEncryption(info, of: taskInfo, done: done)
+                self.savePreparedEntries(entries, of: taskInfo, done: done)
+            }
+            taskInfo.onFilePrepared = { [weak taskInfo] file in
+                guard let taskInfo else { return }
+                await self.attachVideoPreview(of: taskInfo, file: file)
             }
         }
     }
 
-    /// Writes the key `prepareUpload` settled into the attachment's `enc` and saves the row,
-    /// before the upload sends a byte (architecture doc: the key is on the attachment first, so
-    /// a retry or a relaunch prepares with it again). An `enc` already there for the same key
-    /// keeps its renditions.
-    private func savePreparedEncryption(_ info: EncryptedFileInfo, of taskInfo: SCTDataSessionTaskInfo, done: @escaping (Error?) -> Void) {
+    /// Merges the entries the provider's `prepareUpload` returned into the attachment's
+    /// metadata (returned keys added or overwritten, the rest kept) and saves the row, before
+    /// the upload sends a byte (spec: write-ahead, so a retry or a relaunch finds them on the
+    /// attachment, and a crash at any later point can resume).
+    private func savePreparedEntries(_ entries: [String: String], of taskInfo: SCTDataSessionTaskInfo, done: @escaping (Error?) -> Void) {
         guard let transfer else {
             done(CancellationError())
             return
         }
         let atch = taskInfo.attachment
         TransferLog.with(taskInfo.logContext) {
-            let existing = atch.encryption
-            let renditions = existing?.attachmentId == info.attachmentId && existing?.key == info.key ? existing?.renditions ?? [] : []
-            let encryption = AttachmentEncryption(info: info, renditions: renditions)
-            if existing == encryption {
-                logger.debug("[Encryption] \(taskInfo.logTag) upload prepared with the saved enc attachmentId=\(info.attachmentId)")
+            // Keys only: a provider's values may carry keys.
+            let keys = entries.keys.sorted().joined(separator: ",")
+            if entries.allSatisfy({ atch.stringMetadataEntries[$0.key] == $0.value }) {
+                logger.debug("[Attachment] \(taskInfo.logTag) upload prepared: entries [\(keys)] already saved")
                 done(nil)
                 return
             }
             do {
-                atch.updateMetadata(try ChatMessage.Attachment.metadata(atch.metadata, settingEncryption: encryption))
+                atch.updateMetadata(try ChatMessage.Attachment.metadata(atch.metadata, merging: entries))
             } catch {
-                logger.debug("[Encryption] \(taskInfo.logTag) upload cannot write the prepared enc into the metadata: \(TransferLog.describe(error))")
-                done(AttachmentEncryptionError.metadataFailed(error))
+                logger.debug("[Attachment] \(taskInfo.logTag) upload cannot merge the prepared entries [\(keys)] into the metadata: \(TransferLog.describe(error))")
+                done(AttachmentMetadataError.saveFailed(error))
                 return
             }
-            // Ids and algorithm only: the key is never logged.
-            logger.debug("[Encryption] \(taskInfo.logTag) upload prepared enc alg=\(info.algorithm) attachmentId=\(info.attachmentId) replaced=\(existing?.attachmentId ?? "-"), saving before the upload")
+            logger.debug("[Attachment] \(taskInfo.logTag) upload prepared entries [\(keys)], saving before the upload")
             transfer.store.save([atch], of: message) { error in
                 if let error {
-                    logger.debug("[Encryption] \(taskInfo.logTag) upload prepared enc could not be saved: \(TransferLog.describe(error))")
-                    done(AttachmentEncryptionError.metadataFailed(error))
+                    logger.debug("[Attachment] \(taskInfo.logTag) upload prepared entries could not be saved: \(TransferLog.describe(error))")
+                    done(AttachmentMetadataError.saveFailed(error))
                 } else {
                     done(nil)
+                }
+            }
+        }
+    }
+
+    /// A sent video's poster, as its own preview attachment, before the video's bytes: the
+    /// preview and the video's `video_thumb` are saved with the message, so the message the
+    /// sender builds once the video lands carries both.
+    private func attachVideoPreview(of taskInfo: SCTDataSessionTaskInfo, file: URL) async {
+        guard let transfer else { return }
+        let message = self.message
+        await TransferLog.$current.withValue(taskInfo.logContext) {
+            await transfer.posters.attachPreview(taskInfo: taskInfo, message: message, attachment: taskInfo.attachment, file: file) { attachments in
+                await withCheckedContinuation { continuation in
+                    transfer.store.save(attachments, of: message) { continuation.resume(returning: $0) }
                 }
             }
         }
@@ -110,7 +127,7 @@ final class TransferRun {
             report(progress: progress, of: taskInfo, transfer: transfer)
             return
         }
-        // Every layer this event reaches (`enc` parsing, the poster) tags its lines with
+        // Every layer this event reaches (the checksum, the poster) tags its lines with
         // this transfer.
         TransferLog.with(taskInfo.logContext) {
             switch event {
@@ -195,48 +212,11 @@ final class TransferRun {
     }
 
     private func finishSuccess(uri: String, taskInfo: SCTDataSessionTaskInfo, atch: ChatMessage.Attachment, transfer: AttachmentTransfer) {
-        let tag = taskInfo.logTag
-        if let error = AttachmentTransfer.encryptionGateError(taskInfo: taskInfo, attachment: atch) {
-            logger.debug("[Encryption] \(tag) rejecting success of \(taskInfo.transferType) (fail closed): \(TransferLog.describe(error)) uploadedEncryption=\(taskInfo.uploadedEncryption != nil) decrypted=\(taskInfo.didDecryptDownload)")
-            switch taskInfo.transferType {
-            case .upload:
-                // Not delivered: keep it an unsent attachment, and keep its url out of the
-                // checksum table so nothing dedupes onto the plaintext object.
-                atch.url = nil
-            case .download:
-                // Whatever the session stored is ciphertext, not the file.
-                if let filePath = atch.filePath {
-                    TransferLog.remove(URL(fileURLWithPath: filePath), what: "the undecrypted download", context: "[Encryption] \(tag) gate", level: .error)
-                }
-                atch.filePath = nil
-                atch.transferProgress = 0
-            }
-            taskInfo.reject(error: error)
-            return
-        }
         // For a just-uploaded video, upload its poster frame too before completing, so the
         // merged "video_thumb" metadata is persisted by `end` and rides the wire message the
         // sender builds from this attachment.
         transfer.attachVideoThumbnailIfNeeded(taskInfo: taskInfo, message: message, attachment: atch) { [self] in
             TransferLog.with(taskInfo.logContext) {
-                if taskInfo.transferType == .upload, let encryption = AttachmentTransfer.uploadEncryption(of: taskInfo, attachment: atch) {
-                    // The receiver's keys (the file's, and the poster's when one went out),
-                    // and the original size for display: the stored object is larger.
-                    // Ids and algorithm only: the keys are never logged.
-                    logger.debug("[Encryption] \(tag) upload enc alg=\(encryption.algorithm) attachmentId=\(encryption.attachmentId) thumbnailAttachmentId=\(encryption.thumbnail?.attachmentId ?? "-")")
-                    do {
-                        atch.updateMetadata(try ChatMessage.Attachment.metadata(atch.metadata, settingEncryption: encryption))
-                    } catch {
-                        // Sent without its key, the file could never be opened.
-                        logger.debug("[Encryption] \(tag) upload cannot write enc into the metadata: \(TransferLog.describe(error))")
-                        atch.url = nil
-                        taskInfo.reject(error: AttachmentEncryptionError.metadataFailed(error))
-                        return
-                    }
-                    if let size = taskInfo.uploadedPlaintextSize {
-                        atch.uploadedFileSize = UInt(size)
-                    }
-                }
                 atch.url = uri
                 atch.transferProgress = 1
                 atch.status = .done

@@ -45,20 +45,16 @@ extension AttachmentTransfer {
                 atch.metadata = Self.metadata(decodedMetadata, size: builder.imageSize)
             }
         }
-        // The typed rebuild above only knows the media keys.
-        atch.metadata = ChatMessage.Attachment.metadata(atch.metadata, preservingEncryptionFrom: previousMetadata)
+        // The typed rebuild above only knows the media keys: a provider's entries stay.
+        atch.metadata = ChatMessage.Attachment.metadata(atch.metadata, preservingUnownedKeysFrom: previousMetadata)
         atch.name = url.lastPathComponent
         atch.filePath = url.path
         let fileSize = environment.storage().sizeOfItem(at: url)
-        // An encrypted download is only the file once it was decrypted;
-        // before that this is ciphertext, whose size is `cl`, not `ps`.
-        let isPlaintext = taskInfo.transferType == .upload
-            || taskInfo.encryption == .none
-            || taskInfo.didDecryptDownload
-        if fileSize > 0, isPlaintext {
+        // A provider delivers the file as the user sees it (decrypted, if it was encrypted).
+        if fileSize > 0 {
             atch.uploadedFileSize = fileSize
         }
-        if taskInfo.transferType == .download, fileSize > 0, isPlaintext {
+        if taskInfo.transferType == .download, fileSize > 0 {
             atch.transferProgress = 1
             atch.status = .done
         }

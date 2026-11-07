@@ -12,15 +12,15 @@ import OSLog
 
 // MARK: - Diagnostics
 
-/// What the transfer and encryption logs may say about a URL, an error or an attachment.
+/// What the transfer logs may say about a URL, an error or an attachment.
 ///
-/// Never logged: keys (`EncryptedFileInfo.key`, `enc`), checkpoints, file contents, and the
+/// Never logged: a provider's metadata values (they may carry keys), file contents, and the
 /// query or fragment of a URL — a presigned or signed URL carries its credentials there.
 enum TransferLog {
 
     /// The transfer the current task (or, outside a task, the current thread) works for. Bound
     /// by `TransportDataSession` around a transport call and by `AttachmentTransfer` around its
-    /// event handling, so the layers below it (`FileEncryption`, the checksum, `enc` parsing)
+    /// event handling, so the layers below it (the provider, the checksum, the poster)
     /// tag their lines with the same `xfer=` without a parameter in their public API.
     @TaskLocal static var current: TransferLogContext?
 
@@ -66,6 +66,11 @@ enum TransferLog {
         SHA256.hash(data: Data(text.utf8)).prefix(6).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// The SHA-256 of `parts`, joined by NUL, in hex: a file name made from ids.
+    static func hash(_ parts: [String]) -> String {
+        SHA256.hash(data: Data(parts.joined(separator: "\u{0}").utf8)).map { String(format: "%02x", $0) }.joined()
+    }
+
     /// Whether `error` means the transfer was abandoned (`cancel`), not that it failed.
     /// The device could not reach the server (no network, connection lost, timed out):
     /// worth trying again by itself once the network is back, unlike a refusal.
@@ -103,24 +108,12 @@ enum TransferLog {
     static func describe(_ error: Error?) -> String {
         guard let error else { return "nil" }
         switch error {
-        case let error as AttachmentEncryptionError:
+        case let error as AttachmentMetadataError:
             switch error {
-            case .metadataFailed(let underlying):
-                return "AttachmentEncryptionError.metadataFailed(\(describe(underlying)))"
-            case .decryptionFailed(let underlying):
-                return "AttachmentEncryptionError.decryptionFailed(\(ChatSDKFileEncryption.failureKind(underlying)): \(describe(underlying)))"
-            case .invalidCiphertextSize(let size):
-                return "AttachmentEncryptionError.invalidCiphertextSize(\(size))"
-            case .encryptionUnsupportedBySession:
-                return "AttachmentEncryptionError.encryptionUnsupportedBySession"
-            case .encryptionBypassed:
-                return "AttachmentEncryptionError.encryptionBypassed"
-            case .invalidCheckpoint:
-                return "AttachmentEncryptionError.invalidCheckpoint"
-            case .invalidEncryptionInfo:
-                return "AttachmentEncryptionError.invalidEncryptionInfo"
-            case .metadataNotAnObject:
-                return "AttachmentEncryptionError.metadataNotAnObject"
+            case .notAnObject:
+                return "AttachmentMetadataError.notAnObject"
+            case .saveFailed(let underlying):
+                return "AttachmentMetadataError.saveFailed(\(describe(underlying)))"
             }
         case let error as FileTransferError:
             return "FileTransferError.\(error)"
@@ -275,7 +268,7 @@ enum TransferDirectories {
     static let staleDecryptionAge: TimeInterval = 10 * 60
 
     /// Removes the hidden `.<uuid>-<name>` decryption files of `destination` that builds before
-    /// `EncryptedFileDownloader` left after a crash: nothing else would.
+    /// the encrypted downloader left after a crash: nothing else would.
     static func removeStaleDecryptionFiles(for destination: URL, now: Date = Date(), tag: String) {
         let folder = destination.deletingLastPathComponent()
         let suffix = "-\(destination.lastPathComponent)"
@@ -321,7 +314,9 @@ public enum TransferFailureCategory: String {
         if TransferLog.isCancellation(error) || error is CancellationError {
             return .cancelled
         }
-        if error is AttachmentEncryptionError {
+        // Data that didn't verify: tampered, truncated, or a wrong key (the Chat SDK's
+        // file encryption, used by a provider).
+        if (error as NSError).domain == "com.sceyt.chat.fileencryption" {
             return .integrity
         }
         if error is TransportDataSessionError || TransferLog.isOutOfSpace(error as NSError) {
@@ -348,7 +343,9 @@ public struct TransferMetrics: Equatable {
 
     public let operationId: String
     public let direction: Direction
-    public let isEncrypted: Bool
+    /// The upload went with provider metadata entries (an encryption key, say), new or kept
+    /// from an earlier attempt. Always false for a download.
+    public let hasProviderEntries: Bool
     /// The size shown for the file, nil when unknown.
     public let bytes: Int64?
     public let attempts: Int

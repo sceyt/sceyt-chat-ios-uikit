@@ -27,19 +27,20 @@ public enum TransportDataSessionError: Error {
     case missingSourceFile
 }
 
-/// The `SCTDataSession` that routes attachments to a `FileTransferTransport`: it checks for a
-/// duplicate, prepares the file (resize, export, zip), schedules uploads one at a time, turns
-/// pause / resume / cancel into transport calls and reports results to the task. The transport
-/// only moves bytes, plain or encrypted (`FileUploadType`).
+/// The `SCTDataSession` that routes attachments to a `FileTransferProvider`: it checks for a
+/// duplicate, prepares the file (resize, export, zip), schedules uploads one at a time, saves
+/// what the provider's `prepareUpload` returns before the upload starts, turns pause / resume /
+/// cancel into provider calls and reports results to the task. The provider moves the bytes
+/// (and encrypts them, if it does).
 ///
 /// A prepared file is staged per operation and reused by the next attempt of the same upload,
-/// so a retry or a relaunch sends the bytes a transport may already have stored in part.
+/// so a retry or a relaunch sends the bytes a provider may already have stored in part.
 /// Safe to share between threads: its transfers live in `board`, changed one locked step at a
 /// time; its configuration (`environment`, `stagingDirectory`, the hooks) is set before the
 /// first transfer and only read after.
 open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
 
-    public let transport: FileTransferTransport
+    public let provider: FileTransferProvider
 
     /// The jobs, the upload queue and its slots, and each job's state: changed only through
     /// `board.withState`, one locked step at a time.
@@ -60,44 +61,21 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
     var willBeginUpload: ((SCTDataSessionTaskInfo) -> Void)?
     var willStartDownload: ((SCTDataSessionTaskInfo) -> Void)?
 
-    /// Decrypts what the transport downloads for an encrypted attachment.
-    let encryptedDownloader: EncryptedFileDownloader
-
     /// Runs the uploads (UploadCoordinator.swift). Set once, in `init`.
     private(set) var uploads: UploadCoordinator!
     /// Runs the downloads (DownloadCoordinator.swift). Set once, in `init`.
     private(set) var downloads: DownloadCoordinator!
 
-    /// Where encrypted downloads keep their sessions (no keys): Application Support, so a
-    /// decryption resumes after a relaunch.
-    static var encryptedDownloadSessionsDirectory: URL {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        return support.appendingPathComponent("SceytChatUIKit/download-sessions", isDirectory: true)
-    }
-
-    /// One for every session: they share the sessions directory, and a purge must see every
-    /// session's running downloads.
-    static let sharedEncryptedDownloader = EncryptedFileDownloader(directory: encryptedDownloadSessionsDirectory)
-
-    /// How long an encrypted download nobody tried again keeps its temporary files.
-    static let staleDownloadSessionAge: TimeInterval = 7 * 24 * 60 * 60
-
-    public init(transport: FileTransferTransport) {
-        self.transport = transport
-        encryptedDownloader = Self.sharedEncryptedDownloader
+    public init(provider: FileTransferProvider) {
+        self.provider = provider
         super.init()
         uploads = UploadCoordinator(session: self)
         downloads = DownloadCoordinator(session: self)
         let staging = self.staging
-        let downloader = encryptedDownloader
         DispatchQueue.global(qos: .utility).async {
             staging.purgeStale()
-            downloader.purgeStale(olderThan: Self.staleDownloadSessionAge)
         }
     }
-
-    open var supportsAttachmentEncryption: Bool { true }
 
     /// How long an upload waits for the checksum provider before it uploads anyway.
     var checksumTimeout: TimeInterval = 60
@@ -128,16 +106,22 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
         attachment.tid != 0 ? "upload-\(attachment.tid)" : "upload-\(UUID().uuidString)"
     }
 
-    /// The server accepted `message`: its uploads' results are final, and what the transport
+    /// The server accepted `message`: its uploads' results are final, and what the provider
     /// kept to report them again goes. Only attachments with a `tid` have an operation that
     /// can be found again.
     open func messageSent(_ message: ChatMessage) {
         for attachment in message.attachments ?? [] where attachment.tid != 0 && attachment.type != "link" {
-            transport.uploadDelivered(operationId: uploadOperationId(for: attachment))
+            provider.uploadDelivered(operationId: uploadOperationId(for: attachment))
+            if attachment.kind == .video, message.previewAttachment(of: attachment) != nil {
+                provider.uploadDelivered(operationId: videoPreviewOperationId(for: attachment))
+            }
         }
     }
 
-    /// HTTP headers for an attachment's download request. None by default; a transport that
+    /// A sent video's poster goes as its own preview attachment, through the provider.
+    open var sendsVideoPreviewAttachments: Bool { true }
+
+    /// HTTP headers for an attachment's download request. None by default; a provider that
     /// needs per-request values read at send time (a token that may be refreshed) adds them
     /// itself.
     open func downloadHeaders(for attachment: ChatMessage.Attachment, message: ChatMessage) -> [String: String] {
@@ -185,7 +169,7 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
         fileStore.updateThumbnailPath(transferId: transferId, filePath: filePath)
     }
 
-    /// Where a download's plaintext goes, the place `getFilePath` finds it afterwards.
+    /// Where a download's file goes, the place `getFilePath` finds it afterwards.
     open func downloadDestination(for attachment: ChatMessage.Attachment) -> URL? {
         guard let string = attachment.url, let url = URL(string: string) else {
             logger.debug("[Transfer] \(TransferLog.currentTag) no download destination: url missing or unparsable (\(TransferLog.redact(attachment.url))) \(attachment.transferLogDescription)")
@@ -244,7 +228,7 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
         )
         let tag = taskInfo.logTag
         // A second start of an upload still running joins it: two jobs of one operation would
-        // share its staging folder and the transport's record, and a cancel of one would end
+        // share its staging folder and the provider's record, and a cancel of one would end
         // the other's transfer.
         let joinedRunning: (job: UploadJob, state: UploadJob.State, attempt: Int)? = board.withState { jobs in
             guard let running = jobs.uploads.values.first(where: { $0.operationId == job.operationId && !$0.isFinished }) else {
@@ -267,7 +251,7 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
         if attachment.tid == 0 {
             logger.warn("[Transfer] \(tag) upload has no tid: a retry or relaunch cannot find what this attempt saves \(attachment.transferLogDescription)")
         }
-        logger.debug("[Transfer] \(tag) upload queued encryption=\(taskInfo.encryption) source=\(TransferLog.size(path: attachment.filePath)) \(attachment.transferLogDescription)")
+        logger.debug("[Transfer] \(tag) upload queued source=\(TransferLog.size(path: attachment.filePath)) \(attachment.transferLogDescription)")
         taskInfo.onAction = actions(of: job)
         uploads.enqueue(job)
     }
@@ -313,22 +297,15 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
             Task { self.report(taskInfo, .failure(FileTransferError.invalidRequest)) }
             return
         }
-        let encryption = (taskInfo.encryption == .required ? taskInfo.downloadEncryption?.fileInfo : nil).map {
-            // The size the sender sent: decryption verifies the object holds exactly that.
-            FileDownloadEncryption(info: $0, trustedPlaintextSize: attachment.uploadedFileSize > 0 ? Int64(attachment.uploadedFileSize) : nil)
-        }
         let request = FileDownloadRequest(
             operationId: taskInfo.operationId,
             url: url,
             destinationFile: destination,
             context: AttachmentTransferContext(message: taskInfo.message, attachment: attachment),
-            headers: downloadHeaders(for: attachment, message: taskInfo.message)
+            headers: downloadHeaders(for: attachment, message: taskInfo.message),
+            metadata: attachment.stringMetadataEntries
         )
-        let job = DownloadJob(request: request, encryption: encryption, taskInfo: taskInfo)
-        if taskInfo.encryption == .required, encryption == nil {
-            // Fails closed later: the transport stores ciphertext and the gate rejects it.
-            logger.warn("[Encryption] \(tag) download must be decrypted but has no enc; the request goes out without it \(attachment.transferLogDescription)")
-        }
+        let job = DownloadJob(request: request, taskInfo: taskInfo)
         // A second start of a download still running joins it: two invocations of one
         // operation would write the same destination, and only one could be controlled.
         let joinedRunning: (job: DownloadJob, state: DownloadJob.State, attempt: Int)? = board.withState { jobs in
@@ -349,12 +326,12 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
             }
             return
         }
-        logger.debug("[Transfer] \(tag) download queued encrypted=\(encryption != nil) trustedSize=\(encryption?.trustedPlaintextSize.map { "\($0) B" } ?? "-") url=\(TransferLog.redact(url)) destinationExists=\(FileManager.default.fileExists(atPath: destination.path)) \(attachment.transferLogDescription)")
+        logger.debug("[Transfer] \(tag) download queued url=\(TransferLog.redact(url)) destinationExists=\(FileManager.default.fileExists(atPath: destination.path)) \(attachment.transferLogDescription)")
         taskInfo.onAction = actions(of: job)
         downloads.start(job)
     }
 
-    /// Abandons the uploads of `attachments`, running or only saved by the transport (after a
+    /// Abandons the uploads of `attachments`, running or only saved by the provider (after a
     /// relaunch nothing runs, but a remote multipart upload may still be open).
     open func cancel(attachments: [ChatMessage.Attachment]) {
         for attachment in attachments where attachment.tid != 0 {
@@ -364,15 +341,19 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
                 uploads.cancel(job)
             } else {
                 let operationId = uploadOperationId(for: attachment)
-                logger.info("[Transfer] xfer=\(operationId) upload has no live job: abandoning what the transport saved \(attachment.transferLogDescription)")
-                transport.cancel(operationId: operationId)
+                logger.info("[Transfer] xfer=\(operationId) upload has no live job: abandoning what the provider saved \(attachment.transferLogDescription)")
+                provider.cancel(operationId: operationId)
                 staging.discard(operationId: operationId)
+            }
+            if attachment.kind == .video {
+                // Its preview, uploaded before it, goes with it.
+                provider.cancel(operationId: videoPreviewOperationId(for: attachment))
             }
         }
     }
 
     /// Stops every transfer without abandoning any (the network went away): each task fails
-    /// with `error`, and the transport keeps what a later attempt can continue.
+    /// with `error`, and the provider keeps what a later attempt can continue.
     open func interruptTransfers(error: Error) {
         let (uploadJobs, downloadJobs) = board.withState { jobs -> ([UploadJob], [DownloadJob]) in
             let uploadJobs = Array(jobs.uploads.values)

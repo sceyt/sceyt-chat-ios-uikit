@@ -2,15 +2,14 @@
 //  DownloadCoordinator.swift
 //  SceytChatUIKit
 //
-//  The download state machine: each attempt, its result (an encrypted attachment's decrypted
-//  by `EncryptedFileDownloader`), and pause / resume / cancel. Every state change is one
-//  `board` step.
+//  The download state machine: each attempt, its result, and pause / resume / cancel. Every
+//  state change is one `board` step.
 //
 
 import Foundation
 
 /// Runs the session's downloads: each attempt, its result, and pause / resume / cancel. The
-/// session owns it and stays the one customization point (its transport, hooks and reporting).
+/// session owns it and stays the one customization point (its provider, hooks and reporting).
 final class DownloadCoordinator: Sendable {
     unowned let session: TransportDataSession
 
@@ -19,9 +18,7 @@ final class DownloadCoordinator: Sendable {
     }
 
     private var board: JobBoard { session.board }
-    private var transport: FileTransferTransport { session.transport }
-    private var encryptedDownloader: EncryptedFileDownloader { session.encryptedDownloader }
-    private var environment: TransferEnvironment { session.environment }
+    private var provider: FileTransferProvider { session.provider }
     private var willStartDownload: ((SCTDataSessionTaskInfo) -> Void)? { session.willStartDownload }
 
     private func attempt(of job: DownloadJob) -> Int { session.attempt(of: job) }
@@ -35,7 +32,6 @@ final class DownloadCoordinator: Sendable {
     func start(_ job: DownloadJob) {
         let tag = job.taskInfo.logTag
         willStartDownload?(job.taskInfo)
-        let encrypted = job.encryption != nil
         let context = job.taskInfo.logContext
         enum Start { case finished, started(attempt: Int, from: DownloadJob.State, previous: Task<Void, Never>?) }
         let start: Start = board.withState { _ in
@@ -46,32 +42,21 @@ final class DownloadCoordinator: Sendable {
             job.state = .running
             ([job.taskInfo] + job.joined).forEach { $0.attempts = attempt }
             // Installed in the same step, so a pause or cancel that follows finds it (a cancel
-            // that found no task let the download, and its decryption, run to the end).
+            // that found no task let the download run to the end).
             // Holds the session (weakly, strongly while it works): the coordinator reaches it
             // `unowned`, which is safe only while something keeps the session alive.
             let previous = job.replaceTask(Task { [weak session = self.session] in
                 guard let session, let self = session.downloads else { return }
-                // Every layer below (transport, encryption) tags its lines with this transfer.
+                // Every layer below (the provider) tags its lines with this transfer.
                 let report: (Double) -> Void = { [weak session] progress in
                     guard let self = session?.downloads, self.isRunning(job, attempt: attempt) else { return }
                     if let quarter = job.progressMilestone(progress) {
                         logger.debug("[Transfer] \(tag) download attempt=\(attempt) progress \(quarter)%")
                     }
-                    // An encrypted download reaches 1 only once it is decrypted and published.
                     self.tasks(of: job).forEach { $0.updateProgress(progress) }
                 }
                 let result = await TransferLog.$current.withValue(context) {
-                    if let encryption = job.encryption {
-                        return await self.encryptedDownloader.download(
-                            job.request,
-                            encryption: encryption,
-                            fileEncryption: self.environment.fileEncryption(),
-                            progress: report
-                        ) { request, progress in
-                            await self.transport.download(request, progress: progress)
-                        }
-                    }
-                    return await self.transport.download(job.request, progress: report)
+                    await self.provider.download(job.request, progress: report)
                 }
                 self.handle(result, of: job, attempt: attempt)
             })
@@ -81,7 +66,7 @@ final class DownloadCoordinator: Sendable {
             logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) not started: already finished")
             return
         }
-        logger.info("[Transfer] \(tag) download attempt=\(attempt) \(attempt == 1 ? "queued" : "\(from)") -> running encrypted=\(encrypted) url=\(TransferLog.redact(job.request.url))")
+        logger.info("[Transfer] \(tag) download attempt=\(attempt) \(attempt == 1 ? "queued" : "\(from)") -> running url=\(TransferLog.redact(job.request.url))")
         previous?.cancel()
     }
 
@@ -132,13 +117,10 @@ final class DownloadCoordinator: Sendable {
                 return
             }
             if !FileManager.default.fileExists(atPath: file.path) {
-                logger.warn("[Transfer] \(tag) download attempt=\(attempt) transport reported success but its file does not exist")
+                logger.warn("[Transfer] \(tag) download attempt=\(attempt) provider reported success but its file does not exist")
             }
-            logger.debug("[Transfer] \(tag) download attempt=\(attempt) running -> finished (success) size=\(TransferLog.sizeText(file)) decrypted=\(job.encryption != nil)")
+            logger.debug("[Transfer] \(tag) download attempt=\(attempt) running -> finished (success) size=\(TransferLog.sizeText(file))")
             for taskInfo in live {
-                if job.encryption != nil {
-                    taskInfo.didDecryptDownload = true
-                }
                 taskInfo.updateLocalFileLocation(newPath: file.path)
             }
             report(live, .successURI(job.request.url))
@@ -161,8 +143,8 @@ final class DownloadCoordinator: Sendable {
             logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) pause ignored while \(notRunning)")
             return
         }
-        // Asked outside the lock: the transport may call back into this session.
-        let alive = transport.pause(operationId: job.request.operationId)
+        // Asked outside the lock: the provider may call back into this session.
+        let alive = provider.pause(operationId: job.request.operationId)
         let raced: DownloadJob.State? = board.withState { _ in
             guard case .running = job.state else { return job.state }
             job.state = .paused(alive: alive)
@@ -194,7 +176,7 @@ final class DownloadCoordinator: Sendable {
             }
             return
         }
-        if alive, transport.resume(operationId: job.request.operationId) {
+        if alive, provider.resume(operationId: job.request.operationId) {
             logger.info("[Transfer] \(tag) download attempt=\(attempt(of: job)) paused -> running (resumed the live invocation)")
             return
         }
@@ -204,11 +186,11 @@ final class DownloadCoordinator: Sendable {
             return false
         }
         if cancelled {
-            // Cancelled while the transport was asked to resume: it stays cancelled.
+            // Cancelled while the provider was asked to resume: it stays cancelled.
             logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) cancelled during the resume, not restarted")
             return
         }
-        logger.info("[Transfer] \(tag) download attempt=\(attempt(of: job)) \(alive ? "transport could not resume the invocation" : "no live invocation"), starting a new attempt")
+        logger.info("[Transfer] \(tag) download attempt=\(attempt(of: job)) \(alive ? "provider could not resume the invocation" : "no live invocation"), starting a new attempt")
         start(job)
     }
 
@@ -226,18 +208,8 @@ final class DownloadCoordinator: Sendable {
             return
         }
         logger.debug("[Transfer] \(tag) download attempt=\(attempt(of: job)) \(previous) -> finished (cancelled)")
-        transport.cancel(operationId: job.request.operationId)
-        let task = job.currentTask
+        provider.cancel(operationId: job.request.operationId)
         job.cancelTask()
-        if job.encryption != nil {
-            // Its temporary files go once nothing writes them any more.
-            let downloader = encryptedDownloader
-            let operationId = job.request.operationId
-            Task {
-                await task?.value
-                downloader.discard(operationId)
-            }
-        }
         report(tasks(of: job), .failure(URLError(.cancelled)))
     }
 }

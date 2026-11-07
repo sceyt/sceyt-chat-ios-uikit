@@ -1,13 +1,11 @@
 //
-//  AttachmentTransferEncryptionTests.swift
+//  AttachmentTransferPipelineTests.swift
 //  SceytChatUIKitTests
 //
-//  The encryption parts of `AttachmentTransfer` beyond the fail-closed gate tests: the setup
-//  and gate helpers one by one, rejected successes (a download the session never decrypted,
-//  an `enc` that cannot be written), offline failures, a dedupe hit that reuses an encrypted
-//  object, the encrypted video poster on upload and on download, the media-metadata rebuild of
-//  an encrypted image, and the checksum table only reusing encrypted objects for an encrypted
-//  send (`ChannelMessageChecksumProvider`).
+//  `AttachmentTransfer` end to end over `TransportDataSession` and a scripted
+//  `FileTransferProvider`: the provider's prepared metadata entries saved before the upload
+//  and kept through every metadata rebuild, the video poster on upload and on download, event
+//  ordering, cancel / pause / resume, and the checksum table (`ChannelMessageChecksumProvider`).
 //
 
 @testable import SceytChatUIKit
@@ -18,17 +16,17 @@ import XCTest
 
 // MARK: - Fakes
 
-/// Answers uploads by encrypting the request with the real SDK, or as the test says.
-private final class EncryptingTransport: FileTransferTransport {
+/// Answers uploads with "PLAIN", or as the test says.
+private final class ScriptedProvider: FileTransferProvider {
     var onUpload: ((FileUploadRequest) async -> FileTransferResult<FileUploadResult>)?
-    /// The prepare hook's answer; nil prepares nothing (the key is made while uploading).
-    var onPrepare: ((FileUploadRequest) async -> FileTransferResult<FileUploadPreparation>)?
+    /// The prepare step's answer; nil prepares nothing.
+    var onPrepare: ((FileUploadRequest) async throws -> [String: String]?)?
     private var _prepares = [FileUploadRequest]()
     var prepares: [FileUploadRequest] { lock.lock(); defer { lock.unlock() }; return _prepares }
 
-    func prepareUpload(_ request: FileUploadRequest) async -> FileTransferResult<FileUploadPreparation> {
+    func prepareUpload(_ request: FileUploadRequest) async throws -> [String: String]? {
         lock.lock(); _prepares.append(request); lock.unlock()
-        return await onPrepare?(request) ?? .success(FileUploadPreparation(encryptionInfo: nil))
+        return try await onPrepare?(request)
     }
 
     var onDownload: (FileDownloadRequest) async -> FileTransferResult<URL> = { _ in .failure(URLError(.badURL)) }
@@ -37,8 +35,6 @@ private final class EncryptingTransport: FileTransferTransport {
     private var _downloads = [FileDownloadRequest]()
     var uploads: [FileUploadRequest] { lock.lock(); defer { lock.unlock() }; return _uploads }
     var downloads: [FileDownloadRequest] { lock.lock(); defer { lock.unlock() }; return _downloads }
-    /// The objects the default upload stored, by remote reference.
-    private(set) var objects = [String: URL]()
     let directory: URL
 
     init(directory: URL) {
@@ -48,15 +44,7 @@ private final class EncryptingTransport: FileTransferTransport {
     func upload(_ request: FileUploadRequest, progress: @escaping (Double) -> Void) async -> FileTransferResult<FileUploadResult> {
         lock.lock(); _uploads.append(request); lock.unlock()
         if let onUpload { return await onUpload(request) }
-        guard request.type == .encrypted else { return .success(FileUploadResult(url: "PLAIN")) }
-        do {
-            let object = directory.appendingPathComponent("object-\(UUID().uuidString)")
-            let info = try await ChatSDKFileEncryption().encrypt(file: request.sourceFile, to: object)
-            lock.lock(); objects["ENC"] = object; lock.unlock()
-            return .success(FileUploadResult(url: "ENC", encryptionInfo: info))
-        } catch {
-            return .failure(error)
-        }
+        return .success(FileUploadResult(url: "PLAIN"))
     }
 
     func download(_ request: FileDownloadRequest, progress: @escaping (Double) -> Void) async -> FileTransferResult<URL> {
@@ -64,13 +52,17 @@ private final class EncryptingTransport: FileTransferTransport {
         return await onDownload(request)
     }
 
-    func cancel(operationId: String) {}
+    private var _cancelled = [String]()
+    var cancelled: [String] { lock.lock(); defer { lock.unlock() }; return _cancelled }
+
+    func cancel(operationId: String) {
+        lock.lock(); _cancelled.append(operationId); lock.unlock()
+    }
 }
 
 /// The router, storing under one directory, with hooks for what the transport split cannot fake.
 private final class HookedSession: TransportDataSession {
     let root: URL
-    var encrypts = true
     var checksums = false
     /// Replace the whole upload / download when set.
     var onUpload: ((ChatMessage.Attachment, SCTDataSessionTaskInfo) -> Void)?
@@ -81,14 +73,16 @@ private final class HookedSession: TransportDataSession {
     var onThumbnailDownload: (String) -> Result<URL, Error> = { _ in .failure(SCTDataSessionError.thumbnailDownloadFailed) }
     private(set) var thumbnailUploads = [Data]()
 
-    init(transport: FileTransferTransport, root: URL) {
+    init(transport: FileTransferProvider, root: URL) {
         self.root = root
-        super.init(transport: transport)
+        super.init(provider: transport)
     }
 
-    override var supportsAttachmentEncryption: Bool { encrypts }
     override var checksumsBeforeUpload: Bool { checksums }
     override var stagingDirectory: URL { root.appendingPathComponent("staging", isDirectory: true) }
+    /// Whether a video's poster goes as a preview attachment (the new flow) or the old way.
+    var previews = false
+    override var sendsVideoPreviewAttachments: Bool { previews }
 
     override func storeFile(atPath path: String, transferId: String, fileName: String?) -> String { path }
 
@@ -163,15 +157,13 @@ private final class PosterTransfer: AttachmentTransfer {
         try? FileManager.default.copyItem(at: poster, to: copy)
         return copy
     }
-}
 
-/// A `FileEncryption` that cannot prepare anything.
-private final class UnpreparedEncryption: FileEncryption {
-    func newEncryptionInfo() async throws -> EncryptedFileInfo { throw CocoaError(.fileNoSuchFile) }
-    func prepareEncryption(file: URL) async throws -> FileEncryptionSession { throw CocoaError(.fileNoSuchFile) }
-    func restoreEncryption(file: URL, checkpoint: EncryptedFileCheckpoint) async throws -> FileEncryptionSession { throw AttachmentEncryptionError.invalidCheckpoint }
-    func prepareDecryption(encryptedFile: URL, encryptionInfo: EncryptedFileInfo, plaintextSize: Int64) async throws -> FileDecryptionSession {
-        throw AttachmentEncryptionError.decryptionFailed(CocoaError(.fileReadCorruptFile))
+    /// The files the preview step made its poster from.
+    private(set) var posterSources = [URL]()
+
+    override func makeVideoThumbnailFile(from file: URL, for attachment: ChatMessage.Attachment) -> URL? {
+        posterSources.append(file)
+        return makeVideoThumbnailFile(for: attachment)
     }
 }
 
@@ -186,32 +178,30 @@ private func waitUntil(timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bo
 
 // MARK: - AttachmentTransfer
 
-final class AttachmentTransferEncryptionTests: XCTestCase {
+final class AttachmentTransferPipelineTests: XCTestCase {
 
     private var transfer: PosterTransfer!
-    private var transport: EncryptingTransport!
+    private var transport: ScriptedProvider!
     private var session: HookedSession!
     private var directory: URL!
     private var originalDataSession: SCTDataSession?
     private var originalDatabase: Database!
 
     private let messageId: MessageId = 902
-    private let encryption = ChatSDKFileEncryption()
 
     override func setUpWithError() throws {
         try super.setUpWithError()
         originalDatabase = DataProvider.database
         DataProvider.database = MockDatabase()
         directory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("enc-transfer-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("pipeline-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        transport = EncryptingTransport(directory: directory)
+        transport = ScriptedProvider(directory: directory)
         session = HookedSession(transport: transport, root: directory)
         transfer = PosterTransfer()
         transfer.offline = true
         let session = session!
         transfer.environment.dataSession = { session }
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider { _, _ in .required } }
     }
 
     override func tearDownWithError() throws {
@@ -282,41 +272,19 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         return (finished, outcome.wrapped.error)
     }
 
-    /// An encrypted remote attachment: the stored object and what the message carries.
+    /// A remote attachment: the stored object and what the message carries (with a provider's
+    /// entry, which UIKit passes on and never reads).
     private func remote(of plaintext: URL, type: String = "file", name: String = "report.pdf", metadata: String = #"{"tmb":"x"}"#) throws -> (attachment: ChatMessage.Attachment, object: URL) {
         let object = directory.appendingPathComponent("remote-\(UUID().uuidString)")
-        let info = try encrypt(plaintext, to: object)
+        try FileManager.default.copyItem(at: plaintext, to: object)
         let attachment = makeAttachment(
             tid: 0,
             type: type,
             name: name,
             url: "REMOTE-\(UUID().uuidString)",
-            metadata: try ChatMessage.Attachment.metadata(metadata, settingEncryption: AttachmentEncryption(info: info))
+            metadata: try ChatMessage.Attachment.metadata(metadata, merging: ["sceyt.enc": "TOKEN"])
         )
         return (attachment, object)
-    }
-
-    private func encrypt(_ file: URL, to object: URL) throws -> EncryptedFileInfo {
-        let result = Locked<Result<EncryptedFileInfo, Error>?>(nil)
-        Task {
-            do { result.wrapped = .success(try await self.encryption.encrypt(file: file, to: object)) } catch { result.wrapped = .failure(error) }
-        }
-        XCTAssertTrue(waitUntil { result.wrapped != nil })
-        return try XCTUnwrap(result.wrapped).get()
-    }
-
-    private func decrypt(_ object: URL, info: EncryptedFileInfo) throws -> Data {
-        let output = directory.appendingPathComponent("decrypted-\(UUID().uuidString)")
-        let result = Locked<Result<Void, Error>?>(nil)
-        Task {
-            do {
-                try await self.encryption.decrypt(file: object, to: output, encryptionInfo: info, plaintextSize: nil)
-                result.wrapped = .success(())
-            } catch { result.wrapped = .failure(error) }
-        }
-        XCTAssertTrue(waitUntil { result.wrapped != nil })
-        try XCTUnwrap(result.wrapped).get()
-        return try Data(contentsOf: output)
     }
 
     /// Serves `object` as stored: UIKit decrypts it.
@@ -325,7 +293,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
             let staging = self.directory.appendingPathComponent("staging-\(UUID().uuidString)")
             do {
                 try FileManager.default.copyItem(at: object, to: staging)
-                try DefaultFileTransferTransport.publish(staging, to: request)
+                try DefaultFileTransferProvider.publish(staging, to: request)
                 return .success(request.destinationFile)
             } catch {
                 return .failure(error)
@@ -333,201 +301,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         }
     }
 
-    // MARK: - Setup and gate helpers
-
-    func testUploadEncryptionCoversOnlyRequiredAttachmentsWithAFile() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider { attachment, _ in attachment.tid == 3 ? .none : .required } }
-        let withFile = makeAttachment(tid: 1, filePath: try file().path)
-        let withoutFile = makeAttachment(tid: 2)
-        let notRequired = makeAttachment(tid: 3, filePath: try file().path)
-        let link = makeAttachment(tid: 4, type: "link", filePath: try file().path)
-
-        let setups = transfer.uploadEncryption(message: makeMessage([withFile, withoutFile, notRequired, link]), attachments: [withFile, withoutFile, notRequired, link])
-
-        XCTAssertEqual(Set(setups.keys), [ObjectIdentifier(withFile)])
-        XCTAssertNil(setups[ObjectIdentifier(withFile)]?.download)
-        XCTAssertNil(setups[ObjectIdentifier(withFile)]?.error)
-    }
-
-    func testDownloadEncryptionReadsEncAndRejectsWhatItCannotRead() throws {
-        let enc = AttachmentEncryption(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "a", key: "7b64ReeCOhm0NOUU1jMyLzNHwQVjgtI9p8MEvF5k6C4")
-        let plain = makeAttachment(metadata: #"{"tmb":"x"}"#)
-        let readable = makeAttachment(metadata: try ChatMessage.Attachment.metadata(nil, settingEncryption: enc))
-        let otherAlgorithm = makeAttachment(metadata: try ChatMessage.Attachment.metadata(nil, settingEncryption: AttachmentEncryption(algorithm: "aes-cbc", attachmentId: "a", key: "7b64ReeCOhm0NOUU1jMyLzNHwQVjgtI9p8MEvF5k6C4")))
-        let malformed = makeAttachment(metadata: #"{"enc":{"v":1}}"#)
-        let truncated = makeAttachment(metadata: #"{"enc":{"alg":"#)
-
-        let setups = transfer.downloadEncryption(attachments: [plain, readable, otherAlgorithm, malformed, truncated])
-
-        XCTAssertNil(setups[ObjectIdentifier(plain)], "a plaintext attachment stays on the legacy path")
-        XCTAssertEqual(setups[ObjectIdentifier(readable)]?.download, enc)
-        XCTAssertNil(setups[ObjectIdentifier(readable)]?.error)
-        for attachment in [otherAlgorithm, malformed, truncated] {
-            guard case .invalidEncryptionInfo = setups[ObjectIdentifier(attachment)]?.error as? AttachmentEncryptionError else {
-                return XCTFail("expected invalidEncryptionInfo for \(attachment.metadata ?? "")")
-            }
-            XCTAssertNil(setups[ObjectIdentifier(attachment)]?.download)
-        }
-    }
-
-    func testApplyMarksTheTaskAndFailsClosed() {
-        let enc = AttachmentEncryption(algorithm: "alg", attachmentId: "a", key: "7b64ReeCOhm0NOUU1jMyLzNHwQVjgtI9p8MEvF5k6C4")
-        let attachment = makeAttachment()
-
-        let ready = makeTask(attachment, .download)
-        XCTAssertNil(AttachmentTransfer.apply(.init(download: enc), to: ready, dataSession: session))
-        XCTAssertEqual(ready.encryption, .required)
-        XCTAssertEqual(ready.downloadEncryption, enc)
-
-        let malformed = makeTask(attachment, .download)
-        guard case .invalidEncryptionInfo = AttachmentTransfer.apply(.init(error: AttachmentEncryptionError.invalidEncryptionInfo), to: malformed, dataSession: session) as? AttachmentEncryptionError else {
-            return XCTFail("the setup's error")
-        }
-
-        session.encrypts = false
-        let unsupported = makeTask(attachment, .upload)
-        guard case .encryptionUnsupportedBySession = AttachmentTransfer.apply(.init(), to: unsupported, dataSession: session) as? AttachmentEncryptionError else {
-            return XCTFail("a session that cannot encrypt comes first")
-        }
-        XCTAssertEqual(unsupported.encryption, .required, "marked either way, so nothing treats it as plaintext")
-    }
-
-    func testEncryptionGate() throws {
-        let encrypted = makeAttachment(metadata: try ChatMessage.Attachment.metadata(nil, settingEncryption: AttachmentEncryption(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")))
-        let plain = makeAttachment()
-        func gate(_ type: SCTDataSessionTaskInfo.TransferType, _ attachment: ChatMessage.Attachment, _ setup: (SCTDataSessionTaskInfo) -> Void) -> AttachmentEncryptionError? {
-            let taskInfo = makeTask(attachment, type)
-            setup(taskInfo)
-            return AttachmentTransfer.encryptionGateError(taskInfo: taskInfo, attachment: attachment) as? AttachmentEncryptionError
-        }
-
-        XCTAssertNil(gate(.upload, plain) { _ in }, "not encrypted: no gate")
-        XCTAssertNil(gate(.download, plain) { _ in })
-        guard case .encryptionBypassed = gate(.upload, plain, { $0.encryption = .required }) else { return XCTFail("upload without its encryption") }
-        XCTAssertNil(gate(.upload, plain) {
-            $0.encryption = .required
-            $0.uploadedEncryption = EncryptedFileInfo(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")
-        })
-        XCTAssertNil(gate(.upload, encrypted) { $0.encryption = .required }, "a dedupe hit reused an encrypted object with its enc")
-        guard case .encryptionBypassed = gate(.download, encrypted, { $0.encryption = .required }) else { return XCTFail("download never decrypted") }
-        XCTAssertNil(gate(.download, encrypted) {
-            $0.encryption = .required
-            $0.didDecryptDownload = true
-        })
-    }
-
-    // MARK: - Rejected successes
-
-    func testADownloadTheSessionDidNotDecryptIsRejectedAndItsFileRemoved() throws {
-        let remote = try remote(of: try file(size: 500))
-        let stored = directory.appendingPathComponent("stored-ciphertext")
-        session.onDownload = { _, taskInfo in
-            // A session that claims encryption support but stores the object as is.
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
-                try? FileManager.default.copyItem(at: remote.object, to: stored)
-                taskInfo.updateLocalFileLocation(newPath: stored.path)
-                taskInfo.success(origin: remote.attachment.url!)
-            }
-        }
-
-        let (finished, error) = download(remote.attachment)
-
-        XCTAssertTrue(finished)
-        guard case .encryptionBypassed = error as? AttachmentEncryptionError else {
-            return XCTFail("expected encryptionBypassed, got \(String(describing: error))")
-        }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: stored.path), "ciphertext is never kept as the file")
-        XCTAssertNil(remote.attachment.filePath)
-        XCTAssertEqual(remote.attachment.transferProgress, 0)
-        XCTAssertEqual(remote.attachment.uploadedFileSize, 0, "the ciphertext's size is not the file's")
-        XCTAssertEqual(remote.attachment.status, .failedDownloading)
-    }
-
-    func testAnUploadTheSessionDidNotEncryptIsRejected() throws {
-        let attachment = makeAttachment(filePath: try file().path)
-        session.onUpload = { _, taskInfo in
-            // A session that claims encryption support but reports a plain upload.
-            DispatchQueue.global().asyncAfter(deadline: .now() + 0.2) {
-                taskInfo.success(origin: "PLAINTEXT-OBJECT")
-            }
-        }
-
-        let error = upload(attachment)
-
-        guard case .encryptionBypassed = error as? AttachmentEncryptionError else {
-            return XCTFail("expected encryptionBypassed, got \(String(describing: error))")
-        }
-        XCTAssertNil(attachment.url, "kept out of the checksum table, so nothing dedupes onto it")
-        XCTAssertNil(attachment.encryption)
-        XCTAssertEqual(attachment.status, .failedUploading)
-    }
-
-    func testAnEncThatCannotBeWrittenRejectsTheUpload() throws {
-        let attachment = makeAttachment(filePath: try file().path, metadata: "not a json object")
-
-        let error = upload(attachment)
-
-        guard case .metadataFailed(let reason) = error as? AttachmentEncryptionError,
-              case .metadataNotAnObject = reason as? AttachmentEncryptionError
-        else { return XCTFail("expected metadataFailed(metadataNotAnObject), got \(String(describing: error))") }
-        XCTAssertNil(attachment.url, "an object nobody can decrypt is not sent")
-        XCTAssertEqual(attachment.status, .failedUploading)
-        XCTAssertEqual(attachment.metadata, "not a json object")
-    }
-
-    // MARK: - Offline
-
-    func testOfflineFailuresWaitUnlessEncryptionRefusedThem() throws {
-        transfer.offline = true
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
-        transport.onUpload = { _ in .failure(URLError(.notConnectedToInternet)) }
-        let waiting = makeAttachment(tid: 1, filePath: try file().path)
-        XCTAssertNotNil(upload(waiting))
-        XCTAssertEqual(waiting.status, .pending, "offline is not a refusal")
-
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider { _, _ in .required } }
-        transport.onUpload = { _ in .success(FileUploadResult(url: "PLAIN")) }
-        let refused = makeAttachment(tid: 2, filePath: try file().path)
-        XCTAssertNotNil(upload(refused))
-        XCTAssertEqual(refused.status, .failedUploading, "an encryption refusal fails even offline")
-
-        transfer.offline = false
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
-        transport.onUpload = { _ in .failure(URLError(.timedOut)) }
-        let online = makeAttachment(tid: 3, filePath: try file().path)
-        XCTAssertNotNil(upload(online))
-        XCTAssertEqual(online.status, .failedUploading)
-    }
-
     // MARK: - Dedupe
-
-    func testAChecksumHitOnAnEncryptedObjectReusesItsEnc() throws {
-        session.checksums = true
-        let content = try file(size: 300)
-        let storedEnc = AttachmentEncryption(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "stored", key: "CweZ37AtigP65_yafHCBtUWtN5_Q41Y-y3U6hbP85Rw")
-        try seedStoredUpload(of: content, url: "STORED-ENC", metadata: try ChatMessage.Attachment.metadata(#"{"tmb":"s"}"#, settingEncryption: storedEnc))
-        let attachment = makeAttachment(tid: 50, filePath: try copy(content).path)
-
-        XCTAssertNil(upload(attachment))
-
-        XCTAssertTrue(transport.uploads.isEmpty, "nothing is uploaded again")
-        XCTAssertEqual(attachment.url, "STORED-ENC")
-        XCTAssertEqual(attachment.encryption, storedEnc, "the receiver gets the key the object was encrypted with")
-        XCTAssertEqual(attachment.status, .done)
-    }
-
-    func testAChecksumHitOnAPlaintextObjectIsNotReusedForAnEncryptedSend() throws {
-        session.checksums = true
-        let content = try file(size: 300)
-        try seedStoredUpload(of: content, url: "STORED-PLAIN", metadata: #"{"tmb":"s"}"#)
-        let attachment = makeAttachment(tid: 51, filePath: try copy(content).path)
-
-        XCTAssertNil(upload(attachment))
-
-        XCTAssertEqual(transport.uploads.map(\.type), [.encrypted])
-        XCTAssertEqual(attachment.url, "ENC")
-        XCTAssertNotNil(attachment.encryption)
-    }
 
     private func copy(_ file: URL) throws -> URL {
         let url = directory.appendingPathComponent("copy-\(UUID().uuidString).bin")
@@ -555,34 +329,8 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         return makeAttachment(type: "video", name: "clip.mp4", filePath: try file(size: 4000, ext: "mp4").path)
     }
 
-    func testAnEncryptedVideoSendsItsPosterEncryptedUnderItsOwnKey() throws {
-        let attachment = try videoUpload()
-        let poster = try Data(contentsOf: try XCTUnwrap(transfer.poster))
-        var sentPoster: URL?
-        session.onThumbnailUpload = { url in
-            sentPoster = url
-            return .success("POSTER-ORIGIN")
-        }
-
-        XCTAssertNil(upload(attachment))
-
-        let enc = try XCTUnwrap(attachment.encryption)
-        let rendition = try XCTUnwrap(enc.thumbnail, "the poster's key rides in enc.renditions")
-        XCTAssertNotEqual(rendition.key, enc.key)
-        XCTAssertNotEqual(rendition.attachmentId, enc.attachmentId)
-        XCTAssertEqual(try ChatMessage.Attachment.Metadata<String>.decode(try XCTUnwrap(attachment.metadata)).videoThumbnail, "POSTER-ORIGIN")
-        XCTAssertEqual(sentPoster?.pathExtension, "enc")
-        XCTAssertFalse(FileManager.default.fileExists(atPath: try XCTUnwrap(sentPoster).path), "the ciphertext is removed once sent")
-
-        let sent = try XCTUnwrap(session.thumbnailUploads.first)
-        XCTAssertNotEqual(sent.prefix(poster.count), poster, "never the plaintext poster")
-        let object = directory.appendingPathComponent("poster-object")
-        try sent.write(to: object)
-        XCTAssertEqual(try decrypt(object, info: enc.info(of: rendition)), poster)
-    }
 
     func testAPlaintextVideoSendsAPlaintextPoster() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let attachment = try videoUpload()
         let poster = try Data(contentsOf: try XCTUnwrap(transfer.poster))
         session.onThumbnailUpload = { _ in .success("PLAIN-POSTER") }
@@ -590,7 +338,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         XCTAssertNil(upload(attachment))
 
         XCTAssertEqual(session.thumbnailUploads, [poster])
-        XCTAssertNil(attachment.encryption)
         XCTAssertEqual(try ChatMessage.Attachment.Metadata<String>.decode(try XCTUnwrap(attachment.metadata)).videoThumbnail, "PLAIN-POSTER")
     }
 
@@ -600,22 +347,10 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
 
         XCTAssertNil(upload(attachment))
 
-        let enc = try XCTUnwrap(attachment.encryption)
-        XCTAssertNil(enc.thumbnail, "video_thumb and its rendition go together or not at all")
         XCTAssertNil(try? ChatMessage.Attachment.Metadata<String>.decode(attachment.metadata ?? "").videoThumbnail)
         XCTAssertEqual(attachment.status, .done)
     }
 
-    func testAPosterThatCannotBeEncryptedIsNotSent() throws {
-        let attachment = try videoUpload()
-        transfer.environment.fileEncryption = { UnpreparedEncryption() }
-
-        XCTAssertNil(upload(attachment))
-
-        XCTAssertTrue(session.thumbnailUploads.isEmpty, "a plaintext poster would show the video")
-        XCTAssertNil(try XCTUnwrap(attachment.encryption).thumbnail)
-        XCTAssertEqual(attachment.status, .done)
-    }
 
     // MARK: - Video poster on download
 
@@ -624,87 +359,10 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         let bytes = try Data(contentsOf: download)
         let destination = directory.appendingPathComponent("thumb.jpg")
 
-        try await AttachmentTransfer.storeVideoThumbnail(download, of: makeAttachment(type: "video", metadata: #"{"video_thumb":"T"}"#), at: destination, encryption: encryption)
+        try AttachmentTransfer.storeVideoThumbnail(download, of: makeAttachment(type: "video", metadata: #"{"video_thumb":"T"}"#), at: destination)
 
         XCTAssertEqual(try Data(contentsOf: destination), bytes)
         XCTAssertFalse(FileManager.default.fileExists(atPath: download.path), "the downloaded file is consumed")
-    }
-
-    func testStoringAnEncryptedPosterReplacesAnOlderOne() async throws {
-        let poster = try file(size: 900, ext: "jpg")
-        let object = directory.appendingPathComponent("poster.enc")
-        let posterInfo = try await encryption.encrypt(file: poster, to: object)
-        let videoInfo = EncryptedFileInfo(algorithm: posterInfo.algorithm, attachmentId: "video", key: posterInfo.key)
-        let enc = AttachmentEncryption(info: videoInfo, renditions: [.init(role: AttachmentEncryption.Rendition.thumbnailRole, info: posterInfo)])
-        let attachment = makeAttachment(type: "video", metadata: try ChatMessage.Attachment.metadata(#"{"video_thumb":"T"}"#, settingEncryption: enc))
-        let destination = directory.appendingPathComponent("thumb.jpg")
-        try Data("stale".utf8).write(to: destination)
-
-        try await AttachmentTransfer.storeVideoThumbnail(object, of: attachment, at: destination, encryption: encryption)
-
-        XCTAssertEqual(try Data(contentsOf: destination), try Data(contentsOf: poster))
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).filter { $0.hasPrefix(".") }, [], "no temporary file is left")
-    }
-
-    func testAnUnreadableEncMeansNoPoster() async throws {
-        let download = try file(size: 50, ext: "jpg")
-        let destination = directory.appendingPathComponent("thumb.jpg")
-        do {
-            try await AttachmentTransfer.storeVideoThumbnail(download, of: makeAttachment(type: "video", metadata: #"{"video_thumb":"T","enc":{"v":7}}"#), at: destination, encryption: encryption)
-            XCTFail("an unreadable enc is never shown as plaintext")
-        } catch {
-            guard case .invalidEncryptionInfo = error as? AttachmentEncryptionError else { return XCTFail("\(error)") }
-        }
-        XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
-        XCTAssertFalse(FileManager.default.fileExists(atPath: download.path))
-    }
-
-    func testAReceivedEncryptedPosterIsDecryptedIntoTheCache() throws {
-        let poster = try image()
-        let object = directory.appendingPathComponent("poster.enc")
-        let posterInfo = try encrypt(poster, to: object)
-        let videoInfo = try encrypt(try file(size: 100), to: directory.appendingPathComponent("video.enc"))
-        let enc = AttachmentEncryption(info: videoInfo, renditions: [.init(role: AttachmentEncryption.Rendition.thumbnailRole, info: posterInfo)])
-
-        for tampered in [false, true] {
-            let origin = "poster-\(UUID().uuidString)"
-            let cache = FileStorage.default.videoThumbnailCachePath(origin: origin)
-            defer { try? FileManager.default.removeItem(atPath: cache) }
-            let attachment = makeAttachment(tid: 0, type: "video", url: "REMOTE-VIDEO", metadata: try ChatMessage.Attachment.metadata(#"{"tmb":"x","video_thumb":"\#(origin)"}"#, settingEncryption: enc))
-            session.onThumbnailDownload = { _ in
-                let local = self.directory.appendingPathComponent("received-\(UUID().uuidString)")
-                var bytes = (try? Data(contentsOf: object)) ?? Data()
-                if tampered { bytes[bytes.count / 2] ^= 0x01 }
-                try? bytes.write(to: local)
-                return .success(local)
-            }
-
-            transfer.downloadVideoThumbnailsIfNeeded(message: makeMessage([attachment]))
-
-            if tampered {
-                RunLoop.main.run(until: Date().addingTimeInterval(0.3))
-                XCTAssertFalse(FileManager.default.fileExists(atPath: cache), "a poster that does not verify is never cached")
-            } else {
-                XCTAssertTrue(waitUntil { FileManager.default.fileExists(atPath: cache) })
-                XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: cache)), try Data(contentsOf: poster))
-            }
-        }
-    }
-
-    // MARK: - Metadata rebuild
-
-    func testAnEncryptedImageKeepsItsEncWhenItsMetadataIsRebuilt() throws {
-        let remote = try remote(of: try image(), type: "image", name: "photo.png", metadata: #"{"tmb":"x","szw":1,"szh":1}"#)
-        serve(remote.object)
-
-        let (finished, error) = download(remote.attachment)
-
-        XCTAssertTrue(finished)
-        XCTAssertNil(error)
-        let metadata = try ChatMessage.Attachment.Metadata<String>.decode(try XCTUnwrap(remote.attachment.metadata))
-        XCTAssertEqual(metadata.width, 40, "rebuilt from the decrypted image")
-        XCTAssertNotNil(remote.attachment.encryption, "the rebuild must not drop enc")
-        XCTAssertEqual(remote.attachment.status, .done)
     }
 
     // MARK: - Event ordering
@@ -730,7 +388,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
 
     /// The same for an upload a session fails synchronously, inside `upload(attachment:taskInfo:)`.
     func testAnUploadFailedAtOnceBySessionStillCompletes() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         transfer.offline = false
         session.onUpload = { _, taskInfo in taskInfo.failure(error: URLError(.badServerResponse)) }
         let attachment = makeAttachment(tid: 60, filePath: try file().path)
@@ -762,7 +419,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
     /// A cancelled upload ends: its task leaves the transfer, and a later upload of the same
     /// file is a new one instead of waiting on the cancelled task forever.
     func testACancelledUploadEndsAndTheFileCanBeUploadedAgain() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let attempts = Locked(0)
         transport.onUpload = { _ in
             var attempt = 0
@@ -807,7 +463,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
     }
 
     func testAUserCancelIsNotResentOnReconnect() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         for offline in [false, true] {
             transfer.offline = offline
             holdUploads()
@@ -821,7 +476,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
 
             XCTAssertTrue(waitUntil { done })
             XCTAssertTrue(notResent.contains(attachment.status), "offline=\(offline): \(attachment.status) would be resent on reconnect")
-            transport = EncryptingTransport(directory: directory)
+            transport = ScriptedProvider(directory: directory)
             session = HookedSession(transport: transport, root: directory)
             let current = session!
             transfer.environment.dataSession = { current }
@@ -831,7 +486,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
     /// "Stop" from outside the chat (the background-upload activity) cancels each running
     /// upload as the user's own cancel would: kept in the chat, never resent on reconnect.
     func testCancelAllUploadsCancelsEachAsTheUserWould() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         transfer.offline = false
         holdUploads()
         let attachment = makeAttachment(tid: 71, filePath: try file().path)
@@ -857,7 +511,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
     /// A cancel the session reports without the task's own `cancel()` (an abandoned upload,
     /// `TransportDataSession.cancel(attachments:)`) is the user's too.
     func testAnAbandonedUploadIsNotResentOnReconnect() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         transfer.offline = false
         holdUploads()
         let attachment = makeAttachment(tid: 65, filePath: try file().path)
@@ -874,7 +527,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
 
     /// An interruption stays resendable, even when the error it carries is a cancellation.
     func testAnInterruptionStaysResendable() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         for (offline, error, expected) in [
             (true, URLError(.cancelled), ChatMessage.Attachment.TransferStatus.pending),
             (true, URLError(.networkConnectionLost), .pending),
@@ -893,7 +545,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
             XCTAssertTrue(waitUntil { done })
             XCTAssertEqual(attachment.status, expected, "offline=\(offline) \(error.code)")
             XCTAssertFalse(notResent.contains(attachment.status), "an interruption is resent on reconnect")
-            transport = EncryptingTransport(directory: directory)
+            transport = ScriptedProvider(directory: directory)
             session = HookedSession(transport: transport, root: directory)
             let current = session!
             transfer.environment.dataSession = { current }
@@ -902,7 +554,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
 
     /// A pause stops the upload without ending it, and a resume sends it.
     func testAPausedUploadStillResumes() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         transfer.offline = false
         let attempts = Locked(0)
         transport.onUpload = { _ in
@@ -944,7 +595,7 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
         XCTAssertEqual(AttachmentTransfer.uploadStatus(afterFailure: FileTransferError.cancelled, isOffline: false), .pauseUploading)
         XCTAssertEqual(AttachmentTransfer.uploadStatus(afterFailure: URLError(.timedOut), userCancelled: true, isOffline: false), .pauseUploading)
         XCTAssertEqual(AttachmentTransfer.uploadStatus(afterFailure: URLError(.cancelled), interrupted: true, isOffline: false), .pending)
-        XCTAssertEqual(AttachmentTransfer.uploadStatus(afterFailure: AttachmentEncryptionError.encryptionBypassed, isOffline: false), .failedUploading)
+        XCTAssertEqual(AttachmentTransfer.uploadStatus(afterFailure: AttachmentMetadataError.notAnObject, isOffline: false), .failedUploading)
         XCTAssertEqual(AttachmentTransfer.uploadStatus(afterFailure: TransportDataSessionError.missingSourceFile, isOffline: false), .failedUploading)
         XCTAssertEqual(AttachmentTransfer.uploadStatus(afterFailure: URLError(.timedOut), isOffline: false), .failedUploading)
         XCTAssertEqual(AttachmentTransfer.uploadStatus(afterFailure: URLError(.timedOut), isOffline: true), .pending)
@@ -953,7 +604,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
     // MARK: - Two starts for one message (finding #7)
 
     func testTwoStartsForOneMessageKeepEachOthersTasksAndCompletions() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         transfer.offline = false
         let release = ReleaseSet()
         transport.onUpload = { request in
@@ -996,7 +646,6 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
     /// A task rejected before it starts never joins the message's group.
     func testARejectedUploadNeverJoinsTheRunningGroup() throws {
         transfer.offline = false
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         holdUploads()
         let running = makeAttachment(tid: 82, filePath: try file().path)
         let missing = makeAttachment(tid: 83, filePath: nil)
@@ -1014,185 +663,8 @@ final class AttachmentTransferEncryptionTests: XCTestCase {
 
     // MARK: - Dedupe hit with a new poster (finding #2)
 
-    private func seedEncryptedVideo(_ content: URL, url: String) throws -> AttachmentEncryption {
-        let storedEnc = AttachmentEncryption(algorithm: StreamingAeadFileEncryptionProvider.format, attachmentId: "stored", key: "CweZ37AtigP65_yafHCBtUWtN5_Q41Y-y3U6hbP85Rw")
-        try seedStoredUpload(of: content, url: url, metadata: try ChatMessage.Attachment.metadata(#"{"tmb":"s"}"#, settingEncryption: storedEnc))
-        return storedEnc
-    }
-
-    func testADedupeHitWithANewPosterKeepsEncAndAddsTheRendition() throws {
-        session.checksums = true
-        let content = try file(size: 4000, ext: "mp4")
-        let storedEnc = try seedEncryptedVideo(content, url: "STORED-VIDEO")
-        transfer.poster = try file(size: 2000, ext: "jpg")
-        let poster = try Data(contentsOf: try XCTUnwrap(transfer.poster))
-        session.onThumbnailUpload = { _ in .success("POSTER-HIT") }
-        let attachment = makeAttachment(tid: 90, type: "video", name: "clip.mp4", filePath: try copy(content).path)
-        // A video's checksum reads its asset file (a Photos lookup otherwise).
-        attachment.assetFilePath = attachment.filePath
-
-        XCTAssertNil(upload(attachment))
-
-        XCTAssertTrue(transport.uploads.isEmpty, "a dedupe hit: the video is not uploaded again")
-        XCTAssertEqual(attachment.url, "STORED-VIDEO")
-        let enc = try XCTUnwrap(attachment.encryption, "the reused object's key survives the poster's metadata rebuild")
-        XCTAssertEqual(enc.attachmentId, storedEnc.attachmentId)
-        XCTAssertEqual(enc.key, storedEnc.key)
-        let rendition = try XCTUnwrap(enc.thumbnail, "the new poster's key is written for a dedupe hit too")
-        XCTAssertEqual(try ChatMessage.Attachment.Metadata<String>.decode(try XCTUnwrap(attachment.metadata)).videoThumbnail, "POSTER-HIT")
-        let sent = try XCTUnwrap(session.thumbnailUploads.first)
-        let object = directory.appendingPathComponent("hit-poster")
-        try sent.write(to: object)
-        XCTAssertEqual(try decrypt(object, info: enc.info(of: rendition)), poster)
-        XCTAssertEqual(attachment.status, .done)
-    }
-
-    /// With no encryption required, a dedupe hit can still reuse an encrypted object: its ref
-    /// must never go out without its `enc`, and its poster is encrypted with it.
-    func testThePlainPolicyNeverSendsACiphertextRefWithoutEnc() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
-        session.checksums = true
-        let content = try file(size: 4000, ext: "mp4")
-        let storedEnc = try seedEncryptedVideo(content, url: "STORED-VIDEO-PLAIN")
-        transfer.poster = try file(size: 2000, ext: "jpg")
-        let poster = try Data(contentsOf: try XCTUnwrap(transfer.poster))
-        for posterResult in [Result<String, Error>.success("POSTER-PLAIN"), .failure(SCTDataSessionError.thumbnailUploadFailed)] {
-            session.onThumbnailUpload = { _ in posterResult }
-            let attachment = makeAttachment(tid: 91, type: "video", name: "clip.mp4", filePath: try copy(content).path)
-            attachment.assetFilePath = attachment.filePath
-
-            XCTAssertNil(upload(attachment))
-
-            XCTAssertEqual(attachment.url, "STORED-VIDEO-PLAIN")
-            let enc = try XCTUnwrap(attachment.encryption, "a ciphertext ref without its key could never be opened")
-            XCTAssertEqual(enc.key, storedEnc.key)
-            if case .success = posterResult {
-                let rendition = try XCTUnwrap(enc.thumbnail)
-                let sent = try XCTUnwrap(session.thumbnailUploads.last)
-                XCTAssertNotEqual(sent.prefix(poster.count), poster, "never a plaintext poster for an encrypted video")
-                let object = directory.appendingPathComponent("plain-hit-poster-\(UUID().uuidString)")
-                try sent.write(to: object)
-                XCTAssertEqual(try decrypt(object, info: enc.info(of: rendition)), poster)
-            } else {
-                XCTAssertNil(enc.thumbnail)
-                XCTAssertNil(try? ChatMessage.Attachment.Metadata<String>.decode(attachment.metadata ?? "").videoThumbnail)
-            }
-        }
-    }
-
-    /// A plaintext poster's metadata rebuild keeps an `enc` already there.
-    func testAPlainPosterRebuildKeepsEnc() throws {
-        let enc = AttachmentEncryption(algorithm: "a", attachmentId: "b", key: "zXgmf8ZVlpdTnfhSSh34q87xbERlhieF1MTFzn78ILw")
-        let attachment = makeAttachment(type: "video", metadata: try ChatMessage.Attachment.metadata(#"{"tmb":"x"}"#, settingEncryption: enc))
-        var meta = try ChatMessage.Attachment.Metadata<String>.decode(try XCTUnwrap(attachment.metadata))
-        meta.videoThumbnail = "V"
-        AttachmentTransfer.updateMetadata(of: attachment, rebuiltFrom: meta)
-        XCTAssertEqual(attachment.encryption, enc)
-        XCTAssertEqual(attachment.imageDecodedMetadata?.videoThumbnail, "V")
-    }
-
     // MARK: - Prepare hook
 
-    private func newInfo() throws -> EncryptedFileInfo {
-        let sdk = try StreamingAeadFileEncryptionProvider.prepare(uniqueId: StreamingAeadFileEncryptionProvider.newUniqueId())
-        return EncryptedFileInfo(algorithm: sdk.format, attachmentId: sdk.data.uniqueId, key: sdk.data.key)
-    }
-
-    /// The key the transport prepares is in the attachment's `enc` before the upload sends a
-    /// byte, and the upload is asked to encrypt under exactly it.
-    func testAPreparedKeyIsSavedInEncBeforeTheUploadUsesIt() throws {
-        let info = try newInfo()
-        let attachment = makeAttachment(filePath: try file().path, metadata: #"{"tmb":"x"}"#)
-        transport.onPrepare = { _ in .success(FileUploadPreparation(encryptionInfo: info)) }
-        let encAtUpload = Locked<AttachmentEncryption?>(nil)
-        transport.onUpload = { request in
-            encAtUpload.wrapped = (request.context as? AttachmentTransferContext)?.attachment.encryption
-            XCTAssertEqual(request.encryptionInfo, info)
-            return .success(FileUploadResult(url: "ENC", encryptionInfo: request.encryptionInfo))
-        }
-
-        XCTAssertNil(upload(attachment))
-
-        XCTAssertEqual(transport.prepares.count, 1)
-        XCTAssertNil(transport.prepares.first?.encryptionInfo, "nothing saved before the first attempt")
-        XCTAssertEqual(encAtUpload.wrapped?.attachmentId, info.attachmentId, "saved before the upload started")
-        XCTAssertEqual(encAtUpload.wrapped?.key, info.key)
-        XCTAssertEqual(attachment.encryption?.key, info.key)
-        XCTAssertEqual(attachment.url, "ENC")
-        XCTAssertTrue(attachment.metadata?.contains("\"tmb\"") == true, "other metadata keys are kept")
-    }
-
-    /// A retry (or a relaunch) prepares with the `enc` an earlier attempt saved.
-    func testARetryPreparesWithTheSavedEnc() throws {
-        let info = try newInfo()
-        let attachment = makeAttachment(
-            filePath: try file().path,
-            metadata: try ChatMessage.Attachment.metadata(nil, settingEncryption: AttachmentEncryption(info: info))
-        )
-        transport.onPrepare = { request in .success(FileUploadPreparation(encryptionInfo: request.encryptionInfo)) }
-        transport.onUpload = { request in .success(FileUploadResult(url: "ENC", encryptionInfo: request.encryptionInfo)) }
-
-        XCTAssertNil(upload(attachment))
-
-        XCTAssertEqual(transport.prepares.first?.encryptionInfo, info)
-        XCTAssertEqual(transport.uploads.first?.encryptionInfo, info)
-        XCTAssertEqual(attachment.encryption?.key, info.key)
-    }
-
-    func testAnUploadUnderAnotherKeyThanThePreparedOneIsRejected() throws {
-        let prepared = try newInfo()
-        let other = try newInfo()
-        let attachment = makeAttachment(filePath: try file().path)
-        transport.onPrepare = { _ in .success(FileUploadPreparation(encryptionInfo: prepared)) }
-        transport.onUpload = { _ in .success(FileUploadResult(url: "ENC", encryptionInfo: other)) }
-
-        let error = upload(attachment)
-
-        guard case .encryptionBypassed = error as? AttachmentEncryptionError else {
-            return XCTFail("expected encryptionBypassed, got \(String(describing: error))")
-        }
-        XCTAssertNil(attachment.url, "an object the message's key can't open is not sent")
-    }
-
-    func testAFailedPrepareFailsTheUploadBeforeAnyByte() throws {
-        let attachment = makeAttachment(filePath: try file().path)
-        transport.onPrepare = { _ in .failure(AttachmentEncryptionError.invalidEncryptionInfo) }
-
-        let error = upload(attachment)
-
-        guard case .invalidEncryptionInfo = error as? AttachmentEncryptionError else {
-            return XCTFail("expected the prepare error, got \(String(describing: error))")
-        }
-        XCTAssertTrue(transport.uploads.isEmpty)
-        XCTAssertNil(attachment.encryption)
-    }
-
-    func testTheEncAnUploadWrites() throws {
-        let rendition = AttachmentEncryption.Rendition(role: AttachmentEncryption.Rendition.thumbnailRole, attachmentId: "p", key: "YGzDgK1imJtelRMNIoRMDMFn3l2SITyRHaqTrSwGYx4")
-        let reused = AttachmentEncryption(algorithm: "alg", attachmentId: "r", key: "fc3Ym1caWRIAWJRXZAj3kM088pUm0Etu7i2i70hQsDk", renditions: [
-            .init(role: AttachmentEncryption.Rendition.thumbnailRole, attachmentId: "old", key: "BtHbbG6Z6Hk0kPbpcRr8eWlr7nR7O8nhoS2NmIPAtyk"),
-            .init(role: "other", attachmentId: "o", key: "y4TL5ZGVvz2hb4Yt5NEoKwHxSRWy3H3plIQFlMNzm5E"),
-        ])
-        let hit = makeAttachment(metadata: try ChatMessage.Attachment.metadata(nil, settingEncryption: reused))
-        let plain = makeAttachment()
-
-        let none = makeTask(plain, .upload)
-        XCTAssertNil(AttachmentTransfer.uploadEncryption(of: none, attachment: plain))
-        none.thumbnailRendition = rendition
-        XCTAssertNil(AttachmentTransfer.uploadEncryption(of: none, attachment: plain), "nothing to attach a rendition to")
-
-        let hitTask = makeTask(hit, .upload)
-        XCTAssertNil(AttachmentTransfer.uploadEncryption(of: hitTask, attachment: hit), "a hit's enc is already in place")
-        hitTask.thumbnailRendition = rendition
-        let written = try XCTUnwrap(AttachmentTransfer.uploadEncryption(of: hitTask, attachment: hit))
-        XCTAssertEqual(written.key, "fc3Ym1caWRIAWJRXZAj3kM088pUm0Etu7i2i70hQsDk")
-        XCTAssertEqual(written.renditions.map(\.attachmentId), ["o", "p"], "the new poster replaces the old one")
-
-        let uploaded = makeTask(plain, .upload)
-        uploaded.uploadedEncryption = EncryptedFileInfo(algorithm: "alg", attachmentId: "u", key: "O4kW0_9syhx4EGfXXDXG1E_RjeEH-MpcqGZXXweqn5k")
-        uploaded.thumbnailRendition = rendition
-        XCTAssertEqual(AttachmentTransfer.uploadEncryption(of: uploaded, attachment: plain)?.renditions, [rendition])
-    }
 }
 
 // MARK: - Coverage: the rest of AttachmentTransfer's transfer paths
@@ -1208,7 +680,7 @@ private final class OneFrameProcessor: VideoProcessor {
     override class func copyFrame(url: URL, at time: TimeInterval = 1) -> UIImage? { frame }
 }
 
-extension AttachmentTransferEncryptionTests {
+extension AttachmentTransferPipelineTests {
 
     private func pngImage() -> UIImage {
         let format = UIGraphicsImageRendererFormat()
@@ -1288,7 +760,6 @@ extension AttachmentTransferEncryptionTests {
     }
 
     func testAnUploadReportsTheMessageWhenItIsStored() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let attachment = makeAttachment(tid: 74, filePath: try file().path)
         let message = makeMessage([attachment])
         try XCTUnwrap(DataProvider.database as? MockDatabase).syncWrite { $0.createOrUpdate(message: message.builder.build(), channelId: 100) }
@@ -1303,7 +774,6 @@ extension AttachmentTransferEncryptionTests {
     }
 
     func testTheSessionsPathForTheFileIsUsed() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let own = try file()
         let resolved = try file()
         session.filePathFor = { _ in resolved.path }
@@ -1313,7 +783,6 @@ extension AttachmentTransferEncryptionTests {
     }
 
     func testAMissingSourceIsRecoveredFromTheSessionOrTheTemporaryFolder() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         transfer.offline = false
         let recovered = try file()
         let gone = directory.appendingPathComponent("gone.bin").path
@@ -1378,7 +847,6 @@ extension AttachmentTransferEncryptionTests {
         XCTAssertNil(transfer.transferStatus(message: makeMessage([done]), attachment: done))
 
         // A task whose message no longer lists the attachment.
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         transport.onUpload = { _ in
             try? await Task.sleep(nanoseconds: 10_000_000_000)
             return .interrupted(CancellationError())
@@ -1430,8 +898,8 @@ extension AttachmentTransferEncryptionTests {
     func testAPosterThatTakesTooLongIsLeftOut() throws {
         transfer.videoThumbnailTimeout = 0.2
         session.thumbnailDelay = 0.6
-        for required in [false, true] {
-            transfer.environment.keyProvider = { required ? InlineAttachmentKeyProvider { _, _ in .required } : InlineAttachmentKeyProvider() }
+        for prepared in [nil, ["sceyt.enc": "TOKEN"]] as [[String: String]?] {
+            transport.onPrepare = { _ in prepared }
             session.onThumbnailUpload = { _ in .success("LATE") }
             let attachment = try videoUpload()
 
@@ -1442,12 +910,12 @@ extension AttachmentTransferEncryptionTests {
             // Let the late answer arrive: this test is about time (an answer after the
             // poster timeout), so it waits out the delay on purpose.
             _ = waitUntil(timeout: 0.6) { false }
-            XCTAssertNil(attachment.encryption?.thumbnail, "a late poster is not attached")
+            XCTAssertNil(try? ChatMessage.Attachment.Metadata<String>.decode(attachment.metadata ?? "").videoThumbnail, "a late poster is not attached")
+            XCTAssertEqual(attachment.stringMetadataEntries["sceyt.enc"], prepared?["sceyt.enc"])
         }
     }
 
     func testAVideoWithoutAFrameOrWhosePlainPosterFailsGoesWithout() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let noFrame = try videoUpload()
         transfer.poster = nil
         XCTAssertNil(upload(noFrame))
@@ -1481,7 +949,6 @@ extension AttachmentTransferEncryptionTests {
     }
 
     func testASuccessByURLAndAMovedFileArePersisted() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let moved = try file()
         session.onUpload = { _, taskInfo in
             DispatchQueue.global().async {
@@ -1496,7 +963,6 @@ extension AttachmentTransferEncryptionTests {
     }
 
     func testAnEndThatCannotBePersistedStillCompletes() throws {
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let faulty = FaultyDatabase(try XCTUnwrap(DataProvider.database as? MockDatabase))
         faulty.failingWrites = Set(1...100)
         DataProvider.database = faulty
@@ -1518,7 +984,6 @@ extension AttachmentTransferEncryptionTests {
         // The message's own attachments when none are given.
         XCTAssertTrue(transfer.downloadMessageAttachmentsIfNeeded(message: makeMessage([makeAttachment(tid: 89, type: "link")])).isEmpty)
         // A nameless attachment is recovered by its file's name.
-        transfer.environment.keyProvider = { InlineAttachmentKeyProvider() }
         let name = "nameless-\(UUID().uuidString).bin"
         let temporary = FileManager.default.temporaryDirectory.appendingPathComponent(name)
         try Data([1]).write(to: temporary)
@@ -1532,7 +997,6 @@ extension AttachmentTransferEncryptionTests {
         let image = directory.appendingPathComponent("voice-\(UUID().uuidString).png")
         try XCTUnwrap(pngImage().pngData()).write(to: image)
         let voice = makeAttachment(tid: 0, type: "voice", name: "v.png", url: "REMOTE-VOICE", metadata: #"{"tmb":[1,2,3],"dur":2}"#)
-        session.encrypts = false
         session.onDownload = { _, taskInfo in
             DispatchQueue.global().async {
                 taskInfo.updateLocalFileLocation(newPath: image.path)
@@ -1590,74 +1054,8 @@ private final class TrailCapture {
     }
 }
 
-extension AttachmentTransferEncryptionTests {
+extension AttachmentTransferPipelineTests {
 
-    /// One encrypted upload (through the checksum step) and one tampered encrypted download:
-    /// every transfer line of each names that transfer with one `xfer=`, each ends with one
-    /// summary line, the tampered download logs exactly one ERROR, and no key, `enc` key or
-    /// signed query is logged.
-    func testEachTransferLogsUnderOneIdWithOneSummaryAndOneErrorPerFailure() throws {
-        let capture = TrailCapture()
-        defer { capture.stop() }
-        func isTransferLine(_ text: String) -> Bool {
-            ["[Transfer]", "[Encryption]", "[Attachment]", "[CHECKSUM]"].contains { text.contains($0) }
-        }
-        func settle() { RunLoop.main.run(until: Date().addingTimeInterval(0.3)) }
-
-        // Upload
-        session.checksums = true
-        let attachment = makeAttachment(tid: 77, filePath: try file(size: 3000).path)
-        XCTAssertNil(upload(attachment))
-        settle()
-        let uploadLines = capture.take()
-        let key = try XCTUnwrap(attachment.encryption?.key)
-
-        // Tampered download
-        let remote = try remote(of: try file(size: 5000))
-        var bytes = try Data(contentsOf: remote.object)
-        bytes[bytes.count / 2] ^= 0x01
-        try bytes.write(to: remote.object)
-        serve(remote.object)
-        _ = capture.take() // the fixture's own encryption above is not the transfer's
-        let (finished, error) = download(remote.attachment)
-        XCTAssertTrue(finished)
-        guard case .decryptionFailed = error as? AttachmentEncryptionError else { return XCTFail("\(String(describing: error))") }
-        settle()
-        let downloadLines = capture.take()
-
-        let downloadId = TransportDataSession.shortDownloadOperationId(for: remote.attachment)
-        for (name, lines, id) in [("upload", uploadLines, "upload-77"), ("download", downloadLines, downloadId)] {
-            let transfer = lines.map(\.text).filter(isTransferLine)
-            XCTAssertFalse(transfer.isEmpty, name)
-            let untagged = transfer.filter { !$0.contains("xfer=\(id) ") }
-            XCTAssertTrue(untagged.isEmpty, "\(name): every line carries xfer=\(id): \(untagged)")
-            let summaries = transfer.filter { $0.contains("transfer finished") }
-            XCTAssertEqual(summaries.count, 1, "\(name): one summary line: \(summaries)")
-            XCTAssertTrue(summaries.first?.contains("msg=\(messageId)/") == true, name)
-            XCTAssertTrue(summaries.first?.contains("channel=100") == true, name)
-            XCTAssertTrue(summaries.first?.contains("type=encrypted") == true, name)
-            for secret in [key, remote.attachment.encryption?.key ?? "?"] {
-                XCTAssertFalse(lines.contains { $0.text.contains(secret) }, "\(name): a key reached the logs")
-            }
-        }
-        let uploadSummary = try XCTUnwrap(uploadLines.first { $0.text.contains("transfer finished") })
-        XCTAssertEqual(uploadSummary.level, .info)
-        XCTAssertTrue(uploadSummary.text.contains("dir=upload") && uploadSummary.text.contains("result=success") && uploadSummary.text.contains("attempts=1") && uploadSummary.text.contains("size=3000"), uploadSummary.text)
-        XCTAssertTrue(uploadLines.filter { $0.level == .error }.isEmpty, "\(uploadLines.filter { $0.level == .error }.map(\.text))")
-        let loud = uploadLines.filter { $0.level <= .info }
-        XCTAssertLessThanOrEqual(loud.count, 10, "a successful upload stays short at info+: \(loud.map(\.text))")
-
-        let errors = downloadLines.filter { $0.level <= .error }
-        XCTAssertEqual(errors.count, 1, "one ERROR for one failure: \(errors.map(\.text))")
-        let failure = try XCTUnwrap(errors.first?.text)
-        XCTAssertTrue(failure.contains("transfer finished") && failure.contains("dir=download") && failure.contains("result=failure"), failure)
-        XCTAssertTrue(failure.contains("decryptionFailed(authentication failed"), "the cause chain: \(failure)")
-
-        // For the report: the trail as it is logged.
-        print("TRAIL-BEGIN")
-        (uploadLines + downloadLines).filter { isTransferLine($0.text) }.forEach { print("TRAIL \($0.text)") }
-        print("TRAIL-END")
-    }
 }
 
 /// Waits on a background-safe spin (the caller is not the main thread).
@@ -1672,7 +1070,7 @@ private func waitUntilOffMain(timeout: TimeInterval = 2, _ condition: () -> Bool
 
 // MARK: - ChannelMessageChecksumProvider
 
-final class ChecksumEncryptionTests: XCTestCase {
+final class ChecksumReuseTests: XCTestCase {
 
     private var database: MockDatabase!
     private var originalDatabase: Database!
@@ -1720,53 +1118,25 @@ final class ChecksumEncryptionTests: XCTestCase {
         (try? database.read { ChecksumDTO.fetch(checksum: key, context: $0) != nil ? 1 : 0 }.get()) ?? 0
     }
 
-    private func checksum(_ attachment: ChatMessage.Attachment, encryption: EncryptionRequirement?) -> Result<String?, Error>? {
+    private func checksum(_ attachment: ChatMessage.Attachment) -> Result<String?, Error>? {
         let message = ChatMessage(id: 0, channelId: 1, attachments: [attachment], user: ChatUser(id: "u"))
         var result: Result<String?, Error>?
         let provider = ChannelMessageChecksumProvider()
-        if let encryption {
-            provider.startChecksum(message: message, attachment: attachment, encryption: encryption) { result = $0 }
-        } else {
-            provider.startChecksum(message: message, attachment: attachment) { result = $0 }
-        }
+        provider.startChecksum(message: message, attachment: attachment) { result = $0 }
         XCTAssertTrue(waitUntil { result != nil })
         return result
     }
 
-    func testAnEncryptedSendReusesOnlyAnEncryptedObject() throws {
-        let bytes = Data("same bytes".utf8)
-        let enc = try ChatMessage.Attachment.metadata(#"{"tmb":"t"}"#, settingEncryption: AttachmentEncryption(algorithm: "alg", attachmentId: "id", key: "7b64ReeCOhm0NOUU1jMyLzNHwQVjgtI9p8MEvF5k6C4"))
-        try seed(bytes, url: "ENCRYPTED-OBJECT", metadata: enc)
-
-        let new = attachment(tid: 1, filePath: try file(bytes).path)
-        guard case .success(let link) = checksum(new, encryption: .required) else { return XCTFail("the checksum failed") }
-
-        XCTAssertEqual(link, "ENCRYPTED-OBJECT")
-        XCTAssertEqual(new.metadata, enc, "the reused object's enc comes with it")
-        XCTAssertEqual(new.status, .done)
-    }
-
-    func testAnEncryptedSendNeverReusesAPlaintextObject() throws {
-        let bytes = Data("plain bytes".utf8)
-        try seed(bytes, url: "PLAIN-OBJECT", metadata: #"{"tmb":"t"}"#)
-
-        let new = attachment(tid: 2, filePath: try file(bytes).path)
-        guard case .success(let link) = checksum(new, encryption: .required) else { return XCTFail("the checksum failed") }
-
-        XCTAssertNil(link, "a miss: the file is encrypted and uploaded")
-        XCTAssertNil(new.metadata)
-        XCTAssertNotEqual(new.status, .done)
-    }
-
-    func testAPlaintextSendReusesEitherKind() throws {
+    /// A hit reuses the stored attachment's url with its whole metadata: a provider's entries
+    /// (the key that object was encrypted with) go with it.
+    func testAHitReusesTheStoredObjectWithItsProvidersEntries() throws {
         let bytes = Data("plain again".utf8)
-        try seed(bytes, url: "PLAIN-OBJECT-2", metadata: #"{"tmb":"t"}"#)
+        try seed(bytes, url: "OBJECT-2", metadata: #"{"tmb":"t","sceyt.enc":"STORED-TOKEN"}"#)
 
-        for encryption in [nil, EncryptionRequirement.none] {
-            let new = attachment(tid: 3, filePath: try file(bytes).path)
-            guard case .success(let link) = checksum(new, encryption: encryption) else { return XCTFail("the checksum failed") }
-            XCTAssertEqual(link, "PLAIN-OBJECT-2", "the legacy entry point is the plaintext policy")
-        }
+        let new = attachment(tid: 3, filePath: try file(bytes).path)
+        guard case .success(let link) = checksum(new) else { return XCTFail("the checksum failed") }
+        XCTAssertEqual(link, "OBJECT-2")
+        XCTAssertEqual(new.stringMetadataEntries["sceyt.enc"], "STORED-TOKEN")
     }
 
     // MARK: Collisions
@@ -1783,7 +1153,7 @@ final class ChecksumEncryptionTests: XCTestCase {
         try seed(first, url: "FIRST-FILE", metadata: #"{"tmb":"t"}"#)
 
         let new = attachment(tid: 20, filePath: try file(second).path)
-        guard case .success(let link) = checksum(new, encryption: nil) else { return XCTFail("the checksum failed") }
+        guard case .success(let link) = checksum(new) else { return XCTFail("the checksum failed") }
 
         XCTAssertNil(link, "a miss: the size is part of the match")
         XCTAssertNotEqual(new.status, .done)
@@ -1795,7 +1165,7 @@ final class ChecksumEncryptionTests: XCTestCase {
         let local = try file(bytes)
         try seed(Data("other".utf8), url: "OTHER-SIZE", metadata: #"{"tmb":"t"}"#, storedSize: 5, key: try XCTUnwrap(Components.storage.dedupeChecksum(filePath: local.path)))
 
-        guard case .success(let link) = checksum(attachment(tid: 21, filePath: local.path), encryption: nil) else { return XCTFail("the checksum failed") }
+        guard case .success(let link) = checksum(attachment(tid: 21, filePath: local.path)) else { return XCTFail("the checksum failed") }
 
         XCTAssertNil(link)
     }
@@ -1809,7 +1179,7 @@ final class ChecksumEncryptionTests: XCTestCase {
         XCTAssertNil(Components.storage.dedupeChecksum(filePath: missing))
 
         for path in [empty.path, missing] {
-            guard case .success(let link) = checksum(attachment(tid: 22, filePath: path, size: 0), encryption: nil) else { return XCTFail("the checksum failed") }
+            guard case .success(let link) = checksum(attachment(tid: 22, filePath: path, size: 0)) else { return XCTFail("the checksum failed") }
             XCTAssertNil(link, "\(path) never matches the 0 row")
         }
         XCTAssertEqual(checksumRows(0), 1, "only the seeded row: nothing new is recorded under 0")
@@ -1821,7 +1191,7 @@ final class ChecksumEncryptionTests: XCTestCase {
         let local = try file(bytes)
         try seed(bytes, url: "LEGACY", metadata: #"{"tmb":"t"}"#, key: Int64(Components.storage.checksum(filePath: local.path)))
 
-        guard case .success(let link) = checksum(attachment(tid: 23, filePath: local.path), encryption: nil) else { return XCTFail("the checksum failed") }
+        guard case .success(let link) = checksum(attachment(tid: 23, filePath: local.path)) else { return XCTFail("the checksum failed") }
 
         XCTAssertNil(link)
         XCTAssertEqual(checksumRows(try XCTUnwrap(Components.storage.dedupeChecksum(filePath: local.path))), 1, "recorded under the new key for the next send")
@@ -1829,7 +1199,7 @@ final class ChecksumEncryptionTests: XCTestCase {
 
     func testNothingToChecksum() {
         for attachment in [attachment(tid: 4, filePath: nil), ChatMessage.Attachment(id: 0, tid: 5, messageId: 0, userId: "u", url: "https://x", filePath: "/tmp/x", type: "link", name: nil, metadata: nil, uploadedFileSize: 0, createdAt: Date())] {
-            guard case .success(nil) = checksum(attachment, encryption: .required) else { return XCTFail("\(attachment)") }
+            guard case .success(nil) = checksum(attachment) else { return XCTFail("\(attachment)") }
         }
     }
 }
@@ -1896,7 +1266,7 @@ private final class NoAssetProcessor: VideoProcessor {
     override class func assetUrl(localIdentifier: String, completion: @escaping (URL?) -> Void) { completion(nil) }
 }
 
-extension ChecksumEncryptionTests {
+extension ChecksumReuseTests {
 
     private func faulty(reads: Set<Int> = [], writes: Set<Int> = []) -> FaultyDatabase {
         let faulty = FaultyDatabase(database)
@@ -1932,13 +1302,13 @@ extension ChecksumEncryptionTests {
     func testALookupThatFailsIsAMiss() throws {
         _ = faulty(reads: [1])
         let new = attachment(tid: 33, filePath: try file(Data("lookup".utf8)).path)
-        guard case .success(nil) = checksum(new, encryption: nil) else { return XCTFail() }
+        guard case .success(nil) = checksum(new) else { return XCTFail() }
     }
 
     func testARecordThatFailsFailsTheChecksum() throws {
         _ = faulty(writes: [1])
         let new = attachment(tid: 34, filePath: try file(Data("record".utf8)).path)
-        guard case .failure = checksum(new, encryption: nil) else { return XCTFail("the upload fails with it") }
+        guard case .failure = checksum(new) else { return XCTFail("the upload fails with it") }
     }
 
     func testARowWhoseObjectNoAttachmentHasIsAMiss() throws {
@@ -1947,21 +1317,21 @@ extension ChecksumEncryptionTests {
         let key = try XCTUnwrap(Components.storage.dedupeChecksum(filePath: local.path))
         try database.syncWrite { $0.createOrUpdate(checksum: .init(checksum: key, messageTid: 1, attachmentTid: 1, data: "NOBODY-HAS-IT")) }
 
-        guard case .success(nil) = checksum(attachment(tid: 35, filePath: local.path), encryption: nil) else { return XCTFail() }
+        guard case .success(nil) = checksum(attachment(tid: 35, filePath: local.path)) else { return XCTFail() }
     }
 
     func testAFailedLookupOfTheStoredAttachmentFailsTheChecksum() throws {
         let bytes = Data("second read".utf8)
         try seed(bytes, url: "STORED-READ", metadata: #"{"tmb":"t"}"#)
         _ = faulty(reads: [2])
-        guard case .failure = checksum(attachment(tid: 36, filePath: try file(bytes).path), encryption: nil) else { return XCTFail() }
+        guard case .failure = checksum(attachment(tid: 36, filePath: try file(bytes).path)) else { return XCTFail() }
     }
 
     func testAHitThatCannotBePersistedFailsTheChecksum() throws {
         let bytes = Data("hit write".utf8)
         try seed(bytes, url: "STORED-WRITE", metadata: #"{"tmb":"t"}"#)
         _ = faulty(writes: [1])
-        guard case .failure = checksum(attachment(tid: 37, filePath: try file(bytes).path), encryption: nil) else { return XCTFail() }
+        guard case .failure = checksum(attachment(tid: 37, filePath: try file(bytes).path)) else { return XCTFail() }
     }
 
     func testAHitInAMessageOfSeveralAttachmentsReplacesTheMatchingOne() throws {
@@ -1973,7 +1343,7 @@ extension ChecksumEncryptionTests {
         var result: Result<String?, Error>?
         // Held: the provider answers only while it is alive.
         let provider = ChannelMessageChecksumProvider()
-        provider.startChecksum(message: message, attachment: hit, encryption: .none) { result = $0 }
+        provider.startChecksum(message: message, attachment: hit) { result = $0 }
         XCTAssertTrue(waitUntil { result != nil })
         withExtendedLifetime(provider) {}
         guard case .success("STORED-SEVERAL") = result else { return XCTFail("\(String(describing: result))") }
@@ -1988,7 +1358,7 @@ extension ChecksumEncryptionTests {
             let provider = RowProvider(row: .init(checksum: key, messageTid: 1, attachmentTid: 8000, data: "STORED-NOASSET"), clearsFile: clearsFile)
             let message = ChatMessage(id: 0, channelId: 1, attachments: nil, user: ChatUser(id: "u"))
             var result: Result<String?, Error>?
-            provider.startChecksum(message: message, attachment: new, encryption: .none) { result = $0 }
+            provider.startChecksum(message: message, attachment: new) { result = $0 }
             XCTAssertTrue(waitUntil { result != nil })
             withExtendedLifetime(provider) {}
             // Without a file its size is 0, so the stored object's size does not match: a miss.
@@ -2032,5 +1402,218 @@ extension ChecksumEncryptionTests {
         } catch {
             XCTAssertEqual((error as? CocoaError)?.code, .fileWriteNoPermission)
         }
+    }
+}
+
+// MARK: - The provider's prepared entries (spec: FileTransferProvider.prepareUpload)
+
+extension AttachmentTransferPipelineTests {
+
+    /// What `prepareUpload` returns lands in the attachment's metadata, which the message
+    /// carries; an image's metadata is rebuilt with its dimensions on the way and keeps it.
+    func testThePreparedEntriesAreInTheSentMetadataAfterAnImageRebuild() throws {
+        transport.onPrepare = { _ in ["sceyt.enc": "TOKEN"] }
+        let attachment = makeAttachment(tid: 70, type: "image", name: "photo.png", filePath: try image().path, metadata: #"{"tmb":"x"}"#)
+
+        XCTAssertNil(upload(attachment))
+
+        XCTAssertEqual(attachment.status, .done)
+        XCTAssertEqual(attachment.stringMetadataEntries["sceyt.enc"], "TOKEN")
+        XCTAssertEqual(transport.uploads.first?.metadata["sceyt.enc"], "TOKEN", "the upload sees what was saved")
+    }
+
+    /// A video's poster rebuilds its metadata from the typed model: the provider's entry stays.
+    func testAVideoPosterKeepsThePreparedEntries() throws {
+        transport.onPrepare = { _ in ["sceyt.enc": "TOKEN"] }
+        session.onThumbnailUpload = { _ in .success("POSTER") }
+        let attachment = try videoUpload()
+
+        XCTAssertNil(upload(attachment))
+
+        XCTAssertEqual(try ChatMessage.Attachment.Metadata<String>.decode(try XCTUnwrap(attachment.metadata)).videoThumbnail, "POSTER")
+        XCTAssertEqual(attachment.stringMetadataEntries["sceyt.enc"], "TOKEN")
+    }
+
+    /// A prepare that throws fails the upload before any byte; nothing is saved.
+    func testAFailedPrepareFailsTheUploadBeforeAnyByte() throws {
+        transfer.offline = false
+        struct NoSlot: Error {}
+        transport.onPrepare = { _ in throw NoSlot() }
+        let attachment = makeAttachment(tid: 71, filePath: try file().path)
+
+        XCTAssertTrue(upload(attachment) is NoSlot)
+
+        XCTAssertTrue(transport.uploads.isEmpty)
+        XCTAssertEqual(attachment.status, .failedUploading)
+        XCTAssertNil(attachment.stringMetadataEntries["sceyt.enc"])
+    }
+}
+
+// MARK: - A video's poster as a preview attachment (video-preview spec)
+
+extension AttachmentTransferPipelineTests {
+
+    /// Stores a message of `attachment` (as the sender stores it before the upload), uploads
+    /// the stored attachment (its tid is the SDK's), and returns it with the message the sender
+    /// would send: the stored one.
+    private func sendStored(_ attachment: ChatMessage.Attachment) throws -> (video: ChatMessage.Attachment, message: ChatMessage?, error: Error?) {
+        let database = try XCTUnwrap(DataProvider.database as? MockDatabase)
+        try database.syncWrite { context in
+            context.createOrUpdate(message: self.makeMessage([attachment]).builder.build(), channelId: 100)
+        }
+        let message = try XCTUnwrap(try database.read { MessageDTO.fetch(id: self.messageId, context: $0)?.convert() }.get())
+        let stored = try XCTUnwrap(message.attachments?.first)
+        stored.filePath = attachment.filePath
+        let outcome = Locked<(finished: Bool, message: ChatMessage?, error: Error?)>((false, nil, nil))
+        transfer.uploadMessageAttachments(message: message, attachments: [stored]) { sent, error in
+            outcome.wrapped = (true, sent, error)
+        }
+        XCTAssertTrue(waitUntil { outcome.wrapped.finished }, "the upload never completed")
+        return (stored, outcome.wrapped.message, outcome.wrapped.error)
+    }
+
+    /// The poster goes first, through the provider (prepared: its own "sceyt.enc"), as its own
+    /// preview attachment; the video names it in `video_thumb`, and the message sent carries both.
+    func testAVideoSendsItsPosterFirstAsAPreviewAttachment() throws {
+        session.previews = true
+        transport.onPrepare = { request in ["sceyt.enc": "TOKEN-\(request.operationId)"] }
+        transport.onUpload = { request in
+            .success(FileUploadResult(url: request.operationId.hasSuffix("-thumbnail") ? "PREVIEW-OBJECT" : "VIDEO-OBJECT"))
+        }
+        let source = try videoUpload()
+        source.updateMetadata(#"{"szw":3810,"szh":1962,"tmb":"hash","dur":10}"#)
+
+        let (video, sent, error) = try sendStored(source)
+
+        XCTAssertNil(error)
+        let operationId = "upload-\(video.tid)"
+        XCTAssertEqual(transport.uploads.map(\.operationId), ["\(operationId)-thumbnail", operationId], "the poster before the video")
+        XCTAssertEqual(transport.uploads.map(\.parentOperationId), [operationId, nil], "the poster is part of the video's upload")
+        XCTAssertEqual(transfer.posterSources.map(\.path), [video.filePath], "made from the file the video upload sends")
+        XCTAssertTrue(session.thumbnailUploads.isEmpty, "never the old way too")
+        let videoMeta = try ChatMessage.Attachment.Metadata<String>.decode(try XCTUnwrap(video.metadata))
+        XCTAssertEqual(videoMeta.videoThumbnail, "PREVIEW-OBJECT")
+        XCTAssertEqual(video.stringMetadataEntries["sceyt.enc"], "TOKEN-\(operationId)")
+
+        let message = try XCTUnwrap(sent)
+        XCTAssertEqual(message.attachments?.map(\.type), ["video"], "the preview is no item of the message")
+        let preview = try XCTUnwrap(message.previewAttachment(of: try XCTUnwrap(message.attachments?.first)))
+        XCTAssertEqual(preview.type, "preview")
+        XCTAssertEqual(preview.url, "PREVIEW-OBJECT")
+        XCTAssertEqual(preview.name, "clip-preview.jpg")
+        let previewMeta = try XCTUnwrap(ChatMessage.Attachment.metadataObject(preview.metadata))
+        XCTAssertEqual(Set(previewMeta.keys), ["szw", "szh", "tmb", "sceyt.enc"], "no dur, no video_thumb")
+        XCTAssertEqual(previewMeta["szw"] as? Int, 3810)
+        XCTAssertEqual(previewMeta["tmb"] as? String, "hash")
+        XCTAssertEqual(previewMeta["sceyt.enc"] as? String, "TOKEN-\(operationId)-thumbnail", "its own key, not the video's")
+        XCTAssertEqual(message.builder.build().attachments?.count, 2, "both go out")
+        XCTAssertNotNil(transfer.cachedVideoThumbnailPath(attachment: video), "the sender shows its own poster at once")
+        if let cached = transfer.cachedVideoThumbnailPath(attachment: video) { try? FileManager.default.removeItem(atPath: cached) }
+    }
+
+    /// Without a frame, or when the preview upload fails, the video goes alone: no
+    /// `video_thumb`, no preview, and no poster the old way either.
+    func testAPreviewThatCannotBeSentLeavesTheVideoAlone() throws {
+        session.previews = true
+        for makesFrame in [false, true] {
+            transport.onUpload = { request in
+                request.operationId.hasSuffix("-thumbnail") ? .failure(URLError(.badServerResponse)) : .success(FileUploadResult(url: "VIDEO-OBJECT"))
+            }
+            let source = try videoUpload()
+            if !makesFrame { transfer.poster = nil }
+
+            let (video, sent, error) = try sendStored(source)
+
+            XCTAssertNil(error)
+            XCTAssertEqual(video.status, .done)
+            XCTAssertNil(try? ChatMessage.Attachment.Metadata<String>.decode(video.metadata ?? "").videoThumbnail)
+            XCTAssertNil(sent?.previewAttachments)
+            XCTAssertTrue(session.thumbnailUploads.isEmpty)
+            XCTAssertTrue(transport.cancelled.contains("upload-\(video.tid)-thumbnail"), "what the preview's upload left goes")
+        }
+    }
+
+    /// A preview the video gives up on (timed out) is abandoned too: its upload never stays open.
+    func testATimedOutPreviewIsAbandoned() throws {
+        session.previews = true
+        transfer.videoThumbnailTimeout = 0.2
+        transport.onUpload = { request in
+            if request.operationId.hasSuffix("-thumbnail") {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                return .interrupted(CancellationError())
+            }
+            return .success(FileUploadResult(url: "VIDEO-OBJECT"))
+        }
+        let (video, sent, error) = try sendStored(try videoUpload())
+
+        XCTAssertNil(error)
+        XCTAssertNil(sent?.previewAttachments)
+        XCTAssertTrue(transport.cancelled.contains("upload-\(video.tid)-thumbnail"))
+    }
+
+    /// The previewer's forward sends the video with its preview.
+    func testForwardingAVideoKeepsItsPreview() {
+        let video = makeAttachment(tid: 0, type: "video", name: "clip.mp4", url: "V", metadata: #"{"tmb":"h","video_thumb":"P"}"#)
+        let preview = makeAttachment(tid: 0, type: "preview", url: "P", metadata: #"{"tmb":"h"}"#)
+        let message = makeMessage([video, preview])
+        let forwarded = [video.builder.build()] + (message.previewAttachment(of: video).map { [$0.builder.build()] } ?? [])
+        XCTAssertEqual(forwarded.map(\.type), ["video", "preview"])
+    }
+
+    /// A received video's poster is its message's preview attachment: fetched (and decrypted)
+    /// by the provider, with the preview's own entries, into the poster cache.
+    func testAReceivedPreviewIsFetchedThroughTheProvider() throws {
+        session.previews = true
+        let origin = "PREVIEW-\(UUID().uuidString)"
+        let poster = try file(size: 64, ext: "jpg")
+        transport.onDownload = { request in
+            do {
+                try FileManager.default.copyItem(at: poster, to: request.destinationFile)
+                return .success(request.destinationFile)
+            } catch {
+                return .failure(error)
+            }
+        }
+        let video = makeAttachment(tid: 0, type: "video", name: "clip.mp4", url: "VIDEO-OBJECT", metadata: "{\"tmb\":\"h\",\"video_thumb\":\"\(origin)\"}")
+        let preview = makeAttachment(tid: 0, type: "preview", name: "clip-preview.jpg", url: origin, metadata: #"{"tmb":"h","sceyt.enc":"TOKEN"}"#)
+        let message = makeMessage([video, preview])
+        XCTAssertEqual(message.attachments?.count, 1)
+
+        transfer.downloadVideoThumbnailsIfNeeded(message: message)
+
+        XCTAssertTrue(waitUntil { self.transfer.cachedVideoThumbnailPath(attachment: video) != nil })
+        let request = try XCTUnwrap(transport.downloads.first)
+        XCTAssertEqual(request.url, origin)
+        XCTAssertEqual(request.metadata["sceyt.enc"], "TOKEN", "the preview's own entries")
+        XCTAssertEqual(try Data(contentsOf: URL(fileURLWithPath: try XCTUnwrap(transfer.cachedVideoThumbnailPath(attachment: video)))), try Data(contentsOf: poster))
+        if let cached = transfer.cachedVideoThumbnailPath(attachment: video) { try? FileManager.default.removeItem(atPath: cached) }
+    }
+}
+
+final class ChatMessagePreviewAttachmentTests: XCTestCase {
+
+    private func attachment(_ type: String, url: String, metadata: String? = nil) -> ChatMessage.Attachment {
+        .init(id: 0, tid: 0, messageId: 1, userId: "u", url: url, filePath: nil, type: type, name: nil, metadata: metadata, uploadedFileSize: 0, createdAt: Date())
+    }
+
+    /// A "preview" attachment is never one of the message's items: `attachments.first`,
+    /// counts and formatters see the video alone. The builder sends both.
+    func testAPreviewIsKeptApartFromTheItems() {
+        let video = attachment("video", url: "V", metadata: #"{"tmb":"h","video_thumb":"P"}"#)
+        let preview = attachment("preview", url: "P")
+        let message = ChatMessage(id: 1, channelId: 1, attachments: [preview, video], user: ChatUser(id: "u"))
+
+        XCTAssertEqual(message.attachments?.map(\.url), ["V"])
+        XCTAssertEqual(message.previewAttachments?.map(\.url), ["P"])
+        XCTAssertEqual(message.allAttachments.count, 2)
+        XCTAssertTrue(message.previewAttachment(of: video) === preview)
+        XCTAssertEqual(message.builder.build().attachments?.count, 2)
+    }
+
+    func testAMessageWithoutPreviewsHasNone() {
+        let video = attachment("video", url: "V", metadata: #"{"tmb":"h"}"#)
+        let message = ChatMessage(id: 1, channelId: 1, attachments: [video], user: ChatUser(id: "u"))
+        XCTAssertNil(message.previewAttachments)
+        XCTAssertNil(message.previewAttachment(of: video), "an old message: the poster by its origin, as before")
     }
 }

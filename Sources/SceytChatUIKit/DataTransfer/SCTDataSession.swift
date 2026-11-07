@@ -25,11 +25,6 @@ public protocol AttachmentTransferring: NSObject, Sendable {
         attachment: ChatMessage.Attachment,
         taskInfo: SCTDataSessionTaskInfo
     )
-
-    /// Whether this session encrypts the uploads and decrypts the downloads of encrypted tasks
-    /// (`TransportDataSession` does, through its transport). When it does not, an attachment
-    /// that requires encryption fails instead of going out as plaintext.
-    var supportsAttachmentEncryption: Bool { get }
 }
 
 /// Where a session keeps attachments' files and their thumbnails.
@@ -60,16 +55,45 @@ public protocol AttachmentThumbnailTransferring: AnyObject, Sendable {
         origin: String,
         completion: @escaping (Result<URL, Error>) -> Void
     )
+
+    /// Whether a sent video's poster goes as its own "preview" attachment of the message
+    /// (`uploadVideoPreview`), with the video's `video_thumb` naming it. False: the poster
+    /// goes the old way, uploaded with `uploadAttachmentThumbnail` after the video.
+    var sendsVideoPreviewAttachments: Bool { get }
+
+    /// Uploads `file`, the poster image of the sent `video`, as a file of its own: prepared by
+    /// the session's provider first (which may encrypt it). Returns its url and the metadata
+    /// entries the provider prepared for the preview attachment.
+    func uploadVideoPreview(_ file: URL, of video: ChatMessage.Attachment, message: ChatMessage) async throws -> VideoPreviewUpload
+
+    /// Downloads the received `preview` attachment's file (decrypted, if its provider entries
+    /// say it is encrypted) to `destination`.
+    func downloadVideoPreview(_ preview: ChatMessage.Attachment, message: ChatMessage, to destination: URL) async throws
+
+    /// The preview of `video` will not be sent (it failed, timed out, could not be saved, or
+    /// the video was cancelled): whatever its upload left (an open multipart upload, a saved
+    /// record) goes. Must tolerate repeats and an upload that never started.
+    func abandonVideoPreview(of video: ChatMessage.Attachment)
+}
+
+/// A video's poster uploaded as a preview attachment: its remote reference and the entries its
+/// provider prepared for the preview's metadata (an encryption key, say).
+public struct VideoPreviewUpload: Sendable {
+    public let url: String
+    public let metadata: [String: String]
+
+    public init(url: String, metadata: [String: String]) {
+        self.url = url
+        self.metadata = metadata
+    }
 }
 
 public enum SCTDataSessionError: Error {
     case thumbnailUploadFailed
     case thumbnailDownloadFailed
     case unsupportedThumbnailOrigin
-}
-
-public extension AttachmentTransferring {
-    var supportsAttachmentEncryption: Bool { false }
+    /// The session sends no preview attachments (`sendsVideoPreviewAttachments` is false).
+    case videoPreviewsUnsupported
 }
 
 public extension AttachmentThumbnailTransferring {
@@ -88,6 +112,18 @@ public extension AttachmentThumbnailTransferring {
     ) {
         DefaultThumbnailTransfer().download(origin: origin, completion: completion)
     }
+
+    var sendsVideoPreviewAttachments: Bool { false }
+
+    func uploadVideoPreview(_ file: URL, of video: ChatMessage.Attachment, message: ChatMessage) async throws -> VideoPreviewUpload {
+        throw SCTDataSessionError.videoPreviewsUnsupported
+    }
+
+    func downloadVideoPreview(_ preview: ChatMessage.Attachment, message: ChatMessage, to destination: URL) async throws {
+        throw SCTDataSessionError.videoPreviewsUnsupported
+    }
+
+    func abandonVideoPreview(of video: ChatMessage.Attachment) {}
 }
 
 /// Video posters through the Chat SDK's upload and a plain download of their URL.
@@ -196,29 +232,24 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
     internal let message: ChatMessage
     @Atomic internal var attachment: ChatMessage.Attachment
 
-    /// `.required` when this transfer must be encrypted: set before the session sees the
-    /// task, from the key provider (upload) or the attachment's metadata (download).
-    @Atomic public internal(set) var encryption: EncryptionRequirement = .none
-    /// The received attachment's `enc`, read before the download started.
-    @Atomic internal var downloadEncryption: AttachmentEncryption?
-    /// The encryption of the uploaded object, from the transport's `FileUploadResult`.
-    @Atomic internal var uploadedEncryption: EncryptedFileInfo?
-    /// The size of the prepared file an encrypted upload sent: the message shows it, not the
-    /// stored object's.
-    @Atomic internal var uploadedPlaintextSize: Int64?
     /// The size of the file this transfer actually moves, once the data session knows it: an
     /// upload's prepared file (a compressed video can be a small part of its original). Progress
     /// fractions are of these bytes. Nil until reported (`reportTransferSize`).
     @Atomic public private(set) var transferSize: Int64?
     /// Told each reported transfer size (`TransferRun` saves it on the attachment).
     @Atomic internal var onTransferSize: ((Int64) -> Void)?
-    /// Saves the encryption a transport's `prepareUpload` settled in the attachment's `enc` and
-    /// the database, then calls back (with the error when it could not). Set by `TransferRun`.
-    @Atomic internal var onEncryptionPrepared: ((EncryptedFileInfo, @escaping (Error?) -> Void) -> Void)?
-    /// The encrypted video poster sent with this upload, for `enc.renditions`.
-    @Atomic internal var thumbnailRendition: AttachmentEncryption.Rendition?
-    /// The transport returned the verified plaintext of an encrypted download.
-    @Atomic internal var didDecryptDownload = false
+    /// Merges the entries a provider's `prepareUpload` returned into the attachment's metadata
+    /// and saves it, then calls back (with the error when it could not). Set by `TransferRun`.
+    @Atomic internal var onUploadPrepared: (([String: String], @escaping (Error?) -> Void) -> Void)?
+    /// This upload goes with provider entries (an encryption key, say): returned by this
+    /// attempt's `prepareUpload`, or saved on the attachment by an earlier one.
+    @Atomic public internal(set) var hasProviderEntries = false
+    /// Called with the prepared file (exported, resized) before the upload starts: a video's
+    /// poster is made from it and sent as a preview attachment. Set by `TransferRun`.
+    @Atomic internal var onFilePrepared: ((URL) async -> Void)?
+    /// The preview step ran for this upload (sent or not): the poster is not sent again the
+    /// old way after the video lands.
+    @Atomic internal var videoPreviewHandled = false
 
     /// Names this transfer in every log line of every layer (`xfer=`). The data session's own
     /// operation id when it has one (`TransportDataSession`), assigned before the session sees
@@ -354,15 +385,15 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
     /// Reports the size of the file the transfer moves, before its first progress: the
     /// progress shown in bytes is of it, not of the attachment's original. Ignored once the
     /// task has ended.
-    /// Saves `info` in the attachment's `enc` and in the database, before the upload sends a
-    /// byte. Throws when it could not be saved: the upload must not start then.
-    func persistPreparedEncryption(_ info: EncryptedFileInfo) async throws {
-        guard let save = onEncryptionPrepared else {
-            // Nothing would save the key: the receiver could never open the file.
-            throw AttachmentEncryptionError.metadataFailed(CocoaError(.featureUnsupported))
+    /// Merges `entries` into the attachment's metadata and saves it in the database, before
+    /// the upload sends a byte. Throws when they could not be saved: the upload must not start
+    /// then (the message would go out without them).
+    func persistPreparedEntries(_ entries: [String: String]) async throws {
+        guard let save = onUploadPrepared else {
+            throw AttachmentMetadataError.saveFailed(CocoaError(.featureUnsupported))
         }
         let error: Error? = await withCheckedContinuation { continuation in
-            save(info) { continuation.resume(returning: $0) }
+            save(entries) { continuation.resume(returning: $0) }
         }
         if let error { throw error }
     }
@@ -477,8 +508,7 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
         TransferLog.with(logContext) {
             checksumProvider.startChecksum(
                 message: message,
-                attachment: attachment,
-                encryption: encryption) { [weak self] in
+                attachment: attachment) { [weak self] in
                     guard let self else { return }
                     guard reserve() else {
                         logger.debug("[Transfer] \(self.logTag) upload checksum answered after its wait ended (timed out, paused or cancelled): ignored")
@@ -494,7 +524,7 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
                                 completion(false)
                                 return
                             }
-                            logger.info("[Transfer] \(self.logTag) upload checksum hit: reusing \(TransferLog.redact(link)) encryption=\(self.encryption) \(self.attachment.transferLogDescription)")
+                            logger.info("[Transfer] \(self.logTag) upload checksum hit: reusing \(TransferLog.redact(link)) \(self.attachment.transferLogDescription)")
                             completion(true)
                         } else {
                             logger.debug("[Transfer] \(self.logTag) upload checksum miss")

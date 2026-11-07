@@ -1,5 +1,5 @@
 //
-//  DefaultFileTransferTransport.swift
+//  DefaultFileTransferProvider.swift
 //  SceytChatUIKit
 //
 //  Copyright © 2026 Sceyt LLC. All rights reserved.
@@ -8,15 +8,13 @@
 import Foundation
 import SceytChat
 
-/// The Chat SDK's own transfers: one upload request to the Sceyt file endpoint (encrypted as it
-/// is sent, with `ChatClient.uploadEncrypted`), and a plain download of the attachment's URL.
-/// The chat server has no multipart upload, so a failed upload starts over as a whole and
-/// nothing is saved between attempts.
-/// Safe to share: the live transfers are behind `lock`; the hooks and the encryption are set
-/// before the first transfer and only read after.
-open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Sendable {
-
-    public let encryption: FileEncryption
+/// The Chat SDK's own transfers: one upload request to the Sceyt file endpoint, and a plain
+/// download of the attachment's URL. It prepares nothing (`prepareUpload` returns nil) and
+/// encrypts nothing. The chat server has no multipart upload, so a failed upload starts over
+/// as a whole and nothing is saved between attempts.
+/// Safe to share: the live transfers are behind `lock`; the hooks are set before the first
+/// transfer and only read after.
+open class DefaultFileTransferProvider: FileTransferProvider, @unchecked Sendable {
 
     private let lock = NSLock()
     private var uploads = [String: LiveTransfer<FileUploadResult>]()
@@ -34,7 +32,7 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
 
     /// Where an interrupted download of `operationId` keeps its resume data.
     public static func resumeDataFile(operationId: String) -> URL {
-        resumeDirectory.appendingPathComponent(EncryptedFileDownloader.hash([operationId]) + ".resume")
+        resumeDirectory.appendingPathComponent(TransferLog.hash([operationId]) + ".resume")
     }
 
     /// Removes resume data not touched for `staleResumeAge`: its download was never continued
@@ -64,8 +62,7 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
     /// The client uploads go through: the app's, read at each use.
     var chatClient: () -> ChatClient = { SceytChatUIKit.shared.chatClient }
 
-    public init(encryption: FileEncryption = SceytChatUIKit.Components.fileEncryption) {
-        self.encryption = encryption
+    public init() {
         DispatchQueue.global(qos: .utility).async { Self.purgeStaleResumeData() }
     }
 
@@ -75,23 +72,17 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
         _ request: FileUploadRequest,
         progress: @escaping (Double) -> Void
     ) async -> FileTransferResult<FileUploadResult> {
-        let context = TransferLogContext(request)
-        let tag = context.tag
+        let tag = TransferLogContext(request).tag
         let live = LiveTransfer<FileUploadResult>(operationId: request.operationId, progress: progress)
         guard register(live, operationId: request.operationId, in: \.uploads, tag: tag) else {
             return .failure(FileTransferError.duplicateOperation)
         }
         defer { unregister(live, operationId: request.operationId, in: \.uploads) }
-        logger.debug("[Transfer] \(tag) transport upload start type=\(request.type) size=\(TransferLog.sizeText(request.sourceFile))")
+        logger.debug("[Transfer] \(tag) transport upload start size=\(TransferLog.sizeText(request.sourceFile))")
         let result = await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 live.begin(continuation)
-                switch request.type {
-                case .plain:
-                    self.uploadPlain(request, live: live, tag: tag)
-                case .encrypted:
-                    Task { await TransferLog.$current.withValue(context) { await self.uploadEncrypted(request, live: live, tag: tag) } }
-                }
+                self.uploadPlain(request, live: live, tag: tag)
             }
         } onCancel: {
             logger.debug("[Transfer] \(tag) transport upload task cancelled: interrupting the invocation")
@@ -115,62 +106,6 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
                 logger.warn("[Transfer] \(tag) transport upload: SDK returned neither a url nor an error")
             }
             live.finish(.failure(error ?? FileTransferError.invalidRequest))
-        }
-    }
-
-    private func uploadEncrypted(_ request: FileUploadRequest, live: LiveTransfer<FileUploadResult>, tag: String) async {
-        let session: FileEncryptionSession
-        do {
-            session = try await encryption.prepareEncryption(file: request.sourceFile)
-        } catch {
-            logger.debug("[Encryption] \(tag) upload prepare failed: \(TransferLog.describe(error))")
-            live.finish(.failure(error))
-            return
-        }
-        let context = TransferLog.current
-        // Not restorable: a retry sends again under a new key, so nothing is kept. Released
-        // once, by whichever ending comes first: the SDK's completion, or a cancel or
-        // interruption of the invocation (after which the SDK may never call back).
-        let releaseOnce = OnceFlag()
-        let release = {
-            guard releaseOnce.claim() else { return }
-            TransferLog.with(context) { session.close() }
-        }
-        // Ended (cancelled or interrupted) while the session was being prepared: nothing is
-        // sent. `setStopper` runs the release at once when the invocation is already over.
-        live.setStopper(release)
-        guard !live.hasEnded else {
-            logger.debug("[Encryption] \(tag) upload ended during prepare: the session is released, nothing is sent")
-            return
-        }
-        // `uploadEncrypted` raises for a session another provider prepared.
-        guard let sdkSession = session as? ChatSDKEncryptionSession, sdkSession.isSDKStreaming else {
-            logger.debug("[Encryption] \(tag) upload rejected (fail closed): session \(type(of: session)) was not prepared by the SDK's streaming provider: it cannot go through ChatClient.uploadEncrypted")
-            release()
-            live.finish(.failure(AttachmentEncryptionError.encryptionUnsupportedBySession))
-            return
-        }
-        let info = session.encryptionInfo
-        // Sizes and the bound id only: never the key.
-        logger.info("[Encryption] \(tag) upload encrypt start plaintext=\(session.plaintextSize) B ciphertext=\(session.ciphertextSize) B attachmentId=\(info.attachmentId) alg=\(info.algorithm)")
-        let operation = chatClient().uploadEncrypted(sdkSession.upload) { pct in
-            live.report(progress: pct)
-        } completion: { url, _, error in
-            // The session stays open until here, as the SDK requires.
-            release()
-            if let url, error == nil {
-                logger.debug("[Encryption] \(tag) upload encrypt finished, stored ciphertext=\(session.ciphertextSize) B attachmentId=\(info.attachmentId)")
-                live.finish(.success(FileUploadResult(url: url.absoluteString, encryptionInfo: info, plaintextSize: session.plaintextSize)))
-            } else {
-                if error == nil {
-                    logger.warn("[Transfer] \(tag) transport upload: SDK returned neither a url nor an error")
-                }
-                live.finish(.failure(error ?? FileTransferError.invalidRequest))
-            }
-        }
-        live.setStopper {
-            operation.cancel()
-            release()
         }
     }
 
@@ -306,8 +241,7 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
         }
     }
 
-    /// Moves the downloaded bytes to the request's destination, as they were stored: an
-    /// encrypted attachment's are decrypted by UIKit afterwards.
+    /// Moves the downloaded bytes to the request's destination, as they were stored.
     static func publish(_ staging: URL, to request: FileDownloadRequest) throws {
         let tag = TransferLogContext(request).tag
         let destination = request.destinationFile
@@ -412,7 +346,7 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
     /// while an earlier invocation of it is still running: two invocations would share one
     /// record, and pause / resume / cancel could reach only one of them. One that already
     /// ended (stopped, waiting for its task to unwind) is replaced.
-    private func register<T: Sendable>(_ live: LiveTransfer<T>, operationId: String, in table: ReferenceWritableKeyPath<DefaultFileTransferTransport, [String: LiveTransfer<T>]>, tag: String) -> Bool {
+    private func register<T: Sendable>(_ live: LiveTransfer<T>, operationId: String, in table: ReferenceWritableKeyPath<DefaultFileTransferProvider, [String: LiveTransfer<T>]>, tag: String) -> Bool {
         lock.lock()
         if let existing = self[keyPath: table][operationId], !existing.hasEnded {
             lock.unlock()
@@ -424,25 +358,12 @@ open class DefaultFileTransferTransport: FileTransferTransport, @unchecked Senda
         return true
     }
 
-    private func unregister<T: Sendable>(_ live: LiveTransfer<T>, operationId: String, in table: ReferenceWritableKeyPath<DefaultFileTransferTransport, [String: LiveTransfer<T>]>) {
+    private func unregister<T: Sendable>(_ live: LiveTransfer<T>, operationId: String, in table: ReferenceWritableKeyPath<DefaultFileTransferProvider, [String: LiveTransfer<T>]>) {
         lock.lock()
         if self[keyPath: table][operationId] === live {
             self[keyPath: table][operationId] = nil
         }
         lock.unlock()
-    }
-}
-
-/// True for the first `claim` only, from any thread.
-final class OnceFlag {
-    private let lock = NSLock()
-    private var claimed = false
-
-    func claim() -> Bool {
-        lock.lock(); defer { lock.unlock() }
-        guard !claimed else { return false }
-        claimed = true
-        return true
     }
 }
 

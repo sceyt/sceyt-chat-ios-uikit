@@ -31,7 +31,7 @@ final class TransferStructureTests: XCTestCase {
     // MARK: File store
 
     func testASessionStoresThroughItsFileStore() {
-        let session = TransportDataSession(transport: DefaultFileTransferTransport())
+        let session = TransportDataSession(provider: DefaultFileTransferProvider())
         let store = RecordingStore()
         session.fileStore = store
 

@@ -14,6 +14,13 @@ import UIKit.UIImage
 extension ChatMessage {
     
     public class Attachment {
+        /// The type of a video's poster image sent as its own attachment (`video_thumb` names
+        /// its url). Never shown as an item: `ChatMessage.previewAttachments`.
+        public static let previewType = "preview"
+
+        /// A video's poster image, not an item of the message.
+        public var isVideoPreview: Bool { type == Self.previewType }
+
         public let id: AttachmentId
         public let tid: Int64
         public let messageId: MessageId

@@ -100,14 +100,6 @@ open class ChannelMessageChecksumProvider: DataProvider {
         }
     }
 
-    open func startChecksum(
-        message: ChatMessage,
-        attachment: ChatMessage.Attachment,
-        completion: @escaping ((Result<String?, Error>) -> Void))
-    {
-        startChecksum(message: message, attachment: attachment, encryption: .none, completion: completion)
-    }
-
     /// Whether the stored attachment can stand for `attachment`'s file: the same size, where
     /// its size is the file's own. An image or a video is resized or exported before it is
     /// sent, so its stored size is not its source's; the size in the key covers those.
@@ -116,13 +108,11 @@ open class ChannelMessageChecksumProvider: DataProvider {
         return stored.uploadedFileSize == localSize
     }
 
-    /// With `encryption == .required` only an earlier *encrypted* upload counts as a hit:
-    /// its url is reused together with its `enc`, so the receiver gets the key that object
-    /// was encrypted with. A plaintext object is never reused for an encrypted send.
+    /// On a hit the stored attachment's url is reused together with its whole metadata, so a
+    /// provider's entries (the key that object was encrypted with, say) go with it.
     open func startChecksum(
         message: ChatMessage,
         attachment: ChatMessage.Attachment,
-        encryption: EncryptionRequirement,
         completion: @escaping ((Result<String?, Error>) -> Void))
     {
         let context = TransferLog.current
@@ -172,17 +162,12 @@ open class ChannelMessageChecksumProvider: DataProvider {
                                 createChecksum()
                                 return
                             }
-                            guard encryption == .none || stored.encryption != nil else {
-                                logger.info("[CHECKSUM] \(tag) miss: the stored object is plaintext and this upload must be encrypted, uploading")
-                                createChecksum()
-                                return
-                            }
                             guard Self.sizesMatch(stored: stored, attachment: attachment, localSize: localSize) else {
                                 logger.info("[CHECKSUM] \(tag) miss: checksum \(checksum.checksum) matches but the stored object is \(stored.uploadedFileSize) B and this file \(localSize) B, uploading")
                                 createChecksum()
                                 return
                             }
-                            logger.info("[CHECKSUM] \(tag) hit: checksum \(checksum.checksum) reuses \(TransferLog.redact(link)) encrypted=\(stored.encryption != nil) storedSize=\(stored.uploadedFileSize) size=\(localSize) from \(stored.transferLogDescription)")
+                            logger.info("[CHECKSUM] \(tag) hit: checksum \(checksum.checksum) reuses \(TransferLog.redact(link)) storedSize=\(stored.uploadedFileSize) size=\(localSize) from \(stored.transferLogDescription)")
                             attachment.filePath = stored.filePath
                             attachment.name = stored.name
                             attachment.metadata = stored.metadata

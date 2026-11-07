@@ -11,7 +11,7 @@ import SceytChat
 import UIKit
 
 /// The default data session: `TransportDataSession` over the Chat SDK's own transfers
-/// (`DefaultFileTransferTransport`), storing files in `FileStorage`.
+/// (`DefaultFileTransferProvider`), storing files in `FileStorage`.
 open class SCTSession: TransportDataSession, @unchecked Sendable {
 
     public static let `default` = SCTSession()
@@ -20,20 +20,20 @@ open class SCTSession: TransportDataSession, @unchecked Sendable {
 
     public init() {
         fileStorage = .init()
-        super.init(transport: DefaultFileTransferTransport())
+        super.init(provider: DefaultFileTransferProvider())
         fileStore = fileStorage
     }
 
-    public override init(transport: FileTransferTransport) {
+    public override init(provider: FileTransferProvider) {
         fileStorage = .init()
-        super.init(transport: transport)
+        super.init(provider: provider)
         fileStore = fileStorage
     }
 
     /// With its own storage. A test seam.
-    init(transport: FileTransferTransport, fileStorage: FileStorage) {
+    init(provider: FileTransferProvider, fileStorage: FileStorage) {
         self.fileStorage = fileStorage
-        super.init(transport: transport)
+        super.init(provider: provider)
         fileStore = fileStorage
     }
 

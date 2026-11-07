@@ -12,7 +12,7 @@ import Foundation
 /// (by rule) each job's `state`, `joined` and `attempt`. One lock guards all of it and
 /// `withState` is the only way in, so a decision and the change it makes are one step and no
 /// path can leave the lock held. Not re-entrant: a step only reads and writes state; logging,
-/// the transport and callbacks run after it.
+/// the provider and callbacks run after it.
 final class JobBoard: @unchecked Sendable {
     struct Jobs {
         var uploads = [ObjectIdentifier: UploadJob]()
@@ -107,7 +107,7 @@ final class UploadJob: TransferJob, @unchecked Sendable {
         work.replace(videoProcessInfo: videoProcessInfo, task: task)
     }
 
-    /// Stops preparation and the current invocation. To the transport this is an interruption,
+    /// Stops preparation and the current invocation. To the provider this is an interruption,
     /// not an abandonment.
     func stopWork() {
         work.current.stop()
@@ -151,8 +151,6 @@ final class DownloadJob: TransferJob, @unchecked Sendable {
     }
 
     let request: FileDownloadRequest
-    /// Set for an encrypted attachment: UIKit decrypts what the transport fetched.
-    let encryption: FileDownloadEncryption?
     let taskInfo: SCTDataSessionTaskInfo
     var state = State.running
     /// Tasks that started the same operation while this job ran: they get its events.
@@ -186,9 +184,8 @@ final class DownloadJob: TransferJob, @unchecked Sendable {
         work.current.task
     }
 
-    init(request: FileDownloadRequest, encryption: FileDownloadEncryption? = nil, taskInfo: SCTDataSessionTaskInfo) {
+    init(request: FileDownloadRequest, taskInfo: SCTDataSessionTaskInfo) {
         self.request = request
-        self.encryption = encryption
         self.taskInfo = taskInfo
     }
 }

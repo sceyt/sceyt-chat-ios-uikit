@@ -12,10 +12,6 @@ import Foundation
 public struct TransferEnvironment {
     /// The session attachments are sent and fetched through.
     public var dataSession: () -> SCTDataSession?
-    /// Whether an upload must be encrypted.
-    public var keyProvider: () -> AttachmentKeyProvider
-    /// Encrypts and decrypts files (video posters; the transport has its own).
-    public var fileEncryption: () -> FileEncryption
     /// Exports videos and takes their frames.
     public var videoProcessor: () -> VideoProcessor.Type
     /// Reads and resizes images.
@@ -31,8 +27,6 @@ public struct TransferEnvironment {
 
     public init(
         dataSession: @escaping () -> SCTDataSession?,
-        keyProvider: @escaping () -> AttachmentKeyProvider,
-        fileEncryption: @escaping () -> FileEncryption,
         videoProcessor: @escaping () -> VideoProcessor.Type,
         imageBuilder: @escaping () -> ImageBuilder.Type,
         storage: @escaping () -> Storage.Type,
@@ -41,8 +35,6 @@ public struct TransferEnvironment {
         preventsDuplicateUploads: @escaping () -> Bool = { SceytChatUIKit.shared.config.preventDuplicateAttachmentUpload }
     ) {
         self.dataSession = dataSession
-        self.keyProvider = keyProvider
-        self.fileEncryption = fileEncryption
         self.videoProcessor = videoProcessor
         self.imageBuilder = imageBuilder
         self.storage = storage
@@ -56,8 +48,6 @@ public struct TransferEnvironment {
     public static var components: TransferEnvironment {
         TransferEnvironment(
             dataSession: { Components.dataSession },
-            keyProvider: { Components.attachmentKeyProvider },
-            fileEncryption: { Components.fileEncryption },
             videoProcessor: { Components.videoProcessor },
             imageBuilder: { Components.imageBuilder },
             storage: { Components.storage },

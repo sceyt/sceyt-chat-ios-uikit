@@ -36,7 +36,13 @@ public class ChatMessage {
     /// durable record — who pinned it, when, and to whom it is visible — is `PinnedMessageDTO`.
     public let pinDetails: PinDetails?
 
+    /// The attachments the message shows. A video's poster image, sent as its own "preview"
+    /// attachment, is not one of them: it is in `previewAttachments`.
     public let attachments: [Attachment]?
+    /// The "preview" attachments: each the poster image of one of `attachments`' videos (the
+    /// video's `video_thumb` is its url), shown as that video's thumbnail and never as an item
+    /// of its own. Sent with the message, forwarded and kept through edits like the rest.
+    public let previewAttachments: [Attachment]?
     public let userReactions: [Reaction]?
     public let userPendingReactions: [Reaction]?
     public let reactionTotal: [ReactionTotal]?
@@ -56,6 +62,24 @@ public class ChatMessage {
     /// This message is pinned and the pin has not lapsed. Backed by `pinDetails`, whose key
     /// paths are registered on `LazyMessagesObserver`, so a pin/unpin reconfigures the cell.
     public var isPinned: Bool { pinDetails?.isCurrentlyPinned == true }
+
+    /// `attachments` and `previewAttachments`: everything the message carries.
+    public var allAttachments: [Attachment] {
+        (attachments ?? []) + (previewAttachments ?? [])
+    }
+
+    /// `attachments` without the "preview" ones, which go to the previews (with `previews`).
+    static func split(_ attachments: [Attachment]?, previews: [Attachment]?) -> ([Attachment]?, [Attachment]?) {
+        let shown = attachments?.filter { !$0.isVideoPreview }
+        let found = (attachments ?? []).filter(\.isVideoPreview) + (previews ?? [])
+        return (shown, found.isEmpty ? nil : found)
+    }
+
+    /// The preview attachment `video` names in its `video_thumb`, when the message carries it.
+    public func previewAttachment(of video: Attachment) -> Attachment? {
+        guard let origin = video.imageDecodedMetadata?.videoThumbnail, !origin.isEmpty else { return nil }
+        return previewAttachments?.first { $0.url == origin }
+    }
 
     var hasDisplayedFromMe: Bool {
         userMarkers?.contains(where: { $0.user?.id == SceytChatUIKit.shared.currentUserId && $0.name == DeliveryStatus.displayed.rawValue} ) == true
@@ -81,6 +105,7 @@ public class ChatMessage {
                 disableMentionsCount: Bool = false,
                 viewOnce: Bool = false,
                 attachments: [ChatMessage.Attachment]? = nil,
+                previewAttachments: [ChatMessage.Attachment]? = nil,
                 userReactions: [ChatMessage.Reaction]? = nil,
                 userPendingReactions: [ChatMessage.Reaction]? = nil,
                 reactionTotals: [ChatMessage.ReactionTotal]? = nil,
@@ -114,7 +139,7 @@ public class ChatMessage {
         self.displayCount = displayCount
         self.disableMentionsCount = disableMentionsCount
         self.viewOnce = viewOnce
-        self.attachments = attachments
+        (self.attachments, self.previewAttachments) = Self.split(attachments, previews: previewAttachments)
         self.userReactions = userReactions
         self.userPendingReactions = userPendingReactions
         self.reactionTotal = reactionTotals
@@ -173,7 +198,7 @@ public class ChatMessage {
             changedBy = nil
         }
         
-        attachments = dto.attachments?.map {
+        (attachments, previewAttachments) = Self.split(dto.attachments?.map {
             $0.convert()
         }.sorted(by: { item1, item2 in
             if let f1 = item1.filePath, let f2 = item2.filePath {
@@ -182,7 +207,7 @@ public class ChatMessage {
                 return f1 < f2
             }
             return item1.type < item2.type
-        })
+        }), previews: nil)
         
         mentionedUsers = {
             var map = [UserId: ChatUser]()
@@ -556,8 +581,9 @@ public extension ChatMessage {
         if let parent {
             b.parentMessageId(parent.id)
         }
-        if let attachments {
-            b.attachments(attachments.map { $0.builder.build() })
+        if attachments != nil || previewAttachments != nil {
+            // The previews go out too: a video's `video_thumb` names one of them.
+            b.attachments(allAttachments.map { $0.builder.build() })
         }
         if let fwId = forwardingDetails?.messageId {
             b.forwardingMessageId(fwId)

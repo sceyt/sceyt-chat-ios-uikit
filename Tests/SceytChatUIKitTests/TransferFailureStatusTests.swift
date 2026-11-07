@@ -47,7 +47,7 @@ final class TransferFailureStatusTests: XCTestCase {
         XCTAssertEqual(TransferFailureCategory.of(CancellationError()), .cancelled)
         XCTAssertEqual(TransferFailureCategory.of(URLError(.notConnectedToInternet)), .connectivity)
         XCTAssertEqual(TransferFailureCategory.of(URLError(.badServerResponse)), .refusal)
-        XCTAssertEqual(TransferFailureCategory.of(AttachmentEncryptionError.encryptionBypassed), .integrity)
+        XCTAssertEqual(TransferFailureCategory.of(NSError(domain: "com.sceyt.chat.fileencryption", code: 5)), .integrity)
         XCTAssertEqual(TransferFailureCategory.of(TransportDataSessionError.missingSourceFile), .storage)
         XCTAssertEqual(TransferFailureCategory.of(CocoaError(.fileWriteOutOfSpace)), .storage)
         XCTAssertEqual(TransferFailureCategory.of(AttachmentTransferError.missingURL), .refusal)

@@ -88,17 +88,7 @@ extension AttachmentTransfer {
             return
         }
         attachment.status = .uploading
-        let setup = TransferLog.with(taskInfo.logContext) {
-            uploadEncryption(message: message, attachments: [attachment])[ObjectIdentifier(attachment)]
-        }
-        // Fail closed: an attachment that must be encrypted never reaches a session that would
-        // upload it as plaintext.
-        if let setup, let error = Self.apply(setup, to: taskInfo, dataSession: dataSession) {
-            logger.debug("[Encryption] \(tag) upload rejected before start (fail closed): \(TransferLog.describe(error)) session=\(type(of: dataSession))")
-            plan.reject(taskInfo, error)
-            return
-        }
-        logger.info("[Attachment] \(tag) upload start type=\(taskInfo.encryption == .required ? "encrypted" : "plain") size=\(TransferLog.size(path: attachment.filePath)) session=\(type(of: dataSession)) \(attachment.transferLogDescription)")
+        logger.info("[Attachment] \(tag) upload start size=\(TransferLog.size(path: attachment.filePath)) session=\(type(of: dataSession)) \(attachment.transferLogDescription)")
         plan.start(taskInfo)
     }
 
@@ -212,17 +202,7 @@ extension AttachmentTransfer {
             return
         }
         attachment.status = .downloading
-        let setup = TransferLog.with(taskInfo.logContext) {
-            downloadEncryption(attachments: [attachment])[ObjectIdentifier(attachment)]
-        }
-        // A malformed encryption field or a session that would store the ciphertext as the
-        // file: fail before fetching anything.
-        if let setup, let error = Self.apply(setup, to: taskInfo, dataSession: dataSession) {
-            logger.debug("[Encryption] \(tag) download rejected before fetching (fail closed): \(TransferLog.describe(error)) session=\(type(of: dataSession))")
-            plan.reject(taskInfo, error)
-            return
-        }
-        logger.info("[Attachment] \(tag) download start type=\(taskInfo.encryption == .required ? "encrypted" : "plain") size=\(attachment.uploadedFileSize) url=\(TransferLog.redact(attachment.url)) session=\(type(of: dataSession)) \(attachment.transferLogDescription)")
+        logger.info("[Attachment] \(tag) download start size=\(attachment.uploadedFileSize) url=\(TransferLog.redact(attachment.url)) session=\(type(of: dataSession)) \(attachment.transferLogDescription)")
         plan.start(taskInfo)
     }
 

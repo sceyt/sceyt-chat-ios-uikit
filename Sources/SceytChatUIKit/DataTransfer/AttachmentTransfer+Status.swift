@@ -15,8 +15,8 @@ extension AttachmentTransfer {
     /// The status of an upload that failed with `error`. Being offline is not a refusal: the
     /// upload fails the instant there is no network, and `.failedUploading` would swap the
     /// loader for a retry arrow on a message the app resends by itself on the next connect
-    /// (`SyncService.resendPendingMessage`), so it is parked back in the queue. A refusal by
-    /// encryption, or a file that is gone, fails.
+    /// (`SyncService.resendPendingMessage`), so it is parked back in the queue. A provider's
+    /// entries that could not be saved, or a file that is gone, fail.
     ///
     /// A cancel by the user (`SCTDataSessionTaskInfo.cancel`, or a cancellation the session did
     /// not report as an interruption) is `.pauseUploading`: the one upload status
@@ -35,7 +35,7 @@ extension AttachmentTransfer {
         if TransferLog.isCancellation(error) {
             return .pending
         }
-        if error is AttachmentEncryptionError {
+        if error is AttachmentMetadataError {
             return .failedUploading
         }
         if case .missingSourceFile? = error as? TransportDataSessionError {
@@ -97,7 +97,7 @@ extension AttachmentTransfer {
         let (result, level) = outcome(error: error, status: atch.status, interrupted: taskInfo.wasInterrupted)
         var line = "[Attachment] \(taskInfo.logTag) transfer finished"
         line += " dir=\(taskInfo.transferType == .upload ? "upload" : "download")"
-        line += " type=\(taskInfo.encryption == .required ? "encrypted" : "plain")"
+        line += " providerEntries=\(taskInfo.hasProviderEntries)"
         line += " size=\(size > 0 ? "\(size)" : "-")"
         line += " attempts=\(taskInfo.attempts)"
         line += " duration=\(duration)ms"
@@ -121,7 +121,7 @@ extension AttachmentTransfer {
         let metrics = TransferMetrics(
             operationId: taskInfo.operationId,
             direction: taskInfo.transferType == .upload ? .upload : .download,
-            isEncrypted: taskInfo.encryption == .required,
+            hasProviderEntries: taskInfo.hasProviderEntries,
             bytes: size > 0 ? size : nil,
             attempts: taskInfo.attempts,
             durationMs: duration,

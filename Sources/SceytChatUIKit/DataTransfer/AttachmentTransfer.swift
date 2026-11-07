@@ -435,15 +435,25 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
     open func makeVideoThumbnailFile(for attachment: ChatMessage.Attachment) -> URL? {
         let path = dataSession(forAttachment: attachment)?.getFilePath(attachment: attachment)
             ?? attachment.filePath
+        guard let path, FileManager.default.fileExists(atPath: path) else {
+            logger.warn("[Attachment] \(TransferLog.currentTag) video poster not made: no local file \(attachment.transferLogDescription)")
+            return nil
+        }
+        return makeVideoThumbnailFile(from: URL(fileURLWithPath: path), for: attachment)
+    }
+
+    /// The poster frame of the video `file` (the file `attachment`'s upload sends: the exported
+    /// video), as a resized JPEG in the temporary directory. Nil when no frame can be made.
+    open func makeVideoThumbnailFile(from file: URL, for attachment: ChatMessage.Attachment) -> URL? {
         let config = environment.imageResizeConfig()
         let failed = { (step: String) -> URL? in
             logger.warn("[Attachment] \(TransferLog.currentTag) video poster not made: \(step) \(attachment.transferLogDescription)")
             return nil
         }
-        guard let path, FileManager.default.fileExists(atPath: path) else {
+        guard FileManager.default.fileExists(atPath: file.path) else {
             return failed("no local file")
         }
-        guard let frame = environment.videoProcessor().copyFrame(url: URL(fileURLWithPath: path)) else {
+        guard let frame = environment.videoProcessor().copyFrame(url: file) else {
             return failed("no frame could be read from the video")
         }
         let builder: ImageBuilder
