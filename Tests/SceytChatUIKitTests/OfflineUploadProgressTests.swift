@@ -448,6 +448,113 @@ final class OfflineUploadProgressTests: XCTestCase {
         XCTAssertEqual(sending.completedBytes, 1_080_000, "once the transport reported the file, its bytes")
     }
 
+    // MARK: - An upload's progress never goes back
+
+    /// Starts an upload of `attachment` and returns its task once the transport has it,
+    /// different from `previous` (a retry's task replaces the failed one in the mock).
+    private func startUpload(
+        _ message: ChatMessage,
+        _ attachment: ChatMessage.Attachment,
+        replacing previous: SCTDataSessionTaskInfo? = nil
+    ) throws -> SCTDataSessionTaskInfo {
+        transfer.uploadMessageAttachments(message: message, attachments: [attachment])
+        XCTAssertTrue(waitUntil {
+            guard let task = self.session.task(forUrl: "") else { return false }
+            return previous.map { $0 !== task } ?? true
+        }, "the transport was never asked to upload")
+        return try XCTUnwrap(session.task(forUrl: ""))
+    }
+
+    /// The reported case: a video showed "2.10MB / 2.92MB", an attempt failed, and the retry
+    /// resumed from the parts the server had stored ("1.05MB / 2.92MB"). The bubble keeps the
+    /// furthest it showed until the retry passes it.
+    func testARetriedUploadDoesNotShowLessThanTheFailedAttemptShowed() throws {
+        let attachment = makeOutgoingAttachment(filePath: try makeFileOnDisk(), type: "video")
+        let message = makeMessage([attachment])
+        var received = [AttachmentTransfer.AttachmentProgress]()
+        transfer.progress(message: message, attachment: attachment, objectIdKey: "cell") { received.append($0) }
+
+        let first = try startUpload(message, attachment)
+        first.reportTransferSize(2_920_000)
+        first.updateProgress(0.72)
+        first.failure(error: URLError(.networkConnectionLost))
+        XCTAssertTrue(waitUntil { self.transfer.taskFor(message: message, attachment: attachment) == nil })
+
+        received.removeAll()
+        let retry = try startUpload(message, attachment, replacing: first)
+        retry.reportTransferSize(2_920_000)
+        retry.updateProgress(0.36)
+        retry.updateProgress(0.80)
+
+        XCTAssertFalse(received.isEmpty, "the retry reported nothing")
+        XCTAssertTrue(received.allSatisfy { $0.progress >= 0.72 },
+                      "the retry went back: \(received.map(\.progress))")
+        XCTAssertTrue(received.allSatisfy { $0.totalBytes == 2_920_000 },
+                      "every tick of the retry keeps the byte count, the placeholder too: \(received.map(\.totalBytes))")
+        XCTAssertEqual(received.last?.progress, 0.80, "once past the floor, the retry's own progress shows")
+        XCTAssertEqual(transfer.currentProgressPercent(message: message, attachment: attachment), 0.80)
+    }
+
+    /// Within one attempt too: a tick lower than the last one shown (a resent part's bytes
+    /// counted again from 0) does not move the bar back.
+    func testALowerTickOfTheSameUploadIsHeld() throws {
+        let attachment = makeOutgoingAttachment(filePath: try makeFileOnDisk(), type: "video")
+        let message = makeMessage([attachment])
+        var received = [Double]()
+        transfer.progress(message: message, attachment: attachment, objectIdKey: "cell") { received.append($0.progress) }
+
+        let task = try startUpload(message, attachment)
+        task.reportTransferSize(2_920_000)
+        task.updateProgress(0.72)
+        task.updateProgress(0.36)
+
+        XCTAssertEqual(received.last, 0.72, "\(received)")
+    }
+
+    /// A cancel abandons what the server stored: the next upload really starts from nothing.
+    func testACancelledUploadStartsOverFromNothing() throws {
+        let attachment = makeOutgoingAttachment(filePath: try makeFileOnDisk(), type: "video")
+        let message = makeMessage([attachment])
+        var received = [Double]()
+        transfer.progress(message: message, attachment: attachment, objectIdKey: "cell") { received.append($0.progress) }
+
+        let first = try startUpload(message, attachment)
+        first.reportTransferSize(2_920_000)
+        first.updateProgress(0.72)
+        first.cancel()
+        first.failure(error: CancellationError())
+        XCTAssertTrue(waitUntil { self.transfer.taskFor(message: message, attachment: attachment) == nil })
+
+        received.removeAll()
+        let again = try startUpload(message, attachment, replacing: first)
+        again.reportTransferSize(2_920_000)
+        again.updateProgress(0.10)
+
+        XCTAssertEqual(received.last, 0.10, "\(received)")
+    }
+
+    /// A retry that sends another file (prepared again to a different size) has nothing in
+    /// common with what was shown before.
+    func testARetryOfADifferentFileIsNotHeldAtTheOldProgress() throws {
+        let attachment = makeOutgoingAttachment(filePath: try makeFileOnDisk(), type: "video")
+        let message = makeMessage([attachment])
+        var received = [Double]()
+        transfer.progress(message: message, attachment: attachment, objectIdKey: "cell") { received.append($0.progress) }
+
+        let first = try startUpload(message, attachment)
+        first.reportTransferSize(2_920_000)
+        first.updateProgress(0.72)
+        first.failure(error: URLError(.networkConnectionLost))
+        XCTAssertTrue(waitUntil { self.transfer.taskFor(message: message, attachment: attachment) == nil })
+
+        received.removeAll()
+        let retry = try startUpload(message, attachment, replacing: first)
+        retry.reportTransferSize(3_100_000)
+        retry.updateProgress(0.10)
+
+        XCTAssertEqual(received.last, 0.10, "\(received)")
+    }
+
     // MARK: - An unsent attachment is never downloaded
 
     /// A picked video's file can be missing when its cell first binds (it is still being

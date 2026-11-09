@@ -152,6 +152,14 @@ final class TransferRun {
     private func report(progress: Double, of taskInfo: SCTDataSessionTaskInfo, transfer: AttachmentTransfer) {
         guard progress > 0 else { return }
         let key = AttachmentTransfer.key(message: taskInfo.message, attachment: taskInfo.attachment)
+        var progress = progress
+        var totalBytes = taskInfo.transferSize
+        if taskInfo.transferType == .upload {
+            // Never less than the upload already showed, in this attempt or an earlier one.
+            let shown = transfer.observers.floorUpload(progress: progress, totalBytes: totalBytes, forKey: key)
+            progress = shown.progress
+            totalBytes = shown.totalBytes
+        }
         let observers = transfer.observers.record(progress: progress, forKey: key)
         if observers.isEmpty {
             if transfer.observers.markUnobserved(key) {
@@ -166,7 +174,7 @@ final class TransferRun {
             message: taskInfo.message,
             attachment: taskInfo.attachment,
             progress: progress,
-            totalBytes: taskInfo.transferSize.map { UInt64($0) }
+            totalBytes: totalBytes.map { UInt64($0) }
         )
         observers.forEach { $0(attachmentProgress) }
     }
@@ -238,7 +246,10 @@ final class TransferRun {
         // No progress or completion event will fire for this key again: drop the cached
         // percent, so a rebind reading a stale `.downloading` can't restore a ring nothing
         // would ever hide.
-        transfer.observers.endProgress(forKey: key)
+        // An upload that will go again keeps the furthest it showed; a cancel abandons what the
+        // server stored, so the next upload really starts from nothing.
+        let retried = taskInfo.transferType == .upload && error != nil && taskInfo.action != .cancel
+        transfer.observers.endProgress(forKey: key, keepingUploadFloor: retried)
         // Only this task's attachment: the message's others belong to their own transfers.
         let identity = AttachmentTransfer.transferIdentity(of: taskInfo.attachment)
         let owned = attachments.filter { AttachmentTransfer.transferIdentity(of: $0) == identity }

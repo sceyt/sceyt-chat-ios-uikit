@@ -76,6 +76,38 @@ final class ProgressObserverRegistry {
         return (subscriptions[key] ?? []).compactMap(\.progress)
     }
 
+    /// The furthest an upload got: its progress, and the bytes that progress was of.
+    struct UploadHighWater: Equatable {
+        var progress: Double
+        var totalBytes: Int64?
+    }
+
+    /// The furthest each upload has shown, kept across its attempts: a resent part counts its
+    /// bytes again from 0, and a retry resumes from what the server stored, both less than
+    /// what the bubble already showed. Dropped when the upload succeeds or is cancelled
+    /// (`endProgress`), or when an attempt sends a file of another size.
+    @Atomic private var uploadHighWater = [String: UploadHighWater]()
+
+    /// `progress` of `key`'s upload, raised to the furthest the upload has already shown, and
+    /// the bytes it is of (the earlier attempt's while this one has not reported its file).
+    func floorUpload(progress: Double, totalBytes: Int64?, forKey key: String) -> UploadHighWater {
+        var shown = UploadHighWater(progress: progress, totalBytes: totalBytes)
+        _uploadHighWater.mutate { marks in
+            if let mark = marks[key],
+               totalBytes == nil || mark.totalBytes == nil || mark.totalBytes == totalBytes {
+                shown.totalBytes = totalBytes ?? mark.totalBytes
+                shown.progress = max(progress, mark.progress)
+            }
+            marks[key] = shown
+        }
+        return shown
+    }
+
+    /// The furthest `key`'s upload has shown with a known byte count, while it has a floor.
+    func uploadHighWater(forKey key: String) -> UploadHighWater? {
+        uploadHighWater[key]
+    }
+
     /// Notes that `key` reported progress with no observer. True the first time.
     func markUnobserved(_ key: String) -> Bool {
         var inserted = false
@@ -83,10 +115,15 @@ final class ProgressObserverRegistry {
         return inserted
     }
 
-    /// `key`'s transfer is over: no progress comes for it again.
-    func endProgress(forKey key: String) {
+    /// `key`'s transfer is over: no progress comes for it again. `keepingUploadFloor` for an
+    /// upload that will be tried again (failed, interrupted, paused): its next attempt does not
+    /// show less than this one did.
+    func endProgress(forKey key: String, keepingUploadFloor: Bool = false) {
         lastProgress[key] = nil
         _unobserved.mutate { $0.remove(key) }
+        if !keepingUploadFloor {
+            _uploadHighWater.mutate { $0[key] = nil }
+        }
     }
 
     /// Forgets the progress of `key` without ending anything (its last observer went and no

@@ -173,6 +173,12 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
     open func currentProgressPercent(message: ChatMessage, attachment: ChatMessage.Attachment) -> Double? {
         observers.progress(forKey: Self.key(message: message, attachment: attachment))
     }
+
+    /// True when an earlier attempt of this upload already showed a byte count: a retry
+    /// keeps showing it while it prepares, instead of going back to "Preparing".
+    open func hasShownUploadBytes(message: ChatMessage, attachment: ChatMessage.Attachment) -> Bool {
+        observers.uploadHighWater(forKey: Self.key(message: message, attachment: attachment))?.totalBytes != nil
+    }
     
     open func removeProgressObserver(
         message: ChatMessage,

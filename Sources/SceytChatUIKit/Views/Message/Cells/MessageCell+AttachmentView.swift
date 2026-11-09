@@ -381,7 +381,8 @@ extension MessageCell {
                let task = AttachmentTransfer.default.taskFor(message: message, attachment: data.attachment),
                task.transferType == .upload,
                [.pending, .uploading].contains(data.transferStatus),
-               task.transferSize == nil {
+               task.transferSize == nil,
+               !attachmentTransfer.hasShownUploadBytes(message: message, attachment: data.attachment) {
                 progressLabel.text = L10n.Upload.preparing
             }
             guard progressView.progress != progress
