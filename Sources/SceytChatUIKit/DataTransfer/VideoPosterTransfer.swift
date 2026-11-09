@@ -4,14 +4,29 @@
 //
 //  A video's poster frame: made and sent with a sent video, and fetched for a received one.
 //  Through a session that sends preview attachments, the poster is its own "preview"
-//  attachment of the message (uploaded and downloaded by the provider, which encrypts it);
-//  otherwise it goes the old way, uploaded after the video with `uploadAttachmentThumbnail`. Every piece of work it starts is
+//  attachment of the message (uploaded by the provider, which encrypts it, before the video,
+//  which waits for it; downloaded on its own); otherwise it goes the old way, uploaded after the video with `uploadAttachmentThumbnail`. Every piece of work it starts is
 //  owned: `cancelAll` stops it and `waitForWork` waits for it.
 //
 
 import Foundation
 import SceytChat
 import UIKit.UIImage
+
+/// How a sent video's preview step ended, for the upload attempt waiting on it.
+enum VideoPreviewStep: Sendable {
+    /// The video's bytes go now: its preview was sent and saved, or it sends none.
+    case proceed
+    /// The preview was not sent: the attempt fails with `error`, as a failed (or, when
+    /// `interrupted`, an interrupted) upload of the video would, and is retried the same way.
+    case failed(Error, interrupted: Bool)
+}
+
+/// A preview upload the provider reported interrupted (the connection went, say) rather than
+/// failed: the video's attempt ends the way an interrupted video upload does.
+public struct VideoPreviewInterrupted: Error {
+    public let underlying: Error
+}
 
 /// What the poster transfer needs from the transfer it serves.
 protocol VideoPosterHost: AnyObject {
@@ -28,7 +43,8 @@ protocol VideoPosterHost: AnyObject {
 final class VideoPosterTransfer: @unchecked Sendable {
     /// Set once, by the transfer that owns this, right after both exist.
     weak var host: VideoPosterHost?
-    /// How long a sent video waits for its poster before it goes out without one.
+    /// How long a sent video waits for a poster sent the old way (`uploadAttachmentThumbnail`)
+    /// before it goes out without one. A preview attachment has no limit: the video waits.
     @Atomic var timeout: TimeInterval = 30
     /// Origins being fetched, so a poster is never fetched twice at once.
     @Atomic private var fetching = Set<String>()
@@ -43,65 +59,47 @@ final class VideoPosterTransfer: @unchecked Sendable {
     /// saved, with `save`, before the video upload starts, so the message the sender builds
     /// once the video lands carries both.
     ///
-    /// Never fails the video: without a frame, on a failed upload, or after `timeout`, the
-    /// video goes alone, without `pvw`. A retry whose video already names a poster
-    /// sends none again.
+    /// The two go in order: the video waits for its preview, with no time limit (as the video
+    /// itself has none). A preview whose upload or save failed fails the attempt
+    /// (`.failed`): it is retried as a failed video upload is, preview first again. Only a
+    /// video no frame can be read from goes alone, without `pvw`: a retry would make none
+    /// either. A retry whose video already names a poster sends none again.
     func attachPreview(
         taskInfo: SCTDataSessionTaskInfo,
         message: ChatMessage,
         attachment atch: ChatMessage.Attachment,
         file: URL,
         save: @escaping ([ChatMessage.Attachment]) async -> Error?
-    ) async {
+    ) async -> VideoPreviewStep {
         guard taskInfo.transferType == .upload, atch.kind == .video, !message.isViewOnceMessage,
               let host, let dataSession = host.dataSession(for: message, forAttachment: atch),
               dataSession.sendsVideoPreviewAttachments
-        else { return }
+        else { return .proceed }
         // From here on the poster is this step's: it is never sent the old way after the video.
         taskInfo.videoPreviewHandled = true
         let tag = taskInfo.logTag
         let decoded = Self.decodedMetadata(of: atch)
         guard decoded?.videoThumbnail == nil else {
             logger.debug("[Attachment] \(tag) video preview: the video already names one, none sent")
-            return
+            return .proceed
         }
-        let timeout = self.timeout
-        let handoff = Handoff((host, dataSession, message, atch))
-        let outcome = await withTaskGroup(of: PreviewRace.self) { group -> PreviewRace in
-            group.addTask {
-                let (host, dataSession, message, atch) = handoff.value
-                guard let frame = host.makeVideoThumbnailFile(from: file, for: atch) else {
-                    return .failed("no poster frame could be made")
-                }
-                do {
-                    let uploaded = try await dataSession.uploadVideoPreview(frame, of: atch, message: message)
-                    return .uploaded(PreviewFile(frame: frame, upload: uploaded))
-                } catch {
-                    TransferLog.remove(frame, what: "the poster frame", context: "[Attachment] \(tag) video preview")
-                    return .failed("upload failed: \(TransferLog.describe(error))")
-                }
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
-                return .timedOut
-            }
-            let first = await group.next() ?? .timedOut
-            group.cancelAll()
-            return first
+        guard let frame = host.makeVideoThumbnailFile(from: file, for: atch) else {
+            logger.warn("[Attachment] \(tag) video preview not sent (no poster frame could be made), sending the video without it")
+            return .proceed
         }
         let poster: PreviewFile
-        switch outcome {
-        case .timedOut:
-            logger.warn("[Attachment] \(tag) video preview timed out after \(Int(timeout)) s, sending the video without it")
-            // An upload that finished as time ran out is never named by the video: it goes.
+        do {
+            let uploaded = try await dataSession.uploadVideoPreview(frame, of: atch, message: message)
+            poster = PreviewFile(frame: frame, upload: uploaded)
+        } catch {
+            TransferLog.remove(frame, what: "the poster frame", context: "[Attachment] \(tag) video preview")
             dataSession.abandonVideoPreview(of: atch)
-            return
-        case .failed(let reason):
-            logger.warn("[Attachment] \(tag) video preview not sent (\(reason)), sending the video without it")
-            dataSession.abandonVideoPreview(of: atch)
-            return
-        case .uploaded(let uploaded):
-            poster = uploaded
+            if let interruption = error as? VideoPreviewInterrupted {
+                logger.warn("[Attachment] \(tag) video preview upload interrupted, the video waits for its retry: \(TransferLog.describe(interruption.underlying))")
+                return .failed(interruption.underlying, interrupted: true)
+            }
+            logger.warn("[Attachment] \(tag) video preview upload failed, the video waits for its retry: \(TransferLog.describe(error))")
+            return .failed(error, interrupted: false)
         }
         let frameSize = TransferLog.size(poster.frame) ?? 0
         let preview = Self.previewAttachment(of: atch, decoded: decoded, message: message, upload: poster.upload, size: frameSize)
@@ -120,17 +118,12 @@ final class VideoPosterTransfer: @unchecked Sendable {
         if let error = await save([atch, preview]) {
             // Unsaved, the message would name a preview it does not carry.
             atch.updateMetadata(previousMetadata)
-            logger.warn("[Attachment] \(tag) video preview could not be saved, sending the video without it: \(TransferLog.describe(error))")
+            logger.warn("[Attachment] \(tag) video preview could not be saved, the video waits for its retry: \(TransferLog.describe(error))")
             dataSession.abandonVideoPreview(of: atch)
-            return
+            return .failed(error, interrupted: false)
         }
         logger.info("[Attachment] \(tag) video preview sent ref=\(TransferLog.redact(poster.upload.url)) size=\(frameSize) providerEntries=[\(poster.upload.metadata.keys.sorted().joined(separator: ","))]")
-    }
-
-    private enum PreviewRace: Sendable {
-        case timedOut
-        case failed(String)
-        case uploaded(PreviewFile)
+        return .proceed
     }
 
     private struct PreviewFile: Sendable {

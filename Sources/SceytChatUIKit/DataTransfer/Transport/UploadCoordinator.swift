@@ -195,12 +195,20 @@ final class UploadCoordinator: Sendable {
             logger.warn("[Transfer] \(tag) upload attempt=\(attempt) prepared file is 0 bytes \(job.attachment.transferLogDescription)")
         }
         // A video's poster goes first, as its own preview attachment, made from the file
-        // this attempt sends (the exported video). It never fails the video: without it the
-        // video goes alone.
+        // this attempt sends (the exported video); the video's bytes only after it. A preview
+        // that could not be sent fails the attempt as a failed video upload would, so it is
+        // retried the same way (a retry sends the preview again, then the video).
         if let preparePreview = job.taskInfo.onFilePrepared {
-            await preparePreview(prepared.file)
+            let step = await preparePreview(prepared.file)
             guard isCurrent(job, attempt: attempt) else {
                 logger.debug("[Transfer] \(tag) upload attempt=\(attempt) paused, cancelled or superseded during the preview, not uploading")
+                return
+            }
+            if case .failed(let error, let interrupted) = step {
+                // The staged file stays: the next attempt sends it again.
+                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (\(interrupted ? "interrupted" : "failure")): the video's preview was not sent \(TransferLog.describe(error))")
+                finish(job, attempt: attempt)
+                report(tasks(of: job), .failure(error), interrupted: interrupted)
                 return
             }
         }

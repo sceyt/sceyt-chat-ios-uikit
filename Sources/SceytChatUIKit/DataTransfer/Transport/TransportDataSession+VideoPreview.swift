@@ -31,16 +31,28 @@ extension TransportDataSession {
         request = request.merging(metadata: entries)
         // Keys only: a provider's values may carry keys.
         logger.debug("[Transfer] xfer=\(operationId) preview upload start size=\(TransferLog.sizeText(file)) providerEntries=[\(entries.keys.sorted().joined(separator: ","))]")
-        switch await provider.upload(request, progress: { _ in }) {
+        // The video's attempt waits on this upload: a pause or cancel of it (which cancels the
+        // attempt's task) stops this one too.
+        let provider = self.provider
+        let result = await withTaskCancellationHandler {
+            await provider.upload(request, progress: { _ in })
+        } onCancel: {
+            provider.cancel(operationId: operationId)
+        }
+        switch result {
         case .success(let uploaded):
             logger.debug("[Transfer] xfer=\(operationId) preview upload finished ref=\(TransferLog.redact(uploaded.url))")
             return VideoPreviewUpload(url: uploaded.url, metadata: entries)
-        case .failure(let error), .interrupted(let error):
+        case .failure(let error):
             // Not kept for a later attempt: a retry prepares a new preview (a new key), so
             // what this one left would only stay open.
             logger.debug("[Transfer] xfer=\(operationId) preview upload failed, abandoning it: \(TransferLog.describe(error))")
             provider.cancel(operationId: operationId)
             throw error
+        case .interrupted(let error):
+            logger.debug("[Transfer] xfer=\(operationId) preview upload interrupted, abandoning it: \(TransferLog.describe(error))")
+            provider.cancel(operationId: operationId)
+            throw VideoPreviewInterrupted(underlying: error)
         }
     }
 

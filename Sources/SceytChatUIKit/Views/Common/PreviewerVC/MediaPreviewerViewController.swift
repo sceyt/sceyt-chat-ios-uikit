@@ -813,7 +813,8 @@ open class MediaPreviewerViewController: ViewController, UIGestureRecognizerDele
             .showShareActionSheet(
                 previewItem: previewItem,
                 from: sender,
-                topActions: topActions)
+                topActions: topActions,
+                canForwardAndShare: viewModel.canForwardAndShare)
         { [unowned self] option in
             switch option {
             case .saveGallery:

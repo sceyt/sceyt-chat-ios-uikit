@@ -245,8 +245,9 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
     /// attempt's `prepareUpload`, or saved on the attachment by an earlier one.
     @Atomic public internal(set) var hasProviderEntries = false
     /// Called with the prepared file (exported, resized) before the upload starts: a video's
-    /// poster is made from it and sent as a preview attachment. Set by `TransferRun`.
-    @Atomic internal var onFilePrepared: ((URL) async -> Void)?
+    /// poster is made from it and sent as a preview attachment. Set by `TransferRun`. A
+    /// `.failed` step fails the attempt, as a failed upload of the video would.
+    @Atomic internal var onFilePrepared: ((URL) async -> VideoPreviewStep)?
     /// The preview step ran for this upload (sent or not): the poster is not sent again the
     /// old way after the video lands.
     @Atomic internal var videoPreviewHandled = false

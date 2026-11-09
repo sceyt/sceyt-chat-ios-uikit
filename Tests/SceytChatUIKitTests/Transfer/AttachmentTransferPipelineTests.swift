@@ -1511,44 +1511,100 @@ extension AttachmentTransferPipelineTests {
         if let cached = transfer.cachedVideoThumbnailPath(attachment: video) { try? FileManager.default.removeItem(atPath: cached) }
     }
 
-    /// Without a frame, or when the preview upload fails, the video goes alone: no
-    /// `pvw`, no preview, and no poster the old way either.
-    func testAPreviewThatCannotBeSentLeavesTheVideoAlone() throws {
+    /// Without a frame the video goes alone: no `pvw`, no preview, and no poster the old way
+    /// either (a retry could make none).
+    func testAVideoWithoutAFrameGoesAlone() throws {
         session.previews = true
-        for makesFrame in [false, true] {
-            transport.onUpload = { request in
-                request.operationId.hasSuffix("-thumbnail") ? .failure(URLError(.badServerResponse)) : .success(FileUploadResult(url: "VIDEO-OBJECT"))
-            }
-            let source = try videoUpload()
-            if !makesFrame { transfer.poster = nil }
+        transport.onUpload = { _ in .success(FileUploadResult(url: "VIDEO-OBJECT")) }
+        let source = try videoUpload()
+        transfer.poster = nil
 
-            let (video, sent, error) = try sendStored(source)
+        let (video, sent, error) = try sendStored(source)
 
-            XCTAssertNil(error)
-            XCTAssertEqual(video.status, .done)
-            XCTAssertNil(try? ChatMessage.Attachment.Metadata<String>.decode(video.metadata ?? "").videoThumbnail)
-            XCTAssertNil(sent?.previewAttachments)
-            XCTAssertTrue(session.thumbnailUploads.isEmpty)
-            XCTAssertTrue(transport.cancelled.contains("upload-\(video.tid)-thumbnail"), "what the preview's upload left goes")
-        }
+        XCTAssertNil(error)
+        XCTAssertEqual(video.status, .done)
+        XCTAssertEqual(transport.uploads.map(\.operationId), ["upload-\(video.tid)"], "only the video")
+        XCTAssertNil(try? ChatMessage.Attachment.Metadata<String>.decode(video.metadata ?? "").videoThumbnail)
+        XCTAssertNil(sent?.previewAttachments)
+        XCTAssertTrue(session.thumbnailUploads.isEmpty)
     }
 
-    /// A preview the video gives up on (timed out) is abandoned too: its upload never stays open.
-    func testATimedOutPreviewIsAbandoned() throws {
+    /// A preview whose upload fails fails the video's attempt: the video's bytes never go
+    /// without it. The retry sends the preview first again, then the video.
+    func testAFailedPreviewFailsTheVideoAndTheRetrySendsBoth() throws {
+        session.previews = true
+        transport.onUpload = { request in
+            request.operationId.hasSuffix("-thumbnail") ? .failure(URLError(.badServerResponse)) : .success(FileUploadResult(url: "VIDEO-OBJECT"))
+        }
+        let (video, failed, error) = try sendStored(try videoUpload())
+
+        XCTAssertNotNil(error, "the attempt fails with the preview")
+        XCTAssertNil(failed?.previewAttachments)
+        let operationId = "upload-\(video.tid)"
+        XCTAssertEqual(transport.uploads.map(\.operationId), ["\(operationId)-thumbnail"], "the video's bytes never went")
+        XCTAssertTrue(transport.cancelled.contains("\(operationId)-thumbnail"), "what the preview's upload left goes")
+        XCTAssertNil(try? ChatMessage.Attachment.Metadata<String>.decode(video.metadata ?? "").videoThumbnail)
+        XCTAssertTrue(session.thumbnailUploads.isEmpty, "never the old way")
+
+        transport.onUpload = { request in
+            .success(FileUploadResult(url: request.operationId.hasSuffix("-thumbnail") ? "PREVIEW-OBJECT" : "VIDEO-OBJECT"))
+        }
+        let database = try XCTUnwrap(DataProvider.database as? MockDatabase)
+        let message = try XCTUnwrap(try database.read { MessageDTO.fetch(id: self.messageId, context: $0)?.convert() }.get())
+        let outcome = Locked<(finished: Bool, message: ChatMessage?, error: Error?)>((false, nil, nil))
+        transfer.uploadMessageAttachments(message: message, attachments: [video]) { sent, error in
+            outcome.wrapped = (true, sent, error)
+        }
+        XCTAssertTrue(waitUntil { outcome.wrapped.finished }, "the retry never completed")
+
+        XCTAssertNil(outcome.wrapped.error)
+        XCTAssertEqual(
+            transport.uploads.map(\.operationId),
+            ["\(operationId)-thumbnail", "\(operationId)-thumbnail", operationId],
+            "the retry: the preview first, then the video"
+        )
+        XCTAssertEqual(try ChatMessage.Attachment.Metadata<String>.decode(try XCTUnwrap(video.metadata)).videoThumbnail, "PREVIEW-OBJECT")
+        let sent = try XCTUnwrap(outcome.wrapped.message)
+        XCTAssertEqual(sent.previewAttachment(of: try XCTUnwrap(sent.attachments?.first))?.url, "PREVIEW-OBJECT")
+        if let cached = transfer.cachedVideoThumbnailPath(attachment: video) { try? FileManager.default.removeItem(atPath: cached) }
+    }
+
+    /// An interrupted preview upload ends the video's attempt as an interrupted video upload
+    /// would.
+    func testAnInterruptedPreviewInterruptsTheVideo() throws {
+        session.previews = true
+        transport.onUpload = { request in
+            request.operationId.hasSuffix("-thumbnail") ? .interrupted(URLError(.networkConnectionLost)) : .success(FileUploadResult(url: "VIDEO-OBJECT"))
+        }
+        let (video, sent, error) = try sendStored(try videoUpload())
+
+        XCTAssertNotNil(error)
+        XCTAssertNil(sent?.previewAttachments)
+        XCTAssertEqual(transport.uploads.map(\.operationId), ["upload-\(video.tid)-thumbnail"], "the video's bytes never went")
+        XCTAssertNotEqual(video.status, .done)
+    }
+
+    /// A slow preview holds the video, past the old poster's time limit: the two go in order,
+    /// never the video alone.
+    func testTheVideoWaitsForASlowPreview() throws {
         session.previews = true
         transfer.videoThumbnailTimeout = 0.2
         transport.onUpload = { request in
             if request.operationId.hasSuffix("-thumbnail") {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                return .interrupted(CancellationError())
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                return .success(FileUploadResult(url: "PREVIEW-OBJECT"))
             }
             return .success(FileUploadResult(url: "VIDEO-OBJECT"))
         }
         let (video, sent, error) = try sendStored(try videoUpload())
 
         XCTAssertNil(error)
-        XCTAssertNil(sent?.previewAttachments)
-        XCTAssertTrue(transport.cancelled.contains("upload-\(video.tid)-thumbnail"))
+        let operationId = "upload-\(video.tid)"
+        XCTAssertEqual(transport.uploads.map(\.operationId), ["\(operationId)-thumbnail", operationId])
+        XCTAssertFalse(transport.cancelled.contains("\(operationId)-thumbnail"))
+        let message = try XCTUnwrap(sent)
+        XCTAssertEqual(message.previewAttachment(of: try XCTUnwrap(message.attachments?.first))?.url, "PREVIEW-OBJECT")
+        if let cached = transfer.cachedVideoThumbnailPath(attachment: video) { try? FileManager.default.removeItem(atPath: cached) }
     }
 
     /// The previewer's forward sends the video with its preview.

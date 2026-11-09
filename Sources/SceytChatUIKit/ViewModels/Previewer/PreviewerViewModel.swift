@@ -111,6 +111,33 @@ open class PreviewerViewModel: PreviewDataSourceItemObservable {
         }
     }
     
+    /// Whether the item can be forwarded or shared: its message reached the server (not
+    /// pending or failed, as the chat's context menu decides). Read from the database when
+    /// asked: the item's own attachment is not refreshed once it has a local file, so a
+    /// sender's video keeps the `messageId` (0) it had while it was uploading.
+    open var canForwardAndShare: Bool {
+        let attachment = previewItem.attachment
+        let sent: Bool? = try? DataProvider.database.read { context -> Bool in
+            let message: MessageDTO?
+            if attachment.messageId != 0 {
+                message = MessageDTO.fetch(id: attachment.messageId, context: context)
+            } else if attachment.tid != 0 {
+                let request = AttachmentDTO.fetchRequest()
+                request.sortDescriptor = NSSortDescriptor(keyPath: \AttachmentDTO.tid, ascending: false)
+                request.predicate = .init(format: "tid == %lld", attachment.tid)
+                request.fetchLimit = 1
+                message = AttachmentDTO.fetch(request: request, context: context).first?.message
+            } else {
+                message = nil
+            }
+            guard let message, message.id != 0 else { return false }
+            let status = Int(message.deliveryStatus)
+            return status != MessageDeliveryStatus.pending.rawValue
+                && status != MessageDeliveryStatus.failed.rawValue
+        }.get()
+        return sent ?? false
+    }
+
     public func didUpdate(previewItem: PreviewItem) {
         if self.previewItem.attachment.filePath != nil {
             return

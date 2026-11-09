@@ -21,6 +21,7 @@ open class PreviewerRouter: Router<MediaPreviewerViewController> {
         previewItem: PreviewItem,
         from barButtonItem: UIBarButtonItem,
         topActions: [SheetAction] = [],
+        canForwardAndShare: Bool = true,
         callback: @escaping (ShareOption) -> Void
     ) {
         let isVideo = previewItem.attachment.type == "video"
@@ -39,25 +40,29 @@ open class PreviewerRouter: Router<MediaPreviewerViewController> {
                 callback(.saveGallery)
             })
 
-        actions.append(
-            .init(
-                title: L10n.Previewer.forward,
-                icon: .chatForward,
-                style: .default
-            ) { [weak self] in
-                self?.showForward { channels in
-                    callback(.forward(channels.map { $0.id }))
-                }
-            })
+        // A message not sent yet (pending, failed) has nothing to forward or share: its
+        // media is not uploaded.
+        if canForwardAndShare {
+            actions.append(
+                .init(
+                    title: L10n.Previewer.forward,
+                    icon: .chatForward,
+                    style: .default
+                ) { [weak self] in
+                    self?.showForward { channels in
+                        callback(.forward(channels.map { $0.id }))
+                    }
+                })
 
-        actions.append(
-            .init(
-                title: isVideo ? L10n.Previewer.shareVideo : L10n.Previewer.sharePhoto,
-                icon: .chatShare,
-                style: .default
-            ) {
-                callback(.share)
-            })
+            actions.append(
+                .init(
+                    title: isVideo ? L10n.Previewer.shareVideo : L10n.Previewer.sharePhoto,
+                    icon: .chatShare,
+                    style: .default
+                ) {
+                    callback(.share)
+                })
+        }
 
         actions.append(
             .init(

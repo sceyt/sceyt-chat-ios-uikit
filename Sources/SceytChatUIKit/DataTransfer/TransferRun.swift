@@ -46,8 +46,8 @@ final class TransferRun {
                 self.savePreparedEntries(entries, of: taskInfo, done: done)
             }
             taskInfo.onFilePrepared = { [weak taskInfo] file in
-                guard let taskInfo else { return }
-                await self.attachVideoPreview(of: taskInfo, file: file)
+                guard let taskInfo else { return .failed(CancellationError(), interrupted: false) }
+                return await self.attachVideoPreview(of: taskInfo, file: file)
             }
         }
     }
@@ -91,11 +91,11 @@ final class TransferRun {
 
     /// A sent video's poster, as its own preview attachment, before the video's bytes: the
     /// preview and the video's `pvw` are saved with the message, so the message the
-    /// sender builds once the video lands carries both.
-    private func attachVideoPreview(of taskInfo: SCTDataSessionTaskInfo, file: URL) async {
-        guard let transfer else { return }
+    /// sender builds once the video lands carries both. A failed step fails the attempt.
+    private func attachVideoPreview(of taskInfo: SCTDataSessionTaskInfo, file: URL) async -> VideoPreviewStep {
+        guard let transfer else { return .failed(CancellationError(), interrupted: false) }
         let message = self.message
-        await TransferLog.$current.withValue(taskInfo.logContext) {
+        return await TransferLog.$current.withValue(taskInfo.logContext) {
             await transfer.posters.attachPreview(taskInfo: taskInfo, message: message, attachment: taskInfo.attachment, file: file) { attachments in
                 await withCheckedContinuation { continuation in
                     transfer.store.save(attachments, of: message) { continuation.resume(returning: $0) }
