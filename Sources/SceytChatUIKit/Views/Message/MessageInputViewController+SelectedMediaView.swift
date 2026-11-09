@@ -155,6 +155,24 @@ extension MessageInputViewController {
             }
         }
 
+        /// Removes the gallery attachments whose `PHAsset` is in `identifiers`, without animation.
+        /// `items` and `stackView.arrangedSubviews` are index-aligned, so both go by the same index.
+        open func remove(photoAssetIdentifiers identifiers: Set<String>) {
+            guard !identifiers.isEmpty else { return }
+            for index in items.indices.reversed() {
+                guard let id = items[index].photoAsset?.localIdentifier,
+                      identifiers.contains(id)
+                else { continue }
+                if stackView.arrangedSubviews.indices.contains(index) {
+                    let v = stackView.arrangedSubviews[index]
+                    stackView.removeArrangedSubview(v)
+                    v.removeFromSuperview()
+                }
+                _onDelete?(items.remove(at: index))
+            }
+            _onUpdate?()
+        }
+
         open func removeAll() {
             items.removeAll()
             imageRequestIDs.forEach {

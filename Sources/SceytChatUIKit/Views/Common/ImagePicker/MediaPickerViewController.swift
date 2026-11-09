@@ -33,6 +33,12 @@ open class MediaPickerViewController: ViewController,
     private var selectedIdentifierOrder = [String]()
     private var attachmentSelectionLimit = SceytChatUIKit.shared.config.attachmentSelectionLimit
 
+    /// Pre-selected assets the user deselected in this session. They are already in the
+    /// composer, so `onSelected` should remove them there; they are not part of its `assets`.
+    public var deselectedPreSelectedIdentifiers: Set<String> {
+        preSelectedIdentifiers.subtracting(selectedIdentifiers)
+    }
+
     /// How many items the collection view is actually showing, as of the last applied update.
     ///
     /// `collectionView.numberOfItems(inSection:)` cannot be trusted for this: `reloadData()` is
@@ -335,12 +341,6 @@ open class MediaPickerViewController: ViewController,
             showAlert(message: L10n.Error.maxValueItems(attachmentSelectionLimit))
             return false
         }
-        if indexPath.item < assets.count,
-           preSelectedIdentifiers.contains(assets[indexPath.item].localIdentifier)
-        {
-            return false
-        }
-        
         return true
     }
     
@@ -351,6 +351,12 @@ open class MediaPickerViewController: ViewController,
         if indexPath.item < assets.count {
             let identifier = assets[indexPath.item].localIdentifier
             selectedIdentifiers.insert(identifier)
+            // Re-selecting a pre-selected asset only restores it: it is still in the composer,
+            // so handing it back through `onSelected` would attach it twice.
+            guard !preSelectedIdentifiers.contains(identifier) else {
+                footerView.selectedCount = selectedIdentifiers.count
+                return
+            }
             // A `reloadData()` clears the collection view's own selection while `willDisplay`
             // keeps drawing the checkmark from `selectedIdentifiers`, so the same cell can be
             // "selected" twice. Appending unconditionally would attach it twice as well.

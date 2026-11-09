@@ -806,6 +806,8 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
         router.showPhotos(selectedPhotoAssetIdentifiers: selectedPhotoAssetIdentifiers)
         { [weak self] assets, picker in
             logger.verbose("[ATTACHMENT] did select assets \(assets.count)")
+            // Pre-selected photos the user unticked in the picker leave the composer too.
+            self?.selectedMediaView.remove(photoAssetIdentifiers: picker.deselectedPreSelectedIdentifiers)
             // `self` stays weak (no strong rebinding) so the background task below
             // can't read a dangling reference if the chat is closed mid-processing.
             guard self != nil, !assets.isEmpty else { return true }
