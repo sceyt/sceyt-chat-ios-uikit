@@ -465,7 +465,7 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
         guard let data = builder.jpegData(compressionQuality: config.compressionQuality) else {
             return failed("the frame could not be encoded as JPEG")
         }
-        guard let file = environment.storage().storeInTemporaryDirectory(data: data, filename: "video_thumb_\(attachment.tid)", ext: "jpg") else {
+        guard let file = environment.storage().storeInTemporaryDirectory(data: data, filename: "pvw_\(attachment.tid)", ext: "jpg") else {
             return failed("the poster could not be written")
         }
         return file
@@ -473,7 +473,7 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
 
     /// After a video upload succeeds, uploads its poster frame through the data
     /// session and merges the returned origin into the attachment metadata under
-    /// "video_thumb". Always calls `completion` exactly once; the thumbnail is a
+    /// "pvw". Always calls `completion` exactly once; the thumbnail is a
     /// progressive enhancement, so any failure (or a 30s timeout) just sends the
     /// message without it.
     open func attachVideoThumbnailIfNeeded(
@@ -485,7 +485,7 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
         posters.attach(taskInfo: taskInfo, message: message, attachment: atch, completion: completion)
     }
 
-    /// Local cache path of a downloaded "video_thumb" poster, or nil if not cached.
+    /// Local cache path of a downloaded "pvw" poster, or nil if not cached.
     open func cachedVideoThumbnailPath(attachment: ChatMessage.Attachment) -> String? {
         posters.cachedPath(attachment: attachment)
     }
@@ -499,7 +499,7 @@ open class AttachmentTransfer: DataProvider, @unchecked Sendable {
         posters.needsFetch(attachment: attachment)
     }
 
-    /// Downloads the "video_thumb" poster for video attachments whose video file is
+    /// Downloads the "pvw" poster for video attachments whose video file is
     /// not local yet, so the receiver can show a sharp preview while the (much
     /// larger) video is still downloading. Failures are dropped silently and
     /// retried on the next cell bind.

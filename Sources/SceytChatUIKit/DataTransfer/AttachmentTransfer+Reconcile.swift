@@ -90,7 +90,7 @@ extension AttachmentTransfer {
         completion: ((ChatMessage?, Error?) -> Void)?
     ) -> [ChatMessage.Attachment] {
 
-        // Before any status filtering: fetch the small "video_thumb" posters for
+        // Before any status filtering: fetch the small "pvw" posters for
         // videos that aren't local yet, so even paused/failed video downloads show
         // a sharp preview instead of the blurred thumbHash.
         downloadVideoThumbnailsIfNeeded(message: message, attachments: attachments)

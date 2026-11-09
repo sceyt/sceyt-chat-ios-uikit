@@ -1811,7 +1811,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             if let attachments = message.attachments?.filter({ $0.type != "link" }) {
                 editAttachments += attachments.map { $0.builder.build() }
             }
-            // A video's poster goes with it: its `video_thumb` names the preview.
+            // A video's poster goes with it: its `pvw` names the preview.
             editAttachments += (message.previewAttachments ?? []).map { $0.builder.build() }
         default:
             break
@@ -2050,7 +2050,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 else { return }
                 acc[urlStr] = hide
             }
-            // A video's poster goes with it: its `video_thumb` names the preview.
+            // A video's poster goes with it: its `pvw` names the preview.
             let nonLinks = ((message.attachments ?? []).filter { $0.type != "link" } + (message.previewAttachments ?? []))
                 .map { $0.builder.build() }
             let freshLinks = DataDetector.getLinks(text: message.body).map { url -> Attachment in

@@ -132,7 +132,7 @@ extension ChannelInfoViewController {
         }
 
         /// Repaints when a sharp, file-backed thumbnail lands for the bound attachment —
-        /// most visibly the downloaded "video_thumb" poster, which arrives long after the
+        /// most visibly the downloaded "pvw" poster, which arrives long after the
         /// cell was bound and while the video itself is still transferring (or not
         /// transferring at all).
         ///
@@ -207,7 +207,7 @@ extension ChannelInfoViewController {
         /// longer owns.
         ///
         /// "Already sharp" means file-backed AND big enough for this cell: a video shows its
-        /// small downloaded "video_thumb" poster (file-backed) before the video itself is
+        /// small downloaded "pvw" poster (file-backed) before the video itself is
         /// local, and once it is, a grid-sized frame can replace it.
         open func refreshThumbnailFromFile() {
             guard let data, data.type == .image || data.type == .video else { return }

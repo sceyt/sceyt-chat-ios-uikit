@@ -92,7 +92,7 @@ open class PreviewerViewModel: PreviewDataSourceItemObservable {
         builder.tid(0)
         builder.parentMessageId(0)
         builder.forwardingMessageId(attachment.messageId)
-        // A video's poster goes with it: its `video_thumb` names the preview attachment.
+        // A video's poster goes with it: its `pvw` names the preview attachment.
         let preview = message.previewAttachment(of: attachment).map { [$0.builder.build()] } ?? []
         builder.attachments([attachment.builder.build()] + preview)
         

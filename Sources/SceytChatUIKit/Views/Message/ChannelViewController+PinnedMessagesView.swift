@@ -704,7 +704,7 @@ extension ChannelViewController {
         /// Resolved in the same order as `MessageLayoutModel.AttachmentLayout.loadThumbnail`,
         /// so the banner shows exactly what the message's own bubble does: the sharp on-disk
         /// thumbnail (generated from the local file, poster frame included), then the
-        /// downloaded `video_thumb` poster, then the blurred thumbHash the sender ships in
+        /// downloaded `pvw` poster, then the blurred thumbHash the sender ships in
         /// metadata.
         ///
         /// Called off the main thread by `loadThumbnail(for:)`; it touches no view state.

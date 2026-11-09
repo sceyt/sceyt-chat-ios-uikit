@@ -38,7 +38,7 @@ public protocol AttachmentLocalFiles: AnyObject, Sendable {
 public protocol AttachmentThumbnailTransferring: AnyObject, Sendable {
 
     /// Uploads a poster-frame image for a video attachment. Calls back with the
-    /// opaque origin string stored under the `"video_thumb"` metadata key —
+    /// opaque origin string stored under the `"pvw"` metadata key —
     /// whatever this session's `downloadAttachmentThumbnail` can later resolve
     /// (the default session uses a full URL; a host session may use a transfer id).
     func uploadAttachmentThumbnail(
@@ -48,7 +48,7 @@ public protocol AttachmentThumbnailTransferring: AnyObject, Sendable {
     )
 
     /// Downloads the poster-frame image identified by the opaque `origin`
-    /// (the `"video_thumb"` metadata value). Calls back with a local file URL;
+    /// (the `"pvw"` metadata value). Calls back with a local file URL;
     /// a temporary location is fine — the caller moves it into its own cache.
     func downloadAttachmentThumbnail(
         for attachment: ChatMessage.Attachment,
@@ -57,7 +57,7 @@ public protocol AttachmentThumbnailTransferring: AnyObject, Sendable {
     )
 
     /// Whether a sent video's poster goes as its own "preview" attachment of the message
-    /// (`uploadVideoPreview`), with the video's `video_thumb` naming it. False: the poster
+    /// (`uploadVideoPreview`), with the video's `pvw` naming it. False: the poster
     /// goes the old way, uploaded with `uploadAttachmentThumbnail` after the video.
     var sendsVideoPreviewAttachments: Bool { get }
 
@@ -184,7 +184,7 @@ struct DefaultThumbnailTransfer {
             }
             // The task's temp file dies when this callback returns — move it first.
             let stable = posterDirectory()
-                .appendingPathComponent("video_thumb_\(UUID().uuidString)")
+                .appendingPathComponent("pvw_\(UUID().uuidString)")
                 .appendingPathExtension("jpg")
             do {
                 try FileManager.default.moveItem(at: location, to: stable)

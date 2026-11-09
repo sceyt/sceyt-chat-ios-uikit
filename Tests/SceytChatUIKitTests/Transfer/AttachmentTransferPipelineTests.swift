@@ -153,7 +153,7 @@ private final class PosterTransfer: AttachmentTransfer {
 
     override func makeVideoThumbnailFile(for attachment: ChatMessage.Attachment) -> URL? {
         guard let poster else { return nil }
-        let copy = FileManager.default.temporaryDirectory.appendingPathComponent("video_thumb_\(UUID().uuidString).jpg")
+        let copy = FileManager.default.temporaryDirectory.appendingPathComponent("pvw_\(UUID().uuidString).jpg")
         try? FileManager.default.copyItem(at: poster, to: copy)
         return copy
     }
@@ -359,7 +359,7 @@ final class AttachmentTransferPipelineTests: XCTestCase {
         let bytes = try Data(contentsOf: download)
         let destination = directory.appendingPathComponent("thumb.jpg")
 
-        try AttachmentTransfer.storeVideoThumbnail(download, of: makeAttachment(type: "video", metadata: #"{"video_thumb":"T"}"#), at: destination)
+        try AttachmentTransfer.storeVideoThumbnail(download, of: makeAttachment(type: "video", metadata: #"{"pvw":"T"}"#), at: destination)
 
         XCTAssertEqual(try Data(contentsOf: destination), bytes)
         XCTAssertFalse(FileManager.default.fileExists(atPath: download.path), "the downloaded file is consumed")
@@ -929,14 +929,14 @@ extension AttachmentTransferPipelineTests {
 
     func testWhetherAPosterNeedsADownload() {
         let origin = "https://cdn.example/poster-\(UUID().uuidString).jpg"
-        let video = makeAttachment(tid: 0, type: "video", url: "REMOTE-V", metadata: #"{"tmb":"x","video_thumb":"\#(origin)"}"#)
+        let video = makeAttachment(tid: 0, type: "video", url: "REMOTE-V", metadata: #"{"tmb":"x","pvw":"\#(origin)"}"#)
         XCTAssertTrue(transfer.needsVideoThumbnailDownload(attachment: video))
         XCTAssertFalse(transfer.needsVideoThumbnailDownload(attachment: makeAttachment(type: "image")))
     }
 
     func testAPosterDownloadThatFailsIsDropped() {
         let origin = "poster-fail-\(UUID().uuidString)"
-        let video = makeAttachment(tid: 0, type: "video", url: "REMOTE-V2", metadata: #"{"tmb":"x","video_thumb":"\#(origin)"}"#)
+        let video = makeAttachment(tid: 0, type: "video", url: "REMOTE-V2", metadata: #"{"tmb":"x","pvw":"\#(origin)"}"#)
         // Asked from the poster's own task: counted behind a lock.
         let asked = Locked(0)
         session.onThumbnailDownload = { _ in
@@ -1473,7 +1473,7 @@ extension AttachmentTransferPipelineTests {
     }
 
     /// The poster goes first, through the provider (prepared: its own "sceyt.enc"), as its own
-    /// preview attachment; the video names it in `video_thumb`, and the message sent carries both.
+    /// preview attachment; the video names it in `pvw`, and the message sent carries both.
     func testAVideoSendsItsPosterFirstAsAPreviewAttachment() throws {
         session.previews = true
         transport.onPrepare = { request in ["sceyt.enc": "TOKEN-\(request.operationId)"] }
@@ -1502,7 +1502,7 @@ extension AttachmentTransferPipelineTests {
         XCTAssertEqual(preview.url, "PREVIEW-OBJECT")
         XCTAssertEqual(preview.name, "clip-preview.jpg")
         let previewMeta = try XCTUnwrap(ChatMessage.Attachment.metadataObject(preview.metadata))
-        XCTAssertEqual(Set(previewMeta.keys), ["szw", "szh", "tmb", "sceyt.enc"], "no dur, no video_thumb")
+        XCTAssertEqual(Set(previewMeta.keys), ["szw", "szh", "tmb", "sceyt.enc"], "no dur, no pvw")
         XCTAssertEqual(previewMeta["szw"] as? Int, 3810)
         XCTAssertEqual(previewMeta["tmb"] as? String, "hash")
         XCTAssertEqual(previewMeta["sceyt.enc"] as? String, "TOKEN-\(operationId)-thumbnail", "its own key, not the video's")
@@ -1512,7 +1512,7 @@ extension AttachmentTransferPipelineTests {
     }
 
     /// Without a frame, or when the preview upload fails, the video goes alone: no
-    /// `video_thumb`, no preview, and no poster the old way either.
+    /// `pvw`, no preview, and no poster the old way either.
     func testAPreviewThatCannotBeSentLeavesTheVideoAlone() throws {
         session.previews = true
         for makesFrame in [false, true] {
@@ -1553,7 +1553,7 @@ extension AttachmentTransferPipelineTests {
 
     /// The previewer's forward sends the video with its preview.
     func testForwardingAVideoKeepsItsPreview() {
-        let video = makeAttachment(tid: 0, type: "video", name: "clip.mp4", url: "V", metadata: #"{"tmb":"h","video_thumb":"P"}"#)
+        let video = makeAttachment(tid: 0, type: "video", name: "clip.mp4", url: "V", metadata: #"{"tmb":"h","pvw":"P"}"#)
         let preview = makeAttachment(tid: 0, type: "preview", url: "P", metadata: #"{"tmb":"h"}"#)
         let message = makeMessage([video, preview])
         let forwarded = [video.builder.build()] + (message.previewAttachment(of: video).map { [$0.builder.build()] } ?? [])
@@ -1574,7 +1574,7 @@ extension AttachmentTransferPipelineTests {
                 return .failure(error)
             }
         }
-        let video = makeAttachment(tid: 0, type: "video", name: "clip.mp4", url: "VIDEO-OBJECT", metadata: "{\"tmb\":\"h\",\"video_thumb\":\"\(origin)\"}")
+        let video = makeAttachment(tid: 0, type: "video", name: "clip.mp4", url: "VIDEO-OBJECT", metadata: "{\"tmb\":\"h\",\"pvw\":\"\(origin)\"}")
         let preview = makeAttachment(tid: 0, type: "preview", name: "clip-preview.jpg", url: origin, metadata: #"{"tmb":"h","sceyt.enc":"TOKEN"}"#)
         let message = makeMessage([video, preview])
         XCTAssertEqual(message.attachments?.count, 1)
@@ -1599,7 +1599,7 @@ final class ChatMessagePreviewAttachmentTests: XCTestCase {
     /// A "preview" attachment is never one of the message's items: `attachments.first`,
     /// counts and formatters see the video alone. The builder sends both.
     func testAPreviewIsKeptApartFromTheItems() {
-        let video = attachment("video", url: "V", metadata: #"{"tmb":"h","video_thumb":"P"}"#)
+        let video = attachment("video", url: "V", metadata: #"{"tmb":"h","pvw":"P"}"#)
         let preview = attachment("preview", url: "P")
         let message = ChatMessage(id: 1, channelId: 1, attachments: [preview, video], user: ChatUser(id: "u"))
 

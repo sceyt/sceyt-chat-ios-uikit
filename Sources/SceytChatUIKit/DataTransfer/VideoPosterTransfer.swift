@@ -39,12 +39,12 @@ final class VideoPosterTransfer: @unchecked Sendable {
     /// Sends a video's poster as its own "preview" attachment of the message (video-preview
     /// spec): made from `file`, the video this attempt uploads, and uploaded through the data
     /// session's provider (which encrypts it, under its own key, as it does any file) before
-    /// the video's bytes. The preview attachment and the video's `video_thumb` (its url) are
+    /// the video's bytes. The preview attachment and the video's `pvw` (its url) are
     /// saved, with `save`, before the video upload starts, so the message the sender builds
     /// once the video lands carries both.
     ///
     /// Never fails the video: without a frame, on a failed upload, or after `timeout`, the
-    /// video goes alone, without `video_thumb`. A retry whose video already names a poster
+    /// video goes alone, without `pvw`. A retry whose video already names a poster
     /// sends none again.
     func attachPreview(
         taskInfo: SCTDataSessionTaskInfo,
@@ -140,7 +140,7 @@ final class VideoPosterTransfer: @unchecked Sendable {
 
     /// The preview attachment of `video` (video-preview spec): type "preview", named after the
     /// video ("<name>-preview.jpg"), its metadata only the video's `szw`, `szh`, `tmb` and the
-    /// entries its provider prepared (no `dur`, no `video_thumb`).
+    /// entries its provider prepared (no `dur`, no `pvw`).
     static func previewAttachment(
         of video: ChatMessage.Attachment,
         decoded: ChatMessage.Attachment.Metadata<String>?,
@@ -198,7 +198,7 @@ final class VideoPosterTransfer: @unchecked Sendable {
         attachment atch: ChatMessage.Attachment
     ) -> PosterJob? {
         // The metadata string is decoded fresh: a dedupe hit replaces only the string, and one
-        // that reused a thumbnailed upload already carries "video_thumb".
+        // that reused a thumbnailed upload already carries "pvw".
         // A session that sends preview attachments handled the poster before the upload.
         guard taskInfo.transferType == .upload, atch.kind == .video, !message.isViewOnceMessage,
               !taskInfo.videoPreviewHandled
@@ -235,14 +235,14 @@ final class VideoPosterTransfer: @unchecked Sendable {
         }
         switch outcome {
         case .timedOut:
-            logger.warn("[Attachment] \(tag) video_thumb timed out after \(Int(timeout)) s, sending without it")
+            logger.warn("[Attachment] \(tag) pvw timed out after \(Int(timeout)) s, sending without it")
         case .poster(nil):
             break
         case .poster(let poster?):
             var meta = decoded ?? ChatMessage.Attachment.Metadata<String>(thumbnail: "")
             meta.videoThumbnail = poster.origin
             AttachmentTransfer.updateMetadata(of: atch, rebuiltFrom: meta)
-            logger.verbose("[Attachment] \(tag) video_thumb uploaded, origin \(TransferLog.redact(poster.origin))")
+            logger.verbose("[Attachment] \(tag) pvw uploaded, origin \(TransferLog.redact(poster.origin))")
         }
     }
 
@@ -282,7 +282,7 @@ final class VideoPosterTransfer: @unchecked Sendable {
         let tag = taskInfo.logTag
         let context = taskInfo.logContext
         guard let host, let frame = host.makeVideoThumbnailFile(for: atch) else {
-            logger.warn("[Attachment] \(tag) video_thumb: no poster frame could be made, sending without it")
+            logger.warn("[Attachment] \(tag) pvw: no poster frame could be made, sending without it")
             return nil
         }
         return await send(frame, what: "the poster frame", attachment: atch, dataSession: dataSession, context: context, tag: tag)
@@ -295,7 +295,7 @@ final class VideoPosterTransfer: @unchecked Sendable {
         let result: Result<String, Error> = await Self.awaitCallback(cancelled: .failure(CancellationError())) { done in
             TransferLog.with(context) {
                 dataSession.uploadAttachmentThumbnail(for: atch, fileUrl: file) { result in
-                    TransferLog.remove(file, what: what, context: "[Attachment] \(tag) video_thumb")
+                    TransferLog.remove(file, what: what, context: "[Attachment] \(tag) pvw")
                     done(result)
                 }
             }
@@ -304,17 +304,17 @@ final class VideoPosterTransfer: @unchecked Sendable {
         case .success(let origin):
             return origin
         case .failure(let error as CancellationError):
-            logger.debug("[Attachment] \(tag) video_thumb upload no longer awaited: \(TransferLog.describe(error))")
+            logger.debug("[Attachment] \(tag) pvw upload no longer awaited: \(TransferLog.describe(error))")
             return nil
         case .failure(let error):
-            logger.warn("[Attachment] \(tag) video_thumb upload failed, sending without it: \(TransferLog.describe(error))")
+            logger.warn("[Attachment] \(tag) pvw upload failed, sending without it: \(TransferLog.describe(error))")
             return nil
         }
     }
 
     // MARK: Received videos
 
-    /// Local cache path of a downloaded "video_thumb" poster, or nil if not cached.
+    /// Local cache path of a downloaded "pvw" poster, or nil if not cached.
     func cachedPath(attachment: ChatMessage.Attachment) -> String? {
         guard attachment.kind == .video,
               let origin = attachment.imageDecodedMetadata?.videoThumbnail,
@@ -390,14 +390,14 @@ final class VideoPosterTransfer: @unchecked Sendable {
         case .success(let url):
             localUrl = url
         case .failure(let error):
-            logger.warn("[Attachment] video_thumb download failed, origin \(TransferLog.redact(origin)): \(TransferLog.describe(error)) \(atch.transferLogDescription)")
+            logger.warn("[Attachment] pvw download failed, origin \(TransferLog.redact(origin)): \(TransferLog.describe(error)) \(atch.transferLogDescription)")
             return
         }
         let destination = URL(fileURLWithPath: FileStorage.default.videoThumbnailCachePath(origin: origin))
         do {
             try Self.store(localUrl, of: atch, at: destination)
         } catch {
-            logger.warn("[Attachment] video_thumb store failed, origin \(TransferLog.redact(origin)): \(TransferLog.describe(error)) \(atch.transferLogDescription)")
+            logger.warn("[Attachment] pvw store failed, origin \(TransferLog.redact(origin)): \(TransferLog.describe(error)) \(atch.transferLogDescription)")
             return
         }
         let handoff = Handoff(atch)
@@ -409,7 +409,7 @@ final class VideoPosterTransfer: @unchecked Sendable {
     }
 
     /// Downloads a video's preview attachment into the poster cache (under the video's
-    /// `video_thumb`, the preview's url), through the session's provider: an encrypted one
+    /// `pvw`, the preview's url), through the session's provider: an encrypted one
     /// is verified and decrypted before anything is written there.
     private func fetchPreview(
         _ preview: ChatMessage.Attachment,
@@ -437,7 +437,7 @@ final class VideoPosterTransfer: @unchecked Sendable {
 
     /// Writes a downloaded poster to the cache.
     static func store(_ localUrl: URL, of attachment: ChatMessage.Attachment, at destination: URL) throws {
-        defer { TransferLog.remove(localUrl, what: "the downloaded poster", context: "[Attachment] video_thumb") }
+        defer { TransferLog.remove(localUrl, what: "the downloaded poster", context: "[Attachment] pvw") }
         // Atomic write so a concurrent loadThumbnail never observes a partially written
         // JPEG (same pattern as SCTSession.thumbnailFile).
         try Data(contentsOf: localUrl).write(to: destination, options: .atomic)

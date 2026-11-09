@@ -1896,7 +1896,7 @@ extension MessageLayoutModel {
                 }
                 if resultThumbnail == nil, attachmentType == .video,
                    let path = self.attachmentTransfer.cachedVideoThumbnailPath(attachment: attachment) {
-                    // Downloaded "video_thumb" poster: sharp preview available before
+                    // Downloaded "pvw" poster: sharp preview available before
                     // the video itself is local. File-backed semantics so the
                     // no-downgrade guards keep it over the thumbHash blur.
                     do {
@@ -1905,10 +1905,10 @@ extension MessageLayoutModel {
                             resultThumbnail = image
                             resultLoadedFromFile = true
                         } else {
-                            logger.error("[Attachment] video_thumb decode failed, path \(path)")
+                            logger.error("[Attachment] pvw decode failed, path \(path)")
                         }
                     } catch {
-                        logger.errorIfNotNil(error, "load video_thumb from path \(path)")
+                        logger.errorIfNotNil(error, "load pvw from path \(path)")
                     }
                 }
                 if resultThumbnail == nil {

@@ -182,17 +182,17 @@ open class FileStorage: Storage, @unchecked Sendable {
             }
     }
     
-    /// Cache location for a downloaded "video_thumb" poster image, keyed by the
+    /// Cache location for a downloaded "pvw" poster image, keyed by the
     /// opaque origin from the attachment metadata (hashed — origins may be URLs
     /// containing path separators). Creates the cache directory on demand.
     open func videoThumbnailCachePath(origin: String) -> String {
-        let dir = URL(fileURLWithPath: storagePath).appendingPathComponent("video_thumbs")
+        let dir = URL(fileURLWithPath: storagePath).appendingPathComponent("pvws")
         if !fileManager.fileExists(atPath: dir.path) {
             do {
                 try fileManager.createDirectory(at: dir, withIntermediateDirectories: true, attributes: nil)
             } catch {
                 // The poster's store then fails and is logged by its caller with this reason.
-                Self.logFailure("video_thumbs folder", error)
+                Self.logFailure("pvws folder", error)
             }
         }
         let digest = SHA256.hash(data: Data(origin.utf8))

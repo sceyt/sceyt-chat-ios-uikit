@@ -46,10 +46,21 @@ final class AttachmentMetadataEntriesTests: XCTestCase {
     }
 
     func testARebuildThatDropsAnOwnedKeyDropsIt() throws {
-        let old = #"{"video_thumb":"P","sceyt.enc":"TOKEN"}"#
+        let old = #"{"pvw":"P","sceyt.enc":"TOKEN"}"#
         let result = try object(ChatMessage.Attachment.metadata(#"{"szw":1}"#, preservingUnownedKeysFrom: old))
-        XCTAssertNil(result["video_thumb"], "an owned key is UIKit's to drop")
+        XCTAssertNil(result["pvw"], "an owned key is UIKit's to drop")
         XCTAssertEqual(result["sceyt.enc"] as? String, "TOKEN")
+    }
+
+    func testALegacyVideoThumbIsReadAsThePosterAndDroppedOnRebuild() throws {
+        typealias Metadata = ChatMessage.Attachment.Metadata<String>
+        XCTAssertEqual(try Metadata.decode(#"{"tmb":"","video_thumb":"OLD"}"#).videoThumbnail, "OLD", "older builds wrote the poster under video_thumb")
+        XCTAssertEqual(try Metadata.decode(#"{"tmb":"","pvw":"NEW","video_thumb":"OLD"}"#).videoThumbnail, "NEW", "pvw wins")
+        let encoded = try XCTUnwrap(Metadata(thumbnail: "", videoThumbnail: "P").build())
+        XCTAssertEqual(try object(encoded)["pvw"] as? String, "P")
+        XCTAssertNil(try object(encoded)["video_thumb"], "the legacy key is never written")
+        let rebuilt = try object(ChatMessage.Attachment.metadata(encoded, preservingUnownedKeysFrom: #"{"video_thumb":"OLD"}"#))
+        XCTAssertNil(rebuilt["video_thumb"], "the legacy key is UIKit's to drop")
     }
 
     func testARebuildWithNothingToKeepIsUnchanged() {

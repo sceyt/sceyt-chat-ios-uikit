@@ -176,7 +176,7 @@ final class ChannelInfoMediaCellThumbnailTests: XCTestCase {
     }
 
     func testDoneUpgradesSmallFileBackedPoster() {
-        // A video shows its small downloaded "video_thumb" poster — file-backed — before the
+        // A video shows its small downloaded "pvw" poster — file-backed — before the
         // video itself is local. Once the video is done, a grid-sized frame must replace it;
         // a file-backed layout used to be treated as final.
         let attachment = makeAttachment(id: 7006)

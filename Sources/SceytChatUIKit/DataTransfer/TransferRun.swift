@@ -90,7 +90,7 @@ final class TransferRun {
     }
 
     /// A sent video's poster, as its own preview attachment, before the video's bytes: the
-    /// preview and the video's `video_thumb` are saved with the message, so the message the
+    /// preview and the video's `pvw` are saved with the message, so the message the
     /// sender builds once the video lands carries both.
     private func attachVideoPreview(of taskInfo: SCTDataSessionTaskInfo, file: URL) async {
         guard let transfer else { return }
@@ -213,7 +213,7 @@ final class TransferRun {
 
     private func finishSuccess(uri: String, taskInfo: SCTDataSessionTaskInfo, atch: ChatMessage.Attachment, transfer: AttachmentTransfer) {
         // For a just-uploaded video, upload its poster frame too before completing, so the
-        // merged "video_thumb" metadata is persisted by `end` and rides the wire message the
+        // merged "pvw" metadata is persisted by `end` and rides the wire message the
         // sender builds from this attachment.
         transfer.attachVideoThumbnailIfNeeded(taskInfo: taskInfo, message: message, attachment: atch) { [self] in
             TransferLog.with(taskInfo.logContext) {

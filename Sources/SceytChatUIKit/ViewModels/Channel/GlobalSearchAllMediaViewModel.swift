@@ -531,7 +531,7 @@ open class GlobalSearchAllMediaViewModel: NSObject {
         }
     }
 
-    /// Fetches the small "video_thumb" poster so a video that is not downloaded yet
+    /// Fetches the small "pvw" poster so a video that is not downloaded yet
     /// still previews sharply in the grid. Independent of the video transfer itself:
     /// it must happen even when the video won't be (or hasn't been) downloaded.
     open func downloadVideoThumbnailIfNeeded(_ layout: MessageLayoutModel.AttachmentLayout) {

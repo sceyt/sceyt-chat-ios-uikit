@@ -23,7 +23,7 @@ public extension ChatMessage.Attachment {
 
     /// The keys UIKit writes (the typed `Metadata` model). Every other key belongs to someone
     /// else (a `FileTransferProvider`, the server) and is kept as it is.
-    static let ownedMetadataKeys: Set<String> = ["szw", "szh", "tmb", "dur", "dsc", "iur", "tur", "hld", "video_thumb"]
+    static let ownedMetadataKeys: Set<String> = ["szw", "szh", "tmb", "dur", "dsc", "iur", "tur", "hld", "pvw", "video_thumb"]
 
     /// The metadata entries that have string values: what a provider's requests carry.
     var stringMetadataEntries: [String: String] {

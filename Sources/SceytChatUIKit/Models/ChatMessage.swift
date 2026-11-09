@@ -40,7 +40,7 @@ public class ChatMessage {
     /// attachment, is not one of them: it is in `previewAttachments`.
     public let attachments: [Attachment]?
     /// The "preview" attachments: each the poster image of one of `attachments`' videos (the
-    /// video's `video_thumb` is its url), shown as that video's thumbnail and never as an item
+    /// video's `pvw` is its url), shown as that video's thumbnail and never as an item
     /// of its own. Sent with the message, forwarded and kept through edits like the rest.
     public let previewAttachments: [Attachment]?
     public let userReactions: [Reaction]?
@@ -75,7 +75,7 @@ public class ChatMessage {
         return (shown, found.isEmpty ? nil : found)
     }
 
-    /// The preview attachment `video` names in its `video_thumb`, when the message carries it.
+    /// The preview attachment `video` names in its `pvw`, when the message carries it.
     public func previewAttachment(of video: Attachment) -> Attachment? {
         guard let origin = video.imageDecodedMetadata?.videoThumbnail, !origin.isEmpty else { return nil }
         return previewAttachments?.first { $0.url == origin }
@@ -582,7 +582,7 @@ public extension ChatMessage {
             b.parentMessageId(parent.id)
         }
         if attachments != nil || previewAttachments != nil {
-            // The previews go out too: a video's `video_thumb` names one of them.
+            // The previews go out too: a video's `pvw` names one of them.
             b.attachments(allAttachments.map { $0.builder.build() })
         }
         if let fwId = forwardingDetails?.messageId {

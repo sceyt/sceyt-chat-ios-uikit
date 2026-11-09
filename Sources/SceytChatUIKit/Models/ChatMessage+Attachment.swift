@@ -14,7 +14,7 @@ import UIKit.UIImage
 extension ChatMessage {
     
     public class Attachment {
-        /// The type of a video's poster image sent as its own attachment (`video_thumb` names
+        /// The type of a video's poster image sent as its own attachment (`pvw` names
         /// its url). Never shown as an item: `ChatMessage.previewAttachments`.
         public static let previewType = "preview"
 
@@ -263,6 +263,12 @@ extension ChatMessage {
                 case imageUrl = "iur"
                 case thumbnailUrl = "tur"
                 case hideLinkDetails = "hld"
+                case videoThumbnail = "pvw"
+            }
+
+            /// The key `videoThumbnail` was stored under before it became `pvw`; still read
+            /// so videos sent by older builds keep their poster. Never written.
+            private enum LegacyCodingKeys: String, CodingKey {
                 case videoThumbnail = "video_thumb"
             }
 
@@ -311,6 +317,8 @@ extension ChatMessage {
                 thumbnailUrl = (try? container.decode(String.self, forKey: CodingKeys.thumbnailUrl))
                 hideLinkDetails = (try? container.decode(Bool.self, forKey: CodingKeys.hideLinkDetails))
                 videoThumbnail = (try? container.decode(String.self, forKey: CodingKeys.videoThumbnail))
+                    ?? (try? decoder.container(keyedBy: LegacyCodingKeys.self)
+                        .decode(String.self, forKey: .videoThumbnail))
                 if let base64 = thumbnail as? String, !base64.isEmpty {
                     thumbnailImage = Components.imageBuilder.image(thumbHash: base64)
                     if thumbnailImage == nil,
