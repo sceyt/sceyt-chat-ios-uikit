@@ -95,6 +95,54 @@ final class LazyDBObserverTests: XCTestCase {
         assertItemsAfterUpdate(reference2.compactMap(\.data))
     }
 
+    // MARK: - Snapshot delivered with each change cycle
+
+    /// Two change cycles finish on the context queue before the main queue runs
+    /// the first `onDidChange`. The first callback must read the snapshot its
+    /// own changes produce, not the later one — otherwise a consumer applies
+    /// cycle 1's index paths to cycle 2's row count, and
+    /// `UITableView.performBatchUpdates` throws (Crashlytics e5ae779b…).
+    func test_twoCyclesQueuedBeforeMain_eachCallbackReadsItsOwnSnapshot() throws {
+        var a: ChecksumDTO!, b: ChecksumDTO!, c: ChecksumDTO!
+        context.performAndWait {
+            a = makeChecksum(data: "a")
+            b = makeChecksum(data: "b")
+            c = makeChecksum(data: "c")
+        }
+        testFRC.test_fetchedObjects = [a]
+        try startObservingAndWaitForInitialResults()
+
+        var seen: [[String]] = []
+        let exp = expectation(description: "both cycles delivered")
+        exp.expectedFulfillmentCount = 2
+        observer.onDidChange = { [unowned self] _ in
+            seen.append(self.observer.rawItems)
+            exp.fulfill()
+        }
+
+        let relay = observer.changeRelay
+        let frc = unsafeBitCast(observer.frc, to: NSFetchedResultsController<NSFetchRequestResult>.self)
+        let testFRC = self.testFRC
+        // Both cycles complete before this (main) thread returns to its run loop,
+        // so both callbacks are queued behind each other.
+        context.performAndWait {
+            testFRC.test_fetchedObjects = [a, b]
+            relay.controllerWillChangeContent(frc)
+            relay.controller(frc, didChange: b, at: nil, for: .insert, newIndexPath: IndexPath(row: 1, section: 0))
+            relay.controllerDidChangeContent(frc)
+
+            testFRC.test_fetchedObjects = [a, b, c]
+            relay.controllerWillChangeContent(frc)
+            relay.controller(frc, didChange: c, at: nil, for: .insert, newIndexPath: IndexPath(row: 2, section: 0))
+            relay.controllerDidChangeContent(frc)
+        }
+
+        wait(for: [exp], timeout: defaultTimeout)
+        XCTAssertEqual(seen, [["a", "b"], ["a", "b", "c"]])
+        // Outside the callback, rawItems is the latest snapshot again.
+        XCTAssertEqual(observer.rawItems, ["a", "b", "c"])
+    }
+
     // MARK: - startObserving
 
     func test_startObserving_startsFRC() throws {
