@@ -802,7 +802,42 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
 
     open func openPhotoPicker() {
-        logger.verbose("[ATTACHMENT] openPhotoPicker")
+        // Right after a system permission alert the scene is still inactive. When it
+        // re-activates, UIWindow restores the first responder it saved when the alert
+        // appeared, so a resign done now is undone and the keyboard (or a custom
+        // inputView such as an attachment panel) is drawn over the presented picker.
+        // Wait for the scene to be active, then drop the keyboard and present.
+        performWhenSceneActive { [weak self] in
+            guard let self else { return }
+            logger.verbose("[ATTACHMENT] openPhotoPicker")
+            self.inputTextView.resignFirstResponder()
+            self.presentPhotoPicker()
+        }
+    }
+
+    /// Runs `action` now if the hosting scene is foreground-active, otherwise on the
+    /// next main-queue turn after it becomes active (after UIKit's own first-responder
+    /// restoration, which also runs on activation).
+    open func performWhenSceneActive(_ action: @escaping () -> Void) {
+        let scene = view.window?.windowScene
+        guard let scene, scene.activationState != .foregroundActive else {
+            action()
+            return
+        }
+        logger.verbose("[ATTACHMENT] scene not active (\(scene.activationState.rawValue)), deferring")
+        var token: NSObjectProtocol?
+        token = NotificationCenter.default.addObserver(
+            forName: UIScene.didActivateNotification,
+            object: scene,
+            queue: .main
+        ) { _ in
+            if let token { NotificationCenter.default.removeObserver(token) }
+            token = nil
+            DispatchQueue.main.async(execute: action)
+        }
+    }
+
+    private func presentPhotoPicker() {
         router.showPhotos(selectedPhotoAssetIdentifiers: selectedPhotoAssetIdentifiers)
         { [weak self] assets, picker in
             logger.verbose("[ATTACHMENT] did select assets \(assets.count)")
@@ -865,6 +900,16 @@ open class MessageInputViewController: ViewController, UITextViewDelegate {
     }
     
     open func openCameraPicker() {
+        // Same first-responder restoration race as `openPhotoPicker` after the
+        // camera permission alert.
+        performWhenSceneActive { [weak self] in
+            guard let self else { return }
+            self.inputTextView.resignFirstResponder()
+            self.presentCameraPicker()
+        }
+    }
+
+    private func presentCameraPicker() {
         router.showCamera { [weak self] attachmentView in
             guard let self, let attachmentView else { return }
             self.selectedMediaView
