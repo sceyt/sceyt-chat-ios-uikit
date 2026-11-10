@@ -727,6 +727,13 @@ open class ChannelListViewController: ViewController,
         } else {
             if view.window == nil || tableView.visibleCells.isEmpty || !isViewDidAppear {
                 tableView.reloadData()
+            } else if !canApplyBatchUpdates(paths: paths) {
+                // UIKit raises NSInternalInconsistencyException for a batch that
+                // does not take the table's current rows to the data source's
+                // row count. Any drift between the paths and the view model's
+                // list ends up here; a reload is always correct.
+                logger.warn("ChannelListViewController: change paths do not match the data source (rows=\(tableView.numberOfRows(inSection: 0)), channels=\(channelListViewModel.numberOfChannel(at: 0)), +\(paths.inserts.count) -\(paths.deletes.count) ~\(paths.updates.count) moves=\(paths.moves.count)) — reloading")
+                tableView.reloadData()
             } else {
                 UIView.performWithoutAnimation {
                     tableView.performBatchUpdates {
@@ -739,7 +746,17 @@ open class ChannelListViewController: ViewController,
                     } completion: { [weak self] _ in
                         guard let self else { return }
                         UIView.performWithoutAnimation {
-                            let movedTo = paths.moves.map { $0.to }
+                            // This completion runs at CATransaction commit, after any
+                            // later change cycle queued on main has already been
+                            // applied, so the move targets may describe rows that
+                            // no longer exist. The iOS 26 simulator tolerates
+                            // `reloadRows` on such rows (verified); older releases
+                            // are not known to, so only rows that still exist are
+                            // refreshed. Cheap either way.
+                            let rowCount = self.tableView.numberOfRows(inSection: 0)
+                            guard rowCount == self.channelListViewModel.numberOfChannel(at: 0) else { return }
+                            let movedTo = Set(paths.moves.map { $0.to })
+                                .filter { $0.section == 0 && $0.row < rowCount }
                             let openChannelId = self.openSwipe?.channelId
                             // `reloadRows` re-dequeues, which would rebuild the
                             // action buttons under the user's finger and drop the
@@ -761,6 +778,40 @@ open class ChannelListViewController: ViewController,
                 }
             }
         }
+    }
+
+    /// Whether `paths` can be applied to the table with `performBatchUpdates`
+    /// without UIKit throwing: the row count must add up, and every index path
+    /// must be in range — deletes, reloads and move sources against the rows
+    /// the table shows now, inserts and move targets against the new count.
+    ///
+    /// Subclasses that override `updateTableView(paths:)` and keep their own
+    /// `performBatchUpdates` call should gate it on this too.
+    open func canApplyBatchUpdates(paths: ChannelListViewModel.Paths) -> Bool {
+        guard paths.sectionInserts.isEmpty, paths.sectionDeletes.isEmpty,
+              tableView.numberOfSections == 1,
+              channelListViewModel.numberOfSections == 1
+        else { return false }
+
+        let oldCount = tableView.numberOfRows(inSection: 0)
+        let newCount = channelListViewModel.numberOfChannel(at: 0)
+        guard oldCount + paths.inserts.count - paths.deletes.count == newCount
+        else { return false }
+
+        func inRange(_ indexPaths: [IndexPath], _ count: Int) -> Bool {
+            indexPaths.allSatisfy { $0.section == 0 && $0.row >= 0 && $0.row < count }
+        }
+        func unique(_ indexPaths: [IndexPath]) -> Bool {
+            Set(indexPaths).count == indexPaths.count
+        }
+        let moveSources = paths.moves.map(\.from)
+        let moveTargets = paths.moves.map(\.to)
+        let oldSide = paths.deletes + paths.updates + moveSources
+        let newSide = paths.inserts + moveTargets
+        return inRange(oldSide, oldCount)
+            && inRange(newSide, newCount)
+            && unique(oldSide)
+            && unique(newSide)
     }
 
     open func showEmptyViewIfNeeded() {
