@@ -285,17 +285,16 @@ extension MessageCell {
             super.setProgress(progress)
             playButton.isHidden = true
 
-            let message: String
-            if progress.progress <= 0.01 || progress.progress >= 1 {
-                message = data.fileSize(using: appearance.attachmentFileSizeFormatter)
-            } else if let total = progress.totalBytes, let done = progress.completedBytes {
+            if progress.progress > 0.01, progress.progress < 1,
+               let total = progress.totalBytes, let done = progress.completedBytes {
                 // Of the file the transfer moves (an upload's compressed copy), not the original.
-                message = "\(appearance.attachmentFileSizeFormatter.format(done)) • \(appearance.attachmentFileSizeFormatter.format(total))"
+                sizeLabel.text = "\(appearance.attachmentFileSizeFormatter.format(done)) • \(appearance.attachmentFileSizeFormatter.format(total))"
             } else {
-                // An upload not sending yet: its progress is a placeholder, not bytes.
-                message = L10n.Upload.preparing
+                // Not moving bytes yet (an upload still preparing: its progress is a
+                // placeholder), just started, or done: the row shows the upload's initial
+                // state — the file's size under a running ring — never a "Preparing" line.
+                sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
             }
-            sizeLabel.text = message
         }
 
         open override func setCompletion(_ completion: AttachmentTransfer.AttachmentCompletion) {
