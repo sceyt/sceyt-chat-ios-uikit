@@ -124,6 +124,36 @@ public extension ChatMessage.Attachment {
         return string
     }
 
+    /// The metadata of an attachment that reuses an already uploaded object (a checksum hit):
+    /// `storedMetadata`, with every key UIKit owns taken from `ownMetadata` where it has one.
+    /// The stored object's other keys (the key a provider encrypted it with) must go with the
+    /// object, but the media keys describe this attachment: the same file sent earlier as a
+    /// plain file has no duration, dimensions or poster, and taking its metadata whole sent
+    /// the video as 00:00. A media key this attachment lacks is still taken from the stored one.
+    static func metadata(reusing storedMetadata: String?, keepingOwnedKeysFrom ownMetadata: String?) -> String? {
+        metadata(reusing: storedMetadata, keepingOwnedKeysFrom: ownMetadata, json: .live)
+    }
+
+    internal static func metadata(reusing storedMetadata: String?, keepingOwnedKeysFrom ownMetadata: String?, json: MetadataJSON) -> String? {
+        guard let own = metadataObject(ownMetadata)?.filter({ ownedMetadataKeys.contains($0.key) }),
+              !own.isEmpty
+        else { return storedMetadata }
+        if let storedMetadata, !storedMetadata.isEmpty, metadataObject(storedMetadata) == nil {
+            // Not handled: the stored metadata is not an object, so only the media keys remain.
+            logger.warn("[Attachment] \(TransferLog.currentTag) reused metadata is not a JSON object: only this attachment's media keys are kept")
+        }
+        var object = metadataObject(storedMetadata) ?? [:]
+        object.merge(own) { _, mine in mine }
+        guard let data = try? json.serialize(object),
+              let string = json.string(data)
+        else {
+            // Not expected (both are JSON objects): the stored metadata keeps the object readable.
+            logger.error("[Attachment] \(TransferLog.currentTag) media keys \(own.keys.sorted()) could not be merged into the reused metadata: it is taken whole")
+            return storedMetadata
+        }
+        return string
+    }
+
     internal static func metadataObject(_ metadata: String?) -> [String: Any]? {
         guard let data = metadata?.data(using: .utf8), !data.isEmpty else { return nil }
         return (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]

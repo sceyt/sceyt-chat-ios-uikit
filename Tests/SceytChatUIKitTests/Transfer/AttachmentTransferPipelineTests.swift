@@ -1139,6 +1139,41 @@ final class ChecksumReuseTests: XCTestCase {
         XCTAssertEqual(new.stringMetadataEntries["sceyt.enc"], "STORED-TOKEN")
     }
 
+    /// A video whose bytes were sent earlier as a plain file: the stored object and its key are
+    /// reused, but the video keeps its own media keys. Taking the file's metadata whole sent
+    /// the video with no duration (00:00), dimensions or poster.
+    func testAHitKeepsTheAttachmentsOwnMediaKeys() throws {
+        let bytes = Data("sent as a file first".utf8)
+        try seed(bytes, url: "AS-FILE", metadata: #"{"sceyt.enc":"STORED-TOKEN","dur":99}"#)
+
+        let video = attachment(tid: 24, filePath: try file(bytes).path, metadata: #"{"szw":1920,"szh":1080,"tmb":"hash","dur":12,"pvw":"POSTER","sceyt.enc":"OWN-TOKEN"}"#, type: "video")
+        guard case .success(let link) = checksum(video) else { return XCTFail("the checksum failed") }
+
+        XCTAssertEqual(link, "AS-FILE")
+        let object = try XCTUnwrap(ChatMessage.Attachment.metadataObject(video.metadata))
+        XCTAssertEqual(object["dur"] as? Int, 12)
+        XCTAssertEqual(object["szw"] as? Int, 1920)
+        XCTAssertEqual(object["szh"] as? Int, 1080)
+        XCTAssertEqual(object["tmb"] as? String, "hash")
+        XCTAssertEqual(object["pvw"] as? String, "POSTER")
+        XCTAssertEqual(object["sceyt.enc"] as? String, "STORED-TOKEN", "the reused object was encrypted with the stored key")
+    }
+
+    /// The attachment's media keys win; a media key it lacks is still taken from the stored one.
+    func testReusedMetadataMergesOwnedKeysOverTheStoredOnes() {
+        typealias A = ChatMessage.Attachment
+        let stored = #"{"tmb":"stored","szw":10,"p.key":"K"}"#
+        let merged = A.metadataObject(A.metadata(reusing: stored, keepingOwnedKeysFrom: #"{"tmb":"own","x.local":"dropped"}"#))
+        XCTAssertEqual(merged?["tmb"] as? String, "own")
+        XCTAssertEqual(merged?["szw"] as? Int, 10)
+        XCTAssertEqual(merged?["p.key"] as? String, "K")
+        XCTAssertNil(merged?["x.local"], "an unowned key is the stored object's, not the new attachment's")
+
+        XCTAssertEqual(A.metadata(reusing: stored, keepingOwnedKeysFrom: nil), stored)
+        XCTAssertEqual(A.metadata(reusing: stored, keepingOwnedKeysFrom: "not json"), stored)
+        XCTAssertEqual(A.metadataObject(A.metadata(reusing: nil, keepingOwnedKeysFrom: #"{"dur":3}"#))?["dur"] as? Int, 3)
+    }
+
     // MARK: Collisions
 
     /// Two files whose sampled bytes are the same but whose sizes differ: the old CRC32-only

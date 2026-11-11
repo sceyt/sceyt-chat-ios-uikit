@@ -108,8 +108,9 @@ open class ChannelMessageChecksumProvider: DataProvider {
         return stored.uploadedFileSize == localSize
     }
 
-    /// On a hit the stored attachment's url is reused together with its whole metadata, so a
-    /// provider's entries (the key that object was encrypted with, say) go with it.
+    /// On a hit the stored attachment's url is reused together with its metadata, so a
+    /// provider's entries (the key that object was encrypted with, say) go with it; the media
+    /// keys stay this attachment's own (`metadata(reusing:keepingOwnedKeysFrom:)`).
     open func startChecksum(
         message: ChatMessage,
         attachment: ChatMessage.Attachment,
@@ -170,7 +171,7 @@ open class ChannelMessageChecksumProvider: DataProvider {
                             logger.info("[CHECKSUM] \(tag) hit: checksum \(checksum.checksum) reuses \(TransferLog.redact(link)) storedSize=\(stored.uploadedFileSize) size=\(localSize) from \(stored.transferLogDescription)")
                             attachment.filePath = stored.filePath
                             attachment.name = stored.name
-                            attachment.metadata = stored.metadata
+                            attachment.metadata = ChatMessage.Attachment.metadata(reusing: stored.metadata, keepingOwnedKeysFrom: attachment.metadata)
                             attachment.uploadedFileSize = stored.uploadedFileSize
                             attachment.status = .done
                             self.database.performWriteTask { context in
