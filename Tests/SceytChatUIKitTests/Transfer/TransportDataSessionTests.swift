@@ -1017,6 +1017,86 @@ final class TransportDataSessionTests: XCTestCase {
         XCTAssertFalse(infos.first === infos.last)
     }
 
+    /// Issue #3: a resume right after a pause that caught the provider's prepare, which ignores
+    /// the cancel (WAAFI makes its cipher in a detached task). The new attempt waits for the
+    /// paused one to end: never two prepares (or stagings) of one operation at once.
+    func testAResumeWaitsForThePausedAttemptToEndBeforeItPreparesAgain() throws {
+        let firstPrepare = Hold<Void>()
+        let inFlight = Locked((now: 0, most: 0))
+        let prepares = Locked(0)
+        transport.onPrepare = { _ in
+            inFlight.mutate { $0.now += 1; $0.most = max($0.most, $0.now) }
+            defer { inFlight.mutate { $0.now -= 1 } }
+            var first = false
+            prepares.mutate { $0 += 1; first = $0 == 1 }
+            if first { await firstPrepare.wait() }
+            return nil
+        }
+        let (taskInfo, recorder, _) = try upload()
+        waitUntil { firstPrepare.isWaiting }
+
+        taskInfo.stop()
+        taskInfo.resume()
+        settle(0.3)
+        XCTAssertEqual(transport.prepared.count, 1, "the new attempt waits for the paused one to end")
+
+        firstPrepare.open(())
+        waitUntil { recorder.isOver }
+        XCTAssertEqual(transport.prepared.count, 2)
+        XCTAssertEqual(inFlight.wrapped.most, 1, "never two prepares of one operation at once")
+        XCTAssertEqual(uploads(of: "upload-1"), 1, "only the new attempt uploads")
+    }
+
+    /// A previous attempt whose preparation never ends (a provider's prepare that ignores the
+    /// cancel for good) holds the new one back only until `attemptHandoverTimeout`.
+    func testANewAttemptStartsAnywayWhenThePreviousPreparationNeverEnds() throws {
+        session.attemptHandoverTimeout = 0.3
+        let stuck = Hold<Void>()
+        let prepares = Locked(0)
+        transport.onPrepare = { _ in
+            var first = false
+            prepares.mutate { $0 += 1; first = $0 == 1 }
+            if first { await stuck.wait() }
+            return nil
+        }
+        let (taskInfo, recorder, _) = try upload()
+        waitUntil { stuck.isWaiting }
+
+        taskInfo.stop()
+        taskInfo.resume()
+        waitUntil { recorder.isOver }
+
+        XCTAssertEqual(transport.prepared.count, 2)
+        XCTAssertEqual(uploads(of: "upload-1"), 1)
+        XCTAssertEqual(recorder.successes, ["REMOTE"])
+        stuck.open(())
+    }
+
+    /// A pause that comes while the new attempt still waits for the old one drops the new one:
+    /// it never prepares.
+    func testAPauseWhileTheNewAttemptWaitsForTheOldOneDropsIt() throws {
+        let firstPrepare = Hold<Void>()
+        let prepares = Locked(0)
+        transport.onPrepare = { _ in
+            var first = false
+            prepares.mutate { $0 += 1; first = $0 == 1 }
+            if first { await firstPrepare.wait() }
+            return nil
+        }
+        let (taskInfo, _, _) = try upload()
+        waitUntil { firstPrepare.isWaiting }
+
+        taskInfo.stop()
+        taskInfo.resume()
+        settle()
+        taskInfo.stop()
+        firstPrepare.open(())
+        settle(0.3)
+
+        XCTAssertEqual(transport.prepared.count, 1, "the waiting attempt was paused before it began")
+        XCTAssertEqual(uploads(of: "upload-1"), 0)
+    }
+
     func testProgressAfterTheEndIsDroppedAndDoesNotReplaceIt() throws {
         let (taskInfo, recorder, _) = try upload()
         waitUntil { recorder.isOver }

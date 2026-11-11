@@ -80,6 +80,12 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
     /// How long an upload waits for the checksum provider before it uploads anyway.
     var checksumTimeout: TimeInterval = 60
 
+    /// How long a new upload attempt waits for the preparation of the one it replaces to be
+    /// over (handed to the provider's upload, or ended) before it starts anyway. The wait keeps
+    /// two attempts of one upload from exporting, staging or calling `prepareUpload` at once;
+    /// the limit keeps a preparation that ignores cancellation from holding it back for good.
+    var attemptHandoverTimeout: TimeInterval = 10
+
     /// How many uploads run at once; the rest wait in order. One by default: a message is
     /// sent when its upload lands, so parallel uploads can send messages out of the order
     /// they were written in (a small photo overtaking an earlier video). Raise it where

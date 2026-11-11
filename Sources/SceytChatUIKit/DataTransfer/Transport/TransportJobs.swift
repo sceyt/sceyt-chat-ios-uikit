@@ -102,9 +102,14 @@ final class UploadJob: TransferJob, @unchecked Sendable {
         self.operationId = operationId
     }
 
+    /// The current attempt's preparation, for the next attempt to wait for.
+    var currentPreparation: AttemptPreparation? {
+        work.current.preparation
+    }
+
     /// Installs a new attempt's work and returns the previous attempt's, for the caller to stop.
-    func replaceWork(videoProcessInfo: SCVideoProcessInfo, task: Task<Void, Never>) -> AttemptWork.Snapshot {
-        work.replace(videoProcessInfo: videoProcessInfo, task: task)
+    func replaceWork(videoProcessInfo: SCVideoProcessInfo, preparation: AttemptPreparation, task: Task<Void, Never>) -> AttemptWork.Snapshot {
+        work.replace(videoProcessInfo: videoProcessInfo, preparation: preparation, task: task)
     }
 
     /// Stops preparation and the current invocation. To the provider this is an interruption,
@@ -114,10 +119,12 @@ final class UploadJob: TransferJob, @unchecked Sendable {
     }
 }
 
-/// One attempt's cancellable work: its task and its video export state.
+/// One attempt's cancellable work: its task, its video export state, and when its
+/// preparation is over.
 final class AttemptWork: @unchecked Sendable {
     struct Snapshot {
         let videoProcessInfo: SCVideoProcessInfo?
+        let preparation: AttemptPreparation?
         let task: Task<Void, Never>?
 
         func stop() {
@@ -127,18 +134,107 @@ final class AttemptWork: @unchecked Sendable {
     }
 
     private let lock = NSLock()
-    private var snapshot = Snapshot(videoProcessInfo: nil, task: nil)
+    private var snapshot = Snapshot(videoProcessInfo: nil, preparation: nil, task: nil)
 
     var current: Snapshot {
         lock.lock(); defer { lock.unlock() }
         return snapshot
     }
 
-    func replace(videoProcessInfo: SCVideoProcessInfo?, task: Task<Void, Never>) -> Snapshot {
+    func replace(videoProcessInfo: SCVideoProcessInfo?, preparation: AttemptPreparation?, task: Task<Void, Never>) -> Snapshot {
         lock.lock(); defer { lock.unlock() }
         let previous = snapshot
-        snapshot = Snapshot(videoProcessInfo: videoProcessInfo, task: task)
+        snapshot = Snapshot(videoProcessInfo: videoProcessInfo, preparation: preparation, task: task)
         return previous
+    }
+}
+
+/// Over once an attempt's preparation is (the export, the staging, the provider's prepare):
+/// it handed its request to the provider's upload, or it ended. The next attempt of the same
+/// upload waits for it, so two attempts never prepare, stage or call `prepareUpload` at once.
+/// Not for the upload itself: a provider takes a new invocation while an older one unwinds.
+final class AttemptPreparation: @unchecked Sendable {
+    private let lock = NSLock()
+    private var over = false
+    private var waiters = [CheckedContinuation<Void, Never>]()
+
+    func markOver() {
+        lock.lock()
+        guard !over else { lock.unlock(); return }
+        over = true
+        let waiters = waiters
+        self.waiters = []
+        lock.unlock()
+        waiters.forEach { $0.resume() }
+    }
+
+    /// Waits until it is over, at most `timeout`. False when the wait did not last: it timed
+    /// out (a preparation that ignores the cancel and never ends), or the waiting task was
+    /// cancelled (its attempt is dropped right after, so there is nothing to wait for).
+    func waitUntilOver(timeout: TimeInterval) async -> Bool {
+        let once = ResumeOnce()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                once.take(continuation)
+                let timer = Task {
+                    try? await Task.sleep(nanoseconds: UInt64(max(0, timeout) * 1_000_000_000))
+                    guard !Task.isCancelled else { return }
+                    once.resume(returning: false)
+                }
+                Task {
+                    await self.waitUntilOver()
+                    timer.cancel()
+                    once.resume(returning: true)
+                }
+            }
+        } onCancel: {
+            once.resume(returning: false)
+        }
+    }
+
+    private func waitUntilOver() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if over {
+                lock.unlock()
+                continuation.resume()
+                return
+            }
+            waiters.append(continuation)
+            lock.unlock()
+        }
+    }
+}
+
+/// Resumes its continuation once, with the first value given; later values do nothing. The
+/// value may come before the continuation (a cancel already in effect): it is then resumed
+/// with that value as soon as it is taken.
+private final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var pending: Bool?
+    private var done = false
+
+    func take(_ continuation: CheckedContinuation<Bool, Never>) {
+        lock.lock()
+        if let pending {
+            lock.unlock()
+            continuation.resume(returning: pending)
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    func resume(returning value: Bool) {
+        lock.lock()
+        guard !done else { lock.unlock(); return }
+        done = true
+        let continuation = continuation
+        self.continuation = nil
+        if continuation == nil { pending = value }
+        lock.unlock()
+        continuation?.resume(returning: value)
     }
 }
 
@@ -172,7 +268,7 @@ final class DownloadJob: TransferJob, @unchecked Sendable {
 
     /// Installs a new attempt's task and returns the previous one, for the caller to cancel.
     func replaceTask(_ task: Task<Void, Never>) -> Task<Void, Never>? {
-        work.replace(videoProcessInfo: nil, task: task).task
+        work.replace(videoProcessInfo: nil, preparation: nil, task: task).task
     }
 
     func cancelTask() {

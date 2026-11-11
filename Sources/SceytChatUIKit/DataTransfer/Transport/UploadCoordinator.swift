@@ -43,6 +43,7 @@ final class UploadCoordinator: Sendable {
     private var maxConcurrentUploads: Int { session.maxConcurrentUploads }
     private var checksumsBeforeUpload: Bool { session.checksumsBeforeUpload }
     private var checksumTimeout: TimeInterval { session.checksumTimeout }
+    private var attemptHandoverTimeout: TimeInterval { session.attemptHandoverTimeout }
     private var willBeginUpload: ((SCTDataSessionTaskInfo) -> Void)? { session.willBeginUpload }
 
     private func attempt(of job: UploadJob) -> Int { session.attempt(of: job) }
@@ -143,18 +144,35 @@ final class UploadCoordinator: Sendable {
         // Each attempt gets its own export state: a cancelled one stays cancelled, so reusing
         // it would fail the next export and send the uncompressed original.
         let videoProcessInfo = SCVideoProcessInfo()
+        let preparation = AttemptPreparation()
+        let handoverTimeout = attemptHandoverTimeout
         let (attempt, previous) = board.withState { _ -> (Int, AttemptWork.Snapshot) in
             job.attempt += 1
             let attempt = job.attempt
             job.state = .preparing
             ([job.taskInfo] + job.joined).forEach { $0.attempts = attempt }
+            // Read in the same board step that replaces it: the preparation this attempt waits for.
+            let previousPreparation = job.currentPreparation
             // Holds the session (weakly, strongly while it works): the coordinator reaches it
             // `unowned`, which is safe only while something keeps the session alive.
-            let previous = job.replaceWork(videoProcessInfo: videoProcessInfo, task: Task { [weak session = self.session] in
+            let previous = job.replaceWork(videoProcessInfo: videoProcessInfo, preparation: preparation, task: Task { [weak session = self.session] in
+                defer { preparation.markOver() }
+                // The attempt this one replaces is told to stop below, but parts of its
+                // preparation ignore a cancel (a provider's prepare, an image resize): until it
+                // is over, both would export, stage and call `prepareUpload` for the same
+                // operation. Its upload is not waited for: a provider takes a new invocation
+                // while an older one unwinds.
+                if let previousPreparation, await !previousPreparation.waitUntilOver(timeout: handoverTimeout), !Task.isCancelled {
+                    logger.warn("[Transfer] \(context.tag) upload attempt=\(attempt) the previous attempt's preparation did not end within \(Int(handoverTimeout)) s, starting anyway")
+                }
                 guard let session else { return }
+                guard session.uploads.isCurrent(job, attempt: attempt) else {
+                    logger.debug("[Transfer] \(context.tag) upload attempt=\(attempt) paused, cancelled or superseded while the previous attempt ended, not starting")
+                    return
+                }
                 // Every layer below (the provider) tags its lines with this transfer.
                 await TransferLog.$current.withValue(context) {
-                    await session.uploads.run(job, attempt: attempt, videoProcessInfo: videoProcessInfo)
+                    await session.uploads.run(job, attempt: attempt, videoProcessInfo: videoProcessInfo, preparation: preparation)
                 }
             })
             return (attempt, previous)
@@ -175,7 +193,7 @@ final class UploadCoordinator: Sendable {
         }
     }
 
-    func run(_ job: UploadJob, attempt: Int, videoProcessInfo: SCVideoProcessInfo) async {
+    func run(_ job: UploadJob, attempt: Int, videoProcessInfo: SCVideoProcessInfo, preparation: AttemptPreparation) async {
         let tag = job.taskInfo.logTag
         if checksumsBeforeUpload, await endedByChecksum(job, attempt: attempt) {
             return
@@ -225,6 +243,8 @@ final class UploadCoordinator: Sendable {
         if let preparedSize, preparedSize > 0 {
             tasks(of: job).forEach { $0.reportTransferSize(preparedSize) }
         }
+        // Prepared: a next attempt may prepare now (this upload is the provider's to unwind).
+        preparation.markOver()
         let result = await provider.upload(request) { [weak self, weak job] progress in
             guard let self, let job, self.isUploading(job, attempt: attempt) else { return }
             if let quarter = job.progressMilestone(progress) {
