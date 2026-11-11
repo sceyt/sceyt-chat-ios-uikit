@@ -1557,7 +1557,7 @@ open class MessageLayoutModel {
             size.width = max(size.width, attachment.thumbnailSize.width)
             size.height += attachment.thumbnailSize.height
         }
-        size.height += CGFloat(4 * (rows.count - 1))
+        size.height += MessageCell.AttachmentStackView.rowSpacing * CGFloat(rows.count - 1)
         return size
     }
 }

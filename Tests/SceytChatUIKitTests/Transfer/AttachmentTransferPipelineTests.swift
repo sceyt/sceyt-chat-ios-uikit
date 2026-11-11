@@ -1757,6 +1757,28 @@ final class ChatMessagePreviewAttachmentTests: XCTestCase {
         XCTAssertEqual(message.builder.build().attachments?.count, 2)
     }
 
+    /// A poster stored or sent with another type is still the video's `pvw`: it must not become
+    /// a second media row (the bubble was sized for two items and the video stretched).
+    func testAPosterWithTheWrongTypeIsStillAPreview() {
+        let video = attachment("video", url: "V", metadata: #"{"tmb":"h","pvw":"P"}"#)
+        let poster = attachment("image", url: "P")
+        let message = ChatMessage(id: 1, channelId: 1, attachments: [poster, video], user: ChatUser(id: "u"))
+
+        XCTAssertEqual(message.attachments?.map(\.url), ["V"])
+        XCTAssertEqual(message.previewAttachments?.map(\.url), ["P"])
+        XCTAssertTrue(message.previewAttachment(of: video) === poster)
+    }
+
+    /// An image that is no video's poster stays an item.
+    func testAnUnrelatedImageStaysAnItem() {
+        let video = attachment("video", url: "V", metadata: #"{"tmb":"h","pvw":"P"}"#)
+        let image = attachment("image", url: "I")
+        let message = ChatMessage(id: 1, channelId: 1, attachments: [image, video], user: ChatUser(id: "u"))
+
+        XCTAssertEqual(Set(message.attachments?.compactMap(\.url) ?? []), ["V", "I"])
+        XCTAssertNil(message.previewAttachments)
+    }
+
     func testAMessageWithoutPreviewsHasNone() {
         let video = attachment("video", url: "V", metadata: #"{"tmb":"h"}"#)
         let message = ChatMessage(id: 1, channelId: 1, attachments: [video], user: ChatUser(id: "u"))

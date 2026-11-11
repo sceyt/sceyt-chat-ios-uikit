@@ -24,6 +24,10 @@ open class ChannelAttachmentListViewModel: NSObject {
         .init(channelId: channel.id)
     public var appearance: MessageCell.Appearance
     @Published public var event: Event?
+    /// Downloads the user started from this list (the cell's download button) that failed,
+    /// delivered on the main queue. Automatic downloads stay quiet: a list full of expired
+    /// files would otherwise report one failure after another as it scrolls.
+    public let userRequestedDownloadFailure = PassthroughSubject<DownloadFailure, Never>()
     private let downloadQueue = DispatchQueue(label: "com.sceytchat.uikit.attachments", qos: .userInitiated)
 
     public var thumbnailSize: CGSize = .init(width: 40, height: 40) {
@@ -425,7 +429,12 @@ open class ChannelAttachmentListViewModel: NSObject {
                             .downloadMessageAttachments(
                                 message: message,
                                 attachments: [attachment]
-                            )
+                            ) { [weak self] _, error in
+                                guard let error else { return }
+                                DispatchQueue.main.async {
+                                    self?.userRequestedDownloadFailure.send(.init(layout: layout, error: error))
+                                }
+                            }
                     }
                 }
             }
@@ -478,6 +487,11 @@ open class ChannelAttachmentListViewModel: NSObject {
 public extension ChannelAttachmentListViewModel {
     enum Event {
         case change(ChangeItemPaths)
+    }
+
+    struct DownloadFailure {
+        public let layout: MessageLayoutModel.AttachmentLayout
+        public let error: Error
     }
 }
 

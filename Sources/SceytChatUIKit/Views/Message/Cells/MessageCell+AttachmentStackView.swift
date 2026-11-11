@@ -55,9 +55,7 @@ extension MessageCell {
                 .withoutAutoresizingMask
             v.appearance = appearance
             addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
+            pinRow(v, height: layout.thumbnailSize.height)
             v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
             return v
         }
@@ -67,9 +65,7 @@ extension MessageCell {
                 .withoutAutoresizingMask
             v.appearance = appearance
             addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
+            pinRow(v, height: layout.thumbnailSize.height)
             v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
             return v
         }
@@ -79,9 +75,7 @@ extension MessageCell {
                 .withoutAutoresizingMask
             v.appearance = appearance
             addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
+            pinRow(v, height: layout.thumbnailSize.height)
             v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
             return v
         }
@@ -91,12 +85,32 @@ extension MessageCell {
                 .withoutAutoresizingMask
             v.appearance = appearance
             addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
+            pinRow(v, height: layout.thumbnailSize.height)
             v.playPauseButton.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(onTapPlay)))
             v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
             return v
+        }
+
+        /// Vertical gap between rows; `MessageLayoutModel.calculateAttachmentsContainerSize`
+        /// reserves the same 4pt per gap when it sizes the stack.
+        public static var rowSpacing: CGFloat = 4
+
+        /// Lays a row out below the previous one at its own height.
+        ///
+        /// Every row used to be pinned to all four edges of the stack. With more than one row
+        /// the rows overlapped, and their fixed heights could not all equal the stack's (the sum
+        /// of the rows), so Auto Layout broke one and stretched an aspect-fill view across every
+        /// slot. The last row's bottom is pinned in `addAttachmentViews`, once all rows exist.
+        private func pinRow(_ row: UIView, height: CGFloat) {
+            let previous = subviews.last { $0 !== row && $0 is AttachmentView }
+            row.leadingAnchor.pin(to: leadingAnchor)
+            row.trailingAnchor.pin(to: trailingAnchor)
+            if let previous {
+                row.topAnchor.pin(to: previous.bottomAnchor, constant: Self.rowSpacing)
+            } else {
+                row.topAnchor.pin(to: topAnchor)
+            }
+            row.heightAnchor.pin(constant: height)
         }
 
         open var previewer: (() -> AttachmentPreviewDataSource?)?
@@ -181,6 +195,7 @@ extension MessageCell {
                 guard let av else { return }
                 bind(layout: layout, to: av)
             }
+            subviews.last { $0 is AttachmentView }?.bottomAnchor.pin(to: bottomAnchor)
         }
 
         private func bind(layout: MessageLayoutModel.AttachmentLayout, to av: AttachmentView) {

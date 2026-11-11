@@ -69,9 +69,28 @@ public class ChatMessage {
     }
 
     /// `attachments` without the "preview" ones, which go to the previews (with `previews`).
+    ///
+    /// A poster is recognised by its type *or* by being the url a sibling video names in its
+    /// `pvw`. The type alone is not enough: a stored row can carry a stale type (the DTO update
+    /// path never overwrites a non-empty one) and another client may type the poster
+    /// differently. A poster that slipped through became a second media row, so the bubble was
+    /// measured for two items while the video view stretched across both slots.
     static func split(_ attachments: [Attachment]?, previews: [Attachment]?) -> ([Attachment]?, [Attachment]?) {
-        let shown = attachments?.filter { !$0.isVideoPreview }
-        let found = (attachments ?? []).filter(\.isVideoPreview) + (previews ?? [])
+        let posterURLs = Set((attachments ?? []).compactMap { attachment -> String? in
+            guard attachment.type == "video",
+                  let origin = attachment.imageDecodedMetadata?.videoThumbnail,
+                  !origin.isEmpty
+            else { return nil }
+            return origin
+        })
+        func isPreview(_ attachment: Attachment) -> Bool {
+            if attachment.isVideoPreview { return true }
+            guard !posterURLs.isEmpty, attachment.type != "video", let url = attachment.url
+            else { return false }
+            return posterURLs.contains(url)
+        }
+        let shown = attachments?.filter { !isPreview($0) }
+        let found = (attachments ?? []).filter(isPreview) + (previews ?? [])
         return (shown, found.isEmpty ? nil : found)
     }
 
