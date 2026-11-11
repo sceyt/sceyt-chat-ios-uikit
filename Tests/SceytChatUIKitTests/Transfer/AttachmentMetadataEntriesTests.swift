@@ -73,6 +73,35 @@ final class AttachmentMetadataEntriesTests: XCTestCase {
         XCTAssertEqual(ChatMessage.Attachment.metadata(#"{"szw":1}"#, preservingUnownedKeysFrom: #"{"sceyt.enc":"T"}"#, json: failing), #"{"szw":1}"#)
     }
 
+    func testRollingBackRestoresOverwrittenKeysRemovesAddedOnesAndKeepsTheRest() throws {
+        let previous = #"{"szw":3,"other":"keep"}"#
+        let merged = try ChatMessage.Attachment.metadata(previous, merging: ["sceyt.enc": "K1", "other": "NEW"])
+        // A write that landed after the merge (a poster) must survive the rollback.
+        let later = try ChatMessage.Attachment.metadata(merged, merging: ["pvw": "P"])
+        let result = try object(ChatMessage.Attachment.metadata(later, restoringKeys: ["sceyt.enc", "other"], from: previous))
+        XCTAssertNil(result["sceyt.enc"], "a key the merge added is removed")
+        XCTAssertEqual(result["other"] as? String, "keep", "a key the merge overwrote is restored")
+        XCTAssertEqual(result["szw"] as? Int, 3, "a non-string key is kept")
+        XCTAssertEqual(result["pvw"] as? String, "P", "a later write is kept")
+    }
+
+    func testRollingBackAMergeIntoNoMetadataGivesNoMetadata() throws {
+        let merged = try ChatMessage.Attachment.metadata(nil, merging: ["sceyt.enc": "K1"])
+        XCTAssertNil(ChatMessage.Attachment.metadata(merged, restoringKeys: ["sceyt.enc"], from: nil))
+        XCTAssertEqual(ChatMessage.Attachment.metadata(merged, restoringKeys: ["sceyt.enc"], from: ""), "")
+    }
+
+    func testRollingBackNoKeysOrNonObjectMetadataIsUnchanged() {
+        XCTAssertEqual(ChatMessage.Attachment.metadata(#"{"a":"b"}"#, restoringKeys: [], from: nil), #"{"a":"b"}"#)
+        XCTAssertEqual(ChatMessage.Attachment.metadata("[1]", restoringKeys: ["a"], from: nil), "[1]")
+    }
+
+    func testARollbackThatCannotBeWrittenRestoresTheEarlierMetadata() {
+        let failing = MetadataJSON(serialize: { _ in throw CocoaError(.coderInvalidValue) }, string: { _ in nil })
+        let previous = #"{"szw":1}"#
+        XCTAssertEqual(ChatMessage.Attachment.metadata(#"{"szw":1,"sceyt.enc":"K1"}"#, restoringKeys: ["sceyt.enc"], from: previous, json: failing), previous)
+    }
+
     func testStringEntriesSkipOtherValues() {
         XCTAssertEqual(ChatMessage.Attachment.stringEntries(inMetadata: #"{"szw":3,"tmb":"t","hld":true,"sceyt.enc":"T"}"#), ["tmb": "t", "sceyt.enc": "T"])
         XCTAssertEqual(ChatMessage.Attachment.stringEntries(inMetadata: "not json"), [:])

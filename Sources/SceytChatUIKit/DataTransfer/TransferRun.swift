@@ -30,8 +30,11 @@ final class TransferRun {
     /// `attachments` are not parallel (an attachment already transferring has no task here).
     func observe(_ tasks: [SCTDataSessionTaskInfo]) {
         for taskInfo in tasks {
-            // The run lives as long as one of its tasks can report.
-            taskInfo.onEvent = { event in
+            // The run lives as long as one of its tasks can report. The task owns this closure:
+            // capturing it strongly would keep every finished task (and its message and run)
+            // alive for the life of the process.
+            taskInfo.onEvent = { [weak taskInfo] event in
+                guard let taskInfo else { return }
                 self.handle(event, of: taskInfo)
             }
             taskInfo.onTransferSize = { [weak taskInfo] size in
@@ -70,6 +73,8 @@ final class TransferRun {
                 done(nil)
                 return
             }
+            // What a failed save rolls back to: only the merged keys, as they were.
+            let previousMetadata = atch.metadata
             do {
                 atch.updateMetadata(try ChatMessage.Attachment.metadata(atch.metadata, merging: entries))
             } catch {
@@ -80,7 +85,10 @@ final class TransferRun {
             logger.debug("[Attachment] \(taskInfo.logTag) upload prepared entries [\(keys)], saving before the upload")
             transfer.store.save([atch], of: message) { error in
                 if let error {
-                    logger.debug("[Attachment] \(taskInfo.logTag) upload prepared entries could not be saved: \(TransferLog.describe(error))")
+                    // The attachment must not claim entries the database does not have: a
+                    // retry would find them "already saved" and upload without them stored.
+                    atch.updateMetadata(ChatMessage.Attachment.metadata(atch.metadata, restoringKeys: Set(entries.keys), from: previousMetadata))
+                    logger.debug("[Attachment] \(taskInfo.logTag) upload prepared entries [\(keys)] could not be saved, rolled back: \(TransferLog.describe(error))")
                     done(AttachmentMetadataError.saveFailed(error))
                 } else {
                     done(nil)

@@ -62,6 +62,35 @@ public extension ChatMessage.Attachment {
         return string
     }
 
+    /// `metadata` with each of `keys` put back as `previousMetadata` had it: restored when it
+    /// had the key, removed when it did not. Every other key is left as it is now, so a write
+    /// that landed after `previousMetadata` was read is kept. Undoes a `metadata(_:merging:)`
+    /// whose save failed.
+    static func metadata(_ metadata: String?, restoringKeys keys: Set<String>, from previousMetadata: String?) -> String? {
+        self.metadata(metadata, restoringKeys: keys, from: previousMetadata, json: .live)
+    }
+
+    internal static func metadata(_ metadata: String?, restoringKeys keys: Set<String>, from previousMetadata: String?, json: MetadataJSON) -> String? {
+        guard !keys.isEmpty, var object = metadataObject(metadata) else { return metadata }
+        let previous = metadataObject(previousMetadata) ?? [:]
+        for key in keys {
+            object[key] = previous[key]
+        }
+        if object.isEmpty, previous.isEmpty {
+            // Nothing is left that the merge did not add: back to what it was (nil or empty).
+            return previousMetadata
+        }
+        guard let data = try? json.serialize(object),
+              let string = json.string(data)
+        else {
+            // Not expected (the merge serialized the same kind of object): the whole earlier
+            // metadata is the closest safe state, since it never held the unsaved entries.
+            logger.error("[Attachment] \(TransferLog.currentTag) metadata keys \(keys.sorted()) could not be rolled back key by key: restoring the earlier metadata")
+            return previousMetadata
+        }
+        return string
+    }
+
     /// `newMetadata` with every key of `oldMetadata` that UIKit does not own carried over. The
     /// typed `Metadata` model only knows the media keys, so any code that rebuilds metadata
     /// from it (dimensions after a resize, the video poster) would otherwise drop a provider's

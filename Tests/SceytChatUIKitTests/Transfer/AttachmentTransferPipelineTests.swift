@@ -1447,6 +1447,62 @@ extension AttachmentTransferPipelineTests {
         XCTAssertEqual(attachment.status, .failedUploading)
         XCTAssertNil(attachment.stringMetadataEntries["sceyt.enc"])
     }
+
+    /// Entries that could not be saved are taken back out of the attachment: only the keys the
+    /// merge touched (a new key removed, an overwritten one restored), every other key kept. A
+    /// retry then saves them again instead of finding them "already saved" in memory only.
+    func testEntriesThatCouldNotBeSavedAreRolledBackAndSavedAgainOnRetry() throws {
+        let store = FailingFirstSaveStore()
+        transfer.store = store
+        transport.onPrepare = { _ in ["sceyt.enc": "K1", "other": "NEW"] }
+        let attachment = makeAttachment(tid: 72, filePath: try file().path, metadata: #"{"tmb":"x","other":"keep"}"#)
+
+        let error = upload(attachment)
+
+        guard case .saveFailed? = error as? AttachmentMetadataError else {
+            return XCTFail("expected saveFailed, got \(String(describing: error))")
+        }
+        XCTAssertTrue(transport.uploads.isEmpty, "nothing is sent without the entries saved")
+        XCTAssertNil(attachment.stringMetadataEntries["sceyt.enc"], "a key the merge added is removed")
+        XCTAssertEqual(attachment.stringMetadataEntries["other"], "keep", "a key the merge overwrote is restored")
+        XCTAssertEqual(attachment.stringMetadataEntries["tmb"], "x", "keys the merge did not touch are kept")
+
+        XCTAssertNil(upload(attachment))
+
+        XCTAssertGreaterThanOrEqual(store.saveCount, 2, "the retry saves the entries again")
+        XCTAssertEqual(transport.uploads.count, 1)
+        XCTAssertEqual(transport.uploads.first?.metadata["sceyt.enc"], "K1")
+        XCTAssertEqual(attachment.stringMetadataEntries["sceyt.enc"], "K1")
+    }
+}
+
+/// A `TransferStore` whose first save of the provider's entries ("sceyt.enc") fails; every
+/// other save, and every end, succeeds.
+private final class FailingFirstSaveStore: TransferStore {
+    private let lock = NSLock()
+    private var saves = 0
+
+    /// Saves that carried the provider's entries.
+    var saveCount: Int { lock.lock(); defer { lock.unlock() }; return saves }
+
+    func save(_ attachments: [ChatMessage.Attachment], of message: ChatMessage, completion: ((Error?) -> Void)?) {
+        guard attachments.contains(where: { $0.stringMetadataEntries["sceyt.enc"] != nil }) else {
+            completion?(nil)
+            return
+        }
+        lock.lock(); saves += 1; let first = saves == 1; lock.unlock()
+        completion?(first ? CocoaError(.fileWriteOutOfSpace) : nil)
+    }
+
+    func saveEnd(of attachments: [ChatMessage.Attachment], of message: ChatMessage, completion: @escaping (ChatMessage?, Error?) -> Void) {
+        completion(message, nil)
+    }
+
+    func saveLocalFile(of attachment: ChatMessage.Attachment, previousPath: String?, of message: ChatMessage) {}
+
+    func messageExists(_ message: ChatMessage, completion: @escaping (Bool) -> Void) {
+        completion(true)
+    }
 }
 
 // MARK: - A video's poster as a preview attachment (video-preview spec)
