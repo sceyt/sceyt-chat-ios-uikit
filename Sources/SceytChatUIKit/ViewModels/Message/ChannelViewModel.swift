@@ -1857,18 +1857,28 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         }
         guard !messages.isEmpty else { return }
 
-        let first = messages.remove(at: 0)
-        sendUserMessage(first, action: userMessage.action)
+        let first = messages[0]
+        sendUserMessagesInOrder(messages[...], action: userMessage.action)
         if let linkMetadata = userMessage.linkMetadata {
             let chatMessage = ChatMessage(message: first, channelId: channel.id)
             provider.storeLinkMetadata(linkMetadata, to: chatMessage)
         }
-        for index in 0 ..< messages.count {
-            DispatchQueue
-                .global(qos: .userInteractive)
-                .asyncAfter(deadline: .now() + TimeInterval(1 * index)) {
-                    self.sendUserMessage(messages[index], action: userMessage.action)
-                }
+    }
+
+    /// Sends `messages` (one per attachment of a single send) in the order the user picked them.
+    ///
+    /// Each message is handed to the sender only after the one before it was: stored, and its
+    /// upload queued. Uploads run one at a time in queue order and a message goes out when its
+    /// upload lands, so the hand-off order is the order the messages reach the server. They used
+    /// to be started on timers a second apart, and the second one had no delay at all: it raced
+    /// the first through `storePending`, and the receiver often saw 2, 1, 3, 4.
+    private func sendUserMessagesInOrder(_ messages: ArraySlice<Message>, action: UserSendMessage.Action) {
+        guard let next = messages.first else { return }
+        // Strong `self`: the rest of the batch must still go out if the screen closes meanwhile.
+        sendUserMessage(next, action: action) {
+            DispatchQueue.main.async {
+                self.sendUserMessagesInOrder(messages.dropFirst(), action: action)
+            }
         }
     }
 
@@ -1943,6 +1953,17 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         _ message: Message,
         action: UserSendMessage.Action
     ) {
+        sendUserMessage(message, action: action, didHandOff: nil)
+    }
+
+    /// - Parameter didHandOff: called once, when the message has been stored and handed to the
+    ///   sender (its upload, if any, is queued), or when it is stored but can't be sent (the
+    ///   channel could not be created on the server). Not the delivery: the ack comes later.
+    open func sendUserMessage(
+        _ message: Message,
+        action: UserSendMessage.Action,
+        didHandOff: (() -> Void)?
+    ) {
         if case .edit = action {} else {
             // Announces the user's intent to send, not delivery. Observers use it to
             // react to "the user wrote something in this channel" (e.g. the channel
@@ -1980,6 +2001,10 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
         }
         
+        // A store's completion can be reported twice (see `OneShotCallback`); a second hand-off
+        // would start the next message of the batch twice.
+        let handOff = OneShotCallback<Void> { _ in didHandOff?() }
+
         if channel.unSynched {
             logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched")
             Task { // may need priority
@@ -2001,14 +2026,20 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                                     }
                                 }
                             }
+                            // The sender stores this one on the database's serial writer, so a
+                            // next message stored from here on is stored after it.
+                            handOff.fire(())
                         }
                     } else {
                         logger.verbose("[MESSAGE SEND] sendUserMessage channel exists")
                         send()
+                        handOff.fire(())
                     }
                 } catch {
                     logger.verbose("[MESSAGE SEND] sendUserMessage channel unSynched error \(error)")
-                    provider.storePending(message: message)
+                    provider.storePending(message: message) { _ in
+                        handOff.fire(())
+                    }
                 }
             }
         } else {
@@ -2016,6 +2047,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             provider.storePending(message: message) { _ in
                 logger.verbose("[MESSAGE SEND] sendUserMessage channel synched send")
                 send()
+                handOff.fire(())
             }
         }
     }
