@@ -151,7 +151,10 @@ extension AttachmentTransfer {
             return
         }
         store.save(attachments, of: message)
-        merge(plan.tasks, intoGroup: Self.groupKey(of: message))
+        // A rejected task never joins the group: it ends below, before any session sees it, and
+        // a concurrent call must not wait on it as if it ran.
+        let rejected = Set(plan.rejected.map { ObjectIdentifier($0.0) })
+        merge(plan.tasks.filter { !rejected.contains(ObjectIdentifier($0)) }, intoGroup: Self.groupKey(of: message))
         // The hooks go in before any session sees a task: an event it reports at once (a fast
         // failure) is never lost.
         handle(tasks: plan.tasks, message: message, attachments: attachments, completion: completion)
@@ -199,6 +202,16 @@ extension AttachmentTransfer {
             // Nothing will ever end a task for this key: the completion is not kept (it would
             // leak, and fire on some later download).
             logger.verbose("[Attachment] \(tag) download: file already on disk")
+            return
+        }
+        let size = Int64(clamping: attachment.uploadedFileSize)
+        let available = environment.availableStorage()
+        if StorageSpace.cannotFit(size, available: available), let available {
+            // Failed like any download (a retry arrow, the app's "storage full" alert), without
+            // fetching a part that could never be written.
+            logger.error("[Attachment] \(tag) download failed before fetching: \(size) B does not fit in \(available) B free \(attachment.transferLogDescription)")
+            attachment.status = .downloading
+            plan.reject(taskInfo, StorageSpace.outOfSpaceError(needed: size, available: available))
             return
         }
         attachment.status = .downloading

@@ -832,6 +832,30 @@ extension AttachmentTransferPipelineTests {
         XCTAssertTrue(waitUntil { calls.count("first") == 1 && calls.count("second") == 2 })
     }
 
+    func testADownloadThatCannotFitFailsAsStorageFullWithoutFetching() throws {
+        transfer.environment.availableStorage = { 1_000 }
+        let attachment = makeAttachment(tid: 0, url: "REMOTE-\(UUID().uuidString)")
+        attachment.uploadedFileSize = 5_000
+        let outcome = download(attachment)
+        XCTAssertTrue(outcome.finished)
+        XCTAssertTrue(StorageSpace.isFull(outcome.error), "\(String(describing: outcome.error))")
+        XCTAssertEqual(attachment.status, .failedDownloading, "a retry arrow, not a spinner or a silent pending")
+        XCTAssertTrue(transport.downloads.isEmpty, "nothing was fetched")
+    }
+
+    func testADownloadThatFitsOrWhoseSizeIsUnknownStarts() throws {
+        let remote = try remote(of: try file(size: 300))
+        remote.attachment.uploadedFileSize = 300
+        transfer.environment.availableStorage = { 300 }
+        _ = download(remote.attachment)
+        XCTAssertEqual(transport.downloads.count, 1, "an exact fit starts")
+
+        let unknown = try self.remote(of: try file(size: 300))
+        transfer.environment.availableStorage = { 0 }
+        _ = download(unknown.attachment)
+        XCTAssertEqual(transport.downloads.count, 2, "an attachment without a size is left to the write")
+    }
+
     func testPauseAndResumeWithoutATaskOrAMatchingAttachment() throws {
         let uploading = makeAttachment(tid: 80, filePath: "/tmp/u")
         uploading.status = .uploading

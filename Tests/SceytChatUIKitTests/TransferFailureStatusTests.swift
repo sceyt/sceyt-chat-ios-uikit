@@ -33,6 +33,25 @@ final class TransferFailureStatusTests: XCTestCase {
         XCTAssertEqual(AttachmentTransfer.downloadStatus(afterFailure: NSError(domain: "x", code: 1), userCancelled: true), .pauseDownloading)
     }
 
+    func testAFullDiskFailsAndIsRecognizedThroughWrappers() {
+        let posix = NSError(domain: NSPOSIXErrorDomain, code: Int(ENOSPC))
+        let wrapped = NSError(domain: "transport", code: 1, userInfo: [NSUnderlyingErrorKey: posix])
+        for error: Error in [CocoaError(.fileWriteOutOfSpace), posix, wrapped, StorageSpace.outOfSpaceError(needed: 2, available: 1)] {
+            XCTAssertTrue(StorageSpace.isFull(error), "\(error)")
+            XCTAssertEqual(AttachmentTransfer.downloadStatus(afterFailure: error), .failedDownloading, "\(error)")
+        }
+        XCTAssertFalse(StorageSpace.isFull(nil))
+        XCTAssertFalse(StorageSpace.isFull(CocoaError(.fileNoSuchFile)))
+        XCTAssertFalse(StorageSpace.isFull(URLError(.notConnectedToInternet)))
+    }
+
+    func testOnlyAKnownSizeOverAKnownCapacityCannotFit() {
+        XCTAssertTrue(StorageSpace.cannotFit(10, available: 9))
+        XCTAssertFalse(StorageSpace.cannotFit(10, available: 10))
+        XCTAssertFalse(StorageSpace.cannotFit(10, available: nil))
+        XCTAssertFalse(StorageSpace.cannotFit(0, available: 0))
+    }
+
     func testARefusalFails() {
         XCTAssertEqual(AttachmentTransfer.downloadStatus(afterFailure: NSError(domain: "http", code: 404)), .failedDownloading)
         XCTAssertEqual(AttachmentTransfer.downloadStatus(afterFailure: AttachmentTransferError.missingURL), .failedDownloading)

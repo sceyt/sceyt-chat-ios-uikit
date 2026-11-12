@@ -24,6 +24,9 @@ public struct TransferEnvironment {
     public var imageResizeConfig: () -> SceytChatUIKit.Config.ResizeConfig
     /// Whether an upload first asks the checksum table for an object already stored.
     public var preventsDuplicateUploads: () -> Bool
+    /// The bytes free for a download, nil when unknown: one that certainly does not fit fails
+    /// before it fetches anything.
+    public var availableStorage: () -> Int64?
 
     public init(
         dataSession: @escaping () -> SCTDataSession?,
@@ -32,7 +35,8 @@ public struct TransferEnvironment {
         storage: @escaping () -> Storage.Type,
         checksumProvider: @escaping () -> ChannelMessageChecksumProvider.Type,
         imageResizeConfig: @escaping () -> SceytChatUIKit.Config.ResizeConfig = { SceytChatUIKit.shared.config.imageAttachmentResizeConfig },
-        preventsDuplicateUploads: @escaping () -> Bool = { SceytChatUIKit.shared.config.preventDuplicateAttachmentUpload }
+        preventsDuplicateUploads: @escaping () -> Bool = { SceytChatUIKit.shared.config.preventDuplicateAttachmentUpload },
+        availableStorage: @escaping () -> Int64? = { StorageSpace.availableCapacity() }
     ) {
         self.dataSession = dataSession
         self.videoProcessor = videoProcessor
@@ -41,6 +45,7 @@ public struct TransferEnvironment {
         self.checksumProvider = checksumProvider
         self.imageResizeConfig = imageResizeConfig
         self.preventsDuplicateUploads = preventsDuplicateUploads
+        self.availableStorage = availableStorage
     }
 
     /// The app's `Components`, read at each use: a component the app replaces later is the
