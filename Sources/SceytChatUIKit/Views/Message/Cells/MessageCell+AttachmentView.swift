@@ -223,9 +223,6 @@ extension MessageCell {
                   AttachmentTransfer.transferIdentity(of: data.attachment)
                     == AttachmentTransfer.transferIdentity(of: attachment)
             else { return }
-            if status == .done {
-                logger.info("[UPLOAD-TIMING] cell \(TransferLog.redact(AttachmentTransfer.transferIdentity(of: attachment))) got .done from the status relay, ring hidden=\(progressView.isHidden) at \(Int(progressView.progress * 100))%")
-            }
             data.attachment.status = status
             lastAttachmentTransferProgress = nil
             let rendered = applyTransferStatus(status)
@@ -572,9 +569,6 @@ extension MessageCell {
                 highestRenderedProgress = 0
                 pauseButton.setImage(appearance.overlayMediaLoaderAppearance.downloadIcon, for: .normal)
             case .done:
-                if !progressView.isHidden {
-                    logger.info("[UPLOAD-TIMING] cell \(data.map { TransferLog.redact(AttachmentTransfer.transferIdentity(of: $0.attachment)) } ?? "-") .done with ring on screen at \(Int(progressView.progress * 100))%: \(pendingHideWorkItem != nil || isHidingProgressView ? "already hiding" : progressView.progress >= 1 ? "hiding now" : progressView.progress > 0 ? "filling to 100% then hiding" : "hiding now (no progress)")")
-                }
                 if pendingHideWorkItem != nil || isHidingProgressView {
                     // Already on its way out: the fill-through to 100% hides it once.
                     break
