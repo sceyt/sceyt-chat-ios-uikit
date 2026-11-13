@@ -228,11 +228,17 @@ final class TransferRun {
     }
 
     private func finishSuccess(uri: String, taskInfo: SCTDataSessionTaskInfo, atch: ChatMessage.Attachment, transfer: AttachmentTransfer) {
+        if taskInfo.transferType == .upload {
+            logger.info("[UPLOAD-TIMING] \(taskInfo.logTag) success reached TransferRun \(taskInfo.sinceStart) since the task started (kind=\(atch.type))")
+        }
         // For a just-uploaded video, upload its poster frame too before completing, so the
         // merged "pvw" metadata is persisted by `end` and rides the wire message the
         // sender builds from this attachment.
         transfer.attachVideoThumbnailIfNeeded(taskInfo: taskInfo, message: message, attachment: atch) { [self] in
             TransferLog.with(taskInfo.logContext) {
+                if taskInfo.transferType == .upload {
+                    logger.info("[UPLOAD-TIMING] \(taskInfo.logTag) video-poster step over, marking .done and notifying completion observers \(taskInfo.sinceStart) since the task started")
+                }
                 atch.url = uri
                 atch.transferProgress = 1
                 atch.status = .done
@@ -261,7 +267,14 @@ final class TransferRun {
         // Only this task's attachment: the message's others belong to their own transfers.
         let identity = AttachmentTransfer.transferIdentity(of: taskInfo.attachment)
         let owned = attachments.filter { AttachmentTransfer.transferIdentity(of: $0) == identity }
+        let saveStarted = Date()
+        if taskInfo.transferType == .upload {
+            logger.info("[UPLOAD-TIMING] \(tag) saving the end to the database \(taskInfo.sinceStart) since the task started (the ring hides once .done is relayed after this save)")
+        }
         transfer.store.saveEnd(of: owned.isEmpty ? [taskInfo.attachment] : owned, of: message) { [self] storedMessage, dbError in
+            if taskInfo.transferType == .upload {
+                logger.info("[UPLOAD-TIMING] \(tag) database save of the end took \(Int(Date().timeIntervalSince(saveStarted) * 1000))ms, relaying \(error == nil && taskInfo.attachment.status == .done ? ".done" : "nothing (status \(taskInfo.attachment.status))") \(taskInfo.sinceStart) since the task started, main=\(Thread.isMainThread)")
+            }
             if let dbError {
                 logger.error("[Attachment] \(tag) \(taskInfo.transferType) end could not be persisted: \(TransferLog.describe(dbError)) \(taskInfo.attachment.transferLogDescription)")
             }

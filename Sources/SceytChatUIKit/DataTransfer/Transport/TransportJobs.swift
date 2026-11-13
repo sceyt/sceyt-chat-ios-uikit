@@ -40,6 +40,19 @@ protocol TransferJob: AnyObject {
 }
 
 /// Logs progress at 25 / 50 / 75 / 100 % only, never per chunk.
+/// `[UPLOAD-TIMING]`: true the first time it is asked, false after.
+final class OnceFlag {
+    private let lock = NSLock()
+    private var done = false
+
+    func take() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        guard !done else { return false }
+        done = true
+        return true
+    }
+}
+
 final class ProgressMilestones {
     private let lock = NSLock()
     private var logged = 0
@@ -91,6 +104,8 @@ final class UploadJob: TransferJob, @unchecked Sendable {
     /// thread, hence its own lock.
     private let work = AttemptWork()
     private let milestones = ProgressMilestones()
+    /// `[UPLOAD-TIMING]`: the provider's 99% (the bar looks full) was logged.
+    let fullProgressLogged = OnceFlag()
 
     func progressMilestone(_ progress: Double) -> Int? {
         milestones.crossed(progress)

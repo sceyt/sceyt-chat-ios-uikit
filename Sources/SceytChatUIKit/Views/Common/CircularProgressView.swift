@@ -90,14 +90,36 @@ open class CircularProgressView: View {
         ensureRotateZAnimation()
     }
 
+    /// How long a fill across the whole ring takes; a step takes its share of it, never less
+    /// than `animationDuration`. A big jump (a small upload's bytes all buffered at once) then
+    /// fills at a readable pace instead of snapping. Only while `animationDuration > 0`.
+    open var fullSweepDuration: TimeInterval = 1.2
+
     open var progress: CGFloat = 0 {
         didSet {
-            let animation = CABasicAnimation(keyPath: "strokeEnd")
-            animation.duration = animationDuration
-            animation.fromValue = oldValue
-            animation.toValue = progress
-            animation.timingFunction = CAMediaTimingFunction(name: .linear)
+            // From what is on screen: a value set mid-fill continues from there, it doesn't
+            // jump to the previous target first.
+            let shown = progressLayer.animation(forKey: "animateprogress") != nil
+                ? progressLayer.presentation()?.strokeEnd ?? oldValue
+                : oldValue
             progressLayer.strokeEnd = progress
+            let animation = CABasicAnimation(keyPath: "strokeEnd")
+            animation.fromValue = shown
+            animation.toValue = progress
+            if animationDuration <= 0 {
+                // As before: no fill to watch.
+                animation.duration = 0
+                animation.timingFunction = CAMediaTimingFunction(name: .linear)
+            } else if progress >= 1 {
+                // Done: whatever is left fills quickly, so the ring can hide right after
+                // (`animationDuration` is what the cells wait before they hide it).
+                animation.duration = animationDuration
+                animation.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            } else {
+                let share = TimeInterval(abs(progress - shown)) * fullSweepDuration
+                animation.duration = max(animationDuration, share)
+                animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            }
             progressLayer.add(animation, forKey: "animateprogress")
         }
     }

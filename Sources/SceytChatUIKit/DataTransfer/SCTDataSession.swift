@@ -312,6 +312,11 @@ open class SCTDataSessionTaskInfo: NSObject, @unchecked Sendable {
         TransferLogContext(operationId: operationId, message: message)
     }
 
+    /// `[UPLOAD-TIMING]`: `+<ms>ms` since this task started.
+    var sinceStart: String {
+        "+\(Int((Date().timeIntervalSince(startedAt) * 1000).rounded()))ms"
+    }
+
     /// `xfer=<operation> msg=<id>/<tid> channel=<id>`.
     var logTag: String {
         logContext.tag

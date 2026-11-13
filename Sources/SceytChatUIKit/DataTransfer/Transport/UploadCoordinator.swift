@@ -250,8 +250,12 @@ final class UploadCoordinator: Sendable {
             if let quarter = job.progressMilestone(progress) {
                 logger.debug("[Transfer] \(tag) upload attempt=\(attempt) progress \(quarter)%")
             }
+            if progress >= 0.99, job.fullProgressLogged.take() {
+                logger.info("[UPLOAD-TIMING] \(tag) SDK got provider progress \(Int(progress * 100))% (ring looks full) \(job.taskInfo.sinceStart) since the task started")
+            }
             self.tasks(of: job).forEach { $0.updateProgress(progress) }
         }
+        logger.info("[UPLOAD-TIMING] \(tag) provider.upload returned \(Self.describe(result)) \(job.taskInfo.sinceStart) since the task started")
         handle(result, of: job, attempt: attempt, prepared: prepared, preparedSize: preparedSize, request: request)
     }
 
@@ -514,6 +518,7 @@ final class UploadCoordinator: Sendable {
         }
         staging.discard(operationId: job.operationId)
         logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (success) ref=\(TransferLog.redact(uploaded.url))")
+        logger.info("[UPLOAD-TIMING] \(tag) reporting successURI to \(live.count) task(s) \(job.taskInfo.sinceStart) since the task started (staged=\(prepared.isStaged))")
         report(live, .successURI(uploaded.url))
     }
 

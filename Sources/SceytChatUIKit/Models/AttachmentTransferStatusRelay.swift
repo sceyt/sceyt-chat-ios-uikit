@@ -62,7 +62,11 @@ public final class AttachmentTransferStatusRelay {
         // allObjects snapshots the live observers, so a handler that triggers a nested post
         // re-enters safely. Note that reading a weak table retains+autoreleases the members —
         // observers may outlive their last strong reference until the enclosing pool drains.
-        for case let observer as AttachmentTransferStatusObserver in observers.allObjects {
+        let current = observers.allObjects
+        if status == .done {
+            logger.info("[UPLOAD-TIMING] status relay delivers .done for \(TransferLog.redact(AttachmentTransfer.transferIdentity(of: attachment))) to \(current.count) observer(s) on main")
+        }
+        for case let observer as AttachmentTransferStatusObserver in current {
             observer.attachmentTransferStatusDidChange(attachment, status: status)
         }
     }
