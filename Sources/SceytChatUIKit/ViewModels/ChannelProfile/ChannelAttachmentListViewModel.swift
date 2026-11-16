@@ -347,14 +347,32 @@ open class ChannelAttachmentListViewModel: NSObject {
             // indefinitely.
             self.downloadVideoThumbnailIfNeeded(layout)
 
-            guard shouldAutoDownload(attachment),
-                  // A stored `.done` is not proof the bytes are still there (cache
-                  // eviction, restored backup), and a stored `.pending` is not proof
-                  // they are missing. The file itself is the authority.
-                  self.attachmentTransfer.filePath(attachment: attachment) == nil
-            else {
+            guard shouldAutoDownload(attachment) else {
                 DispatchQueue.main.async {
                     completion?(layout)
+                }
+                return
+            }
+
+            // A stored `.done` is not proof the bytes are still there (cache
+            // eviction, restored backup), and a stored `.pending` is not proof
+            // they are missing. The file itself is the authority.
+            if self.attachmentTransfer.filePath(attachment: attachment) != nil {
+                // The file is on disk but the stored status may not say so: the database was
+                // rebuilt (reinstall, cleared data) while the shared storage kept the file, so
+                // the row would sit on `.pending` and draw a download button over audio that is
+                // already here. Run the chat's reconcile, which heals the status to `.done`,
+                // saves the path and relays it to the visible cells.
+                self.getMessage(layout) { message in
+                    if let message {
+                        _ = self.attachmentTransfer.downloadMessageAttachmentsIfNeeded(
+                            message: message,
+                            attachments: [attachment]
+                        )
+                    }
+                    DispatchQueue.main.async {
+                        completion?(layout)
+                    }
                 }
                 return
             }

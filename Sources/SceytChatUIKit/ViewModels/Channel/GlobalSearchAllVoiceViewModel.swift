@@ -272,28 +272,31 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         downloadQueue.async { [weak self] in
             guard let self,
                   attachment.type != "link",
-                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
-                  attachment.status != .done,
-                  attachment.status != .failedDownloading,
-                  attachment.status != .pauseDownloading,
-                  attachment.status != .failedUploading
+                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize
             else {
                 DispatchQueue.main.async { completion?(layout) }
                 return
             }
             getMessage(layout) { message in
-                if let message {
-                    self.attachmentTransfer.downloadMessageAttachments(
-                        message: message,
-                        attachments: [attachment]
-                    ) { message, error in
-                        if let attachment = message?.attachments?.first(where: { $0.id == attachment.id }) {
-                            layout.update(attachment: attachment)
-                        } else if let error {
-                            logger.errorIfNotNil(error, "Download global search voice attachment")
-                        }
-                        DispatchQueue.main.async { completion?(layout) }
+                guard let message else {
+                    DispatchQueue.main.async { completion?(layout) }
+                    return
+                }
+                // The stored status is not the authority on whether the bytes are here: the
+                // database can be rebuilt while the shared storage keeps the file (`.pending`
+                // over a file on disk) or the file can be evicted under a stored `.done`. The
+                // chat's reconcile checks the disk, heals the status either way, and starts a
+                // download only when one is needed (never for a paused or failed one).
+                _ = self.attachmentTransfer.downloadMessageAttachmentsIfNeeded(
+                    message: message,
+                    attachments: [attachment]
+                ) { message, error in
+                    if let attachment = message?.attachments?.first(where: { $0.id == attachment.id }) {
+                        layout.update(attachment: attachment)
+                    } else if let error {
+                        logger.errorIfNotNil(error, "Download global search voice attachment")
                     }
+                    DispatchQueue.main.async { completion?(layout) }
                 }
             }
         }
