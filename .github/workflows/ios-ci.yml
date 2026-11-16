@@ -50,16 +50,7 @@ jobs:
       - name: Pick simulator
         id: sim
         run: |
-          UDID=$(xcrun simctl list devices available --json | python3 -c '
-          import json, sys
-          runtimes = json.load(sys.stdin)["devices"]
-          ios = sorted((r for r in runtimes if "iOS" in r), reverse=True)
-          for r in ios:
-              for d in runtimes[r]:
-                  if d["name"].startswith("iPhone"):
-                      print(d["udid"]); sys.exit()
-          sys.exit("no iPhone simulator found")
-          ')
+          UDID=$(python3 -I scripts/pick_simulator.py)
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
       # What Swift 6 will make errors: the transfer layer stays free of data-race warnings.
