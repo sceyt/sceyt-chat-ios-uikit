@@ -375,19 +375,17 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     public func delete(members: [Member], channelId: ChannelId) {
         guard let channel = ChannelDTO.fetch(id: channelId, context: self)
         else { return }
-        let toDelete = members.compactMap {
-            MemberDTO.fetch(id: $0.id, channelId: channelId, context: self)
-        }
-        toDelete
-            .forEach {
-                delete($0)
-            }
+        // Every row, not just the first: racing writers on separate contexts can leave two
+        // MemberDTO rows for one (user, channel), and deleting one would keep a member who
+        // left or was kicked in the channel.
+        members
+            .flatMap { MemberDTO.fetchAll(id: $0.id, channelId: channelId, context: self) }
+            .forEach { delete($0) }
     }
-    
+
     public func deleteMember(id: UserId, from channelId: ChannelId) {
-        if let member = MemberDTO.fetch(id: id, channelId: channelId, context: self) {
-            delete(member)
-        }
+        MemberDTO.fetchAll(id: id, channelId: channelId, context: self)
+            .forEach { delete($0) }
     }
     
     public func updateChannelDTOs(for userId: UserId) {
