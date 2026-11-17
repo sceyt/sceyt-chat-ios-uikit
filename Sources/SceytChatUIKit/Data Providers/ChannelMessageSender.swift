@@ -400,6 +400,14 @@ open class ChannelMessageSender: DataProvider {
         }
     }
     
+    /// Deletes a sent message (it has a server id).
+    ///
+    /// Works like `deleteMessage(pendingMessage:type:)`: in one transaction the intent is stored
+    /// as a `PendingMessageDeleteDTO` and the row takes its deleted look at once — a "deleted"
+    /// tombstone for `.deleteForEveryone`, hidden for the other types. The request is then sent,
+    /// and if it can't get through (offline, timeout) `SyncService` retries it until the server
+    /// confirms or refuses it. The row is kept rather than removed so it can be restored if the
+    /// server refuses the delete.
     open func deleteMessage(
         id: MessageId,
         type: DeleteMessageType = .deleteForMe,
@@ -410,29 +418,51 @@ open class ChannelMessageSender: DataProvider {
             completion?(nil)
             return
         }
-        channelOperator
-            .deleteMessage(id: id,
-                           type: type
-            ) {message, error in
-                self.didDelete(message?.id, error: error)
-                guard let message = message
-                else {
-                    completion?(error)
-                    return
-                }
-                self.database.write ({
-                    switch type {
-                    case .deleteHard:
-                        $0.deleteMessage(id: message.id)
-                    default:
-                        $0.createOrUpdate(
-                            message: message,
-                            channelId: self.channelId
-                        )
-                    }
-                    
-                }, completion: completion)
+        logger.info("Deleting message with id \(id) in channel \(channelId), type \(type.rawValue)")
+        var record: PendingMessageDelete?
+        // The write completion can fire twice on a save error and this one sends a request.
+        let once = OneShotCompletion { [weak self] dbError in
+            guard let self else {
+                completion?(dbError)
+                return
             }
+            guard let record else {
+                logger.errorIfNotNil(dbError, "Storing pending delete for id \(id) failed")
+                self.didDelete(nil, error: dbError)
+                completion?(dbError)
+                return
+            }
+            self.flushPendingDelete(record) { error in
+                self.didDelete(error == nil ? id : nil, error: error)
+                completion?(error ?? dbError)
+            }
+        }
+        database.performWriteTask ({ context in
+            let dto = MessageDTO.fetch(id: id, context: context)
+            // Our own messages are keyed by tid (the send ack and `createOrUpdate` look them up
+            // that way); incoming ones have no tid of ours and are keyed by id.
+            let tid: Int64 = {
+                guard let dto, !dto.incoming else { return 0 }
+                return dto.tid
+            }()
+            let pending = context.addPendingMessageDelete(
+                messageTid: tid,
+                channelId: self.channelId,
+                messageId: id,
+                type: type
+            )
+            if let dto {
+                switch type {
+                case .deleteForEveryone:
+                    context.markMessageDeletedLocally(dto)
+                default:
+                    context.hideMessageLocally(dto)
+                }
+            }
+            record = pending.convert()
+        }) { dbError in
+            once.fire(dbError)
+        }
     }
     
     /// Deletes a message that has no server id yet (delivery status `pending` or `failed`).
@@ -524,14 +554,48 @@ open class ChannelMessageSender: DataProvider {
         case .retry:
             logger.info("Keeping pending delete for tid \(record.messageTid) for a later retry, attempt \(record.retryCount + 1)")
         }
+        let serverId: MessageId = {
+            if let id = message?.id, id > 0 { return id }
+            return record.messageId
+        }()
+        var refetchId: MessageId?
         database.write ({ context in
             switch outcome {
-            case .done, .drop:
-                context.removePendingMessageDelete(messageTid: record.messageTid, channelId: record.channelId)
-                // Nothing must survive locally: a late ack may have recreated the row.
-                context.deleteMessage(tid: record.messageTid, channelId: record.channelId)
-                if let id = message?.id, id > 0 {
-                    context.deleteMessage(id: id)
+            case .done:
+                context.removePendingMessageDelete(record)
+                if record.type == .deleteForEveryone,
+                   let message, message.id > 0,
+                   MessageDTO.fetch(id: message.id, context: context) != nil {
+                    // A sent message showing its local tombstone: store the server's deleted
+                    // message over it, the same as an online delete does.
+                    context.createOrUpdate(message: message, channelId: record.channelId)
+                } else {
+                    // Nothing must survive locally: a late ack may have recreated the row.
+                    if record.messageTid != 0 {
+                        context.deleteMessage(tid: record.messageTid, channelId: record.channelId)
+                    }
+                    if serverId > 0 {
+                        context.deleteMessage(id: serverId)
+                    }
+                }
+            case .drop:
+                context.removePendingMessageDelete(record)
+                let isGone = error?.sdkError == .notFound
+                    || error?.sceytChatCode == .channelNotExists
+                if !isGone, serverId > 0, let dto = MessageDTO.fetch(id: serverId, context: context) {
+                    // The message exists but the server refused the delete (e.g. not allowed):
+                    // undo the local effect and load it again, as a tombstone no longer holds
+                    // its content.
+                    dto.unlisted = false
+                    refetchId = serverId
+                } else {
+                    // Nothing to restore: drop whatever is left locally.
+                    if record.messageTid != 0 {
+                        context.deleteMessage(tid: record.messageTid, channelId: record.channelId)
+                    }
+                    if serverId > 0 {
+                        context.deleteMessage(id: serverId)
+                    }
                 }
             case .retry:
                 guard let dto = context.pendingMessageDelete(
@@ -545,7 +609,26 @@ open class ChannelMessageSender: DataProvider {
                 }
             }
         }) { _ in
+            if let refetchId {
+                self.refetchMessage(id: refetchId, channelId: record.channelId)
+            }
             completion?(outcome.isRetry ? error : nil)
+        }
+    }
+
+    /// Reloads one message from the server and stores it, used to restore a row whose delete the
+    /// server refused.
+    private func refetchMessage(id: MessageId, channelId: ChannelId) {
+        logger.info("Restoring message with id \(id) after a refused delete")
+        // The sender is often a short-lived one made for a retry operation, so the reply must not
+        // depend on it still being alive.
+        let database = self.database
+        ChannelOperator(channelId: channelId).getMessages(ids: [NSNumber(value: id)]) { messages, error in
+            logger.errorIfNotNil(error, "Restoring message with id \(id) failed")
+            guard let messages, !messages.isEmpty else { return }
+            database.write {
+                $0.createOrUpdate(messages: messages, channelId: channelId)
+            }
         }
     }
 

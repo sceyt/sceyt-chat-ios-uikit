@@ -23,7 +23,10 @@ open class PendingMessageDeleteOperation: AsyncOperation {
     public init(sender: ChannelMessageSender, record: PendingMessageDelete) {
         self.sender = sender
         self.record = record
-        super.init("\(sender.channelId)-\(record.messageTid)")
+        // Incoming messages' records have no tid and are keyed by server id instead.
+        super.init(record.messageTid != 0
+                   ? "\(sender.channelId)-\(record.messageTid)"
+                   : "\(sender.channelId)-id\(record.messageId)")
         // `AsyncOperation.timeout` is deliberately not used: its `cancel()` never sets
         // `isFinished`, which would wedge a serial queue forever.
     }

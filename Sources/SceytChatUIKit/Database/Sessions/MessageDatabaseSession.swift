@@ -101,7 +101,15 @@ public protocol MessageDatabaseSession {
 
     func removePendingMessageDelete(messageTid: Int64, channelId: ChannelId)
 
+    func removePendingMessageDelete(_ record: PendingMessageDelete)
+
     func pendingMessageDelete(messageTid: Int64, channelId: ChannelId) -> PendingMessageDeleteDTO?
+
+    func pendingMessageDelete(for message: Message, channelId: ChannelId) -> PendingMessageDeleteDTO?
+
+    func markMessageDeletedLocally(_ dto: MessageDTO)
+
+    func hideMessageLocally(_ dto: MessageDTO)
 
     func resolveSendAck(sentMessage: Message, channelId: ChannelId) -> SendAckResolution
 
@@ -259,14 +267,15 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         // The user deleted this outgoing message while the delete is still being retried on the
         // server. Keep it out of the message list rather than letting a late ack, a multi-device
         // echo or a message sync put it back on screen.
-        if !message.incoming,
-           message.tid != 0,
-           pendingMessageDelete(messageTid: Int64(message.tid), channelId: channelId) != nil {
-            logger.info("Message with tid \(message.tid) has a pending delete, keeping it unlisted")
-            dto.unlisted = true
-            if let channel = ownerChannel, channel.lastMessage == dto {
-                let predicate = NSPredicate(format: "channelId == %lld AND tid != %lld", channel.id, Int64(message.tid))
-                channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
+        // A sent message deleted for everyone keeps its "deleted" tombstone instead, the same thing
+        // the server will send once the delete reaches it.
+        if let record = pendingMessageDelete(for: message, channelId: channelId) {
+            if record.type == .deleteForEveryone, message.id > 0 {
+                logger.info("Message with id \(message.id) has a pending delete for everyone, keeping it deleted")
+                markMessageDeletedLocally(dto)
+            } else {
+                logger.info("Message with tid \(message.tid) id \(message.id) has a pending delete, keeping it unlisted")
+                hideMessageLocally(dto)
             }
         }
 
@@ -940,7 +949,12 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         messageId: MessageId,
         type: DeleteMessageType
     ) -> PendingMessageDeleteDTO {
-        let dto = PendingMessageDeleteDTO.fetchOrCreate(messageTid: messageTid, channelId: channelId, context: self)
+        let dto = PendingMessageDeleteDTO.fetchOrCreate(
+            messageTid: messageTid,
+            messageId: messageId,
+            channelId: channelId,
+            context: self
+        )
         dto.type = type
         if messageId > 0 {
             dto.messageId = Int64(messageId)
@@ -954,6 +968,56 @@ extension NSManagedObjectContext: MessageDatabaseSession {
 
     public func pendingMessageDelete(messageTid: Int64, channelId: ChannelId) -> PendingMessageDeleteDTO? {
         PendingMessageDeleteDTO.fetch(messageTid: messageTid, channelId: channelId, context: self)
+    }
+
+    public func removePendingMessageDelete(_ record: PendingMessageDelete) {
+        if record.messageTid != 0 {
+            removePendingMessageDelete(messageTid: record.messageTid, channelId: record.channelId)
+        } else {
+            PendingMessageDeleteDTO.delete(messageId: record.messageId, channelId: record.channelId, context: self)
+        }
+    }
+
+    /// The stored delete intent for `message`, if any: by tid for our own messages, by server id
+    /// for incoming ones (and for ours, should the record have been keyed by id).
+    public func pendingMessageDelete(for message: Message, channelId: ChannelId) -> PendingMessageDeleteDTO? {
+        if !message.incoming, message.tid != 0,
+           let record = pendingMessageDelete(messageTid: Int64(message.tid), channelId: channelId) {
+            return record
+        }
+        return PendingMessageDeleteDTO.fetch(messageId: message.id, channelId: channelId, context: self)
+    }
+
+    /// Turns the row into the "message deleted" tombstone the server sends for a delete for
+    /// everyone, so the UI reacts before the server has confirmed. Mirrors what
+    /// `createOrUpdate(message:channelId:changedBy:)` does for a message whose state is `.deleted`.
+    public func markMessageDeletedLocally(_ dto: MessageDTO) {
+        let deletedState = Int16(ChatMessage.State.deleted.intValue)
+        guard dto.state != deletedState else { return }
+        dto.state = deletedState
+        dto.body = ""
+        dto.bodyAttributes = []
+        dto.orderedMentionedUserIds = nil
+        dto.mentionedUsers = nil
+        dto.linkMetadatas = nil
+        dto.parent = nil
+        dto.attachments?.forEach { delete($0) }
+        // Soft delete => auto-unpin, see `syncPin(for:)`.
+        syncPin(for: dto)
+    }
+
+    /// Takes the row out of the message list without deleting it, so it can be shown again if
+    /// the server refuses the delete.
+    public func hideMessageLocally(_ dto: MessageDTO) {
+        dto.unlisted = true
+        if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self),
+           channel.lastMessage == dto {
+            let predicate = NSPredicate(
+                format: "channelId == %lld AND SELF != %@ AND unlisted == false",
+                Int64(dto.channelId), dto
+            )
+            channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
+        }
     }
 
     /// Stores a sent message unless the user already deleted it while the send was in flight.
