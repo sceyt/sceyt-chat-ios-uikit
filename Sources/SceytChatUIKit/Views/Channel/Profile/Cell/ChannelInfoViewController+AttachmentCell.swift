@@ -37,6 +37,41 @@ extension ChannelInfoViewController {
         /// True while `hideProgressView`'s shrink-out is running.
         private var isHidingProgressView = false
 
+        /// The largest value the ring has drawn for the transfer on screen. Progress reaches
+        /// this cell from two places with different latency: the transfer's own ticks, each
+        /// hopped onto main separately, and `syncTransferOverlay` reading the transfer's
+        /// freshest cached percent on every database update. An older tick landing after a
+        /// fresher sync used to animate the ring backwards. Reset whenever there is no drawn
+        /// value left to regress from (reuse, hide, pause/failure).
+        open private(set) var highestRenderedProgress: CGFloat = 0
+
+        /// How far the ring may go before the transfer's completion arrives. The last byte
+        /// arrives before the file is in place (decrypted, moved, saved), and a ring that
+        /// filled and hid at that moment left a blurred thumbnail behind it and tried to
+        /// load the sharp one from a file that wasn't there yet. Only the completion
+        /// (`update(status: .done)`) takes the ring to 100%.
+        public static var maxInFlightProgress: CGFloat = 0.9
+
+        /// A transfer's progress as the ring shows it while in flight: scaled into
+        /// `0...maxInFlightProgress` rather than clamped, so the ring moves at a steady pace
+        /// the whole way instead of racing to the cap and sitting there; the jump from the
+        /// cap to 100% on completion reads as "done".
+        public static func inFlightProgress(_ progress: Double) -> CGFloat {
+            CGFloat(min(max(progress, 0), 1)) * maxInFlightProgress
+        }
+
+        /// Hide scheduled after the ring fills to 100%, so the fill is seen before the
+        /// shrink-out. Cancelled by any newer show, rebind or reuse.
+        private var pendingHideWorkItem: DispatchWorkItem?
+
+        /// How long the full ring stays on screen after its fill, before it shrinks out.
+        public static var completedRingHold: TimeInterval = 0.15
+
+        /// Drops the floor so the next value is drawn whatever it is.
+        open func resetProgressFloor() {
+            highestRenderedProgress = 0
+        }
+
         open var overlayLoaderAppearance = CircularProgressView.Appearance(
             reference: CircularProgressView.appearance,
             progressColor: .onPrimary,
@@ -61,6 +96,77 @@ extension ChannelInfoViewController {
         /// grid must rebind — the previewer can't match the stale snapshot and would open
         /// a different item.
         open var previewAttachment: ChatMessage.Attachment?
+
+        // MARK: Progress ticks
+
+        /// Folds the transfer's progress ticks into at most one main-queue update per pass.
+        public private(set) lazy var progressTicks = MainQueueLatestValue<AttachmentTransfer.AttachmentProgress> { [weak self] progress in
+            // A tick queued for the previous binding of a reused cell is dropped.
+            guard let self, let data = self.data,
+                  AttachmentTransfer.transferIdentity(of: data.attachment)
+                    == AttachmentTransfer.transferIdentity(of: progress.attachment)
+            else { return }
+            self.setProgress(Self.inFlightProgress(progress.progress))
+            self.lastAttachmentTransferProgress = progress
+        }
+
+        // MARK: Thumbnail
+
+        /// Draws grid thumbnails off the main thread at the tile's size.
+        open var thumbnailRenderer: ThumbnailRenderer { .shared }
+
+        /// Bumped on every `setThumbnail`, so a render that finishes after a newer image was
+        /// asked for (or after the cell was rebound) is dropped.
+        private var thumbnailRequest = 0
+        /// The renderer key of what the image view shows, when it is a rendered bitmap.
+        private var displayedThumbnailKey: NSString?
+        /// The attachment whose picture the image view shows.
+        private var displayedThumbnailIdentity: String?
+
+        /// The size, in pixels, a thumbnail is drawn at for this tile.
+        open var thumbnailTargetPixelSize: CGSize {
+            let scale = traitCollection.displayScale > 0 ? traitCollection.displayScale : UIScreen.main.scale
+            return CGSize(width: bounds.width * scale, height: bounds.height * scale)
+        }
+
+        /// The one way this cell puts a picture on screen. An image clearly bigger than the tile
+        /// is drawn at the tile's size in the background (`ThumbnailRenderer`), so the main
+        /// thread never decodes a full-size file mid-scroll; a small one is shown directly.
+        /// While a render runs the tile keeps what it shows if that is the same attachment (the
+        /// blur stays until the sharp image is ready), and is cleared if it was another one.
+        open func setThumbnail(_ image: UIImage?) {
+            thumbnailRequest &+= 1
+            let identity = data.map { AttachmentTransfer.transferIdentity(of: $0.attachment) }
+            guard let image, let identity else {
+                showThumbnail(image, key: nil, identity: identity)
+                return
+            }
+            let target = thumbnailTargetPixelSize
+            guard thumbnailRenderer.needsRendering(image, targetPixelSize: target) else {
+                showThumbnail(image, key: nil, identity: identity)
+                return
+            }
+            let key = thumbnailRenderer.key(identity: identity, image: image, targetPixelSize: target)
+            if key == displayedThumbnailKey, imageView.image != nil { return }
+            if let cached = thumbnailRenderer.cachedImage(forKey: key) {
+                showThumbnail(cached, key: key, identity: identity)
+                return
+            }
+            if displayedThumbnailIdentity != identity {
+                showThumbnail(nil, key: nil, identity: nil)
+            }
+            let request = thumbnailRequest
+            thumbnailRenderer.render(image, key: key, targetPixelSize: target) { [weak self] rendered in
+                guard let self, self.thumbnailRequest == request else { return }
+                self.showThumbnail(rendered, key: key, identity: identity)
+            }
+        }
+
+        private func showThumbnail(_ image: UIImage?, key: NSString?, identity: String?) {
+            imageView.image = image
+            displayedThumbnailKey = key
+            displayedThumbnailIdentity = image == nil ? nil : identity
+        }
 
         override open func setup() {
             super.setup()
@@ -117,6 +223,20 @@ extension ChannelInfoViewController {
                   AttachmentTransfer.transferIdentity(of: data.attachment)
                     == AttachmentTransfer.transferIdentity(of: attachment)
             else { return }
+            // The relay is keyed by the stored object, which several attachments can share
+            // (one file sent in several messages). A failed or paused transfer of one of them
+            // says nothing about a sibling whose bytes are already on disk: taking it would put
+            // the download button over a finished image (and stamp the failure on its status).
+            // Not for an unsent upload, whose local file is the upload's source.
+            switch status {
+            case .failedDownloading, .pauseDownloading, .failedUploading, .pauseUploading:
+                if !data.attachment.isPendingUpload,
+                   attachmentTransfer.filePath(attachment: data.attachment) != nil {
+                    return
+                }
+            default:
+                break
+            }
             data.attachment.status = status
             lastAttachmentTransferProgress = nil
             update(status: status)
@@ -125,7 +245,7 @@ extension ChannelInfoViewController {
                 let live = data.ownerMessage.flatMap {
                     self.attachmentTransfer.currentProgressPercent(message: $0, attachment: data.attachment)
                 }
-                setProgress(live ?? 0.0001)
+                setProgress(live.map(Self.inFlightProgress) ?? 0.0001)
             default:
                 break
             }
@@ -163,9 +283,7 @@ extension ChannelInfoViewController {
             // setFileBackedThumbnail normally paints via the layout's onLoadThumbnail
             // fire, but that slot may be owned by a dead cell — paint directly so the
             // screen never depends on slot ownership.
-            if imageView.image !== image {
-                imageView.image = image
-            }
+            setThumbnail(image)
         }
 
         open func update(status: ChatMessage.Attachment.TransferStatus) {
@@ -180,10 +298,12 @@ extension ChannelInfoViewController {
                 // A paused upload keeps its task (and its last cached percent) alive so
                 // it can resume — the ring must stop and offer "tap to upload" instead
                 // of spinning on as if bytes were still going out.
+                resetProgressFloor()
                 setProgress(0.0001)
                 progressView.isHiddenProgress = true
                 pauseButton.setImage(overlayLoaderAppearance.uploadIcon ?? .attachmentUpload, for: .normal)
             case .pauseDownloading, .failedDownloading:
+                resetProgressFloor()
                 setProgress(0.0001)
                 progressView.isHiddenProgress = true
                 pauseButton.setImage(overlayLoaderAppearance.downloadIcon, for: .normal)
@@ -216,9 +336,7 @@ extension ChannelInfoViewController {
                // A reload that already ran is final: a source without size metadata and
                // smaller than the cell never meets the size, and must not reload forever.
                meetsCellResolution(thumbnail, for: data) || reloadedThumbnailAttachment == data.attachment {
-                if imageView.image !== thumbnail {
-                    imageView.image = thumbnail
-                }
+                setThumbnail(thumbnail)
                 return
             }
             reloadThumbnailFromFile(for: data.attachment)
@@ -266,8 +384,8 @@ extension ChannelInfoViewController {
                     // slot and the relay; paint directly too — the slot may not be ours.
                     layout.setFileBackedThumbnail(image)
                     self.reloadedThumbnailAttachment = attachment
-                    if let thumbnail = layout.thumbnail, self.imageView.image !== thumbnail {
-                        self.imageView.image = thumbnail
+                    if let thumbnail = layout.thumbnail {
+                        self.setThumbnail(thumbnail)
                     }
                 }
             }
@@ -295,6 +413,11 @@ extension ChannelInfoViewController {
         }
 
         open func setProgress(_ progress: CGFloat) {
+            if progress > 0, progress < 1, !progressView.isHidden, progress < highestRenderedProgress {
+                // A stale value: the ring already drew more for this transfer.
+                return
+            }
+            highestRenderedProgress = progress <= 0 ? 0 : max(highestRenderedProgress, progress)
             guard progressView.progress != progress else {
                 if progress > 0, progress < 1, progressView.isHidden {
                     // A stale hide-animation completion beat the show that set this
@@ -305,8 +428,30 @@ extension ChannelInfoViewController {
                 }
                 return
             }
-            progressView.progress = progress
-            if progress <= 0 || progress >= 1 {
+            if progress > 0, progress < 1, progressView.isHidden {
+                // Coming back on screen (a reused cell, a scrolled-in transfer): the ring
+                // still holds the previous binding's value, and animating from it plays a
+                // fill from 0 — read as the transfer starting over.
+                progressView.setProgressWithoutAnimation(progress)
+            } else {
+                progressView.progress = progress
+            }
+            if progress >= 1, !progressView.isHidden, !progressView.isHiddenProgress, !isHidingProgressView {
+                // Fill-through: let the stroke reach 100% (it animates over
+                // `animationDuration`), hold it briefly, then shrink out. Hiding on the same
+                // tick hid the ring mid-fill, so it vanished from 90%.
+                pendingHideWorkItem?.cancel()
+                let item = DispatchWorkItem { [weak self] in
+                    guard let self, self.progressView.progress >= 1 else { return }
+                    self.pendingHideWorkItem = nil
+                    self.hideProgressView()
+                }
+                pendingHideWorkItem = item
+                DispatchQueue.main.asyncAfter(
+                    deadline: .now() + progressView.animationDuration + Self.completedRingHold,
+                    execute: item
+                )
+            } else if progress <= 0 || progress >= 1 {
                 hideProgressView()
             } else {
                 showProgressView()
@@ -324,6 +469,8 @@ extension ChannelInfoViewController {
         /// `resetTransformCancellingAnimations`; otherwise a ring shown (or a cell reused)
         /// mid-shrink draws its background disc oversized and shrinks it back.
         private func cancelHideAnimation() {
+            pendingHideWorkItem?.cancel()
+            pendingHideWorkItem = nil
             overlayGeneration &+= 1
             isHidingProgressView = false
             progressView.resetTransformCancellingAnimations()
@@ -350,6 +497,7 @@ extension ChannelInfoViewController {
                 self.isHidingProgressView = false
                 self.progressView.isHidden = true
                 self.pauseButton.isHidden = true
+                self.resetProgressFloor()
                 self.progressView.transform = .identity
                 self.pauseButton.transform = .identity
                 self.refreshThumbnailFromFile()
@@ -360,17 +508,20 @@ extension ChannelInfoViewController {
             guard let data = data,
                   let message = data.ownerMessage
             else { return }
+            // Resolved here, on main: the tick block below runs on the transfer's thread and
+            // must not be the first to touch the lazy property.
+            let ticks = progressTicks
             self.attachmentTransfer
                 .progress(
                     message: message,
                     attachment: data.attachment,
                     objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infoattachment")
-                ) { [weak self] progress in
-                    guard let self, self.data?.attachment.id == data.attachment.id else { return }
-                    DispatchQueue.main.async { [weak self] in
-                        self?.setProgress(progress.progress)
-                        self?.lastAttachmentTransferProgress = progress
-                    }
+                ) { progress in
+                    // Called on the transfer's thread for every tick (every 0.5% of every
+                    // running download). Only the newest tick matters, so the ticks are folded
+                    // into one main-queue update per pass instead of one hop each — dozens of
+                    // downloads ticking at once used to flood main during a scroll.
+                    ticks.submit(progress)
                 } completion: { [weak self, transfer = attachmentTransfer] done in
                     guard self?.data?.attachment.id == data.attachment.id else { return }
                     if done.error == nil {
@@ -383,11 +534,19 @@ extension ChannelInfoViewController {
                     data.update(attachment: done.attachment)
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { return }
+                        self.progressTicks.discardPending()
                         // The transfer is over — its last progress tick must not keep
                         // driving the pause button's status resolution.
                         self.lastAttachmentTransferProgress = nil
                         if let thumbnail = self.data?.thumbnail {
-                            self.imageView.image = thumbnail
+                            self.setThumbnail(thumbnail)
+                        }
+                        if done.error == nil {
+                            // The bytes just landed on disk, so a reload that failed before
+                            // (nothing to derive a thumbnail from yet) can now succeed: lift
+                            // its cooldown instead of leaving the image blurred for it. The
+                            // `.done` update below reloads.
+                            ThumbnailReloadGate.invalidate(attachment: done.attachment)
                         }
                         self.update(status: done.attachment.status)
                     }
@@ -396,6 +555,7 @@ extension ChannelInfoViewController {
 
         override open func prepareForReuse() {
             super.prepareForReuse()
+            progressTicks.discardPending()
             // Invalidate any in-flight hide animation of the previous binding so its
             // completion can't hide the next binding's overlay (or load the wrong
             // thumbnail), and drop its shrink so the next binding starts at full size.
@@ -411,7 +571,8 @@ extension ChannelInfoViewController {
             progressView.isHidden = true
             pauseButton.isHidden = true
             progressView.isHiddenProgress = false
-            progressView.progress = 0
+            progressView.setProgressWithoutAnimation(0)
+            resetProgressFloor()
         }
 
         deinit {

@@ -1710,6 +1710,35 @@ final class TransportDataSessionTests: XCTestCase {
         XCTAssertEqual(b.successes.count, 1)
         XCTAssertEqual(b.locations, a.locations, "both get the one file")
     }
+
+    /// One file sent in several messages: each attachment has its own id (so its own operation
+    /// id), but they share the stored object and so the destination. Two jobs writing one
+    /// destination raced each other's cleanup and one failed; the second must join instead.
+    func testADownloadOfAnotherAttachmentWritingTheSameFileJoinsIt() throws {
+        let hold = Hold<FileTransferResult<URL>>()
+        transport.onDownload = { _, _ in await hold.wait() }
+        let url = "https://files.example/\(UUID().uuidString)/report.pdf"
+        session.fixedDestination = session.root.appendingPathComponent("shared/report.pdf")
+        func attachment(id: AttachmentId, messageId: MessageId) -> ChatMessage.Attachment {
+            .init(id: id, tid: 0, messageId: messageId, userId: "user", url: url, filePath: nil, type: "file", name: "report.pdf", metadata: nil, uploadedFileSize: 0, createdAt: Date())
+        }
+        let (first, a) = makeTask(attachment(id: 11, messageId: 10), .download)
+        session.download(attachment: first.attachment, taskInfo: first)
+        waitUntil { hold.isWaiting }
+        let (second, b) = makeTask(attachment(id: 21, messageId: 20), .download)
+        session.download(attachment: second.attachment, taskInfo: second)
+        XCTAssertNotEqual(first.operationId, second.operationId, "per-attachment operation ids")
+
+        hold.open(.success(try XCTUnwrap(transport.downloads.first).destinationFile))
+        waitUntil { a.isOver && b.isOver }
+
+        XCTAssertEqual(transport.downloads.count, 1, "one transfer for the shared file")
+        XCTAssertEqual(a.successes.count, 1)
+        XCTAssertEqual(b.successes.count, 1)
+        XCTAssertTrue(a.failures.isEmpty)
+        XCTAssertTrue(b.failures.isEmpty)
+        XCTAssertEqual(b.locations, a.locations, "both get the one file")
+    }
 }
 
 // MARK: - Coverage: the remaining branches of the router

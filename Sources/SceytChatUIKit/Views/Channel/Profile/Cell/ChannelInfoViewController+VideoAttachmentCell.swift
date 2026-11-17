@@ -47,7 +47,7 @@ extension ChannelInfoViewController {
                 } else {
                     timeLabel.text = ""
                 }
-                imageView.image = data.thumbnail
+                setThumbnail(data.thumbnail)
                 imageView.setup(
                     previewer: { [weak self] in self?.previewer?() },
                     item: PreviewItem.attachment(data.attachment)

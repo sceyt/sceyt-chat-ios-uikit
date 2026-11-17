@@ -314,8 +314,22 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
         let job = DownloadJob(request: request, taskInfo: taskInfo)
         // A second start of a download still running joins it: two invocations of one
         // operation would write the same destination, and only one could be controlled.
+        //
+        // "The same download" is also any running job writing the same destination file. The
+        // operation id is per attachment, but the destination is per stored object and file
+        // name, so one file sent in several messages (forwarded, re-sent) gave several jobs
+        // writing, decrypting and cleaning up one destination at once: the loser found its
+        // fetched bytes already moved away and failed, and that failure was relayed to every
+        // attachment of the object. Joined, one transfer lands the file and each task reports
+        // it for its own message.
+        let destinationPath = destination.standardizedFileURL.path
         let joinedRunning: (job: DownloadJob, state: DownloadJob.State, attempt: Int)? = board.withState { jobs in
-            guard let running = jobs.downloads.values.first(where: { $0.request.operationId == request.operationId && !$0.isFinished }) else {
+            guard let running = jobs.downloads.values.first(where: {
+                !$0.isFinished && (
+                    $0.request.operationId == request.operationId
+                        || $0.request.destinationFile.standardizedFileURL.path == destinationPath
+                )
+            }) else {
                 jobs.downloads[ObjectIdentifier(taskInfo)] = job
                 return nil
             }
@@ -325,7 +339,10 @@ open class TransportDataSession: NSObject, SCTDataSession, @unchecked Sendable {
         if let joinedRunning {
             let (running, state, attempt) = joinedRunning
             taskInfo.attempts = attempt
-            logger.info("[Transfer] \(tag) download started again while attempt \(attempt) is \(state): joins it, no second transfer \(attachment.transferLogDescription)")
+            let reason = running.request.operationId == request.operationId
+                ? "started again"
+                : "writes the same file as \(running.request.operationId)"
+            logger.info("[Transfer] \(tag) download \(reason) while attempt \(attempt) is \(state): joins it, no second transfer \(attachment.transferLogDescription)")
             taskInfo.onAction = actions(of: running)
             if case .paused = state {
                 downloads.resume(running)
