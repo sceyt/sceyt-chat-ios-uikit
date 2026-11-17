@@ -122,8 +122,11 @@ extension MessageCell {
                 if let filePath = data.attachment.filePath,
                    filePath.hasPrefix("/local/"),
                    let asset = PHAsset.fetchAssets(withLocalIdentifiers: [filePath.substring(fromIndex: 7)], options: .none).firstObject {
-                    PHImageManager.default().requestImage(for: asset, targetSize: imageView.frame.size, contentMode: .aspectFill, options: .none) { [weak self] image, _ in
-                        guard let self else { return }
+                    // The video's poster frame, not the Photos thumbnail: the same picture the
+                    // cell shows once the video is exported and sent.
+                    let layout = data
+                    Components.videoProcessor.posterFrame(photoAsset: asset) { [weak self] image in
+                        guard let self, self.data === layout else { return }
                         self.imageView.image = image ?? self.data.thumbnail
                     }
                 } else {

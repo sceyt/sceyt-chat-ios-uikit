@@ -471,10 +471,19 @@ public struct AttachmentModel {
                             duration = Int(slowMoDuration)
                         }
                         
+                        // The same poster frame the exported video's poster is made of (not the
+                        // Photos thumbnail), so the preview, its thumbHash and the sender's
+                        // preparing cell match the cell once the video is sent.
+                        let poster = Components.videoProcessor.copyFrame(asset: avAsset)
+                            .flatMap { try? Components.imageBuilder.init(image: $0).resize(max: maxDimen).uiImage }
+                        if let poster {
+                            Components.videoProcessor.storePosterFrame(poster, photoAssetIdentifier: asset.localIdentifier)
+                        }
+                        let thumbnail = poster ?? image
                         var v = AttachmentModel(
                             mediaUrl: URL(string: "local:///local/\(asset.localIdentifier)")!,
-                            thumbnail: image,
-                            imageSize: image.size,
+                            thumbnail: thumbnail,
+                            imageSize: thumbnail.size,
                             duration: duration
                         )
                         v.photoAsset = asset

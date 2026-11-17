@@ -21,39 +21,170 @@ open class VideoProcessor {
         return $0
     }(OperationQueue())
     
+    /// A frame of the video at `url`. With no `time`, the video's poster frame: see
+    /// `copyFrame(asset:at:)`.
     open class func copyFrame(
         url: URL,
-        at time: TimeInterval = 1
+        at time: TimeInterval? = nil
     ) -> UIImage? {
         // Prefer precise duration/timing so `asset.duration` is reliable on a freshly written file.
         let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
         return copyFrame(asset: asset, at: time)
     }
-    
+
+    /// A frame of `asset` at `time`, or — with no `time` — its poster frame: the first frame
+    /// that is not (nearly) black, among fixed timestamps from the start.
+    ///
+    /// The poster must come out the same from the picked original (the sender's cell while the
+    /// video is prepared) and from the exported copy (the uploaded poster, the cell once sent).
+    /// Fixed timestamps, decoded with a tight tolerance, land on the same picture in both files,
+    /// whatever their keyframe layouts; a loose tolerance snaps to the nearest keyframe, which
+    /// differs between the two.
     open class func copyFrame(
         asset: AVAsset,
-        at time: TimeInterval = 1
+        at time: TimeInterval? = nil
     ) -> UIImage? {
-        let generator = AVAssetImageGenerator(asset: asset)
-        generator.appliesPreferredTrackTransform = true
+        let durationSeconds = CMTimeGetSeconds(asset.duration)
+        let knownDuration = durationSeconds.isFinite && durationSeconds > 0 ? durationSeconds : nil
+        guard let time else {
+            return posterFrame(asset: asset, duration: knownDuration)
+        }
+        // Clamp the requested time into the asset; never the exact end of a short clip (no frame
+        // there), and fall back to the first frame when the duration is still unresolved (cold file).
+        let requestedSeconds = knownDuration.map { min(time, $0 / 2) } ?? 0
+        return looseFrame(asset: asset, at: requestedSeconds)
+    }
+
+    /// Timestamps (seconds) tried in order for the poster frame.
+    open class var posterFrameCandidates: [TimeInterval] {
+        [0, 0.25, 0.5, 1, 1.5, 2, 3, 4, 5]
+    }
+
+    private static func posterFrame(asset: AVAsset, duration: TimeInterval?) -> UIImage? {
+        let generator = makeGenerator(asset: asset)
+        // Exact-ish: a frame at most this far after the timestamp (the first frame of a file
+        // often starts a few ms after 0), none before it.
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = CMTime(seconds: 0.1, preferredTimescale: 600)
+        let candidates = posterFrameCandidates.filter { seconds in
+            // Unknown duration (cold file): only the first frame is certain to exist.
+            guard let duration else { return seconds == 0 }
+            return seconds == 0 || seconds < duration
+        }
+        var firstFrame: CGImage?
+        for seconds in candidates {
+            guard let cgImage = try? generator.copyCGImage(
+                at: CMTime(seconds: seconds, preferredTimescale: 600),
+                actualTime: nil
+            ) else { continue }
+            if !isNearlyBlack(cgImage) {
+                return UIImage(cgImage: cgImage)
+            }
+            if firstFrame == nil { firstFrame = cgImage }
+        }
+        if let firstFrame {
+            // An all-dark opening: the first frame, still the same in both files.
+            return UIImage(cgImage: firstFrame)
+        }
+        // The tight tolerance found nothing (some GOP layouts, freshly downloaded files):
+        // any decodable frame near the start beats none.
+        return looseFrame(asset: asset, at: 0)
+    }
+
+    private static func looseFrame(asset: AVAsset, at seconds: TimeInterval) -> UIImage? {
+        let generator = makeGenerator(asset: asset)
         // Return the nearest decodable frame instead of demanding an exact one — zero tolerance
         // throws AVErrorNoImageAtTime on many GOP layouts (and on freshly downloaded files), which
         // is the deterministic case a retry alone can never recover from.
         generator.requestedTimeToleranceBefore = .positiveInfinity
         generator.requestedTimeToleranceAfter = .positiveInfinity
-        // Clamp the requested time into the asset; never the exact end of a short clip (no frame
-        // there), and fall back to the first frame when the duration is still unresolved (cold file).
-        let durationSeconds = CMTimeGetSeconds(asset.duration)
-        let requestedSeconds = (durationSeconds.isFinite && durationSeconds > 0)
-            ? min(time, durationSeconds / 2)
-            : 0
-        let requestedTime = CMTime(seconds: requestedSeconds, preferredTimescale: 600)
         do {
-            let cgImage = try generator.copyCGImage(at: requestedTime, actualTime: nil)
+            let cgImage = try generator.copyCGImage(at: CMTime(seconds: seconds, preferredTimescale: 600), actualTime: nil)
             return UIImage(cgImage: cgImage)
         } catch {
-            logger.errorIfNotNil(error, "Copy video frame at \(requestedSeconds) s., given value id \(time) s.")
+            logger.errorIfNotNil(error, "Copy video frame at \(seconds) s.")
             return nil
+        }
+    }
+
+    private static func makeGenerator(asset: AVAsset) -> AVAssetImageGenerator {
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        return generator
+    }
+
+    /// True when `image` is (nearly) black: its brightest spot, sampled on a small grid, is dark.
+    static func isNearlyBlack(_ image: CGImage) -> Bool {
+        let side = 16
+        var pixels = [UInt8](repeating: 0, count: side * side * 4)
+        let drawn: Bool = pixels.withUnsafeMutableBytes { buffer in
+            guard let context = CGContext(
+                data: buffer.baseAddress,
+                width: side,
+                height: side,
+                bitsPerComponent: 8,
+                bytesPerRow: side * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            ) else { return false }
+            context.interpolationQuality = .low
+            context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+            return true
+        }
+        guard drawn else { return false }
+        var brightest = 0
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            // Rec. 601 luma, integer.
+            let luma = (299 * Int(pixels[index]) + 587 * Int(pixels[index + 1]) + 114 * Int(pixels[index + 2])) / 1000
+            brightest = max(brightest, luma)
+        }
+        return brightest < 24
+    }
+
+    private static let posterFrameCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.countLimit = 30
+        return cache
+    }()
+
+    /// Remembers `image` as the poster frame of the Photos asset `localIdentifier`, for
+    /// `posterFrame(photoAsset:completion:)`.
+    open class func storePosterFrame(_ image: UIImage, photoAssetIdentifier localIdentifier: String) {
+        posterFrameCache.setObject(image, forKey: localIdentifier as NSString)
+    }
+
+    /// The poster frame (`copyFrame(asset:)`) of a picked Photos video, for the sender's cell
+    /// while the video is still prepared, so it shows what the cell shows once sent; the
+    /// Photos thumbnail (its own poster) when the video can't be read. Completes on main.
+    open class func posterFrame(photoAsset asset: PHAsset, completion: @escaping (UIImage?) -> Void) {
+        let key = asset.localIdentifier as NSString
+        if let cached = posterFrameCache.object(forKey: key) {
+            completion(cached)
+            return
+        }
+        let photosThumbnail: () -> Void = {
+            _ = PHImageManager.default().requestImage(
+                for: asset,
+                targetSize: CGSize(width: 848, height: 848),
+                contentMode: .aspectFit,
+                options: nil
+            ) { image, _ in completion(image) }
+        }
+        let options = PHVideoRequestOptions()
+        options.version = .current
+        options.deliveryMode = .highQualityFormat
+        PHImageManager.default().requestAVAsset(forVideo: asset, options: options) { avAsset, _, _ in
+            guard let avAsset else {
+                DispatchQueue.main.async { photosThumbnail() }
+                return
+            }
+            let frame = copyFrame(asset: avAsset)
+                .flatMap { try? Components.imageBuilder.init(image: $0).resize(max: 848).uiImage }
+            DispatchQueue.main.async {
+                guard let frame else { return photosThumbnail() }
+                posterFrameCache.setObject(frame, forKey: key)
+                completion(frame)
+            }
         }
     }
     

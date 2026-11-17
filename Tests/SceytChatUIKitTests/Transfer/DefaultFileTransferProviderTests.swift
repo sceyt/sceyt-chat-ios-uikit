@@ -879,7 +879,7 @@ final class SCTSessionTransportTests: XCTestCase {
 /// A video processor that returns a fixed frame.
 private final class FrameProcessor: VideoProcessor {
     static var frame: UIImage?
-    override class func copyFrame(url: URL, at time: TimeInterval = 1) -> UIImage? { frame }
+    override class func copyFrame(url: URL, at time: TimeInterval? = nil) -> UIImage? { frame }
 }
 
 /// Storage whose thumbnails go under a path that cannot be a folder.

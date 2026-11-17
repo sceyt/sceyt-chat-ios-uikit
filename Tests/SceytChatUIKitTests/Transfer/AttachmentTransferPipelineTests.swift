@@ -677,7 +677,7 @@ private final class SessionlessTransfer: AttachmentTransfer {
 /// A video processor that returns one fixed frame.
 private final class OneFrameProcessor: VideoProcessor {
     static var frame: UIImage?
-    override class func copyFrame(url: URL, at time: TimeInterval = 1) -> UIImage? { frame }
+    override class func copyFrame(url: URL, at time: TimeInterval? = nil) -> UIImage? { frame }
 }
 
 extension AttachmentTransferPipelineTests {
