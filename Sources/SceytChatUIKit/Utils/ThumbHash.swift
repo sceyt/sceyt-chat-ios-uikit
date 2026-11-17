@@ -34,8 +34,11 @@ import Foundation
 func rgbaToThumbHash(w: Int, h: Int, rgba: Data) -> Data {
     // Encoding an image larger than 100x100 is slow with no benefit
     assert(w <= 100 && h <= 100)
-    assert(rgba.count == w * h * 4)
-    
+    // A zero dimension makes the DCT divide by w * h == 0, producing NaN that
+    // traps on the UInt32/UInt16/UInt8 conversions below.
+    guard w > 0, h > 0, rgba.count >= w * h * 4
+    else { return Data() }
+
     // Determine the average color
     var avg_r: Float32 = 0
     var avg_g: Float32 = 0
@@ -237,7 +240,7 @@ func rgbaToThumbHash(w: Int, h: Int, rgba: Data) -> Data {
 
 func thumbHashToRGBA(hash: Data) -> (Int, Int, Data) {
     // Read the constants
-    guard hash.count >= 4
+    guard hash.count >= 5 // header is 5 bytes; hash[4] is read below
     else { return (0, 0, Data())}
     let h0 = UInt32(hash[0])
     let h1 = UInt32(hash[1])
@@ -565,8 +568,11 @@ import UIKit
 
 func imageToThumbHash(image: UIImage) -> Data {
     let size = image.size
-    let w = Int(round(100 * size.width / max(size.width, size.height)))
-    let h = Int(round(100 * size.height / max(size.width, size.height)))
+    guard size.width > 0, size.height > 0, size.width.isFinite, size.height.isFinite
+    else { return Data() }
+    // Clamp to 1 so extreme aspect ratios (> ~200:1) don't round a side down to 0
+    let w = max(1, Int(round(100 * size.width / max(size.width, size.height))))
+    let h = max(1, Int(round(100 * size.height / max(size.width, size.height))))
     var rgba = Data(count: w * h * 4)
     rgba.withUnsafeMutableBytes { rgba in
         if
