@@ -144,6 +144,12 @@ extension MessageCell {
             !progressView.isHidden
         }
 
+        /// Re-resolves anything that shares the centre of the thumbnail with the transfer
+        /// overlay (the view-once icon) against `isTransferOverlayVisible`. Called on every
+        /// path that puts the overlay on or off screen, so a subclass derives its visibility
+        /// from one rule instead of assigning it along individual paths. No-op by default.
+        open func transferOverlayVisibilityDidChange() {}
+
         /// True when the bound attachment is an outgoing file that has not been uploaded yet.
         /// `.pending` on such an attachment means "queued to upload" — waiting behind the
         /// serialized upload queue, or waiting for a connection after an offline attempt —
@@ -372,7 +378,10 @@ extension MessageCell {
         }
         
         open func setProgress(_ progress: CGFloat) {
-            defer { updateProgressLabelVisibility() }
+            defer {
+                updateProgressLabelVisibility()
+                transferOverlayVisibilityDidChange()
+            }
             guard !isStaleProgress(progress)
             else { return }
             // Until the transport sends the file (it reports the file's size first), an upload's
@@ -484,6 +493,7 @@ extension MessageCell {
             cancelHideAnimation()
             progressView.isHidden = false
             pauseButton.isHidden = false
+            transferOverlayVisibilityDidChange()
         }
 
         /// Stops a running shrink-out and puts the overlay back at full size (see
@@ -537,12 +547,16 @@ extension MessageCell {
         
         open func didHideProgressView() {
             pauseButton.isHidden = true
+            transferOverlayVisibilityDidChange()
         }
         
         open func update(status: ChatMessage.Attachment.TransferStatus) {
             progressView.isHiddenProgress = false
             progressView.rotateZ = true
-            defer { updateProgressLabelVisibility() }
+            defer {
+                updateProgressLabelVisibility()
+                transferOverlayVisibilityDidChange()
+            }
             switch status {
             case .pending:
                 // A queued upload. Offline this is where the attachment sits for the whole
@@ -705,6 +719,7 @@ extension MessageCell {
             progressLabel.isHidden = true
             progressLabel.text = nil
             pauseButton.isHidden = true
+            transferOverlayVisibilityDidChange()
         }
 
         /// The status this view should *render* for `stored`, resolved from the transfer rather

@@ -111,7 +111,6 @@ extension MessageCell {
                 // Show/hide blur and fire icon based on viewOnce
                 let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
                 blurEffectView.isHidden = !isViewOnce
-                fireIconContainerView.isHidden = !isViewOnce
 
                 // Resolve the play button *after* the transfer state, not before: binding a
                 // video whose bytes are already on disk while its ring is still on screen
@@ -157,13 +156,6 @@ extension MessageCell {
         override open func setProgress(_ progress: CGFloat) {
             guard progressView.progress != progress
             else { return }
-            if progress > 0, progress < 1 {
-                // Hide viewOnce blur and fire icon during upload/download to avoid double blur
-                let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
-                if isViewOnce {
-                    fireIconContainerView.isHidden = true
-                }
-            }
             super.setProgress(progress)
             updatePlayButtonVisibility()
         }
@@ -190,10 +182,6 @@ extension MessageCell {
         open override func didHideProgressView() {
             super.didHideProgressView()
 
-            // Show viewOnce blur and fire icon again after upload/download completes
-            let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
-            fireIconContainerView.isHidden = !isViewOnce
-
             // The reveal runs here rather than in `willHideProgressView`: popping the play
             // button in as the ring starts shrinking put both in the middle of the thumbnail
             // for the length of that animation, with the ring still drawn at 100%.
@@ -212,18 +200,23 @@ extension MessageCell {
 
         override open func update(status: ChatMessage.Attachment.TransferStatus) {
             super.update(status: status)
-
-            // Hide fire icon when showing download/upload icons
-            switch status {
-            case .pauseDownloading, .failedDownloading, .pauseUploading, .failedUploading:
-                fireIconContainerView.isHidden = true
-            default:
-                let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
-                fireIconContainerView.isHidden = !isViewOnce
-            }
             // A paused/failed download puts the overlay back on screen without going through
             // `setProgress`, so the play button has to be re-resolved from here too.
             updatePlayButtonVisibility()
+        }
+
+        /// The view-once icon and the transfer overlay are the same size and both sit in the
+        /// centre of the thumbnail, so at most one of them may be on screen: the icon is shown
+        /// only while no upload/download overlay (ring, pause/retry button, including its
+        /// shrink-out) is visible, and comes back once the overlay is gone.
+        open var shouldShowViewOnceIcon: Bool {
+            guard let data else { return false }
+            return (data.ownerMessage?.isViewOnceMessage ?? false) && !isTransferOverlayVisible
+        }
+
+        override open func transferOverlayVisibilityDidChange() {
+            super.transferOverlayVisibilityDidChange()
+            fireIconContainerView.isHidden = !shouldShowViewOnceIcon
         }
 
         open override func layoutSubviews() {

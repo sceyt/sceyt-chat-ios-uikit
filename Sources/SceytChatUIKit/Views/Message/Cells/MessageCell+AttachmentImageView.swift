@@ -121,39 +121,18 @@ extension MessageCell {
             }
         }
 
-        override open func setProgress(_ progress: CGFloat) {
-            guard progressView.progress != progress
-            else { return }
-
-            // Hide viewOnce blur and fire icon during upload/download to avoid double blur
-            if progress > 0, progress < 1 {
-                let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
-                if isViewOnce {
-                    fireIconContainerView.isHidden = true
-                }
-            }
-            super.setProgress(progress)
+        /// The view-once icon and the transfer overlay are the same size and both sit in the
+        /// centre of the thumbnail, so at most one of them may be on screen: the icon is shown
+        /// only while no upload/download overlay (ring, pause/retry button, including its
+        /// shrink-out) is visible, and comes back once the overlay is gone.
+        open var shouldShowViewOnceIcon: Bool {
+            guard let data else { return false }
+            return (data.ownerMessage?.isViewOnceMessage ?? false) && !isTransferOverlayVisible
         }
 
-        override open func didHideProgressView() {
-            super.didHideProgressView()
-
-            // Show viewOnce blur and fire icon again after upload/download completes
-            let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
-            fireIconContainerView.isHidden = !isViewOnce
-        }
-
-        override open func update(status: ChatMessage.Attachment.TransferStatus) {
-            super.update(status: status)
-
-            // Hide fire icon when showing download/upload icons
-            switch status {
-            case .pauseDownloading, .failedDownloading, .pauseUploading, .failedUploading:
-                fireIconContainerView.isHidden = true
-            default:
-                let isViewOnce = data.ownerMessage?.isViewOnceMessage ?? false
-                fireIconContainerView.isHidden = !isViewOnce
-            }
+        override open func transferOverlayVisibilityDidChange() {
+            super.transferOverlayVisibilityDidChange()
+            fireIconContainerView.isHidden = !shouldShowViewOnceIcon
         }
     }
 }

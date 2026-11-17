@@ -399,23 +399,29 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                         }
                     }
                 }
-                return
-            }
-            
-            if let prevMessage, let _ = layoutModel(for: prevMessage) {
-                if prevMessage.user.id != message.user.id {
-                    layoutModel(for: message)?.showUserInfo(true)
-                } else {
-                    //                    layoutModel(for: message)?.showUserInfo(false)
+            } else {
+                if let prevMessage, let prevModel = layoutModel(for: prevMessage) {
+                    // The "New messages" separator is drawn under the last displayed
+                    // message, so the one right after it starts a new group and carries
+                    // its sender's avatar and name even when the sender is the same.
+                    // Checked from this side too: a message inserted below an anchor that
+                    // is not itself part of the change would otherwise never get it.
+                    if prevMessage.user.id != message.user.id || prevModel.isLastDisplayedMessage {
+                        layoutModel(for: message)?.showUserInfo(true)
+                    }
+                }
+
+                if let nextMessage, let nextModel = layoutModel(for: nextMessage) {
+                    if nextMessage.user.id == message.user.id {
+                        nextModel.showUserInfo(false)
+                    }
                 }
             }
-            
-            if let nextMessage, let nextModel = layoutModel(for: nextMessage) {
-                if nextMessage.user.id == message.user.id {
-                    nextModel.showUserInfo(false)
-                }
-            }
-            
+
+            // Runs for the first message of a section as well. That branch used to return
+            // early, so when the separator sat under the first message of the day (e.g. the
+            // read message was later deleted and the same sender wrote again), the message
+            // below the separator had its avatar taken away just above and never got it back.
             if let model = layoutModel(for: message), model.isLastDisplayedMessage {
                 if let nextMessage, let nextModel = layoutModel(for: nextMessage) {
                     nextModel.showUserInfo(true)
