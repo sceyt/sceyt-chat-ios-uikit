@@ -468,8 +468,22 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                 if let message = cachedMessage(toIndexPath) {
                     updateUserInfo(indexPath: toIndexPath, message: cachedMessage(toIndexPath) ?? message)
                 }
-            case .delete:
-                break
+            case let .delete(indexPath):
+                // The removed row's neighbours are now adjacent and have to be regrouped:
+                // the row that took its place may start a group (or, after the same
+                // sender, continue one), and the row above decides whether that one keeps
+                // its avatar and name. Neither is part of this change otherwise, so
+                // without this they kept the grouping they had next to the removed row
+                // until something else reloaded them.
+                if indexPath.item > 0 {
+                    let above = IndexPath(item: indexPath.item - 1, section: indexPath.section)
+                    if let message = cachedMessage(above) {
+                        updateUserInfo(indexPath: above, message: message)
+                    }
+                }
+                if let message = cachedMessage(indexPath) {
+                    updateUserInfo(indexPath: indexPath, message: message)
+                }
             case let .update(indexPath, message):
                 updateUserInfo(indexPath: indexPath, message: message)
                 break

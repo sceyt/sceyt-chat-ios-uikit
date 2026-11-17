@@ -605,6 +605,13 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
         }
     }
     
+    /// Whether a shown row that a refresh moved outside `fetchPredicate` should be removed from
+    /// the list. The default keeps it: the fetch predicate also bounds the loaded window, so
+    /// failing it usually only means the row is outside that window. Called on `context`'s queue.
+    open func shouldRemoveCachedItem(_ dto: DTO) -> Bool {
+        false
+    }
+
     @objc
     open func willSaveObjects(notification: Notification) {
         guard isObserverStarted else { return }
@@ -658,11 +665,27 @@ open class LazyDatabaseObserver<DTO: NSManagedObject, Item>: NSObject, NSFetched
                         !filteredObjectIDs.contains(dto.objectID) &&
                         readCache({ self.mainCaches.mapItems[dto.objectID] }) != nil
                     }
-                    dtos += cachedDtos
-                    if !dtos.isEmpty {
+                    // A shown row outside the fetch predicate is normally just outside the
+                    // current window and is kept. One that no longer belongs in the list at
+                    // all (hidden by a delete for me, say) must leave it now, not when the
+                    // row is finally deleted.
+                    let removedDtos = cachedDtos.filter { shouldRemoveCachedItem($0) }
+                    let removedIDs = Set(removedDtos.map(\.objectID))
+                    dtos += cachedDtos.filter { !removedIDs.contains($0.objectID) }
+                    if !dtos.isEmpty || !removedDtos.isEmpty {
                         willChangeCache()
-                        shouldInsert = reload(dtos: dtos, in: &insertCache, changeItems: &changeItems, changeSections: &changeSections)
                         sendEvent = true
+                    }
+                    // Removals go first, so the reload below records the positions its rows
+                    // end up at. Done the other way round, every reload path past a removed
+                    // row is one off, and `ChannelViewModel` reads those paths back to regroup
+                    // neighbouring bubbles (avatar, name, tail).
+                    if !removedDtos.isEmpty {
+                        logger.debug("[LazyDatabaseObserver<\(DTO.entity().name ?? "?")>] removing \(removedDtos.count) refreshed row(s) that left the list")
+                        delete(dtos: removedDtos, in: &insertCache, changeItems: &changeItems, changeSections: &changeSections)
+                    }
+                    if !dtos.isEmpty {
+                        shouldInsert = reload(dtos: dtos, in: &insertCache, changeItems: &changeItems, changeSections: &changeSections)
                     }
                 }
                 

@@ -38,18 +38,24 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         #keyPath(MessageDTO.poll.closed)
     ]
     
+    /// The rules for a message to belong in a channel's list, with no window bounds. Load
+    /// windows are built on top of it (`listPredicate AND id-range`), and
+    /// `shouldRemoveCachedItem(_:)` relies on it holding nothing but list rules.
+    public static func listPredicate(channelId: ChannelId, now: Date = Date()) -> NSPredicate {
+        let autoDeleteThreshold = now.addingTimeInterval(-60)
+        return NSPredicate(
+            format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false AND (autoDeleteAt == nil OR autoDeleteAt > %@)",
+            channelId,
+            autoDeleteThreshold.bridgeDate
+        )
+    }
+
     public init(
         channelId: ChannelId,
         loadRangeProvider: LoadRangeProvider,
         itemCreator: @escaping (MessageDTO) -> ChatMessage
     ) {
-        let autoDeleteThreshold = Date().addingTimeInterval(-60)
-
-        defaultFetchPredicate = NSPredicate(
-            format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false AND (autoDeleteAt == nil OR autoDeleteAt > %@)",
-            channelId,
-            autoDeleteThreshold.bridgeDate
-        )
+        defaultFetchPredicate = Self.listPredicate(channelId: channelId)
         currentFetchPredicate = defaultFetchPredicate
         self.loadRangeProvider = loadRangeProvider
         self.channelId = channelId
@@ -66,6 +72,8 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         )
     }
     
+    /// `fetchPredicate` becomes `defaultFetchPredicate`, so it must hold list rules only (see
+    /// `listPredicate(channelId:now:)`): a row failing it is taken off the list on refresh.
     public override init(
         context: NSManagedObjectContext,
         sortDescriptors: [NSSortDescriptor],
@@ -90,6 +98,19 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         )
     }
     
+    /// A shown row leaves the list as soon as it breaks one of the list's own rules — not
+    /// only when the row is finally deleted. `defaultFetchPredicate` holds exactly those
+    /// rules (channel, not a thread reply, not a hidden reply-parent stub, not `unlisted`,
+    /// not auto-deleted) and none of the window bounds: every load window is built as
+    /// `defaultFetchPredicate AND id-range`, so a row that only fell outside the loaded
+    /// window still passes it and is kept.
+    ///
+    /// Covers a delete for me waiting for the server (`unlisted`) and a parent stub
+    /// hidden by a history clear (`replied`), plus any rule added to the predicate later.
+    open override func shouldRemoveCachedItem(_ dto: MessageDTO) -> Bool {
+        !defaultFetchPredicate.evaluate(with: dto)
+    }
+
     open func startObserver(
         initialMessageId: MessageId,
         lastMessageId: MessageId,
