@@ -190,7 +190,13 @@ final class ChannelInfoMediaCellThumbnailTests: XCTestCase {
         mock.setThumbnailPath(bigPath, for: attachment.id)
         cell.update(status: .done)
 
-        XCTAssertTrue(waitUntil { cell.imageView.image?.size == CGSize(width: 400, height: 400) },
+        // Not an exact 400×400: `setThumbnail` renders oversized images down to the cell's
+        // pixel size (ThumbnailRenderer), so the frame arrives at roughly the cell's size.
+        // What matters is that the 10×10 poster was replaced by something grid-sized.
+        XCTAssertTrue(waitUntil {
+                          guard let image = cell.imageView.image else { return false }
+                          return max(image.size.width, image.size.height) * image.scale > 100
+                      },
                       "a done video must replace a too-small poster with its real thumbnail")
     }
 

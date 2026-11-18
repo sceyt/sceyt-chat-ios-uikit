@@ -1220,11 +1220,14 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     NSPredicate(format: "children.@count == 0")
                 ])
             }
+            // Attachments first: the sweep selects them through `message`, and the batch
+            // delete below leaves that link pointing at deleted rows (no Nullify), so run
+            // afterwards it could no longer tell which message an attachment belonged to.
+            try? deleteAllAttachments(channelId: channelId, before: date)
             try batchDelete(fetchRequest: request)
             // NSBatchDeleteRequest ignores deletion rules and PinnedMessageDTO holds no
             // relationship anyway, so the pin rows have to be swept by hand.
             unpinMessages(channelId: channelId, before: date)
-            try? deleteAllAttachments(channelId: channelId, before: date)
             if let date,
                let channel = ChannelDTO.fetch(id: channelId, context: self)
             {
@@ -1254,12 +1257,19 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         request.sortDescriptor = NSSortDescriptor(keyPath: \AttachmentDTO.id, ascending: false)
         var predicate = NSPredicate(format: "channelId == %lld", channelId)
         if let date {
+            // Dated by the MESSAGE, not the attachment: an attachment's own `createdAt` can
+            // be the original upload time (a forwarded file uploaded before the clear), and
+            // sweeping by it emptied messages sent after the clear on every channel sync —
+            // the "forwarded message with no content after relaunch" bug.
+            // Messages kept as hidden reply-parent stubs keep their attachments too,
+            // mirroring deleteAllMessages, otherwise reply previews lose thumbnails.
+            // Rows with no message have nothing else to go by, so they keep their own date.
             predicate = NSCompoundPredicate(type: .and, subpredicates: [
                 predicate,
-                NSPredicate(format: "createdAt <= %@", date as NSDate),
-                // Mirror deleteAllMessages: messages kept as hidden reply-parent stubs
-                // keep their attachments too, otherwise reply previews lose thumbnails.
-                NSPredicate(format: "message == nil OR message.children.@count == 0")
+                NSPredicate(
+                    format: "(message != nil AND message.createdAt <= %@ AND message.children.@count == 0) OR (message == nil AND createdAt <= %@)",
+                    date as NSDate, date as NSDate
+                )
             ])
         }
         request.predicate = predicate
