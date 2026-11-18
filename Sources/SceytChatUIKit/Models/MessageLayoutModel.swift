@@ -2358,6 +2358,14 @@ extension MessageLayoutModel {
         public func updateAttachment(message: ChatMessage) {
             guard self.message == message
             else { return }
+            // Same rule as init: a view_once parent never exposes its media in the reply
+            // preview. This runs on every update of the replying message (sent → delivered →
+            // read), so without the guard the first status change built an AttachmentLayout
+            // and ReplyView revealed the view_once thumbnail.
+            guard !message.isViewOnceMessage else {
+                self.attachment = nil
+                return
+            }
             if let attachment = message.attachments?.first {
                 // Reuse the existing layout when it already describes this attachment: building a
                 // new one throws away a thumbnail that is already loaded, so the reply image would
