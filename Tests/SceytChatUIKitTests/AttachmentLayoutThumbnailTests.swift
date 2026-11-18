@@ -924,4 +924,31 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
 
         XCTAssertEqual(model.contentVersion, versionBefore)
     }
+
+    // MARK: - Unsent Photos-library video
+
+    /// A video picked from Photos is sent with the placeholder path `/local/<PHAsset id>`
+    /// until its upload lands; there is no file there to take a frame from. Every
+    /// consumer of the layout (the Channel Info Media grid included) must get the
+    /// picked video's poster frame, not the thumbHash blur, for as long as the upload
+    /// is in flight or paused.
+    func testUnsentPhotosVideoLoadsItsPosterFrameInsteadOfThePlaceholder() {
+        let assetId = "POSTER-\(UUID().uuidString)"
+        let poster = UIGraphicsImageRenderer(size: CGSize(width: 33, height: 33)).image { ctx in
+            UIColor.green.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 33, height: 33))
+        }
+        Components.videoProcessor.storePosterFrame(poster, photoAssetIdentifier: assetId)
+
+        for status: ChatMessage.Attachment.TransferStatus in [.uploading, .pauseUploading] {
+            let layout = makeLayout(
+                makeAttachment(id: 0, type: "video", name: "video.mp4", status: status, filePath: "/local/\(assetId)"),
+                async: true
+            )
+            XCTAssertTrue(waitUntil { layout.thumbnail === poster },
+                          "a \(status) Photos video must show its poster frame, not a placeholder")
+            XCTAssertFalse(layout.isThumbnailLoadedFromFile,
+                           "the poster is not the sent file: the upload's file must still be able to replace it")
+        }
+    }
 }

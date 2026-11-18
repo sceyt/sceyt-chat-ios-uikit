@@ -8,6 +8,7 @@
 
 import UIKit
 import SceytChat
+import Photos
 
 open class MessageLayoutModel {
     
@@ -1874,6 +1875,9 @@ extension MessageLayoutModel {
             var resultThumbnail: UIImage?
             var resultWaveform: [Float]?
             var resultLoadedFromFile = false
+            /// An unsent Photos video whose poster frame isn't made yet: fetched after the
+            /// placeholder is applied, see the end of this method.
+            var pendingPhotoPosterAssetId: String?
 
             switch attachmentType {
             case .voice:
@@ -1909,6 +1913,19 @@ extension MessageLayoutModel {
                         }
                     } catch {
                         logger.errorIfNotNil(error, "load pvw from path \(path)")
+                    }
+                }
+                if resultThumbnail == nil, attachmentType == .video,
+                   let assetId = VideoProcessor.photoAssetIdentifier(filePath: attachment.filePath) {
+                    // A video picked from Photos keeps the placeholder path `/local/<id>` until
+                    // its upload lands, so there is no file to take a frame from — while it
+                    // uploads, and for as long as it stays paused. Its poster frame is the
+                    // picture the cell shows once it is sent. Not file-backed: the sent file
+                    // must still be able to replace it.
+                    if let poster = Components.videoProcessor.cachedPosterFrame(photoAssetIdentifier: assetId) {
+                        resultThumbnail = poster
+                    } else {
+                        pendingPhotoPosterAssetId = assetId
                     }
                 }
                 if resultThumbnail == nil {
@@ -1996,6 +2013,28 @@ extension MessageLayoutModel {
                 if resultLoadedFromFile, let image = resultThumbnail {
                     AttachmentSharpThumbnailRelay.default.post(attachment, image: image)
                 }
+                if let assetId = pendingPhotoPosterAssetId {
+                    self.loadPhotoPosterFrame(assetId: assetId, for: attachment)
+                }
+            }
+        }
+
+        /// Replaces the placeholder of an unsent Photos video with its poster frame, which has
+        /// to be made from the Photos asset (a relaunch empties the in-memory poster cache, and
+        /// a paused upload outlives it). Main thread only; the poster arrives on main.
+        private func loadPhotoPosterFrame(assetId: String, for attachment: ChatMessage.Attachment) {
+            guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [assetId], options: nil).firstObject
+            else { return }
+            Components.videoProcessor.posterFrame(photoAsset: asset) { [weak self] poster in
+                guard let self, let poster,
+                      self.attachment == attachment,
+                      // The upload landed meanwhile: its own file won.
+                      !self.isThumbnailLoadedFromFile,
+                      VideoProcessor.photoAssetIdentifier(filePath: self.attachment.filePath) == assetId
+                else { return }
+                self.thumbnail = poster
+                self.isLoadedThumbnail = true
+                self.onLoadThumbnail?(poster)
             }
         }
         

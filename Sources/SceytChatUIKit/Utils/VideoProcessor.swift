@@ -153,6 +153,20 @@ open class VideoProcessor {
         posterFrameCache.setObject(image, forKey: localIdentifier as NSString)
     }
 
+    /// The poster frame already made for the Photos asset `localIdentifier`, if any; never
+    /// touches Photos, so it is safe on any thread. `posterFrame(photoAsset:completion:)` makes one.
+    open class func cachedPosterFrame(photoAssetIdentifier localIdentifier: String) -> UIImage? {
+        posterFrameCache.object(forKey: localIdentifier as NSString)
+    }
+
+    /// The Photos asset id of an unsent video picked from the library: its `filePath` is the
+    /// placeholder `/local/<PHAsset id>` until the upload lands and the exported file replaces it.
+    public static func photoAssetIdentifier(filePath: String?) -> String? {
+        guard let filePath, filePath.hasPrefix("/local/") else { return nil }
+        let identifier = String(filePath.dropFirst("/local/".count))
+        return identifier.isEmpty ? nil : identifier
+    }
+
     /// The poster frame (`copyFrame(asset:)`) of a picked Photos video, for the sender's cell
     /// while the video is still prepared, so it shows what the cell shows once sent; the
     /// Photos thumbnail (its own poster) when the video can't be read. Completes on main.

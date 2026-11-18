@@ -18,13 +18,17 @@ public final class PresenceProvider: DataProvider, NSCopying {
     
     private var scheduler: Scheduler?
     private var schedulerQueue = DispatchQueue(label: "com.sceytchat.uikit.presence_provider")
-    @Atomic private var userIds = Set<UserId>()
+    /// Polled users, most recently subscribed first, so the cap below evicts the users that
+    /// subscribed longest ago instead of an arbitrary `Set` element that may still be on screen.
+    @Atomic private var userIds = [UserId]()
     private(set) var isStartedChecking = false
     @Atomic private(set) var iSuspended = false
     @Atomic private var cache = Cache<UserId, Handler>()
     
     static var subscriptionCheckInterval = TimeInterval(4)
-    static var maxCheckableUsersCount = 10
+    /// Must exceed the number of rows a list shows at once: a subscribed user pushed past the cap
+    /// keeps its handler but is no longer polled, so its row silently stops updating.
+    static var maxCheckableUsersCount = 30
 
     @Published public var presences: Set<UserPresence>?
     
@@ -60,12 +64,11 @@ public final class PresenceProvider: DataProvider, NSCopying {
         guard Self.maxCheckableUsersCount >= 1
         else { return }
         
-        let checkable = userIds.prefix(Self.maxCheckableUsersCount)
-        let filtered = checkable.filter { !self.userIds.contains($0) }
-        
-        let newIds = (filtered + self.userIds)
-            .prefix(Self.maxCheckableUsersCount)
-        self.userIds = Set(newIds)
+        let checkable = Array(userIds.prefix(Self.maxCheckableUsersCount))
+        _userIds.mutate { current in
+            current.removeAll { checkable.contains($0) }
+            current = Array((checkable + current).prefix(Self.maxCheckableUsersCount))
+        }
         guard !iSuspended else { return }
         if let presences = userPresences {
             let existing = presences.filter { checkable.contains($0.userId) }
@@ -81,12 +84,13 @@ public final class PresenceProvider: DataProvider, NSCopying {
     }
     
     public func stop(userIds: [UserId]) {
-        userIds.forEach { self.userIds.remove($0) }
-        guard !iSuspended else { return }
-        if let filtered = userPresences?.filter({ userIds.contains($0.userId) }) {
-            userPresences?.subtract(filtered)
+        _userIds.mutate { current in
+            current.removeAll { userIds.contains($0) }
         }
-      
+        guard !iSuspended else { return }
+        // Keep the last known presence of stopped users: when the row comes back, `start` replays
+        // it immediately instead of the row showing the stored (possibly older) value until the
+        // next poll.
         if self.userIds.isEmpty {
             isStartedChecking = false
         }
@@ -143,10 +147,19 @@ public final class PresenceProvider: DataProvider, NSCopying {
             guard let self = self,
                   self.isStartedChecking
             else { return }
-            self.userPresences = Set(
-                users.map { UserPresence(user: $0) }
-            )
+            self.userPresences = self.merging(users.map { UserPresence(user: $0) })
         }
+    }
+
+    /// Cached presences with `fresh` replacing the entries for the same users.
+    ///
+    /// `UserPresence` hashes by `userId` but its `==` also compares the presence, so a plain
+    /// `Set.insert`/`update(with:)` could keep two entries for one user; key by id instead.
+    private func merging(_ fresh: [UserPresence]) -> Set<UserPresence> {
+        var byId = [UserId: UserPresence]()
+        userPresences?.forEach { byId[$0.userId] = $0 }
+        fresh.forEach { byId[$0.userId] = $0 }
+        return Set(byId.values)
     }
     
     private func request(userIds: [UserId]) {
@@ -157,16 +170,7 @@ public final class PresenceProvider: DataProvider, NSCopying {
                   self.isStartedChecking
             else { return }
             
-            if self.userPresences == nil {
-                self.userPresences = .init()
-            }
-            users.forEach {
-                let presence = UserPresence(user: $0)
-                self.send(presence: presence)
-                if self.userPresences!.update(with: presence) == nil {
-                    self.userPresences!.insert(presence)
-                }
-            }
+            self.userPresences = self.merging(users.map { UserPresence(user: $0) })
         }
     }
     
