@@ -355,6 +355,102 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         )
     }
 
+    // MARK: - Video poster ("preview") attachments
+
+    /// A video is sent with its poster as a second attachment of type "preview". The poster has
+    /// no file path, so the sort falls to the upload ids — and whenever the poster's id sorted
+    /// first, the pin kept the poster, which `ChatMessage.split` then drops: the banner showed no
+    /// thumbnail and an empty preview line. Shapes taken from a real failing pin.
+    func testAttachmentSnapshotPick_skipsThePosterOfAVideo() {
+        let video = PinnedMessageDTO.AttachmentSnapshot(
+            type: "video", name: "clip.mp4",
+            filePath: "/storage/A9E3/clip.mp4",
+            url: "f0a1c2d3-video",
+            metadata: #"{"szw":540,"szh":960,"dur":3,"pvw":"6501a645-poster"}"#
+        )
+        let poster = PinnedMessageDTO.AttachmentSnapshot(
+            type: ChatMessage.Attachment.previewType, name: "clip-preview.jpg",
+            filePath: nil,
+            url: "6501a645-poster", // sorts before the video's url
+            metadata: #"{"szw":540,"szh":960,"tmb":"V/gBDAJr53k4hp0IOFd5gIUHdw=="}"#
+        )
+
+        // The sender's own pin: the video has a local file, the poster does not.
+        XCTAssertEqual(PinnedMessageDTO.AttachmentSnapshot.pick(from: [video, poster])?.type, "video")
+        XCTAssertEqual(PinnedMessageDTO.AttachmentSnapshot.pick(from: [poster, video])?.type, "video")
+
+        // The server pin sync: neither carries a file path, so only urls are left to compare.
+        let remoteVideo = PinnedMessageDTO.AttachmentSnapshot(
+            type: video.type, name: video.name, filePath: nil, url: video.url, metadata: video.metadata
+        )
+        XCTAssertEqual(PinnedMessageDTO.AttachmentSnapshot.pick(from: [poster, remoteVideo])?.url, video.url)
+    }
+
+    /// Another client may type the poster differently. Like `ChatMessage.split`, it is still
+    /// recognised as the url its video names in `pvw` — or in the legacy `video_thumb` key.
+    func testAttachmentSnapshotPick_skipsAPosterNamedByTheVideoWhateverItsType() {
+        for key in ["pvw", "video_thumb"] {
+            let video = PinnedMessageDTO.AttachmentSnapshot(
+                type: "video", name: nil, filePath: nil, url: "z-video",
+                metadata: "{\"\(key)\":\"a-poster\"}"
+            )
+            let poster = PinnedMessageDTO.AttachmentSnapshot(
+                type: "image", name: nil, filePath: nil, url: "a-poster", metadata: nil
+            )
+            XCTAssertEqual(
+                PinnedMessageDTO.AttachmentSnapshot.pick(from: [poster, video])?.url, "z-video",
+                "poster named under \(key)"
+            )
+        }
+
+        // An image the video does not name is an ordinary attachment and keeps its place.
+        let unrelated = PinnedMessageDTO.AttachmentSnapshot(
+            type: "image", name: nil, filePath: nil, url: "a-photo", metadata: nil
+        )
+        let video = PinnedMessageDTO.AttachmentSnapshot(
+            type: "video", name: nil, filePath: nil, url: "z-video", metadata: #"{"pvw":"a-poster"}"#
+        )
+        XCTAssertEqual(PinnedMessageDTO.AttachmentSnapshot.pick(from: [video, unrelated])?.url, "a-photo")
+    }
+
+    func testAttachmentSnapshotPick_aLonePosterIsNoAttachment() {
+        let poster = PinnedMessageDTO.AttachmentSnapshot(
+            type: ChatMessage.Attachment.previewType, name: nil, filePath: nil, url: "p", metadata: nil
+        )
+        XCTAssertNil(PinnedMessageDTO.AttachmentSnapshot.pick(from: [poster]))
+    }
+
+    /// End to end through the pin path: the row the banner renders from has to carry the video,
+    /// so `previewMessage` still has an attachment once `ChatMessage.split` has run.
+    func testPinningAVideoWithAPoster_snapshotsTheVideo() {
+        let message = seedMessage(id: 900, channelId: channelId)
+        message.body = ""
+
+        let video = AttachmentDTO.insertNewObject(into: ctx)
+        video.type = "video"
+        video.name = "clip.mp4"
+        video.filePath = "/storage/A9E3/clip.mp4"
+        video.url = "f0a1c2d3-video"
+        video.metadata = #"{"szw":540,"szh":960,"dur":3,"pvw":"6501a645-poster"}"#
+        video.message = message
+
+        let poster = AttachmentDTO.insertNewObject(into: ctx)
+        poster.type = ChatMessage.Attachment.previewType
+        poster.name = "clip-preview.jpg"
+        poster.url = "6501a645-poster"
+        poster.metadata = #"{"szw":540,"szh":960,"tmb":"V/gBDAJr53k4hp0IOFd5gIUHdw=="}"#
+        poster.message = message
+        try? ctx.save()
+
+        let row = pin(message)
+        XCTAssertEqual(row?.attachmentType, "video")
+        XCTAssertEqual(row?.attachmentUrl, "f0a1c2d3-video")
+
+        let preview = row?.convert().previewMessage
+        XCTAssertEqual(preview?.attachments?.count, 1)
+        XCTAssertEqual(preview?.attachments?.first?.type, "video")
+    }
+
     func testSenderSnapshot_fromAStoredUserAndFromAChatUser() {
         let dto = UserDTO.fetchOrCreate(id: "u1", context: ctx)
         dto.firstName = "Ada"

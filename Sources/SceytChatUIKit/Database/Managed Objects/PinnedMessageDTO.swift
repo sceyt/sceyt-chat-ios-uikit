@@ -557,12 +557,49 @@ public class PinnedMessageDTO: NSManagedObject {
             )
         }
 
+        /// The attachment the pin shows: the first in `ChatMessage.init(dto:)`'s order that is
+        /// not a video's poster.
+        ///
+        /// A video is sent with its poster as a second, "preview" attachment, and
+        /// `ChatMessage.split` moves that one out of `attachments` — so a snapshot holding the
+        /// poster renders as a message with no attachment at all: no thumbnail, and an empty
+        /// preview line. The sort alone cannot keep it out, because the poster has no file path
+        /// and the tie then falls to comparing two random upload ids.
         public static func pick(from attachments: [AttachmentSnapshot]) -> AttachmentSnapshot? {
-            attachments.sorted { lhs, rhs in
-                if let l = lhs.filePath, let r = rhs.filePath { return l < r }
-                if let l = lhs.url, let r = rhs.url { return l < r }
-                return lhs.type < rhs.type
-            }.first
+            let posterURLs = Set(attachments.compactMap(\.posterURL))
+            return attachments
+                .sorted { lhs, rhs in
+                    if let l = lhs.filePath, let r = rhs.filePath { return l < r }
+                    if let l = lhs.url, let r = rhs.url { return l < r }
+                    return lhs.type < rhs.type
+                }
+                .first { !$0.isPoster(among: posterURLs) }
+        }
+
+        /// The same rule as `ChatMessage.split`: a poster is recognised by its type, or by being
+        /// the url a sibling video names as its poster — another client may type it differently.
+        func isPoster(among posterURLs: Set<String>) -> Bool {
+            if type == ChatMessage.Attachment.previewType { return true }
+            guard type != "video", let url else { return false }
+            return posterURLs.contains(url)
+        }
+
+        /// The url of this video's poster (`pvw`, or the legacy `video_thumb`), if it names one.
+        var posterURL: String? {
+            guard type == "video",
+                  let data = metadata?.data(using: .utf8),
+                  let keys = try? JSONDecoder().decode(PosterKeys.self, from: data),
+                  let url = keys.pvw ?? keys.video_thumb,
+                  !url.isEmpty
+            else { return nil }
+            return url
+        }
+
+        /// Only the poster keys, so a metadata blob without a `tmb` still decodes — unlike
+        /// `ChatMessage.Attachment.Metadata`, which requires one.
+        private struct PosterKeys: Decodable {
+            let pvw: String?
+            let video_thumb: String?
         }
     }
 
@@ -642,6 +679,7 @@ public class PinnedMessageDTO: NSManagedObject {
         let resolvedTid = messageTid != 0
             ? messageTid
             : ((message.incoming || message.tid == 0) ? Int64(message.id) : Int64(message.tid))
+
 
         return applySnapshot(
             channelId: Int64(channelId),
