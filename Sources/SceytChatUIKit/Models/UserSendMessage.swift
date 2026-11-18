@@ -228,9 +228,11 @@ public struct AttachmentModel {
             }
         } else if type == .voice {
             let targetCount = 50
+            // `thumb` is empty for audio that wasn't recorded in-app (e.g. a shared .m4a goes
+            // through `init(mediaUrl:)`): a zero chunk size traps in `stride(by:)`.
             if let json = ChatMessage.Attachment.Metadata<[Int]>(
                 thumbnail: thumb
-                    .chunked(into: Int(ceil(Float(thumb.count) / Float(targetCount))))
+                    .chunked(into: max(1, Int(ceil(Float(thumb.count) / Float(targetCount)))))
                     .map { $0.reduce(0, +) / Int($0.count) },
                 duration: duration
             ).build() {
