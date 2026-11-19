@@ -309,7 +309,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             pinnedMessageObserver.stopObserver()
         }
         NotificationCenter.default.removeObserver(self)
-        //        unsubscribeToPeerPresence()
+        presenceProvider.unsubscribe(owner: self)
         SceytChatUIKit.shared.chatClient.removeDelegate(identifier: clientDelegateIdentifier)
         SceytChatUIKit.shared.chatClient.removeChannelDelegate(identifier: channelDelegateIdentifier)
         if isTyping {
@@ -3001,7 +3001,9 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             if let presence = presenceProvider.presence(userId: peer.id)?.presence {
                 peerPresence = presence
             }
-            presenceProvider.subscribe(userId: peer.id) { [weak self] presence in
+            // Pinned: the header's last seen is the point of this screen, so the peer must stay
+            // polled however many rows (the list behind this chat, member lists) subscribe later.
+            presenceProvider.subscribe(userId: peer.id, owner: self, priority: .pinned) { [weak self] presence in
                 DispatchQueue.main.async { [weak self] in
                     guard let self
                     else { return }
@@ -3021,9 +3023,7 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
     }
     
     open func unsubscribeToPeerPresence() {
-        channel.members?.forEach({
-            presenceProvider.unsubscribe(userId: $0.id)
-        })
+        presenceProvider.unsubscribe(owner: self)
     }
     
     // MARK: Search

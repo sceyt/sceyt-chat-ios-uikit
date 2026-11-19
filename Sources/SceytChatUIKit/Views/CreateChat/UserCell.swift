@@ -27,9 +27,10 @@ open class UserCell: BaseChannelUserCell {
         guard let contact = userData
         else { return }
         Components.presenceProvider
-            .subscribe(userId: contact.id) { [weak self] userPresence in
-                PresenceProvider.unsubscribe(userId: contact.id)
-                guard let self, userPresence.userId == self.userData.id
+            .subscribe(userId: contact.id, owner: self) { [weak self] userPresence in
+                guard let self else { return }
+                Components.presenceProvider.unsubscribe(userId: contact.id, owner: self)
+                guard userPresence.userId == self.userData.id
                 else { return }
                 self.statusLabel.text = appearance.subtitleFormatter.format(.init(user: userPresence.user))
             }
