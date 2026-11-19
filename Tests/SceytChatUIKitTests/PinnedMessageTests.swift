@@ -671,24 +671,32 @@ final class PinnedMessageTests: XCTestCase {
         XCTAssertEqual(row.convert().messageType, "text")
     }
 
-    /// A pinned view-once or auto-deleting message would keep a full body snapshot on disk
-    /// after it had vanished from the timeline.
-    func testPin_refusesViewOnceTransientAndAutoDeleteMessages() {
+    /// A pinned view-once message would keep a full body snapshot on disk after it had
+    /// been viewed.
+    func testPin_refusesViewOnceAndTransientMessages() {
         let viewOnce = seedMessage(id: 1, channelId: channelId)
         viewOnce.viewOnce = true
 
         let transient = seedMessage(id: 2, channelId: channelId)
         transient.transient = true
-
-        let autoDelete = seedMessage(id: 3, channelId: channelId)
-        autoDelete.autoDeleteAt = Date().addingTimeInterval(600).bridgeDate
         try? ctx.save()
 
-        for message in [viewOnce, transient, autoDelete] {
+        for message in [viewOnce, transient] {
             XCTAssertNil(pin(message), "message id \(message.id) must not be pinnable")
             XCTAssertNil(message.pinDetails)
         }
         XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 0)
+    }
+
+    /// Disappearing-mode chats stamp every message with `autoDeleteAt`; those stay pinnable.
+    func testPin_allowsDisappearingMessages() {
+        let message = seedMessage(id: 3, channelId: channelId)
+        message.autoDeleteAt = Date().addingTimeInterval(600).bridgeDate
+        try? ctx.save()
+
+        XCTAssertNotNil(pin(message))
+        XCTAssertNotNil(message.pinDetails)
+        XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 1)
     }
 
     func testPin_refusesAMessageThatIsNotInTheLocalStore() {
@@ -842,10 +850,10 @@ final class PinnedMessageTests: XCTestCase {
 
     func testExpiredAutoDeleteMessage_dropsItsPin() {
         let message = seedMessage(id: 1, channelId: channelId)
-        pin(message)
-        // Set the expiry only after pinning; pinning an auto-delete message is refused.
         message.autoDeleteAt = Date().addingTimeInterval(-600).bridgeDate
         try? ctx.save()
+        XCTAssertNotNil(pin(message))
+        XCTAssertEqual(ctx.pinnedMessageCount(channelId: channelId), 1)
 
         ctx.deleteExpiredAutoDeleteMessages()
         try? ctx.save()

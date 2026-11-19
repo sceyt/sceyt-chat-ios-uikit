@@ -17,7 +17,7 @@ import SceytChat
 public protocol PinnedMessageDatabaseSession {
 
     /// Pins a message. Returns `nil` when the message cannot be pinned — it is not in
-    /// the local store, or it is transient / view-once / auto-deleting.
+    /// the local store, or it is transient / view-once.
     @discardableResult
     func pinMessage(
         id: MessageId,
@@ -159,10 +159,11 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
             return nil
         }
 
-        // A pinned view-once or auto-deleting message would keep a full body snapshot on
-        // disk after it has vanished from the timeline. Refuse rather than leak it.
-        guard !message.transient, !message.viewOnce, message.autoDeleteAt == nil else {
-            logger.info("Refusing to pin transient/view-once/auto-deleting message id \(id)")
+        // A pinned view-once message would keep a full body snapshot on disk after it has
+        // been viewed. Refuse rather than leak it. Disappearing (`autoDeleteAt`) messages are
+        // pinnable: `deleteExpiredAutoDeleteMessages` drops the pin with the message.
+        guard !message.transient, !message.viewOnce else {
+            logger.info("Refusing to pin transient/view-once message id \(id)")
             return nil
         }
 
@@ -318,10 +319,10 @@ extension NSManagedObjectContext: PinnedMessageDatabaseSession {
         let pinTid = localMessage?.tid
             ?? ((message.incoming || message.tid == 0) ? Int64(message.id) : Int64(message.tid))
 
-        // The same refusals `pinMessage` applies: a pinned view-once or auto-deleting message
-        // would keep a full body snapshot on disk after it has vanished from the timeline.
-        guard !message.transient, !message.viewOnce, message.autoDeleteAt == nil else {
-            logger.info("Refusing to store pin \(serverPinId): transient/view-once/auto-deleting message id \(message.id)")
+        // The same refusals `pinMessage` applies: a pinned view-once message would keep a
+        // full body snapshot on disk after it has been viewed.
+        guard !message.transient, !message.viewOnce else {
+            logger.info("Refusing to store pin \(serverPinId): transient/view-once message id \(message.id)")
             return nil
         }
 

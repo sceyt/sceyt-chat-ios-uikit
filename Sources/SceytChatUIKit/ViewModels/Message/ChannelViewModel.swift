@@ -2302,7 +2302,6 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
         guard message.state != .deleted,
               !message.transient,
               !message.viewOnce,
-              message.autoDeleteAt == nil,
               !Self.unpinnableDeliveryStatuses.contains(message.deliveryStatus),
               !Self.unpinnableDeliveryStatuses.contains(model.messageDeliveryStatus)
         else { return false }

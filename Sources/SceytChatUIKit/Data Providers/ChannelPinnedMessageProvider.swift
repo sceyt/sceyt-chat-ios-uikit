@@ -128,7 +128,7 @@ open class ChannelPinnedMessageProvider: DataProvider {
         } completion: { error in
             guard let record else {
                 // Nothing was stored — the message is not in the local store, or it is
-                // transient / view-once / auto-deleting. See `pinMessage`.
+                // transient / view-once. See `pinMessage`.
                 completion?(error)
                 return
             }
