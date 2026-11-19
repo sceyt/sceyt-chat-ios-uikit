@@ -199,7 +199,7 @@ public struct AttachmentModel {
         if type == .image || type == .video {
             let tm = Components
                 .imageBuilder.init(image: thumbnail)
-                .thumbHashBase64()
+                .thumbHashBase64(maxSide: type == .image ? SceytChatUIKit.shared.config.imageAttachmentThumbHashMaxSide : 100)
             
             if let json = ChatMessage.Attachment.Metadata<String>(
                 width: imageWidth,
@@ -399,9 +399,11 @@ public struct AttachmentModel {
                             let fileUrl = Components.storage.copyFile(fullSizeImageURL) ?? fullSizeImageURL
                             var imageUrl: URL?
                             if let jpeg = Components.imageBuilder.init(imageUrl: fileUrl)?.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality) {
+                                // The image builder may keep the original bytes (a GIF, say):
+                                // name the copy after what it holds.
                                 let base = fileUrl
                                     .deletingPathExtension()
-                                    .appendingPathExtension("jpg")
+                                    .appendingPathExtension(jpeg.imageFileExtension ?? "jpg")
                                     .lastPathComponent
                                 // iOS exports edited photos under a shared generic name (e.g.
                                 // "FullSizeRender-3.jpg") regardless of which photo it is. Storing under

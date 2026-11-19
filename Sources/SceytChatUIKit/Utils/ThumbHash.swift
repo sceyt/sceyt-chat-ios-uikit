@@ -566,13 +566,15 @@ func thumbHashToImage(hash: Data) -> NSImage {
 #if os(iOS)
 import UIKit
 
-func imageToThumbHash(image: UIImage) -> Data {
+/// `maxSide`: the image is drawn at most this many pixels on its longest side before hashing.
+func imageToThumbHash(image: UIImage, maxSide: Int = 100) -> Data {
     let size = image.size
-    guard size.width > 0, size.height > 0, size.width.isFinite, size.height.isFinite
+    guard size.width > 0, size.height > 0, size.width.isFinite, size.height.isFinite, maxSide > 0
     else { return Data() }
-    // Clamp to 1 so extreme aspect ratios (> ~200:1) don't round a side down to 0
-    let w = max(1, Int(round(100 * size.width / max(size.width, size.height))))
-    let h = max(1, Int(round(100 * size.height / max(size.width, size.height))))
+    let side = CGFloat(min(maxSide, 100))
+    // Clamp to 1 so extreme aspect ratios don't round a side down to 0
+    let w = max(1, Int(round(side * size.width / max(size.width, size.height))))
+    let h = max(1, Int(round(side * size.height / max(size.width, size.height))))
     var rgba = Data(count: w * h * 4)
     rgba.withUnsafeMutableBytes { rgba in
         if

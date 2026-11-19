@@ -67,8 +67,9 @@ struct UploadPreparer {
                 }
             }
             try Task.checkCancellation()
+            // Named after what it holds: a PNG re-encoded as JPEG goes out as .jpg.
             if let jpeg,
-               let resized = environment.storage().storeInTemporaryDirectory(data: jpeg, filename: attachment.name ?? UUID().uuidString) {
+               let resized = environment.storage().storeInTemporaryDirectory(data: jpeg, filename: Self.fileName(attachment.name ?? UUID().uuidString, for: jpeg)) {
                 return PreparedUploadFile(file: try staging.stage(resized, operationId: operationId, fileName: resized.lastPathComponent, tag: taskInfo.logTag), isStaged: true)
             }
             logger.warn("[Transfer] \(taskInfo.logTag) upload image resize \(jpeg == nil ? "failed (\(reason))" : "could not be stored"), uploading the original")
@@ -90,5 +91,14 @@ struct UploadPreparer {
             break
         }
         return PreparedUploadFile(file: URL(fileURLWithPath: filePath), isStaged: false)
+    }
+
+    /// `name` with the extension of the image `data` holds (unchanged when it is unknown).
+    static func fileName(_ name: String, for data: Data) -> String {
+        guard let ext = data.imageFileExtension else { return name }
+        let current = (name as NSString).pathExtension.lowercased()
+        if current == ext || (ext == "jpg" && current == "jpeg") { return name }
+        let base = (name as NSString).deletingPathExtension
+        return (base.isEmpty ? UUID().uuidString : base) + "." + ext
     }
 }

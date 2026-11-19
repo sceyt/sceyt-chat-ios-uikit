@@ -126,6 +126,9 @@ extension SceytChatUIKit {
         public var avatarResizeConfig: ResizeConfig = .low
         public var imageAttachmentResizeConfig: ResizeConfig = .medium
         public var videoAttachmentResizeConfig: VideoResizeConfig = .medium
+        /// The longest side (1...100 px) an image attachment is drawn at for its `tmb` ThumbHash.
+        /// Videos and previewable files always use 100.
+        public var imageAttachmentThumbHashMaxSide: Int = 100
         public var attachmentSelectionLimit: Int = 20
         public var messageMultiselectLimit: Int = 30
         /// Maximum number of destination chats selectable at once on the Forward screen.
