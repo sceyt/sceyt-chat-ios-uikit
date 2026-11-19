@@ -241,7 +241,7 @@ extension ChannelViewController {
                     bottomActionView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 4.0),
                     bottomActionView.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -4.0),
                 ]
-            } else if layout.contentOptions.contains(.unsupported), layout.attachments.isEmpty {
+            } else if layout.contentOptions.contains(.unsupported) {
                 layoutConstraint += [
                     bubbleView.trailingAnchor.pin(to: containerView.trailingAnchor, constant: -12),
                     bubbleView.topAnchor.pin(to: containerView.topAnchor),
@@ -254,7 +254,7 @@ extension ChannelViewController {
                     textLabel.heightAnchor.pin(constant: 0.0),
 
                     unsupportedView.leadingAnchor.pin(to: bubbleView.leadingAnchor),
-                    unsupportedView.topAnchor.pin(to: bubbleView.topAnchor, constant: 8.0),
+                    unsupportedView.topAnchor.pin(to: bubbleViewTopAnchor, constant: 8.0),
                     unsupportedView.trailingAnchor.pin(to: bubbleView.trailingAnchor),
                     unsupportedView.bottomAnchor.pin(to: infoView.topAnchor)
                 ]
@@ -502,6 +502,8 @@ extension ChannelViewController {
                 bubbleSize.height += 4.0
                 let infoViewSize = InfoView.measure(model: model, appearance: appearance)
                 bubbleSize.height += infoViewSize.height
+                // DEBUG(unsupported-layout): remove after diagnosis
+                logger.info("[UnsupportedMsg] cellMeasure outgoing id=\(model.message.id) unsupportedMeasure=\(model.unsupportedViewMeasure) infoView=\(infoViewSize) bubbleSize=\(bubbleSize) hasReply=\(model.hasReply) isForwarded=\(model.isForwarded)")
             } else {
                 shouldShowDateTickBackground = false
                 bubbleSize = model.attachmentsContainerSize

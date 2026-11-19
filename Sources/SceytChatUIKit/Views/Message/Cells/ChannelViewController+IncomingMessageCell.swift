@@ -294,7 +294,7 @@ extension ChannelViewController {
                     bottomActionView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 4.0),
                     bottomActionView.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -4.0),
                 ]
-            } else if layout.contentOptions.contains(.unsupported), layout.attachments.isEmpty {
+            } else if layout.contentOptions.contains(.unsupported) {
                 layoutConstraint += [
                     bubbleView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 10),
                     bubbleView.topAnchor.pin(to: containerView.topAnchor),
@@ -580,6 +580,8 @@ extension ChannelViewController {
 
                 let infoViewSize = InfoView.measure(model: model, appearance: appearance)
                 bubbleSize.height += infoViewSize.height
+                // DEBUG(unsupported-layout): remove after diagnosis
+                logger.info("[UnsupportedMsg] cellMeasure incoming id=\(model.message.id) unsupportedMeasure=\(model.unsupportedViewMeasure) infoView=\(infoViewSize) bubbleSize=\(bubbleSize) hasReply=\(model.hasReply) isForwarded=\(model.isForwarded)")
             } else {
                 bubbleSize = model.attachmentsContainerSize
                 bubbleSize.width += 4
