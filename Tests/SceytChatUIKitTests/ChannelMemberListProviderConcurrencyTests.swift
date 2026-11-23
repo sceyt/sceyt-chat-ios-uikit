@@ -61,6 +61,11 @@ final class ChannelMemberListProviderConcurrencyTests: XCTestCase {
 
     // MARK: - Helpers
 
+    /// How long the writes may take. A passing test returns as soon as they finish, so this
+    /// only bounds a failure; CI runners were seen managing about one write a second, which
+    /// overran the old 15 s on the many-member storm.
+    private static let writeTimeout: TimeInterval = 60
+
     /// Seeds the channel and, as a side effect, forces the lazy `backgroundPerformContext`
     /// to initialize on the main thread before the concurrent storm (lazy var init is not
     /// thread-safe).
@@ -70,7 +75,7 @@ final class ChannelMemberListProviderConcurrencyTests: XCTestCase {
             let (channel, _) = ChannelDTO.fetchOrCreate(id: self.channelId, context: ctx)
             channel.type = "group"
         }, completion: { _ in seeded.fulfill() })
-        wait(for: [seeded], timeout: 5)
+        wait(for: [seeded], timeout: Self.writeTimeout)
     }
 
     private func makeMember(id: String, role: String) -> Member {
@@ -85,7 +90,7 @@ final class ChannelMemberListProviderConcurrencyTests: XCTestCase {
         database.write({ ctx in
             count = MemberDTO.fetchAll(id: userId, channelId: self.channelId, context: ctx).count
         }, completion: { _ in drained.fulfill() })
-        wait(for: [drained], timeout: 15)
+        wait(for: [drained], timeout: Self.writeTimeout)
         return count
     }
 
