@@ -167,11 +167,12 @@ final class LazyMessagesObserverListRuleTests: XCTestCase {
         wait(for: [changed], timeout: 5)
     }
 
-    private func waitUntil(timeout: TimeInterval = 3, _ condition: () -> Bool) {
+    private func waitUntil(timeout: TimeInterval = defaultWaitTimeout, _ condition: () -> Bool) {
         let deadline = Date().addingTimeInterval(timeout)
         while !condition(), Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
+        drainMainQueueAfterDeadline(until: condition)
     }
 
     private func shownIds() -> [MessageId] {

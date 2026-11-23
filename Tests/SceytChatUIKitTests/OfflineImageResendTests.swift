@@ -229,12 +229,13 @@ final class OfflineImageResendTests: XCTestCase {
         return (try? ctx.fetch(AttachmentDTO.fetchRequest())) ?? []
     }
 
-    private func waitUntil(timeout: TimeInterval = 2, _ condition: () -> Bool) -> Bool {
+    private func waitUntil(timeout: TimeInterval = defaultWaitTimeout, _ condition: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if condition() { return true }
             RunLoop.main.run(until: Date().addingTimeInterval(0.01))
         }
+        drainMainQueueAfterDeadline(until: condition)
         return condition()
     }
 

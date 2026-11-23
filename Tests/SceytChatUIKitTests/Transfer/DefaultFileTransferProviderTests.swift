@@ -154,12 +154,13 @@ private final class Outcome<T> {
     func set(_ value: T) { lock.lock(); _value = value; lock.unlock() }
 }
 
-private func waitUntil(timeout: TimeInterval = 5, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
+private func waitUntil(timeout: TimeInterval = defaultWaitTimeout, _ condition: () -> Bool, file: StaticString = #filePath, line: UInt = #line) {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
         if condition() { return }
         RunLoop.main.run(until: Date().addingTimeInterval(0.005))
     }
+    drainMainQueueAfterDeadline(until: condition)
     XCTAssertTrue(condition(), "timed out", file: file, line: line)
 }
 

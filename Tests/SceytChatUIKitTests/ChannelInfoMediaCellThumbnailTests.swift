@@ -98,21 +98,14 @@ final class ChannelInfoMediaCellThumbnailTests: XCTestCase {
         return cell
     }
 
-    /// 10 s, not less: the reload runs on a `.utility` queue and the paint on a renderer
-    /// queue, both of which a busy CI runner can starve for seconds.
     @discardableResult
-    private func waitUntil(timeout: TimeInterval = 10, _ condition: () -> Bool) -> Bool {
+    private func waitUntil(timeout: TimeInterval = defaultWaitTimeout, _ condition: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if condition() { return true }
             RunLoop.main.run(until: Date().addingTimeInterval(0.01))
         }
-        // A main thread stalled past the deadline (seen on CI: 22 s for a 5 s wait) can
-        // leave the paint queued on main. Deliver what is already queued before the
-        // last check, so a stall can't use up the wait before the paint ever runs.
-        for _ in 0..<5 where !condition() {
-            RunLoop.main.run(until: Date().addingTimeInterval(0.05))
-        }
+        drainMainQueueAfterDeadline(until: condition)
         return condition()
     }
 
