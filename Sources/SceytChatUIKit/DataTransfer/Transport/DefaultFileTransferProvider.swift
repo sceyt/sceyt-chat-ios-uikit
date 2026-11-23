@@ -522,7 +522,9 @@ final class DownloadResume: @unchecked Sendable {
     func take() -> Data? {
         lock.lock(); defer { lock.unlock() }
         guard let data = try? Data(contentsOf: file) else { return nil }
-        try? FileManager.default.removeItem(at: file)
+        // Used either way: if it stays behind, the next take() offers the same data again,
+        // and a stale resume is rejected by URLSession and falls back to a fresh download.
+        TransferLog.remove(file, what: "the used resume data", context: "[Transfer] \(tag) transport download")
         return data
     }
 

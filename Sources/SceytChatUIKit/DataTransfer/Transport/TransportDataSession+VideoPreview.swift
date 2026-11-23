@@ -33,11 +33,12 @@ extension TransportDataSession {
         logger.debug("[Transfer] xfer=\(operationId) preview upload start size=\(TransferLog.sizeText(file)) providerEntries=[\(entries.keys.sorted().joined(separator: ","))]")
         // The video's attempt waits on this upload: a pause or cancel of it (which cancels the
         // attempt's task) stops this one too.
-        let provider = self.provider
+        // The provider is reached through the session (Sendable), not captured on its own:
+        // `FileTransferProvider` is not Sendable and the cancel handler can run on any thread.
         let result = await withTaskCancellationHandler {
-            await provider.upload(request, progress: { _ in })
+            await self.provider.upload(request, progress: { _ in })
         } onCancel: {
-            provider.cancel(operationId: operationId)
+            self.provider.cancel(operationId: operationId)
         }
         switch result {
         case .success(let uploaded):
