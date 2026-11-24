@@ -74,6 +74,34 @@ final class ChannelListStoreWriteContextTests: XCTestCase {
         return channel
     }
 
+    /// A channel with nothing but the fields `ChannelDTO.map` reads. Each gets its own
+    /// `createdAt`: `sortingKey` (unique in the model) is derived from it.
+    private func plainChannel(id: ChannelId) -> Channel {
+        let channel = (Channel.self as NSObject.Type).init() as! Channel
+        channel.setValue(id, forKey: "id")
+        channel.setValue("direct", forKey: "type")
+        channel.setValue("", forKey: "uri")
+        channel.setValue("", forKey: "subject")
+        channel.setValue(Date(timeIntervalSince1970: 1_700_000_000 + TimeInterval(id)), forKey: "createdAt")
+        return channel
+    }
+
+    private func page(of count: Int) -> [Channel] {
+        (1...count).map { plainChannel(id: ChannelId(10_000 + $0)) }
+    }
+
+    private func storedChannelCount() -> Int {
+        let ctx = inner.container.viewContext
+        ctx.refreshAllObjects()
+        return (try? ctx.count(for: ChannelDTO.fetchRequest())) ?? -1
+    }
+
+    private func storedChannel(id: ChannelId) -> ChannelDTO? {
+        let ctx = inner.container.viewContext
+        ctx.refreshAllObjects()
+        return ChannelDTO.fetch(id: id, context: ctx)
+    }
+
     private func storedAttachmentCount() -> Int {
         let ctx = inner.container.viewContext
         ctx.refreshAllObjects()
@@ -112,6 +140,167 @@ final class ChannelListStoreWriteContextTests: XCTestCase {
                        "The sync's channel store must share the serial context with the chat screen's writes")
     }
 
+    // MARK: - Chunked page save
+    //
+    // A 50-channel page takes 210–340 ms on device (channel_save_performance_findings.md). On the
+    // serial context every received message, send ack and message-page load queued behind it
+    // waited for the whole page. The page is now stored in chunks, each queued only after the
+    // previous one finished, so such a write waits for one chunk at most.
+
+    func testChannelListStore_largePage_isStoredInSerialChunks() {
+        let provider = ChannelListProvider()
+        var reported: [Channel]?
+        provider.onStoreChannels = { reported = $0 }
+        let done = expectation(description: "page stored")   // over-fulfil fails: completion once
+        provider.store(channels: page(of: 25)) { error in
+            XCTAssertNil(error)
+            done.fulfill()
+        }
+        wait(for: [done], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(database.calls, ["write", "write", "write"],
+                       "25 channels in chunks of \(ChannelListProvider.storeChunkSize), all on the serial context")
+        XCTAssertEqual(storedChannelCount(), 25)
+        XCTAssertEqual(reported?.count, 25, "onStoreChannels reports the whole page once")
+    }
+
+    func testChannelListStore_writeQueuedDuringPage_runsBetweenChunks() {
+        let pageDone = expectation(description: "page stored")
+        let otherDone = expectation(description: "other write")
+        var channelsSeenByOtherWrite = -1
+
+        ChannelListProvider().store(channels: page(of: 25)) { _ in pageDone.fulfill() }
+        // Stands for a received message or send ack arriving while the page is being stored.
+        database.write({ ctx in
+            channelsSeenByOtherWrite = (try? ctx.count(for: ChannelDTO.fetchRequest())) ?? -1
+        }, completion: { _ in otherDone.fulfill() })
+        wait(for: [pageDone, otherDone], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(channelsSeenByOtherWrite, ChannelListProvider.storeChunkSize,
+                       "the other write must run after the first chunk, not after the whole page")
+        XCTAssertEqual(storedChannelCount(), 25)
+    }
+
+    func testChannelListStore_smallPage_isOneWrite() {
+        let done = expectation(description: "page stored")
+        ChannelListProvider().store(channels: page(of: 3)) { _ in done.fulfill() }
+        wait(for: [done], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(database.calls, ["write"])
+        XCTAssertEqual(storedChannelCount(), 3)
+    }
+
+    // MARK: - Chunked page safety (ChunkedChannelStore)
+
+    /// A channel deleted between two chunks (a channel-deleted event) must not be re-created by a
+    /// later chunk carrying the page's copy.
+    func testChannelDeletedBetweenChunks_isNotBroughtBack() {
+        let pageDone = expectation(description: "page stored")
+        let deleteDone = expectation(description: "delete stored")
+        let lastId = ChannelId(10_025)
+
+        ChannelListProvider().store(channels: page(of: 25)) { _ in pageDone.fulfill() }
+        // `deleteChannel(id:)` records the delete and removes the row. It also merges into
+        // `SceytChatUIKit.shared.database`, which an in-memory test store cannot share, so this
+        // does the first two steps the same way.
+        database.write({ ctx in
+            DeletedChannelLog.record(lastId)
+            ChannelDTO.fetch(id: lastId, context: ctx).map(ctx.delete)
+        }, completion: { _ in deleteDone.fulfill() })
+        wait(for: [pageDone, deleteDone], timeout: defaultWaitTimeout)
+
+        XCTAssertNil(storedChannel(id: lastId), "the deleted channel must stay deleted")
+        XCTAssertEqual(storedChannelCount(), 24)
+    }
+
+    /// An update event stored between two chunks is newer than the page and must not be
+    /// overwritten by it.
+    func testChannelUpdatedBetweenChunks_isNotOverwritten() {
+        let pageDone = expectation(description: "page stored")
+        let updateDone = expectation(description: "update stored")
+        let lastId = ChannelId(10_025)
+        let channels = page(of: 25)
+        channels.last?.setValue(Date(timeIntervalSince1970: 1_790_000_000), forKey: "updatedAt")
+        channels.last?.setValue("old", forKey: "subject")
+        let updated = plainChannel(id: lastId)
+        updated.setValue(Date(timeIntervalSince1970: 1_790_000_100), forKey: "updatedAt")
+        updated.setValue("new", forKey: "subject")
+
+        ChannelListProvider().store(channels: channels) { _ in pageDone.fulfill() }
+        database.write({ $0.createOrUpdate(channel: updated) }, completion: { _ in updateDone.fulfill() })
+        wait(for: [pageDone, updateDone], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(storedChannel(id: lastId)?.subject, "new")
+        XCTAssertEqual(storedChannelCount(), 25)
+    }
+
+    /// The page's copy still wins over an older stored copy.
+    func testOlderStoredCopy_isUpdatedByThePage() {
+        let old = plainChannel(id: 10_001)
+        old.setValue(Date(timeIntervalSince1970: 1_790_000_000), forKey: "updatedAt")
+        old.setValue("old", forKey: "subject")
+        let fresh = plainChannel(id: 10_001)
+        fresh.setValue(Date(timeIntervalSince1970: 1_790_000_100), forKey: "updatedAt")
+        fresh.setValue("new", forKey: "subject")
+        let ctx = inner.backgroundPerformContext
+        ctx.performAndWait {
+            ctx.createOrUpdate(channel: old)
+            try? ctx.save()
+        }
+
+        let done = expectation(description: "page stored")
+        ChannelListProvider().store(channels: [fresh]) { _ in done.fulfill() }
+        wait(for: [done], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(storedChannel(id: 10_001)?.subject, "new")
+    }
+
+    /// A failed chunk does not stop the rest of the page; the error is reported once at the end
+    /// and the page is not reported as stored.
+    func testFailedChunk_restOfPageIsStillStored() {
+        database.failingWriteNumber = 2
+        let provider = ChannelListProvider()
+        var reported = false
+        provider.onStoreChannels = { _ in reported = true }
+        let done = expectation(description: "page stored")
+        var reportedError: Error?
+        provider.store(channels: page(of: 25)) { error in
+            reportedError = error
+            done.fulfill()
+        }
+        wait(for: [done], timeout: defaultWaitTimeout)
+
+        XCTAssertNotNil(reportedError)
+        XCTAssertFalse(reported)
+        XCTAssertEqual(database.calls, ["write", "write", "write"])
+        XCTAssertEqual(storedChannelCount(), 15, "chunks 1 and 3 are stored, chunk 2 failed")
+    }
+
+    /// The hops between chunks must not wait for the main thread; only the final completion
+    /// is delivered there.
+    func testChunkHops_doNotGoThroughMain() {
+        let done = expectation(description: "page stored")
+        ChannelListProvider().store(channels: page(of: 25)) { _ in
+            XCTAssertTrue(Thread.isMainThread)
+            done.fulfill()
+        }
+        wait(for: [done], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(database.writeResultQueuesOnMain, [false, false, false])
+    }
+
+    /// A full sync is stored in chunks too, so other writes are not held back by all of it.
+    func testStoreChannelsOperation_largeSync_isStoredInChunks() {
+        let operation = StoreChannelsOperation(database: database, channels: page(of: 25))
+        let finished = expectation(description: "operation finished")
+        operation.completionBlock = { finished.fulfill() }
+        OperationQueue().addOperation(operation)
+        wait(for: [finished], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(database.calls, ["write", "write", "write"])
+        XCTAssertEqual(storedChannelCount(), 25)
+    }
+
     /// End to end: the chat-list page and the chat's first message page store the same message
     /// back to back, as they do right after a cold launch. One attachment must come out.
     func testChannelListAndMessagePage_storeTheSameMessage_keepOneAttachment() {
@@ -142,13 +331,31 @@ private final class RecordingDatabase: Database {
 
     init(inner: MockDatabase) { self.inner = inner }
 
+    private var _writeResultQueuesOnMain: [Bool] = []
+    /// For each `write`, whether its completion was asked for on the main queue.
+    var writeResultQueuesOnMain: [Bool] { lock.lock(); defer { lock.unlock() }; return _writeResultQueuesOnMain }
+    /// 1-based number of the `write` whose block throws (and whose changes are rolled back).
+    var failingWriteNumber: Int?
+
     private func record(_ call: String) { lock.lock(); _calls.append(call); lock.unlock() }
 
     func write(resultQueue: DispatchQueue,
                _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                completion: ((Error?) -> Void)?) {
-        record("write")
-        inner.write(resultQueue: resultQueue, perform, completion: completion)
+        lock.lock()
+        _calls.append("write")
+        _writeResultQueuesOnMain.append(resultQueue === DispatchQueue.main)
+        let shouldFail = failingWriteNumber == _calls.filter { $0 == "write" }.count
+        lock.unlock()
+        guard shouldFail else {
+            inner.write(resultQueue: resultQueue, perform, completion: completion)
+            return
+        }
+        inner.write(resultQueue: resultQueue, { ctx in
+            try perform(ctx)
+            ctx.rollback()
+            throw NSError(domain: "RecordingDatabase", code: 1)
+        }, completion: completion)
     }
 
     func performWriteTask(resultQueue: DispatchQueue,

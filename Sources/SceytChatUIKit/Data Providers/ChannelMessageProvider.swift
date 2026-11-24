@@ -331,26 +331,101 @@ open class ChannelMessageProvider: DataProvider {
         }
     }
     
+    /// Stores a new outgoing message before it is sent.
+    ///
+    /// Runs on the serial writer (`database.write`), the same context that stores incoming
+    /// messages, send acks and message pages. That is what makes the newest-row lookup below
+    /// correct: every earlier write is already in this context, and no other write can land
+    /// between the lookup and the save. Two pending stores are ordered the same way.
     open func storePending(
         message: Message,
         completion: ((Error?) -> Void)? = nil
     ) {
-        database.performWriteTask ({
-            $0.createOrUpdate(
+        database.write ({
+            let stored = $0.createOrUpdate(
                 message: message,
                 channelId: self.channelId
             )
+            // Never above the newest message: with a phone clock behind the server, the phone's
+            // time would put the new message above one received just before it. The server's
+            // time replaces this one on the ack (`MessageDTO.map(_:)`), which then stays below too.
+            // Only the stored row is changed: the caller keeps using `message` (send payload,
+            // in-memory model) on other threads, so it must not be written to from here.
+            if let newest = Self.newestListCreatedAt(
+                for: stored,
+                threadMessageId: self.threadMessageId,
+                context: $0
+            ), stored.createdAt.bridgeDate <= newest {
+                stored.createdAt = newest.addingTimeInterval(0.001).bridgeDate
+                Self.promoteToLastMessageIfNewer(stored, channelId: self.channelId, context: $0)
+            }
             if let ownerChannel = ChannelDTO.fetch(id: self.channelId, context: $0),
                 let createdAt = ownerChannel.lastMessage?.createdAt.bridgeDate,
-               createdAt < message.createdAt {
+               createdAt < stored.createdAt.bridgeDate {
                 ownerChannel.lastDisplayedMessageId = 0
             }
         }) { error in
-            
             completion?(error)
         }
     }
     
+    /// `createdAt` of the newest other row in the list `row` belongs to, with the same rules and
+    /// sort as that list: the channel's main list (`LazyMessagesObserver.listPredicate`), or, for
+    /// a thread reply, the thread's replies. `nil` when there is none, or when a thread reply's
+    /// thread is unknown (no list to place it in, so it keeps its own time).
+    static func newestListCreatedAt(
+        for row: MessageDTO,
+        threadMessageId: MessageId?,
+        context: NSManagedObjectContext
+    ) -> Date? {
+        let listPredicate: NSPredicate
+        if row.repliedInThread {
+            guard let threadId = threadMessageId ?? row.parent.map({ MessageId($0.id) }),
+                  threadId > 0
+            else { return nil }
+            listPredicate = NSPredicate(
+                format: "channelId == %lld AND repliedInThread == true AND parent.id == %lld AND unlisted == false",
+                row.channelId,
+                Int64(threadId)
+            )
+        } else {
+            listPredicate = LazyMessagesObserver.listPredicate(channelId: ChannelId(row.channelId))
+        }
+        let request = MessageDTO.fetchRequest()
+        request.predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [
+            listPredicate,
+            NSPredicate(format: "SELF != %@", row)
+        ])
+        request.sortDescriptors = [
+            .init(keyPath: \MessageDTO.createdAt, ascending: false),
+            .init(keyPath: \MessageDTO.id, ascending: false)
+        ]
+        request.fetchLimit = 1
+        return (try? context.fetch(request))?.first?.createdAt.bridgeDate
+    }
+
+    /// Re-runs `createOrUpdate`'s last-message rule for an unsent row (by `createdAt`) after its
+    /// time was moved forward, since that rule saw the phone's time.
+    private static func promoteToLastMessageIfNewer(
+        _ row: MessageDTO,
+        channelId: ChannelId,
+        context: NSManagedObjectContext
+    ) {
+        guard row.id == 0,
+              let channel = ChannelDTO.fetch(id: channelId, context: context),
+              channel.lastMessage != row
+        else { return }
+        if let lastMessage = channel.lastMessage,
+           lastMessage.createdAt.bridgeDate >= row.createdAt.bridgeDate {
+            return
+        }
+        channel.lastMessage = row
+        if let lastReactionAt = channel.lastReaction?.createdAt?.bridgeDate,
+           row.createdAt.bridgeDate > lastReactionAt {
+            channel.lastReaction = nil
+        }
+    }
+
     open func deletePending(
         message tid: Int64,
         completion: ((Error?) -> Void)? = nil

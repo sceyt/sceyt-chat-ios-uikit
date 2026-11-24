@@ -267,6 +267,8 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     }
     
     public func deleteChannel(id: ChannelId) {
+        // A chat-list page or sync being stored in chunks must not bring it back.
+        DeletedChannelLog.record(id)
         try? deleteAllMessages(channelId: id)
         ChannelSyncStateDTO.delete(channelId: id, context: self)
         DraftMessageDTO.delete(channelId: id, context: self)

@@ -151,7 +151,18 @@ public class MessageDTO: NSManagedObject {
         incoming = map.incoming
         body = map.body
         metadata = map.metadata
-        if createdAt.bridgeDate < Date(timeIntervalSince1970: 60 * 60 * 24 * 2) {
+        let minValidCreatedAt = Date(timeIntervalSince1970: 60 * 60 * 24 * 2)
+        if createdAt.bridgeDate < minValidCreatedAt {
+            // A new row takes whatever the message carries.
+            createdAt = map.createdAt.bridgeDate
+        } else if map.id > 0,
+                  map.createdAt >= minValidCreatedAt,
+                  createdAt.bridgeDate != map.createdAt {
+            // A server-confirmed message carries the server's time, which is the truth. An outgoing
+            // row was stored before the send with the phone's time; when the phone clock is off,
+            // keeping it put the sent message above messages received just before it, for good.
+            // `id > 0` keeps unconfirmed writes (pending store, a resend from the local copy) from
+            // overwriting; the date check keeps a payload without a real date from doing so.
             createdAt = map.createdAt.bridgeDate
         }
         updatedAt = map.updatedAt?.bridgeDate

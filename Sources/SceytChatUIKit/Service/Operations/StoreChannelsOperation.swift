@@ -74,12 +74,12 @@ open class StoreChannelsOperation: AsyncOperation {
     open override func main() {
         guard !channels.isEmpty
         else { return }
-        database.performWriteTask({
-            $0.createOrUpdate(channels: self.channels)
-        }, completion: { [weak self] error in
+        // Serial writer in chunks, like `ChannelListProvider.store` (see `ChunkedChannelStore`):
+        // a full sync in one write held back every send, ack and received message behind it.
+        ChunkedChannelStore.store(channels, database: database) { [weak self] error in
             logger.errorIfNotNil(error, "StoreChannelsOperation completed with ")
             self?.complete()
-        })
+        }
 //        Components.channelListProvider.syncMessageForReactions(channels: channels)
     }
 }

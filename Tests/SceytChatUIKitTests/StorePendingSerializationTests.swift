@@ -3,16 +3,19 @@
 //  SceytChatUIKitTests
 //
 //  `storePending` stores a new outgoing message at `max(phone time, newest list row + 1 ms)` so
-//  it never sorts above a message received just before it (MessageOrderClockSkewTests). It runs
-//  on `performWriteTask` — a context of its own per call, so a send never waits behind a
-//  channel-list page on the serial context (channel_save_performance_findings.md).
+//  it never sorts above a message received just before it (MessageOrderClockSkewTests).
 //
-//  Two `storePending` calls running at the same time could then both read the same newest row
-//  and both store newest + 1 ms: same `createdAt`, both `id == 0`, so their order in the list was
-//  undefined. `storePending` calls now wait for each other (and only for each other).
+//  That lookup is only right if it sees every write queued before it. It runs on the serial
+//  writer (`database.write`), the context that also stores incoming messages, send acks and
+//  message pages. On a context of its own (`performWriteTask`) it missed an incoming row that
+//  had not committed yet, and two pending stores could both read the same newest row and tie.
 //
-//  `BarrierDatabase` makes the race deterministic: every `performWriteTask` holds its save until
-//  a second one has run its block too (or 0.3 s passed), the interleaving that produced the tie.
+//  `SplitContextDatabase` makes `performWriteTask` use a context of its own per call, as
+//  `PersistentContainer` does (`MockDatabase` routes it to the serial writer, which would hide
+//  the race).
+//
+//  Also covered: the caller's `Message` is never written to, and a thread reply is placed
+//  against its thread's replies, not the channel's main list.
 //
 
 @testable import SceytChatUIKit
@@ -23,28 +26,25 @@ import XCTest
 final class StorePendingSerializationTests: XCTestCase {
 
     private var inner: MockDatabase!
-    private var database: BarrierDatabase!
+    private var database: SplitContextDatabase!
     private var originalDatabase: Database!
 
     private let channelId: ChannelId = 740_046
     private let receivedId: MessageId = 884_559_669_371_215_872
+    private let threadRootId: MessageId = 884_559_600_000_000_000
+    private let threadReplyId: MessageId = 884_559_640_000_000_000
     private let t0 = Date(timeIntervalSince1970: 1_795_000_000)
     private let phoneBehind: TimeInterval = 18.7
 
     override func setUp() {
         super.setUp()
         inner = MockDatabase()
-        database = BarrierDatabase(inner: inner)
+        database = SplitContextDatabase(inner: inner)
         originalDatabase = DataProvider.database
         DataProvider.database = database
         let ctx = inner.backgroundPerformContext
         ctx.performAndWait {
             _ = ChannelDTO.fetchOrCreate(id: channelId, context: ctx)
-            let received = Message.Builder().id(receivedId).tid(Int(receivedId)).type("text").body("Message 1").build()
-            received.setValue(true, forKey: "incoming")
-            received.setValue(t0, forKey: "createdAt")
-            received.setValue(MessageDeliveryStatus.sent.rawValue, forKey: "deliveryStatus")
-            ctx.createOrUpdate(message: received, channelId: channelId)
             try? ctx.save()
         }
     }
@@ -56,12 +56,73 @@ final class StorePendingSerializationTests: XCTestCase {
         super.tearDown()
     }
 
-    private func pendingMessage(tid: Int, phoneCreatedAt: Date, body: String) -> Message {
-        let message = Message.Builder().tid(tid).type("text").body(body).build()
+    // MARK: - Fixtures
+
+    private func serverMessage(id: MessageId, createdAt: Date, body: String, inThread: Bool = false) -> Message {
+        let builder = Message.Builder().id(id).tid(Int(id)).type("text").body(body)
+        if inThread {
+            builder.parentMessageId(threadRootId)
+            builder.replyInThread(true)
+        }
+        let message = builder.build()
+        message.setValue(true, forKey: "incoming")
+        message.setValue(createdAt, forKey: "createdAt")
+        message.setValue(MessageDeliveryStatus.sent.rawValue, forKey: "deliveryStatus")
+        return message
+    }
+
+    private func pendingMessage(tid: Int, phoneCreatedAt: Date, body: String, inThread: Bool = false) -> Message {
+        let builder = Message.Builder().tid(tid).type("text").body(body)
+        if inThread {
+            builder.parentMessageId(threadRootId)
+            builder.replyInThread(true)
+        }
+        let message = builder.build()
         message.setValue(false, forKey: "incoming")
         message.setValue(phoneCreatedAt, forKey: "createdAt")
         message.setValue(MessageDeliveryStatus.pending.rawValue, forKey: "deliveryStatus")
         return message
+    }
+
+    /// Writes on the serial writer and waits for the save.
+    private func write(_ messages: Message...) {
+        let ctx = inner.backgroundPerformContext
+        ctx.performAndWait {
+            for message in messages {
+                ctx.createOrUpdate(message: message, channelId: channelId)
+            }
+            try? ctx.save()
+        }
+    }
+
+    /// Stores the thread root and one reply in it (the reply linked to its root, as a sync does).
+    private func writeThread(replyCreatedAt: Date) {
+        write(serverMessage(id: threadRootId, createdAt: t0.addingTimeInterval(-100), body: "root"))
+        write(serverMessage(id: threadReplyId, createdAt: replyCreatedAt, body: "reply", inThread: true))
+        let ctx = inner.backgroundPerformContext
+        ctx.performAndWait {
+            let reply = MessageDTO.fetch(id: threadReplyId, context: ctx)
+            reply?.parent = MessageDTO.fetch(id: threadRootId, context: ctx)
+            try? ctx.save()
+        }
+    }
+
+    private func storePending(_ message: Message, threadMessageId: MessageId? = nil) {
+        let done = expectation(description: "storePending")
+        ChannelMessageProvider(channelId: channelId, threadMessageId: threadMessageId)
+            .storePending(message: message) { error in
+                XCTAssertNil(error)
+                done.fulfill()
+            }
+        wait(for: [done], timeout: defaultWaitTimeout)
+    }
+
+    private func createdAt(tid: Int) -> Date? {
+        let ctx = inner.container.viewContext
+        ctx.refreshAllObjects()
+        let request = MessageDTO.fetchRequest()
+        request.predicate = NSPredicate(format: "tid == %lld", Int64(tid))
+        return (try? ctx.fetch(request))?.first?.createdAt.bridgeDate
     }
 
     private func listRows() -> [MessageDTO] {
@@ -76,9 +137,12 @@ final class StorePendingSerializationTests: XCTestCase {
         return (try? ctx.fetch(request)) ?? []
     }
 
+    // MARK: - Ordering against other writes
+
     /// Two sends stored at the same time (a system message and a user send, the share extension
     /// and the app) must get distinct times, in call order, both below the received message.
     func testConcurrentStorePending_getDistinctTimesInCallOrder() {
+        write(serverMessage(id: receivedId, createdAt: t0, body: "Message 1"))
         let firstDone = expectation(description: "first stored")
         let secondDone = expectation(description: "second stored")
         let provider = ChannelMessageProvider(channelId: channelId)
@@ -91,44 +155,89 @@ final class StorePendingSerializationTests: XCTestCase {
         }
         wait(for: [firstDone, secondDone], timeout: defaultWaitTimeout)
 
-        let rows = listRows()
-        XCTAssertEqual(rows.map(\.body), ["Message 1", "first", "second"])
-        let first = rows.first { $0.body == "first" }?.createdAt.bridgeDate
-        let second = rows.first { $0.body == "second" }?.createdAt.bridgeDate
-        XCTAssertNotNil(first)
-        XCTAssertNotNil(second)
-        if let first, let second {
+        XCTAssertEqual(listRows().map(\.body), ["Message 1", "first", "second"])
+        if let first = createdAt(tid: 7_001), let second = createdAt(tid: 7_002) {
             XCTAssertLessThan(first, second, "the two pending messages must not share a createdAt")
+        } else {
+            XCTFail("both pending rows must be stored")
         }
     }
 
-    /// A store whose write never reports back must not block later sends forever.
-    func testStorePending_doesNotWaitForeverOnAStuckWrite() {
-        ChannelMessageProvider.pendingStoreTimeout = 0.5
-        defer { ChannelMessageProvider.pendingStoreTimeout = ChannelMessageProvider.defaultPendingStoreTimeout }
-        database.dropNextCompletion = true
+    /// A message received just before the send, still being written on the serial writer when
+    /// `storePending` is called, must be seen: the sent message goes below it.
+    func testStorePending_seesIncomingStillBeingWritten() {
+        let received = serverMessage(id: receivedId, createdAt: t0, body: "Message 1")
+        let incomingQueued = expectation(description: "incoming stored")
+        // A slow incoming write: still uncommitted for 0.3 s after `storePending` is called.
+        database.write({ ctx in
+            ctx.createOrUpdate(message: received, channelId: self.channelId)
+            Thread.sleep(forTimeInterval: 0.3)
+        }, completion: { _ in incomingQueued.fulfill() })
 
-        let provider = ChannelMessageProvider(channelId: channelId)
-        provider.storePending(message: pendingMessage(tid: 7_101, phoneCreatedAt: t0, body: "stuck")) { _ in }
-        let laterDone = expectation(description: "later stored")
-        provider.storePending(message: pendingMessage(tid: 7_102, phoneCreatedAt: t0, body: "later")) { _ in
-            laterDone.fulfill()
-        }
-        wait(for: [laterDone], timeout: defaultWaitTimeout)
+        storePending(pendingMessage(tid: 7_201, phoneCreatedAt: t0.addingTimeInterval(3.8 - phoneBehind), body: "2"))
+        wait(for: [incomingQueued], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(listRows().map(\.body), ["Message 1", "2"])
+    }
+
+    // MARK: - The caller's message
+
+    /// The time is moved on the stored row only. The caller keeps using its `Message` (send
+    /// payload, in-memory model) on other threads, so `storePending` must not write to it.
+    func testStorePending_doesNotChangeCallersMessage() {
+        write(serverMessage(id: receivedId, createdAt: t0, body: "Message 1"))
+        let phoneTime = t0.addingTimeInterval(3.8 - phoneBehind)
+        let message = pendingMessage(tid: 7_301, phoneCreatedAt: phoneTime, body: "2")
+
+        storePending(message)
+
+        XCTAssertEqual(message.createdAt.timeIntervalSince1970, phoneTime.timeIntervalSince1970, accuracy: 0.0001)
+        XCTAssertGreaterThan(createdAt(tid: 7_301) ?? .distantPast, t0, "the stored row is still moved below the received message")
+    }
+
+    // MARK: - Threads
+
+    /// A thread reply is placed against its thread's replies: a newer main-channel message must
+    /// not push it forward.
+    func testThreadReply_ignoresNewerMainChannelMessage() {
+        writeThread(replyCreatedAt: t0.addingTimeInterval(-50))
+        write(serverMessage(id: receivedId, createdAt: t0, body: "Message 1"))
+        let phoneTime = t0.addingTimeInterval(-40)
+
+        storePending(pendingMessage(tid: 7_401, phoneCreatedAt: phoneTime, body: "my reply", inThread: true),
+                     threadMessageId: threadRootId)
+
+        XCTAssertEqual(createdAt(tid: 7_401)?.timeIntervalSince1970 ?? 0, phoneTime.timeIntervalSince1970, accuracy: 0.001)
+    }
+
+    /// A thread reply stamped before the thread's newest reply goes just below it.
+    func testThreadReply_placedAfterNewestReplyInThread() {
+        let newestReply = t0.addingTimeInterval(-50)
+        writeThread(replyCreatedAt: newestReply)
+
+        storePending(pendingMessage(tid: 7_402, phoneCreatedAt: t0.addingTimeInterval(-60), body: "my reply", inThread: true),
+                     threadMessageId: threadRootId)
+
+        XCTAssertEqual(createdAt(tid: 7_402)?.timeIntervalSince1970 ?? 0,
+                       newestReply.addingTimeInterval(0.001).timeIntervalSince1970, accuracy: 0.0005)
+    }
+
+    /// A main-list message is not moved by a newer thread reply (replies are not in that list).
+    func testMainListMessage_ignoresNewerThreadReply() {
+        writeThread(replyCreatedAt: t0)
+        let phoneTime = t0.addingTimeInterval(-40)
+
+        storePending(pendingMessage(tid: 7_403, phoneCreatedAt: phoneTime, body: "2"))
+
+        XCTAssertEqual(createdAt(tid: 7_403)?.timeIntervalSince1970 ?? 0, phoneTime.timeIntervalSince1970, accuracy: 0.001)
     }
 }
 
-/// `MockDatabase` with a `performWriteTask` that, like `PersistentContainer`, uses a context of
-/// its own per call — and holds each save until a second `performWriteTask` has run its block
-/// (or 0.3 s passed), the interleaving that made two concurrent `storePending` calls tie.
-private final class BarrierDatabase: Database {
+/// `MockDatabase` whose `performWriteTask` uses a context of its own per call, like
+/// `PersistentContainer`; `write` stays on the shared serial context.
+private final class SplitContextDatabase: Database {
 
     let inner: MockDatabase
-    private let lock = NSLock()
-    private var arrived = 0
-    private let bothArrived = DispatchSemaphore(value: 0)
-    /// The next `performWriteTask` never calls its completion (a stuck write).
-    var dropNextCompletion = false
 
     init(inner: MockDatabase) { self.inner = inner }
 
@@ -141,28 +250,15 @@ private final class BarrierDatabase: Database {
     func performWriteTask(resultQueue: DispatchQueue,
                           _ perform: @escaping (NSManagedObjectContext) throws -> Void,
                           completion: ((Error?) -> Void)?) {
-        lock.lock()
-        let drop = dropNextCompletion
-        dropNextCompletion = false
-        lock.unlock()
         let ctx = inner.container.newBackgroundContext()
         ctx.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        ctx.perform { [self] in
+        ctx.perform {
             do {
                 try perform(ctx)
-                lock.lock()
-                arrived += 1
-                let count = arrived
-                lock.unlock()
-                if count == 2 {
-                    bothArrived.signal()
-                    bothArrived.signal()
-                }
-                _ = bothArrived.wait(timeout: .now() + 0.3)
                 if ctx.hasChanges { try ctx.save() }
-                if !drop { resultQueue.async { completion?(nil) } }
+                resultQueue.async { completion?(nil) }
             } catch {
-                if !drop { resultQueue.async { completion?(error) } }
+                resultQueue.async { completion?(error) }
             }
         }
     }

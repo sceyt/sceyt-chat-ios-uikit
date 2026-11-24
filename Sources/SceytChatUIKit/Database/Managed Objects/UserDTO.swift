@@ -69,24 +69,7 @@ public class UserDTO: NSManagedObject {
         username = map.username
         avatarUrl = map.avatarUrl
         
-        // Remove existing metadata entries
-        if let existingEntries = metadataEntries {
-            for entry in existingEntries {
-                managedObjectContext?.delete(entry)
-            }
-        }
-        
-        if let metadataDict = map.metadataMap {
-            var newEntries = Set<UserMetadataDTO>()
-            for (key, value) in metadataDict {
-                let entry = UserMetadataDTO(context: managedObjectContext!)
-                entry.key = key
-                entry.value = value
-                entry.user = self
-                newEntries.insert(entry)
-            }
-            metadataEntries = newEntries
-        }
+        updateMetadata(map.metadataMap)
 
         blocked = map.blocked
         state = Int16(map.state.rawValue)
@@ -103,24 +86,7 @@ public class UserDTO: NSManagedObject {
         username = map.username
         avatarUrl = map.avatarUrl
         
-        // Remove existing metadata entries
-        if let existingEntries = metadataEntries {
-            for entry in existingEntries {
-                managedObjectContext?.delete(entry)
-            }
-        }
-        
-        if let metadataDict = map.metadataDict {
-            var newEntries = Set<UserMetadataDTO>()
-            for (key, value) in metadataDict {
-                let entry = UserMetadataDTO(context: managedObjectContext!)
-                entry.key = key
-                entry.value = value
-                entry.user = self
-                newEntries.insert(entry)
-            }
-            metadataEntries = newEntries
-        }
+        updateMetadata(map.metadataDict)
 
         blocked = map.blocked
         state = Int16(map.state.rawValue)
@@ -128,6 +94,37 @@ public class UserDTO: NSManagedObject {
         presenceStatus = map.presence.status
         presenceLastActiveAt = map.presence.lastActiveAt
         return self
+    }
+
+    /// Brings the metadata rows in line with `metadata`, touching only what changed: a changed
+    /// value is set on its row, a removed key's row is deleted, a new key gets a row. It used to
+    /// delete every row and insert new ones on each save, so every save of an unchanged user
+    /// (once per channel of a chat-list page) inserted and deleted rows and marked the user as
+    /// changed. `nil` or empty removes all rows, as before.
+    func updateMetadata(_ metadata: [String: String]?) {
+        guard let context = managedObjectContext else { return }
+        let metadata = metadata ?? [:]
+        var rowsByKey = [String: UserMetadataDTO]()
+        for row in metadataEntries ?? [] where !row.isDeleted {
+            if rowsByKey[row.key] == nil, metadata[row.key] != nil {
+                rowsByKey[row.key] = row
+            } else {
+                // A key no longer present, or a duplicate row for a key.
+                context.delete(row)
+            }
+        }
+        for (key, value) in metadata {
+            if let row = rowsByKey[key] {
+                if row.value != value {
+                    row.value = value
+                }
+            } else {
+                let row = UserMetadataDTO(context: context)
+                row.key = key
+                row.value = value
+                row.user = self
+            }
+        }
     }
 
     public func convert() -> ChatUser {
@@ -143,22 +140,7 @@ extension UserDTO {
         lastName = map.lastName
         username = map.username
         
-        // Remove existing metadata entries
-        if let existingEntries = metadataEntries {
-            for entry in existingEntries {
-                managedObjectContext?.delete(entry)
-            }
-        }
-        
-        var newEntries = Set<UserMetadataDTO>()
-        for (key, value) in map.metadataDict {
-            let entry = UserMetadataDTO(context: managedObjectContext!)
-            entry.key = key
-            entry.value = value
-            entry.user = self
-            newEntries.insert(entry)
-        }
-        metadataEntries = newEntries
+        updateMetadata(map.metadataDict)
         
         return self
     }
