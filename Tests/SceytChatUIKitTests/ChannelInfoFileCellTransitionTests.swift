@@ -67,8 +67,18 @@ final class ChannelInfoFileCellTransitionTests: XCTestCase {
         return cell
     }
 
-    private func pump(_ seconds: TimeInterval) {
-        RunLoop.main.run(until: Date().addingTimeInterval(seconds))
+    /// Turns the main run loop until `condition` holds or `defaultWaitTimeout` passes. For
+    /// an animation's end state: a fixed pump of its duration fails whenever the runner is
+    /// slower than the animation (seen on CI: the button still at its 0.01 shrink scale).
+    @discardableResult
+    private func waitUntil(_ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(defaultWaitTimeout)
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.main.run(until: Date().addingTimeInterval(0.01))
+        }
+        drainMainQueueAfterDeadline(until: condition)
+        return condition()
     }
 
     func testFinishedDownloadOfBoundRow_animatesTheButtonOut() {
@@ -85,7 +95,12 @@ final class ChannelInfoFileCellTransitionTests: XCTestCase {
 
         XCTAssertFalse(cell.downloadButton.layer.animationKeys()?.isEmpty ?? true,
                        "the button must shrink out, not vanish")
-        pump(ChannelInfoViewController.FileCell.transitionDuration + 0.2)
+        // Until the transition's completion has run: it hides the button and restores it.
+        waitUntil {
+            cell.downloadButton.isHidden
+                && cell.downloadButton.transform == .identity
+                && cell.downloadButton.alpha == 1
+        }
         XCTAssertTrue(cell.downloadButton.isHidden)
         XCTAssertEqual(cell.downloadButton.transform, .identity, "no shrunk leftover may keep its slot")
         XCTAssertEqual(cell.downloadButton.alpha, 1)

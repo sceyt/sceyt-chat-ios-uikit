@@ -55,7 +55,7 @@ final class AttachmentTransferInjectionTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 2)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(transfer.uploads.wrapped.count, 1)
         XCTAssertTrue(transfer.uploads.wrapped.first?.first === attachment)
@@ -70,7 +70,7 @@ final class AttachmentTransferInjectionTests: XCTestCase {
 
         let done = expectation(description: "completion")
         sender.uploadAttachmentsIfNeeded(message: message) { _, _ in done.fulfill() }
-        wait(for: [done], timeout: 2)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(transfer.uploads.wrapped.isEmpty)
     }

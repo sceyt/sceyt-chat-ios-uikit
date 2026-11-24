@@ -96,7 +96,7 @@ final class TransferFailureStatusTests: XCTestCase {
             result = $0
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         guard case .failure = result else { return XCTFail("an error body is not a poster: \(String(describing: result))") }
         XCTAssertTrue(try FileManager.default.contentsOfDirectory(atPath: posters.path).isEmpty, "nothing cached as the poster")

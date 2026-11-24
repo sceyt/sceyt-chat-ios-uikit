@@ -65,7 +65,7 @@ final class LazyDatabaseObserverRestartTests: XCTestCase {
 
         XCTAssertTrue(startedNow, "The first restart should start immediately")
         XCTAssertFalse(queued, "A restart while one is in flight should be queued, not started")
-        wait(for: [c1, c2], timeout: 5, enforceOrder: true)
+        wait(for: [c1, c2], timeout: defaultWaitTimeout, enforceOrder: true)
 
         XCTAssertEqual(observer.fetchPredicate, p2, "The queued restart should be the one the observer ends on")
         XCTAssertEqual(landedPredicates, [NSPredicate(value: true), p1, p2],
@@ -82,7 +82,7 @@ final class LazyDatabaseObserverRestartTests: XCTestCase {
         observer.restartObserver(fetchPredicate: p2) { c2.fulfill() }
         observer.restartObserver(fetchPredicate: p3) { c3.fulfill() }
 
-        wait(for: [c1, c2, c3], timeout: 5)
+        wait(for: [c1, c2, c3], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(observer.fetchPredicate, p3)
         XCTAssertEqual(landedPredicates, [NSPredicate(value: true), p1, p3],
@@ -104,7 +104,7 @@ final class LazyDatabaseObserverRestartTests: XCTestCase {
         }
         observer.restartObserver(fetchPredicate: p2) { c2.fulfill() }
 
-        wait(for: [c1, c2, c3], timeout: 5)
+        wait(for: [c1, c2, c3], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(observer.fetchPredicate, p3)
         XCTAssertEqual(landedPredicates, [NSPredicate(value: true), p1, p3])
@@ -127,7 +127,7 @@ final class LazyDatabaseObserverRestartTests: XCTestCase {
         let c3 = expectation(description: "p3 completion")
         let startedNow = observer.restartObserver(fetchPredicate: p3) { c3.fulfill() }
         XCTAssertTrue(startedNow)
-        wait(for: [c3], timeout: 5)
+        wait(for: [c3], timeout: defaultWaitTimeout)
         XCTAssertEqual(observer.fetchPredicate, p3)
     }
 
@@ -136,7 +136,7 @@ final class LazyDatabaseObserverRestartTests: XCTestCase {
     private func start() {
         let started = expectation(description: "initial start")
         observer.startObserver(completion: { started.fulfill() })
-        wait(for: [started], timeout: 5)
+        wait(for: [started], timeout: defaultWaitTimeout)
         XCTAssertEqual(landedPredicates.count, 1)
     }
 

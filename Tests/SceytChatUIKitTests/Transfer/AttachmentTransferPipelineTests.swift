@@ -167,12 +167,13 @@ private final class PosterTransfer: AttachmentTransfer {
     }
 }
 
-private func waitUntil(timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
+private func waitUntil(timeout: TimeInterval = defaultWaitTimeout, _ condition: () -> Bool) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
         if condition() { return true }
         RunLoop.main.run(until: Date().addingTimeInterval(0.01))
     }
+    drainMainQueueAfterDeadline(until: condition)
     return condition()
 }
 
@@ -252,7 +253,7 @@ final class AttachmentTransferPipelineTests: XCTestCase {
         SCTDataSessionTaskInfo(transferType: type, message: makeMessage([attachment]), attachment: attachment)
     }
 
-    private func upload(_ attachment: ChatMessage.Attachment, timeout: TimeInterval = 5) -> Error? {
+    private func upload(_ attachment: ChatMessage.Attachment, timeout: TimeInterval = defaultWaitTimeout) -> Error? {
         // Set on the transfer's queues, read here: behind a lock.
         let outcome = Locked<(finished: Bool, error: Error?)>((false, nil))
         transfer.uploadMessageAttachments(message: makeMessage([attachment]), attachments: [attachment]) { _, error in
@@ -262,7 +263,7 @@ final class AttachmentTransferPipelineTests: XCTestCase {
         return outcome.wrapped.error
     }
 
-    private func download(_ attachment: ChatMessage.Attachment, timeout: TimeInterval = 5) -> (finished: Bool, error: Error?) {
+    private func download(_ attachment: ChatMessage.Attachment, timeout: TimeInterval = defaultWaitTimeout) -> (finished: Bool, error: Error?) {
         // Set on the transfer's queues, read here: behind a lock.
         let outcome = Locked<(finished: Bool, error: Error?)>((false, nil))
         transfer.downloadMessageAttachments(message: makeMessage([attachment]), attachments: [attachment]) { _, error in
@@ -378,7 +379,7 @@ final class AttachmentTransferPipelineTests: XCTestCase {
             _ = waitUntilOffMain { taskInfo.event.map { if case .failure = $0 { return true } else { return false } } ?? false }
         }
 
-        let (finished, error) = download(remote.attachment, timeout: 3)
+        let (finished, error) = download(remote.attachment)
 
         XCTAssertTrue(finished, "the download never completed")
         XCTAssertEqual((error as? URLError)?.code, .badServerResponse)
@@ -392,7 +393,7 @@ final class AttachmentTransferPipelineTests: XCTestCase {
         session.onUpload = { _, taskInfo in taskInfo.failure(error: URLError(.badServerResponse)) }
         let attachment = makeAttachment(tid: 60, filePath: try file().path)
 
-        let error = upload(attachment, timeout: 3)
+        let error = upload(attachment)
 
         XCTAssertEqual((error as? URLError)?.code, .badServerResponse)
         XCTAssertEqual(attachment.status, .failedUploading)
@@ -1083,7 +1084,8 @@ extension AttachmentTransferPipelineTests {
 }
 
 /// Waits on a background-safe spin (the caller is not the main thread).
-private func waitUntilOffMain(timeout: TimeInterval = 2, _ condition: () -> Bool) -> Bool {
+/// Off main, so there is no main queue to drain after the deadline: only the longer wait.
+private func waitUntilOffMain(timeout: TimeInterval = defaultWaitTimeout, _ condition: () -> Bool) -> Bool {
     let deadline = Date().addingTimeInterval(timeout)
     while Date() < deadline {
         if condition() { return true }

@@ -57,11 +57,11 @@ final class DatabaseWriteCompletionTests: XCTestCase {
             user.id = "left-behind"
             throw Failure()
         }, completion: { _ in failed.fulfill() })
-        wait(for: [failed], timeout: 5)
+        wait(for: [failed], timeout: defaultWaitTimeout)
 
         let next = expectation(description: "next write")
         database.write(resultQueue: .global(), { _ in }, completion: { _ in next.fulfill() })
-        wait(for: [next], timeout: 5)
+        wait(for: [next], timeout: defaultWaitTimeout)
 
         let request = NSFetchRequest<UserDTO>(entityName: "UserDTO")
         request.predicate = NSPredicate(format: "id == %@", "left-behind")
@@ -79,7 +79,7 @@ final class DatabaseWriteCompletionTests: XCTestCase {
             lock.lock(); received.append(error); lock.unlock()
             first.fulfill()
         }
-        wait(for: [first], timeout: 5)
+        wait(for: [first], timeout: defaultWaitTimeout)
         // A second, wrong completion is queued right behind the first.
         RunLoop.current.run(until: Date().addingTimeInterval(0.2))
         lock.lock(); defer { lock.unlock() }

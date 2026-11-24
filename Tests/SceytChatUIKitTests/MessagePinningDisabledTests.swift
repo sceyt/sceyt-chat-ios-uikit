@@ -128,7 +128,7 @@ final class MessagePinningDisabledTests: XCTestCase {
             reported = error
             done.fulfill()
         }
-        wait(for: [done], timeout: 10)
+        wait(for: [done], timeout: defaultWaitTimeout)
         return reported
     }
 
@@ -209,7 +209,7 @@ final class MessagePinningDisabledTests: XCTestCase {
             XCTAssertFalse(started, "no sweep may be started while the feature is off")
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 
     func testSyncChannelPins_leavesStoredPinsAloneWhileDisabled() {
@@ -219,7 +219,7 @@ final class MessagePinningDisabledTests: XCTestCase {
 
         let done = expectation(description: "refused")
         SyncService.syncChannelPins(channelId: channelId) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(
             pinRowCount(), 1,

@@ -152,7 +152,7 @@ final class GlobalSearchAllVoiceViewModelTests: XCTestCase {
         let paths = ChangeItemPaths(changeItems: [])
         viewModel.simulateChange(paths)
 
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     func testEventPublisherEmitsChangeEvent() {
@@ -167,7 +167,7 @@ final class GlobalSearchAllVoiceViewModelTests: XCTestCase {
         let paths = ChangeItemPaths(changeItems: [])
         viewModel.simulateChange(paths)
 
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     func testMultipleSimulatedChangesPublishMultipleEvents() {
@@ -181,7 +181,7 @@ final class GlobalSearchAllVoiceViewModelTests: XCTestCase {
         viewModel.simulateChange(ChangeItemPaths(changeItems: []))
         viewModel.simulateChange(ChangeItemPaths(changeItems: []))
 
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     // MARK: - No-op observer and loader

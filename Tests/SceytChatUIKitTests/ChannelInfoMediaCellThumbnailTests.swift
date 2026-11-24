@@ -99,12 +99,13 @@ final class ChannelInfoMediaCellThumbnailTests: XCTestCase {
     }
 
     @discardableResult
-    private func waitUntil(timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
+    private func waitUntil(timeout: TimeInterval = defaultWaitTimeout, _ condition: () -> Bool) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         while Date() < deadline {
             if condition() { return true }
             RunLoop.main.run(until: Date().addingTimeInterval(0.01))
         }
+        drainMainQueueAfterDeadline(until: condition)
         return condition()
     }
 

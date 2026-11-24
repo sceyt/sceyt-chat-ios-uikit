@@ -140,7 +140,7 @@ final class PinnedMessageObserverDeadlockTests: XCTestCase {
         returned.value = true
 
         // Main is free again, so it can serve the posted notification and the context drains.
-        wait(for: [measured], timeout: 5)
+        wait(for: [measured], timeout: defaultWaitTimeout)
     }
 
     // MARK: - No behaviour change
@@ -183,7 +183,7 @@ final class PinnedMessageObserverDeadlockTests: XCTestCase {
             written.fulfill()
         })
 
-        wait(for: [written, changed], timeout: 5)
+        wait(for: [written, changed], timeout: defaultWaitTimeout)
         XCTAssertEqual(observer.orderedItems.map(\.messageId), [messageIds[1]])
         XCTAssertTrue(callbackOnMain, "pin observer callbacks must arrive on main")
     }
@@ -209,7 +209,7 @@ final class PinnedMessageObserverDeadlockTests: XCTestCase {
             ctx.unpinMessage(id: messageIds[0], tid: Int64(messageIds[0]), channelId: channelId)
         }, completion: nil)
 
-        wait(for: [removed], timeout: 5)
+        wait(for: [removed], timeout: defaultWaitTimeout)
         XCTAssertTrue(observer.orderedItems.isEmpty)
     }
 }

@@ -201,7 +201,7 @@ final class GlobalSearchUserBarViewModelTests: XCTestCase {
             .store(in: &cancellables)
 
         viewModel.search(query: "ali")
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     func testEmptyQueryAlsoPublishesReloadEvent() {
@@ -216,6 +216,6 @@ final class GlobalSearchUserBarViewModelTests: XCTestCase {
             .store(in: &cancellables)
 
         viewModel.search(query: "")
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 }

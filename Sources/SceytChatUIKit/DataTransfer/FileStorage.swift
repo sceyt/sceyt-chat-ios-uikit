@@ -12,7 +12,7 @@ import CryptoKit
 
 /// Safe to share: it holds no state of its own, only paths derived from constants.
 open class FileStorage: Storage, @unchecked Sendable {
-    nonisolated(unsafe) public static let `default` = FileStorage()
+    public static let `default` = FileStorage()
     
     var fileManager: FileManager { FileManager.default }
     

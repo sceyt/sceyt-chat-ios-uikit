@@ -109,7 +109,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
     private func flushDatabaseWrites() {
         let done = expectation(description: "writes drained")
         mockDB.write({ _ in }, completion: { _ in done.fulfill() })
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 
     /// How many "X pinned" system messages the channel holds for `messageId`.
@@ -139,7 +139,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
     /// through `Database`, whose completions are delivered on the main queue, so a blocked main
     /// thread means the write never completes and the operation never finishes. `wait(for:)`
     /// pumps the runloop instead, which is the whole point.
-    private func run(_ operations: [Operation], timeout: TimeInterval = 20) {
+    private func run(_ operations: [Operation], timeout: TimeInterval = defaultWaitTimeout) {
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
         let done = expectation(description: "operations finished")
@@ -680,7 +680,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "flushed")
         provider.flushPendingPin(record) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(provider.mockOperator.pinnedIds, [[NSNumber(value: 800)]])
         XCTAssertEqual(provider.mockOperator.lastPinTill, until)
@@ -698,7 +698,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "flushed")
         provider.flushPendingPin(record) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         ctx.refreshAllObjects()
         XCTAssertEqual(provider.mockOperator.pinnedIds, [[NSNumber(value: 805)]])
@@ -720,7 +720,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(provider.mockOperator.pinnedIds.isEmpty,
                       "pinning a message the user already unpinned is exactly the bug")
@@ -737,7 +737,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(provider.mockOperator.pinnedIds.isEmpty,
                       "there is nothing to send for a message the server has never seen")
@@ -757,7 +757,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNotNil(error, "the caller still learns the attempt failed")
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         ctx.refreshAllObjects()
         let row = pinRow(tid: 801)
@@ -778,7 +778,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "attempted")
         provider.flushPendingPin(record) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         ctx.refreshAllObjects()
         XCTAssertEqual(pinRow(tid: 802)?.sync, .pendingPin)
@@ -796,7 +796,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error, "being offline is not an error the caller has to handle")
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(provider.mockOperator.pinnedIds.isEmpty, "nothing can be sent while offline")
         ctx.refreshAllObjects()
@@ -825,7 +825,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         ctx.refreshAllObjects()
         let row = pinRow(tid: 804)
@@ -846,7 +846,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "confirmed")
         provider.confirm(record, serverPinId: 10, pinnedUntil: nil, scope: .forAll) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(systemPinMessageCount(targeting: 820), 1)
     }
@@ -859,7 +859,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "confirmed")
         provider.confirm(record, serverPinId: 11, pinnedUntil: nil, scope: .forMe) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(systemPinMessageCount(targeting: 821), 0)
     }
@@ -874,7 +874,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         for index in 0 ..< 2 {
             let done = expectation(description: "confirmed \(index)")
             provider.confirm(record, serverPinId: 12, pinnedUntil: nil, scope: .forAll) { _ in done.fulfill() }
-            wait(for: [done], timeout: 5)
+            wait(for: [done], timeout: defaultWaitTimeout)
         }
 
         XCTAssertEqual(
@@ -892,7 +892,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "attempted")
         provider.flushPendingPin(record) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(systemPinMessageCount(targeting: 823), 0)
     }
@@ -908,7 +908,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "confirmed")
         provider.confirm(record, serverPinId: 13, pinnedUntil: nil, scope: .forAll) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(systemPinMessageCount(targeting: 824), 0)
     }
@@ -928,7 +928,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(provider.mockOperator.unpinnedIds, [[NSNumber(value: 805)]])
         ctx.refreshAllObjects()
@@ -949,7 +949,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNotNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         ctx.refreshAllObjects()
         XCTAssertEqual(pinRow(tid: 806)?.sync, .pendingUnpin, "the removal stays queued for the next sync")
@@ -971,7 +971,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(provider.mockOperator.unpinnedIds.isEmpty)
         ctx.refreshAllObjects()
@@ -990,7 +990,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(
             provider.mockOperator.unpinnedIds.isEmpty,
@@ -1011,7 +1011,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "unpinned")
         provider.unpin(record) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(provider.mockOperator.unpinnedIds, [[NSNumber(value: 811)]])
         ctx.refreshAllObjects()
@@ -1037,7 +1037,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(provider.mockOperator.unpinnedIds.isEmpty)
         ctx.refreshAllObjects()
@@ -1066,7 +1066,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(provider.mockOperator.unpinnedIds, [[NSNumber(value: 813)]])
         ctx.refreshAllObjects()
@@ -1090,7 +1090,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "flushed")
         provider.flushPendingIntent(record) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(provider.mockOperator.pinnedIds, [[NSNumber(value: 830)]])
         XCTAssertTrue(provider.mockOperator.unpinnedIds.isEmpty)
@@ -1109,7 +1109,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "flushed")
         provider.flushPendingIntent(record) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(provider.mockOperator.unpinnedIds, [[NSNumber(value: 831)]])
         XCTAssertTrue(provider.mockOperator.pinnedIds.isEmpty)
@@ -1126,7 +1126,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "flushed")
         provider.flushPendingIntent(record) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(provider.mockOperator.pinnedIds.isEmpty)
         XCTAssertTrue(provider.mockOperator.unpinnedIds.isEmpty)
@@ -1146,7 +1146,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         let done = expectation(description: "fetched")
         var records = [PinnedMessageRecord]()
         ChannelPinnedMessageProvider.fetchPendingPins { records = $0; done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(Set(records.map(\.messageTid)), [840, 841])
     }
@@ -1160,7 +1160,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         let done = expectation(description: "built")
         var operations = [PinResendOperation]()
         SyncService.makePendingPinOperations { operations = $0; done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(operations.count, 2)
     }
@@ -1179,7 +1179,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         let done = expectation(description: "built")
         var operations = [PinResendOperation]()
         SyncService.makePendingPinOperations(channelId: channelId) { operations = $0; done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(operations.count, 1, "the channel-open sweep only drains its own channel")
         XCTAssertEqual(operations.first?.record.messageTid, 860)
@@ -1189,7 +1189,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         let done = expectation(description: "built")
         var operations = [PinResendOperation]()
         SyncService.makePendingPinOperations { operations = $0; done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertTrue(operations.isEmpty)
     }
@@ -1230,7 +1230,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
         XCTAssertEqual(PinnedMessageDTO.count(channelId: channelId, context: ctx), 0)
     }
 
@@ -1243,7 +1243,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "reconciled")
         provider.reconcile(serverPinIds: [40]) { _ in done.fulfill() }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         ctx.refreshAllObjects()
         XCTAssertNotNil(pinRow(tid: 810))
@@ -1390,7 +1390,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertFalse(started)
             done.fulfill()
         }
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 
     func testSyncChannelPins_runsToCompletionAndPostsItsNotification() {
@@ -1407,7 +1407,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
 
         let done = expectation(description: "finished")
         SyncService.syncChannelPins(channelId: channelId) { _ in done.fulfill() }
-        wait(for: [done, posted], timeout: 20)
+        wait(for: [done, posted], timeout: defaultWaitTimeout)
     }
 
     /// The conversation and the pinned list both kick a sweep on open; the second must collapse
@@ -1420,7 +1420,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
         SyncService.syncChannelPins(channelId: channelId) { started in secondStarted = started }
 
         XCTAssertEqual(secondStarted, false, "a second sweep for the same channel is a no-op")
-        wait(for: [first], timeout: 20)
+        wait(for: [first], timeout: defaultWaitTimeout)
     }
 
     /// ...but a different channel must not be blocked, which is why this is a per-channel guard
@@ -1435,7 +1435,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertTrue(started, "a sweep for another channel must be allowed to start")
             b.fulfill()
         }
-        wait(for: [a, b], timeout: 20)
+        wait(for: [a, b], timeout: defaultWaitTimeout)
     }
 
     func testCancelPinSync_freesTheSlotImmediately() {
@@ -1447,7 +1447,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertTrue(started, "cancelling must release the channel's slot at once")
             done.fulfill()
         }
-        wait(for: [done], timeout: 20)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 
     func testCancelAllPinSyncs_freesEveryChannelsSlot() {
@@ -1466,7 +1466,7 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertTrue(started)
             b.fulfill()
         }
-        wait(for: [a, b], timeout: 20)
+        wait(for: [a, b], timeout: defaultWaitTimeout)
     }
 
     /// `cancelSync` runs before the database is wiped on account switch, so it has to take the
@@ -1481,6 +1481,6 @@ final class PinnedMessageServerSyncTests: XCTestCase {
             XCTAssertTrue(started)
             done.fulfill()
         }
-        wait(for: [done], timeout: 20)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 }

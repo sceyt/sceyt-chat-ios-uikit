@@ -143,7 +143,7 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
     /// returns at once, and "must not happen" checks pass their own short timeout.
     @discardableResult
     private func waitUntil(
-        timeout: TimeInterval = 10,
+        timeout: TimeInterval = defaultWaitTimeout,
         _ condition: () -> Bool
     ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
@@ -151,6 +151,7 @@ final class AttachmentLayoutThumbnailTests: XCTestCase {
             if condition() { return true }
             RunLoop.main.run(until: Date().addingTimeInterval(0.01))
         }
+        drainMainQueueAfterDeadline(until: condition)
         return condition()
     }
 

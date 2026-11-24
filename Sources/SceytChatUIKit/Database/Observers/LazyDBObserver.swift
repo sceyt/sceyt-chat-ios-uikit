@@ -54,6 +54,12 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     /// The array describes the cycle's structural changes (`.insert`, `.update`, `.move`,
     /// `.delete`) already translated from DTOs into `Item`. Consumers can apply the
     /// changes directly, or ignore them and re-read ``rawItems`` for a fresh snapshot.
+    ///
+    /// During this callback, main-thread reads of ``rawItems`` return the snapshot *this
+    /// cycle* produced — never a later one. Cycles are delivered with `main.async`, so a
+    /// second cycle can publish before the first callback runs; applying the first
+    /// cycle's index paths against the second cycle's snapshot is what made
+    /// `UITableView.performBatchUpdates` throw "invalid number of rows".
     public var onDidChange: (([DBChangeItem<Item>]) -> Void)?
 
     /// Fires on the main queue after ``restart(predicate:)`` has swapped the predicate
@@ -118,6 +124,11 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     /// previous list during the ``onWillChange`` callback.
     private var _willChangeItems: [Item]?
 
+    /// The snapshot belonging to the cycle whose ``onDidChange`` is on the call stack.
+    /// Main-thread only: set and cleared around the callback, read by ``rawItems`` when
+    /// called on the main thread.
+    private var _deliveringSnapshot: [Item]?
+
     /// `true` while ``onWillChange`` is on the call stack; gates ``rawItems`` to read
     /// from ``_willChangeItems`` instead of ``_items``.
     private var _notifyingWillChange = false
@@ -135,6 +146,9 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     /// `performAndWait`. The returned array is a value-type copy that can be passed
     /// across threads.
     public var rawItems: [Item] {
+        if Thread.isMainThread, let delivering = _deliveringSnapshot {
+            return delivering
+        }
         if onWillChange != nil {
             let willChangeState: (active: Bool, cachedItems: [Item]?) = queue.sync { (_notifyingWillChange, _willChangeItems) }
             if willChangeState.active {
@@ -224,8 +238,8 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
         }
         changeRelay.onDidChange = { [weak self] changes in
             guard let self else { return }
-            self.updateItems(changes)
-            self.notifyDidChange(changes: changes)
+            let snapshot = self.updateItems(changes)
+            self.notifyDidChange(changes: changes, snapshot: snapshot)
         }
     }
 
@@ -256,7 +270,7 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
             guard let self else { return }
             let items = self.updateItems(nil)
             let changes: [DBChangeItem<Item>] = items.enumerated().map { .insert($1, IndexPath(item: $0, section: 0)) }
-            self.notifyDidChange(changes: changes)
+            self.notifyDidChange(changes: changes, snapshot: items)
         }
     }
 
@@ -330,10 +344,20 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
     }
 
     /// Forwards the converted change list to the public ``onDidChange`` callback on
-    /// the main queue.
-    private func notifyDidChange(changes: [DBChangeItem<Item>]) {
+    /// the main queue, with ``rawItems`` pinned to `snapshot` — the list these changes
+    /// produce — for the duration of the callback.
+    private func notifyDidChange(changes: [DBChangeItem<Item>], snapshot: [Item]) {
+        // Captured here, not at delivery: a cycle computed under one consumer
+        // closure must not reach a closure installed later (stop/start resync).
         guard let onDidChange = onDidChange else { return }
-        DispatchQueue.main.async {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                onDidChange(changes)
+                return
+            }
+            let outer = self._deliveringSnapshot
+            self._deliveringSnapshot = snapshot
+            defer { self._deliveringSnapshot = outer }
             onDidChange(changes)
         }
     }
@@ -357,9 +381,9 @@ open class LazyDBObserver<Item, DTO: NSManagedObject> {
             sorting: sorting
         )
         _items = items
-        // Publish before notifyDidChange dispatches to main, so consumers reading
-        // rawItems from the onDidChange callback see a snapshot at least as new as
-        // the changes they received.
+        // `_snapshot` is what readers *outside* a callback get: always the latest.
+        // Inside `onDidChange` the main thread reads `_deliveringSnapshot` instead,
+        // which `notifyDidChange` pins to the cycle being delivered — see `rawItems`.
         queue.sync { _snapshot = items }
         return items
     }

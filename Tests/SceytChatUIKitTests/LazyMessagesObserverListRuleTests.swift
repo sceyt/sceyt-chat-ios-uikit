@@ -54,7 +54,7 @@ final class LazyMessagesObserverListRuleTests: XCTestCase {
         )
         let started = expectation(description: "initial start")
         observer.startObserver(completion: { started.fulfill() })
-        wait(for: [started], timeout: 5)
+        wait(for: [started], timeout: defaultWaitTimeout)
         XCTAssertEqual(shownIds(), [1, 2, 3, 4])
     }
 
@@ -164,14 +164,15 @@ final class LazyMessagesObserverListRuleTests: XCTestCase {
             changed.fulfill()
         }
         write(block)
-        wait(for: [changed], timeout: 5)
+        wait(for: [changed], timeout: defaultWaitTimeout)
     }
 
-    private func waitUntil(timeout: TimeInterval = 3, _ condition: () -> Bool) {
+    private func waitUntil(timeout: TimeInterval = defaultWaitTimeout, _ condition: () -> Bool) {
         let deadline = Date().addingTimeInterval(timeout)
         while !condition(), Date() < deadline {
             RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         }
+        drainMainQueueAfterDeadline(until: condition)
     }
 
     private func shownIds() -> [MessageId] {

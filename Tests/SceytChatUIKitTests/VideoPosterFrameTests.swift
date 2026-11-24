@@ -145,7 +145,7 @@ private extension VideoPosterFrameTests {
         input.markAsFinished()
         let done = expectation(description: "video written")
         writer.finishWriting { done.fulfill() }
-        wait(for: [done], timeout: 10)
+        wait(for: [done], timeout: defaultWaitTimeout)
         XCTAssertEqual(writer.status, .completed, "\(String(describing: writer.error))")
         return url
     }

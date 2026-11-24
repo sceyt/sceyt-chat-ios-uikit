@@ -107,14 +107,14 @@ final class AtomicLostUpdateTests: XCTestCase {
         line: UInt = #line
     ) -> Bool {
         let t1Done = runAsync(t1)
-        XCTAssertEqual(gate.entered.wait(timeout: .now() + 5), .success,
+        XCTAssertEqual(gate.entered.wait(timeout: .now() + defaultWaitTimeout), .success,
                        "T1 never reached its change step", file: file, line: line)
         let t2Done = runAsync(t2)
         let t2RanDuringT1 = t2Done.wait(timeout: .now() + 0.5) == .success
         gate.release.signal()
-        XCTAssertEqual(t1Done.wait(timeout: .now() + 5), .success, file: file, line: line)
+        XCTAssertEqual(t1Done.wait(timeout: .now() + defaultWaitTimeout), .success, file: file, line: line)
         if !t2RanDuringT1 {
-            XCTAssertEqual(t2Done.wait(timeout: .now() + 5), .success, file: file, line: line)
+            XCTAssertEqual(t2Done.wait(timeout: .now() + defaultWaitTimeout), .success, file: file, line: line)
         }
         return t2RanDuringT1
     }
