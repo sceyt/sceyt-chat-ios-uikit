@@ -54,7 +54,7 @@ final class SessionDownloadStatusTests: XCTestCase {
             result = $0
             done.fulfill()
         })
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
         return try XCTUnwrap(result)
     }
 

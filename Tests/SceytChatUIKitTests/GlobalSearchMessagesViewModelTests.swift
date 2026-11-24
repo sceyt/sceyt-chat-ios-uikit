@@ -419,7 +419,7 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             .store(in: &cancellables)
 
         viewModel.search(query: "Hello")
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     func testEmptyQueryAlsoPublishesReloadEvent() {
@@ -434,7 +434,7 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             .store(in: &cancellables)
 
         viewModel.search(query: "")
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     func testNilQueryAlsoPublishesReloadEvent() {
@@ -449,7 +449,7 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
             .store(in: &cancellables)
 
         viewModel.search(query: nil)
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     func testConsecutiveSearchesPublishMultipleReloadEvents() {
@@ -464,7 +464,7 @@ final class GlobalSearchMessagesViewModelTests: XCTestCase {
 
         viewModel.search(query: "Hello")
         viewModel.search(query: "world")
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     // MARK: - shouldShowMessagesSection

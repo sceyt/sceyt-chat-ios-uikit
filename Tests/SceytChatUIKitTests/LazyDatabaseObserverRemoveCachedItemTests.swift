@@ -94,7 +94,7 @@ final class LazyDatabaseObserverRemoveCachedItemTests: XCTestCase {
     private func start() {
         let started = expectation(description: "initial start")
         observer.startObserver(completion: { started.fulfill() })
-        wait(for: [started], timeout: 5)
+        wait(for: [started], timeout: defaultWaitTimeout)
         XCTAssertEqual(shownRows(), ["a", "b", "c"])
     }
 
@@ -113,7 +113,7 @@ final class LazyDatabaseObserverRemoveCachedItemTests: XCTestCase {
             dto.checksum = 1
             try! writer.save()
         }
-        wait(for: [changed], timeout: 5)
+        wait(for: [changed], timeout: defaultWaitTimeout)
     }
 
     private func shownRows() -> [String] {

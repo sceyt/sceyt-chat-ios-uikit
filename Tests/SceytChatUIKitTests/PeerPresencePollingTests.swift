@@ -73,7 +73,7 @@ final class PeerPresencePollingTests: XCTestCase {
     private func drainMainQueue() {
         let drained = expectation(description: "main queue drained")
         DispatchQueue.main.async { drained.fulfill() }
-        wait(for: [drained], timeout: 1)
+        wait(for: [drained], timeout: defaultWaitTimeout)
     }
 
     // MARK: - 1. Polled every 4 seconds while the chat is open

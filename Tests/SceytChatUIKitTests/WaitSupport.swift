@@ -8,10 +8,12 @@
 
 import Foundation
 
-/// The default `waitUntil` timeout. A passing condition returns as soon as it holds, so this
-/// only bounds a failure. 10 s, not less: CI runners stall for seconds at a time (a 5.7 s gap
-/// between two adjacent statements was logged), and a stall spends the wait on nothing.
-let defaultWaitTimeout: TimeInterval = 10
+/// The default timeout of every wait for something that must happen (`waitUntil` and XCTest
+/// expectations). A passing wait returns as soon as its condition holds, so this only bounds
+/// a failure. 30 s: slow CI runners were seen taking over 10 s for work that takes
+/// milliseconds locally (a 5.7 s gap between two adjacent statements, about one database
+/// write a second). Waits that check something does *not* happen keep their own short time.
+let defaultWaitTimeout: TimeInterval = 30
 
 /// Called once a wait's deadline has passed: gives the main queue a few more short turns
 /// (≤ 0.25 s) to deliver work that is already queued there. A runner stall can use up the

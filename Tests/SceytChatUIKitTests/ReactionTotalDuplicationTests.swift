@@ -117,7 +117,7 @@ final class ReactionTotalDuplicationTests: XCTestCase {
             message.incoming = true
             message.createdAt = Date().bridgeDate
         }, completion: { _ in seeded.fulfill() })
-        wait(for: [seeded], timeout: 5)
+        wait(for: [seeded], timeout: defaultWaitTimeout)
     }
 
     /// Runs `perform` through the production serialized write path and waits.
@@ -127,7 +127,7 @@ final class ReactionTotalDuplicationTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         })
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 
     /// Fetches the persisted totals for the message with the exact query the
@@ -142,7 +142,7 @@ final class ReactionTotalDuplicationTests: XCTestCase {
             totals = ReactionTotalDTO.fetch(request: request, context: ctx)
                 .map { ($0.key, $0.count, $0.score) }
         }, completion: { _ in read.fulfill() })
-        wait(for: [read], timeout: 5)
+        wait(for: [read], timeout: defaultWaitTimeout)
         return totals
     }
 
@@ -157,7 +157,7 @@ final class ReactionTotalDuplicationTests: XCTestCase {
                                             self.messageId, self.reactionKey, pending)
             ids = ReactionDTO.fetch(request: request, context: ctx).map { ReactionId($0.id) }
         }, completion: { _ in read.fulfill() })
-        wait(for: [read], timeout: 5)
+        wait(for: [read], timeout: defaultWaitTimeout)
         return ids
     }
 

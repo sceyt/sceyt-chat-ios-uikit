@@ -920,7 +920,7 @@ final class PinnedMessageConcurrencyTests: XCTestCase {
                 XCTAssertTrue(started, "channel \(channel)'s slot was never released")
                 restarted.fulfill()
             }
-            wait(for: [restarted], timeout: 20)
+            wait(for: [restarted], timeout: defaultWaitTimeout)
         }
     }
 
@@ -947,7 +947,7 @@ final class PinnedMessageConcurrencyTests: XCTestCase {
             XCTAssertTrue(started, "the channel's slot leaked")
             done.fulfill()
         }
-        wait(for: [done], timeout: 20)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 
     /// The provider's flush/rollback cycle hammered from many threads. Nothing is asserted about

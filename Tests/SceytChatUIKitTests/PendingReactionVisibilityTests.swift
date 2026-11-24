@@ -104,7 +104,7 @@ final class PendingReactionVisibilityTests: XCTestCase {
             // The current user must be in the store for addPendingReaction to attach them.
             _ = UserDTO.fetchOrCreate(id: self.me, context: ctx)
         }, completion: { _ in seeded.fulfill() })
-        wait(for: [seeded], timeout: 5)
+        wait(for: [seeded], timeout: defaultWaitTimeout)
     }
 
     private func write(_ perform: @escaping (NSManagedObjectContext) -> Void) {
@@ -113,7 +113,7 @@ final class PendingReactionVisibilityTests: XCTestCase {
             XCTAssertNil(error)
             done.fulfill()
         })
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 
     private func addPendingReaction(key: String? = nil) {
@@ -136,7 +136,7 @@ final class PendingReactionVisibilityTests: XCTestCase {
             request.sortDescriptor = NSSortDescriptor(keyPath: \ReactionDTO.key, ascending: false)
             keys = ReactionDTO.fetch(request: request, context: ctx).map { $0.key }
         }, completion: { _ in read.fulfill() })
-        wait(for: [read], timeout: 5)
+        wait(for: [read], timeout: defaultWaitTimeout)
         return keys
     }
 
@@ -149,7 +149,7 @@ final class PendingReactionVisibilityTests: XCTestCase {
             request.sortDescriptor = NSSortDescriptor(keyPath: \ReactionTotalDTO.key, ascending: false)
             totals = ReactionTotalDTO.fetch(request: request, context: ctx).map { $0.convert() }
         }, completion: { _ in read.fulfill() })
-        wait(for: [read], timeout: 5)
+        wait(for: [read], timeout: defaultWaitTimeout)
         return totals
     }
 
@@ -226,7 +226,7 @@ final class PendingReactionVisibilityTests: XCTestCase {
                                                               existingIds: reactions.map { $0.id })
             keys = ReactionDTO.fetch(request: request, context: ctx).map { $0.key }
         }, completion: { _ in read.fulfill() })
-        wait(for: [read], timeout: 5)
+        wait(for: [read], timeout: defaultWaitTimeout)
         return keys
     }
 

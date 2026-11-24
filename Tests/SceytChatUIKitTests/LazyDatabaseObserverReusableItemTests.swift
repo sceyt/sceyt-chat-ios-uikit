@@ -72,7 +72,7 @@ final class LazyDatabaseObserverReusableItemTests: XCTestCase {
     func test_updatedRow_keepsItsItemInstance() {
         let started = expectation(description: "initial start")
         observer.startObserver(completion: { started.fulfill() })
-        wait(for: [started], timeout: 5)
+        wait(for: [started], timeout: defaultWaitTimeout)
 
         let indexPath = IndexPath(row: 1, section: 0)
         let before = try! XCTUnwrap(observer.item(at: indexPath))
@@ -87,7 +87,7 @@ final class LazyDatabaseObserverReusableItemTests: XCTestCase {
             dto.checksum = 42
             try! writer.save()
         }
-        wait(for: [updated], timeout: 5)
+        wait(for: [updated], timeout: defaultWaitTimeout)
 
         let after = try! XCTUnwrap(observer.item(at: indexPath))
         XCTAssertTrue(after === before,

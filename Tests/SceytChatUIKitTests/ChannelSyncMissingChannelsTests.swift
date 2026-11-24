@@ -111,7 +111,7 @@ final class ChannelSyncMissingChannelsTests: XCTestCase {
         let done = expectation(description: "operation finished")
         operation.completionBlock = { done.fulfill() }
         queue.addOperation(operation)
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
     }
 
     /// Starts the operation and returns once the verifier is holding its answer.
@@ -122,7 +122,7 @@ final class ChannelSyncMissingChannelsTests: XCTestCase {
         let done = expectation(description: "operation finished")
         operation.completionBlock = { done.fulfill() }
         queue.addOperation(operation)
-        wait(for: [asked], timeout: 5)
+        wait(for: [asked], timeout: defaultWaitTimeout)
         return done
     }
 
@@ -233,7 +233,7 @@ final class ChannelSyncMissingChannelsTests: XCTestCase {
 
         seedChannels([9])
         verifier.pendingAnswer?()
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(operation.deletedIds, [3])
         XCTAssertEqual(storedChannelIds(), [1, 9])
@@ -247,7 +247,7 @@ final class ChannelSyncMissingChannelsTests: XCTestCase {
 
         ProtectedChannels.protect(channelId: 3)
         verifier.pendingAnswer?()
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertNil(operation.deletedIds)
         XCTAssertEqual(storedChannelIds(), [1, 3])
@@ -261,7 +261,7 @@ final class ChannelSyncMissingChannelsTests: XCTestCase {
 
         operation.cancel()
         verifier.pendingAnswer?()
-        wait(for: [done], timeout: 5)
+        wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertNil(operation.deletedIds)
         XCTAssertEqual(storedChannelIds(), [1, 3])
