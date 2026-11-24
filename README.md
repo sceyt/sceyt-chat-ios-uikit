@@ -10,6 +10,7 @@ The Sceyt Chat UIKit is a comprehensive toolkit designed for chat integration. W
 * [Installation](#installation)
 * [Usage](#usage)
 * [Customization](#customization)
+* [Development](#development)
 
 ## Features
 - **Offline Support:** Automatically stores messages and new chats when offline, and synchronizes them upon reconnection.
@@ -180,3 +181,35 @@ class DemoChannelCell: ChannelCell {
     }
 }
 ```
+
+## Development
+
+For local setup, test commands, pull request checks, and submitting changes, see the [contributor guide](CONTRIBUTING.md). [AGENTS.md](AGENTS.md) holds the repository's review and verification rules, and [Sources/ARCHITECTURE.md](Sources/ARCHITECTURE.md) follows a channel's messages from SceytChat through the database to the screen. Report vulnerabilities as described in [SECURITY.md](SECURITY.md).
+
+### Continuous integration
+
+The `iOS CI` workflow in `.github/workflows/ios-ci.yml` runs for pull requests to `main` and `dev`, for pushes to `main`, `dev`, and `v*` release branches, and from **Actions → iOS CI → Run workflow**. It uses the latest stable Xcode on the `macos-latest` runner, builds without code signing, and resolves the Sceyt Chat iOS SDK from `Package.swift`. The demo app is not built, because it also needs a `sceyt-call-ios-uikit` checkout.
+
+The `unit-tests` job:
+
+1. Checks the size and the failure logging of the data transfer layer (`Sources/SceytChatUIKit/DataTransfer`).
+2. Builds the package with complete concurrency checking and fails on any warning in the data transfer layer.
+3. Runs the package unit tests on an iPhone simulator, except `GlobalSearchMessagesViewModelDBPerformanceTests`, with code coverage and complete concurrency checking (`SWIFT_STRICT_CONCURRENCY=complete`).
+4. Compares the public Swift interface of `SceytChatUIKit` with `api/SceytChatUIKit.swiftinterface`.
+
+For pull requests, it also tests the check scripts and checks changed-source formatting, compiler warnings on changed lines, and 80% coverage of changed lines in `Sources/SceytChatUIKit`. See the [contributor guide](CONTRIBUTING.md#check-changed-lines-before-pushing). When a step fails, the job writes the compile errors and failing tests to the run summary and uploads the test results, build log, and generated interface as the `test-results` artifact.
+
+The **Thread Sanitizer** job runs the unit tests with Thread Sanitizer in parallel and uploads its result bundle and log when it fails. See [Check for data races](CONTRIBUTING.md#check-for-data-races).
+
+To enforce the checks before merging, require `unit-tests` and **Thread Sanitizer** in the branch protection rule or ruleset for `main` and `dev`.
+
+After both jobs finish, **Slack Alerts** posts the result to Slack. A failure alert names the failed check first, for example `🔴 Changed-line coverage failed`. The message includes the branch or pull request, commit, the passed and failed jobs, and a link to the run. Cancelled runs, outdated pull request commits, and fork pull requests do not send alerts. The alert uses the `SLACK_WEBHOOK_URL_CI_IOS` secret, a Slack incoming webhook URL set at the organization level or under **Settings → Secrets and variables → Actions**. Until the secret is available to this repository, the job skips the alert without failing. The sender does not check out pull request code, retry failed deliveries, or print the webhook URL. Delivery failures appear in the **Slack Alerts** job, which does not need to be required for merging.
+
+Run the CI script tests locally with Python 3.9 or newer and Node.js 20 or newer:
+
+```bash
+python3 -B -m unittest discover -s scripts/tests
+node --test .github/tests/slack-alerts.test.cjs
+```
+
+The Slack tests mock GitHub and Slack requests, including a missing or invalid webhook and delivery failures, without posting to Slack.

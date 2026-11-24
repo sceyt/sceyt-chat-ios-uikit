@@ -1,0 +1,136 @@
+name: Slack Alerts
+
+on:
+  workflow_call:
+    inputs:
+      failed:
+        required: true
+        type: boolean
+    secrets:
+      SLACK_WEBHOOK_URL_CI_IOS:
+        required: false
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      # No checkout: the sender must not execute pull request code.
+      - name: Build CI alert
+        id: alert
+        uses: actions/github-script@v7
+        env:
+          FAILED: ${{ inputs.failed }}
+        with:
+          script: |
+            const {data: run} = await github.rest.actions.getWorkflowRun({
+              ...context.repo, run_id: context.runId
+            });
+            const failed = process.env.FAILED === 'true';
+            const headSha = context.payload.pull_request?.head.sha || run.head_sha;
+            const candidates = context.payload.pull_request ? [context.payload.pull_request] : [];
+            const prs = [];
+            for (const candidate of candidates) {
+              const {data: pr} = await github.rest.pulls.get({
+                ...context.repo, pull_number: candidate.number
+              });
+              if (pr.head.sha === headSha && pr.state === 'open') prs.push(pr);
+            }
+            // Suppress results superseded by new pull request commits.
+            if (candidates.length && !prs.length) {
+              core.info('Skipping CI alert: PR closed or newer commits exist.');
+              return;
+            }
+            let passedChecks;
+            let failedChecks = [];
+            const failedConclusions = ['failure', 'timed_out', 'action_required'];
+            try {
+              const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
+                ...context.repo, run_id: context.runId, filter: 'latest', per_page: 100
+              });
+              const checks = jobs.filter(job =>
+                job.name !== 'Slack Alerts' && !job.name.startsWith('Slack Alerts /')
+              );
+              passedChecks = checks.filter(job => job.conclusion === 'success').map(job => job.name);
+              failedChecks = checks.filter(job => failedConclusions.includes(job.conclusion));
+            } catch {
+              core.warning('Could not list check results; sending the alert with the run link.');
+            }
+            const actor = run.triggering_actor?.login || run.actor?.login;
+            const checkTitles = new Map([
+              ['Check changed source formatting', 'Source formatting'],
+              ['Check compiler warnings on changed lines', 'Compiler warnings'],
+              ['Check changed source line coverage', 'Changed-line coverage'],
+              ['Check the public API', 'Public API'],
+              ['Run unit tests with Thread Sanitizer', 'Thread Sanitizer']
+            ]);
+            const failureTitles = failedChecks.flatMap(job => {
+              const steps = (job.steps ?? [])
+                .filter(step => failedConclusions.includes(step.conclusion))
+                .map(step => checkTitles.get(step.name) ?? step.name);
+              return steps.length ? steps : [job.name];
+            });
+            const failureTitle = failureTitles.join(' & ') || 'iOS CI';
+            const body = [
+              failed ? `🔴 ${failureTitle} failed`
+                : '🟢 All iOS checks passed',
+              '',
+              '📱 Sceyt Chat iOS UIKit · GitHub',
+              ...prs.flatMap(pr => [
+                `🌿 ${pr.head.ref} → ${pr.base.ref}`,
+                `🔀 PR #${pr.number} · ${pr.title.replace(/\s+/g, ' ').trim()}`
+              ]),
+              ...(!prs.length ? [`🌿 ${run.head_branch}`] : []),
+              `🔖 Commit ${headSha.slice(0, 7)} · Run #${run.run_number}`,
+              ...(actor ? [`👤 Triggered by @${actor}`] : []),
+              '', '🔍 View logs', run.html_url,
+              ...(passedChecks ? [
+                '', '✅ Passed checks',
+                ...(passedChecks.length ? passedChecks.map(name => `• ${name}`) : ['• None']),
+                ...(failedChecks.length ? [
+                  '', '❌ Failed checks', ...failedChecks.map(job => `• ${job.name}`)
+                ] : [])
+              ] : ['', 'Check results unavailable. See the run logs for details.']),
+              ...prs.flatMap(pr => ['', '🔀 Open pull request', pr.html_url])
+            ].join('\n');
+            core.setOutput('body', body);
+
+      - name: Send CI alert to Slack
+        if: ${{ !cancelled() && steps.alert.outputs.body != '' }}
+        uses: actions/github-script@v7
+        env:
+          ALERT_BODY: ${{ steps.alert.outputs.body }}
+          SLACK_WEBHOOK_URL_CI_IOS: ${{ secrets.SLACK_WEBHOOK_URL_CI_IOS }}
+        with:
+          script: |
+            const webhook = process.env.SLACK_WEBHOOK_URL_CI_IOS?.trim();
+            if (!webhook) {
+              core.info('Slack alerts are disabled until SLACK_WEBHOOK_URL_CI_IOS is configured.');
+              return;
+            }
+            if (!/^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/.test(webhook)) {
+              core.setFailed('Configure SLACK_WEBHOOK_URL_CI_IOS with a Slack incoming webhook URL.');
+              return;
+            }
+            try {
+              const response = await fetch(webhook, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  text: process.env.ALERT_BODY, mrkdwn: false, link_names: false,
+                  unfurl_links: false, unfurl_media: false
+                }),
+                signal: AbortSignal.timeout(15000),
+                redirect: 'error'
+              });
+              if (!response.ok) core.setFailed(`Slack delivery failed: HTTP ${response.status}`);
+              else core.info('Slack alert delivered.');
+            } catch {
+              core.setFailed('Slack delivery failed before an HTTP response was received.');
+            }
