@@ -11,15 +11,29 @@ import UIKit
 public extension ChatMessage.Attachment {
     
     var originalImage: UIImage? {
+        originalImage(using: fileProvider)
+    }
+
+    var thumbnailImage: UIImage? {
+        thumbnailImage(using: fileProvider)
+    }
+
+    var filePreviewImage: UIImage? {
+        filePreviewImage(using: fileProvider)
+    }
+
+    /// The local file as an image, else `thumbnailImage(using:)`.
+    func originalImage(using transfer: AttachmentTransfer) -> UIImage? {
         if let filePath,
             let image = UIImage(contentsOfFile: filePath) {
             return image
         }
-        return thumbnailImage
+        return thumbnailImage(using: transfer)
     }
-    
-    var thumbnailImage: UIImage? {
-        guard let path = fileProvider.thumbnailFile(for: self, preferred: MessageLayoutModel.defaults.imageAttachmentSize)
+
+    /// The sharp thumbnail `transfer` keeps on disk, else the blurred one in the metadata.
+    func thumbnailImage(using transfer: AttachmentTransfer) -> UIImage? {
+        guard let path = transfer.thumbnailFile(for: self, preferred: MessageLayoutModel.defaults.imageAttachmentSize)
         else {
             if let image = imageDecodedMetadata?.thumbnailImage {
                 return image
@@ -40,12 +54,12 @@ public extension ChatMessage.Attachment {
     /// `nil` for a document that has no preview at all (pdf/zip/…) and for a previewable one
     /// that is not on disk yet and whose sender shipped no thumbHash — callers fall back to
     /// the generic file icon there.
-    var filePreviewImage: UIImage? {
+    func filePreviewImage(using transfer: AttachmentTransfer) -> UIImage? {
         let fileName = name ?? ((url ?? filePath) as NSString?)?.lastPathComponent
         guard AttachmentFileKind.kind(ofFileNamed: fileName).isPreviewable
         else { return nil }
 
-        if let path = fileProvider.thumbnailFile(for: self, preferred: MessageLayoutModel.defaults.imageAttachmentSize),
+        if let path = transfer.thumbnailFile(for: self, preferred: MessageLayoutModel.defaults.imageAttachmentSize),
            let image = UIImage(contentsOfFile: path)
         {
             return image

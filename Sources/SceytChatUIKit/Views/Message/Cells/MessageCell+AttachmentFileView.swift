@@ -209,11 +209,30 @@ extension MessageCell {
 
         open override func update(status: ChatMessage.Attachment.TransferStatus) {
             super.update(status: status)
-            if data.transferStatus == .done {
-                if imageView.image != nil && isVideoFile {
-                    playButton.isHidden = false
-                }
+            updatePlayButtonVisibility()
+        }
+
+        /// The play glyph sits dead centre of the 40×40 icon slot — the same place the
+        /// transfer ring draws — so only one of them may be on screen. `isTransferOverlayVisible`
+        /// covers the ring's shrink-out too, so the play button waits for the animation to
+        /// finish instead of appearing over a ring still drawn at 100%.
+        open func updatePlayButtonVisibility() {
+            guard let data else {
+                playButton.isHidden = true
+                return
             }
+            // The `filePath` fallback mirrors `renderedTransferStatus`: a stored status can
+            // outlive its transfer, and a video whose bytes are on disk is playable whatever
+            // the row still says.
+            let isDownloaded = data.transferStatus == .done
+                || self.attachmentTransfer.filePath(attachment: data.attachment) != nil
+            let isPlayable = isDownloaded && imageView.image != nil && isVideoFile
+            playButton.isHidden = !isPlayable || isTransferOverlayVisible
+        }
+
+        open override func didHideProgressView() {
+            super.didHideProgressView()
+            updatePlayButtonVisibility()
         }
 
         open override var data: MessageLayoutModel.AttachmentLayout! {
@@ -222,11 +241,10 @@ extension MessageCell {
                 // Show whatever preview the layout resolved: the sharp on-disk one when the
                 // file is local/downloaded, or the blurred thumbHash placeholder decoded from
                 // metadata while the upload/download is still in flight. The play button stays
-                // gated on .done — the blurred placeholder is not playable.
+                // gated on .done — the blurred placeholder is not playable — and on the
+                // transfer overlay being off screen, so it never draws through the ring.
                 applyThumbnail(nil)
-                if data.transferStatus == .done, imageView.image != nil, isVideoFile {
-                    playButton.isHidden = false
-                }
+                updatePlayButtonVisibility()
                 titleLabel.text = data.name
                 sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
                 updateSizeLabelTrailingInset()
@@ -240,7 +258,7 @@ extension MessageCell {
                     // A file-backed load flips showsPreviewImage for a document with no
                     // metadata thumbHash (older messages), so re-run the whole paint.
                     self.applyThumbnail(thumbnail)
-                    self.playButton.isHidden = !(self.imageView.image != nil && self.isVideoFile && data.transferStatus == .done)
+                    self.updatePlayButtonVisibility()
                 }
 
                 // Self-heal for "blurred placeholder stays after download" — same recovery the
@@ -260,18 +278,23 @@ extension MessageCell {
         }
 
         open override func setProgress(_ progress: AttachmentTransfer.AttachmentProgress) {
+            // Same stale-tick rule the ring follows (see `isStaleProgress`): the running
+            // "<downloaded> • <total>" line must not count down either.
+            guard !isStaleProgress(progress.progress)
+            else { return }
             super.setProgress(progress)
             playButton.isHidden = true
 
-            let message: String
-            if progress.progress <= 0.01 || progress.progress >= 1 {
-                message = data.fileSize(using: appearance.attachmentFileSizeFormatter)
+            if progress.progress > 0.01, progress.progress < 1,
+               let total = progress.totalBytes, let done = progress.completedBytes {
+                // Of the file the transfer moves (an upload's compressed copy), not the original.
+                sizeLabel.text = "\(appearance.attachmentFileSizeFormatter.format(done)) • \(appearance.attachmentFileSizeFormatter.format(total))"
             } else {
-                let total = progress.attachment.uploadedFileSize
-                let downloaded = UInt(progress.progress * Double(total))
-                message = "\(appearance.attachmentFileSizeFormatter.format(UInt64(downloaded))) • \(appearance.attachmentFileSizeFormatter.format(UInt64(total)))"
+                // Not moving bytes yet (an upload still preparing: its progress is a
+                // placeholder), just started, or done: the row shows the upload's initial
+                // state — the file's size under a running ring — never a "Preparing" line.
+                sizeLabel.text = data.fileSize(using: appearance.attachmentFileSizeFormatter)
             }
-            sizeLabel.text = message
         }
 
         open override func setCompletion(_ completion: AttachmentTransfer.AttachmentCompletion) {

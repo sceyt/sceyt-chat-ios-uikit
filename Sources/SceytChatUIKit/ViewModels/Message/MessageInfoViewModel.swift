@@ -19,8 +19,13 @@ open class MessageInfoViewModel: NSObject {
     
     public var markers: [(markerName: String, markerArray: [ChatMessage.Marker])] {
 		var markersArray: [(markerName: String, markerArray: [ChatMessage.Marker])] = []
-		
+
+		var seen = Set<String>()
 		markerObserver.items.forEach { marker in
+			if let userId = marker.user?.id,
+			   !seen.insert("\(marker.name)|\(userId)").inserted {
+				return
+			}
 			if let index = markersArray.firstIndex(where: { $0.markerName == marker.name }) {
 				markersArray[index].markerArray.append(marker)
 			} else {

@@ -10,133 +10,44 @@ import ImageIO
 import SceytChat
 import UIKit
 
-open class SCTSession: NSObject, SCTDataSession {
-    private lazy var queue = {
-        $0.name = "com.sceyt.SCTUploadingQueue"
-        $0.maxConcurrentOperationCount = 1
-        return $0
-    }(OperationQueue())
-    
-    private lazy var pendingOperations = NSMutableSet()
-    
-    open func add(_ operation: SCTUploadOperation) {
-        if pendingOperations.contains(operation) {
-            pendingOperations.remove(operation)
-        }
-        queue.addOperation(operation)
-    }
-    
-    open func stop(_ operation: SCTUploadOperation) {
-        operation.complete()
-        pendingOperations.add(SCTUploadOperation(
-            uuid: operation.uuid,
-            attachment: operation.attachment,
-            taskInfo: operation.taskInfo
-        ))
-    }
-    
-    open func resume(_ operation: SCTUploadOperation) {
-        if let operation = pending(uuid: operation.uuid) {
-            add(operation)
-        } else {
-            add(SCTUploadOperation(
-                uuid: operation.uuid,
-                attachment: operation.attachment,
-                taskInfo: operation.taskInfo
-            ))
-        }
-    }
-    
-    open func queuedOperation(uuid: String) -> SCTUploadOperation? {
-        Self.default.queue.operations.first(where: { ($0 as? SCTUploadOperation)?.uuid == uuid }) as? SCTUploadOperation
-    }
-    
-    open func pending(uuid: String) -> SCTUploadOperation? {
-        Self.default.pendingOperations.first(where: { ($0 as? SCTUploadOperation)?.uuid == uuid }) as? SCTUploadOperation
-    }
-    
+/// The default data session: `TransportDataSession` over the Chat SDK's own transfers
+/// (`DefaultFileTransferProvider`), storing files in `FileStorage`.
+open class SCTSession: TransportDataSession, @unchecked Sendable {
+
     public static let `default` = SCTSession()
-    
-    public let fileStorage: FileStorage = .init()
-    
-    open func upload(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo) {
-        let operation = SCTUploadOperation(
-            attachment: attachment,
-            taskInfo: taskInfo
-        )
-        add(operation)
-        
-        taskInfo.onAction = { [weak self] in
-            guard let self else { return }
-            
-            switch $0 {
-            case .stop:
-                if let operation = queuedOperation(uuid: operation.uuid) {
-                    stop(operation)
-                }
-            case .cancel:
-                if let operation = queuedOperation(uuid: operation.uuid) {
-                    operation.cancel()
-                }
-            case .resume:
-                resume(operation)
-            @unknown default:
-                break
-            }
-            
-            operation.complete()
-        }
+
+    public let fileStorage: FileStorage
+
+    public init() {
+        fileStorage = .init()
+        super.init(provider: DefaultFileTransferProvider())
+        fileStore = fileStorage
     }
-    
-    open func download(attachment: ChatMessage.Attachment, taskInfo: SCTDataSessionTaskInfo) {
-        guard let urlString = attachment.url,
-              let url = URL(string: urlString)
-        else {
-            // No task is created, so nothing will ever report progress, complete or
-            // fail — the attachment is left in whatever status it already has.
-            logger.error("[Attachment] SCTSession.download: unusable url, download not started \(attachment.description)")
-            return
-        }
-        let downloadTask = Session.download(url: url) { progress in
-            taskInfo.updateProgress(progress.fractionCompleted)
-        } completion: { result in
-            switch result {
-            case .failure(let error):
-                taskInfo.failure(error: error)
-            case .success(let fileUrl):
-                let transferId = url.deletingLastPathComponent().lastPathComponent
-                let path = self.fileStorage.store(transferId: transferId, fileName: attachment.name, file: fileUrl.path)
-                taskInfo.updateLocalFileLocation(newPath: path)
-                taskInfo.success(origin: url)
-            }
-        }
-        
-        // Drive the real URLSession task. This handler used to be an empty switch — the
-        // returned Cancellable was discarded — so pausing a download changed only the
-        // persisted status while the bytes kept arriving and `updateProgress` kept ticking
-        // into whatever view was showing the (supposedly paused) transfer.
-        //
-        // `suspend()` rather than `cancel(byProducingResumeData:)`: it keeps the bytes already
-        // received and leaves the task alive, which is what `AttachmentTransfer.resumeTransfer`
-        // assumes — it refuses to resume unless `taskFor(...)` still finds a live task. A task
-        // left suspended long enough can still be timed out by the system; that surfaces as
-        // `.failedDownloading` through the existing failure path, which is the correct outcome.
-        // Weakly: URLSession keeps the task alive until it finishes, and a strong capture
-        // here would close the cycle task -> completion closure -> taskInfo -> onAction -> task.
-        taskInfo.onAction = { [weak task = downloadTask as? URLSessionTask] action in
-            guard let task else { return }
-            switch action {
-            case .stop:
-                task.suspend()
-            case .cancel:
-                task.cancel()
-            case .resume:
-                task.resume()
-            }
-        }
+
+    public override init(provider: FileTransferProvider) {
+        fileStorage = .init()
+        super.init(provider: provider)
+        fileStore = fileStorage
     }
-    
-    open func getFilePath(attachment: ChatMessage.Attachment) -> String? {
+
+    /// With its own storage. A test seam.
+    init(provider: FileTransferProvider, fileStorage: FileStorage) {
+        self.fileStorage = fileStorage
+        super.init(provider: provider)
+        fileStore = fileStorage
+    }
+
+    open override func downloadDestination(for attachment: ChatMessage.Attachment) -> URL? {
+        guard let string = attachment.url, let url = URL(string: string) else {
+            // The download fails with invalidRequest, reported once by `AttachmentTransfer`.
+            logger.debug("[Transfer] \(TransferLog.currentTag) no download destination: url missing or unparsable (\(TransferLog.redact(attachment.url))) \(attachment.transferLogDescription)")
+            return nil
+        }
+        let transferId = url.deletingLastPathComponent().lastPathComponent
+        return URL(fileURLWithPath: fileStorage.createPath(transferId: transferId, fileName: attachment.name))
+    }
+
+    open override func getFilePath(attachment: ChatMessage.Attachment) -> String? {
         if let filePath = attachment.filePath, FileManager.default.fileExists(atPath: filePath) {
             return filePath
         }
@@ -163,27 +74,27 @@ open class SCTSession: NSObject, SCTDataSession {
         return CGImageSourceGetStatus(source) == .statusComplete
     }
 
-    open func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
-        let scale = UIScreen.main.traitCollection.displayScale
+    open override func thumbnailFile(for attachment: ChatMessage.Attachment, preferred size: CGSize) -> String? {
+        let scale = DisplayScale.shared.value
         let newSize = CGSize(width: size.width * scale, height: size.height * scale)
         
         func makeThumbnail(file path: String, thumbnailPath: String) -> String? {
             var image: UIImage?
-            if attachment.type == "image" {
+            if attachment.kind == .image {
                 image = UIImage(contentsOfFile: path)
-            } else if attachment.type == "video" {
-                image = Components.videoProcessor.copyFrame(url: URL(fileURLWithPath: path))
-            } else if attachment.type == "file" {
+            } else if attachment.kind == .video {
+                image = environment.videoProcessor().copyFrame(url: URL(fileURLWithPath: path))
+            } else if attachment.kind == .file {
                 let fileURL = URL(fileURLWithPath: path)
                 if fileURL.isImage {
                     image = UIImage(contentsOfFile: path)
                 } else if fileURL.isVideo {
-                    image = Components.videoProcessor.copyFrame(url: fileURL)
+                    image = environment.videoProcessor().copyFrame(url: fileURL)
                 }
             }
             if let image,
-               let ib = try? Components.imageBuilder.init(image: image).resize(max: newSize.maxSide),
-               let data = ib.jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality)
+               let ib = try? environment.imageBuilder().init(image: image).resize(max: newSize.maxSide),
+               let data = ib.jpegData(compressionQuality: environment.imageResizeConfig().compressionQuality)
             {
                 // Atomic write: stage to a temp file then atomically replace the destination so a
                 // concurrent reader (loadThumbnail / reloadThumbnailFromFile) never observes a
@@ -194,10 +105,10 @@ open class SCTSession: NSObject, SCTDataSession {
                 do {
                     try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
                     try data.write(to: destination, options: .atomic)
-                    logger.debug("[thumbnail] 3 stored (atomic) \(thumbnailPath)")
+                    logger.debug("[Attachment] \(TransferLog.currentTag) thumbnail stored \((thumbnailPath as NSString).lastPathComponent)")
                     return thumbnailPath
                 } catch {
-                    logger.errorIfNotNil(error, "[thumbnail] atomic store failed, falling back \(thumbnailPath)")
+                    logger.warn("[Attachment] \(TransferLog.currentTag) thumbnail atomic store failed, writing it directly: \(TransferLog.describe(error))")
                     return Storage.storeData(data, filePath: thumbnailPath)?.path
                 }
             }
@@ -214,11 +125,11 @@ open class SCTSession: NSObject, SCTDataSession {
                 // so fully decoding it here just to throw the pixels away doubled the cost of
                 // every cached-thumbnail lookup — on the hot path of every file-cell bind.
                 if Self.isCompleteImageFile(at: thumbnailPath) {
-                    logger.debug("[thumbnail] found file \(attachment.type)")
+                    logger.verbose("[Attachment] \(TransferLog.currentTag) thumbnail cached \(attachment.transferLogDescription)")
                     return thumbnailPath
                 }
-                logger.debug("[thumbnail] cached thumbnail unreadable, evicting \(thumbnailPath)")
-                try? FileManager.default.removeItem(atPath: thumbnailPath)
+                logger.debug("[Attachment] \(TransferLog.currentTag) cached thumbnail unreadable, regenerating \(attachment.transferLogDescription)")
+                TransferLog.remove(URL(fileURLWithPath: thumbnailPath), what: "the unreadable thumbnail", context: "[Attachment] \(TransferLog.currentTag) thumbnail")
             }
             return makeThumbnail(file: path, thumbnailPath: thumbnailPath)
         } else if let path = attachment.filePath {
@@ -229,103 +140,28 @@ open class SCTSession: NSObject, SCTDataSession {
     }
 }
 
-open class SCTUploadOperation: AsyncOperation {
-    let attachment: ChatMessage.Attachment
-    let taskInfo: SCTDataSessionTaskInfo
-    private(set) var videoProcessInfo: SCVideoProcessInfo?
-    public let fileStorage: FileStorage = .init()
+/// The screen's scale for work off the main thread: `UIScreen` may only be read on main, so it
+/// is read there and cached. Until it is read, the largest scale (thumbnails at most a little
+/// larger than needed, never blurry).
+final class DisplayScale: @unchecked Sendable {
+    static let shared = DisplayScale()
 
-    init(
-        uuid: String = UUID().uuidString,
-        attachment: ChatMessage.Attachment,
-        taskInfo: SCTDataSessionTaskInfo
-    ) {
-        self.attachment = attachment
-        self.taskInfo = taskInfo
-        super.init(uuid)
+    private let lock = NSLock()
+    private var _value: CGFloat = 3
+
+    var value: CGFloat {
+        lock.lock(); defer { lock.unlock() }
+        return _value
     }
-    
-    override open func main() {
-        guard SceytChatUIKit.shared.config.preventDuplicateAttachmentUpload else {
-            self.startPreparing()
-            return
-        }
-        taskInfo.startChecksum { [weak self] stored in
-            guard let self else { return }
-            if stored {
-                self.complete()
-            } else {
-                self.startPreparing()
+
+    private init() {
+        if Thread.isMainThread {
+            _value = MainActor.assumeIsolated { UIScreen.main.scale }
+        } else {
+            DispatchQueue.main.async { [self] in
+                let scale = UIScreen.main.scale
+                lock.lock(); _value = scale; lock.unlock()
             }
         }
-    }
-    
-    open func startPreparing() {
-        Task {
-            var canContinue: Bool { !isFinished && !isCancelled }
-            
-            guard var filePath = attachment.filePath else { return }
-            logger.debug("check \(FileManager.default.fileExists(atPath: filePath))")
-            let transferId = UUID().uuidString
-            if attachment.type == "video" {
-                taskInfo.updateProgress(0.01)
-                let videoProcessInfo = SCVideoProcessInfo()
-                let result = await Components.videoProcessor.export(from: filePath, processInfo: videoProcessInfo)
-                switch result {
-                case .success(let success):
-                    let path = self.fileStorage.store(transferId: transferId, fileName: success.lastPathComponent, file: success.path)
-                    taskInfo.updateLocalFileLocation(newLocation: URL(fileURLWithPath: path))
-                    filePath = path
-                case .failure(let error):
-                    logger.errorIfNotNil(error, "")
-                }
-            } else if attachment.type == "image" {
-                if let builder = Components.imageBuilder.init(imageUrl: URL(fileURLWithPath: filePath)) {
-                    let imageSize = builder.imageSize
-                    if !imageSize.isNan {
-                        if let data = try? builder.resize(max: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.dimensionThreshold).jpegData(compressionQuality: SceytChatUIKit.shared.config.imageAttachmentResizeConfig.compressionQuality),
-                           let newUrl = FileStorage.storeInTemporaryDirectory(data: data, filename: attachment.name ?? UUID().uuidString)
-                        {
-                            let path = self.fileStorage.store(transferId: transferId, fileName: attachment.name, file: newUrl.path)
-                            filePath = path
-                            taskInfo.updateLocalFileLocation(newLocation: URL(fileURLWithPath: path))
-                            fileStorage.updateThumbnailPath(transferId: transferId, filePath: attachment.filePath ?? "")
-                            if attachment.filePath != filePath {
-                                fileStorage.remove(path: attachment.filePath ?? "")
-                            }
-                        }
-                    }
-                }
-            }
-            
-            guard canContinue else { return }
-            
-            startUploading(filePath: filePath)
-        }
-    }
-    
-    open func startUploading(filePath: String) {
-        let fileUrl = URL(fileURLWithPath: filePath)
-        SceytChatUIKit.shared.chatClient.upload(fileUrl: fileUrl) { [weak self] pct in
-            self?.taskInfo.updateProgress(pct)
-        } completion: { [weak self] url, error in
-            guard let self else { return }
-            if let error {
-                self.taskInfo.failure(error: error)
-            } else {
-                self.taskInfo.success(origin: url!)
-            }
-            self.complete()
-        }
-    }
-    
-    override open func cancel() {
-        videoProcessInfo?.cancel()
-        super.cancel()
-    }
-    
-    override open func complete() {
-        videoProcessInfo?.cancel()
-        super.complete()
     }
 }

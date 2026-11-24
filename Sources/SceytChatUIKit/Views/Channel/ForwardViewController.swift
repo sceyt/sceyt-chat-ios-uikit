@@ -157,6 +157,8 @@ open class ForwardViewController: ViewController,
                 }
             }
             navigationItem.rightBarButtonItem?.isEnabled = !viewModel.selectedChannels.isEmpty
+        case let .selectionLimitReached(limit):
+            showAlert(message: L10n.Error.maxValueItems(limit))
         }
     }
     
@@ -233,5 +235,23 @@ open class ForwardViewController: ViewController,
 public extension ForwardViewController {
     enum Layouts {
         public static var selectedViewHeight: CGFloat = 96
+    }
+}
+
+public extension ForwardViewController {
+
+    /// The channel picker, inside the navigation controller it needs for its own bar, ready
+    /// to be presented.
+    ///
+    /// Built here rather than inside a router because more than one screen opens it — the
+    /// conversation, the attachment previewer, the pinned-messages list — and each presents
+    /// it from itself, so the two can never drift apart in what they build, only in where
+    /// they put it.
+    static func build(_ handler: @escaping ([ChatChannel]) -> Void) -> UIViewController {
+        let viewController = Components.forwardViewController.init()
+        viewController.viewModel = Components.channelForwardViewModel.init(handler: handler)
+        let navigationController = Components.navigationController.init()
+        navigationController.viewControllers = [viewController]
+        return navigationController
     }
 }

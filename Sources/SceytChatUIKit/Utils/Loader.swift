@@ -19,11 +19,16 @@ open class Session: NSObject {
                                 progressHandler: ((Progress) -> Void)? = nil,
                                 completion: ((_ result: Result<URL, Error>) -> Void)? = nil)
     -> Cancellable? {
+        download(request: URLRequest(url: url), progressHandler: progressHandler, completion: completion)
+    }
 
-        let request = URLRequest(url: url)
-
-        return URLSession.shared.downloadTask(with: request) { responseUrl, _, error in
-            if let error = error {
+    /// Continues a download from the resume data an interrupted one left.
+    public class func download(resumeData: Data,
+                                progressHandler: ((Progress) -> Void)? = nil,
+                                completion: ((_ result: Result<URL, Error>) -> Void)? = nil)
+    -> Cancellable? {
+        URLSession.shared.downloadTask(withResumeData: resumeData) { responseUrl, response, error in
+            if let error = error ?? Self.statusError(response) {
                 completion?(.failure(error))
             } else if let responseUrl = responseUrl {
                 completion?(.success(responseUrl))
@@ -31,6 +36,31 @@ open class Session: NSObject {
         }.start().handleProgress { progress in
             progressHandler?(progress)
         }
+    }
+
+    public class func download(request: URLRequest,
+                                progressHandler: ((Progress) -> Void)? = nil,
+                                completion: ((_ result: Result<URL, Error>) -> Void)? = nil)
+    -> Cancellable? {
+        URLSession.shared.downloadTask(with: request) { responseUrl, response, error in
+            if let error = error ?? Self.statusError(response) {
+                completion?(.failure(error))
+            } else if let responseUrl = responseUrl {
+                completion?(.success(responseUrl))
+            }
+        }.start().handleProgress { progress in
+            progressHandler?(progress)
+        }
+    }
+
+    /// A download task hands back the response body whatever the status, so a 404 arrives as a
+    /// "downloaded" error page. Stored as the file, it read as finished and was never fetched
+    /// again.
+    static func statusError(_ response: URLResponse?) -> Error? {
+        guard let statusCode = (response as? HTTPURLResponse)?.statusCode,
+              !(200..<300).contains(statusCode)
+        else { return nil }
+        return URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "HTTP \(statusCode)"])
     }
 
     @discardableResult
@@ -52,8 +82,8 @@ open class Session: NSObject {
 
         let request = URLRequest(url: url)
 
-        return URLSession.shared.downloadTask(with: request) { responseUrl, _, error in
-            if let error = error {
+        return URLSession.shared.downloadTask(with: request) { responseUrl, response, error in
+            if let error = error ?? Self.statusError(response) {
                 DispatchQueue.main.async {
                     completion?(.failure(error))
                 }

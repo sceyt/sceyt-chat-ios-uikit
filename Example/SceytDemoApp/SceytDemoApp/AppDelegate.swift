@@ -16,6 +16,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         configureSceytChatUIKit()
+        if !UITestSupport.isActive {
+            DemoCalling.initialize(reconnect: {
+                ConnectionService.shared.reconnectIfNeeded()
+            })
+        }
         UITestSupport.bootstrapIfNeeded()
         setupAppearance()
         // Skip the system push-permission prompt under UI tests: it would block
@@ -53,6 +58,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         didFailToRegisterForRemoteNotificationsWithError error: Error
     ) {
         print("Failed to register: \(error)")
+    }
+
+    func application(_ application: UIApplication,
+                     continue userActivity: NSUserActivity,
+                     restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
+        DemoCalling.handleCallUserActivity(userActivity)
     }
     
     func setupAppearance() {
@@ -94,26 +105,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func registerForPushNotifications() {
         UNUserNotificationCenter.current().delegate = self
-        UNUserNotificationCenter.current()
-            .requestAuthorization(
-                options: [.alert, .sound, .badge]) { [weak self] granted, _ in
-                    print("Permission granted: \(granted)")
-                    guard granted else { return }
-                    self?.getNotificationSettings()
-                }
-        
-    }
-    
-    func getNotificationSettings() {
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            print("Notification settings: \(settings)")
-            guard settings.authorizationStatus == .authorized else { return }
-            DispatchQueue.main.async {
-                UIApplication.shared.registerForRemoteNotifications()
-            }
-            
+        // APNs registration is independent of permission to show notification alerts.
+        // VoIP registration is owned by DemoPushService and Call UIKit's PushKit bridge.
+        UIApplication.shared.registerForRemoteNotifications()
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { _, error in
+            if let error { print("[Push] Notification authorization failed: \(error)") }
         }
     }
+
 }
 
 extension AppDelegate: UNUserNotificationCenterDelegate {

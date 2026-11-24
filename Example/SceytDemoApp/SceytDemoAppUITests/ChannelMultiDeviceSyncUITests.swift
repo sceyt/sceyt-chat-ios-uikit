@@ -83,28 +83,20 @@ final class ChannelMultiDeviceSyncUITests: BaseUITestCase {
 
     // MARK: - The reported repro: drag a little, then the Web messages arrive
 
-    /// The user's exact sequence. A tall unread tail (12 multi-line received
-    /// messages) opens the screen at the "New messages" separator; the user
-    /// drags the list a little (which disarms the unread-open anchors, as a
-    /// real reading interaction does); THEN the Web-sent batch lands above the
-    /// viewport as one database transaction. The message the user was looking
-    /// at must stay exactly where it was.
-    func test_open_unread_dragSlightly_thenWebBatchArrives_viewportDoesNotJump() {
-        openConversation(unreadCount: 12, longUnread: true, webSyncButtonCount: 6)
-        assertNoJumpAfterWebSync()
-    }
-
-    /// Same sequence, but the insert is followed by the observer-window
-    /// recalculation the real sync pipeline performs after storing a page
-    /// (an `isInitial` redelivery). This is the truest model of the reported
-    /// production scenario — sync never delivers a bare database write.
+    /// A tall unread tail (12 multi-line received messages) opens the screen at
+    /// the "New messages" separator; the user drags the list a little (which
+    /// disarms the unread-open anchors, as a real reading interaction does);
+    /// THEN the Web-sent batch lands above the viewport, followed by the
+    /// observer-window recalculation the real sync pipeline performs after
+    /// storing a page (an `isInitial` redelivery). The message the user was
+    /// looking at must stay exactly where it was.
     func test_open_unread_dragSlightly_thenWebBatchWithSyncRecalc_viewportDoesNotJump() {
         openConversation(unreadCount: 12, longUnread: true,
                          webSyncButtonCount: 6, webSyncButtonRestart: true)
         assertNoJumpAfterWebSync()
     }
 
-    /// Shared body of the two drag-first repros: settle at the separator open
+    /// Body of the drag-first repro: settle at the separator open
     /// position, drag slightly, snapshot the mid-viewport anchor message, fire
     /// the web sync, and require the anchor (and the whole viewport) to hold.
     private func assertNoJumpAfterWebSync(file: StaticString = #filePath,

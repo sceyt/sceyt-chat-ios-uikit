@@ -36,6 +36,8 @@ extension MessageCell {
 
                 messageLabel.attributedText = Components.messageCell.appearance.unsupportedMessageFormatter.format(data.message)
                 isHidden = false
+                // DEBUG(unsupported-layout): remove after diagnosis
+                logger.info("[UnsupportedMsg] bind id=\(data.message.id) tid=\(data.message.tid) incoming=\(data.message.incoming) measure=\(data.unsupportedViewMeasure) options=\(data.contentOptions.rawValue) attachments=\(data.attachments.count) textLen=\(messageLabel.attributedText?.length ?? -1)")
             }
         }
 
@@ -50,6 +52,14 @@ extension MessageCell {
 
             addSubview(messageLabel)
             messageLabel.pin(to: self, anchors: [.leading(8.0), .trailing(-8.0), .top, .bottom])
+        }
+
+        // DEBUG(unsupported-layout): remove after diagnosis
+        override open func layoutSubviews() {
+            super.layoutSubviews()
+            guard !isHidden, let data else { return }
+            let fits = messageLabel.sizeThatFits(CGSize(width: messageLabel.bounds.width, height: .greatestFiniteMagnitude))
+            logger.info("[UnsupportedMsg] layout id=\(data.message.id) view=\(frame) label=\(messageLabel.frame) labelContent=\(messageLabel.contentSize) labelFits=\(fits) measure=\(data.unsupportedViewMeasure) superview=\(superview?.bounds ?? .zero) clips=\(superview?.clipsToBounds ?? false)")
         }
 
         override open func setupAppearance() {
@@ -79,7 +89,15 @@ extension MessageCell {
             let textSize = TextSizeMeasure.calculateSize(of: attributedString, config: config).textSize
             let height = 8.0 + ceil(textSize.height) // top + bottom padding
 
-            return CGSize(width: textSize.width + 16.0, height: ceil(height))
+            let result = CGSize(width: textSize.width + 16.0, height: ceil(height))
+            // DEBUG(unsupported-layout): remove after diagnosis
+            let boundingRect = attributedString.boundingRect(
+                with: CGSize(width: contentMaxWidth, height: .greatestFiniteMagnitude),
+                options: [.usesLineFragmentOrigin, .usesFontLeading],
+                context: nil
+            )
+            logger.info("[UnsupportedMsg] measure id=\(model.message.id) tid=\(model.message.tid) messageWidth=\(Components.messageLayoutModel.defaults.messageWidth) maxWidth=\(contentMaxWidth) textLen=\(attributedString.length) textSize=\(textSize) boundingRect=\(boundingRect.size) result=\(result) text=\"\(attributedString.string)\"")
+            return result
         }
     }
 }

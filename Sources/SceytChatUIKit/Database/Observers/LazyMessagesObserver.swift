@@ -9,19 +9,53 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
     public private(set) var loadRangeProvider: LoadRangeProvider
     
     public let channelId: ChannelId
+
+    /// Related-object changes that must reconfigure a message cell.
+    ///
+    /// `RelationshipKeyPathsObserver` resolves exactly **one** hop — it splits on `.` and
+    /// walks the relationship's inverse — so every entry here has to be
+    /// `MessageDTO.<toOneOrToMany>.<field>` with an inverse defined. A deeper path (a
+    /// reply's `parent.attachments.filePath`, say) silently does nothing; those cases need
+    /// an in-view backstop instead.
+    ///
+    /// Named rather than inlined so it can be asserted on in tests: forgetting to list a
+    /// field here fails silently at runtime, with the cell simply never updating.
+    public static let relationshipKeyPaths: [String] = [
+        #keyPath(MessageDTO.attachments.status),
+        #keyPath(MessageDTO.attachments.filePath),
+        #keyPath(MessageDTO.user.avatarUrl),
+        #keyPath(MessageDTO.user.firstName),
+        #keyPath(MessageDTO.user.lastName),
+        #keyPath(MessageDTO.parent.state),
+        #keyPath(MessageDTO.bodyAttributes),
+        #keyPath(MessageDTO.linkMetadatas),
+        // Without these the bubble never repaints on pin/unpin.
+        #keyPath(MessageDTO.pinDetails.isPinned),
+        #keyPath(MessageDTO.pinDetails.pinnedUntil),
+        #keyPath(MessageDTO.poll.votesPerOption),
+        #keyPath(MessageDTO.poll.votes),
+        #keyPath(MessageDTO.poll.ownVotes),
+        #keyPath(MessageDTO.poll.closed)
+    ]
     
+    /// The rules for a message to belong in a channel's list, with no window bounds. Load
+    /// windows are built on top of it (`listPredicate AND id-range`), and
+    /// `shouldRemoveCachedItem(_:)` relies on it holding nothing but list rules.
+    public static func listPredicate(channelId: ChannelId, now: Date = Date()) -> NSPredicate {
+        let autoDeleteThreshold = now.addingTimeInterval(-60)
+        return NSPredicate(
+            format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false AND (autoDeleteAt == nil OR autoDeleteAt > %@)",
+            channelId,
+            autoDeleteThreshold.bridgeDate
+        )
+    }
+
     public init(
         channelId: ChannelId,
         loadRangeProvider: LoadRangeProvider,
         itemCreator: @escaping (MessageDTO) -> ChatMessage
     ) {
-        let autoDeleteThreshold = Date().addingTimeInterval(-60)
-
-        defaultFetchPredicate = NSPredicate(
-            format: "channelId == %lld AND repliedInThread == false AND replied == false AND unlisted == false AND (autoDeleteAt == nil OR autoDeleteAt > %@)",
-            channelId,
-            autoDeleteThreshold.bridgeDate
-        )
+        defaultFetchPredicate = Self.listPredicate(channelId: channelId)
         currentFetchPredicate = defaultFetchPredicate
         self.loadRangeProvider = loadRangeProvider
         self.channelId = channelId
@@ -33,24 +67,13 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
             ],
             sectionNameKeyPath: #keyPath(MessageDTO.daySectionIdentifier),
             fetchPredicate: defaultFetchPredicate,
-            relationshipKeyPathsObserver: [
-                #keyPath(MessageDTO.attachments.status),
-                #keyPath(MessageDTO.attachments.filePath),
-                #keyPath(MessageDTO.user.avatarUrl),
-                #keyPath(MessageDTO.user.firstName),
-                #keyPath(MessageDTO.user.lastName),
-                #keyPath(MessageDTO.parent.state),
-                #keyPath(MessageDTO.bodyAttributes),
-                #keyPath(MessageDTO.linkMetadatas),
-                #keyPath(MessageDTO.poll.votesPerOption),
-                #keyPath(MessageDTO.poll.votes),
-                #keyPath(MessageDTO.poll.ownVotes),
-                #keyPath(MessageDTO.poll.closed)
-            ],
+            relationshipKeyPathsObserver: Self.relationshipKeyPaths,
             itemCreator: itemCreator
         )
     }
     
+    /// `fetchPredicate` becomes `defaultFetchPredicate`, so it must hold list rules only (see
+    /// `listPredicate(channelId:now:)`): a row failing it is taken off the list on refresh.
     public override init(
         context: NSManagedObjectContext,
         sortDescriptors: [NSSortDescriptor],
@@ -75,6 +98,19 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         )
     }
     
+    /// A shown row leaves the list as soon as it breaks one of the list's own rules — not
+    /// only when the row is finally deleted. `defaultFetchPredicate` holds exactly those
+    /// rules (channel, not a thread reply, not a hidden reply-parent stub, not `unlisted`,
+    /// not auto-deleted) and none of the window bounds: every load window is built as
+    /// `defaultFetchPredicate AND id-range`, so a row that only fell outside the loaded
+    /// window still passes it and is kept.
+    ///
+    /// Covers a delete for me waiting for the server (`unlisted`) and a parent stub
+    /// hidden by a history clear (`replied`), plus any rule added to the predicate later.
+    open override func shouldRemoveCachedItem(_ dto: MessageDTO) -> Bool {
+        !defaultFetchPredicate.evaluate(with: dto)
+    }
+
     open func startObserver(
         initialMessageId: MessageId,
         lastMessageId: MessageId,
@@ -186,12 +222,23 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
         loadPrev(done: done)
     }
     
+    /// Re-anchors the window around `messageId`.
+    ///
+    /// `done(true)` means a restart is on its way — started now or queued behind the one
+    /// in flight (see `LazyDatabaseObserver.restartObserver`); `done(false)` means none
+    /// will happen: the observer is stopped, no range covers the message, or
+    /// `shouldProceed` said no. `shouldProceed` is asked right before the restart, after
+    /// the asynchronous range lookup: a caller whose intent may have been superseded in
+    /// the meantime (a newer jump) answers `false` there instead of re-anchoring the list
+    /// onto a target the user has already left behind.
     open func restartToNear(
         at messageId: MessageId,
         done: ((Bool) -> Void)? = nil,
-        completion: (() -> Void)? = nil
+        completion: (() -> Void)? = nil,
+        shouldProceed: (() -> Bool)? = nil
     ) {
-        guard isObserverStarted else {
+        // A restart in flight is not a reason to refuse: the request queues behind it.
+        guard isObserverStarted || isObserverRestarting else {
             done?(false)
             return
         }
@@ -201,6 +248,10 @@ open class LazyMessagesObserver: LazyDatabaseObserver<MessageDTO, ChatMessage> {
                 triggeredMessageId: messageId
             ) { [weak self] range in
                 guard let self, let range else {
+                    done?(false)
+                    return
+                }
+                if let shouldProceed, !shouldProceed() {
                     done?(false)
                     return
                 }

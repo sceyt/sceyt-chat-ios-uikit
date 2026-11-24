@@ -194,14 +194,19 @@ open class Storage: NSObject {
         return nil
     }
     
+    /// Copies the zipped item out of the coordinator's temporary location. A test seam:
+    /// `FileManager.copyItem` in production.
+    static var copyZippedItem: (URL, URL) throws -> Void = { try FileManager.default.copyItem(at: $0, to: $1) }
+
     open class func makeUploadingUrl(directoryUrl: URL, completion:(URL?, Error?) -> Void) {
         let coordinator = NSFileCoordinator()
         var error: NSError?
+        var accessed = false
         coordinator.coordinate(
             readingItemAt: directoryUrl,
             options: [.forUploading],
             error: &error) { zipUrl in
-            
+            accessed = true
             do {
                 let tmpUrl = try FileManager.default.url(
                     for: .itemReplacementDirectory,
@@ -209,11 +214,16 @@ open class Storage: NSObject {
                     appropriateFor: zipUrl,
                     create: true
                 ).appendingPathComponent(directoryUrl.lastPathComponent + ".zip", isDirectory: false)
-                try FileManager.default.copyItem(at: zipUrl, to: tmpUrl)
+                try copyZippedItem(zipUrl, tmpUrl)
                 completion(tmpUrl, nil)
             } catch {
                 completion(nil, error)
             }
+        }
+        // A coordination that fails (the item is gone) never runs the accessor: without this
+        // the caller waited forever.
+        if !accessed {
+            completion(nil, error ?? CocoaError(.fileReadUnknown))
         }
     }
     
@@ -233,68 +243,58 @@ open class Storage: NSObject {
     open class func readFile(at url: URL, upToCount count: Int = 0, seek toOffset: UInt64 = 0) throws -> Data? {
         let handle = try FileHandle(forReadingFrom: url)
         let data: Data?
-        if #available(iOS 13.4, *) {
-            if count > 0 {
-                try handle.seek(toOffset: toOffset)
-                data = try handle.read(upToCount: count)
-            } else {
-                data = try handle.readToEnd()
-            }
+        // iOS 15 is the minimum: the pre-13.4 InputStream fallback could never run.
+        if count > 0 {
+            try handle.seek(toOffset: toOffset)
+            data = try handle.read(upToCount: count)
         } else {
-            let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: count)
-            guard let stream = InputStream(url: url)
-            else {
-                logger.error("ERROR OPENING FILE")
-                return nil
-            }
-            
-            stream.open()
-            
-            let bytesRead = stream.read(buffer, maxLength: count)
-            if bytesRead == -1 {
-                logger.error("ERROR READING FILE")
-                return nil
-            }
-            data = Data(bytes: buffer, count: count)
-            buffer.deallocate()
-            stream.close()
+            data = try handle.readToEnd()
         }
         try handle.close()
         return data
     }
     
+    /// The CRC32 of sampled bytes of the file at `filePath` (all of it up to
+    /// `calculateChecksumMaxBytes`, else its start, middle and end). 0 for an empty or
+    /// unreadable file, so 0 never identifies a file: dedupe with `dedupeChecksum(filePath:)`.
     open class func checksum(filePath: String) -> Int {
-        let upToCount = calculateChecksumMaxBytes
+        let fileUrl = URL(fileURLWithPath: filePath)
+        return sampledCRC32(fileUrl: fileUrl, fileSize: sizeOfItem(at: fileUrl)).map { Int($0) } ?? 0
+    }
+
+    /// Marks a key made by `dedupeChecksum`: older rows hold a bare CRC32 (below 2^32), so they
+    /// never match one, and an upload made before it is simply not deduped again.
+    static let dedupeChecksumVersionBit: Int64 = 1 << 62
+
+    /// What the checksum table matches a file on: its sampled CRC32 together with its size
+    /// (bits 32..61, modulo 2^30), so two files of different sizes never share a key. Nil for an
+    /// empty file or one that cannot be read in full: nothing dedupes on it, since every such
+    /// file would share one key and a hit would deliver another file's object.
+    open class func dedupeChecksum(filePath: String) -> Int64? {
         let fileUrl = URL(fileURLWithPath: filePath)
         let fileSize = sizeOfItem(at: fileUrl)
-        guard fileSize > 0
-        else { return 0 }
-        if fileSize <= upToCount || upToCount <= 3/*byte*/ {
-            if let data = try? Storage.readFile(at: fileUrl) {
-                let crc = ChecksumAlg.crc32(data: data)
-                return Int(crc)
-            }
-        } else {
-            let part = upToCount / 3
-            var buff = Data()
-            if let data = try? Storage.readFile(at: fileUrl, upToCount: part) {
-                buff.append(data)
-            }
-            
-            if let data = try? Storage.readFile(at: fileUrl, upToCount: part, seek: UInt64(fileSize) / 2) {
-                buff.append(data)
-            }
-            
-            if let data = try? Storage.readFile(at: fileUrl, upToCount: part, seek: UInt64(fileSize) - UInt64(part) - 1) {
-                buff.append(data)
-            }
-            
-            let crc = ChecksumAlg.crc32(data: buff)
-            return Int(crc)
-        }
-        return 0
+        guard fileSize > 0, let crc = sampledCRC32(fileUrl: fileUrl, fileSize: fileSize) else { return nil }
+        let size = Int64(fileSize & 0x3FFF_FFFF)
+        return dedupeChecksumVersionBit | (size << 32) | Int64(crc & 0xFFFF_FFFF)
     }
-    
+
+    /// Nil when the file is empty or any sampled read fails or comes back short.
+    private class func sampledCRC32(fileUrl: URL, fileSize: UInt) -> UInt? {
+        let upToCount = calculateChecksumMaxBytes
+        guard fileSize > 0 else { return nil }
+        if fileSize <= upToCount || upToCount <= 3/*byte*/ {
+            guard let data = try? Storage.readFile(at: fileUrl), data.count == Int(fileSize) else { return nil }
+            return ChecksumAlg.crc32(data: data)
+        }
+        let part = upToCount / 3
+        var buff = Data()
+        for offset in [0, UInt64(fileSize) / 2, UInt64(fileSize) - UInt64(part) - 1] {
+            guard let data = try? Storage.readFile(at: fileUrl, upToCount: part, seek: offset), data.count == part else { return nil }
+            buff.append(data)
+        }
+        return ChecksumAlg.crc32(data: buff)
+    }
+
     open class func deleteAll() {
         storingKey.removeStorageFolder()
     }

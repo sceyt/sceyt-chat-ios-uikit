@@ -12,6 +12,7 @@ import SceytChatUIKit
 let users = ["zoe", "thomas", "ethan", "charlie", "william", "michael", "james", "john", "lily", "david", "grace", "emma", "olivia", "ben", "emily", "isabella", "sophia", "alice", "jacob"]
 
 struct Config {
+    static let broadcastExtensionBundleIdentifier = "com.sceyt.chat.demo.BroadcastExtension"
     static let sceytApiURL = "https://us-ohio-api.sceyt.com"
     static let sceytAppId = "8lwox2ge93"
     static let genToken = "https://vd3eaqzjli.execute-api.us-east-2.amazonaws.com/chat/token?user="
@@ -70,6 +71,7 @@ func configureSceytChatUIKit() {
     
     // Set customized component subclass
     SceytChatUIKit.Components.clientConnectionHandler = ConnectionService.self
+    SceytChatUIKit.Components.channelViewController = CallChannelViewController.self
     SceytChatUIKit.Components.channelInfoViewController = CustomChannelInfoViewController.self
     SceytChatUIKit.Components.channelListViewController = ChannelsViewController.self
     

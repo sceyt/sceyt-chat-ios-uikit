@@ -11,6 +11,10 @@ import UIKit
 
 extension MessageCell {
     open class AttachmentStackView: View {
+        /// Transfers and local files of the attachments shown here: the app's shared transfer
+        /// unless the owner sets its own.
+        public var attachmentTransfer: AttachmentTransfer = fileProvider
+
         
         public lazy var appearance = Components.messageCell.appearance {
             didSet {
@@ -51,9 +55,7 @@ extension MessageCell {
                 .withoutAutoresizingMask
             v.appearance = appearance
             addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
+            pinRow(v, height: layout.thumbnailSize.height)
             v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
             return v
         }
@@ -63,9 +65,7 @@ extension MessageCell {
                 .withoutAutoresizingMask
             v.appearance = appearance
             addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
+            pinRow(v, height: layout.thumbnailSize.height)
             v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
             return v
         }
@@ -75,9 +75,7 @@ extension MessageCell {
                 .withoutAutoresizingMask
             v.appearance = appearance
             addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
+            pinRow(v, height: layout.thumbnailSize.height)
             v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
             return v
         }
@@ -87,12 +85,32 @@ extension MessageCell {
                 .withoutAutoresizingMask
             v.appearance = appearance
             addSubview(v)
-            v.pin(to: self)
-            v.heightAnchor.pin(constant: layout.thumbnailSize.height)
-            v.widthAnchor.pin(to: widthAnchor)
+            pinRow(v, height: layout.thumbnailSize.height)
             v.playPauseButton.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(onTapPlay)))
             v.pauseButton.addTarget(self, action: #selector(pauseAction(_:)), for: .touchUpInside)
             return v
+        }
+
+        /// Vertical gap between rows; `MessageLayoutModel.calculateAttachmentsContainerSize`
+        /// reserves the same 4pt per gap when it sizes the stack.
+        public static var rowSpacing: CGFloat = 4
+
+        /// Lays a row out below the previous one at its own height.
+        ///
+        /// Every row used to be pinned to all four edges of the stack. With more than one row
+        /// the rows overlapped, and their fixed heights could not all equal the stack's (the sum
+        /// of the rows), so Auto Layout broke one and stretched an aspect-fill view across every
+        /// slot. The last row's bottom is pinned in `addAttachmentViews`, once all rows exist.
+        private func pinRow(_ row: UIView, height: CGFloat) {
+            let previous = subviews.last { $0 !== row && $0 is AttachmentView }
+            row.leadingAnchor.pin(to: leadingAnchor)
+            row.trailingAnchor.pin(to: trailingAnchor)
+            if let previous {
+                row.topAnchor.pin(to: previous.bottomAnchor, constant: Self.rowSpacing)
+            } else {
+                row.topAnchor.pin(to: topAnchor)
+            }
+            row.heightAnchor.pin(constant: height)
         }
 
         open var previewer: (() -> AttachmentPreviewDataSource?)?
@@ -177,6 +195,7 @@ extension MessageCell {
                 guard let av else { return }
                 bind(layout: layout, to: av)
             }
+            subviews.last { $0 is AttachmentView }?.bottomAnchor.pin(to: bottomAnchor)
         }
 
         private func bind(layout: MessageLayoutModel.AttachmentLayout, to av: AttachmentView) {
@@ -189,15 +208,17 @@ extension MessageCell {
             av.setProgressHandler()
             switch av.renderedTransferStatus(for: layout.transferStatus) {
             case .pending, .uploading, .downloading:
-                if let progress = fileProvider.currentProgressPercent(message: data.message, attachment: layout.attachment) {
-                    av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress))
-                } else if fileProvider.filePath(attachment: layout.attachment) == nil {
+                if let progress = self.attachmentTransfer.currentProgressPercent(message: data.message, attachment: layout.attachment) {
+                    // The live task's size: the stored attachment may not have it yet.
+                    let total = self.attachmentTransfer.taskFor(message: data.message, attachment: layout.attachment)?.transferSize
+                    av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: progress, totalBytes: total.map { UInt64($0) }))
+                } else if self.attachmentTransfer.filePath(attachment: layout.attachment) == nil {
                     // Through the AttachmentProgress overload so the "0 B / 12.4 MB"
                     // label is seeded too. The CGFloat overload only moves the ring,
                     // which left the byte count blank until the next tick — and blank
                     // forever when the transfer had already delivered its last one.
                     av.setProgress(.init(message: data.message, attachment: layout.attachment, progress: 0.0001))
-                } else if fileProvider.taskFor(message: data.message, attachment: layout.attachment) != nil {
+                } else if self.attachmentTransfer.taskFor(message: data.message, attachment: layout.attachment) != nil {
                     // An upload always has a local file, so the `filePath == nil` fallback
                     // above only ever fires for downloads. Bind a live upload to the same
                     // floor, otherwise a cell that binds before the first progress event —
@@ -329,6 +350,13 @@ extension MessageCell {
                 onAction?(.pauseTransfer(message, attachment))
             case .downloading:
                 av.update(status: .pauseDownloading)
+                av.setProgressHandler()
+                onAction?(.pauseTransfer(message, attachment))
+            case .pending where av.isQueuedUpload:
+                // A queued upload has no task to stop (it is waiting for the upload queue or
+                // for a connection), but its loader carries a cancel button all the same —
+                // the pause is what keeps the next connect from sending it.
+                av.update(status: .pauseUploading)
                 av.setProgressHandler()
                 onAction?(.pauseTransfer(message, attachment))
             default:

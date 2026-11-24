@@ -579,6 +579,16 @@ open class ChannelProvider: DataProvider {
             completion(try? result.get())
         }
     }
+
+    /// The draft, read on the caller's own context — the main one when called from the main
+    /// thread. One row plus its relationships, so it is cheap enough to read inline where the
+    /// input bar has to be correct *this* layout pass rather than a queue hop later.
+    open func fetchDraft() -> DraftMessage? {
+        let channelId = self.channelId
+        return try? database.read {
+            $0.draft(channelId: channelId)
+        }.get()
+    }
     
     open func getLocalChannel(type: String, userId: UserId, completion: @escaping (ChatChannel?) -> Void) {
         database.read {

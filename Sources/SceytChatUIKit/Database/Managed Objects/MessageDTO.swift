@@ -38,6 +38,18 @@ public class MessageDTO: NSManagedObject {
     @NSManaged public var unlisted: Bool
     @NSManaged public var viewOnce: Bool
 
+    /// The pin state the server sends on this message. `nil` means never pinned.
+    ///
+    /// A projection kept here so the bubble's pin indicator repaints through the existing
+    /// `LazyMessagesObserver` — which must list `pinDetails.isPinned` and
+    /// `pinDetails.pinnedUntil` in its relationship key paths for that to happen.
+    /// `PinnedMessageDTO` is the durable per-channel record; the two are always written in
+    /// the same transaction (see `NSManagedObjectContext.pinMessage`).
+    ///
+    /// Not the same concept as `ChannelDTO.pinnedAt`, which means "channel pinned to the
+    /// top of the channel list".
+    @NSManaged public var pinDetails: PinDetailsDTO?
+
     @NSManaged public var markerTotal: [String: Int]?
     @NSManaged public var reactionTotal: Set<ReactionTotalDTO>?
     @NSManaged public var userMarkers: Set<MarkerDTO>?

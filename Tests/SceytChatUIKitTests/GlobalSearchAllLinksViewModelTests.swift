@@ -152,7 +152,7 @@ final class GlobalSearchAllLinksViewModelTests: XCTestCase {
         let paths = ChangeItemPaths(changeItems: [])
         viewModel.simulateChange(paths)
 
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     func testEventPublisherEmitsChangeEvent() {
@@ -167,7 +167,7 @@ final class GlobalSearchAllLinksViewModelTests: XCTestCase {
         let paths = ChangeItemPaths(changeItems: [])
         viewModel.simulateChange(paths)
 
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     func testMultipleSimulatedChangesPublishMultipleEvents() {
@@ -181,7 +181,7 @@ final class GlobalSearchAllLinksViewModelTests: XCTestCase {
         viewModel.simulateChange(ChangeItemPaths(changeItems: []))
         viewModel.simulateChange(ChangeItemPaths(changeItems: []))
 
-        wait(for: [expectation], timeout: 1.0)
+        wait(for: [expectation], timeout: defaultWaitTimeout)
     }
 
     // MARK: - No-op observer and loader
@@ -197,7 +197,7 @@ final class GlobalSearchAllLinksViewModelTests: XCTestCase {
     // MARK: - minAutoDownloadSize default
 
     func testDefaultMinAutoDownloadSize() {
-        XCTAssertEqual(viewModel.minAutoDownloadSize, 3_000_000)
+        XCTAssertEqual(viewModel.minAutoDownloadSize, 0)
     }
 
     // MARK: - sectionNameKeyPath default

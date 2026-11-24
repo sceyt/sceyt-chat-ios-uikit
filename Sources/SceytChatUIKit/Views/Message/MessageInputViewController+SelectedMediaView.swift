@@ -11,7 +11,7 @@ import Photos
 import UIKit
 
 extension MessageInputViewController {
-    open class SelectedMediaView: View {
+    open class SelectedMediaView: View, PHPhotoLibraryChangeObserver {
         public static var scale: CGFloat = UIScreen.main.traitCollection.displayScale
         
         open lazy var imageRequestOptions: PHImageRequestOptions = {
@@ -61,8 +61,12 @@ extension MessageInputViewController {
 
         open private(set) var items = [AttachmentModel]()
         private var imageRequestIDs = [PHImageRequestID]()
+        private var isObservingPhotoLibrary = false
 
         open func insert(view: AttachmentModel, at index: Int = -1) {
+            if view.photoAsset != nil {
+                startObservingPhotoLibraryIfNeeded()
+            }
             if index != -1, items.indices.contains(index) {
                 items.insert(view, at: index)
             } else {
@@ -155,6 +159,24 @@ extension MessageInputViewController {
             }
         }
 
+        /// Removes the gallery attachments whose `PHAsset` is in `identifiers`, without animation.
+        /// `items` and `stackView.arrangedSubviews` are index-aligned, so both go by the same index.
+        open func remove(photoAssetIdentifiers identifiers: Set<String>) {
+            guard !identifiers.isEmpty else { return }
+            for index in items.indices.reversed() {
+                guard let id = items[index].photoAsset?.localIdentifier,
+                      identifiers.contains(id)
+                else { continue }
+                if stackView.arrangedSubviews.indices.contains(index) {
+                    let v = stackView.arrangedSubviews[index]
+                    stackView.removeArrangedSubview(v)
+                    v.removeFromSuperview()
+                }
+                _onDelete?(items.remove(at: index))
+            }
+            _onUpdate?()
+        }
+
         open func removeAll() {
             items.removeAll()
             imageRequestIDs.forEach {
@@ -164,7 +186,38 @@ extension MessageInputViewController {
             stackView.removeArrangedSubviews()
         }
         
+        // MARK: - Photo library changes
+
+        /// Registered only once a gallery-backed item is shown: by then Photos access is already
+        /// granted, so registering can never surface the permission prompt on its own.
+        private func startObservingPhotoLibraryIfNeeded() {
+            guard !isObservingPhotoLibrary else { return }
+            isObservingPhotoLibrary = true
+            PHPhotoLibrary.shared().register(self)
+        }
+
+        /// A picked photo/video deleted from the library (or dropped from a limited-access
+        /// selection) while it sits in the composer leaves the composer too, the same way an
+        /// item unticked in the picker does.
+        open func photoLibraryDidChange(_ changeInstance: PHChange) {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                let deleted = Set(self.items.compactMap { item -> String? in
+                    guard let asset = item.photoAsset,
+                          changeInstance.changeDetails(for: asset)?.objectWasDeleted == true
+                    else { return nil }
+                    return asset.localIdentifier
+                })
+                guard !deleted.isEmpty else { return }
+                logger.verbose("[ATTACHMENT] removing \(deleted.count) attachment(s) deleted from the photo library")
+                self.remove(photoAssetIdentifiers: deleted)
+            }
+        }
+
         deinit {
+            if isObservingPhotoLibrary {
+                PHPhotoLibrary.shared().unregisterChangeObserver(self)
+            }
             imageRequestIDs.forEach {
                 imageManager.cancelImageRequest($0)
             }

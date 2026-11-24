@@ -114,7 +114,7 @@ extension ChannelViewController {
                     readMoreButton.leadingAnchor.pin(to: textLabel.leadingAnchor),
                 ]
                 
-                let infoWidth = layout.infoViewMeasure.width
+                let infoWidth = infoViewWidth(for: layout)
                 let maxSpace = infoWidth == 0 ? 70 : infoWidth + 12
                 if shouldDisplayReadMoreButton {
                     layoutConstraint += [
@@ -139,7 +139,13 @@ extension ChannelViewController {
                 }
                 layoutConstraint += [
                     infoView.leadingAnchor.pin(greaterThanOrEqualTo: bubbleView.leadingAnchor, constant: 10),
-                    infoView.widthAnchor.pin(constant: infoWidth)
+                    infoView.widthAnchor.pin(constant: infoWidth),
+                    // The row's width is required and its edges are pinned to the bubble, so
+                    // a bubble narrower than the row leaves those constraints unsatisfiable.
+                    // `measure` already reserves this much (`lastCharRect + maxSpace + 24`);
+                    // stating it keeps the pair consistent when the row turns out wider than
+                    // the model's measure — a message pinned after it was last measured.
+                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: infoWidth + 24)
                 ]
             } else if layout.contentOptions == .image {
                 infoView.dateLabel.textColor = appearance.onOverlayColor
@@ -183,7 +189,7 @@ extension ChannelViewController {
                     bubbleView.trailingAnchor.pin(to: containerView.trailingAnchor, constant: -12),
                     bubbleView.topAnchor.pin(to: containerView.topAnchor),
                     bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.linkViewMeasure.width + 24),
-                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.infoViewMeasure.width + 24),
+                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: infoViewWidth(for: layout) + 24),
                     bubbleView.widthAnchor.pin(lessThanOrEqualToConstant: Components.messageLayoutModel.defaults.messageWidth).priority(.required),
 
                     infoView.leadingAnchor.pin(greaterThanOrEqualTo: bubbleView.leadingAnchor, constant: 10),
@@ -235,7 +241,7 @@ extension ChannelViewController {
                     bottomActionView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 4.0),
                     bottomActionView.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -4.0),
                 ]
-            } else if layout.contentOptions.contains(.unsupported), layout.attachments.isEmpty {
+            } else if layout.contentOptions.contains(.unsupported) {
                 layoutConstraint += [
                     bubbleView.trailingAnchor.pin(to: containerView.trailingAnchor, constant: -12),
                     bubbleView.topAnchor.pin(to: containerView.topAnchor),
@@ -248,7 +254,7 @@ extension ChannelViewController {
                     textLabel.heightAnchor.pin(constant: 0.0),
 
                     unsupportedView.leadingAnchor.pin(to: bubbleView.leadingAnchor),
-                    unsupportedView.topAnchor.pin(to: bubbleView.topAnchor, constant: 8.0),
+                    unsupportedView.topAnchor.pin(to: bubbleViewTopAnchor, constant: 8.0),
                     unsupportedView.trailingAnchor.pin(to: bubbleView.trailingAnchor),
                     unsupportedView.bottomAnchor.pin(to: infoView.topAnchor)
                 ]
@@ -496,6 +502,8 @@ extension ChannelViewController {
                 bubbleSize.height += 4.0
                 let infoViewSize = InfoView.measure(model: model, appearance: appearance)
                 bubbleSize.height += infoViewSize.height
+                // DEBUG(unsupported-layout): remove after diagnosis
+                logger.info("[UnsupportedMsg] cellMeasure outgoing id=\(model.message.id) unsupportedMeasure=\(model.unsupportedViewMeasure) infoView=\(infoViewSize) bubbleSize=\(bubbleSize) hasReply=\(model.hasReply) isForwarded=\(model.isForwarded)")
             } else {
                 shouldShowDateTickBackground = false
                 bubbleSize = model.attachmentsContainerSize

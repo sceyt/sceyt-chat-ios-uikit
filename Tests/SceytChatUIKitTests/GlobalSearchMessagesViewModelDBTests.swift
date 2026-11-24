@@ -91,7 +91,7 @@ final class GlobalSearchMessagesViewModelDBTests: XCTestCase {
     }
 
     /// Subscribes to `$event`, calls `action`, and waits for `.reload` to be published.
-    private func waitForReload(timeout: TimeInterval = 3.0, action: () -> Void) {
+    private func waitForReload(timeout: TimeInterval = defaultWaitTimeout, action: () -> Void) {
         let exp = expectation(description: "reload event")
         viewModel.$event
             .compactMap { $0 }
@@ -292,7 +292,7 @@ final class GlobalSearchMessagesViewModelDBTests: XCTestCase {
             .store(in: &cancellables)
 
         viewModel.search(query: "Hello")
-        wait(for: [exp], timeout: 3.0)
+        wait(for: [exp], timeout: defaultWaitTimeout)
     }
 
     func testDB_consecutiveSearchesPublishMultipleReloadEvents() {

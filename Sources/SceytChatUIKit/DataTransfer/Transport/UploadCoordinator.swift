@@ -1,0 +1,538 @@
+//
+//  UploadCoordinator.swift
+//  SceytChatUIKit
+//
+//  The upload state machine: the slot queue, each attempt (checksum, preparation, the
+//  provider), its result, and pause / resume / cancel. Every state change is one `board` step.
+//
+
+import Foundation
+import UniformTypeIdentifiers
+
+/// Runs the session's uploads: the slot queue, each attempt, its result, and pause / resume /
+/// cancel. The session owns it and stays the one customization point (preparation, storage,
+/// provider, hooks and reporting).
+final class UploadCoordinator: Sendable {
+    unowned let session: TransportDataSession
+
+    init(session: TransportDataSession) {
+        self.session = session
+    }
+
+    /// Serializes the queue reports: each reads the queue under it, so the session gets them
+    /// in the order of the states they show. Holds the last one reported, to skip repeats.
+    private let queueReports = QueueReports()
+
+    private final class QueueReports: @unchecked Sendable {
+        let lock = NSLock()
+        var last: (running: Int, waiting: Int)?
+    }
+
+    /// Tells the session how many uploads hold a slot and how many wait, when that changed.
+    func reportQueue() {
+        queueReports.lock.lock(); defer { queueReports.lock.unlock() }
+        let counts: (running: Int, waiting: Int) = board.withState { jobs in (jobs.active.count, jobs.waiting.count) }
+        if let last = queueReports.last, last == counts { return }
+        queueReports.last = counts
+        session.uploadQueueDidChange(running: counts.running, waiting: counts.waiting)
+    }
+
+    var board: JobBoard { session.board }
+    var provider: FileTransferProvider { session.provider }
+    var staging: UploadStaging { session.staging }
+    private var maxConcurrentUploads: Int { session.maxConcurrentUploads }
+    private var checksumsBeforeUpload: Bool { session.checksumsBeforeUpload }
+    private var checksumTimeout: TimeInterval { session.checksumTimeout }
+    private var attemptHandoverTimeout: TimeInterval { session.attemptHandoverTimeout }
+    private var willBeginUpload: ((SCTDataSessionTaskInfo) -> Void)? { session.willBeginUpload }
+
+    func attempt(of job: UploadJob) -> Int { session.attempt(of: job) }
+    func tasks(of job: UploadJob) -> [SCTDataSessionTaskInfo] { session.tasks(of: job) }
+    private func joined(of job: UploadJob) -> [SCTDataSessionTaskInfo] { session.joined(of: job) }
+    private func isTerminal(_ taskInfo: SCTDataSessionTaskInfo) -> Bool { session.isTerminal(taskInfo) }
+    func report(_ tasks: [SCTDataSessionTaskInfo], _ event: SCTDataSessionTaskInfo.Event, interrupted: Bool = false) {
+        session.report(tasks, event, interrupted: interrupted)
+    }
+    func report(_ taskInfo: SCTDataSessionTaskInfo, _ event: SCTDataSessionTaskInfo.Event) {
+        session.report(taskInfo, event)
+    }
+    private func prepareUploadFile(_ job: UploadJob, videoProcessInfo: SCVideoProcessInfo) async throws -> PreparedUploadFile {
+        try await session.prepareUploadFile(job, videoProcessInfo: videoProcessInfo)
+    }
+    private func adopt(_ staged: URL, job: UploadJob, tasks: [SCTDataSessionTaskInfo]) {
+        session.adopt(staged, job: job, tasks: tasks)
+    }
+    private static func fileSize(_ url: URL?) -> Int64? { TransportDataSession.fileSize(url) }
+    private static func describe<T: Sendable>(_ result: FileTransferResult<T>) -> String { TransportDataSession.describe(result) }
+    private static func describe(_ event: SCTDataSessionTaskInfo.Event?) -> String { TransportDataSession.describe(event) }
+    func enqueue(_ job: UploadJob) {
+        let slots = max(1, maxConcurrentUploads)
+        let queued: (depth: Int, holders: String)? = board.withState { jobs in
+            guard jobs.active.count >= slots else {
+                jobs.active.append(job)
+                return nil
+            }
+            jobs.waiting.append(job)
+            return (jobs.waiting.count, jobs.active.map(\.operationId).joined(separator: ","))
+        }
+        reportQueue()
+        if let queued {
+            logger.debug("[Transfer] \(job.taskInfo.logTag) upload waiting for an upload slot (position \(queued.depth), \(slots) held by \(queued.holders))")
+            return
+        }
+        begin(job)
+    }
+
+    /// Gives up the slot `job` holds and starts the next waiting upload.
+    func releaseSlot(of job: UploadJob) {
+        let slots = max(1, maxConcurrentUploads)
+        let released: (held: Bool, next: UploadJob?) = board.withState { jobs in
+            guard jobs.active.contains(where: { $0 === job }) else { return (false, nil) }
+            jobs.active.removeAll { $0 === job }
+            guard jobs.active.count < slots, !jobs.waiting.isEmpty else { return (true, nil) }
+            let next = jobs.waiting.removeFirst()
+            jobs.active.append(next)
+            return (true, next)
+        }
+        guard released.held else { return }
+        reportQueue()
+        logger.debug("[Transfer] \(job.taskInfo.logTag) upload released its upload slot, next=\(released.next?.operationId ?? "-")")
+        if let next = released.next {
+            begin(next)
+        }
+    }
+
+    /// `job` holds the slot: continue its paused invocation, or start a new attempt.
+    func begin(_ job: UploadJob) {
+        willBeginUpload?(job.taskInfo)
+        enum Slot { case notWaiting(UploadJob.State), resumeLive, newAttempt }
+        let slot: Slot = board.withState { _ in
+            guard case .waiting(let alive) = job.state else { return .notWaiting(job.state) }
+            guard alive else { return .newAttempt }
+            job.state = .uploading
+            return .resumeLive
+        }
+        switch slot {
+        case .notWaiting(let state):
+            logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) got the slot while \(state), not starting")
+            releaseSlot(of: job)
+            return
+        case .resumeLive:
+            if provider.resume(operationId: job.operationId) {
+                logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) waiting -> uploading (resumed the live invocation)")
+                return
+            }
+            logger.info("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) provider could not resume the paused invocation, starting a new attempt")
+            let moved: UploadJob.State? = board.withState { _ in
+                if case .uploading = job.state { return nil }
+                return job.state
+            }
+            if let moved {
+                logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt(of: job)) became \(moved) during the failed resume, no new attempt")
+                return
+            }
+        case .newAttempt:
+            break
+        }
+        startAttempt(job)
+    }
+
+    /// A new attempt of `job`: its counter, its preparation state and its task, installed in
+    /// one step so a pause or cancel that follows finds them.
+    private func startAttempt(_ job: UploadJob) {
+        let context = job.taskInfo.logContext
+        // Each attempt gets its own export state: a cancelled one stays cancelled, so reusing
+        // it would fail the next export and send the uncompressed original.
+        let videoProcessInfo = SCVideoProcessInfo()
+        let preparation = AttemptPreparation()
+        let handoverTimeout = attemptHandoverTimeout
+        let (attempt, previous) = board.withState { _ -> (Int, AttemptWork.Snapshot) in
+            job.attempt += 1
+            let attempt = job.attempt
+            job.state = .preparing
+            ([job.taskInfo] + job.joined).forEach { $0.attempts = attempt }
+            // Read in the same board step that replaces it: the preparation this attempt waits for.
+            let previousPreparation = job.currentPreparation
+            // Holds the session (weakly, strongly while it works): the coordinator reaches it
+            // `unowned`, which is safe only while something keeps the session alive.
+            let previous = job.replaceWork(videoProcessInfo: videoProcessInfo, preparation: preparation, task: Task { [weak session = self.session] in
+                defer { preparation.markOver() }
+                // The attempt this one replaces is told to stop below, but parts of its
+                // preparation ignore a cancel (a provider's prepare, an image resize): until it
+                // is over, both would export, stage and call `prepareUpload` for the same
+                // operation. Its upload is not waited for: a provider takes a new invocation
+                // while an older one unwinds.
+                if let previousPreparation, await !previousPreparation.waitUntilOver(timeout: handoverTimeout), !Task.isCancelled {
+                    logger.warn("[Transfer] \(context.tag) upload attempt=\(attempt) the previous attempt's preparation did not end within \(Int(handoverTimeout)) s, starting anyway")
+                }
+                guard let session else { return }
+                guard session.uploads.isCurrent(job, attempt: attempt) else {
+                    logger.debug("[Transfer] \(context.tag) upload attempt=\(attempt) paused, cancelled or superseded while the previous attempt ended, not starting")
+                    return
+                }
+                // Every layer below (the provider) tags its lines with this transfer.
+                await TransferLog.$current.withValue(context) {
+                    await session.uploads.run(job, attempt: attempt, videoProcessInfo: videoProcessInfo, preparation: preparation)
+                }
+            })
+            return (attempt, previous)
+        }
+        logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt) waiting -> preparing \(job.attachment.transferLogDescription)")
+        previous.stop()
+    }
+
+    func isCurrent(_ job: UploadJob, attempt: Int) -> Bool {
+        board.withState { _ in
+            guard job.attempt == attempt else { return false }
+            switch job.state {
+            case .preparing, .uploading:
+                return true
+            default:
+                return false
+            }
+        }
+    }
+
+    func run(_ job: UploadJob, attempt: Int, videoProcessInfo: SCVideoProcessInfo, preparation: AttemptPreparation) async {
+        let tag = job.taskInfo.logTag
+        if checksumsBeforeUpload, await endedByChecksum(job, attempt: attempt) {
+            return
+        }
+        guard isCurrent(job, attempt: attempt) else {
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) dropped after the checksum: stale or no longer preparing")
+            return
+        }
+        guard let prepared = await prepare(job, attempt: attempt, videoProcessInfo: videoProcessInfo) else {
+            return
+        }
+        // Measured before the provider sees the file: the staged file is moved (or gone) once
+        // the upload lands.
+        let preparedSize = Self.fileSize(prepared.file)
+        if preparedSize == 0 {
+            // Sent as is. The checksum step never dedupes an empty file.
+            logger.warn("[Transfer] \(tag) upload attempt=\(attempt) prepared file is 0 bytes \(job.attachment.transferLogDescription)")
+        }
+        // A video's poster goes first, as its own preview attachment, made from the file
+        // this attempt sends (the exported video); the video's bytes only after it. A preview
+        // that could not be sent fails the attempt as a failed video upload would, so it is
+        // retried the same way (a retry sends the preview again, then the video).
+        if let preparePreview = job.taskInfo.onFilePrepared {
+            let step = await preparePreview(prepared.file)
+            guard isCurrent(job, attempt: attempt) else {
+                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) paused, cancelled or superseded during the preview, not uploading")
+                return
+            }
+            if case .failed(let error, let interrupted) = step {
+                // The staged file stays: the next attempt sends it again.
+                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (\(interrupted ? "interrupted" : "failure")): the video's preview was not sent \(TransferLog.describe(error))")
+                finish(job, attempt: attempt)
+                report(tasks(of: job), .failure(error), interrupted: interrupted)
+                return
+            }
+        }
+        guard let request = await prepareProvider(job, attempt: attempt, request: uploadRequest(for: job, prepared: prepared)) else {
+            return
+        }
+        guard startUploading(job, attempt: attempt) else {
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) paused, cancelled or superseded during preparation, not uploading")
+            return
+        }
+        logger.info("[Transfer] \(tag) upload attempt=\(attempt) preparing -> uploading providerEntries=\(request.metadata.count) staged=\(prepared.isStaged) size=\(preparedSize.map { "\($0) B" } ?? "unknown") mime=\(request.mimeType ?? "-") \(job.attachment.transferLogDescription)")
+        // The provider's progress is of the prepared file, not of the original: a compressed
+        // video can be a small part of it, and its size is what the message carries.
+        if let preparedSize, preparedSize > 0 {
+            tasks(of: job).forEach { $0.reportTransferSize(preparedSize) }
+        }
+        // Prepared: a next attempt may prepare now (this upload is the provider's to unwind).
+        preparation.markOver()
+        let result = await provider.upload(request) { [weak self, weak job] progress in
+            guard let self, let job, self.isUploading(job, attempt: attempt) else { return }
+            if let quarter = job.progressMilestone(progress) {
+                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) progress \(quarter)%")
+            }
+            self.tasks(of: job).forEach { $0.updateProgress(progress) }
+        }
+        handle(result, of: job, attempt: attempt, prepared: prepared, preparedSize: preparedSize, request: request)
+    }
+
+    /// The provider's prepare step (spec: `FileTransferProvider.prepareUpload`): the entries it
+    /// returns are merged into the attachment's metadata and saved, in the database and on the
+    /// attachment, before any byte is sent. Returns the request to upload, its metadata with the
+    /// entries in, or nil when the attempt ended (failed, or dropped as stale).
+    private func prepareProvider(_ job: UploadJob, attempt: Int, request: FileUploadRequest) async -> FileUploadRequest? {
+        let tag = job.taskInfo.logTag
+        let entries: [String: String]?
+        do {
+            entries = try await provider.prepareUpload(request)
+        } catch {
+            guard isCurrent(job, attempt: attempt) else {
+                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) provider prepare failed (\(TransferLog.describe(error))) after a pause/cancel/new attempt, dropped")
+                return nil
+            }
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (failure): provider prepare failed \(TransferLog.describe(error))")
+            finish(job, attempt: attempt)
+            report(tasks(of: job), .failure(error))
+            return nil
+        }
+        guard isCurrent(job, attempt: attempt) else {
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) provider prepare ended after a pause/cancel/new attempt, dropped")
+            return nil
+        }
+        guard let entries, !entries.isEmpty else {
+            // Nothing to save: the attachment's metadata is what the provider needs (a retry
+            // or a relaunch keeps the entries an earlier attempt saved).
+            markProviderEntries(of: job, in: request)
+            return request
+        }
+        do {
+            // Saved before the upload starts: the entries travel in the message, and a retry
+            // or a relaunch finds them on the attachment.
+            try await job.taskInfo.persistPreparedEntries(entries)
+        } catch {
+            guard isCurrent(job, attempt: attempt) else { return nil }
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (failure): the provider's entries were not saved \(TransferLog.describe(error))")
+            finish(job, attempt: attempt)
+            report(tasks(of: job), .failure(error))
+            return nil
+        }
+        guard isCurrent(job, attempt: attempt) else { return nil }
+        // Joined tasks send the same object: their attachments carry the same entries.
+        joined(of: job).forEach { joinedTask in
+            Task { try? await joinedTask.persistPreparedEntries(entries) }
+        }
+        let prepared = request.merging(metadata: entries)
+        markProviderEntries(of: job, in: prepared)
+        return prepared
+    }
+
+    /// Whether this upload goes with provider entries (keys UIKit does not own, e.g. an
+    /// encryption key), new or saved by an earlier attempt: what its log line and metrics say.
+    private func markProviderEntries(of job: UploadJob, in request: FileUploadRequest) {
+        let has = request.metadata.keys.contains { !ChatMessage.Attachment.ownedMetadataKeys.contains($0) }
+        tasks(of: job).forEach { $0.hasProviderEntries = has }
+    }
+
+    /// Runs the checksum step. True when it ended the attempt: a stored copy was found, or
+    /// the step failed the task (both reported by the checksum itself).
+    private func endedByChecksum(_ job: UploadJob, attempt: Int) async -> Bool {
+        let taskInfo = job.taskInfo
+        let tag = taskInfo.logTag
+        // Resumed once: by the provider, by a cancel of the attempt, or after
+        // `checksumTimeout` (a provider that never answers would hold the upload slot for good).
+        let answer = OnceAnswer<Bool>()
+        let timeout = checksumTimeout
+        let watchdog = Task {
+            try? await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+            if answer.give(false) {
+                logger.warn("[Transfer] \(tag) upload attempt=\(attempt) checksum gave no answer in \(timeout) s: uploading")
+            }
+        }
+        let stored = await withTaskCancellationHandler {
+            await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
+                answer.wait(continuation)
+                // Not started for an attempt already cancelled. The provider's answer counts
+                // only while this wait is open: it claims it (`reserve`) before it ends the task,
+                // so a timeout, a pause or a cancel and a late answer never both act.
+                guard !answer.isGiven else { return }
+                taskInfo.startChecksum(reserve: { answer.reserve() }) { answer.fulfill($0) }
+            }
+        } onCancel: {
+            answer.give(false)
+        }
+        watchdog.cancel()
+        guard stored || isTerminal(taskInfo) else {
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) checksum miss, uploading")
+            return false
+        }
+        logger.debug("[Transfer] \(tag) upload attempt=\(attempt) -> finished (\(stored ? "checksum hit, nothing uploaded" : "checksum step failed the task"))")
+        finish(job, attempt: attempt)
+        // A task that joined this one ends the same way.
+        if let event = taskInfo.event {
+            report(joined(of: job), event)
+        }
+        return true
+    }
+
+    /// The file to send, or nil when the attempt ended (failed, or dropped as stale).
+    private func prepare(_ job: UploadJob, attempt: Int, videoProcessInfo: SCVideoProcessInfo) async -> PreparedUploadFile? {
+        let tag = job.taskInfo.logTag
+        let prepared: PreparedUploadFile
+        do {
+            prepared = try await prepareUploadFile(job, videoProcessInfo: videoProcessInfo)
+        } catch {
+            guard isCurrent(job, attempt: attempt) else {
+                logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparation ended (\(TransferLog.describe(error))) after a pause/cancel/new attempt, dropped")
+                return nil
+            }
+            // Reported at the end, once, by `AttachmentTransfer`.
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (failure): preparation failed \(TransferLog.describe(error))")
+            finish(job, attempt: attempt)
+            report(tasks(of: job), .failure(error))
+            return nil
+        }
+        guard FileManager.default.fileExists(atPath: prepared.file.path) else {
+            guard isCurrent(job, attempt: attempt) else { return nil }
+            // Nothing to send: the source was deleted, or a video export fell back to a
+            // Photos-library path that is not a file.
+            logger.warn("[Transfer] \(tag) upload attempt=\(attempt) preparing -> finished (failure): the prepared file does not exist (missingSourceFile) \(job.attachment.transferLogDescription)")
+            finish(job, attempt: attempt)
+            report(tasks(of: job), .failure(TransportDataSessionError.missingSourceFile))
+            return nil
+        }
+        return prepared
+    }
+
+    private func uploadRequest(for job: UploadJob, prepared: PreparedUploadFile) -> FileUploadRequest {
+        let taskInfo = job.taskInfo
+        let name = job.attachment.name ?? ""
+        let fileName = name.isEmpty ? prepared.file.lastPathComponent : name
+        return FileUploadRequest(
+            operationId: job.operationId,
+            sourceFile: prepared.file,
+            fileName: fileName,
+            mimeType: Self.mimeType(of: prepared, fileName: fileName),
+            context: AttachmentTransferContext(message: taskInfo.message, attachment: job.attachment),
+            metadata: job.attachment.stringMetadataEntries
+        )
+    }
+
+    /// A prepared file's type follows its own extension (a resized image is a JPEG whatever
+    /// its source was); a file sent in place is typed by the name it is sent under, its own
+    /// extension when that name has none.
+    static func mimeType(of prepared: PreparedUploadFile, fileName: String) -> String? {
+        let named = (fileName as NSString).pathExtension
+        let ext = prepared.isStaged || named.isEmpty ? prepared.file.pathExtension : named
+        return UTType(filenameExtension: ext)?.preferredMIMEType
+    }
+
+    /// Preparation is over and nothing paused or cancelled the attempt meanwhile.
+    func startUploading(_ job: UploadJob, attempt: Int) -> Bool {
+        board.withState { _ in
+            guard job.attempt == attempt, case .preparing = job.state else { return false }
+            job.state = .uploading
+            return true
+        }
+    }
+
+    func isUploading(_ job: UploadJob, attempt: Int) -> Bool {
+        board.withState { _ in
+            guard job.attempt == attempt, case .uploading = job.state else { return false }
+            return true
+        }
+    }
+
+    func handle(
+        _ result: FileTransferResult<FileUploadResult>,
+        of job: UploadJob,
+        attempt: Int,
+        prepared: PreparedUploadFile,
+        preparedSize: Int64?,
+        request: FileUploadRequest
+    ) {
+        guard ends(job, attempt: attempt, with: result) else { return }
+        finish(job, attempt: attempt)
+        let tag = job.taskInfo.logTag
+        // Failures are reported at the end, once, by `AttachmentTransfer`: debug here.
+        let tasks = tasks(of: job)
+        switch result {
+        case .success(let uploaded):
+            landed(uploaded, job: job, attempt: attempt, tasks: tasks, prepared: prepared, preparedSize: preparedSize, request: request)
+        case .failure(let error):
+            // The staged file stays: the next attempt sends it again.
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (failure): \(TransferLog.describe(error))")
+            report(tasks, .failure(error))
+        case .interrupted(let error):
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (interrupted, work kept for a retry): \(TransferLog.describe(error))")
+            report(tasks, .failure(error), interrupted: true)
+        }
+    }
+
+    /// Whether the provider's result ends the attempt. A stale attempt's, or a finished
+    /// job's, is dropped; a paused invocation that ended without the file leaves the job
+    /// paused with nothing alive, for a resume to start a new attempt.
+    private func ends(_ job: UploadJob, attempt: Int, with result: FileTransferResult<FileUploadResult>) -> Bool {
+        let outcome = Self.describe(result)
+        let tag = job.taskInfo.logTag
+        enum Verdict { case stale(current: Int), afterFinish, ends, pausedEnded, waitingEnded }
+        let verdict: Verdict = board.withState { _ in
+            guard job.attempt == attempt else { return .stale(current: job.attempt) }
+            switch (result, job.state) {
+            case (_, .finished):
+                return .afterFinish
+            case (.success, _):
+                // Landed, even while paused: the file is stored.
+                return .ends
+            case (_, .paused):
+                job.state = .paused(alive: false)
+                return .pausedEnded
+            case (_, .waiting):
+                job.state = .waiting(alive: false)
+                return .waitingEnded
+            default:
+                return .ends
+            }
+        }
+        switch verdict {
+        case .stale(let current):
+            logger.debug("[Transfer] \(tag) upload stale attempt=\(attempt) ended (\(outcome)) while attempt \(current) is current, dropped")
+            return false
+        case .afterFinish:
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) ended (\(outcome)) after it was finished (cancelled/interrupted), dropped")
+            return false
+        case .pausedEnded:
+            logger.info("[Transfer] \(tag) upload attempt=\(attempt) paused -> paused(alive: false): the paused invocation ended (\(outcome))")
+            return false
+        case .waitingEnded:
+            logger.info("[Transfer] \(tag) upload attempt=\(attempt) waiting -> waiting(alive: false): the paused invocation ended (\(outcome))")
+            return false
+        case .ends:
+            return true
+        }
+    }
+
+    /// The file is stored: its tasks that still run take the reference.
+    private func landed(
+        _ uploaded: FileUploadResult,
+        job: UploadJob,
+        attempt: Int,
+        tasks: [SCTDataSessionTaskInfo],
+        prepared: PreparedUploadFile,
+        preparedSize: Int64?,
+        request: FileUploadRequest
+    ) {
+        let tag = job.taskInfo.logTag
+        // Checked before anything replaces the task's event: an event after the terminal
+        // one would hide that the task ended, and the success would be reported over it.
+        let live = tasks.filter { !$0.isTerminal }
+        guard !live.isEmpty else {
+            logger.debug("[Transfer] \(tag) upload attempt=\(attempt) landed after the task already ended (\(Self.describe(job.taskInfo.event))): result dropped")
+            staging.discard(operationId: job.operationId)
+            return
+        }
+        if prepared.isStaged {
+            adopt(prepared.file, job: job, tasks: live)
+        }
+        staging.discard(operationId: job.operationId)
+        logger.debug("[Transfer] \(tag) upload attempt=\(attempt) uploading -> finished (success) ref=\(TransferLog.redact(uploaded.url))")
+        report(live, .successURI(uploaded.url))
+    }
+
+    /// The attempt is over: the job leaves the queue and the session.
+    func finish(_ job: UploadJob, attempt: Int) {
+        enum Ended { case stale(current: Int), finished(previous: UploadJob.State) }
+        let ended: Ended = board.withState { jobs in
+            guard job.attempt == attempt else { return .stale(current: job.attempt) }
+            let previous = job.state
+            job.state = .finished
+            jobs.uploads[ObjectIdentifier(job.taskInfo)] = nil
+            return .finished(previous: previous)
+        }
+        switch ended {
+        case .stale(let current):
+            logger.debug("[Transfer] \(job.taskInfo.logTag) upload finish of stale attempt=\(attempt) ignored (current \(current))")
+        case .finished(let previous):
+            logger.debug("[Transfer] \(job.taskInfo.logTag) upload attempt=\(attempt) \(previous) -> finished")
+            releaseSlot(of: job)
+        }
+    }
+}

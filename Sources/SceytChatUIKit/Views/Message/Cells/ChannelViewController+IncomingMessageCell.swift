@@ -155,7 +155,7 @@ extension ChannelViewController {
                     readMoreButton.topAnchor.pin(to: textLabel.bottomAnchor),
                     readMoreButton.leadingAnchor.pin(to: textLabel.leadingAnchor),
                 ]
-                let infoWidth = layout.infoViewMeasure.width
+                let infoWidth = infoViewWidth(for: layout)
                 let maxSpace = infoWidth == 0 ? 70 : infoWidth + 12
                 if shouldDisplayReadMoreButton {
                     layoutConstraint += [
@@ -185,7 +185,11 @@ extension ChannelViewController {
                 }
                 layoutConstraint += [
                     infoView.trailingAnchor.pin(lessThanOrEqualTo: bubbleView.trailingAnchor, constant: -10),
-                    infoView.widthAnchor.pin(constant: infoWidth)
+                    infoView.widthAnchor.pin(constant: infoWidth),
+                    // Same reason as the outgoing cell: the row's width is required, so the
+                    // bubble has to be able to hold it even when the row comes out wider than
+                    // the model's measure.
+                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: infoWidth + 24)
                 ]
             } else if options == .image {
                 infoView.dateLabel.textColor = appearance.onOverlayColor
@@ -235,7 +239,7 @@ extension ChannelViewController {
                     bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.messageUserTitleSize.width + 24),
                     bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.linkViewMeasure.width + 24),
                     bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.textSize.width + 24),
-                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: layout.infoViewMeasure.width + 24),
+                    bubbleView.widthAnchor.pin(greaterThanOrEqualToConstant: infoViewWidth(for: layout) + 24),
                     bubbleView.widthAnchor.pin(lessThanOrEqualToConstant: Components.messageLayoutModel.defaults.messageWidth).priority(.required),
 
                     textLabel.topAnchor.pin(to: contentTopAnchor, constant: (layout.isForwarded || showSenderInfo) ? 2 : 8),
@@ -290,7 +294,7 @@ extension ChannelViewController {
                     bottomActionView.leadingAnchor.pin(to: bubbleView.leadingAnchor, constant: 4.0),
                     bottomActionView.trailingAnchor.pin(to: bubbleView.trailingAnchor, constant: -4.0),
                 ]
-            } else if layout.contentOptions.contains(.unsupported), layout.attachments.isEmpty {
+            } else if layout.contentOptions.contains(.unsupported) {
                 layoutConstraint += [
                     bubbleView.leadingAnchor.pin(to: avatarView.trailingAnchor, constant: 10),
                     bubbleView.topAnchor.pin(to: containerView.topAnchor),
@@ -576,6 +580,8 @@ extension ChannelViewController {
 
                 let infoViewSize = InfoView.measure(model: model, appearance: appearance)
                 bubbleSize.height += infoViewSize.height
+                // DEBUG(unsupported-layout): remove after diagnosis
+                logger.info("[UnsupportedMsg] cellMeasure incoming id=\(model.message.id) unsupportedMeasure=\(model.unsupportedViewMeasure) infoView=\(infoViewSize) bubbleSize=\(bubbleSize) hasReply=\(model.hasReply) isForwarded=\(model.isForwarded)")
             } else {
                 bubbleSize = model.attachmentsContainerSize
                 bubbleSize.width += 4

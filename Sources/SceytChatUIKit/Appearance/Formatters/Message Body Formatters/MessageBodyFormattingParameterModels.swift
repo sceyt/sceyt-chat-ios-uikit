@@ -48,6 +48,45 @@ public struct RepliedMessageBodyFormatterAttributes {
     let replyUserNameFormatter: any UserFormatting
 }
 
+/// Input for `PinnedMessageBodyFormatting` — the one-line preview shown in the pinned
+/// messages banner and list.
+///
+/// Unlike its neighbours here, the properties and the memberwise init are **public**: an
+/// integrator swapping `SceytChatUIKit.shared.formatters.pinnedMessageBodyFormatter` has to
+/// be able to read them, and the older structs' internal properties made them impossible to
+/// re-implement from outside the module.
+public struct PinnedMessageBodyFormatterAttributes {
+    public let message: ChatMessage
+    public let deletedStateText: String
+    public let bodyLabelAppearance: LabelAppearance
+    public let mentionLabelAppearance: LabelAppearance
+    public let deletedLabelAppearance: LabelAppearance
+    public let attachmentNameFormatter: any AttachmentFormatting
+    /// Renders a voice attachment's length, so the preview reads "Voice: 00:56".
+    public let attachmentDurationFormatter: any TimeIntervalFormatting
+    public let mentionUserNameFormatter: any UserFormatting
+
+    public init(
+        message: ChatMessage,
+        deletedStateText: String,
+        bodyLabelAppearance: LabelAppearance,
+        mentionLabelAppearance: LabelAppearance,
+        deletedLabelAppearance: LabelAppearance,
+        attachmentNameFormatter: any AttachmentFormatting,
+        attachmentDurationFormatter: any TimeIntervalFormatting = SceytChatUIKit.shared.formatters.mediaDurationFormatter,
+        mentionUserNameFormatter: any UserFormatting
+    ) {
+        self.message = message
+        self.deletedStateText = deletedStateText
+        self.bodyLabelAppearance = bodyLabelAppearance
+        self.mentionLabelAppearance = mentionLabelAppearance
+        self.deletedLabelAppearance = deletedLabelAppearance
+        self.attachmentNameFormatter = attachmentNameFormatter
+        self.attachmentDurationFormatter = attachmentDurationFormatter
+        self.mentionUserNameFormatter = mentionUserNameFormatter
+    }
+}
+
 public struct EditMessageBodyFormatterAttributes {
     let message: ChatMessage
     let bodyLabelAppearance: LabelAppearance

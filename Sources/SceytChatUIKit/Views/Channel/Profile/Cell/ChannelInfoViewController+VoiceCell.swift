@@ -11,6 +11,10 @@ import Combine
 
 extension ChannelInfoViewController {
     open class VoiceCell: CollectionViewCell, AttachmentTransferStatusObserver {
+        /// Transfers and local files of the attachments shown here: the app's shared transfer
+        /// unless the owner sets its own.
+        public var attachmentTransfer: AttachmentTransfer = fileProvider
+
         typealias Layouts = ChannelInfoViewController.VoiceCollectionView.Layouts
         
         let event = PassthroughSubject<Event, Never>()
@@ -213,7 +217,7 @@ extension ChannelInfoViewController {
                 showDownloadButton(true)
                 downloadButton.setImage(appearance.loaderAppearance.cancelIcon, for: [])
                 progressView.isHidden = false
-                progressView.progress = fileProvider.currentProgressPercent(message: message, attachment: attachment) ?? attachment.transferProgress
+                progressView.progress = self.attachmentTransfer.currentProgressPercent(message: message, attachment: attachment) ?? attachment.transferProgress
                 setProgressHandler()
             case .pending, .pauseDownloading, .failedDownloading:
                 showDownloadButton(true)
@@ -255,7 +259,7 @@ extension ChannelInfoViewController {
             else { return }
             let attachment = data.attachment
             progressView.rotateZ = true
-            fileProvider
+            self.attachmentTransfer
                 .progress(
                     message: message,
                     attachment: attachment,
@@ -263,16 +267,15 @@ extension ChannelInfoViewController {
                 ) { [weak self] progress in
                     guard let self, self.data == data
                     else {
-                        logger.verbose("[Attachment] progress self is nil thumbnail load from filePath \(attachment.description)")
                         return
                     }
                     
                     DispatchQueue.main.async { [weak self] in
                         self?.progressView.progress = progress.progress
                     }
-                } completion: { [weak self] result in
+                } completion: { [weak self, transfer = attachmentTransfer] result in
                     logger.debug("[Attachment] completion \(result.attachment.status)")
-                    fileProvider.removeProgressObserver(
+                    transfer.removeProgressObserver(
                         message: result.message,
                         attachment: result.attachment,
                         objectIdKey: self.map { AttachmentTransfer.observerKey(for: $0, prefix: "infovoice") } ?? ""
@@ -298,7 +301,7 @@ extension ChannelInfoViewController {
             super.prepareForReuse()
 
             if let message = data?.ownerMessage, let attachment = data?.attachment {
-                fileProvider.removeProgressObserver(
+                self.attachmentTransfer.removeProgressObserver(
                     message: message,
                     attachment: attachment,
                     objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infovoice"))
@@ -309,7 +312,7 @@ extension ChannelInfoViewController {
             // prepareForReuse only runs on reuse (scrolling); cells visible at screen
             // dismiss are deallocated without it, so remove the observer here too.
             if let message = data?.ownerMessage, let attachment = data?.attachment {
-                fileProvider.removeProgressObserver(
+                self.attachmentTransfer.removeProgressObserver(
                     message: message,
                     attachment: attachment,
                     objectIdKey: AttachmentTransfer.observerKey(for: self, prefix: "infovoice"))

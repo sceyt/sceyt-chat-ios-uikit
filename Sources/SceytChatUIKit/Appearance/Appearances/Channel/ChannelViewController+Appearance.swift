@@ -33,6 +33,7 @@ extension ChannelViewController: AppearanceProviding {
             message: L10n.Channel.NoMessages.message
         ),
         scrollDownAppearance: ScrollDownView.appearance,
+        pinnedMessagesAppearance: PinnedMessagesView.appearance,
         unreadMentionCountApperance: UnreadMentionCountView.appearance,
         dateSeparatorAppearance: DateSeparatorView.appearance,
         reactionPickerAppearance: ReactionPickerViewController.appearance,
@@ -67,6 +68,10 @@ extension ChannelViewController: AppearanceProviding {
         
         @Trackable<Appearance, ScrollDownView.Appearance>
         public var scrollDownAppearance: ScrollDownView.Appearance
+
+        /// The pinned-messages banner under the navigation bar.
+        @Trackable<Appearance, PinnedMessagesView.Appearance>
+        public var pinnedMessagesAppearance: PinnedMessagesView.Appearance
 
         @Trackable<Appearance, UnreadMentionCountView.Appearance>
         public var unreadMentionCountAppearance: UnreadMentionCountView.Appearance
@@ -107,6 +112,7 @@ extension ChannelViewController: AppearanceProviding {
             headerAppearance: HeaderView.Appearance,
             emptyStateAppearance: EmptyStateView.Appearance,
             scrollDownAppearance: ScrollDownView.Appearance,
+            pinnedMessagesAppearance: PinnedMessagesView.Appearance,
             unreadMentionCountApperance: UnreadMentionCountView.Appearance,
             dateSeparatorAppearance: DateSeparatorView.Appearance,
             reactionPickerAppearance: ReactionPickerViewController.Appearance,
@@ -123,6 +129,7 @@ extension ChannelViewController: AppearanceProviding {
             self._headerAppearance = Trackable(value: headerAppearance)
             self._emptyStateAppearance = Trackable(value: emptyStateAppearance)
             self._scrollDownAppearance = Trackable(value: scrollDownAppearance)
+            self._pinnedMessagesAppearance = Trackable(value: pinnedMessagesAppearance)
             self._unreadMentionCountAppearance = Trackable(value: unreadMentionCountApperance)
             self._dateSeparatorAppearance = Trackable(value: dateSeparatorAppearance)
             self._reactionPickerAppearance = Trackable(value: reactionPickerAppearance)
@@ -142,6 +149,7 @@ extension ChannelViewController: AppearanceProviding {
             headerAppearance: HeaderView.Appearance? = nil,
             emptyStateAppearance: EmptyStateView.Appearance? = nil,
             scrollDownAppearance: ScrollDownView.Appearance? = nil,
+            pinnedMessagesAppearance: PinnedMessagesView.Appearance? = nil,
             unreadMentionCountApperance: UnreadMentionCountView.Appearance? = nil,
             dateSeparatorAppearance: DateSeparatorView.Appearance? = nil,
             reactionPickerAppearance: ReactionPickerViewController.Appearance? = nil,
@@ -158,6 +166,7 @@ extension ChannelViewController: AppearanceProviding {
             self._headerAppearance = Trackable(reference: reference, referencePath: \.headerAppearance)
             self._emptyStateAppearance = Trackable(reference: reference, referencePath: \.emptyStateAppearance)
             self._scrollDownAppearance = Trackable(reference: reference, referencePath: \.scrollDownAppearance)
+            self._pinnedMessagesAppearance = Trackable(reference: reference, referencePath: \.pinnedMessagesAppearance)
             self._unreadMentionCountAppearance = Trackable(reference: reference, referencePath: \.unreadMentionCountAppearance)
             self._dateSeparatorAppearance = Trackable(reference: reference, referencePath: \.dateSeparatorAppearance)
             self._reactionPickerAppearance = Trackable(reference: reference, referencePath: \.reactionPickerAppearance)
@@ -174,6 +183,7 @@ extension ChannelViewController: AppearanceProviding {
             if let headerAppearance { self.headerAppearance = headerAppearance }
             if let emptyStateAppearance { self.emptyStateAppearance = emptyStateAppearance }
             if let scrollDownAppearance { self.scrollDownAppearance = scrollDownAppearance }
+            if let pinnedMessagesAppearance { self.pinnedMessagesAppearance = pinnedMessagesAppearance }
             if let unreadMentionCountApperance { self.unreadMentionCountAppearance = unreadMentionCountApperance }
             if let dateSeparatorAppearance { self.dateSeparatorAppearance = dateSeparatorAppearance }
             if let reactionPickerAppearance { self.reactionPickerAppearance = reactionPickerAppearance }

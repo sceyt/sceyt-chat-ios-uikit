@@ -32,7 +32,17 @@ public class ChatMessage {
     public var disableMentionsCount: Bool
     public let viewOnce: Bool
 
+    /// This message's pin state, as the server reports it. `nil` means never pinned. The
+    /// durable record — who pinned it, when, and to whom it is visible — is `PinnedMessageDTO`.
+    public let pinDetails: PinDetails?
+
+    /// The attachments the message shows. A video's poster image, sent as its own "preview"
+    /// attachment, is not one of them: it is in `previewAttachments`.
     public let attachments: [Attachment]?
+    /// The "preview" attachments: each the poster image of one of `attachments`' videos (the
+    /// video's `pvw` is its url), shown as that video's thumbnail and never as an item
+    /// of its own. Sent with the message, forwarded and kept through edits like the rest.
+    public let previewAttachments: [Attachment]?
     public let userReactions: [Reaction]?
     public let userPendingReactions: [Reaction]?
     public let reactionTotal: [ReactionTotal]?
@@ -48,6 +58,47 @@ public class ChatMessage {
     public let forwardingDetails: ForwardingDetails?
     public let bodyAttributes: [BodyAttribute]?
     public let poll: PollDetails?
+
+    /// This message is pinned and the pin has not lapsed. Backed by `pinDetails`, whose key
+    /// paths are registered on `LazyMessagesObserver`, so a pin/unpin reconfigures the cell.
+    public var isPinned: Bool { pinDetails?.isCurrentlyPinned == true }
+
+    /// `attachments` and `previewAttachments`: everything the message carries.
+    public var allAttachments: [Attachment] {
+        (attachments ?? []) + (previewAttachments ?? [])
+    }
+
+    /// `attachments` without the "preview" ones, which go to the previews (with `previews`).
+    ///
+    /// A poster is recognised by its type *or* by being the url a sibling video names in its
+    /// `pvw`. The type alone is not enough: a stored row can carry a stale type (the DTO update
+    /// path never overwrites a non-empty one) and another client may type the poster
+    /// differently. A poster that slipped through became a second media row, so the bubble was
+    /// measured for two items while the video view stretched across both slots.
+    static func split(_ attachments: [Attachment]?, previews: [Attachment]?) -> ([Attachment]?, [Attachment]?) {
+        let posterURLs = Set((attachments ?? []).compactMap { attachment -> String? in
+            guard attachment.type == "video",
+                  let origin = attachment.imageDecodedMetadata?.videoThumbnail,
+                  !origin.isEmpty
+            else { return nil }
+            return origin
+        })
+        func isPreview(_ attachment: Attachment) -> Bool {
+            if attachment.isVideoPreview { return true }
+            guard !posterURLs.isEmpty, attachment.type != "video", let url = attachment.url
+            else { return false }
+            return posterURLs.contains(url)
+        }
+        let shown = attachments?.filter { !isPreview($0) }
+        let found = (attachments ?? []).filter(isPreview) + (previews ?? [])
+        return (shown, found.isEmpty ? nil : found)
+    }
+
+    /// The preview attachment `video` names in its `pvw`, when the message carries it.
+    public func previewAttachment(of video: Attachment) -> Attachment? {
+        guard let origin = video.imageDecodedMetadata?.videoThumbnail, !origin.isEmpty else { return nil }
+        return previewAttachments?.first { $0.url == origin }
+    }
 
     var hasDisplayedFromMe: Bool {
         userMarkers?.contains(where: { $0.user?.id == SceytChatUIKit.shared.currentUserId && $0.name == DeliveryStatus.displayed.rawValue} ) == true
@@ -73,6 +124,7 @@ public class ChatMessage {
                 disableMentionsCount: Bool = false,
                 viewOnce: Bool = false,
                 attachments: [ChatMessage.Attachment]? = nil,
+                previewAttachments: [ChatMessage.Attachment]? = nil,
                 userReactions: [ChatMessage.Reaction]? = nil,
                 userPendingReactions: [ChatMessage.Reaction]? = nil,
                 reactionTotals: [ChatMessage.ReactionTotal]? = nil,
@@ -84,7 +136,8 @@ public class ChatMessage {
                 changedBy: ChatUser? = nil,
                 forwardingDetails: ForwardingDetails? = nil,
                 bodyAttributes: [BodyAttribute]? = nil,
-                poll: PollDetails? = nil
+                poll: PollDetails? = nil,
+                pinDetails: PinDetails? = nil
     ) {
         self.id = id
         self.tid = tid
@@ -105,7 +158,7 @@ public class ChatMessage {
         self.displayCount = displayCount
         self.disableMentionsCount = disableMentionsCount
         self.viewOnce = viewOnce
-        self.attachments = attachments
+        (self.attachments, self.previewAttachments) = Self.split(attachments, previews: previewAttachments)
         self.userReactions = userReactions
         self.userPendingReactions = userPendingReactions
         self.reactionTotal = reactionTotals
@@ -127,6 +180,7 @@ public class ChatMessage {
         self.reactionScores = reactionScores
         self.bodyAttributes = bodyAttributes
         self.poll = poll
+        self.pinDetails = pinDetails
     }
     
     public init(dto: MessageDTO) {
@@ -149,6 +203,7 @@ public class ChatMessage {
         displayCount = Int(dto.displayCount)
         disableMentionsCount = dto.disableMentionsCount
         viewOnce = dto.viewOnce
+        pinDetails = dto.pinDetails?.convert()
         markerCount = dto.markerTotal
         if let user = dto.user {
             self.user = user.convert()
@@ -162,7 +217,7 @@ public class ChatMessage {
             changedBy = nil
         }
         
-        attachments = dto.attachments?.map {
+        (attachments, previewAttachments) = Self.split(dto.attachments?.map {
             $0.convert()
         }.sorted(by: { item1, item2 in
             if let f1 = item1.filePath, let f2 = item2.filePath {
@@ -171,7 +226,7 @@ public class ChatMessage {
                 return f1 < f2
             }
             return item1.type < item2.type
-        })
+        }), previews: nil)
         
         mentionedUsers = {
             var map = [UserId: ChatUser]()
@@ -545,8 +600,9 @@ public extension ChatMessage {
         if let parent {
             b.parentMessageId(parent.id)
         }
-        if let attachments {
-            b.attachments(attachments.map { $0.builder.build() })
+        if attachments != nil || previewAttachments != nil {
+            // The previews go out too: a video's `pvw` names one of them.
+            b.attachments(allAttachments.map { $0.builder.build() })
         }
         if let fwId = forwardingDetails?.messageId {
             b.forwardingMessageId(fwId)
@@ -594,9 +650,40 @@ public extension ChatMessage {
         public static let viewOnce = "view_once"
     }
 
+    /// The `body` values that say what a system message is about — what
+    /// `SystemMessageBodyFormatter` switches on. Only the codes this UIKit generates itself
+    /// are named here; the ones the backend sends (`CG`, `AM`, `JL`, …) stay literals in the
+    /// formatter.
+    struct SystemMessageType {
+        /// Someone pinned a message for everyone. The pinned message is the system
+        /// message's parent.
+        public static let pinnedMessage = "PM"
+    }
+
     /// Returns true if this is a system message
     var isSystemMessage: Bool {
         return type == MessageType.system
+    }
+
+    /// The message a system message points at, and `nil` for every system message that has
+    /// no target — which is what keeps the tap gesture off "Adam joined via invite link".
+    ///
+    /// Today only a pin system message ("PM") has one: the message that was pinned. Prefers
+    /// the linked parent and falls back to the id in the metadata, because
+    /// `SCTMessage.parentMessage` is populated by the server — on the sender's own copy the
+    /// metadata is what makes the tap work before the echo arrives.
+    var systemMessageTargetId: MessageId? {
+        guard isSystemMessage,
+              body == SystemMessageType.pinnedMessage
+        else { return nil }
+        if let parentId = parent?.id, parentId != 0 {
+            return parentId
+        }
+        guard let metadata,
+              let pinned = SystemMessageMetadata.PinnedMessage.from(jsonString: metadata),
+              pinned.id != 0
+        else { return nil }
+        return pinned.id
     }
 
     /// Returns true if this is a poll message

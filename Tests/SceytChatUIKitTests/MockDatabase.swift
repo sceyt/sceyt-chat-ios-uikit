@@ -13,7 +13,14 @@ final class MockDatabase: Database {
 
     let container: NSPersistentContainer
 
-    init() {
+    /// Non-nil when built with `sharesObservableContext: true`.
+    private let sharedObservableContext: NSManagedObjectContext?
+
+    /// - Parameter sharesObservableContext: `true` hands out one `backgroundReadOnlyObservableContext`
+    ///   for every caller, as `PersistentContainer` does in production (a `lazy var`). The default
+    ///   (`false`) keeps the historical behaviour of a fresh context per access, which existing
+    ///   suites rely on.
+    init(sharesObservableContext: Bool = false) {
         let bundle: Bundle
         #if SWIFT_PACKAGE
         bundle = Bundle.module
@@ -35,6 +42,21 @@ final class MockDatabase: Database {
             if let error { fatalError("MockDatabase: store load failed: \(error)") }
         }
         container.viewContext.automaticallyMergesChangesFromParent = true
+        // Created here, not lazily: Swift `lazy` is not thread-safe, and transfer
+        // callbacks reach the first write from several threads at once.
+        let context = container.newBackgroundContext()
+        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+        context.automaticallyMergesChangesFromParent = true
+        backgroundPerformContext = context
+        if sharesObservableContext {
+            let observable = container.newBackgroundContext()
+            observable.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
+            observable.automaticallyMergesChangesFromParent = true
+            observable.retainsRegisteredObjects = true
+            sharedObservableContext = observable
+        } else {
+            sharedObservableContext = nil
+        }
     }
 
     // MARK: - Database protocol
@@ -46,16 +68,13 @@ final class MockDatabase: Database {
     /// `NSErrorMergePolicy`), so a sequence like "persist the downloaded file, then persist the
     /// completion" could commit in either order or not at all — a race the production code does
     /// not have.
-    lazy var backgroundPerformContext: NSManagedObjectContext = {
-        let context = container.newBackgroundContext()
-        context.mergePolicy = NSMergeByPropertyObjectTrumpMergePolicy
-        context.automaticallyMergesChangesFromParent = true
-        return context
-    }()
+    let backgroundPerformContext: NSManagedObjectContext
 
     var backgroundReadOnlyContext: NSManagedObjectContext { container.newBackgroundContext() }
 
-    var backgroundReadOnlyObservableContext: NSManagedObjectContext { container.newBackgroundContext() }
+    var backgroundReadOnlyObservableContext: NSManagedObjectContext {
+        sharedObservableContext ?? container.newBackgroundContext()
+    }
 
     func read<Fetch>(resultQueue: DispatchQueue,
                      _ perform: @escaping (NSManagedObjectContext) throws -> Fetch,

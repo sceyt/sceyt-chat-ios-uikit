@@ -466,6 +466,8 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
         }
 
         open func subscribeForPresence() {
+            // A reused cell shows one peer: drop whoever it watched before.
+            Components.presenceProvider.unsubscribe(owner: self)
             guard let data = data,
                   data.channel.isDirect,
                   let peer = data.channel.peer,
@@ -474,7 +476,7 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
                 presenceView.isHidden = true
                 return
             }
-            Components.presenceProvider.subscribe(userId: peer.id) { [weak self] userPresence in
+            Components.presenceProvider.subscribe(userId: peer.id, owner: self) { [weak self] userPresence in
                 guard let self, let selfData = self.data, peer.id == selfData.channel.peer?.id
                 else { return }
                 self.presenceView.isHidden = userPresence.presence.state != .online
@@ -493,7 +495,7 @@ extension GlobalSearchResultsViewController.ChatsPageViewController {
                 presenceView.isHidden = true
                 return
             }
-            Components.presenceProvider.unsubscribe(userId: userId)
+            Components.presenceProvider.unsubscribe(userId: userId, owner: self)
         }
 
         override open func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,

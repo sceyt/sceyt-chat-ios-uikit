@@ -25,39 +25,29 @@ final class ConnectionService: ClientConnectionHandler {
     }
     
     private var deviceToken: Data?
+    @MainActor
     func setDeviceToken(_ deviceToken: Data) {
-        let tokenParts = deviceToken.map { data in String(format: "%02.2hhx", data) }
-        let token = tokenParts.joined()
-        print("Device Token: \(token)")
-
-        if SceytChatUIKit.shared.chatClient.connectionState == .connected {
-            print("Device Token: Attempting to set \(token)")
-            guard Config.deviceToken != deviceToken else {
-                print("Device Token: Already set. Stored token \((Config.deviceToken ?? Data()).map { data in String(format: "%02.2hhx", data) }.joined() )")
-                return
-            }
-            SceytChatUIKit.shared.chatClient.registerDevicePushToken(deviceToken) { error in
-                if let error {
-                    print("Device Token: Received error while registering \(error)")
-                }
-                print("Device Token: Registered")
-            }
-            
-            Config.deviceToken = deviceToken
-            print("Device Token: Did set \(token)")
-        } else {
-            print("Device Token: Saved to set later")
-            self.deviceToken = deviceToken
-        }
+        self.deviceToken = deviceToken
+        DemoCalling.pushService?.registerDeviceToken(deviceToken)
     }
-    
+
+    @MainActor
     func removeDeviceToken() {
-        print("Device Token: Removing and unregustering for push notifications")
         UIApplication.shared.unregisterForRemoteNotifications()
+        deviceToken = nil
         Config.deviceToken = nil
     }
 
     private var callbacks = [((Error?) -> Void)]()
+    func reconnectIfNeeded() {
+        guard Config.currentUserId != nil else { return }
+        let state = SceytChatUIKit.shared.chatClient.connectionState
+        guard state != .connected, state != .connecting else { return }
+        if !SceytChatUIKit.shared.reconnect(), let token = Config.chatToken {
+            SceytChatUIKit.shared.connect(token: token)
+        }
+    }
+
     func connect(username: String, callback: @escaping (Error?) -> Void) {
         getToken(user: username) { token, error in
             guard let token = token else {
@@ -99,9 +89,7 @@ final class ConnectionService: ClientConnectionHandler {
     func chatClient(_ chatClient: ChatClient, tokenWillExpire timeInterval: TimeInterval) {
         if let user = Config.currentUserId {
             getToken(user: user) { token, error in
-                guard let token = token else {
-                    return
-                }
+                guard Config.currentUserId == user, let token else { return }
                 Config.chatToken = token
                 SceytChatUIKit.shared.chatClient.update(token: token) { _ in
                     
@@ -113,9 +101,7 @@ final class ConnectionService: ClientConnectionHandler {
     func chatClientTokenExpired(_ chatClient: ChatClient) {
         if let user = Config.currentUserId {
             getToken(user: user) { token, error in
-                guard let token = token else {
-                    return
-                }
+                guard Config.currentUserId == user, let token else { return }
                 Config.chatToken = token
                 SceytChatUIKit.shared.chatClient.connect(token: token)
             }
@@ -128,9 +114,14 @@ final class ConnectionService: ClientConnectionHandler {
             Config.currentUserId = chatClient.user.id
             SceytChatUIKit.shared.chatClient.setPresence(state: .online, status: "I'm online")
             NotificationCenter.default.post(name: NSNotification.Name(rawValue: "userProfileUpdated"), object: nil)
-            if let deviceToken {
-                print("Device Token: Setting saved device token and registering for push notifications, \(deviceToken).")
-                (UIApplication.shared.delegate as? AppDelegate)?.registerForPushNotifications()
+            Task { @MainActor [weak self] in
+                guard SceytChatUIKit.shared.isConnected, !UITestSupport.isActive else { return }
+                DemoCalling.pushService?.connectionDidBecomeAvailable()
+                if let deviceToken = self?.deviceToken {
+                    DemoCalling.pushService?.registerDeviceToken(deviceToken)
+                }
+                // Logout stops APNs locally; the next sign-in must request a fresh token.
+                UIApplication.shared.registerForRemoteNotifications()
             }
         }
         switch state {

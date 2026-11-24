@@ -15,11 +15,12 @@ extension ChannelInfoViewController {
             didSet {
                 guard let data
                 else { return }
-                imageView.image = data.thumbnail
+                setThumbnail(data.thumbnail)
                 imageView.setup(
                     previewer: { [weak self] in self?.previewer?() },
                     item: PreviewItem.attachment(data.attachment)
                 )
+                previewAttachment = data.attachment
                 update(status: data.attachment.status)
             }
         }

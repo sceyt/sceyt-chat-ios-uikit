@@ -101,7 +101,15 @@ public protocol MessageDatabaseSession {
 
     func removePendingMessageDelete(messageTid: Int64, channelId: ChannelId)
 
+    func removePendingMessageDelete(_ record: PendingMessageDelete)
+
     func pendingMessageDelete(messageTid: Int64, channelId: ChannelId) -> PendingMessageDeleteDTO?
+
+    func pendingMessageDelete(for message: Message, channelId: ChannelId) -> PendingMessageDeleteDTO?
+
+    func markMessageDeletedLocally(_ dto: MessageDTO)
+
+    func hideMessageLocally(_ dto: MessageDTO)
 
     func resolveSendAck(sentMessage: Message, channelId: ChannelId) -> SendAckResolution
 
@@ -259,16 +267,28 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         // The user deleted this outgoing message while the delete is still being retried on the
         // server. Keep it out of the message list rather than letting a late ack, a multi-device
         // echo or a message sync put it back on screen.
-        if !message.incoming,
-           message.tid != 0,
-           pendingMessageDelete(messageTid: Int64(message.tid), channelId: channelId) != nil {
-            logger.info("Message with tid \(message.tid) has a pending delete, keeping it unlisted")
-            dto.unlisted = true
-            if let channel = ownerChannel, channel.lastMessage == dto {
-                let predicate = NSPredicate(format: "channelId == %lld AND tid != %lld", channel.id, Int64(message.tid))
-                channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
+        // A sent message deleted for everyone keeps its "deleted" tombstone instead, the same thing
+        // the server will send once the delete reaches it.
+        if let record = pendingMessageDelete(for: message, channelId: channelId) {
+            if record.type == .deleteForEveryone, message.id > 0 {
+                logger.info("Message with id \(message.id) has a pending delete for everyone, keeping it deleted")
+                markMessageDeletedLocally(dto)
+            } else {
+                logger.info("Message with tid \(message.tid) id \(message.id) has a pending delete, keeping it unlisted")
+                hideMessageLocally(dto)
             }
         }
+
+        // Every message write funnels through here — server page, incoming event, edit ack,
+        // send ack, forward, notification payload — so this one call keeps a pinned message's
+        // preview snapshot fresh, auto-unpins a soft delete, and promotes tid -> server id.
+        // It cannot be done with a relationship key path: RelationshipKeyPathsObserver
+        // resolves a single hop. See PinnedMessageDTO.
+        syncPin(for: dto)
+        // ...and this applies the pin state the server nests on the message itself. Must run
+        // after `syncPin`, which owns the pin-row -> mirror direction; this is the more
+        // authoritative server -> mirror signal. See `applyPinDetails`.
+        applyPinDetails(message.pin, to: dto)
         return dto
     }
 
@@ -350,6 +370,13 @@ extension NSManagedObjectContext: MessageDatabaseSession {
     
     @discardableResult
     public func createOrUpdate(attachments: [Attachment], dto: MessageDTO) -> MessageDTO {
+        // Rows of this message still waiting for their upload: a local file and no url yet. The
+        // ack gives them a server id and tid 0, and when SceytChat uploaded the file itself a url
+        // they never had, so neither lookup below finds them. Unclaimed, they were orphaned and
+        // the message got a new row with no local file, which the sender then showed blurred.
+        var pendingUploads = Array(dto.attachments ?? []).filter {
+            ($0.url ?? "").isEmpty && !($0.filePath ?? "").isEmpty
+        }
         dto.attachments = .init(
             attachments.compactMap {
                 var attachmentDTO: AttachmentDTO?
@@ -360,8 +387,17 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     if $0.tid != 0 {
                         attachmentDTO = AttachmentDTO.fetch(tid: Int64($0.tid), message: dto, context: self)
                     } else if $0.id != 0 {
-                        attachmentDTO = AttachmentDTO.fetchOrCreate(id: $0.id, context: self)
+                        attachmentDTO = AttachmentDTO.fetch(id: $0.id, context: self)
                     }
+                }
+                if attachmentDTO == nil {
+                    attachmentDTO = AttachmentDTO.claimPendingUpload(for: $0, from: &pendingUploads)
+                }
+                if let attachmentDTO {
+                    pendingUploads.removeAll { $0 == attachmentDTO }
+                }
+                if attachmentDTO == nil, $0.tid == 0, $0.id != 0 {
+                    attachmentDTO = AttachmentDTO.fetchOrCreate(id: $0.id, context: self)
                 }
                 if attachmentDTO == nil, let url = $0.url {
                     attachmentDTO = AttachmentDTO.fetchOrCreate(url: url, message: dto, context: self)
@@ -913,7 +949,12 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         messageId: MessageId,
         type: DeleteMessageType
     ) -> PendingMessageDeleteDTO {
-        let dto = PendingMessageDeleteDTO.fetchOrCreate(messageTid: messageTid, channelId: channelId, context: self)
+        let dto = PendingMessageDeleteDTO.fetchOrCreate(
+            messageTid: messageTid,
+            messageId: messageId,
+            channelId: channelId,
+            context: self
+        )
         dto.type = type
         if messageId > 0 {
             dto.messageId = Int64(messageId)
@@ -927,6 +968,56 @@ extension NSManagedObjectContext: MessageDatabaseSession {
 
     public func pendingMessageDelete(messageTid: Int64, channelId: ChannelId) -> PendingMessageDeleteDTO? {
         PendingMessageDeleteDTO.fetch(messageTid: messageTid, channelId: channelId, context: self)
+    }
+
+    public func removePendingMessageDelete(_ record: PendingMessageDelete) {
+        if record.messageTid != 0 {
+            removePendingMessageDelete(messageTid: record.messageTid, channelId: record.channelId)
+        } else {
+            PendingMessageDeleteDTO.delete(messageId: record.messageId, channelId: record.channelId, context: self)
+        }
+    }
+
+    /// The stored delete intent for `message`, if any: by tid for our own messages, by server id
+    /// for incoming ones (and for ours, should the record have been keyed by id).
+    public func pendingMessageDelete(for message: Message, channelId: ChannelId) -> PendingMessageDeleteDTO? {
+        if !message.incoming, message.tid != 0,
+           let record = pendingMessageDelete(messageTid: Int64(message.tid), channelId: channelId) {
+            return record
+        }
+        return PendingMessageDeleteDTO.fetch(messageId: message.id, channelId: channelId, context: self)
+    }
+
+    /// Turns the row into the "message deleted" tombstone the server sends for a delete for
+    /// everyone, so the UI reacts before the server has confirmed. Mirrors what
+    /// `createOrUpdate(message:channelId:changedBy:)` does for a message whose state is `.deleted`.
+    public func markMessageDeletedLocally(_ dto: MessageDTO) {
+        let deletedState = Int16(ChatMessage.State.deleted.intValue)
+        guard dto.state != deletedState else { return }
+        dto.state = deletedState
+        dto.body = ""
+        dto.bodyAttributes = []
+        dto.orderedMentionedUserIds = nil
+        dto.mentionedUsers = nil
+        dto.linkMetadatas = nil
+        dto.parent = nil
+        dto.attachments?.forEach { delete($0) }
+        // Soft delete => auto-unpin, see `syncPin(for:)`.
+        syncPin(for: dto)
+    }
+
+    /// Takes the row out of the message list without deleting it, so it can be shown again if
+    /// the server refuses the delete.
+    public func hideMessageLocally(_ dto: MessageDTO) {
+        dto.unlisted = true
+        if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self),
+           channel.lastMessage == dto {
+            let predicate = NSPredicate(
+                format: "channelId == %lld AND SELF != %@ AND unlisted == false",
+                Int64(dto.channelId), dto
+            )
+            channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
+        }
     }
 
     /// Stores a sent message unless the user already deleted it while the send was in flight.
@@ -966,6 +1057,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     }
                 }
             }
+            dropPin(for: dto)
             delete(dto)
         }
     }
@@ -993,6 +1085,7 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                     }
                 }
             }
+            dropPin(for: dto)
             delete(dto)
         }
     }
@@ -1115,14 +1208,26 @@ extension NSManagedObjectContext: MessageDatabaseSession {
                 let keptParents = MessageDTO.fetch(request: parentsRequest, context: self)
                 for parent in keptParents {
                     parent.replied = true
+                    // The stub survives the sweep, but its pin row does not — drop its
+                    // pin details or the bubble keeps claiming to be pinned.
+                    if let details = parent.pinDetails {
+                        delete(details)
+                        parent.pinDetails = nil
+                    }
                 }
                 request.predicate = NSCompoundPredicate(type: .and, subpredicates: [
                     predicate,
                     NSPredicate(format: "children.@count == 0")
                 ])
             }
-            try batchDelete(fetchRequest: request)
+            // Attachments first: the sweep selects them through `message`, and the batch
+            // delete below leaves that link pointing at deleted rows (no Nullify), so run
+            // afterwards it could no longer tell which message an attachment belonged to.
             try? deleteAllAttachments(channelId: channelId, before: date)
+            try batchDelete(fetchRequest: request)
+            // NSBatchDeleteRequest ignores deletion rules and PinnedMessageDTO holds no
+            // relationship anyway, so the pin rows have to be swept by hand.
+            unpinMessages(channelId: channelId, before: date)
             if let date,
                let channel = ChannelDTO.fetch(id: channelId, context: self)
             {
@@ -1152,12 +1257,19 @@ extension NSManagedObjectContext: MessageDatabaseSession {
         request.sortDescriptor = NSSortDescriptor(keyPath: \AttachmentDTO.id, ascending: false)
         var predicate = NSPredicate(format: "channelId == %lld", channelId)
         if let date {
+            // Dated by the MESSAGE, not the attachment: an attachment's own `createdAt` can
+            // be the original upload time (a forwarded file uploaded before the clear), and
+            // sweeping by it emptied messages sent after the clear on every channel sync —
+            // the "forwarded message with no content after relaunch" bug.
+            // Messages kept as hidden reply-parent stubs keep their attachments too,
+            // mirroring deleteAllMessages, otherwise reply previews lose thumbnails.
+            // Rows with no message have nothing else to go by, so they keep their own date.
             predicate = NSCompoundPredicate(type: .and, subpredicates: [
                 predicate,
-                NSPredicate(format: "createdAt <= %@", date as NSDate),
-                // Mirror deleteAllMessages: messages kept as hidden reply-parent stubs
-                // keep their attachments too, otherwise reply previews lose thumbnails.
-                NSPredicate(format: "message == nil OR message.children.@count == 0")
+                NSPredicate(
+                    format: "(message != nil AND message.createdAt <= %@ AND message.children.@count == 0) OR (message == nil AND createdAt <= %@)",
+                    date as NSDate, date as NSDate
+                )
             ])
         }
         request.predicate = predicate
@@ -1468,10 +1580,26 @@ extension NSManagedObjectContext: MessageDatabaseSession {
             logger.verbose("Deleting \(expiredMessages.count) expired auto-delete messages")
 
             for message in expiredMessages {
+                // Deleted straight through the context, with nothing to cascade to the
+                // pin table — drop the pin explicitly or it outlives its message.
+                dropPin(for: message)
                 delete(message)
             }
         } catch {
             logger.errorIfNotNil(error, "Failed to fetch expired auto-delete messages")
         }
+    }
+}
+
+private extension AttachmentDTO {
+    /// The pending-upload row an ack attachment stands for: one of the same type and name, or the
+    /// only one of that type. Anything more ambiguous is left alone.
+    static func claimPendingUpload(for attachment: Attachment, from rows: inout [AttachmentDTO]) -> AttachmentDTO? {
+        let sameType = rows.filter { $0.type == attachment.type }
+        let sameName = sameType.filter { $0.name != nil && $0.name == attachment.name }
+        guard let match = sameName.first ?? (sameType.count == 1 ? sameType.first : nil)
+        else { return nil }
+        rows.removeAll { $0 == match }
+        return match
     }
 }

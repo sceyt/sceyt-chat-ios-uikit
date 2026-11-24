@@ -25,6 +25,10 @@ public protocol ChannelMessageSenderDelegate: AnyObject {
 }
 
 open class ChannelMessageSender: DataProvider {
+    /// Sends and fetches this object's attachments. The app's shared transfer unless replaced
+    /// (a test, or a screen with its own transfer).
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
     
     public let channelId: ChannelId
     public let channelOperator: ChannelOperator
@@ -88,6 +92,8 @@ open class ChannelMessageSender: DataProvider {
                 return
             }
             logger.info("message with tid \(sentMessage.tid) id: \(sentMessage.id) sent successfully")
+            // Its uploads will not be asked for again: the transport can forget them.
+            self.attachmentTransfer.messageWasSent(ChatMessage(message: message, channelId: self.channelId))
             let sendAckTid = sentMessage.tid
             var suppressedDelete: PendingMessageDelete?
             // `database.write` can report completion twice (see `OneShotCompletion`), and this one
@@ -179,13 +185,29 @@ open class ChannelMessageSender: DataProvider {
             logger.info("Resending message with tid \(chatMessage.tid) upload attachments if needed")
         }
         let traceTid = Int64(chatMessage.tid)
+        // A reconnect resends the pending messages from more than one trigger (the connection
+        // handler and the channel sync both do), so the same message was often resent twice at
+        // once: two uploads of one file and two sends of one message. A resend of a tid already
+        // in flight waits for that one instead.
+        let finish: (Error?) -> Void
+        if traceTid == 0 {
+            finish = { completion?($0) }
+        } else {
+            guard let token = Self.beginResend(tid: traceTid, completion: completion) else {
+                logger.info("Resend of tid \(chatMessage.tid) already in flight, waiting for it")
+                return
+            }
+            finish = { error in
+                Self.endResend(tid: traceTid, token: token).forEach { $0?(error) }
+            }
+        }
         uploadAttachmentsIfNeeded(message: chatMessage) { message, error in
             if error == nil, let message {
                 let sendableMessage = message.builder.build()
                 guard let sendableMessage = self.willResend(sendableMessage)
                 else {
                      logger.info("Message with tid \(message.tid) build failed can't resend message")
-                    completion?(nil)
+                    finish(nil)
                     return
                 }
                 
@@ -204,7 +226,7 @@ open class ChannelMessageSender: DataProvider {
                             "reason=noAckMessage badParamDelete=\(error?.sceytChatCode == .badMessageParam) "
                             + "\(MessageSendTrace.describe(error: error))"
                         )
-                        completion?(error)
+                        finish(error)
                         return
                     }
                     if sentMessage.deliveryStatus == .pending || sentMessage.deliveryStatus == .failed {
@@ -216,10 +238,12 @@ open class ChannelMessageSender: DataProvider {
                             "reason=status=\(sentMessage.deliveryStatus) localRowUnchanged=true "
                             + "\(MessageSendTrace.describe(error: error))"
                         )
-                        completion?(error)
+                        finish(error)
                         return
                     }
                      logger.info("Message with tid \(sentMessage.tid), id \(sentMessage.id) will store in db")
+                    // Its uploads will not be asked for again: the transport can forget them.
+                    self.attachmentTransfer.messageWasSent(chatMessage)
                     let resendAckTid = sentMessage.tid
                     var suppressedDelete: PendingMessageDelete?
                     // `database.write` can report completion twice (see `OneShotCompletion`), and
@@ -272,7 +296,7 @@ open class ChannelMessageSender: DataProvider {
                     }) { dbError in
                         logger.info("[ResendAck] tid \(resendAckTid) database.write completion, error: \(String(describing: dbError))")
                         flushOnce.fire(nil)
-                        completion?(dbError)
+                        finish(dbError)
                     }
                 }
                 Self.beginSend(tid: Int64(sendableMessage.tid))
@@ -297,7 +321,7 @@ open class ChannelMessageSender: DataProvider {
                     "resend.attachmentUploadFailed", tid: traceTid, channelId: self.channelId,
                     "\(MessageSendTrace.describe(error: error))"
                 )
-                completion?(error)
+                finish(error)
             }
         }
     }
@@ -376,6 +400,14 @@ open class ChannelMessageSender: DataProvider {
         }
     }
     
+    /// Deletes a sent message (it has a server id).
+    ///
+    /// Works like `deleteMessage(pendingMessage:type:)`: in one transaction the intent is stored
+    /// as a `PendingMessageDeleteDTO` and the row takes its deleted look at once — a "deleted"
+    /// tombstone for `.deleteForEveryone`, hidden for the other types. The request is then sent,
+    /// and if it can't get through (offline, timeout) `SyncService` retries it until the server
+    /// confirms or refuses it. The row is kept rather than removed so it can be restored if the
+    /// server refuses the delete.
     open func deleteMessage(
         id: MessageId,
         type: DeleteMessageType = .deleteForMe,
@@ -386,29 +418,51 @@ open class ChannelMessageSender: DataProvider {
             completion?(nil)
             return
         }
-        channelOperator
-            .deleteMessage(id: id,
-                           type: type
-            ) {message, error in
-                self.didDelete(message?.id, error: error)
-                guard let message = message
-                else {
-                    completion?(error)
-                    return
-                }
-                self.database.write ({
-                    switch type {
-                    case .deleteHard:
-                        $0.deleteMessage(id: message.id)
-                    default:
-                        $0.createOrUpdate(
-                            message: message,
-                            channelId: self.channelId
-                        )
-                    }
-                    
-                }, completion: completion)
+        logger.info("Deleting message with id \(id) in channel \(channelId), type \(type.rawValue)")
+        var record: PendingMessageDelete?
+        // The write completion can fire twice on a save error and this one sends a request.
+        let once = OneShotCompletion { [weak self] dbError in
+            guard let self else {
+                completion?(dbError)
+                return
             }
+            guard let record else {
+                logger.errorIfNotNil(dbError, "Storing pending delete for id \(id) failed")
+                self.didDelete(nil, error: dbError)
+                completion?(dbError)
+                return
+            }
+            self.flushPendingDelete(record) { error in
+                self.didDelete(error == nil ? id : nil, error: error)
+                completion?(error ?? dbError)
+            }
+        }
+        database.performWriteTask ({ context in
+            let dto = MessageDTO.fetch(id: id, context: context)
+            // Our own messages are keyed by tid (the send ack and `createOrUpdate` look them up
+            // that way); incoming ones have no tid of ours and are keyed by id.
+            let tid: Int64 = {
+                guard let dto, !dto.incoming else { return 0 }
+                return dto.tid
+            }()
+            let pending = context.addPendingMessageDelete(
+                messageTid: tid,
+                channelId: self.channelId,
+                messageId: id,
+                type: type
+            )
+            if let dto {
+                switch type {
+                case .deleteForEveryone:
+                    context.markMessageDeletedLocally(dto)
+                default:
+                    context.hideMessageLocally(dto)
+                }
+            }
+            record = pending.convert()
+        }) { dbError in
+            once.fire(dbError)
+        }
     }
     
     /// Deletes a message that has no server id yet (delivery status `pending` or `failed`).
@@ -500,14 +554,48 @@ open class ChannelMessageSender: DataProvider {
         case .retry:
             logger.info("Keeping pending delete for tid \(record.messageTid) for a later retry, attempt \(record.retryCount + 1)")
         }
+        let serverId: MessageId = {
+            if let id = message?.id, id > 0 { return id }
+            return record.messageId
+        }()
+        var refetchId: MessageId?
         database.write ({ context in
             switch outcome {
-            case .done, .drop:
-                context.removePendingMessageDelete(messageTid: record.messageTid, channelId: record.channelId)
-                // Nothing must survive locally: a late ack may have recreated the row.
-                context.deleteMessage(tid: record.messageTid, channelId: record.channelId)
-                if let id = message?.id, id > 0 {
-                    context.deleteMessage(id: id)
+            case .done:
+                context.removePendingMessageDelete(record)
+                if record.type == .deleteForEveryone,
+                   let message, message.id > 0,
+                   MessageDTO.fetch(id: message.id, context: context) != nil {
+                    // A sent message showing its local tombstone: store the server's deleted
+                    // message over it, the same as an online delete does.
+                    context.createOrUpdate(message: message, channelId: record.channelId)
+                } else {
+                    // Nothing must survive locally: a late ack may have recreated the row.
+                    if record.messageTid != 0 {
+                        context.deleteMessage(tid: record.messageTid, channelId: record.channelId)
+                    }
+                    if serverId > 0 {
+                        context.deleteMessage(id: serverId)
+                    }
+                }
+            case .drop:
+                context.removePendingMessageDelete(record)
+                let isGone = error?.sdkError == .notFound
+                    || error?.sceytChatCode == .channelNotExists
+                if !isGone, serverId > 0, let dto = MessageDTO.fetch(id: serverId, context: context) {
+                    // The message exists but the server refused the delete (e.g. not allowed):
+                    // undo the local effect and load it again, as a tombstone no longer holds
+                    // its content.
+                    dto.unlisted = false
+                    refetchId = serverId
+                } else {
+                    // Nothing to restore: drop whatever is left locally.
+                    if record.messageTid != 0 {
+                        context.deleteMessage(tid: record.messageTid, channelId: record.channelId)
+                    }
+                    if serverId > 0 {
+                        context.deleteMessage(id: serverId)
+                    }
                 }
             case .retry:
                 guard let dto = context.pendingMessageDelete(
@@ -521,7 +609,26 @@ open class ChannelMessageSender: DataProvider {
                 }
             }
         }) { _ in
+            if let refetchId {
+                self.refetchMessage(id: refetchId, channelId: record.channelId)
+            }
             completion?(outcome.isRetry ? error : nil)
+        }
+    }
+
+    /// Reloads one message from the server and stores it, used to restore a row whose delete the
+    /// server refused.
+    private func refetchMessage(id: MessageId, channelId: ChannelId) {
+        logger.info("Restoring message with id \(id) after a refused delete")
+        // The sender is often a short-lived one made for a retry operation, so the reply must not
+        // depend on it still being alive.
+        let database = self.database
+        ChannelOperator(channelId: channelId).getMessages(ids: [NSNumber(value: id)]) { messages, error in
+            logger.errorIfNotNil(error, "Restoring message with id \(id) failed")
+            guard let messages, !messages.isEmpty else { return }
+            database.write {
+                $0.createOrUpdate(messages: messages, channelId: channelId)
+            }
         }
     }
 
@@ -534,7 +641,7 @@ open class ChannelMessageSender: DataProvider {
                 completion(message, nil)
                 return
             }
-            fileProvider
+            self.attachmentTransfer
                 .uploadMessageAttachments(
                     message: message,
                     attachments: attachments
@@ -544,7 +651,12 @@ open class ChannelMessageSender: DataProvider {
         }
     
     open func uploadableAttachments(of message: ChatMessage) -> [ChatMessage.Attachment] {
-        guard let attachments = message.attachments?.filter({ $0.status != .done && $0.type != "link" && $0.filePath != nil }),
+        // `.done` alone does not mean uploaded: an attachment with no url has never been, whatever
+        // its status says. Skipping it sent the message with only a local path, so SceytChat
+        // uploaded the file itself, to a url the app's data session could not download.
+        guard let attachments = message.attachments?.filter({
+            $0.type != "link" && $0.filePath != nil && ($0.status != .done || $0.isPendingUpload)
+        }),
               !attachments.isEmpty
         else { return [] }
         
@@ -723,5 +835,45 @@ public extension ChannelMessageSender {
             return false
         }
         return true
+    }
+
+    /// A resend in flight, with every caller waiting on its outcome.
+    private struct InFlightResend {
+        let token: UUID
+        var waiters: [((Error?) -> Void)?]
+        let startedAt: Date
+    }
+
+    /// A resend older than this is replaced, so one whose completion never arrives can't stop that
+    /// message from being resent for the rest of the session. Long enough to cover the upload.
+    public static var inFlightResendStaleInterval: TimeInterval = 300
+
+    nonisolated(unsafe) private static var inFlightResends = [Int64: InFlightResend]()
+
+    /// Registers `completion` for a resend of `tid`. Returns the token the caller ends the resend
+    /// with, or nil when a resend is already running and will call `completion` when it ends.
+    static func beginResend(tid: Int64, completion: ((Error?) -> Void)?, now: Date = Date()) -> UUID? {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        if var existing = inFlightResends[tid],
+           now.timeIntervalSince(existing.startedAt) <= inFlightResendStaleInterval {
+            existing.waiters.append(completion)
+            inFlightResends[tid] = existing
+            return nil
+        }
+        // A stale resend's callers are carried over, so they still hear how the message ends.
+        let token = UUID()
+        let carried = inFlightResends[tid]?.waiters ?? []
+        inFlightResends[tid] = InFlightResend(token: token, waiters: carried + [completion], startedAt: now)
+        return token
+    }
+
+    /// Ends the resend `token` started and returns the callers to notify. Empty when a newer resend
+    /// has replaced it, or when it was already ended.
+    static func endResend(tid: Int64, token: UUID) -> [((Error?) -> Void)?] {
+        inFlightLock.lock()
+        defer { inFlightLock.unlock() }
+        guard inFlightResends[tid]?.token == token else { return [] }
+        return inFlightResends.removeValue(forKey: tid)?.waiters ?? []
     }
 }

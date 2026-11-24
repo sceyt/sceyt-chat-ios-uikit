@@ -23,6 +23,20 @@ open class ChannelInfoViewController: ViewController,
         .withoutAutoresizingMask
         .rowAutomaticDimension
     
+    /// Hosts the attachments pager (Media / Files / Links / Voice) for the screen's whole
+    /// lifetime, and is deliberately never dequeued. A dequeued cell runs UIKit's
+    /// `prepareForReuse`, which strips every animation in the cell's subtree — so each
+    /// `reloadData` (a trait change, which iOS also triggers while snapshotting the app
+    /// on its way to the background; rotation; `viewWillAppear`) froze the transfer
+    /// rings of every tab. The pager is the same instance either way, so reusing the
+    /// cell bought nothing.
+    open lazy var attachmentContainerCell: UITableViewCell = {
+        let cell = Components.channelInfoContainerCell.init()
+        cell.contentView.addSubview(segmentViewController.withoutAutoresizingMask)
+        segmentViewController.pin(to: cell.contentView)
+        return cell
+    }()
+
     open lazy var mediaListViewController = Components.channelInfoMediaCollectionView
         .init()
     
@@ -183,12 +197,9 @@ open class ChannelInfoViewController: ViewController,
                         .forEach { cell in
                             // The ring can be stale after backgrounding (the transfer
                             // finished while suspended, or its completion observer was
-                            // wiped by cell reuse) — resync it from the layout state
-                            // first, and only revive the spinner for rings that survive.
+                            // wiped by cell reuse) — resync it from the layout state.
+                            // The spin itself is revived by `CircularProgressView`.
                             self.mediaListViewController.syncTransferOverlay(for: cell)
-                            guard !cell.progressView.isHidden, cell.progressView.progress < 1 else { return }
-                            cell.progressView.removeRotateZAnimation()
-                            cell.progressView.createRotateZAnimation()
                         }
                 }
             }.store(in: &subscriptions)
@@ -393,12 +404,7 @@ open class ChannelInfoViewController: ViewController,
             }
             _cell = cell
         case .attachment:
-            let cell = tableView.dequeueReusableCell(for: indexPath, cellType: Components.channelInfoContainerCell.self)
-            if !cell.contentView.subviews.contains(segmentViewController) {
-                cell.contentView.addSubview(segmentViewController.withoutAutoresizingMask)
-                segmentViewController.pin(to: cell.contentView)
-            }
-            _cell = cell
+            _cell = attachmentContainerCell
         }
         return _cell
     }

@@ -319,4 +319,117 @@ final class PendingMessageDeleteTests: XCTestCase {
         XCTAssertTrue(records(channelId: 1).isEmpty, "Retrying these would only ever fail")
         XCTAssertEqual(records(channelId: 2).count, 1, "Other channels must be untouched")
     }
+
+    // MARK: - Sent messages (have a server id)
+
+    /// Seeds a message that already has a server id: ours (`incoming == false`, keyed by tid) or
+    /// an incoming one (stored with `tid == id`, like `MessageDTO.map` does).
+    @discardableResult
+    private func seedSentMessage(id: MessageId, tid: Int64, channelId: ChannelId, incoming: Bool = false) -> MessageDTO {
+        let message = MessageDTO.fetchOrCreate(id: id, tid: incoming ? 0 : tid, channelId: Int64(channelId), context: ctx)
+        message.channelId = Int64(channelId)
+        message.tid = incoming ? Int64(id) : tid
+        message.incoming = incoming
+        message.body = "hello"
+        message.deliveryStatus = Int16(ChatMessage.DeliveryStatus.sent.intValue)
+        message.createdAt = Date().bridgeDate
+        message.user = UserDTO.fetchOrCreate(id: incoming ? "peer" : "me", context: ctx)
+        try? ctx.save()
+        return message
+    }
+
+    func testFetchOrCreate_keysARecordWithoutTidByMessageId() {
+        let first = PendingMessageDeleteDTO.fetchOrCreate(messageTid: 0, messageId: 700, channelId: 1, context: ctx)
+        let again = PendingMessageDeleteDTO.fetchOrCreate(messageTid: 0, messageId: 700, channelId: 1, context: ctx)
+        let other = PendingMessageDeleteDTO.fetchOrCreate(messageTid: 0, messageId: 701, channelId: 1, context: ctx)
+        try? ctx.save()
+
+        XCTAssertEqual(first.objectID, again.objectID)
+        XCTAssertNotEqual(first.objectID, other.objectID, "Two incoming messages must not share a record")
+        XCTAssertEqual(first.messageId, 700)
+        XCTAssertEqual(records(channelId: 1).count, 2)
+    }
+
+    func testRemovePendingMessageDeleteRecord_byIdKeepsTidRecords() {
+        ctx.addPendingMessageDelete(messageTid: 0, channelId: 1, messageId: 700, type: .deleteForMe)
+        ctx.addPendingMessageDelete(messageTid: 100, channelId: 1, messageId: 0, type: .deleteForMe)
+        try? ctx.save()
+        let idRecord = PendingMessageDeleteDTO.fetch(messageId: 700, channelId: 1, context: ctx)!.convert()
+
+        ctx.removePendingMessageDelete(idRecord)
+        try? ctx.save()
+
+        XCTAssertNil(PendingMessageDeleteDTO.fetch(messageId: 700, channelId: 1, context: ctx))
+        XCTAssertNotNil(ctx.pendingMessageDelete(messageTid: 100, channelId: 1))
+    }
+
+    func testMarkMessageDeletedLocally_turnsTheRowIntoATombstone() {
+        seedChannel(id: 1)
+        let dto = seedSentMessage(id: 600, tid: 200, channelId: 1)
+
+        ctx.addPendingMessageDelete(messageTid: 200, channelId: 1, messageId: 600, type: .deleteForEveryone)
+        ctx.markMessageDeletedLocally(dto)
+        try? ctx.save()
+
+        let stored = MessageDTO.fetch(id: 600, context: ctx)
+        XCTAssertNotNil(stored, "The row stays so it can show the deleted placeholder")
+        XCTAssertEqual(stored?.state, Int16(ChatMessage.State.deleted.intValue))
+        XCTAssertEqual(stored?.body, "")
+        XCTAssertFalse(stored?.unlisted ?? true)
+        XCTAssertEqual(records(channelId: 1).first?.messageId, 600)
+    }
+
+    func testHideMessageLocally_unlistsAndRepicksLastMessage() {
+        let channel = seedChannel(id: 1)
+        let older = seedSentMessage(id: 600, tid: 200, channelId: 1)
+        older.createdAt = Date().addingTimeInterval(-60).bridgeDate
+        let newer = seedSentMessage(id: 601, tid: 201, channelId: 1)
+        channel.lastMessage = newer
+        try? ctx.save()
+
+        ctx.hideMessageLocally(newer)
+        try? ctx.save()
+
+        XCTAssertTrue(newer.unlisted)
+        XCTAssertNotNil(MessageDTO.fetch(id: 601, context: ctx), "Hidden, not deleted, so a refused delete can restore it")
+        XCTAssertEqual(channel.lastMessage?.id, older.id)
+    }
+
+    func testCreateOrUpdate_keepsASentMessageDeletedForEveryoneAsATombstone() {
+        seedChannel(id: 1)
+        seedSentMessage(id: 600, tid: 200, channelId: 1)
+        ctx.addPendingMessageDelete(messageTid: 200, channelId: 1, messageId: 600, type: .deleteForEveryone)
+        try? ctx.save()
+
+        // A message sync after reconnect returns the message before the delete got through.
+        let message = Message.Builder().id(600).tid(200).body("hello").build()
+        let dto = ctx.createOrUpdate(message: message, channelId: 1)
+        try? ctx.save()
+
+        XCTAssertEqual(dto.state, Int16(ChatMessage.State.deleted.intValue), "The sync must not undo the delete")
+        XCTAssertEqual(dto.body, "")
+        XCTAssertFalse(dto.unlisted, "A delete for everyone shows the placeholder")
+    }
+
+    func testCreateOrUpdate_keepsAMessageWithAnIdKeyedPendingDeleteUnlisted() {
+        seedChannel(id: 1)
+        ctx.addPendingMessageDelete(messageTid: 0, channelId: 1, messageId: 602, type: .deleteForMe)
+        try? ctx.save()
+
+        let message = Message.Builder().id(602).build()
+        let dto = ctx.createOrUpdate(message: message, channelId: 1)
+        try? ctx.save()
+
+        XCTAssertTrue(dto.unlisted)
+    }
+
+    func testPendingMessageDeleteOperation_idKeyedRecordsGetDistinctUUIDs() {
+        ctx.addPendingMessageDelete(messageTid: 0, channelId: 1, messageId: 700, type: .deleteForMe)
+        ctx.addPendingMessageDelete(messageTid: 0, channelId: 1, messageId: 701, type: .deleteForMe)
+        try? ctx.save()
+        let sender = ChannelMessageSender(channelId: 1)
+        let uuids = records(channelId: 1).map { PendingMessageDeleteOperation(sender: sender, record: $0.convert()).uuid }
+
+        XCTAssertEqual(Set(uuids).count, 2, "The queue dedupe must not merge two incoming messages' deletes")
+    }
 }

@@ -9,7 +9,7 @@
 import CoreData
 import XCTest
 
-private let defaultTimeout: TimeInterval = 5
+private let defaultTimeout: TimeInterval = defaultWaitTimeout
 
 final class LazyDBObserverTests: XCTestCase {
 

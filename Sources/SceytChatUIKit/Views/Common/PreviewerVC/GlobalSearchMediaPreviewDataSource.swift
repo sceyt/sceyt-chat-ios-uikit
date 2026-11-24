@@ -12,6 +12,10 @@ import SceytChat
 /// `PreviewDataSource` for the global-search Media tab initial state.
 /// Observes all image/video attachments across every channel — no channelId filter.
 open class GlobalSearchMediaPreviewDataSource: PreviewDataSource, PreviewShareActionProviding {
+    /// Transfers and local files of the attachments shown here: the app's shared transfer
+    /// unless the owner sets its own.
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
 
     public let attachmentTypes: [String]
     private let ascending: Bool
@@ -170,13 +174,13 @@ open class GlobalSearchMediaPreviewDataSource: PreviewDataSource, PreviewShareAc
               attachment.status != .done,
               attachment.status != .failedDownloading,
               attachment.status != .failedUploading,
-              fileProvider.filePath(attachment: attachment) == nil
+              self.attachmentTransfer.filePath(attachment: attachment) == nil
         else { return }
         downloadQueue.async {
             guard let chatMessage = try? DataProvider.database.read({
                 MessageDTO.fetch(id: attachment.messageId, context: $0)?.convert()
             }).get() else { return }
-            fileProvider.downloadMessageAttachments(
+            self.attachmentTransfer.downloadMessageAttachments(
                 message: chatMessage,
                 attachments: [attachment]
             )

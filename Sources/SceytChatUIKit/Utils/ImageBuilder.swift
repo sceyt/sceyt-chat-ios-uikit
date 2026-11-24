@@ -226,14 +226,23 @@ open class ImageBuilder {
     }
     
     open func thumbHash() -> Data? {
+        thumbHash(maxSide: 100)
+    }
+
+    /// The ThumbHash of the image drawn at most `maxSide` pixels on its longest side (1...100).
+    open func thumbHash(maxSide: Int) -> Data? {
         if let uiImage {
-            return imageToThumbHash(image: uiImage)
+            return imageToThumbHash(image: uiImage, maxSide: maxSide)
         }
         return nil
     }
     
     open func thumbHashBase64() -> String? {
         thumbHash()?.base64EncodedString()
+    }
+
+    open func thumbHashBase64(maxSide: Int) -> String? {
+        thumbHash(maxSide: maxSide)?.base64EncodedString()
     }
     
     open class func image(thumbHash: Data) -> UIImage? {

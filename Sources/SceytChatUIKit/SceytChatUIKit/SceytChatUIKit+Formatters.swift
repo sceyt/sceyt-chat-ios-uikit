@@ -79,6 +79,9 @@ extension SceytChatUIKit {
         public var channelLastMessageBodyFormatter: any LastMessageBodyFormatting = ChannelLastMessageBodyFormatter()
         
         public var repliedMessageBodyFormatter: any RepliedMessageBodyFormatting = RepliedMessageBodyFormatter()
+
+        /// The one-line preview shown in the pinned messages banner and list.
+        public var pinnedMessageBodyFormatter: any PinnedMessageBodyFormatting = PinnedMessageBodyFormatter()
         
         public var editMessageBodyFormatter: any EditMessageBodyFormatting = EditMessageBodyFormatter()
         

@@ -16,12 +16,32 @@ extension UIImageView {
         var item: PreviewItem?
         var viewOnce: Bool = false
         var messageText: String?
+        /// Whose files the preview checks and downloads.
+        var attachmentTransfer: AttachmentTransfer = fileProvider
     }
     
-    private var viewController: UIViewController? {
-        guard let rootViewController = window?.rootViewController
-        else { return nil }
-        return rootViewController.presentedViewController != nil ? rootViewController.presentedViewController : rootViewController
+    // Resolve from the source view, never from the window's currently presented
+    // controller: a second tap must not use the first preview as its presenter.
+    func mediaPreviewPresenter(from explicitPresenter: UIViewController? = nil) -> UIViewController? {
+        var responder: UIResponder? = self
+        while let current = responder, !(current is UIViewController) {
+            responder = current.next
+        }
+        guard let presenter = explicitPresenter ?? (responder as? UIViewController) else { return nil }
+
+        // UIKit may forward presentation from a child to its navigation/tab parent.
+        var controller: UIViewController? = presenter
+        while let current = controller {
+            guard current.presentedViewController == nil,
+                  !current.isBeingPresented,
+                  !current.isBeingDismissed,
+                  !(current is MediaPreviewerNavigationController),
+                  !(current is MediaPreviewerCarouselViewController),
+                  !(current is MediaPreviewerViewController)
+            else { return nil }
+            controller = current.parent
+        }
+        return presenter
     }
     
     func setup(
@@ -29,7 +49,8 @@ extension UIImageView {
         item: PreviewItem?,
         from: UIViewController? = nil,
         viewOnce: Bool = false,
-        messageText: String? = nil) {
+        messageText: String? = nil,
+        attachmentTransfer: AttachmentTransfer = fileProvider) {
         var _tapRecognizer: TapWithDataRecognizer? = gestureRecognizers?.first(where: { $0 is TapWithDataRecognizer }) as? TapWithDataRecognizer
 
         isUserInteractionEnabled = true
@@ -47,13 +68,17 @@ extension UIImageView {
         _tapRecognizer!.from = from
         _tapRecognizer!.viewOnce = viewOnce
         _tapRecognizer!.messageText = messageText
+        _tapRecognizer!.attachmentTransfer = attachmentTransfer
         addGestureRecognizer(_tapRecognizer!)
     }
     
     @objc
     private func showImageViewer(_ sender: TapWithDataRecognizer) {
         guard let sourceView = sender.view as? UIImageView else { return }
-        logThumbnailStateOnPreviewTap(sourceView: sourceView, item: sender.item, viewOnce: sender.viewOnce)
+        guard sourceView.window != nil,
+              let presentFromViewController = sourceView.mediaPreviewPresenter(from: sender.from)
+        else { return }
+        logThumbnailStateOnPreviewTap(sourceView: sourceView, item: sender.item, viewOnce: sender.viewOnce, transfer: sender.attachmentTransfer)
         UIApplication.shared.sendAction(#selector(resignFirstResponder), to: nil, from: nil, for: nil)
 
         // For view-once messages, create a single-item previewer with just the pressed item
@@ -63,31 +88,39 @@ extension UIImageView {
         if sender.viewOnce, let item = sender.item {
             let attachment = item.attachment
 
-            if attachment.status == .done || fileProvider.filePath(attachment: attachment) != nil {
+            if attachment.status == .done || sender.attachmentTransfer.filePath(attachment: attachment) != nil {
                 // file is fully on disk (covers stuck .downloading case too)
                 finalPreviewer = SingleItemPreviewDataSource(item: item)
                 initialIndex = 0
             } else {
-                // genuinely still downloading — retry to unstick and wait
-                let message = try? DataProvider.database.read {
-                    MessageDTO.fetch(id: attachment.messageId, context: $0)?.convert()
-                }.get()
-                guard let message else { return }
-                fileProvider.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment]) { [weak self] _, _ in
-                    // re-trigger tap after download completes
+                // genuinely still downloading — retry to unstick and wait. Off the main
+                // thread: the read and the transfer queue's check-then-start both wait.
+                let transfer = sender.attachmentTransfer
+                DispatchQueue.global(qos: .userInitiated).async {
+                    let message = try? DataProvider.database.read {
+                        MessageDTO.fetch(id: attachment.messageId, context: $0)?.convert()
+                    }.get()
+                    guard let message else { return }
+                    transfer.downloadMessageAttachmentsIfNeeded(message: message, attachments: [attachment])
                 }
                 return
             }
         } else {
             if let item = sender.item {
                 let attachment = item.attachment
-                if fileProvider.filePath(attachment: attachment) != nil {
-                    if attachment.status != .done {
+                if sender.attachmentTransfer.filePath(attachment: attachment) != nil {
+                    // The local file of an unsent attachment is its upload source, not a finished
+                    // download: marking it `.done` took it out of the resend's upload.
+                    if attachment.status != .done, !attachment.isPendingUpload {
                         attachment.status = .done
-                        DataProvider.database.write {
-                            AttachmentDTO.fetch(id: attachment.id, context: $0)?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
-                        } completion: { error in
-                            logger.errorIfNotNil(error, "")
+                        // id 0 is every attachment the server has not acked yet, so a write by
+                        // it would land on an arbitrary one of them.
+                        if attachment.id != 0 {
+                            DataProvider.database.write {
+                                AttachmentDTO.fetch(id: attachment.id, context: $0)?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
+                            } completion: { error in
+                                logger.errorIfNotNil(error, "")
+                            }
                         }
                     }
                 } else if attachment.status != .done {
@@ -108,8 +141,7 @@ extension UIImageView {
                 initialIndex: initialIndex,
                 viewOnce: sender.viewOnce,
                 messageText: sender.messageText)
-        let presentFromViewController = sender.from ?? viewController
-        presentFromViewController?.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
+        presentFromViewController.present(Components.mediaPreviewerNavigationController.init(imageCarousel), animated: true)
     }
 
     /// Diagnostic for the "image/video download finished but the cell stayed on the blurry
@@ -131,7 +163,7 @@ extension UIImageView {
     /// id back through the `[Attachment]` logs to see which path (duplicate layout instance / missed
     /// completion callback / missed reconfigure) skipped this cell. No-op unless warnings are
     /// enabled, and skipped for view-once (its blur is intentional, not this bug).
-    private func logThumbnailStateOnPreviewTap(sourceView: UIImageView, item: PreviewItem?, viewOnce: Bool) {
+    private func logThumbnailStateOnPreviewTap(sourceView: UIImageView, item: PreviewItem?, viewOnce: Bool, transfer: AttachmentTransfer) {
         guard !viewOnce, let attachment = item?.attachment else { return }
         let type = AttachmentType(rawValue: attachment.type)
         guard type == .image || type == .video else { return }
@@ -145,8 +177,8 @@ extension UIImageView {
             ? MessageLayoutModel.defaults.imageAttachmentSize
             : (layout?.thumbnailSize ?? MessageLayoutModel.defaults.imageAttachmentSize)
 
-        let fullFileOnDisk = fileProvider.filePath(attachment: attachment) != nil
-        let sharpThumbOnDisk = fileProvider.thumbnailFile(for: attachment, preferred: preferred) != nil
+        let fullFileOnDisk = transfer.filePath(attachment: attachment) != nil
+        let sharpThumbOnDisk = transfer.thumbnailFile(for: attachment, preferred: preferred) != nil
         let mediaReady = attachment.status == .done || fullFileOnDisk
         let loadedFromFile = layout?.isThumbnailLoadedFromFile
 

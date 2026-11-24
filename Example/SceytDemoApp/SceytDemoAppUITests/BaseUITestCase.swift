@@ -107,6 +107,9 @@ class BaseUITestCase: XCTestCase {
                    conversation: Bool = false,
                    conversationUnread: Bool = false,
                    conversationUnreadCount: Int? = nil,
+                   conversationEdited: Bool = false,
+                   conversationPending: Bool = false,
+                   conversationTailCount: Int? = nil,
                    conversationUnreadLong: Bool = false,
                    conversationUnreadRecent: Bool = false,
                    injectOnOpenDelayMs: Int? = nil,
@@ -115,6 +118,8 @@ class BaseUITestCase: XCTestCase {
                    injectBurstCount: Int = 6,
                    injectOnKeyboardDelayMs: Int? = nil,
                    restartObserverOnOpenDelayMs: Int? = nil,
+                   messagesFetchLimit: Int? = nil,
+                   nearLoadLocalDelayMs: Int? = nil,
                    messageStormPairs: Int? = nil,
                    messageStormIntervalMs: Int = 300,
                    messageStormStartMs: Int = 1500,
@@ -126,6 +131,11 @@ class BaseUITestCase: XCTestCase {
                    webSyncSeededCount: Int? = nil,
                    replyAttachment: Bool = false,
                    poll: Bool = false,
+                   pinnedMessages: Bool = false,
+                   pinnedMessagesSingle: Bool = false,
+                   pinnedMessagesPinOrder: Bool = false,
+                   pinsStayPending: Bool = false,
+                   pinningDisabled: Bool = false,
                    pollAllowsMultipleVotes: Bool = false,
                    pollDoubleVoteGapMs: Int? = nil,
                    dynamicTypeCategory: String? = nil,
@@ -142,11 +152,35 @@ class BaseUITestCase: XCTestCase {
         if conversation {
             app.launchArguments += ["--uitest-conversation"]
         }
+        if pinnedMessages {
+            app.launchArguments += ["--uitest-pinned-messages"]
+        }
+        if pinnedMessagesSingle {
+            app.launchArguments += ["--uitest-pinned-messages-single"]
+        }
+        if pinnedMessagesPinOrder {
+            app.launchArguments += ["--uitest-pinned-messages-pin-order"]
+        }
+        if pinsStayPending {
+            app.launchArguments += ["--uitest-pins-stay-pending"]
+        }
+        if pinningDisabled {
+            app.launchArguments += ["--uitest-pinning-disabled"]
+        }
         if conversationUnread {
             app.launchArguments += ["--uitest-conversation-unread"]
         }
         if let count = conversationUnreadCount {
             app.launchArguments += ["--uitest-conversation-unread-count=\(count)"]
+        }
+        if conversationEdited {
+            app.launchArguments += ["--uitest-conversation-edited"]
+        }
+        if conversationPending {
+            app.launchArguments += ["--uitest-conversation-pending"]
+        }
+        if let count = conversationTailCount {
+            app.launchArguments += ["--uitest-conversation-tail-count=\(count)"]
         }
         if conversationUnreadLong {
             app.launchArguments += ["--uitest-conversation-unread-long"]
@@ -168,6 +202,12 @@ class BaseUITestCase: XCTestCase {
         }
         if let delayMs = restartObserverOnOpenDelayMs {
             app.launchArguments += ["--uitest-restart-observer-on-open=\(delayMs)"]
+        }
+        if let limit = messagesFetchLimit {
+            app.launchArguments += ["--uitest-messages-fetch-limit=\(limit)"]
+        }
+        if let delayMs = nearLoadLocalDelayMs {
+            app.launchArguments += ["--uitest-near-load-local=\(delayMs)"]
         }
         if let pairs = messageStormPairs {
             app.launchArguments +=

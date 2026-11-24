@@ -7,6 +7,7 @@
 //
 
 import UIKit
+import Combine
 
 open class CircularProgressView: View {
 
@@ -27,6 +28,7 @@ open class CircularProgressView: View {
     open var rotationDuration: TimeInterval = 0
     
     private var isSetupDone = false
+    private var appDidBecomeActiveObserver: AnyCancellable?
     
     open var rotateZ = true {
         didSet {
@@ -73,18 +75,70 @@ open class CircularProgressView: View {
         if rotateZ {
             createRotateZAnimation()
         }
+        // A spin taken off while the app is in the background is not re-installed there
+        // (see `rotateZAnimationDidStop`); bring it back once the app is active again.
+        appDidBecomeActiveObserver = NotificationCenter.default
+            .publisher(for: UIApplication.didBecomeActiveNotification)
+            .sink { [weak self] _ in
+                self?.ensureRotateZAnimation()
+            }
     }
+
+    open override func didMoveToWindow() {
+        super.didMoveToWindow()
+        // Removals while the ring was out of a window are not healed; heal on the way back.
+        ensureRotateZAnimation()
+    }
+
+    /// How long a fill across the whole ring takes; a step takes its share of it, never less
+    /// than `animationDuration`. A big jump (a small upload's bytes all buffered at once) then
+    /// fills at a readable pace instead of snapping. Only while `animationDuration > 0`.
+    open var fullSweepDuration: TimeInterval = 1.2
 
     open var progress: CGFloat = 0 {
         didSet {
-            let animation = CABasicAnimation(keyPath: "strokeEnd")
-            animation.duration = animationDuration
-            animation.fromValue = oldValue
-            animation.toValue = progress
-            animation.timingFunction = CAMediaTimingFunction(name: .linear)
+            // From what is on screen: a value set mid-fill continues from there, it doesn't
+            // jump to the previous target first.
+            let shown = progressLayer.animation(forKey: "animateprogress") != nil
+                ? progressLayer.presentation()?.strokeEnd ?? oldValue
+                : oldValue
             progressLayer.strokeEnd = progress
+            let animation = CABasicAnimation(keyPath: "strokeEnd")
+            animation.fromValue = shown
+            animation.toValue = progress
+            if animationDuration <= 0 {
+                // As before: no fill to watch.
+                animation.duration = 0
+                animation.timingFunction = CAMediaTimingFunction(name: .linear)
+            } else if progress >= 1 {
+                // Done: whatever is left fills quickly, so the ring can hide right after
+                // (`animationDuration` is what the cells wait before they hide it).
+                animation.duration = animationDuration
+                animation.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            } else {
+                let share = TimeInterval(abs(progress - shown)) * fullSweepDuration
+                animation.duration = max(animationDuration, share)
+                animation.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            }
             progressLayer.add(animation, forKey: "animateprogress")
         }
+    }
+
+    /// Applies a value without the stroke-fill animation.
+    ///
+    /// Assigning `progress` always animates from whatever it held before, which is right
+    /// while the ring is on screen and wrong while it is not: nothing resets the stored
+    /// value when the ring is hidden, so seeding a new transfer plays the previous one
+    /// rewinding from 100% over the first frames after the ring is shown again.
+    open func setProgressWithoutAnimation(_ newValue: CGFloat) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        let duration = animationDuration
+        animationDuration = 0
+        progress = newValue
+        animationDuration = duration
+        progressLayer.removeAnimation(forKey: "animateprogress")
+        CATransaction.commit()
     }
     
     open func createRotateZAnimation() {
@@ -93,10 +147,24 @@ open class CircularProgressView: View {
             
             let animation = CABasicAnimation(keyPath: "transform.rotation.z")
             animation.duration = rotationDuration
+            // Phase-locked to the media clock rather than to the moment of installation.
+            // The spin is re-installed whenever the ring's view is rebuilt (a cell reload,
+            // the attachment stack recreating its views) or its animations are cleared, and
+            // counting from install time made each of those snap the arc back to 12 o'clock
+            // mid-transfer. With the offset, a re-installed spin lands on the angle the
+            // previous one would have reached.
+            if rotationDuration > 0 {
+                animation.timeOffset = CACurrentMediaTime()
+                    .truncatingRemainder(dividingBy: rotationDuration)
+            }
+            animation.fromValue = 0
             animation.toValue = CGFloat.pi * 2
             animation.isCumulative = true
             animation.repeatCount = .infinity
             animation.isRemovedOnCompletion = false
+            // Told when the spin is taken off the layer, whoever does it — see
+            // `rotateZAnimationDidStop`.
+            animation.delegate = RotateZAnimationStopObserver(owner: self)
             layer.add(animation, forKey: "rotationAnimation")
         }
         if Thread.isMainThread {
@@ -106,6 +174,30 @@ open class CircularProgressView: View {
         }
     }
     
+    /// Re-installs a spin that was taken off a ring that should still be spinning.
+    ///
+    /// The spin is an infinite animation, and anything that clears the layer's animations
+    /// ends it for good: UIKit's `prepareForReuse` strips every animation in a reused
+    /// cell's subtree, and owners clear their overlays with `removeAllAnimations()`. Core
+    /// Animation reports every such removal here, whoever made it, so a spinning ring
+    /// heals itself instead of freezing until someone happens to set `rotateZ` again. The
+    /// phase lock in `createRotateZAnimation` keeps the arc where it was. In the
+    /// background the re-install waits for `didBecomeActive`.
+    func rotateZAnimationDidStop() {
+        // Next turn of the run loop: the caller may be stopping the spin on purpose and
+        // about to set `rotateZ = false`.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, UIApplication.shared.applicationState != .background else { return }
+            self.ensureRotateZAnimation()
+        }
+    }
+
+    /// Installs the spin if this ring should be spinning and currently is not.
+    open func ensureRotateZAnimation() {
+        guard isSetupDone, rotateZ, window != nil else { return }
+        createRotateZAnimation()
+    }
+
     open func removeRotateZAnimation() {
         layer.removeAnimation(forKey: "rotationAnimation")
     }
@@ -122,5 +214,19 @@ open class CircularProgressView: View {
             .cgPath
         trackLayer.path = path
         progressLayer.path = path
+    }
+}
+
+/// Forwards the spin's stop to its ring without the animation retaining the ring
+/// (`CAAnimation.delegate` is strong, and the ring's layer retains the animation).
+private final class RotateZAnimationStopObserver: NSObject, CAAnimationDelegate {
+    weak var owner: CircularProgressView?
+
+    init(owner: CircularProgressView) {
+        self.owner = owner
+    }
+
+    func animationDidStop(_ anim: CAAnimation, finished flag: Bool) {
+        owner?.rotateZAnimationDidStop()
     }
 }

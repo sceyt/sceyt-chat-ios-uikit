@@ -14,6 +14,10 @@ import UIKit
 /// Loads all voice attachments across every channel for the
 /// global-search Voice tab initial state (no query active).
 open class GlobalSearchAllVoiceViewModel: NSObject {
+    /// Sends and fetches this object's attachments. The app's shared transfer unless replaced
+    /// (a test, or a screen with its own transfer).
+    public var attachmentTransfer: AttachmentTransfer = fileProvider
+
 
     public let attachmentTypes: [String]
     public let sectionNameKeyPath: String?
@@ -42,7 +46,8 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         }
     }
 
-    public var minAutoDownloadSize = 3_000_000
+    /// Largest file, in bytes, the list downloads on its own; 0 means no limit.
+    public var minAutoDownloadSize = 0
 
     private let thumbnailCache = {
         $0.countLimit = 20
@@ -267,28 +272,31 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         downloadQueue.async { [weak self] in
             guard let self,
                   attachment.type != "link",
-                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize,
-                  attachment.status != .done,
-                  attachment.status != .failedDownloading,
-                  attachment.status != .pauseDownloading,
-                  attachment.status != .failedUploading
+                  minAutoDownloadSize <= 0 || attachment.uploadedFileSize <= minAutoDownloadSize
             else {
                 DispatchQueue.main.async { completion?(layout) }
                 return
             }
             getMessage(layout) { message in
-                if let message {
-                    fileProvider.downloadMessageAttachments(
-                        message: message,
-                        attachments: [attachment]
-                    ) { message, error in
-                        if let attachment = message?.attachments?.first(where: { $0.id == attachment.id }) {
-                            layout.update(attachment: attachment)
-                        } else if let error {
-                            logger.errorIfNotNil(error, "Download global search voice attachment")
-                        }
-                        DispatchQueue.main.async { completion?(layout) }
+                guard let message else {
+                    DispatchQueue.main.async { completion?(layout) }
+                    return
+                }
+                // The stored status is not the authority on whether the bytes are here: the
+                // database can be rebuilt while the shared storage keeps the file (`.pending`
+                // over a file on disk) or the file can be evicted under a stored `.done`. The
+                // chat's reconcile checks the disk, heals the status either way, and starts a
+                // download only when one is needed (never for a paused or failed one).
+                _ = self.attachmentTransfer.downloadMessageAttachmentsIfNeeded(
+                    message: message,
+                    attachments: [attachment]
+                ) { message, error in
+                    if let attachment = message?.attachments?.first(where: { $0.id == attachment.id }) {
+                        layout.update(attachment: attachment)
+                    } else if let error {
+                        logger.errorIfNotNil(error, "Download global search voice attachment")
                     }
+                    DispatchQueue.main.async { completion?(layout) }
                 }
             }
         }
@@ -297,7 +305,7 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
     open func resumeDownload(_ layout: MessageLayoutModel.AttachmentLayout) {
         let attachment = layout.attachment
         guard attachment.type != "link" else { return }
-        if fileProvider.filePath(attachment: attachment) != nil {
+        if self.attachmentTransfer.filePath(attachment: attachment) != nil {
             DataProvider.database.write {
                 let dto = AttachmentDTO.fetch(id: attachment.id, context: $0)
                 dto?.status = ChatMessage.Attachment.TransferStatus.done.rawValue
@@ -308,9 +316,9 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         }
         getMessage(layout) { message in
             if let message {
-                fileProvider.resumeTransfer(message: message, attachment: attachment) {
+                self.attachmentTransfer.resumeTransfer(message: message, attachment: attachment, reason: "global search: voice button") {
                     if !$0 {
-                        fileProvider.downloadMessageAttachments(message: message, attachments: [attachment])
+                        self.attachmentTransfer.downloadMessageAttachments(message: message, attachments: [attachment])
                     }
                 }
             }
@@ -321,7 +329,7 @@ open class GlobalSearchAllVoiceViewModel: NSObject {
         let attachment = layout.attachment
         getMessage(layout) { message in
             if let message {
-                fileProvider.stopTransfer(message: message, attachment: attachment) { stopped in
+                self.attachmentTransfer.stopTransfer(message: message, attachment: attachment, reason: "global search: voice button") { stopped in
                     // stopTransfer persists the paused status itself whenever it had
                     // something to stop; false means nothing was running (e.g. the
                     // download already finished) and the stored status must stay.
