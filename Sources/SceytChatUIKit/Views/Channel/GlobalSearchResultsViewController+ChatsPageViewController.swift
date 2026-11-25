@@ -85,8 +85,16 @@ extension GlobalSearchResultsViewController {
             viewModel.$event
                 .compactMap { $0 }
                 .receive(on: DispatchQueue.main)
-                .sink { [weak self] _ in
+                .sink { [weak self] event in
                     guard let self else { return }
+                    if event == .update {
+                        // Live refresh of rows already shown. Must not be counted as the search
+                        // response; while one is pending, the incoming results replace these rows anyway.
+                        guard pendingResponseCount == 0 else { return }
+                        channels = viewModel.channels
+                        reloadData()
+                        return
+                    }
                     if pendingResponseCount > 0 {
                         // Active search: deduplicate per generation to discard stale Task results
                         // from the previous query (viewModel does not cancel old Tasks).

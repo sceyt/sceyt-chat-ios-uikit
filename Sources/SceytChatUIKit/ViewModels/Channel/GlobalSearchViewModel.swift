@@ -52,6 +52,7 @@ open class GlobalSearchViewModel: NSObject {
                 #keyPath(ChannelDTO.lastMessage.deliveryStatus),
                 #keyPath(ChannelDTO.lastMessage.updatedAt),
                 #keyPath(ChannelDTO.lastMessage.state),
+                #keyPath(ChannelDTO.lastMessage.metadata),
                 #keyPath(ChannelDTO.lastReaction.message),
                 #keyPath(ChannelDTO.lastReaction.key)
             ]
@@ -65,13 +66,52 @@ open class GlobalSearchViewModel: NSObject {
     open func startDatabaseObserver() {
         guard !channelObserver.isObserverStarted else { return }
         channelObserver.onDidChange = { [weak self] _, paths, _ in
-            self?.rebuildChannels(changeItems: paths.changeItems)
+            guard let self else { return }
+            if isSearchActive {
+                refreshSearchResults(changeItems: paths.changeItems)
+            } else {
+                rebuildChannels(changeItems: paths.changeItems)
+            }
         }
         channelObserver.startObserver()
     }
 
     open func stopDatabaseObserver() {
         channelObserver.stopObserver()
+    }
+
+    // MARK: - Live updates while searching
+
+    /// Swaps in fresh copies of channels already in the search results.
+    ///
+    /// Search results are a one-time fetch, so without this a row keeps the last message it
+    /// had when the query ran (e.g. a call that has since ended). Only rows already shown are
+    /// replaced: the result set and its order stay as the query produced them, so rows don't
+    /// appear or jump while the user is looking at the list.
+    private func refreshSearchResults(changeItems: [LazyDatabaseObserver<ChannelDTO, ChatChannel>.ChangeItem]) {
+        var fresh: [ChannelId: ChatChannel] = [:]
+        for changeItem in changeItems {
+            switch changeItem {
+            case .insert(_, let item), .update(_, let item), .move(_, _, let item):
+                fresh[item.id] = item
+            case .delete:
+                break
+            }
+        }
+        guard !fresh.isEmpty else { return }
+        // Main queue: the search Task also assigns `channels` there, so the two don't interleave.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, isSearchActive else { return }
+            var didChange = false
+            let patched = channels.map { channel -> ChatChannel in
+                guard let updated = fresh[channel.id] else { return channel }
+                didChange = true
+                return updated
+            }
+            guard didChange else { return }
+            channels = patched
+            event = .update
+        }
     }
 
     // MARK: - Browse mode
@@ -260,5 +300,7 @@ public extension GlobalSearchViewModel {
     enum Event {
         case reload
         case reloadSearch
+        /// Rows already in the search results changed (e.g. their last message). Not a search response.
+        case update
     }
 }
