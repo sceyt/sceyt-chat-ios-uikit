@@ -47,12 +47,15 @@ open class FetchAllChannelsOperation: SyncOperation {
         }
         
         loadChannels()
-        provider.onStoreChannels = {[weak self] channels in
+        provider.onStoreChannels = {[weak self] channels, stored in
             guard let self
             else { return }
-            self.onLoad?(channels)
+            // A channel deleted while its page was stored gets no message catch-up: it would
+            // write messages for a channel that no longer exists.
+            self.onLoad?(stored)
+            // Paging and the missing-channel sweep go by everything the server returned.
             self.channels.append(contentsOf: channels)
-            Components.channelListProvider.syncMessageForReactions(channels: channels)
+            Components.channelListProvider.syncMessageForReactions(channels: stored)
             if channels.count < self.query.limit || !self.query.hasNext {
                 self.finish(result: .success(self.channels))
             } else {

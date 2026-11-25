@@ -230,6 +230,46 @@ final class MessageOrderClockSkewTests: XCTestCase {
         XCTAssertEqual(channelLastMessageBody(), "2")
     }
 
+    /// [GUARD] A message rebuilt locally from its stored copy (`ChatMessage.builder`: keeps the
+    /// server id, sets no date) must not replace the stored server time.
+    func testLocallyRebuiltConfirmedMessage_doesNotReplaceCreatedAt() {
+        write(serverMessage(id: receivedId, incoming: true, createdAt: t0, body: "Message 1"))
+        ctx.refreshAllObjects()
+        guard let stored = MessageDTO.fetch(id: receivedId, context: ctx)?.convert() else {
+            return XCTFail("precondition: the message is stored")
+        }
+        // The builder dates it now, on this device's clock.
+        let rebuilt = stored.builder.build()
+
+        write(rebuilt)
+
+        XCTAssertEqual(listOrder().first?.createdAt.bridgeDate.timeIntervalSince1970 ?? 0,
+                       t0.timeIntervalSince1970, accuracy: 0.001)
+    }
+
+    /// [GUARD] The ack as it really arrives: dated a moment ago. The row is still pending, so the
+    /// server's time is taken even though it is close to this device's clock.
+    func testFreshAck_storesServerCreatedAt() {
+        let serverNow = Date()
+        write(pendingMessage(phoneCreatedAt: serverNow.addingTimeInterval(-phoneBehind)))
+        write(ackMessage(serverCreatedAt: serverNow))
+
+        XCTAssertEqual(ownRow()?.createdAt.bridgeDate.timeIntervalSince1970 ?? 0,
+                       serverNow.timeIntervalSince1970, accuracy: 0.001)
+    }
+
+    /// [GUARD] Same for a send that failed and is acked on resend.
+    func testFreshAck_afterFailedSend_storesServerCreatedAt() {
+        let serverNow = Date()
+        let failed = pendingMessage(phoneCreatedAt: serverNow.addingTimeInterval(-phoneBehind))
+        failed.setValue(MessageDeliveryStatus.failed.rawValue, forKey: "deliveryStatus")
+        write(failed)
+        write(ackMessage(serverCreatedAt: serverNow))
+
+        XCTAssertEqual(ownRow()?.createdAt.bridgeDate.timeIntervalSince1970 ?? 0,
+                       serverNow.timeIntervalSince1970, accuracy: 0.001)
+    }
+
     // MARK: - Part 2: a pending message is stored at the bottom of the list
 
     /// [BUG] While pending (before any ack) the new message must already be at the bottom.

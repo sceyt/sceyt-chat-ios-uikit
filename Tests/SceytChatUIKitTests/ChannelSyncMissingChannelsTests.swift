@@ -279,4 +279,23 @@ final class ChannelSyncMissingChannelsTests: XCTestCase {
         XCTAssertEqual(operation.deletedIds.map { Set($0) }, [2, 3])
         XCTAssertEqual(storedChannelIds(), [1])
     }
+
+    /// The sweep's batch delete never goes through a save, so it records the deleted ids itself:
+    /// a chat-list page being stored at the same time must not bring them back.
+    func testSweep_recordsDeletedChannelsForChunkedStores() {
+        seedChannels([1, 2, 3])
+        let mark = DeletedChannelLog.currentMark()
+        // Deletes nothing through the context, like `NSBatchDeleteRequest`.
+        let operation = BatchLikeDeleteChannelsOperation(database: mockDB, channelIds: [1], verifier: verifier)
+        operation.confirmsMissingChannels = false
+
+        run(operation)
+
+        XCTAssertEqual(DeletedChannelLog.ids(deletedAfter: mark), [2, 3])
+    }
+}
+
+/// Stands for the production `NSBatchDeleteRequest`, which bypasses the context's save.
+private final class BatchLikeDeleteChannelsOperation: DeleteChannelsOperation {
+    override func delete(channelIds ids: [ChannelId], context: NSManagedObjectContext) throws {}
 }

@@ -10,54 +10,6 @@ import Foundation
 import SceytChat
 import CoreData
 
-//open class StoreChannelsOperation: Operation {
-//
-//    private let database: Database
-//    public var channels: [Channel]
-//    private let deleteNonExistences: Bool
-//
-//    public init(
-//        database: Database,
-//        channels: [Channel] = [],
-//        deleteNonExistences: Bool = true) {
-//        self.database = database
-//        self.channels = channels
-//        self.deleteNonExistences = deleteNonExistences
-//    }
-//
-//    open override func main() {
-//        guard !channels.isEmpty
-//        else { return }
-//        try? database.syncWrite {
-//            if self.deleteNonExistences {
-//                let ids = self.channels.map { $0.id }
-//                let request = NSFetchRequest<NSFetchRequestResult>(entityName: ChannelDTO.entityName)
-//                request.sortDescriptor = NSSortDescriptor(keyPath: \ChannelDTO.id, ascending: false)
-//                request.predicate = .init(format: "NOT (id IN %@)", ids)
-//                do {
-//                    try $0.batchDelete(fetchRequest: request)
-//                } catch {
-//                    logger.debug(error)
-//                }
-//            }
-//
-//            self.channels.forEach { channel in
-//                if channel.newMessageCount > 0 {
-//                    logger.debug("[MARKER CHECK] Store Operator fetched channels: \(channel.id) for \(channel.newMessageCount)")
-//                }
-//            }
-//            for channel in self.channels {
-//                $0.createOrUpdate(channel: channel)
-//                if self.isCancelled {
-//                    break
-//                }
-//            }
-//        }
-//        Components.channelListProvider.syncMessageForReactions(channels: channels)
-//    }
-//}
-
-
 open class StoreChannelsOperation: AsyncOperation {
     
     private let database: Database
@@ -76,8 +28,8 @@ open class StoreChannelsOperation: AsyncOperation {
         else { return }
         // Serial writer in chunks, like `ChannelListProvider.store` (see `ChunkedChannelStore`):
         // a full sync in one write held back every send, ack and received message behind it.
-        ChunkedChannelStore.store(channels, database: database) { [weak self] error in
-            logger.errorIfNotNil(error, "StoreChannelsOperation completed with ")
+        ChunkedChannelStore.store(channels, database: database) { [weak self] outcome in
+            logger.errorIfNotNil(outcome.error, "StoreChannelsOperation completed with ")
             self?.complete()
         }
 //        Components.channelListProvider.syncMessageForReactions(channels: channels)
@@ -225,6 +177,9 @@ open class DeleteChannelsOperation: AsyncOperation {
             guard !doomed.isEmpty else { return }
             do {
                 try self.delete(channelIds: doomed, context: $0)
+                // A batch delete never goes through a save, so `DeletedChannelLog` would not see
+                // it: a chat-list page being stored right now must not bring these back.
+                DeletedChannelLog.record(doomed)
             } catch {
                 logger.errorIfNotNil(error, "")
             }

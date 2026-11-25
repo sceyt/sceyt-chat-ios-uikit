@@ -333,15 +333,15 @@ open class ChannelMessageProvider: DataProvider {
     
     /// Stores a new outgoing message before it is sent.
     ///
-    /// Runs on the serial writer (`database.write`), the same context that stores incoming
-    /// messages, send acks and message pages. That is what makes the newest-row lookup below
-    /// correct: every earlier write is already in this context, and no other write can land
-    /// between the lookup and the save. Two pending stores are ordered the same way.
+    /// Runs on a context of its own (`performWriteTask`), not the serial writer, so the bubble
+    /// and the send never wait behind other queued writes (message pages, sync, markers). The
+    /// cost: the newest-row lookup below sees only committed rows, so an incoming message still
+    /// being written, or another pending store running at the same moment, can be missed.
     open func storePending(
         message: Message,
         completion: ((Error?) -> Void)? = nil
     ) {
-        database.write ({
+        database.performWriteTask ({
             let stored = $0.createOrUpdate(
                 message: message,
                 channelId: self.channelId

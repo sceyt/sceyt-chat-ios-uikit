@@ -267,8 +267,6 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
     }
     
     public func deleteChannel(id: ChannelId) {
-        // A chat-list page or sync being stored in chunks must not bring it back.
-        DeletedChannelLog.record(id)
         try? deleteAllMessages(channelId: id)
         ChannelSyncStateDTO.delete(channelId: id, context: self)
         DraftMessageDTO.delete(channelId: id, context: self)
@@ -282,6 +280,12 @@ extension NSManagedObjectContext: ChannelDatabaseSession {
             ]
             delete(dto)
             mergeChangesWithViewContext(fromRemoteContextSave: deletedObjects)
+            // Recorded in `DeletedChannelLog` once the save commits.
+        } else {
+            // Not stored yet, possibly because a chat-list page carrying it is being stored right
+            // now: record it at once so that page does not create it. There is no row whose
+            // delete could roll back.
+            DeletedChannelLog.record([id])
         }
     }
     

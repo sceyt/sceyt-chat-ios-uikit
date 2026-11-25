@@ -2021,8 +2021,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
             }
         }
         
-        // A store's completion can be reported twice (see `OneShotCallback`); a second hand-off
-        // would start the next message of the batch twice.
+        // Fired from more than one path below; a second hand-off would start the next message
+        // of the batch twice (see `OneShotCallback`).
         let handOff = OneShotCallback<Void> { _ in didHandOff?() }
 
         if channel.unSynched {
@@ -2046,8 +2046,8 @@ open class ChannelViewModel: NSObject, ChatClientDelegate, ChannelDelegate, Unre
                                     }
                                 }
                             }
-                            // The sender stores this one on the database's serial writer, so a
-                            // next message stored from here on is stored after it.
+                            // The store of this message has started (on a context of its own); the
+                            // next message of the batch can start now.
                             handOff.fire(())
                         }
                     } else {

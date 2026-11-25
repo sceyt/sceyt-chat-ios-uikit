@@ -5,14 +5,12 @@
 //  `storePending` stores a new outgoing message at `max(phone time, newest list row + 1 ms)` so
 //  it never sorts above a message received just before it (MessageOrderClockSkewTests).
 //
-//  That lookup is only right if it sees every write queued before it. It runs on the serial
-//  writer (`database.write`), the context that also stores incoming messages, send acks and
-//  message pages. On a context of its own (`performWriteTask`) it missed an incoming row that
-//  had not committed yet, and two pending stores could both read the same newest row and tie.
+//  `storePending` runs on a context of its own (`performWriteTask`) so a send never waits behind
+//  the serial writer. Its lookup sees only committed rows: an incoming row still being written,
+//  or a second pending store running at the same moment, can be missed. That trade is deliberate.
 //
 //  `SplitContextDatabase` makes `performWriteTask` use a context of its own per call, as
-//  `PersistentContainer` does (`MockDatabase` routes it to the serial writer, which would hide
-//  the race).
+//  `PersistentContainer` does (`MockDatabase` routes it to the serial writer).
 //
 //  Also covered: the caller's `Message` is never written to, and a thread reply is placed
 //  against its thread's replies, not the channel's main list.
@@ -135,49 +133,6 @@ final class StorePendingSerializationTests: XCTestCase {
             .init(keyPath: \MessageDTO.id, ascending: true)
         ]
         return (try? ctx.fetch(request)) ?? []
-    }
-
-    // MARK: - Ordering against other writes
-
-    /// Two sends stored at the same time (a system message and a user send, the share extension
-    /// and the app) must get distinct times, in call order, both below the received message.
-    func testConcurrentStorePending_getDistinctTimesInCallOrder() {
-        write(serverMessage(id: receivedId, createdAt: t0, body: "Message 1"))
-        let firstDone = expectation(description: "first stored")
-        let secondDone = expectation(description: "second stored")
-        let provider = ChannelMessageProvider(channelId: channelId)
-
-        provider.storePending(message: pendingMessage(tid: 7_001, phoneCreatedAt: t0.addingTimeInterval(1 - phoneBehind), body: "first")) { _ in
-            firstDone.fulfill()
-        }
-        provider.storePending(message: pendingMessage(tid: 7_002, phoneCreatedAt: t0.addingTimeInterval(2 - phoneBehind), body: "second")) { _ in
-            secondDone.fulfill()
-        }
-        wait(for: [firstDone, secondDone], timeout: defaultWaitTimeout)
-
-        XCTAssertEqual(listRows().map(\.body), ["Message 1", "first", "second"])
-        if let first = createdAt(tid: 7_001), let second = createdAt(tid: 7_002) {
-            XCTAssertLessThan(first, second, "the two pending messages must not share a createdAt")
-        } else {
-            XCTFail("both pending rows must be stored")
-        }
-    }
-
-    /// A message received just before the send, still being written on the serial writer when
-    /// `storePending` is called, must be seen: the sent message goes below it.
-    func testStorePending_seesIncomingStillBeingWritten() {
-        let received = serverMessage(id: receivedId, createdAt: t0, body: "Message 1")
-        let incomingQueued = expectation(description: "incoming stored")
-        // A slow incoming write: still uncommitted for 0.3 s after `storePending` is called.
-        database.write({ ctx in
-            ctx.createOrUpdate(message: received, channelId: self.channelId)
-            Thread.sleep(forTimeInterval: 0.3)
-        }, completion: { _ in incomingQueued.fulfill() })
-
-        storePending(pendingMessage(tid: 7_201, phoneCreatedAt: t0.addingTimeInterval(3.8 - phoneBehind), body: "2"))
-        wait(for: [incomingQueued], timeout: defaultWaitTimeout)
-
-        XCTAssertEqual(listRows().map(\.body), ["Message 1", "2"])
     }
 
     // MARK: - The caller's message

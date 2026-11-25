@@ -44,13 +44,11 @@ open class ChannelListProvider: DataProvider {
 
     open private(set) var defaultQuery: ChannelListQuery!
     
-    internal var onStoreChannels: (([Channel]) -> Void)?
+    /// Called once a page is stored. `page` is every channel the server returned (paging and the
+    /// missing-channel sweep need all of them); `stored` leaves out the ones deleted while the page
+    /// was being stored, which must not get a message catch-up.
+    internal var onStoreChannels: ((_ page: [Channel], _ stored: [Channel]) -> Void)?
 
-    /// Channels stored per serial write when a chat-list page is saved. See `ChunkedChannelStore`.
-    static var storeChunkSize: Int {
-        get { ChunkedChannelStore.chunkSize }
-        set { ChunkedChannelStore.chunkSize = newValue }
-    }
     
     public required init(config: Config = .default) {
         self.config = config
@@ -142,15 +140,14 @@ open class ChannelListProvider: DataProvider {
     ) {
         // Serial writer, one chunk per write; see `ChunkedChannelStore` for why, and for how a
         // channel deleted or updated while the page is being stored is kept as it is.
-        // `onStoreChannels` still gets the whole page: `FetchAllChannelsOperation` pages on its
-        // count and hands it to the missing-channel sweep, which must see every returned channel.
-        ChunkedChannelStore.store(channels, database: database) { error in
-            logger.errorIfNotNil(error, "Unable Store channels")
-            if error == nil {
+        ChunkedChannelStore.store(channels, database: database) { outcome in
+            logger.errorIfNotNil(outcome.error, "Unable Store channels")
+            if outcome.error == nil {
                 logger.debug("onStoreChannels:\(channels.count)")
-                self.onStoreChannels?(channels)
+                let stored = channels.filter { !outcome.deletedChannelIds.contains($0.id) }
+                self.onStoreChannels?(channels, stored)
             }
-            completion?(error)
+            completion?(outcome.error)
         }
 
         DispatchQueue.global(qos: .userInitiated).async {

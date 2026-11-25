@@ -141,7 +141,19 @@ public class MessageDTO: NSManagedObject {
         return mo
     }
 
+    /// How close to this device's clock a `createdAt` must be to count as stamped on this device
+    /// (`Message.Builder` dates a message when it is built) rather than by the server.
+    static let freshLocalStampWindow: TimeInterval = 60
+
+    static func isFreshLocalStamp(_ date: Date, now: Date = Date()) -> Bool {
+        abs(now.timeIntervalSince(date)) < freshLocalStampWindow
+    }
+
     public func map(_ map: Message) -> MessageDTO {
+        // Read before `deliveryStatus` is updated below: still pending or failed means the server
+        // has never confirmed this row, so this write is its ack.
+        let isUnconfirmed = deliveryStatus == MessageDeliveryStatus.pending.rawValue
+            || deliveryStatus == MessageDeliveryStatus.failed.rawValue
         tid = (map.incoming || map.tid == 0) ? Int64(map.id) : Int64(map.tid)
         channelId = Int64(map.channelId)
         type = map.type
@@ -157,12 +169,19 @@ public class MessageDTO: NSManagedObject {
             createdAt = map.createdAt.bridgeDate
         } else if map.id > 0,
                   map.createdAt >= minValidCreatedAt,
-                  createdAt.bridgeDate != map.createdAt {
+                  createdAt.bridgeDate != map.createdAt,
+                  isUnconfirmed || !Self.isFreshLocalStamp(map.createdAt) {
             // A server-confirmed message carries the server's time, which is the truth. An outgoing
             // row was stored before the send with the phone's time; when the phone clock is off,
             // keeping it put the sent message above messages received just before it, for good.
-            // `id > 0` keeps unconfirmed writes (pending store, a resend from the local copy) from
-            // overwriting; the date check keeps a payload without a real date from doing so.
+            // - `id > 0` keeps unconfirmed writes (pending store, a resend) from overwriting; the
+            //   date check keeps a payload without a real date from doing so.
+            // - An unconfirmed row (pending/failed) takes the time: that write is the ack.
+            // - A confirmed row already holds the server's time. It is corrected only by a date
+            //   that is not a fresh local stamp: a `Message` rebuilt on this device
+            //   (`ChatMessage.builder`) keeps the server id but is dated when it was built, and
+            //   must not move the message. Rows stored with the phone's time before this fix are
+            //   old, so the next server write of them still corrects them.
             createdAt = map.createdAt.bridgeDate
         }
         updatedAt = map.updatedAt?.bridgeDate

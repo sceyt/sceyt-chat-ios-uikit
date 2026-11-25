@@ -9,9 +9,13 @@ import Foundation
 
 /// Forwards a callback at most once, whichever thread calls it.
 ///
-/// `Database.write` and `Database.performWriteTask` report completion from a `defer` that runs
-/// *before* `save()`, so a save failure invokes their completion twice. Wrap anything that must
-/// not be repeated — a network request, enqueuing work — in one of these.
+/// A guard for callbacks that must not repeat: a network request, enqueuing work.
+///
+/// `Database.write` and `Database.performWriteTask` report completion exactly once (they once
+/// reported it from a `defer` that ran before `save()`, so a failed save reported it twice; that
+/// is fixed). Callers that start a request from a write's completion keep this wrapper as a cheap
+/// safety net against a `Database` implementation that repeats it. It is not needed just to chain
+/// writes.
 public final class OneShotCallback<Value> {
 
     private let lock = NSLock()

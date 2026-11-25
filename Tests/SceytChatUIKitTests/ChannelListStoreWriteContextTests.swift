@@ -150,7 +150,7 @@ final class ChannelListStoreWriteContextTests: XCTestCase {
     func testChannelListStore_largePage_isStoredInSerialChunks() {
         let provider = ChannelListProvider()
         var reported: [Channel]?
-        provider.onStoreChannels = { reported = $0 }
+        provider.onStoreChannels = { page, _ in reported = page }
         let done = expectation(description: "page stored")   // over-fulfil fails: completion once
         provider.store(channels: page(of: 25)) { error in
             XCTAssertNil(error)
@@ -159,7 +159,7 @@ final class ChannelListStoreWriteContextTests: XCTestCase {
         wait(for: [done], timeout: defaultWaitTimeout)
 
         XCTAssertEqual(database.calls, ["write", "write", "write"],
-                       "25 channels in chunks of \(ChannelListProvider.storeChunkSize), all on the serial context")
+                       "25 channels in chunks of \(ChunkedChannelStore.chunkSize), all on the serial context")
         XCTAssertEqual(storedChannelCount(), 25)
         XCTAssertEqual(reported?.count, 25, "onStoreChannels reports the whole page once")
     }
@@ -176,7 +176,7 @@ final class ChannelListStoreWriteContextTests: XCTestCase {
         }, completion: { _ in otherDone.fulfill() })
         wait(for: [pageDone, otherDone], timeout: defaultWaitTimeout)
 
-        XCTAssertEqual(channelsSeenByOtherWrite, ChannelListProvider.storeChunkSize,
+        XCTAssertEqual(channelsSeenByOtherWrite, ChunkedChannelStore.chunkSize,
                        "the other write must run after the first chunk, not after the whole page")
         XCTAssertEqual(storedChannelCount(), 25)
     }
@@ -199,18 +199,95 @@ final class ChannelListStoreWriteContextTests: XCTestCase {
         let deleteDone = expectation(description: "delete stored")
         let lastId = ChannelId(10_025)
 
+        let provider = ChannelListProvider()
+        var page: [Channel]?
+        var stored: [Channel]?
+        provider.onStoreChannels = { pageChannels, storedChannels in
+            page = pageChannels
+            stored = storedChannels
+        }
+        provider.store(channels: self.page(of: 25)) { _ in pageDone.fulfill() }
+        // The channel is not stored yet (the page creates it), so `deleteChannel(id:)` finds no
+        // row and records the id at once. `deleteChannel` itself cannot run here: its message
+        // cleanup merges into `SceytChatUIKit.shared.database`, which a test store cannot share.
+        database.write({ _ in DeletedChannelLog.record([lastId]) }, completion: { _ in deleteDone.fulfill() })
+        wait(for: [pageDone, deleteDone], timeout: defaultWaitTimeout)
+
+        XCTAssertNil(storedChannel(id: lastId), "the deleted channel must stay deleted")
+        XCTAssertEqual(storedChannelCount(), 24)
+        XCTAssertEqual(page?.count, 25, "paging and the sweep still see the whole page")
+        XCTAssertEqual(stored?.map(\.id).contains(lastId), false,
+                       "the deleted channel gets no message catch-up")
+        XCTAssertEqual(stored?.count, 24)
+    }
+
+    /// A stored channel deleted between two chunks: the delete is recorded when its save commits.
+    func testStoredChannelDeletedBetweenChunks_isNotBroughtBack() {
+        let lastId = ChannelId(10_025)
+        let ctx = inner.backgroundPerformContext
+        ctx.performAndWait {
+            ctx.createOrUpdate(channel: plainChannel(id: lastId))
+            try? ctx.save()
+        }
+        let pageDone = expectation(description: "page stored")
+        let deleteDone = expectation(description: "delete stored")
+
         ChannelListProvider().store(channels: page(of: 25)) { _ in pageDone.fulfill() }
-        // `deleteChannel(id:)` records the delete and removes the row. It also merges into
-        // `SceytChatUIKit.shared.database`, which an in-memory test store cannot share, so this
-        // does the first two steps the same way.
+        // What `deleteChannel(id:)` does to a stored row (minus its merge into
+        // `SceytChatUIKit.shared.database`, which a test store cannot share).
         database.write({ ctx in
-            DeletedChannelLog.record(lastId)
             ChannelDTO.fetch(id: lastId, context: ctx).map(ctx.delete)
         }, completion: { _ in deleteDone.fulfill() })
         wait(for: [pageDone, deleteDone], timeout: defaultWaitTimeout)
 
         XCTAssertNil(storedChannel(id: lastId), "the deleted channel must stay deleted")
         XCTAssertEqual(storedChannelCount(), 24)
+    }
+
+    /// A delete that rolls back is not recorded: the channel still exists and later chunks must
+    /// keep updating it.
+    func testRolledBackDelete_doesNotSkipTheChannel() {
+        let pageDone = expectation(description: "page stored")
+        let deleteDone = expectation(description: "delete rolled back")
+        let lastId = ChannelId(10_025)
+        let channels = page(of: 25)
+        channels.last?.setValue("from page", forKey: "subject")
+
+        ChannelListProvider().store(channels: channels) { _ in pageDone.fulfill() }
+        database.write({ ctx in
+            ctx.createOrUpdate(channel: self.plainChannel(id: lastId))
+            ChannelDTO.fetch(id: lastId, context: ctx).map(ctx.delete)
+            // The write fails, as `PersistentContainer.write` does on an error: nothing is saved.
+            ctx.rollback()
+            throw NSError(domain: "test", code: 1)
+        }, completion: { _ in deleteDone.fulfill() })
+        wait(for: [pageDone, deleteDone], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(storedChannel(id: lastId)?.subject, "from page")
+        XCTAssertEqual(storedChannelCount(), 25)
+    }
+
+    /// A newer copy that was already stored before the page started is updated by the page as
+    /// usual: only changes made while the page is being stored are protected.
+    func testNewerCopyStoredBeforeThePage_isStillUpdatedByIt() {
+        let lastId = ChannelId(10_025)
+        let before = plainChannel(id: lastId)
+        before.setValue(Date(timeIntervalSince1970: 1_790_000_100), forKey: "updatedAt")
+        before.setValue("before", forKey: "subject")
+        let ctx = inner.backgroundPerformContext
+        ctx.performAndWait {
+            ctx.createOrUpdate(channel: before)
+            try? ctx.save()
+        }
+        let channels = page(of: 25)
+        channels.last?.setValue(Date(timeIntervalSince1970: 1_790_000_000), forKey: "updatedAt")
+        channels.last?.setValue("from page", forKey: "subject")
+
+        let done = expectation(description: "page stored")
+        ChannelListProvider().store(channels: channels) { _ in done.fulfill() }
+        wait(for: [done], timeout: defaultWaitTimeout)
+
+        XCTAssertEqual(storedChannel(id: lastId)?.subject, "from page")
     }
 
     /// An update event stored between two chunks is newer than the page and must not be
@@ -261,7 +338,7 @@ final class ChannelListStoreWriteContextTests: XCTestCase {
         database.failingWriteNumber = 2
         let provider = ChannelListProvider()
         var reported = false
-        provider.onStoreChannels = { _ in reported = true }
+        provider.onStoreChannels = { _, _ in reported = true }
         let done = expectation(description: "page stored")
         var reportedError: Error?
         provider.store(channels: page(of: 25)) { error in

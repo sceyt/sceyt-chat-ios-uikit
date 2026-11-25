@@ -96,8 +96,7 @@ open class ChannelMessageSender: DataProvider {
             self.attachmentTransfer.messageWasSent(ChatMessage(message: message, channelId: self.channelId))
             let sendAckTid = sentMessage.tid
             var suppressedDelete: PendingMessageDelete?
-            // `database.write` can report completion twice (see `OneShotCompletion`), and this one
-            // starts a network request, so it must not be repeated.
+            // Starts a network request, so it must never run twice (see `OneShotCompletion`).
             let flushOnce = OneShotCompletion { [weak self] _ in
                 guard let self, let suppressedDelete else { return }
                 self.flushPendingDelete(suppressedDelete, force: true)
@@ -246,8 +245,7 @@ open class ChannelMessageSender: DataProvider {
                     self.attachmentTransfer.messageWasSent(chatMessage)
                     let resendAckTid = sentMessage.tid
                     var suppressedDelete: PendingMessageDelete?
-                    // `database.write` can report completion twice (see `OneShotCompletion`), and
-                    // this one starts a network request, so it must not be repeated.
+                    // Starts a network request, so it must never run twice (see `OneShotCompletion`).
                     let flushOnce = OneShotCompletion { [weak self] _ in
                         guard let self, let suppressedDelete else { return }
                         self.flushPendingDelete(suppressedDelete, force: true)
@@ -420,7 +418,7 @@ open class ChannelMessageSender: DataProvider {
         }
         logger.info("Deleting message with id \(id) in channel \(channelId), type \(type.rawValue)")
         var record: PendingMessageDelete?
-        // The write completion can fire twice on a save error and this one sends a request.
+        // Sends a request, so it must never run twice (see `OneShotCompletion`).
         let once = OneShotCompletion { [weak self] dbError in
             guard let self else {
                 completion?(dbError)
@@ -480,7 +478,7 @@ open class ChannelMessageSender: DataProvider {
         let tid = pendingMessage.tid
         logger.info("Deleting pending message with tid \(tid) in channel \(channelId), type \(type.rawValue)")
         var record: PendingMessageDelete?
-        // The write completion can fire twice on a save error and this one sends a request.
+        // Sends a request, so it must never run twice (see `OneShotCompletion`).
         let once = OneShotCompletion { [weak self] dbError in
             guard let self, let record else {
                 logger.errorIfNotNil(dbError, "Storing pending delete for tid \(tid) failed")
