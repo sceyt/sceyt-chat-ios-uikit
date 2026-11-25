@@ -273,18 +273,16 @@ public extension MessageDTO {
         let autoDeletePredicate = NSPredicate(format: "autoDeleteAt == nil OR autoDeleteAt > %@", threshold)
         let combinedPredicate = NSCompoundPredicate(andPredicateWithSubpredicates: [predicate, autoDeletePredicate])
 
-        let result = MessageDTO
-            .maxExpression(
-                keyPaths: ["createdAt"],
-                predicate: combinedPredicate,
-                context: context,
-                resultType: .managedObjectIDResultType,
-                expressionResultType: .objectIDAttributeType
-            )
-        if let result = result as? [NSManagedObjectID],
-           let objectId = result.last {
-            return context.object(with: objectId) as? MessageDTO
-        }
-        return nil
+        // A sorted fetch, not a `max:` expression: with `.managedObjectIDResultType` Core Data
+        // ignores `propertiesToFetch`, so that returned every matching row in no defined order
+        // and `.last` was an arbitrary message (often the oldest). Same order as the list.
+        let request = MessageDTO.fetchRequest()
+        request.predicate = combinedPredicate
+        request.sortDescriptors = [
+            NSSortDescriptor(keyPath: \MessageDTO.createdAt, ascending: false),
+            NSSortDescriptor(keyPath: \MessageDTO.id, ascending: false)
+        ]
+        request.fetchLimit = 1
+        return (try? context.fetch(request))?.first
     }
 }

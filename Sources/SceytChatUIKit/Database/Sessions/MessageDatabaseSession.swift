@@ -116,6 +116,8 @@ public protocol MessageDatabaseSession {
     func deleteMessage(id: MessageId)
     func deleteMessage(tid: Int64)
     func deleteMessage(tid: Int64, channelId: ChannelId)
+    @discardableResult
+    func deleteMessagesMissing(from page: MessagePageReconciliation) -> [MessageId]
     func deleteReaction(id: ReactionId)
     func deleteNotExistReactions(_ reactions: [Reaction])
     func deleteAttachmentsFor(messageId: MessageId)
@@ -1042,24 +1044,31 @@ extension NSManagedObjectContext: MessageDatabaseSession {
 
     public func deleteMessage(id: MessageId) {
         if let dto = MessageDTO.fetch(id: id, context: self) {
-            if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self), channel.lastMessage == dto {
-                let predicate = NSPredicate(format: "channelId == %lld AND id != %lld", channel.id, id)
-                channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
-                
-                if let lastMessage = channel.lastMessage,
-                   lastMessage.id != 0
+            deleteMessage(dto)
+        }
+    }
+
+    /// `deleteMessage(id:)` for a row already in hand: moves the channel's last message off it,
+    /// drops its pin, deletes it.
+    func deleteMessage(_ dto: MessageDTO) {
+        let id = dto.id
+        if let channel = ChannelDTO.fetch(id: ChannelId(dto.channelId), context: self), channel.lastMessage == dto {
+            let predicate = NSPredicate(format: "channelId == %lld AND id != %lld", channel.id, id)
+            channel.lastMessage = MessageDTO.lastMessage(predicate: predicate, context: self)
+            
+            if let lastMessage = channel.lastMessage,
+               lastMessage.id != 0
+            {
+                let reactionPredicate = NSPredicate(format: "channelId == %lld AND message.incoming = false", channel.id)
+                if let lastReaction = ReactionDTO.lastReaction(predicate: reactionPredicate, context: self),
+                   lastMessage.id < lastReaction.id
                 {
-                    let reactionPredicate = NSPredicate(format: "channelId == %lld AND message.incoming = false", channel.id)
-                    if let lastReaction = ReactionDTO.lastReaction(predicate: reactionPredicate, context: self),
-                       lastMessage.id < lastReaction.id
-                    {
-                        channel.lastReaction = lastReaction
-                    }
+                    channel.lastReaction = lastReaction
                 }
             }
-            dropPin(for: dto)
-            delete(dto)
         }
+        dropPin(for: dto)
+        delete(dto)
     }
 
     public func deleteMessage(tid: Int64) {
@@ -1601,5 +1610,76 @@ private extension AttachmentDTO {
         else { return nil }
         rows.removeAll { $0 == match }
         return match
+    }
+}
+
+// MARK: - Server page reconciliation
+
+/// What one server page of channel messages proves about the rows already stored.
+///
+/// The server returns a contiguous slice of the channel, so a stored row whose id sits inside
+/// the slice but is not in it was hard-deleted on the server. When the page also reached the end
+/// of the history in a direction, every stored row beyond it in that direction is gone too.
+/// This is the only cleanup a missed hard-delete event ever gets.
+public struct MessagePageReconciliation {
+    public let channelId: ChannelId
+    /// Ids the server returned in the page.
+    public let serverIds: Set<MessageId>
+    /// Newest stored id when the request was sent. Rows above it were stored after the request
+    /// (a message event that raced the page), so the page proves nothing about them.
+    public let newestStoredIdBeforeRequest: MessageId
+    /// The server has nothing older than the page.
+    public let reachedOldest: Bool
+    /// The server has nothing newer than the page.
+    public let reachedNewest: Bool
+
+    public init(
+        channelId: ChannelId,
+        serverIds: Set<MessageId>,
+        newestStoredIdBeforeRequest: MessageId,
+        reachedOldest: Bool,
+        reachedNewest: Bool
+    ) {
+        self.channelId = channelId
+        self.serverIds = serverIds
+        self.newestStoredIdBeforeRequest = newestStoredIdBeforeRequest
+        self.reachedOldest = reachedOldest
+        self.reachedNewest = reachedNewest
+    }
+}
+
+extension NSManagedObjectContext {
+
+    /// Deletes stored messages of a channel's main list that `page` proves no longer exist on
+    /// the server. Returns the deleted ids.
+    ///
+    /// Left alone: pending rows (`id == 0`), thread replies and unlisted rows (a channel page
+    /// may not return them), and rows stored after the request was sent.
+    @discardableResult
+    public func deleteMessagesMissing(from page: MessagePageReconciliation) -> [MessageId] {
+        let serverIds = page.serverIds.filter { $0 > 0 }
+        guard let serverMin = serverIds.min(),
+              let serverMax = serverIds.max(),
+              page.newestStoredIdBeforeRequest > 0
+        else { return [] }
+
+        let lower: MessageId = page.reachedOldest ? 1 : serverMin
+        let upper: MessageId = page.reachedNewest
+            ? page.newestStoredIdBeforeRequest
+            : min(serverMax, page.newestStoredIdBeforeRequest)
+        guard lower <= upper else { return [] }
+
+        let request = MessageDTO.fetchRequest()
+        request.predicate = NSPredicate(
+            format: "channelId == %lld AND id >= %lld AND id <= %lld AND NOT (id IN %@) AND unlisted != YES AND repliedInThread != YES",
+            Int64(page.channelId),
+            Int64(lower),
+            Int64(upper),
+            serverIds.map { NSNumber(value: Int64($0)) }
+        )
+        let missing = MessageDTO.fetch(request: request, context: self)
+        let missingIds = missing.map { MessageId($0.id) }
+        missing.forEach { deleteMessage($0) }
+        return missingIds
     }
 }

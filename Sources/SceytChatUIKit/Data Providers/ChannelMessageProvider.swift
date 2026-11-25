@@ -58,6 +58,7 @@ open class ChannelMessageProvider: DataProvider {
         completion: ((Error?) -> Void)? = nil
     ) {
         if !query.loading {
+            let reconcile = self.pageReconciler(source: .next, anchor: nil, limit: query.limit)
             loadNextMessagesWithRetry(query: query, messageId: nil)
             { messages, error in
                 guard let messages = messages
@@ -67,6 +68,7 @@ open class ChannelMessageProvider: DataProvider {
                 }
                 self.store(
                     messages: messages,
+                    reconciliation: reconcile(messages, query.hasNext),
                     completion: { error in
                         completion?(error)
                     }
@@ -94,6 +96,7 @@ open class ChannelMessageProvider: DataProvider {
         after messageId: MessageId,
         completion: ((Error?) -> Void)? = nil) {
             if !query.loading {
+                let reconcile = self.pageReconciler(source: .nextAfter, anchor: messageId, limit: query.limit)
                 loadNextMessagesWithRetry(query: query, messageId: messageId)
                 { messages, error in
                     guard let messages = messages
@@ -104,6 +107,7 @@ open class ChannelMessageProvider: DataProvider {
                     self.store(
                         messages: messages,
                         triggerMessage: messageId,
+                        reconciliation: reconcile(messages, query.hasNext),
                         completion: { error in
                             completion?(error)
                         }
@@ -129,6 +133,7 @@ open class ChannelMessageProvider: DataProvider {
         completion: ((Error?) -> Void)? = nil
     ) {
         if !query.loading {
+            let reconcile = self.pageReconciler(source: .prev, anchor: nil, limit: query.limit)
             loadPrevMessagesWithRetry(query: query, messageId: nil)
             { messages, error in
                 guard let messages = messages
@@ -138,6 +143,7 @@ open class ChannelMessageProvider: DataProvider {
                 }
                 self.store(
                     messages: messages,
+                    reconciliation: reconcile(messages, query.hasNext),
                     completion: completion
                 )
                 self.sendReceivedMarker(messages: messages)
@@ -163,6 +169,7 @@ open class ChannelMessageProvider: DataProvider {
         before messageId: MessageId,
         completion: ((Error?) -> Void)? = nil) {
             if !query.loading {
+                let reconcile = self.pageReconciler(source: .prevBefore, anchor: messageId, limit: query.limit)
                 loadPrevMessagesWithRetry(query: query, messageId: messageId)
                 { messages, error in
                     guard let messages = messages
@@ -173,6 +180,7 @@ open class ChannelMessageProvider: DataProvider {
                     self.store(
                         messages: messages,
                         triggerMessage: messageId,
+                        reconciliation: reconcile(messages, query.hasNext),
                         completion: completion
                     )
                     self.sendReceivedMarker(messages: messages)
@@ -197,6 +205,7 @@ open class ChannelMessageProvider: DataProvider {
         query: MessageListQuery,
         near messageId: MessageId,
         completion: (([Message]?, Error?) -> Void)? = nil) {
+            let reconcile = self.pageReconciler(source: .near, anchor: messageId, limit: query.limit)
             loadNearMessagesWithRetry(query: query, messageId: messageId)
             { messages, error in
                 guard let messages = messages
@@ -206,6 +215,7 @@ open class ChannelMessageProvider: DataProvider {
                 }
                 self.store(
                     messages: messages,
+                    reconciliation: reconcile(messages, query.hasNext),
                     completion: { _ in
                         completion?(messages, nil)
                     }
@@ -297,9 +307,15 @@ open class ChannelMessageProvider: DataProvider {
     }
 
     // TODO: Optimize this
+    /// Stores a server page and, when `reconciliation` is given, deletes in the same write the
+    /// stored rows the page proves are gone on the server (hard deletes whose event was missed).
+    ///
+    /// One method with a defaulted parameter, not an overload: every page load and every other
+    /// caller goes through it, so a subclass override sees them all.
     open func store(
         messages: [Message],
         triggerMessage: MessageId? = nil,
+        reconciliation: MessagePageReconciliation? = nil,
         completion: ((Error?) -> Void)? = nil
     ) {
         let startMessageId = messages.min(by: { $0.id < $1.id})?.id
@@ -309,6 +325,9 @@ open class ChannelMessageProvider: DataProvider {
                 messages: messages,
                 channelId: self.channelId
             )
+            if let reconciliation {
+                $0.deleteMessagesMissing(from: reconciliation)
+            }
         }) { error in
             // The range is written on its own context, unordered against the message
             // write above, and every caller re-anchors the observer from `completion` —
@@ -1149,5 +1168,104 @@ private extension ChannelMessageProvider {
             guard !ids.isEmpty else { return }
             self.markMessagesAsReceived(ids: ids)
         }
+    }
+}
+
+// MARK: - Hard-delete reconciliation
+
+extension ChannelMessageProvider {
+
+    /// Which load produced a server page — decides what the page proves about its edges.
+    public enum PageSource {
+        case next, nextAfter, prev, prevBefore, near
+    }
+
+    /// The `before:` anchor that asks for the latest page of a channel.
+    public static let latestPageAnchor = MessageId(Int64.max)
+
+    /// Reads the newest stored id now, before the request is sent, and returns what turns the
+    /// page into a reconciliation once it arrives. One call per load keeps the snapshot and the
+    /// page's source/anchor together.
+    public func pageReconciler(
+        source: PageSource,
+        anchor: MessageId?,
+        limit: UInt
+    ) -> (_ messages: [Message], _ hasMore: Bool) -> MessagePageReconciliation? {
+        let newestStoredId = newestStoredMessageId()
+        return { [weak self] messages, hasMore in
+            self?.pageReconciliation(
+                source: source,
+                anchor: anchor,
+                limit: limit,
+                messages: messages,
+                hasMore: hasMore,
+                newestStoredId: newestStoredId
+            )
+        }
+    }
+
+    /// Newest stored id of the channel, read before a page request is sent. Rows stored after
+    /// it (a message event racing the request) are never reconciled against that page.
+    /// `nil` for thread lists, which are not reconciled.
+    ///
+    /// On main this reads `viewContext` inline; off main the read-only background context.
+    /// Neither is the writer nor the shared observable context, so it cannot deadlock. If
+    /// `viewContext` has not merged the newest write yet the id is lower than the truth, which
+    /// only makes the reconciliation delete less.
+    public func newestStoredMessageId() -> MessageId? {
+        guard threadMessageId == nil else { return nil }
+        let channelId = self.channelId
+        let result = database.read { context -> MessageId? in
+            let request = MessageDTO.fetchRequest()
+            request.predicate = NSPredicate(format: "channelId == %lld AND id > 0", Int64(channelId))
+            request.sortDescriptor = NSSortDescriptor(keyPath: \MessageDTO.id, ascending: false)
+            request.fetchLimit = 1
+            return MessageDTO.fetch(request: request, context: context).first.map { MessageId($0.id) }
+        }
+        return (try? result.get()) ?? nil
+    }
+
+    /// What a page of `messages` from `source` proves, or `nil` when it proves nothing safe to
+    /// act on: thread lists, an empty page (never wipe local history on an empty response),
+    /// or an empty channel before the request.
+    public func pageReconciliation(
+        source: PageSource,
+        anchor: MessageId?,
+        limit: UInt,
+        messages: [Message],
+        hasMore: Bool,
+        newestStoredId: MessageId?
+    ) -> MessagePageReconciliation? {
+        guard threadMessageId == nil,
+              let newestStoredId,
+              !messages.isEmpty
+        else { return nil }
+        // The end of the history in the load direction needs both signals: the page came back
+        // short of `limit` AND the query says there is nothing more (`hasNext`, which follows
+        // the load direction). Short alone is not enough: if the server capped pages below our
+        // `limit`, every page would look short and an edge would wipe all history past it.
+        let isLastPage = messages.count < Int(limit) && !hasMore
+        let reachedOldest: Bool
+        let reachedNewest: Bool
+        switch source {
+        case .prev, .prevBefore:
+            reachedOldest = isLastPage
+            // `before: Int64.max` asks for the latest page: nothing exists above it.
+            reachedNewest = source == .prevBefore && anchor == Self.latestPageAnchor
+        case .next, .nextAfter:
+            reachedOldest = false
+            reachedNewest = isLastPage
+        case .near:
+            // A short near-page could have run out on either side; prove nothing past it.
+            reachedOldest = false
+            reachedNewest = false
+        }
+        return MessagePageReconciliation(
+            channelId: channelId,
+            serverIds: Set(messages.map(\.id)),
+            newestStoredIdBeforeRequest: newestStoredId,
+            reachedOldest: reachedOldest,
+            reachedNewest: reachedNewest
+        )
     }
 }
